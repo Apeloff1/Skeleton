@@ -642,6 +642,10 @@ class FrameReceiptJournal:
                     max_speed_mps=self.max_speed_mps)
                 if expected_transition!=native_transition:
                     raise FrameJournalError("native timeline transition source forged")
+            from .game_frontier_native_fields import inspect_native_force_fields
+            native_fields=inspect_native_force_fields(
+                native,previous=self.native_sample(index-1) if index else None
+            ) if native is not None else None
             from .game_frontier_native_zones import inspect_native_gameplay_zones
             zone_proof=inspect_native_gameplay_zones(
                 native,previous=self.native_sample(index-1) if index else None
@@ -670,6 +674,12 @@ class FrameReceiptJournal:
                     dynamics["receipt_digest"] if dynamics else None),
                 "native_zone_evidence_digest":(
                     zone_proof["receipt_digest"] if zone_proof else None),
+                "native_field_evidence_digest":(
+                    native_fields["receipt_digest"] if native_fields else None),
+                "native_field_step_forces":(
+                    [force for force in native["previous_step_field_forces"]
+                     if actor_id is None or force["actor_id"]==actor_id]
+                    if native_fields else []),
                 "native_zone_occupant_count":(
                     sum(1 for zone in native["native_zone_occupancy"]
                         if actor_id is None or zone["actor_id"]==actor_id)

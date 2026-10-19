@@ -48,6 +48,7 @@ STUDIO_TOOLS = (
     "native_3d_trigger_volume_editor", "authored_quest_zone_bindings",
     "native_zone_event_timeline_inspector",
     "native_runtime_rpg_event_compiler", "native_physics_sensor_bindings",
+    "native_3d_airflow_field_editor", "native_rigid_body_field_receipt_inspector",
 )
 
 
@@ -170,6 +171,31 @@ class StudioTriggerVolume:
 
 
 @dataclass(frozen=True)
+class StudioForceField:
+    """Authored, physically active 3D field anchored to an existing placement."""
+    field_id: str
+    actor_entity_id: str
+    kind: str
+    radius_m: float
+    acceleration_mps2: float
+    center_offset_xyz_m: tuple[float,float,float] = (0.,0.,0.)
+
+    def __post_init__(self):
+        from skeleton.jeeves.game_frontier_native_fields import (
+            normalize_native_force_fields,NativeForceFieldError,
+        )
+        try:
+            normalize_native_force_fields(({
+                "id":self.field_id,"actor_id":self.actor_entity_id,
+                "kind":self.kind,"radius_m":self.radius_m,
+                "acceleration_mps2":self.acceleration_mps2,
+                "center_xyz_m":self.center_offset_xyz_m,
+            },))
+        except NativeForceFieldError as exc:
+            raise StudioError("invalid Studio field type, mass force or coordinate bounds") from exc
+
+
+@dataclass(frozen=True)
 class StudioProject:
     project_id: str
     target_era: str
@@ -183,6 +209,7 @@ class StudioProject:
     environmental_pages: tuple[RPGEventPage, ...] = ()
     virtual_game_map: GameMap | None = None
     native_trigger_volumes: tuple[StudioTriggerVolume,...] = ()
+    native_gameplay_force_fields: tuple[StudioForceField,...] = ()
 
     def __post_init__(self):
         if not self.project_id or len(self.project_id)>128:
@@ -214,12 +241,23 @@ class StudioProject:
             any(not isinstance(zone,StudioTriggerVolume)
                 for zone in self.native_trigger_volumes)):
             raise StudioError("at most 64 typed native game zones")
+        if (type(self.native_gameplay_force_fields) is not tuple or
+            len(self.native_gameplay_force_fields)>64 or
+            any(not isinstance(field,StudioForceField)
+                for field in self.native_gameplay_force_fields)):
+            raise StudioError("bounded typed gameplay force field catalog required")
+        field_ids=[field.field_id for field in self.native_gameplay_force_fields]
+        if len(field_ids)!=len(set(field_ids)):
+            raise StudioError("duplicate Studio gameplay force field")
         zones=[z.zone_id for z in self.native_trigger_volumes]
         if len(set(zones))!=len(zones):
             raise StudioError("duplicate authored gameplay zone")
         actor_sources={
             placement.prefab_id+":"+str(index):placement.prefab_id
             for index,placement in enumerate(self.placements)}
+        if any(field.actor_entity_id not in actor_sources
+               for field in self.native_gameplay_force_fields):
+            raise StudioError("gameplay force field actor has no placed source prefab")
         authored_events={e.event_id:e for e in self.events}
         for zone in self.native_trigger_volumes:
             event=authored_events.get(zone.event_page_id)
@@ -260,6 +298,12 @@ class StudioProject:
                 "event_page_id":zone.event_page_id,"radius_m":zone.radius_m,
                 "offset_xyz_m":list(zone.offset_xyz_m),
             } for zone in self.native_trigger_volumes],
+            "native_gameplay_force_fields":[{
+                "id":field.field_id,"actor_id":field.actor_entity_id,
+                "kind":field.kind,"radius_m":field.radius_m,
+                "acceleration_mps2":field.acceleration_mps2,
+                "offset_xyz_m":list(field.center_offset_xyz_m),
+            } for field in self.native_gameplay_force_fields],
             "soundtrack":self.soundtrack_ids,
             "virtual_game_map": ({
                 "world_id":self.virtual_game_map.world_id,
@@ -321,6 +365,48 @@ def compile_studio_gameplay_zones(project: StudioProject) -> dict:
         "zone_count":len(catalog),
         "available_action_preview_only":True,
         "authority":"studio_authored_zone_candidate_no_world_mutation",
+    }
+    report["receipt_digest"]=sha256(json.dumps(
+        report,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+    return report
+
+
+def compile_studio_gameplay_force_fields(project: StudioProject) -> dict:
+    """Materialize native engine forces around authored placed Studio actors.
+
+    Emit the exact typed `native_gameplay_force_fields` argument accepted
+    by the Godot exporter, with a Studio manifest provenance receipt.
+    """
+    from skeleton.jeeves.game_frontier_native_fields import (
+        normalize_native_force_fields,NativeForceFieldError,
+    )
+    if not isinstance(project,StudioProject):
+        raise StudioError("typed source Studio project required")
+    placements={
+        placement.prefab_id+":"+str(index):placement
+        for index,placement in enumerate(project.placements)}
+    source=[]
+    for field in project.native_gameplay_force_fields:
+        location=placements[field.actor_entity_id]
+        center=[a+b for a,b in zip(
+            (location.x,location.y,location.z),field.center_offset_xyz_m)]
+        source.append({
+            "id":field.field_id,"actor_id":field.actor_entity_id,
+            "kind":field.kind,
+            "center_xyz_m":center,"radius_m":field.radius_m,
+            "acceleration_mps2":field.acceleration_mps2,
+        })
+    try:
+        normalized=normalize_native_force_fields(
+            source,allowed_actors=set(placements))
+    except NativeForceFieldError as exc:
+        raise StudioError("native runtime field source invalid") from exc
+    report={
+        "schema":"skeleton.forge.studio_native_fields.v1",
+        "project_id":project.project_id,
+        "studio_manifest_digest":compile_studio_project(project)["content_sha256"],
+        "fields":normalized,"field_count":len(normalized),
+        "authority":"source_authored_physics_candidate_no_canon_mutation",
     }
     report["receipt_digest"]=sha256(json.dumps(
         report,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()

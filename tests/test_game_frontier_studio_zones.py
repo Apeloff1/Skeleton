@@ -4,7 +4,8 @@ from dataclasses import replace
 
 from skeleton.forge.game_frontier_studio import (
     StudioProject,StudioPrefab,StudioEvent,StudioPlacement,StudioTriggerVolume,
-    compile_studio_native_rpg_pages,
+    compile_studio_native_rpg_pages,StudioForceField,
+    compile_studio_gameplay_force_fields,
     MapLayer,StudioError,compile_studio_gameplay_zones,compile_studio_project,STUDIO_TOOLS,
 )
 from skeleton.jeeves.game_frontier_worlds import ProjectionMode,WorldFamily
@@ -147,3 +148,53 @@ class StudioNativeRPGPageCompilationTests(unittest.TestCase):
         report["pages"][0]["priority"]=90
         with self.assertRaises(NativeRPGBridgeError):
             parse_native_rpg_pages(report)
+
+class StudioGameplayForceTests(unittest.TestCase):
+    def test_real_placement_compiles_native_thermal_and_current(self):
+        from skeleton.jeeves.game_frontier_native_fields import (
+            normalize_native_force_fields,calculated_native_field_force,
+        )
+        source=replace(authored(),native_gameplay_force_fields=(
+            StudioForceField("thermal_updraft","hero:0","updraft",5.,9.8),
+            StudioForceField("current","hero:0","eastward_current",3.,4.,
+                             (2.,0.,0.)),
+        ))
+        fields=compile_studio_gameplay_force_fields(source)
+        self.assertEqual(fields["field_count"],2)
+        self.assertEqual(fields["fields"],normalize_native_force_fields(fields["fields"]))
+        self.assertEqual(fields["fields"][0]["center_xyz_m"],[4.,3.,4.])
+        self.assertEqual(fields["fields"][1]["center_xyz_m"],[2.,3.,4.])
+        self.assertGreater(calculated_native_field_force(
+            fields["fields"][1],[2.,3.,4.],85.)[2],800.)
+        self.assertEqual(fields,compile_studio_gameplay_force_fields(source))
+        self.assertEqual(len(fields["studio_manifest_digest"]),64)
+        self.assertEqual(compile_studio_project(source)["native_gameplay_force_fields"][0][
+            "id"],"thermal_updraft")
+        self.assertIn("native_3d_airflow_field_editor",STUDIO_TOOLS)
+
+    def test_invalid_fields_rejected_before_export(self):
+        for kwargs in (
+            {"radius_m":0.},
+            {"acceleration_mps2":100.},
+            {"kind":"model_authored_script"},
+            {"actor_entity_id":"unplaced:8"},
+            {"center_offset_xyz_m":(float("nan"),0.,0.)},
+        ):
+            source=dict(field_id="a",actor_entity_id="hero:0",
+                        kind="updraft",radius_m=5.,acceleration_mps2=3.)
+            source.update(kwargs)
+            try:
+                field=StudioForceField(**source)
+            except StudioError:
+                continue
+            with self.assertRaises(StudioError):
+                replace(authored(),native_gameplay_force_fields=(field,))
+        field=StudioForceField("same","hero:0","vortex",3.,4.)
+        with self.assertRaises(StudioError):
+            replace(authored(),native_gameplay_force_fields=(field,field))
+
+    def test_legacy_studio_remains_compatible_with_new_physics_editor(self):
+        initial=authored()
+        report=compile_studio_gameplay_force_fields(initial)
+        self.assertEqual(report["fields"],[])
+        self.assertEqual(report["field_count"],0)
