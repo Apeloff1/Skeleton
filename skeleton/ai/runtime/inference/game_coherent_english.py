@@ -138,6 +138,10 @@ FOCUS: dict[str, str] = {
     "cave_map": "The rule is that the cave map of the {place} starts at one entrance and every floor step connects back to that entrance.",
     "elevation_map": "The rule is that the elevation map of the {place} stores a height on every cell, and a walk uses that height rather than the picture.",
     "adventure_map": "The rule is that the adventure map of the {place} links screens across seams, and a large height change is a stair rather than a silent step.",
+    "homebrew_map": "The rule is that the homebrew map of the {place} has one home cell and a maker key, and every trail connects back to that home.",
+    "tabletop_map": "The rule is that the tabletop map of the {place} uses one square scale, and cover stops a shot without blocking a step.",
+    "dungeon_map": "The rule is that the dungeon map of the {place} links original rooms by doors, and every room connects back to the entry.",
+    "jeeves_cognition": "The rule is that Jeeves keeps a claim about the {place} uncertain until the {asset} evidence is written, and a missing observation does not become a fact.",
 }
 
 

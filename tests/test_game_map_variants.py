@@ -27,8 +27,8 @@ from skeleton.ai.runtime.inference.game_map_variants import (
 
 def test_every_family_has_a_valid_variant_and_no_reserved_name():
     report = validate_maps()
-    assert report["families"] == 5
-    assert report["checked"] == 20
+    assert report["families"] == 8
+    assert report["checked"] == 32
     assert validate_passages()["domains"] == len(TEMPLATES)
     for family in FAMILIES:
         text = render_map(family, 0)
@@ -40,6 +40,9 @@ def test_every_family_has_a_valid_variant_and_no_reserved_name():
             assert name not in lowered
     assert "sea_map" in TEMPLATES
     assert "adventure_map" in TEMPLATES
+    assert "homebrew_map" in TEMPLATES
+    assert "dungeon_map" in TEMPLATES
+    assert "jeeves_cognition" in TEMPLATES
     assert half_weights()["sea_map"] >= 2.0
     assert half_weights()["legal"] == 3.0
 
@@ -101,6 +104,18 @@ def test_a_short_map_budget_trains_without_promoting():
     assert set(receipt["families"]) == set(FAMILIES)
     assert "maps" in receipt["official_tracks"]
     assert BILLION_MAPS == 1_000_000_000
+    homebrew = render_map("homebrew_map", 0)
+    tabletop = render_map("tabletop_map", 1)
+    dungeon = render_map("dungeon_map", 2)
+    assert assess_map(homebrew)["valid"] is True
+    assert assess_map(tabletop)["valid"] is True
+    assert assess_map(dungeon)["valid"] is True
+    assert "Home is one cell" in homebrew
+    assert "five feet" in tabletop
+    assert "Doors " in dungeon
+    blob = "\n".join((homebrew, tabletop, dungeon)).lower()
+    for name in ("dnd", "dungeons and dragons", "forgotten realms", "beholder", *RESERVED_NAMES):
+        assert name not in blob
 
 
 def test_a_time_cap_stops_before_the_billion_and_resumes():
