@@ -226,7 +226,9 @@ def test_incomplete_or_contradictory_negative_results_cannot_be_compacted(negati
     # A forged note for a contradictory result is rejected by the separate
     # source-scope verifier even when the tool says 'no_results'.
     prior = WorkingContextCycle().prepare(goal(), (miss(),))
-    forged = replace(prior, notes=(replace(prior.notes[0], call_id="search-partial"),))
+    forged = replace(prepared, notes=(
+        replace(prior.notes[0], call_id="search-partial"),
+    ))
     with pytest.raises(ValueError, match="independently confirmed no-found"):
         ScopeVerifier.verify(forged, goal(), (observation,))
 
