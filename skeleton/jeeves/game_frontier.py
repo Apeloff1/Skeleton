@@ -30,6 +30,8 @@ class FrontierSceneCandidate:
     geometry_vertices: tuple
     moved_clouds: tuple[Cloud, ...]
     approved_for_runtime: bool = False
+    geometry_triangles: tuple[tuple[int, int, int], ...] = ()
+    geometry_colliders: tuple = ()
 
 
 def compile_frontier_scene(
@@ -132,4 +134,5 @@ def compile_frontier_scene(
     }
     digest = sha256(json.dumps(manifest, sort_keys=True,
                                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
-    return FrontierSceneCandidate(manifest, digest, vertices, moved)
+    return FrontierSceneCandidate(manifest, digest, vertices, moved,
+                                  False, mesh.triangles, mesh.colliders)
