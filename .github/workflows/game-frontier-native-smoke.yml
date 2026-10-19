@@ -360,6 +360,8 @@ jobs:
           assert proof["verified_rpg_level"]==2, proof
           assert proof["verified_unlocked_skills"]==1, proof
           assert proof["verified_faction_standings"]==1, proof
+          assert len(proof["independent_progression_receipt"])==64, proof
+          assert len(proof["independent_local_effect_receipt"])==64, proof
           assert proof["verified_local_health"]==88, proof
           assert proof["verified_local_effects"]==3, proof
           assert proof["verified_health_visual_effects"]==2, proof
