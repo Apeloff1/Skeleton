@@ -144,7 +144,12 @@ class PreparedDelivery:
         return canonical_json({
             "kind": "temporary_run_working_memory",
             "scope": "This attempt did not find a match, not proof of absence.",
-            "notes": [note.text for note in self.notes],
+            "notes": [note.text for note in self.notes[-16:]],
+            "older_note_count": max(0, len(self.notes) - 16),
+            "older_notes_digest": stable_fingerprint([
+                note.fingerprint for note in self.notes[:-16]
+            ]),
+            "total_note_count": len(self.notes),
             "original_user_goal_digest": self.goal_digest,
             "reclaimed_chars_estimate": self.freed_chars,
             "page_counter": self.page_count,
@@ -157,8 +162,8 @@ class PreparedDelivery:
 class WorkingContextCycle:
     """Pre-delivery compaction and verified hand-off; never edits the source ledger."""
 
-    def __init__(self, *, max_notes: int = 64, max_refill_chars: int = 4096) -> None:
-        if not isinstance(max_notes, int) or isinstance(max_notes, bool) or not 1 <= max_notes <= 4096:
+    def __init__(self, *, max_notes: int = 8192, max_refill_chars: int = 4096) -> None:
+        if not isinstance(max_notes, int) or isinstance(max_notes, bool) or not 1 <= max_notes <= 50000:
             raise ValueError("invalid max_notes")
         if not isinstance(max_refill_chars, int) or isinstance(max_refill_chars, bool) or not 128 <= max_refill_chars <= 65536:
             raise ValueError("invalid max_refill_chars")
@@ -267,11 +272,31 @@ class ScopeVerifier:
         original = {x.call_id: x for x in observations}
         if len(original) != len(tuple(observations)):
             raise ValueError("observation IDs are not unique")
-        if len(prepared.notes) > 4096 or len(prepared.refill) > 65536:
+        if len(prepared.notes) > 50000 or len(prepared.refill) > 65536:
             raise ValueError("working memory exceeds bounds")
         for note in prepared.notes:
             obs = original.get(note.call_id)
-            if obs is None or not is_no_found(obs):
+            # Deliberately re-evaluate source assertions independently of
+            # the IntegrityVerifier classifier and hash-chain parser.
+            valid_negative = False
+            if obs is not None:
+                if obs.ok and isinstance(obs.payload, dict):
+                    data = obs.payload
+                    complete = data.get("partial") is not True and data.get("truncated") is not True
+                    valid_negative = complete and (
+                        data.get("status") in ("not_found", "no_results", "no_matches")
+                        or (data.get("found") is False and data.get("complete") is True)
+                    )
+                elif not obs.ok:
+                    description = (obs.error or "").lower()
+                    valid_negative = (
+                        bool(re.search(r"\b(?:404|not found|no matches|no results)\b", description))
+                        and not any(token in description for token in (
+                            "permission", "forbidden", "timeout", "unavailable",
+                            "rate limit", "unauthorized"
+                        ))
+                    )
+            if not valid_negative:
                 raise ValueError("note has no independently confirmed no-found source")
             if note.scope != _scope(obs) or "do not infer global nonexistence" not in note.text:
                 raise ValueError("source scope or epistemic warning was lost")
