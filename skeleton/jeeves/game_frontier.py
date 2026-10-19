@@ -39,6 +39,9 @@ from .game_frontier_photometry import (
 )
 from .game_frontier_chunks import verify_registered_era_chunks
 from .game_frontier_mesh_evolution import PixelAsset, create_old_new_asset_pair
+from .game_frontier_biome_motion import (
+    ShrubState, SmallRockState, ContactForce, advance_biome_objects,
+)
 
 FRONTIER_SCENE_SCHEMA = "skeleton.game.frontier_scene_candidate.v1"
 FRONTIER_MODEL_STATUS = "engine_candidate_only_no_proprietary_weights"
@@ -99,6 +102,8 @@ def compile_frontier_scene(
     audio_source_distance_m: float | None = None,
     verify_all_era_chunks: bool = False,
     original_pixel_asset: PixelAsset | None = None,
+    shrubs: tuple[ShrubState, ...] = (),
+    small_rocks: tuple[SmallRockState, ...] = (),
 ) -> FrontierSceneCandidate:
     """Produce a content-addressed, inspectable, playable-engine-side proposal.
 
@@ -225,11 +230,37 @@ def compile_frontier_scene(
                                      dt_s=delta_s, impact_impulse_ns=contact_force))
     audit_leaves = tuple(verify_leaf_shadow(leaf, sun_toward=solar_direction)
                          for leaf in moved_leaves) if leaf_poses else ()
+    object_contacts = tuple(
+        ContactForce(character_step.state.position,
+                     impact.normal.scaled(impact.impulse_ns),
+                     character_step.state.radius_m)
+        for impact in (character_step.impacts if character_step else ())
+    )
+    biome_motion = advance_biome_objects(
+        shrubs, small_rocks, wind=active_wind,
+        dt_s=delta_s, contacts=object_contacts)
+    # Current moving geometry participates in *the same frame's* rays.
+    extra_occluders = tuple(
+        RayOccluder("shrub:"+obj.shrub_id,"foliage",obj.tip,
+                    "sphere",obj.radius_m,opacity=.65)
+        for obj in biome_motion.shrubs
+    ) + tuple(
+        RayOccluder("rock:"+obj.rock_id,"object",obj.position,
+                    "sphere",obj.radius_m)
+        for obj in biome_motion.rocks
+    )
+    if character_step is not None:
+        extra_occluders += (
+            RayOccluder("character:current","character",
+                        character_step.state.position,"sphere",
+                        character_step.state.radius_m),
+        )
     climate = LightClimate(
         atmosphere, rain_mm_h=air_conditions.rain_mm_h,
         cloud_opacity=cloud_coverage)
     traced = (tuple(illuminate_atmosphere_3d(
-        surface, light_sources, light_occluders, tuple(moved_leaves), climate)
+        surface, light_sources, light_occluders + extra_occluders,
+        tuple(moved_leaves), climate)
                     for surface in lighting_surfaces)
               if trace_3d_lighting and lighting_surfaces else ())
     audio = (mix_environment_audio(AudioEnvironment(
@@ -450,6 +481,22 @@ def compile_frontier_scene(
             "spatial_bounds_valid": c.bounds_valid,
             "passed_both": c.approved_by_both,
         } for c in chunk_reports],
+        "biome_motion": {
+            "shrubs": [{
+                "id": obj.shrub_id,
+                "tip": [obj.tip.x, obj.tip.y, obj.tip.z],
+                "root": [obj.root.x, obj.root.y, obj.root.z],
+                "radius_m": obj.radius_m,
+                "health": obj.health,
+            } for obj in biome_motion.shrubs],
+            "rocks": [{
+                "id": obj.rock_id,
+                "position": [obj.position.x,obj.position.y,obj.position.z],
+                "radius_m": obj.radius_m,
+                "rotation_radians": obj.rolling_radians,
+            } for obj in biome_motion.rocks],
+            "character_contact_count": biome_motion.impact_count,
+        },
         "old_new_assets": [{
             "era": m.era, "source_digest": m.source_digest,
             "triangles": m.triangle_count,
