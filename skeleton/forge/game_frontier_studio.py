@@ -253,6 +253,7 @@ def compile_studio_frame(
     previous_frame: object | None = None,
     context_cursor: object | None = None,
     virtual_navigation: VirtualNavigationRequest | None = None,
+    previous_virtual_navigation: dict | None = None,
 ) -> dict:
     """Build one *verified* Studio progress frame from actual placed prefabs.
 
@@ -309,12 +310,15 @@ def compile_studio_frame(
         frame_index=frame_index,fps=fps,gdd=anchor,
         objects=tuple(objects),previous=prior,notes=tuple(notes),
     )
+    if previous_virtual_navigation is not None and virtual_navigation is None:
+        raise StudioError("prior GPS receipt requires a current virtual map observation")
     if virtual_navigation is not None:
         if (project.virtual_game_map is None or
             project.virtual_game_map.identity() != virtual_navigation.world.identity()):
             raise StudioError("virtual navigation must use authored RPG game map")
     game_nav = (compose_virtual_navigation(
-        virtual_navigation,frame=frame,gdd=anchor,previous_frame=prior)
+        virtual_navigation,frame=frame,gdd=anchor,previous_frame=prior,
+        previous_navigation=previous_virtual_navigation)
         if virtual_navigation is not None else None)
     latest_cursor=advance_context_cursor(
         anchor,frame,previous_frame=prior,
