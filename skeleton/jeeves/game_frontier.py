@@ -651,6 +651,20 @@ def compile_frontier_scene(
             } for n in frame_receipt.note_from_previous]
             if frame_receipt is not None else [],
             "gdd_context_authority": "AI_proposal_no_auto_canon_promotion",
+            "virtual_navigation_context": ({
+                "world_id": virtual_position["world_id"],
+                "realm_id": virtual_position["realm_id"],
+                "map_tile_xy": virtual_position["map_tile_xy"],
+                "world_xyz_m": virtual_position["world_xyz_m"],
+                "uncertainty_m": virtual_position["horizontal_uncertainty_m"],
+                "navigation_receipt_digest": virtual_position["receipt_digest"],
+                "linked_frame_receipt_digest": (
+                    frame_receipt.receipt_digest if frame_receipt else None),
+                "linked_signed_gdd_digest": (
+                    frame_gdd.source_digest if frame_receipt else None),
+                "requires_human_design_approval": True,
+                "authority": "fictional_navigation_design_context_not_canon",
+            } if virtual_position is not None else None),
         },
         "preemptive_input": prediction,
         "world_variant": ({
