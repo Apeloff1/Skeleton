@@ -103,6 +103,25 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
 - [ ] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
 - [ ] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
+- [x] GF-P0-100 Implement consent-bound foreground GPS fix ingestion with typed WGS84 position, accuracy, provider and monotone timestamp contracts.
+- [x] GF-P0-101 Add browser real device GPS watcher and foreground Start/Stop/Clear user interface without automatic collection, logs or network uploads.
+- [x] GF-P0-102 Reject absent/expired GPS permission, stale/future/low-accuracy/replayed or physically implausible fixes.
+- [x] GF-P0-103 Implement WGS84 surveyed position from user-verified fixed control stations and bearing line intersection with geometry/residual checks.
+- [x] GF-P0-104 Cross-check independent surveyed and live GPS position differences within declared combined uncertainty; do not silently blend mismatched fixes.
+- [x] GF-P0-105 Publish redacted scene/analytics receipts only, never raw GPS/survey coordinates in hashed GDD, model prompts, game manifests or logs.
+- [x] GF-P0-106 Integrate with existing signed story-bible/GDD source validator and immutable world-law digest rather than creating another canon authority.
+- [x] GF-P0-107 Partition each build frame into spatial actor/prefab chunks with deterministic moving-entity membership at 30/50/60/120 FPS.
+- [x] GF-P0-108 Independent frame verifier A authenticates SHA-256 chunk payload, source object identity and frame receipt linkage.
+- [x] GF-P0-109 Independent frame verifier B checks temporal continuity, chunk membership, signed-GDD law linkage, object conservation and movement envelopes.
+- [x] GF-P0-110 Add strictly bounded between-frame AI/human/engine notes that cite signed GDD world-law indices and never auto-promote generated canon.
+- [x] GF-P0-111 Expose verified frame design context for Jeeves provider callers without invoking LLMs or fabricating model weights.
+- [x] GF-P0-112 Implement bounded constant-memory GDD context cursor with hash-chain lineage to support months-long frame histories.
+- [x] GF-P0-113 Extend the existing RPG Studio to produce double-verified build-progress receipts from true placed prefab assets and stable IDs.
+- [x] GF-P0-114 Focused regressions passed for 141 tests including surveyed fixes, privacy, GPS spoof/replay rejection and 80 continuous GDD-linked frames.
+- [ ] GF-P0-115 Install compatible Expo SDK 54 native foreground location provider with permission config and actually verify Android/iOS device acquisition and revocation.
+- [ ] GF-P0-116 Wire frame chunk A/B verifiers and temporal context to actual *rendered* frames in all historical and modern native engine runtimes.
+- [ ] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay.
+- [ ] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
 
 - [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
@@ -152,6 +171,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-35 Source actual time/sky celestial ephemerides with rotation, astronomical sight corrections, bubble sextant bias and geographic sphere/ellipsoid.
 - [ ] GF-P1-36 Add interactive gyro/compass/sextant/bubble-sextant/barometer/survey-altimeter UI calibration and side-by-side reference instrument simulation.
 - [ ] GF-P1-37 Build visual advanced RPG trigger graph editor tied to weather, character physics, time of day, objects, instruments, quests and world axes.
+- [ ] GF-P1-38 Add native mobile GNSS bridge using approved Expo SDK-compatible foreground-only GPS subscription with hardware accuracies and permission lifecycle.
+- [ ] GF-P1-39 Add ECEF/ENU long-baseline precise surveying, vertical-angle leveling, datum transformations and documented geodetic/geoid height residuals.
+- [ ] GF-P1-40 Add dynamic verified frame snapshots for camera, mesh, shader, shadows, atmospheric physics, GPS/survey, audio, animations and AI inputs together.
+- [ ] GF-P1-41 Integrate chunk provenance and GDD notes through the existing canonical game design editor and procedural worlds with stable cross-chunk identities.
+- [ ] GF-P1-42 Introduce conflict and drift detection across simultaneous AI authoring passes using existing canon/construction authority, with human-review promotion.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -188,6 +212,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-31 Train navigation/world cognition to use instruments without treating synthetic values as ground truth position fixes.
 - [ ] GF-P2-32 Validate actual simulated navigation with moving observer, drift, changing magnetic fields, seasons and game world rotation.
 - [ ] GF-P2-33 Add adversarial tissue/wet cloth/hair/skin simulation and multi-era animation model comparison against native rendering.
+- [ ] GF-P2-34 Integrate location-aware game interactions and privacy ceilings without disclosing raw GPS to unauthorized AI or multiplayer/telemetry.
+- [ ] GF-P2-35 Autonomous design critique uses only verified between-frame observations and signed GDD with abstention and adversarial challenge.
+- [ ] GF-P2-36 Simulate month-long multiworld frame histories, rollback/branch/merge and canonical GDD version evolution while keeping continuity.
+- [ ] GF-P2-37 Develop continuous landmark acquisition/resection/calibration and sensor-fusion training without fabricated survey authority.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -221,6 +249,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-28 Validate instrument error budgets, gyro drift, celestial fixes, barometer and survey results with independent measured cases.
 - [ ] GF-P3-29 Stress 2030s RPG authoring chains, save/restore/canon continuity, event ordering and character environmental triggers for months-long projects.
 - [ ] GF-P3-30 Qualify native stability/memory, weather/elastic skin and calibration replay on historical console and modern hardware profiles.
+- [ ] GF-P3-31 Test live Android/iOS GPS permission grant, decline, temporary access, OS backgrounding, precision downgrade and session revocation.
+- [ ] GF-P3-32 Independent professional-grade survey reference measurements, GNSS multipath/spoofing checks and documented uncertainty against surveyed fixtures.
+- [ ] GF-P3-33 Frame-by-frame native 30/50/60/120 FPS coherence benchmark across all engines including geometry, shadow/weather physics, streaming and GDD logic.
+- [ ] GF-P3-34 Long production-cycle frame receipt retention, privacy deletion, provenance restore, human GDD signoff and reproducible release acceptance.
 
 ## Source references
 
