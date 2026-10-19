@@ -20,7 +20,7 @@ become enabled. See [To-Do](../../TODO.md) for tracked task statuses.
 | Phase | Delivery | Implemented candidate | Open proof |
 |---|---|---|---|
 | P0.1 | Weather and cloud movement | altitude-interpolated wind, seeded spatial-temporal gusts, midpoint cloud advection, shear/stretch | renderer/cloud particle integration, native weather visual proof |
-| P0.2 | FPS mode selector | exact integer nanosecond 30/50/120 presentation scheduler and old-frame dropping | host clock/input integration, actual measured throughput |
+| P0.2 | FPS mode selector | exact integer nanosecond 30/50/60/120 presentation scheduler and old-frame dropping | host clock/input integration, actual measured throughput |
 | P0.3 | Per-era skeletal LOD | generated closed bone-envelope triangle mesh, rigid bone influence, budgets from early 3D to next era | weighting/normal/UV seams, import/export and 3D visual QC |
 | P0.4 | Animated sim assets | sampled clips, hierarchy transforms, per-bone collision capsules | dynamic capsule deformation in actual sim, clip interoperability |
 | P0.5 | Cognition and cinematics | evidenced target selection, reason traces, proposed actions/camera shot class | visual-semantic model, multi-shot blocking continuity, 3D camera controls |
@@ -61,7 +61,7 @@ become enabled. See [To-Do](../../TODO.md) for tracked task statuses.
 
 1. **Correctness** — deterministic seeds, finite numeric guards, invalid-geometry
    rejection, topology-ordered bones, bounded budgets, monotonic frame deadlines.
-2. **Temporal** — compare simulation state at 30/50/120 against same physics
+2. **Temporal** — compare simulation state at 30/50/60/120 against same physics
    tick sequence; presentation FPS may not change authoritative gameplay.
 3. **Weather** — independent snapshots of cloud paths, strong-altitude shear,
    wind direction shifts, tile boundaries and negative/large world coords.
@@ -109,7 +109,7 @@ become enabled. See [To-Do](../../TODO.md) for tracked task statuses.
   contemporary desktop and dedicated console targets.
 - Add quantitative scorecards for scene continuity, interaction success,
   physics plausibility, visual fidelity, long-horizon state restoration and
-  real generated vs displayed FPS at 30, 50 and 120.
+  real generated vs displayed FPS at 30, 50, 60 and 120.
 
 ## Verification record
 
@@ -118,3 +118,81 @@ inference/checkpoint training, live GPU benchmark, engine installation or
 console hardware acceptance has been performed as part of this milestone.
 Do not represent P0–P3 as fully done until the To-Do checkboxes carry accepted
 exact-head run and review evidence.
+
+
+## October 19 continuation — responsive world physics and realm variants
+
+The existing gameplay candidates now support 30/50/**60**/120 FPS. This
+selection changes presentation scheduling only. A canonical era clock owns
+simulation ticks and new `FrontierEraTiming` probes provide cross-FPS
+deterministic-clock consistency evidence; actual GPU/video frame delivery
+must still be measured separately.
+
+### World and perspective matrix
+
+| World family | Executable deterministic mechanism | Further acceptance |
+|---|---|---|
+| Original | canonical seeded biome/climate | terrain engine binding |
+| Inverse | elevations, humidity and temperature invert by strength; optionally negative gravity sign | actual inverted world collision and camera |
+| Mirror | involutive X reflection around declared world axis | scene, NPC and quest mirror synchronization |
+| Elemental | earth, air, water, fire, ice, lightning, aether modulate terrain/climate/energy | liquid/fire/ice effect simulation and VFX |
+| Ethereal | changes permeability, ambient luminance and potentially gravity sign | pass-through collision semantics |
+| Mythic | moonlike cycle controlling energy, sky islands and light | seasonal/quest metaphysics and timeline |
+| Lensed | controlled radial camera lens warp, not collider deformation | accessible lens distortion and ray metric correctness |
+| Shadow | low luminance and ambient cold/energy | shadow-plane rendering, lighting and AI behavior |
+| Celestial | elevated sky-islands and high-luminance energy | airborne navigation, wind and real 3D geometry |
+
+Perspective settings: `top_down`, `platformer`, `3d`,
+`2.5d`, `2.6d`, `2.7d`, `2.8d`, `2.9d`. A
+single `CameraSpec` projects typed vertices and preserves the authoritative
+collision coordinates. Pseudo-depth blends orthographic/perspective factors
+and parallax per mode; this is the first step, not a completed 2.9D renderer.
+
+### Motion, environment and construction
+
+- `game_frontier_motion.py`: explicit material coefficients for skin,
+  cloth, hair, leather boots, wool, wood, stone, steel. Each soft node has
+  spring+damper forces, wind, absorbed water mass, thermal response, anchor
+  displacement and bounded substeps. Hair and clothing are independently
+  responsive; this is not a connected FEM cloth/hair strand solver.
+- Collision adaptation projects characters out of intersected planes, computes
+  restitution/friction and records material-specific impulses and candidate
+  damage. Wear/wet/snow/water effects change traction, gait, heat/cold/wet
+  awareness and suggested protective action. No user controls are actuated.
+- Soil saturation, erosion, snow loading, foliage motion, puddles, debris
+  and ecological health respond to weather and recorded collisions.
+- Construction is a time-dependent state machine with workforce effort
+  explicitly supplied, resource/material parameters, freeze-thaw/rain/wind/dust
+  weathering, biological growth, and maintenance/repair inputs. Advancing
+  world time alone does not silently construct a house.
+- `game_frontier_lighting.py` casts actual CPU rays against sphere/box
+  character/environment primitives, supports deterministic area-light penumbra
+  sampling, occlusion, world-family/cloud ambient modulation and wet highlights.
+  BVH, production shader integration, traced global illumination and ray-traced
+  screenshots remain follow-on work.
+- `game_frontier.py` attaches optional typed inputs for all additions to
+  the existing candidate-only scene manifest with SHA-256 identity and
+  `runtime_admitted=False` until accepted by the canonical engine.
+
+### Validation sequence
+
+1. Run `tests/test_game_frontier_world_physics_lighting.py`, alongside the
+   existing frontier milestone, timing and qualification tests.
+2. Run the path-scoped `game-frontier-validation.yml` check. Tests are
+   **source only** until an actual successful run is recorded.
+3. Execute legacy/3D and Godot scene imports; inspect weather shadows, animated
+   cloth/hair motion, character contacts and ray occlusion in a rendered frame.
+4. Generate and validate 30/50/60/120 frame intervals against **the same**
+   simulation-clock trace, then measure real display/generation FPS and latency.
+5. Bind durability/maintenance state to the existing save/migration/restore
+   topology and compare one-year simulation with pause/resume consistency.
+6. Submit model-driven cinematic/world/cognition changes only through existing
+   rights, provider-route and candidate/admission gates.
+
+Additional ideas for subsequent milestones: weather front propagation,
+pressure fields, altitude-aware microclimates, rain-on-material sound design,
+permeable/spell-reactive architecture, multi-world passage costs, snow/ice
+contact animation, character-accessible shelter decisions, skin subsurface
+scattering, damp hair clumping, water boots buoyancy and fluid drag, time-of-day
+shadow drift, moonlight/sunlight seasonal light schedules, and corrosion/rot
+sensitive to local biomes.
