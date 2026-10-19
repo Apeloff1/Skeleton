@@ -69,12 +69,21 @@ def compare_native_sessions(
         raise NativeComparisonError("cross-session source actor catalog disagrees")
     if actor_id is not None and actor_id not in source_l:
         raise NativeComparisonError("selected actor not in native source catalog")
+    from .game_frontier_native_fields import inspect_native_force_fields
+    first_left=inspect_native_force_fields(l0)
+    first_right=inspect_native_force_fields(r0)
+    if bool(first_left)!=bool(first_right) or (
+        first_left is not None and
+        l0["native_force_fields"]!=r0["native_force_fields"]):
+        raise NativeComparisonError("cross-FPS source game force fields differ")
     chosen=[actor_id] if actor_id is not None else sorted(source_l)
     sums={name:{"id":name,"source_digest":source_l[name],
                 "matched_ticks":0,"position_squared_error_sum":0.,
                 "maximum_position_delta_m":0.,"maximum_velocity_delta_mps":0.,
                 "different_reported_contact_ticks":0,
                 "maximum_reported_kinetic_energy_delta_j":None,
+                "maximum_reported_gameplay_force_delta_n":None,
+                "different_active_gameplay_force_ticks":0,
                 "position_drift_tolerance_exceedances":0} for name in chosen}
     paired=[]
     evidence=[]
@@ -96,6 +105,21 @@ def compare_native_sessions(
         if ({k:v["source_digest"] for k,v in left_items.items()}!=source_l or
             {k:v["source_digest"] for k,v in right_items.items()}!=source_r):
             raise NativeComparisonError("source identity drift within compared game")
+        field_l=inspect_native_force_fields(a)
+        field_r=inspect_native_force_fields(b)
+        if bool(field_l)!=bool(field_r) or (
+            field_l is not None and
+            a["native_force_fields"]!=b["native_force_fields"]):
+            raise NativeComparisonError("native gameplay field source drift across FPS")
+        def actor_field_magnitudes(source):
+            result={}
+            for item in source.get("previous_step_field_forces",()):
+                strength=math.dist([0.,0.,0.],item["force_world_xyz_n"])
+                key=item["actor_id"]
+                result[key]=result.get(key,0.)+strength
+            return result
+        force_l=actor_field_magnitudes(a) if field_l else {}
+        force_r=actor_field_magnitudes(b) if field_r else {}
         la=left.native_dynamics_evidence(i)
         ra=right.native_dynamics_evidence(j)
         if bool(la) != bool(ra):
@@ -115,6 +139,14 @@ def compare_native_sessions(
             row["different_reported_contact_ticks"]+=int(
                 p.get("contact_count")!=q.get("contact_count"))
             row["position_drift_tolerance_exceedances"]+=int(pos_delta>tolerance_m)
+            if field_l:
+                l_force=force_l.get(name,0.)
+                r_force=force_r.get(name,0.)
+                existing=row["maximum_reported_gameplay_force_delta_n"]
+                row["maximum_reported_gameplay_force_delta_n"]=max(
+                    existing if existing is not None else 0.,abs(l_force-r_force))
+                row["different_active_gameplay_force_ticks"]+=int(
+                    (l_force>1e-6)!=(r_force>1e-6))
             if la:
                 energy_delta=abs(ea[name]-eb[name])
                 existing=row["maximum_reported_kinetic_energy_delta_j"]

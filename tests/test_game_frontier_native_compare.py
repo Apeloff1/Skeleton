@@ -41,6 +41,8 @@ class NativeSessionComparisonTests(unittest.TestCase):
                              [0,2,4,6])
             self.assertTrue(report["all_actor_positions_within_tolerance"])
             self.assertEqual(report["actor_metrics"][0]["matched_ticks"],4)
+            self.assertIsNone(report["actor_metrics"][0][
+                "maximum_reported_gameplay_force_delta_n"])
             self.assertAlmostEqual(report["actor_metrics"][0]["rms_position_delta_m"],0)
             self.assertEqual(report,compare_native_sessions(slow,fast,tolerance_m=.01))
             self.assertEqual(len(report["receipt_digest"]),64)

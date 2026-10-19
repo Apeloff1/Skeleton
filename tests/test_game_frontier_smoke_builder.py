@@ -151,5 +151,6 @@ if __name__=="__main__":
             for marker in ("_apply_native_gameplay_fields",
                            "native_force_field_schema",
                            "previous_step_field_forces",
-                           "_aero_character.apply_central_force(applied)"):
+                           "_aero_character.apply_central_force(applied)",
+                           "NativeGameForcePreview_", "KEY_F"):
                 self.assertIn(marker,script)

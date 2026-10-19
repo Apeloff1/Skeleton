@@ -47,6 +47,8 @@ var _native_jump_impulse_ns: float = 120.0
 var _native_gameplay_zones: Array = []
 var _native_force_fields: Array = []
 var _native_previous_field_steps: Array = []
+var _native_field_visual_nodes: Array[MeshInstance3D] = []
+var _native_field_preview_visible: bool = true
 var _native_previous_zone_members: Array = []
 var _native_preview_label: Label
 var _native_recent_zone_events: Array[String] = []
@@ -512,6 +514,32 @@ func _configure_native_capture(settings: Dictionary) -> void:
         _native_controls_enabled = true
     _native_gameplay_zones = settings.get("gameplay_zones", [])
     _native_force_fields = settings.get("gameplay_force_fields", [])
+    # These translucent debug meshes never collide or apply forces: only
+    # _apply_native_gameplay_fields is authoritative for reference simulation.
+    for field_item in _native_force_fields:
+        var field: Dictionary = field_item
+        var preview := MeshInstance3D.new()
+        preview.name = "NativeGameForcePreview_" + str(field["id"])
+        preview.position = _vec(field["center_xyz_m"])
+        var sphere := SphereMesh.new()
+        sphere.radius = float(field["radius_m"])
+        sphere.height = 2.0 * sphere.radius
+        preview.mesh = sphere
+        var tint := StandardMaterial3D.new()
+        tint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        tint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        var kind: String = str(field["kind"])
+        if kind == "updraft":
+            tint.albedo_color = Color(.25, .85, .98, .11)
+        elif kind == "downdraft":
+            tint.albedo_color = Color(.98, .45, .20, .11)
+        elif kind == "vortex":
+            tint.albedo_color = Color(.80, .28, .98, .12)
+        else:
+            tint.albedo_color = Color(.32, .98, .48, .11)
+        preview.material_override = tint
+        add_child(preview)
+        _native_field_visual_nodes.append(preview)
     if not _native_gameplay_zones.is_empty():
         _create_native_playtest_inspector()
     for zone_item in _native_gameplay_zones:
@@ -718,7 +746,7 @@ func _record_native_physics() -> void:
                     " | occupants " + str(occupants.size()) +
                     " | field forces " + str(_native_force_fields.size()) +
                     " | preview speed x" + str(_native_debug_speed),
-                "P pause/resume | - slower | = faster",
+                "P pause/resume | - slower | = faster | F fields",
             ]
             lines.append_array(_native_recent_zone_events)
             _native_preview_label.text = "\n".join(lines)
@@ -810,7 +838,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
     var key := event as InputEventKey
     if not key.pressed or key.echo:
         return
-    if key.physical_keycode == KEY_P:
+    if key.physical_keycode == KEY_F:
+        _native_field_preview_visible = not _native_field_preview_visible
+        for preview_node in _native_field_visual_nodes:
+            preview_node.visible = _native_field_preview_visible
+    elif key.physical_keycode == KEY_P:
         _native_debug_speed = 1.0 if _native_debug_speed == 0.0 else 0.0
         Engine.time_scale = _native_debug_speed
     elif key.physical_keycode == KEY_MINUS:
