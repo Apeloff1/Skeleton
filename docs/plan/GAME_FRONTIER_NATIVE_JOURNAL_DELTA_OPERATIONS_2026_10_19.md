@@ -137,3 +137,34 @@ per-scene allow-list; it is not a complete multi-actor native engine hook.
 Do not mark P0–P3 complete until actual engine and long-run evidence
 exists. The reference regression suite demonstrates executable source
 contracts, not deployment.
+
+
+## Operator Godot 4 binary qualification (added this pass)
+
+Install/obtain a genuine Godot 4 executable yourself, verify its supplier,
+record its **exact binary SHA-256**, and choose a project directory whose
+`project.godot` and `frontier/` overlay files Forge explicitly authored.
+Then run:
+
+```bash
+python scripts/qualify_game_frontier_godot.py \
+  --godot /absolute/path/to/godot \
+  --godot-sha256 ACTUAL_LOWERCASE_64_CHARACTER_BINARY_DIGEST \
+  --project /absolute/path/to/materialized_project \
+  --frames 120 --timeout-seconds 120
+```
+
+The utility runs two **real subprocess** phases when used with a Godot 4
+binary: headless editor import and headless scene playback. It disallows
+symlinked binary and project paths, checks the supplied binary SHA-256,
+validates scene input size/schema, rejects explicit Godot parser errors and
+nonzero exits, and records separate stage stdout/stderr hashes. No shell,
+network download, model-generated script execution or OS GPS access.
+
+The focused Python suite uses a mock binary only to test invocation and
+failure detection; it is **not itself a real Godot headless acceptance**.
+The pending P0 gates require running this operator command on a real
+version-pinned Godot 4 executable, inspecting output and confirming actual
+native RigidBody3D capture against the signed source frame journal. The
+script records headless subprocess evidence, **not GPU framebuffer
+attestation**, game completion or native console certification.
