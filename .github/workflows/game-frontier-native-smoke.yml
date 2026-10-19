@@ -324,7 +324,7 @@ jobs:
             dispatch_user="$RUNNER_TEMP/frontier-dispatch-runtime-$fps"
             mkdir -p "$dispatch_user"
             XDG_DATA_HOME="$dispatch_user" "$FRONTIER_GODOT" \
-              --headless --path "$project" --quit-after 8 \
+              --headless --path "$project" --quit-after 32 \
               > "$RUNNER_TEMP/frontier-game-dispatch-godot-$fps.log" 2>&1
             dispatch_receipt="$(find "$dispatch_user" -type f \
               -name frontier_approved_gameplay_receipt.json -print -quit)"
@@ -341,11 +341,12 @@ jobs:
               -name frontier_native_physics.jsonl -print -quit)"
             test -n "$control_physics"
             test -s "$control_physics"
+            test "$(wc -l < "$control_physics")" -eq 20
             cp "$control_physics" "$RUNNER_TEMP/frontier-dash-control-$fps.jsonl"
             dash_user="$RUNNER_TEMP/frontier-dash-active-$fps"
             mkdir -p "$dash_user"
             XDG_DATA_HOME="$dash_user" "$FRONTIER_GODOT" \
-              --headless --path "$project" --quit-after 8 \
+              --headless --path "$project" --quit-after 32 \
               -- --frontier-ci-wind-dash \
               > "$RUNNER_TEMP/frontier-dash-active-$fps.log" 2>&1
             dash_physics="$(find "$dash_user" -type f \
@@ -360,6 +361,7 @@ jobs:
               exit 1
             fi
             test -s "$dash_physics"
+            test "$(wc -l < "$dash_physics")" -eq 20
             test -s "$dash_activations"
             cmp "$dash_save" "$dispatch_receipt"
             python scripts/verify_game_frontier_dash.py \
