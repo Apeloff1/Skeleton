@@ -31,6 +31,12 @@ from typing import Any, Callable, Mapping, Sequence
 
 from .adversarial_verification import CouncilVerdict, VerificationCouncil, VerificationSubject
 from .cognition import ContextSection
+from .adversarial_verifier_review import AdversarialVerifierReviewer
+from .code_delivery_quality import (
+    CodeDeliveryQualityReviewer, QualityCheckResult, QualityReleaseReceipt,
+    QualityVerifierAdversary, required_delivery_kind,
+)
+from .code_scrutiny_loop import Discovery, Repair
 from .context_repository import (
     ContextEntry,
     ContextKind,
@@ -206,6 +212,17 @@ class AdaptiveRunReport:
     working_receipt: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _DeliveryQualityBinding:
+    kind: str
+    source_reader: Callable[[], Mapping[str, str]]
+    checkers: Mapping[str, Callable[[Mapping[str, str]], QualityCheckResult]]
+    additional_requirements: tuple[str, ...]
+    discover: Discovery | None
+    repair: Repair | None
+    authorize_repairs: bool
+
+
 @dataclass(slots=True)
 class _AdaptiveState:
     run_id: str
@@ -259,6 +276,12 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self._adaptive_lock = threading.RLock()
         self._working_context_cycle = WorkingContextCycle()
         self._working_deliveries: dict[str, PreparedDelivery] = {}
+        self._delivery_quality_bindings: dict[str, _DeliveryQualityBinding] = {}
+        self._delivery_quality_reports: dict[str, QualityReleaseReceipt] = {}
+        self._delivery_adversarial_receipts: dict[str, str] = {}
+        self._code_delivery_quality_reviewer = CodeDeliveryQualityReviewer()
+        self._verifier_adversary = AdversarialVerifierReviewer()
+        self._quality_verifier_adversary = QualityVerifierAdversary()
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1175,6 +1198,37 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             required=True,
             source_ids=tuple(note.call_id for note in prepared.notes),
         ),)
+
+    def register_delivery_quality(
+        self, run_id: str, *, kind: str,
+        source_reader: Callable[[], Mapping[str, str]],
+        checkers: Mapping[str, Callable[[Mapping[str, str]], QualityCheckResult]],
+        additional_requirements: Sequence[str] = (),
+        discover: Discovery | None = None,
+        repair: Repair | None = None,
+        authorize_repairs: bool = False,
+    ) -> None:
+        """Host-only source and independent tools; unregistered tasks fail closed."""
+        run_key = require_id("run_id", run_id)
+        if kind not in {"code", "game"} or not callable(source_reader):
+            raise ValueError("code/game delivery requires an authoritative source reader")
+        if any(not isinstance(name, str) or not callable(checker)
+               for name, checker in checkers.items()):
+            raise ValueError("invalid host checker")
+        if repair is not None and not callable(repair):
+            raise ValueError("invalid repair callback")
+        if discover is not None and not callable(discover):
+            raise ValueError("invalid discovery callback")
+        with self._adaptive_lock:
+            self._delivery_quality_bindings[run_key] = _DeliveryQualityBinding(
+                kind=kind, source_reader=source_reader, checkers=dict(checkers),
+                additional_requirements=tuple(additional_requirements),
+                discover=discover, repair=repair, authorize_repairs=authorize_repairs,
+            )
+
+    def delivery_quality_receipt(self, run_id: str) -> QualityReleaseReceipt | None:
+        with self._adaptive_lock:
+            return self._delivery_quality_reports.get(require_id("run_id", run_id))
 
     def _delivery_verify(self, state: _RunState, draft) -> tuple[bool, str | None]:
         prepared = self._working_deliveries.get(state.run_id)
