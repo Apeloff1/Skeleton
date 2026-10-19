@@ -258,8 +258,13 @@ def advance_frame(
         previous.receipt_digest if previous else None,
         tuple(chunks),notes,True,True,True,"",
     )
-    if previous is not None and not previous.verified:
-        raise FrameCoherenceError("cannot continue an unverified frame")
+    if previous is not None and (
+        not previous.verified or not previous.verifier_a_integrity or
+        not previous.verifier_b_coherence or
+        digest(previous.payload())!=previous.receipt_digest or
+        any(digest(c.payload())!=c.content_digest for c in previous.chunks)
+    ):
+        raise FrameCoherenceError("cannot continue an unverified or corrupted frame")
     # Create the final receipt digest over its complete source payload.
     sealed=FrameReceipt(
         frame_index,t_ns,fps,gdd.source_digest,
