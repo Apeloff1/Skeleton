@@ -74,7 +74,7 @@ jobs:
             python scripts/validate_game_frontier_native_smoke.py \
               --capture-jsonl "$capture" \
               --scene-json "$project/frontier/data/scene.json" \
-              --min-ticks 4 --max-ticks 20 --require-dynamics \
+              --min-ticks 4 --max-ticks 20 --require-dynamics --require-zones \
               > "$RUNNER_TEMP/frontier-native-report-${fps}.json"
             python scripts/run_game_frontier_capture.py ingest \
               --signed-gdd "$project/signed_gdd.json" \

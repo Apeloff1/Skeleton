@@ -19,6 +19,9 @@ from .game_frontier_production import Vec3
 from .game_frontier_receipt_journal import FrameReceiptJournal, FrameJournalError
 from .game_frontier_native_chunks import inspect_native_chunks
 from .game_frontier_native_control import verify_native_reference_input
+from .game_frontier_native_zones import (
+    normalize_gameplay_zones, inspect_native_gameplay_zones, NativeZoneError,
+)
 
 
 class NativeObservationError(ValueError):
@@ -47,6 +50,7 @@ class GodotPhysicsCaptureIngestor:
         max_samples: int = 1_000_000,
         expected_reference_controls: Mapping | None = None,
         controlled_actor_id: str | None = None,
+        expected_gameplay_zones: object = (),
     ) -> None:
         if not isinstance(journal,FrameReceiptJournal):
             raise NativeObservationError("durable canonical frame journal required")
@@ -74,12 +78,29 @@ class GodotPhysicsCaptureIngestor:
             dict(expected_reference_controls) if expected_reference_controls is not None
             else None)
         self.controlled_actor_id=controlled_actor_id
+        try:
+            self.expected_gameplay_zones=normalize_gameplay_zones(
+                expected_gameplay_zones,allowed_actors=set(self.assets))
+        except NativeZoneError as exc:
+            raise NativeObservationError("unauthorized game zone source catalog") from exc
 
     def ingest(self, native: Mapping, *, resume: bool = False) -> dict:
         if not isinstance(native,Mapping):
             raise NativeObservationError("typed Godot runtime sample required")
         head=self.journal.stats()["head"]
         tick=native.get("native_tick")
+        if self.expected_gameplay_zones:
+            try:
+                prior_tick=tick-1 if type(tick) is int and tick>0 else -1
+                prior_native=(self.journal.native_sample(prior_tick)
+                              if prior_tick>=0 else None)
+                inspect_native_gameplay_zones(
+                    native,expected_catalog=self.expected_gameplay_zones,
+                    previous=prior_native)
+            except NativeZoneError as exc:
+                raise NativeObservationError("native gameplay zone source or transition forged") from exc
+        elif "native_zone_schema" in native:
+            raise NativeObservationError("unauthorized native gameplay zone telemetry")
         if self.expected_reference_controls is not None:
             try:
                 verify_native_reference_input(

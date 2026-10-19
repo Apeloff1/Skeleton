@@ -70,7 +70,7 @@ class ZoneRuntimeTests(unittest.TestCase):
         prior=frame(0,0.)
         for bad in (
             lambda x:x["actors"][0].update(world_xyz_m=[0.,0.,100.]),
-            lambda x:x["native_zone_occupancy"].clear(),
+            lambda x:x["native_zone_occupancy"].append({"zone_id":"forged","actor_id":"hero"}),
             lambda x:x["native_zone_events"].clear(),
             lambda x:x["native_zone_events"][0].update(action_kind="world_portal"),
             lambda x:x["gameplay_zones"][0].update(radius_m=99.),
