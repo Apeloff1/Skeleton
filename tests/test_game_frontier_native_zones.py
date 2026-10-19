@@ -107,3 +107,102 @@ class ZoneRuntimeTests(unittest.TestCase):
         changed["gameplay_zones"][0]["radius_m"]=2.
         with self.assertRaises(NativeZoneError):
             inspect_native_gameplay_zones(changed,previous=old)
+
+class NativeZoneJournalTests(unittest.TestCase):
+    def test_engine_source_ingest_event_replay_timeline_and_fork(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd
+        from skeleton.jeeves.game_frontier_native_capture import (
+            GodotPhysicsCaptureIngestor, NativeObservationError,
+        )
+        from skeleton.jeeves.game_frontier_receipt_journal import FrameReceiptJournal
+        from tests.test_game_frontier_native_chunks import sample
+        from tests.test_game_frontier_position_frames import gdd
+        anchor=bind_signed_gdd(gdd())
+        catalog=({
+            "id":"cross32", "actor_id":"hero",
+            "center_xyz_m":[31.99,-1.,30.],"radius_m":.015,
+            "event_page_id":"cross_border","action_kind":"show_dialogue",
+        },)
+        zones=normalize_gameplay_zones(catalog,allowed_actors={"hero","npc","island"})
+        def native(tick):
+            record=sample(tick,anchor.source_digest)
+            record["native_zone_schema"]=ZONE_SCHEMA
+            record["gameplay_zones"]=zones
+            occupied=([{"zone_id":"cross32","actor_id":"hero"}] if tick==0 else [])
+            record["native_zone_occupancy"]=occupied
+            record["native_zone_events"]=[{
+                "zone_id":"cross32","actor_id":"hero",
+                "transition":"enter" if tick==0 else "exit",
+                "event_page_id":"cross_border","action_kind":"show_dialogue",
+                "authority":EVENT_AUTHORITY,
+            }]
+            return record
+        with TemporaryDirectory() as name:
+            db=Path(name)/"zones.sqlite"
+            with FrameReceiptJournal(db,anchor) as journal:
+                ingest=GodotPhysicsCaptureIngestor(
+                    journal,candidate_digest="d"*64,
+                    allowed_assets={"hero":"a"*64,"npc":"b"*64,"island":"c"*64},
+                    expected_gameplay_zones=catalog)
+                first=ingest.ingest(native(0))
+                second=ingest.ingest(native(1))
+                self.assertEqual(second["frame"],1)
+                self.assertEqual(journal.replay()["verified_frames"],2)
+                self.assertEqual(journal.native_chunk_transitions(1)[
+                    "native_zone_event_count"],1)
+                page=journal.evidence_page(actor_id="hero",limit=2)
+                self.assertEqual([x["native_zone_event_proposals"][0]["transition"]
+                                  for x in page["entries"]],["enter","exit"])
+                self.assertTrue(all(x["native_zone_evidence_digest"]
+                                    for x in page["entries"]))
+                journal.fork("rollback_zone",through=0)
+                corrupt=native(2)
+                corrupt["native_zone_events"]=[]
+                with self.assertRaises(NativeObservationError):
+                    ingest.ingest(corrupt)
+                self.assertEqual(journal.stats()["head"],1)
+            with FrameReceiptJournal(db,anchor,track="rollback_zone") as restored:
+                self.assertEqual(restored.replay()["verified_frames"],1)
+                self.assertEqual(restored.evidence_page()["entries"][0][
+                    "native_zone_event_proposals"][0]["transition"],"enter")
+
+    def test_godot_smoke_really_exports_gameplay_zone_sources(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        import json
+        from scripts.build_game_frontier_smoke import build_smoke_project
+        with TemporaryDirectory() as root:
+            target=Path(root)
+            build_smoke_project(target,frames=20)
+            source=json.loads((target/"frontier/data/scene.json").read_text())
+            zone=source["native_capture"]["gameplay_zones"][0]
+            self.assertEqual(zone["actor_id"],"hero")
+            self.assertEqual(zone["action_kind"],"show_dialogue")
+            code=(target/"frontier/frontier_scene.gd").read_text()
+            for marker in ("Area3D.new()", "_native_zone_event",
+                           "native_zone_occupancy", "native_zone_events",
+                           "proposal_only_no_world_mutation"):
+                self.assertIn(marker,code)
+
+    def test_exporter_rejects_unauthorized_zone_mutations(self):
+        from skeleton.jeeves.game_frontier import compile_frontier_scene
+        from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd,FrameObject
+        from skeleton.jeeves.game_frontier_production import Vec3
+        from skeleton.forge.game_frontier_godot import (
+            emit_frontier_godot_overlay,FrontierGodotError,
+        )
+        from tests.test_game_frontier_position_frames import gdd
+        from tests.test_game_frontier_advanced_scene import scene_params
+        cfg=scene_params()
+        cfg.update(frame_gdd=bind_signed_gdd(gdd()),frame_index=0,
+            frame_objects=(FrameObject("hero",Vec3(0,0,30),
+                                      Vec3(0,0,-20),"a"*64),))
+        scene=compile_frontier_scene(**cfg)
+        forged={**ZONES[0],"actor_id":"unlisted"}
+        with self.assertRaises(FrontierGodotError):
+            emit_frontier_godot_overlay(scene,
+                enable_native_capture=True,native_gameplay_zones=(forged,))
+        with self.assertRaises(FrontierGodotError):
+            emit_frontier_godot_overlay(scene,native_gameplay_zones=(ZONES[0],))
