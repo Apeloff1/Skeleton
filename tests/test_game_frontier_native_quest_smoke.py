@@ -69,6 +69,10 @@ class NativeQuestSmokeFixtureTests(unittest.TestCase):
                                  {"start_quest","set_flag","craft_item","show_dialogue","set_npc_emotion",
                                   "trigger_impact_fx","change_camera","inspect_instrument"})
                 self.assertEqual(finish.actions[0].value,"sky_trial:finished")
+                self.assertEqual([a.kind for a in finish.actions],
+                                 ["advance_quest","take_damage","heal_health",
+                                  "consume_item"])
+                self.assertEqual(sum(a.kind=="craft_item" for a in begin.actions),2)
                 self.assertEqual(next(a.value for a in begin.actions
                                       if a.kind=="set_npc_emotion"),"island:curious")
                 self.assertEqual(finish.required_flags,(("quest_active",True),))
