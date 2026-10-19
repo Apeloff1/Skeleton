@@ -699,7 +699,13 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         or next_quests != bundle.get("expected_quests", {})
         or next_inventory != bundle.get("expected_inventory", {})
         or next_npc_emotions != bundle.get("expected_npc_emotions", {})):
-        push_error("Engine RPG reducer diverged from independently replayed state")
+        push_error("Engine RPG reducer diverged from independently replayed state" +
+            " quests=" + JSON.stringify(next_quests) +
+            " expected_quests=" + JSON.stringify(bundle.get("expected_quests", {})) +
+            " flags=" + JSON.stringify(next_flags) +
+            " expected_flags=" + JSON.stringify(bundle.get("expected_flags", {})) +
+            " inventory=" + JSON.stringify(next_inventory) +
+            " expected_inventory=" + JSON.stringify(bundle.get("expected_inventory", {})))
         return
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
