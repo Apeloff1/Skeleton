@@ -56,6 +56,11 @@ def check(stage, events, *, passed=True, covered=None, scope=None, findings=()):
             review_scope=scope or "fictional game corpus and declared source licenses",
             covered_paths=tuple(sources if covered is None else covered),
             passed=passed, findings=tuple(findings),
+            checked_dimensions=(
+                ("provenance", "permissions", "license_conditions", "source_similarity")
+                if stage == "copyright"
+                else ("originality", "substantive_transformation", "canon", "author_voice")
+            ),
         )
     return callback
 
@@ -253,6 +258,33 @@ def test_separate_rights_and_rewrite_verifiers_cannot_share_evidence():
             evidence_ref="host:evidence:copyright",
             review_scope="authorial continuity and narrative canon",
             covered_paths=tuple(sources), passed=True,
+            checked_dimensions=(
+                "originality", "substantive_transformation", "canon", "author_voice",
+            ),
         )
     with pytest.raises(FinalReviewError, match="independent"):
         review(rewrite=identical_evidence)
+
+
+def test_copyright_must_check_similarity_permissions_license_and_provenance():
+    def omissions(files, rights):
+        return ContentReviewResult(
+            stage="copyright", source_digest=stable_fingerprint(dict(files)),
+            checker="host:copyright", evidence_ref="host:evidence:copyright",
+            review_scope="scanned inventory only", covered_paths=tuple(files),
+            passed=True, checked_dimensions=("provenance",),
+        )
+    with pytest.raises(FinalReviewError, match="mandatory scrutiny dimensions"):
+        review(copyright=omissions)
+
+
+def test_rewrite_must_verify_originality_actual_transformation_voice_and_canon():
+    def omissions(files, rights):
+        return ContentReviewResult(
+            stage="creative_rewrite", source_digest=stable_fingerprint(dict(files)),
+            checker="host:rewrite", evidence_ref="host:evidence:rewrite",
+            review_scope="reviewed narrative", covered_paths=tuple(files),
+            passed=True, checked_dimensions=("originality", "substantive_transformation"),
+        )
+    with pytest.raises(FinalReviewError, match="mandatory scrutiny dimensions"):
+        review(rewrite=omissions)
