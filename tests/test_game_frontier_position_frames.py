@@ -260,6 +260,38 @@ class SceneAndStudioIntegrationTests(unittest.TestCase):
                          "proposed_ai_context_not_signed_gdd")
         self.assertEqual(one["authority"],"studio_preview_proposed_not_engine_mutated")
 
+    def test_incremental_cursor_uses_bounded_notes_for_many_frames(self):
+        from skeleton.forge.game_frontier_studio import (
+            StudioProject,StudioPrefab,StudioPlacement,MapLayer,
+            compile_studio_frame,
+        )
+        from skeleton.jeeves.game_frontier_worlds import ProjectionMode,WorldFamily
+        project=StudioProject("frontier","modern",
+            ProjectionMode.DEPTH_29,WorldFamily.CELESTIAL,
+            (MapLayer("floor",1,1,("grass",),(0,)),),
+            prefabs=(StudioPrefab("hero","character","modern","a"*64),),
+            placements=(StudioPlacement("hero",0,0,1),))
+        first=compile_studio_frame(project,gdd(),frame_index=0,fps=60,
+                                   entity_velocities={"hero:0":(6.,0.,0.)})
+        self.assertIsNotNone(first["context_cursor"])
+        preceding=first
+        for index in range(1,80):
+            advanced=replace(project,placements=(
+                StudioPlacement("hero",.1*index,0,1),))
+            preceding=compile_studio_frame(
+                advanced,gdd(),frame_index=index,fps=60,
+                previous_frame=preceding["record"],
+                context_cursor=preceding["context_cursor"],
+                entity_velocities={"hero:0":(6.,0.,0.)},
+                notes=(GDDFrameNote(1,"quality","Maintain GDD wind continuity"),))
+            self.assertTrue(preceding["verified_a"] and preceding["verified_b"])
+        context=preceding["gdd_ai_context"]
+        self.assertEqual(context["final_verified_frame"],79)
+        self.assertTrue(context["truncated"])
+        self.assertEqual(context["total_notes"],79)
+        self.assertLessEqual(len(context["notes"]),32)
+        self.assertEqual(len(context["context_cursor_digest"]),64)
+
     def test_studio_refuses_cross_project_gdd(self):
         from skeleton.forge.game_frontier_studio import (
             StudioProject,StudioPrefab,StudioPlacement,MapLayer,
