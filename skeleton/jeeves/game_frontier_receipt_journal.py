@@ -334,7 +334,7 @@ class FrameReceiptJournal:
                     (self.track,frame.frame_index,delta_hash))
             if native_hash is not None:
                 self._db.execute(
-                    "INSERT INTO frontier_native_samples(track,frame,content_digest) VALUES(?,?,?)"
+                    "INSERT INTO frontier_native_samples(track,frame,content_digest) VALUES(?,?,?)",
                     (self.track,frame.frame_index,native_hash))
             changed=self._db.execute(
                 "UPDATE frontier_tracks SET head=?,fps=? WHERE name=? AND head=?",
