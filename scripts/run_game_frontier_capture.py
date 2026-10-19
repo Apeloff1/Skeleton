@@ -10,6 +10,7 @@ attested, a GPU rendering test, or a successfully completed game.
 from __future__ import annotations
 
 import argparse
+import os
 import json
 from pathlib import Path
 import sys
@@ -29,6 +30,9 @@ from skeleton.jeeves.game_frontier_native_rpg_bridge import (
 from skeleton.jeeves.game_frontier_native_quest_session import (
     simulate_native_quest_session,
 )
+from skeleton.jeeves.game_frontier_native_session_checkpoint import (
+    advance_native_quest_window,
+)
 
 
 def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
@@ -45,7 +49,7 @@ def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation",choices=("ingest","verify","fork","timeline","analyze","compare",
-                                 "evaluate-events","simulate-quests"),
+                                 "evaluate-events","simulate-quests","advance-quests"),
                         help="Do not combine a new capture with replay or fork")
     parser.add_argument("--signed-gdd",type=Path,required=True)
     parser.add_argument("--scene-json",type=Path,required=True)
@@ -63,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--event-limit",type=int,default=256)
     parser.add_argument("--quest-graph-json",type=Path)
     parser.add_argument("--quest-approvals-json",type=Path)
+    parser.add_argument("--checkpoint-input-json",type=Path)
+    parser.add_argument("--checkpoint-output-json",type=Path)
     parser.add_argument("--audit-max-frames",type=int,default=256)
     parser.add_argument("--other-journal",type=Path)
     parser.add_argument("--other-track",default="production")
@@ -83,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("fork requires --fork-track and --through")
     if (arguments.chunk_x is None)!=(arguments.chunk_y is None):
         parser.error("timeline chunk filters require both --chunk-x and --chunk-y")
-    if arguments.operation not in ("timeline","analyze","compare","evaluate-events","simulate-quests") and (
+    if arguments.operation not in ("timeline","analyze","compare","evaluate-events","simulate-quests","advance-quests") and (
         arguments.start_frame!=0 or arguments.actor_id is not None):
         parser.error("frame cursor and actor filter apply only to timeline/analyze")
     if arguments.operation!="timeline" and (
@@ -106,18 +112,24 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.operation=="evaluate-events" and (
         arguments.event_pages_json is None or arguments.actor_id is None):
         parser.error("event evaluation requires --event-pages-json and --actor-id")
-    if arguments.operation=="simulate-quests" and (
+    if arguments.operation in ("simulate-quests","advance-quests") and (
         arguments.event_pages_json is None or arguments.actor_id is None or
         arguments.quest_graph_json is None or arguments.quest_approvals_json is None):
-        parser.error("quest simulation needs RPG pages, actor, graph and approvals")
-    if arguments.operation!="simulate-quests" and (
+        parser.error("quest replay needs RPG pages, actor, graph and approvals")
+    if arguments.operation=="advance-quests" and (
+        arguments.checkpoint_output_json is None or arguments.start_frame!=0):
+        parser.error("durable quest continuation requires a new checkpoint output and no frame cursor")
+    if arguments.operation!="advance-quests" and (
+        arguments.checkpoint_input_json is not None or arguments.checkpoint_output_json is not None):
+        parser.error("checkpoint files only apply to advance-quests")
+    if arguments.operation not in ("simulate-quests","advance-quests") and (
         arguments.quest_graph_json is not None or arguments.quest_approvals_json is not None):
         parser.error("quest graph and approval files apply only to simulate-quests")
-    if arguments.operation not in ("evaluate-events","simulate-quests") and (
+    if arguments.operation not in ("evaluate-events","simulate-quests","advance-quests") and (
         arguments.event_pages_json is not None or arguments.event_flags_json is not None
         or arguments.event_limit!=256):
         parser.error("event pages, flags and evaluation limit only apply to evaluate-events")
-    if arguments.operation=="simulate-quests" and arguments.event_flags_json is not None:
+    if arguments.operation in ("simulate-quests","advance-quests") and arguments.event_flags_json is not None:
         parser.error("game session flags must be embedded in approved manifest")
     if arguments.operation!="ingest" and arguments.resume:
         parser.error("--resume applies only to ingest")
@@ -204,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
                             journal,pages,actor_id=arguments.actor_id,
                             start_frame=arguments.start_frame,
                             limit=arguments.event_limit,flags=flags)}
-            elif arguments.operation=="simulate-quests":
+            elif arguments.operation in ("simulate-quests","advance-quests"):
                 raw_pages=_operator_json(arguments.event_pages_json)
                 if ("source_actor_id" in raw_pages and
                     raw_pages["source_actor_id"]!=arguments.actor_id):
@@ -221,14 +233,48 @@ def main(argv: list[str] | None = None) -> int:
                 pages=parse_native_rpg_pages(raw_pages)
                 graph=_operator_json(arguments.quest_graph_json)
                 approvals=_operator_json(arguments.quest_approvals_json)
-                simulation=simulate_native_quest_session(
-                    journal,pages,graph,approvals,
-                    actor_id=arguments.actor_id,
-                    scene_candidate_digest=settings["candidate_digest"],
-                    start_frame=arguments.start_frame,
-                    through_frame=arguments.through,
-                    limit=arguments.event_limit)
-                report={"operation":"simulate-quests","gameplay_session":simulation}
+                if arguments.operation=="simulate-quests":
+                    simulation=simulate_native_quest_session(
+                        journal,pages,graph,approvals,
+                        actor_id=arguments.actor_id,
+                        scene_candidate_digest=settings["candidate_digest"],
+                        start_frame=arguments.start_frame,
+                        through_frame=arguments.through,
+                        limit=arguments.event_limit)
+                    report={"operation":"simulate-quests","gameplay_session":simulation}
+                else:
+                    prior=None
+                    if arguments.checkpoint_input_json is not None:
+                        prior=_operator_json(arguments.checkpoint_input_json,
+                                             limit=48*1024*1024)
+                    progression=advance_native_quest_window(
+                        journal,pages,graph,approvals,
+                        actor_id=arguments.actor_id,
+                        scene_candidate_digest=settings["candidate_digest"],
+                        through_frame=arguments.through,
+                        previous_checkpoint=prior,
+                        max_frames=arguments.event_limit)
+                    # Exclusive create avoids overwriting any earlier checkpoint,
+                    # restoring/rewriting a user save, or following a symlink.
+                    output=arguments.checkpoint_output_json
+                    if (not output.parent.is_dir() or output.parent.is_symlink()
+                        or output.exists() or output.is_symlink()
+                        or output.resolve()==arguments.journal.resolve()):
+                        raise ValueError("checkpoint must be a new safe file beside an existing directory")
+                    fd=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                    try:
+                        with os.fdopen(fd,"w",encoding="utf-8") as handle:
+                            json.dump(progression["checkpoint"],handle,
+                                      sort_keys=True,separators=(",",":"))
+                            handle.write("\n")
+                            handle.flush()
+                            os.fsync(handle.fileno())
+                    except BaseException:
+                        output.unlink(missing_ok=True)
+                        raise
+                    report={"operation":"advance-quests",
+                            "checkpoint_file":str(output),
+                            "gameplay_window":progression}
             elif arguments.operation=="analyze":
                 report={"operation":"analyze","diagnostics":analyze_native_capture(
                     journal,start_frame=arguments.start_frame,
