@@ -122,7 +122,7 @@ class NativeZoneJournalTests(unittest.TestCase):
         anchor=bind_signed_gdd(gdd())
         catalog=({
             "id":"cross32", "actor_id":"hero",
-            "center_xyz_m":[31.99,-1.,30.],"radius_m":.015,
+            "center_xyz_m":[31.895,-1.,30.],"radius_m":.1,
             "event_page_id":"cross_border","action_kind":"show_dialogue",
         },)
         zones=normalize_gameplay_zones(catalog,allowed_actors={"hero","npc","island"})

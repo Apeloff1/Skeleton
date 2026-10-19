@@ -163,7 +163,7 @@ def validate_native_trace(
                     zone_proof=inspect_native_gameplay_zones(
                         record,expected_catalog=zones,previous=previous)
                 except NativeZoneError as exc:
-                    raise NativeSmokeError("native RPG zone events/actor geometry invalid") from exc
+                    raise NativeSmokeError(f"native RPG zone events/actor geometry invalid: {exc}") from exc
                 verified_zone_ticks+=int(zone_proof is not None)
                 zone_enter_events+=sum(x["transition"]=="enter"
                                        for x in record["native_zone_events"])
