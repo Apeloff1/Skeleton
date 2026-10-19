@@ -64,6 +64,22 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-59 Bind conservative water solver to native moving-boundary shorelines, 3D collision and persistent coastal terrain.
 - [ ] GF-P0-60 Bind atmospheric audio cues and proper audio assets to playable mixer buses, occlusion and audio engine.
 - [ ] GF-P0-61 Profile production GPU 3D ray/path lighting and physically measured leaf-shadow alignment on low/high hardware.
+- [x] GF-P0-62 Implement SI-unit reference terminal velocity using atmosphere density, gravity, body mass, area and drag coefficient.
+- [x] GF-P0-63 Add 3D lee-side aerodynamic drafting with downwind wake distance, width and shielding factors.
+- [x] GF-P0-64 Add hot thermals, sinking air, vertical wind and turbulence with deterministic time/seed/position coherence.
+- [x] GF-P0-65 Add bounded substep aerodynamic integration with gravity, lift, drag, mechanical energy and drag dissipation.
+- [x] GF-P0-66 Implement wet/icy/loose gravel traction, weighted cargo, slope force balance, climbing skill and foothold/rope checks.
+- [x] GF-P0-67 Add mass/inertia-aware rigid-body impulse resolution with tangential Coulomb friction, angular motion, material restitution and energy/momentum receipts.
+- [x] GF-P0-68 Add continuous collision detection for high-speed sphere–sphere and sphere–terrain/plane sweeps.
+- [x] GF-P0-69 Evolve microclimate rain, freeze/thaw, solar drying, erosion, sediment, pressure shear and convective uplift into actual climbing surface/airflow inputs.
+- [x] GF-P0-70 Add 14-domain realism/coherence auditor with measurable invariants and content-addressed evidence; never award self-certified physics quality scores.
+- [x] GF-P0-71 Wire opt-in advanced aerodynamic, traction, impact and weather candidates into the existing source-hashed Jeeves scene.
+- [x] GF-P0-72 Export Godot native RigidBody3D candidate with mass/collider/restitution, live per-fixed-tick wind-relative drag and wet/ice-adjusted contact material.
+- [x] GF-P0-73 Add focused regression source and CI tests for terminal speed, lee-wake, thermals, climbing, collision momentum/energy, CCD, air/terrain integration and scene compatibility.
+- [ ] GF-P0-74 Verify native Godot RigidBody3D/headless import, GPU/physics timestep equivalence and actual slope/impact behavior.
+- [ ] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
+- [ ] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
+- [ ] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
 
 - [ ] GF-P0-11 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
@@ -102,6 +118,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-24 Motion-driven leaf shadow penumbra vs GPU ray-tracer cross-verification and temporal coherence across sunlight.
 - [ ] GF-P1-25 Implement 3D source/medium photometry (atmospheric scattering, high-order bounces, shadow transmittance) in GPU shader pipeline.
 - [ ] GF-P1-26 Build desktop/mobile interactive RPG authoring UI for events, quests, scenes, characters, chunk editors and 3D prefabs.
+- [ ] GF-P1-27 Implement atmospheric boundary-layer turbulence, wind shear, terrain-induced drafting and vortex shedding calibrated against physical reference cases.
+- [ ] GF-P1-28 Integrate GPU/native climbing IK, limb contact, grip mechanics, ropes, sliding and rockfall support across 2D–3D engines.
+- [ ] GF-P1-29 Dynamic rigid-body CCD/broadphase/BVH/manifold generation and reliable restitution/friction on deformable and moving terrain.
+- [ ] GF-P1-30 Couple wind, thermal plumes, dynamic foliage, fabric, debris, fluid droplets and character motion through one authoritative timestep.
+- [ ] GF-P1-31 Map weather state to collision/surface friction, surface temperature and physical damage without mutating canonical worlds out of turn.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -129,6 +150,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-22 Cross-chunk foliage/river/shore physics reconciliation and dual verifier checks under dynamic world changes.
 - [ ] GF-P2-23 Calibrate barometry, aerosol visibility, thermal/cold/wet motion and seasonal astronomical physics against test measurements.
 - [ ] GF-P2-24 Build live character/foliage/rocks/liquid interactions with audio events, impact damage, shadow and weather responses.
+- [ ] GF-P2-25 Add mass-energy calibration and conservation or loss receipts for character, projectile, vehicle, building and mixed-material contacts.
+- [ ] GF-P2-26 Character cognition for drafting, updraft soaring, terminal descent, foothold search, avalanche/fall-risk avoidance and climate-responsive traversal.
+- [ ] GF-P2-27 Closed-loop learned game-agent simulation around weather, fast collision, climbing, carrying loads, stamina and terrain aging.
+- [ ] GF-P2-28 Weather realism parameter fitting across hot/cold, extreme elevation and changing land cover with held-out validation.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -155,6 +180,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-21 Verify all-engine chunk streaming under multithreaded edits, world reloads, LOD swaps, actor movement and save/restore.
 - [ ] GF-P3-22 Full Godot export/import screenshots and real 2D-to-3D modernization project first-install acceptance.
 - [ ] GF-P3-23 Cinematic/audio/lighting/world consistency benchmarks at actual GPU-produced 30/50/60/120fps.
+- [ ] GF-P3-24 Cross-engine real-time aerodynamics, drag, wakes, winds, fast CCD, multi-contact, climbing and impact throughput under 30/50/60/120 FPS presentation modes.
+- [ ] GF-P3-25 Native physics frame-by-frame replay energy/momentum conservation, rollback and weeks-long weather-aware traversal tests.
+- [ ] GF-P3-26 Independent external physics benchmark acceptance across rigid/soft/liquid/terrain engines and hardware generations.
 
 ## Source references
 
