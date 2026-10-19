@@ -52,6 +52,8 @@ from skeleton.ai.runtime.inference.neural import NeuralLMConfig, NumpyRecurrentL
 from skeleton.cortex.port import tokens
 
 WORD_BUDGET = 1_000_000
+TRILLION_WORDS = 1_000_000_000_000
+MILLION_WORD_DIGEST = "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5"
 SCHEMA = "skeleton.game_coherent_english.v1"
 SOURCE_DIGEST = "9121fca460dd2d4e014d7a57659e932f19f0577b5672a71fa24c3d964c039a78"
 ENGLISH = re.compile(r"[A-Za-z0-9,.' -]+")
@@ -131,6 +133,15 @@ FOCUS: dict[str, str] = {
     "likeness": "The rule is that a performer face on the {asset} needs written consent for the {place}, and silence is not a {grant}.",
     "music_rights": "The rule is that the {note} cue separates the composition from the recorded take, and only the take named by the {grant} may ship.",
     "asset_rights": "The rule is that the {asset} enters the {place} only with a {grant} for the shipped revision, and a preview file is not that grant.",
+    "sea_map": "The rule is that the seamap of the {place} marks deep water, the shore, and the rock, and a chart with no shore is not a harbor.",
+    "mountain_map": "The rule is that the mountain map of the {place} has a peak, a valley, and a pass, and the peak is higher than the valley.",
+    "cave_map": "The rule is that the cave map of the {place} starts at one entrance and every floor step connects back to that entrance.",
+    "elevation_map": "The rule is that the elevation map of the {place} stores a height on every cell, and a walk uses that height rather than the picture.",
+    "adventure_map": "The rule is that the adventure map of the {place} links screens across seams, and a large height change is a stair rather than a silent step.",
+    "homebrew_map": "The rule is that the homebrew map of the {place} has one home cell and a maker key, and every trail connects back to that home.",
+    "tabletop_map": "The rule is that the tabletop map of the {place} uses one square scale, and cover stops a shot without blocking a step.",
+    "dungeon_map": "The rule is that the dungeon map of the {place} links original rooms by doors, and every room connects back to the entry.",
+    "jeeves_cognition": "The rule is that Jeeves keeps a claim about the {place} uncertain until the {asset} evidence is written, and a missing observation does not become a fact.",
 }
 
 
@@ -311,6 +322,31 @@ def coherence_gap(model: ByteRNN, domains: tuple[str, ...] | None = None) -> dic
     }
 
 
+def training_stop(words: int, word_budget: int, stall: int, plateau_rejects: int | None) -> str | None:
+    """Stop at the word budget, or earlier when kept steps have stopped arriving."""
+    if words >= word_budget:
+        return "budget"
+    if plateau_rejects is not None and stall >= plateau_rejects:
+        return "plateau"
+    return None
+
+
+def budget_forecast(words: int, seconds: float, word_budget: int) -> dict[str, float | bool]:
+    """Project the wall clock of a budget from words actually processed."""
+    if isinstance(words, bool) or not isinstance(words, int) or words < 1:
+        raise ValueError("words must be a positive int")
+    if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+        raise ValueError("seconds must be positive")
+    if isinstance(word_budget, bool) or not isinstance(word_budget, int) or word_budget < 1:
+        raise ValueError("word_budget must be a positive int")
+    rate = words / float(seconds)
+    return {
+        "words_per_second": rate,
+        "budget_met": words >= word_budget,
+        "projected_seconds": word_budget / rate,
+    }
+
+
 def train_coherent_words(
     *,
     word_budget: int = WORD_BUDGET,
@@ -321,6 +357,8 @@ def train_coherent_words(
     chunk_docs: int = 4,
     slack: float = 2e-4,
     expected_digest: str | None = SOURCE_DIGEST,
+    plateau_rejects: int | None = None,
+    selection: str = "coherent-english",
     ledger_path: Path | str | None = None,
     log: Any = None,
 ) -> dict[str, Any]:
@@ -328,7 +366,8 @@ def train_coherent_words(
 
     A step is kept only when the mean holdout improves and no track falls past
     the slack. The best weights are restored at the end. The source checkpoint
-    is read and never replaced.
+    is read and never replaced. A plateau stops a larger budget when further
+    steps are rejected, and the receipt records how far the budget got.
     """
     if isinstance(word_budget, bool) or not isinstance(word_budget, int) or word_budget < 1:
         raise ValueError("word_budget must be a positive int")
@@ -338,6 +377,8 @@ def train_coherent_words(
         raise ValueError("chunk_docs must be a positive int")
     if isinstance(hidden, bool) or not isinstance(hidden, int) or hidden < 1:
         raise ValueError("hidden must be a positive int")
+    if plateau_rejects is not None and (isinstance(plateau_rejects, bool) or not isinstance(plateau_rejects, int) or plateau_rejects < 1):
+        raise ValueError("plateau_rejects must be a positive int")
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     ckpt_path = root / "checkpoint.pt"
@@ -374,6 +415,7 @@ def train_coherent_words(
     passages = 0
     seen_domains: set[str] = set()
     started = time.perf_counter()
+    reason: str | None = None
     batch: list[tuple[str, str]] = []
     batch_words = 0
     batch_bytes = 0
@@ -450,6 +492,15 @@ def train_coherent_words(
         passages += 1
         if len(batch) >= chunk_docs:
             _flush()
+            reason = training_stop(words, word_budget, ratchet.stall, plateau_rejects)
+            if reason == "plateau":
+                if log is not None:
+                    print(
+                        f"plateau words={words} kept={words_kept} accepts={ratchet.accepts} rejects={ratchet.rejects}",
+                        file=log,
+                        flush=True,
+                    )
+                break
             if words // 100_000 > logged_at:
                 logged_at = words // 100_000
                 _persist()
@@ -460,8 +511,11 @@ def train_coherent_words(
                         file=log,
                         flush=True,
                     )
-    if batch:
+    if batch and reason != "plateau":
         _flush()
+        reason = training_stop(words, word_budget, ratchet.stall, plateau_rejects)
+    if reason is None:
+        reason = "budget" if words >= word_budget else "stopped"
     model.load_state_dict(best_state)
     _pin(model)
     after_gap = coherence_gap(model)
@@ -479,6 +533,7 @@ def train_coherent_words(
         "word_budget": word_budget,
         "words_trained": words,
         "words_kept": words_kept,
+        "stop_reason": reason,
         "token_count": token_total,
         "passages": passages,
         "domains": len(seen_domains),
@@ -509,9 +564,13 @@ def train_coherent_words(
         "promotion": False,
         "service_checkpoint_touched": False,
         "byte_loss_is_gameplay_quality": False,
-        "selection": "coherent-english",
+        "selection": selection,
         "loss_focus": None,
     }
+    forecast = budget_forecast(words, max(receipt["seconds"], 1e-6), word_budget)
+    receipt["budget_met"] = bool(forecast["budget_met"])
+    receipt["words_per_second"] = forecast["words_per_second"]
+    receipt["projected_seconds"] = forecast["projected_seconds"]
     (root / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     if ledger_path is not None:
         _append_ledger(Path(ledger_path), receipt)
