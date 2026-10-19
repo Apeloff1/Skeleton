@@ -168,3 +168,68 @@ version-pinned Godot 4 executable, inspecting output and confirming actual
 native RigidBody3D capture against the signed source frame journal. The
 script records headless subprocess evidence, **not GPU framebuffer
 attestation**, game completion or native console certification.
+
+
+## L14–L22: Native multi-actor, observed chunk proofs and virtual gameplay GPS
+
+**Native source capture** now supports `native_capture_all_actors=True` on
+`emit_frontier_godot_overlay`, using **only** typed actors in the existing
+double-verified signed-GDD game frame. Exported identities, asset hashes, source
+XYZ/velocity and actor classification are checked against canonical frame
+chunk evidence. The first actual `RigidBody3D` is the canonical reference
+body. Additional actors currently instantiate bounded moving or static Godot
+**reference proxies**, not a substitute for production NPC/physics rigs.
+The default single-source behavior remains supported and all this is opt-in.
+
+Each Godot physics tick records actor identity, XYZ velocity/position, bounded
+contact count, source classification, per-cell memberships and the frame-local
+chunk width. The Python `game_frontier_native_chunks.py` independently
+reconstructs source partitioning and refuses duplicates, missing actors,
+incorrect cell indices, nonfinite values or mismatched chunk sizes. These are
+*client-observed* claims; a malicious client can still fabricate plausible
+input. The journal stores the native chunk SHA proof **atomically** beside the
+raw native source, GDD frame, chunk movement proof and optional compact delta.
+Replay and rollback independently reconstruct and validate each attachment.
+
+**Resumable import:** the operator CLI can ingest the same original JSONL
+after interruption with `--resume`. Previously committed records are
+acknowledged *only* if the exact native source and its independent chunk
+evidence match the journal; modified history is rejected before writing.
+Unrecorded frames can then advance the same verified chain. This is
+explicitly opt-in; a normal reimport remains a duplicate-frame error.
+
+**Evidence timeline:** use
+
+```bash
+python scripts/run_game_frontier_capture.py timeline \
+  --signed-gdd signed_gdd.json \
+  --scene-json frontier/data/scene.json \
+  --journal frames.sqlite --start-frame 60 --page-limit 120 \
+  --actor-id hero --changes-only
+```
+
+The native journal revalidates each listed chunk against the actual previous
+source, original GDD and optional native report. Timeline pages are bounded
+at 512 frames and include actor migrations, retired chunks, GDD note counts,
+native source receipt roots, delta roots and page hashes. These are read-only
+Studio/Jeeves evidence; no RPG event is autoexecuted.
+
+**Fictional GPS on actual imported game physics:** the new
+`game_frontier_runtime_navigation.py` reads replay-verified native actor
+snapshots and invokes the existing virtual beacon/landmark survey solver.
+The current and previous game-map GPS fixes are tied to the signed GDD,
+source frame, native chunk receipt, source movement and fictional map
+identity. Missing native captures or contradictory surveyed positions fail
+closed. This does not consult OS location, real-world GNSS or WGS84.
+
+**Actual engine qualification workflow:** the focused native job
+`.github/workflows/game-frontier-native-smoke.yml` downloads official
+Godot 4.7.2 Linux x86_64 release archive and checks its published archive
+SHA-256 `cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4`.
+It generates an explicit two-actor signed-GDD physics smoke project, executes
+the pinned-binary local headless import/playback runner, looks for genuine
+engine-userdata JSONL, imports the observed frames, and replays the source
+journal and timeline. A **queued, failed or skipped job is not acceptance**;
+native import, physic-tick output, physics-world coherence and rendering
+remain unverified until the actual GitHub job succeeds and its logs show the
+expected evidence.
