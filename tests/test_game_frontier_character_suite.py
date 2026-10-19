@@ -33,6 +33,7 @@ from skeleton.jeeves.game_frontier_character_suite import (
 )
 from tests.test_game_frontier_advanced_scene import scene_params
 from skeleton.jeeves.game_frontier import compile_frontier_scene
+from skeleton.jeeves.game_frontier_realism import audit_scene_realism
 from skeleton.forge.game_frontier_godot import emit_frontier_godot_overlay
 
 
@@ -318,6 +319,38 @@ class SuiteIntegrationTests(unittest.TestCase):
         data=json.loads(overlay["frontier/data/scene.json"])
         self.assertGreater(len(data["character_suite"]["elastic_skin3d"]["positions_xyz"]),0)
         self.assertEqual(data["character_suite"]["rpg_events"]["executed"],False)
+
+    def test_second_realism_auditor_detects_mass_and_event_custody_tampering(self):
+        cfg=scene_params()
+        cfg["character_suite"]=self.suite()
+        cfg["weather"]=Weather(Vec3(10,0,0),15,precipitation_mm_h=50)
+        original=compile_frontier_scene(**cfg).manifest
+        self.assertTrue(original["realism_audit"]["reference_checks_passed"])
+        self.assertIn("balance",original["realism_audit"]["participating_domains"])
+        self.assertIn("elastic_skin",original["realism_audit"]["participating_domains"])
+        self.assertIn("instruments",original["realism_audit"]["participating_domains"])
+        self.assertIn("rpg_events",original["realism_audit"]["participating_domains"])
+        modified=dict(original)
+        suite=dict(original["character_suite"])
+        balance=dict(suite["weight_distribution"])
+        loads=[list(item) for item in balance["load_per_foot_n"]]
+        loads[0][1]+=100
+        balance["load_per_foot_n"]=loads
+        suite["weight_distribution"]=balance
+        modified["character_suite"]=suite
+        audit=audit_scene_realism(modified)
+        self.assertFalse(audit.reference_checks_passed)
+        self.assertTrue(any(x.domain=="balance" and not x.passed
+                            for x in audit.invariants))
+        other_suite=dict(original["character_suite"])
+        event=dict(other_suite["rpg_events"])
+        event["executed"]=True
+        other_suite["rpg_events"]=event
+        modified["character_suite"]=other_suite
+        audit=audit_scene_realism(modified)
+        self.assertFalse(audit.reference_checks_passed)
+        self.assertTrue(any(x.domain=="rpg_events" and not x.passed
+                            for x in audit.invariants))
 
     def test_empty_suite_does_not_change_legacy_authority(self):
         cfg=scene_params()
