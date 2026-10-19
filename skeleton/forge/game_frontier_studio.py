@@ -221,3 +221,81 @@ def propose_event_actions(project: StudioProject, *, trigger: str,
                              "target":event.target,"value":event.value,
                              "authority":"candidate_not_executed"})
     return tuple(proposal)
+
+
+def compile_studio_frame(
+    project: StudioProject,
+    signed_gdd: dict,
+    *, frame_index: int,
+    fps: int,
+    preceding_frames: tuple = (),
+    notes: tuple = (),
+    entity_velocities: dict[str, tuple[float,float,float]] | None = None,
+) -> dict:
+    """Build one *verified* Studio progress frame from actual placed prefabs.
+
+    A source-authored and signed GDD is mandatory. Entity IDs and immutable
+    content digests come from the existing StudioProject, rather than a second
+    GDD or an AI-authored invented state. Live AI input is only the linked
+    between-frame note; no mutable gameplay changes occur.
+    """
+    from skeleton.jeeves.game_frontier_frame_coherence import (
+        GDDFrameNote, FrameObject, bind_signed_gdd, advance_frame,
+        ai_design_context, verify_frame, FrameCoherenceError,
+    )
+    from skeleton.jeeves.game_frontier_production import Vec3
+    if not isinstance(project, StudioProject):
+        raise StudioError("typed Studio project required")
+    anchor=bind_signed_gdd(signed_gdd)
+    if anchor.project_id!=project.project_id:
+        raise StudioError("signed GDD is for a different project")
+    if type(preceding_frames) is not tuple or len(preceding_frames)>10000:
+        raise StudioError("bounded prior verified frames required")
+    if any(not isinstance(n,GDDFrameNote) for n in notes):
+        raise StudioError("notes must reference signed GDD world laws")
+    by_id={p.prefab_id:p for p in project.prefabs}
+    velocities=entity_velocities or {}
+    if type(velocities) is not dict or len(velocities)>100000:
+        raise StudioError("bounded entity velocities required")
+    objects=[]
+    for index,placement in enumerate(project.placements):
+        prefab=by_id[placement.prefab_id]
+        entity_id=placement.prefab_id+":"+str(index)
+        speed=velocities.get(entity_id,(0.,0.,0.))
+        if type(speed) is not tuple or len(speed)!=3:
+            raise StudioError("bounded 3D velocity tuple required")
+        objects.append(FrameObject(
+            entity_id,Vec3(placement.x,placement.y,placement.z),
+            Vec3(*speed),prefab.asset_digest,
+        ))
+    if not objects:
+        raise StudioError("per-frame coherence requires placed source prefabs")
+    prior=preceding_frames[-1] if preceding_frames else None
+    if frame_index != len(preceding_frames):
+        raise StudioError("missing/hole in full prior frame sequence")
+    frame=advance_frame(
+        frame_index=frame_index,fps=fps,gdd=anchor,
+        objects=tuple(objects),previous=prior,notes=tuple(notes),
+    )
+    context=ai_design_context(anchor,(*preceding_frames,frame))
+    base=compile_studio_project(project)
+    return {
+        "schema":"skeleton.forge.studio_frame_candidate.v1",
+        "project":project.project_id,
+        "studio_manifest_digest":base["content_sha256"],
+        "source_gdd_digest":anchor.source_digest,
+        "frame":frame.frame_index,
+        "frame_clock_ns":frame.time_ns,
+        "chunk_count":len(frame.chunks),
+        "chunks":[{"cell":list(c.chunk_key),
+                   "content_digest":c.content_digest,
+                   "entities":[o.entity_id for o in c.objects]}
+                  for c in frame.chunks],
+        "verified_a":frame.verifier_a_integrity,
+        "verified_b":frame.verifier_b_coherence,
+        "frame_receipt_digest":frame.receipt_digest,
+        "note_count":len(frame.note_from_previous),
+        "gdd_ai_context":context,
+        "record":frame,
+        "authority":"studio_preview_proposed_not_engine_mutated",
+    }
