@@ -22,6 +22,8 @@ _CORE_AXES = (
     "maintainability", "machine_friendly",
 )
 _STAGES = ("comparative", "objective", "copyright", "creative_rewrite")
+_RIGHTS_AXES = ("provenance", "permissions", "license_conditions", "source_similarity")
+_REWRITE_AXES = ("originality", "substantive_transformation", "canon", "author_voice")
 _SHA_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -190,6 +192,7 @@ class ContentReviewResult:
     covered_paths: tuple[str, ...]
     passed: bool
     findings: tuple[str, ...] = ()
+    checked_dimensions: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.stage not in {"copyright", "creative_rewrite"}:
@@ -210,6 +213,15 @@ class ContentReviewResult:
             raise FinalReviewError("invalid final checker findings")
         if self.passed and self.findings:
             raise FinalReviewError("final checker cannot pass with unresolved findings")
+        if (
+            not isinstance(self.checked_dimensions, tuple)
+            or len(set(self.checked_dimensions)) != len(self.checked_dimensions)
+            or any(
+                not isinstance(item, str) or not re.fullmatch(r"[a-z][a-z0-9_]{2,63}", item)
+                for item in self.checked_dimensions
+            )
+        ):
+            raise FinalReviewError("final checker dimensions are invalid")
 
     @property
     def fingerprint(self) -> str:
@@ -218,6 +230,7 @@ class ContentReviewResult:
             "evidence": self.evidence_ref, "scope": self.review_scope,
             "paths": self.covered_paths, "passed": self.passed,
             "findings": self.findings,
+            "checked_dimensions": self.checked_dimensions,
         })
 
 
@@ -299,6 +312,14 @@ def _review_findings(
     if copyright.checker == rewrite.checker or copyright.evidence_ref == rewrite.evidence_ref:
         raise FinalReviewError("copyright and creative rewrite require independent evidence and reviewers")
     for name, report in (("copyright", copyright), ("creative_rewrite", rewrite)):
+        if report.passed:
+            mandatory = (
+                _RIGHTS_AXES if name == "copyright"
+                else _REWRITE_AXES if kind in {"game", "creative"}
+                else _REWRITE_AXES[:2]
+            )
+            if not set(mandatory).issubset(set(report.checked_dimensions)):
+                raise FinalReviewError(f"{name} reviewer omitted mandatory scrutiny dimensions")
         if report.stage != name or report.source_digest != source_digest:
             raise FinalReviewError(f"{name} checker is stale or misidentified")
         if set(report.covered_paths) != expected_paths or len(report.covered_paths) != len(expected_paths):
