@@ -36,6 +36,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("_load_approved_native_gameplay",script)
             self.assertIn("_advance_approved_dialogue",script)
             self.assertIn("ApprovedGameDialogueCard",script)
+            self.assertIn("_create_approved_inventory_objects",script)
+            self.assertIn("ApprovedInventoryToken_",script)
             self.assertIn("ContinueApprovedDialogue",script)
             self.assertIn("NativeApprovedGameplayHUD",script)
             self.assertIn("frontier_approved_gameplay_receipt.json",script)

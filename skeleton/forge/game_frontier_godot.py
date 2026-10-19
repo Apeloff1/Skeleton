@@ -60,6 +60,7 @@ var _approved_gameplay_flags: Dictionary = {}
 var _approved_gameplay_inventory: Dictionary = {}
 var _approved_gameplay_npc_emotions: Dictionary = {}
 var _approved_npc_visuals: Array[String] = []
+var _approved_inventory_visuals: Array[String] = []
 var _approved_gameplay_cues: Array = []
 var _approved_quest_objectives: Dictionary = {}
 var _approved_quest_titles: Dictionary = {}
@@ -747,6 +748,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     _approved_gameplay_quests = next_quests
     _approved_gameplay_flags = next_flags
     _approved_gameplay_inventory = next_inventory
+    _approved_inventory_visuals = _create_approved_inventory_objects(next_inventory)
     _approved_gameplay_npc_emotions = next_npc_emotions
     _approved_gameplay_cues = next_cues
     _approved_npc_visuals = _show_approved_npc_reactions(next_npc_emotions)
@@ -769,6 +771,7 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
         "quests":next_quests,"flags":next_flags,
         "inventory":next_inventory,"npc_emotions":next_npc_emotions,
         "visualized_npc_ids":_approved_npc_visuals,
+        "visualized_item_ids":_approved_inventory_visuals,
         "executed_action_trace":next_action_trace,
         "presentation_cues":next_cues,
         "authority":"approved_gameplay_runtime_local_state_not_canonical_world_promotion",
@@ -782,6 +785,32 @@ func _load_approved_native_gameplay(capture: Dictionary) -> void:
     result.close()
     _create_approved_gameplay_inspector(accepted)
     _create_approved_dialogue_view()
+
+
+func _create_approved_inventory_objects(items: Dictionary) -> Array[String]:
+    # A simple low-resource visual on the actual controlled RigidBody3D.
+    # Never invent unapproved loot and never instantiate thousands of meshes.
+    var created: Array[String] = []
+    if _aero_character == null:
+        return created
+    var known_ids: Array = items.keys()
+    known_ids.sort()
+    for index in range(mini(24, known_ids.size())):
+        var item_name: String = str(known_ids[index])
+        var token := MeshInstance3D.new()
+        token.name = "ApprovedInventoryToken_" + item_name
+        var cube := BoxMesh.new()
+        cube.size = Vector3(.2,.2,.2)
+        token.mesh = cube
+        var radians := float(index) * TAU / 24.0
+        token.position = Vector3(cos(radians)*.8, .7, sin(radians)*.8)
+        var mat := StandardMaterial3D.new()
+        mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        mat.albedo_color = Color.from_hsv(float(index % 24)/24., .75, .95)
+        token.material_override = mat
+        _aero_character.add_child(token)
+        created.append(item_name)
+    return created
 
 
 func _show_approved_npc_reactions(moods: Dictionary) -> Array[String]:

@@ -308,6 +308,7 @@ jobs:
           assert proof["verified_cue_count"]==1, proof
           assert proof["verified_action_receipts"]==6, proof
           assert proof["verified_npc_reactions"]==1, proof
+          assert proof["verified_inventory_visuals"]==1, proof
           print(json.dumps({"godot_engine_dispatch_verified":True,
                             "verified_commands":proof["verified_engine_actions"],
                             "runtime_receipt":proof["engine_gameplay_receipt_sha256"]}))
