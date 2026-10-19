@@ -457,6 +457,55 @@ jobs:
             echo '~~~' >> "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
           done
+      - name: Negative real-Godot locked-skill approval checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/frontier-project-60"
+          approval_file="$project/frontier/data/native_gameplay_dispatch.json"
+          original="$RUNNER_TEMP/frontier-approved-dispatch-negative-control.json"
+          test -s "$approval_file"
+          cp "$approval_file" "$original"
+          original_digest="$(sha256sum "$original" | cut -d ' ' -f 1)"
+          # First attempt: source absent. Godot must refuse the ability,
+          # create no approved game save and produce no dash activation.
+          rm "$approval_file"
+          absent_user="$RUNNER_TEMP/frontier-wind-dash-no-authority"
+          mkdir -p "$absent_user"
+          XDG_DATA_HOME="$absent_user" "$FRONTIER_GODOT" \
+            --headless --path "$project" --quit-after 32 \
+            -- --frontier-ci-wind-dash \
+            > "$RUNNER_TEMP/frontier-dash-no-authority.log" 2>&1
+          grep -q 'Approved game dispatcher source file/digest missing' \
+            "$RUNNER_TEMP/frontier-dash-no-authority.log"
+          if find "$absent_user" -type f \( \
+                -name frontier_local_ability_activations.jsonl -o \
+                -name frontier_approved_gameplay_receipt.json \
+              \) | grep -q .; then
+            echo "::error::Godot allowed wind dash without approved source"
+            exit 1
+          fi
+          # Second attempt: bundle exists but source digest is tampered.
+          cp "$original" "$approval_file"
+          printf ' \n' >> "$approval_file"
+          tampered_user="$RUNNER_TEMP/frontier-wind-dash-tampered-authority"
+          mkdir -p "$tampered_user"
+          XDG_DATA_HOME="$tampered_user" "$FRONTIER_GODOT" \
+            --headless --path "$project" --quit-after 32 \
+            -- --frontier-ci-wind-dash \
+            > "$RUNNER_TEMP/frontier-dash-tampered-authority.log" 2>&1
+          grep -q 'Approved game dispatcher source SHA does not match scene' \
+            "$RUNNER_TEMP/frontier-dash-tampered-authority.log"
+          if find "$tampered_user" -type f \( \
+                -name frontier_local_ability_activations.jsonl -o \
+                -name frontier_approved_gameplay_receipt.json \
+              \) | grep -q .; then
+            echo "::error::Godot accepted a modified gameplay-approval bundle"
+            exit 1
+          fi
+          cp "$original" "$approval_file"
+          test "$(sha256sum "$approval_file" | cut -d ' ' -f 1)" = "$original_digest"
+          echo "Real Godot rejected both missing and tampered skill approval sources"
       - name: Differential native 30/50/60/120 Hz source-replayed comparisons
         shell: bash
         run: |
