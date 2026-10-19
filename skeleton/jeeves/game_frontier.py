@@ -455,10 +455,65 @@ def compile_frontier_scene(
         }
     # Opt-in character suite: barycentric load, elastic mesh, simulated
     # instruments and RPG conditions. No event or physics execution.
+    import math
+    derived_signals = {
+        "altitude_m": atmosphere.altitude_m,
+        "pressure_pa": atmosphere.pressure_pa,
+        "fog_visibility_m": atmosphere.meteorological_visibility_m,
+        "humidity": air_conditions.relative_humidity,
+        "temperature_c": (physical_weather.temperature_c if physical_weather
+                          else air_conditions.temperature_c),
+        "rain_mm_h": air_conditions.rain_mm_h,
+        "wind_mps": math.sqrt(active_wind.dot(active_wind)),
+    }
+    if tide:
+        derived_signals.update({
+            "tide_height_m": tide.water_height_m,
+            "moon_phase": tide.moon_phase,
+            "solar_height": tide.sun_altitude_proxy,
+            "daylight": 1. if tide.sun_altitude_proxy > 0 else 0.,
+        })
+    if liquid_step:
+        derived_signals["water_depth_m"] = liquid_step.grid.water_depth_m[0]
+    elif physical_weather:
+        derived_signals["water_depth_m"] = physical_weather.water_depth_m
+    if advanced_receipt:
+        derived_signals["updraft_mps"] = advanced_receipt["updraft_mps"]
+        gust = advanced_receipt["turbulence_xyz"]
+        derived_signals["turbulence_mps"] = math.sqrt(sum(v*v for v in gust))
+        derived_signals["fall_speed_mps"] = max(
+            0., -advanced_receipt["body"]["velocity_xyz"][2])
+        derived_signals["traction_slip_risk"] = advanced_receipt["traction"]["slip_risk"]
+        derived_signals["climb_angle_deg"] = advanced_receipt["traction"]["slope_degrees"]
+        if advanced_receipt["impact"]:
+            derived_signals["impact_impulse_ns"] = advanced_receipt["impact"]["impulse_ns"]
+            derived_signals["collision_energy_j"] = advanced_receipt["impact"]["energy_loss_j"]
+        local_climate = advanced_receipt.get("microclimate")
+        if local_climate:
+            derived_signals["soil_wetness"] = local_climate["soil_water_fraction"]
+            derived_signals["ground_ice_fraction"] = local_climate["ground_ice_fraction"]
+            derived_signals["erosion"] = local_climate["erosion_pressure"]
+    elif character_step:
+        derived_signals["traction_slip_risk"] = character_step.awareness.slip_risk
+    if traced:
+        derived_signals["shadow_fraction"] = traced[0].geometric_shadow_fraction
+    if audit_leaves:
+        derived_signals["leaf_shadow_area_m2"] = audit_leaves[0].geometric_area_m2
+    if environment_step:
+        derived_signals.setdefault("erosion",environment_step.erosion)
+        derived_signals.setdefault("soil_wetness",environment_step.soil_saturation)
+    if structure_steps:
+        derived_signals["building_integrity"] = structure_steps[0].integrity
+    if variant_cell:
+        derived_signals["sky_island_height_m"] = variant_cell.celestial_altitude
+    if audio:
+        derived_signals["sound_occlusion"] = float(bool(light_occluders))
+        derived_signals["music_intensity"] = audio.gain
     character_suite_receipt = (compile_character_suite(
         character_suite, skeleton=skeleton, mesh=mesh,
         animation=animation, animation_time_ms=animation_time_ms,
         delta_s=delta_s, weather=physical_weather,
+        derived_observations=derived_signals,
     ) if character_suite is not None else None)
     prediction = None
     if speculative_input is not None:
