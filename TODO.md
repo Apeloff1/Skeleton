@@ -177,6 +177,22 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-167 Provide a version-hash-pinned local Godot 4 headless import/play driver with bounded frame/time budgets, source asset validation and hashed subprocess logs.
 - [x] GF-P0-168 Validate the native Godot operator harness against missing assets, corrupt scene schema, changed executable, process failures and reported parser errors.
 - [ ] GF-P0-169 Execute Godot 4 import/play with a real trusted binary, capture live RigidBody3D ticks and inspect actual emitted game-frame evidence for signoff.
+- [x] GF-P0-170 Export all actors from a signed double-verified source game frame, preserving source asset identity and explicit reference-proxy classifications.
+- [x] GF-P0-171 Implement opt-in multi-actor Godot 4 physics body generation and capture of position, velocity and bounded contact counts.
+- [x] GF-P0-172 Add frame-local native chunk memberships from game coordinates, including negative cell boundaries and exactly-once actor source coverage.
+- [x] GF-P0-173 Independently reconstruct and verify reported native chunk membership, actor source identity, bounded physics values and candidate-only evidence SHA.
+- [x] GF-P0-174 Commit source native-physics chunk receipts alongside frame, GDD, game source and native observations atomically in the durable journal.
+- [x] GF-P0-175 Recheck native chunk source reports during full replay and fork/restore; reject even hash-matched but source-inconsistent reports.
+- [x] GF-P0-176 Add resumed multi-actor JSONL import that reuses only exactly matching committed frames and rejects altered history.
+- [x] GF-P0-177 Build bounded frame/chunk/native/notes evidence page iterator for GDD-aware game studio inspection, temporal filters and source digests.
+- [x] GF-P0-178 Expose paginated game chunk evidence timeline, actor and chunk filters, replay and resumable capture in the operator CLI.
+- [x] GF-P0-179 Bind verified imported native actor frames into fictional world-map GPS and surveyed navigation with GDD and chunk native evidence links.
+- [x] GF-P0-180 Create deterministic safe two-actor signed-GDD native Godot project fixture generator and executable smoke build driver.
+- [x] GF-P0-181 Add specialized real-Godot-4.7.2 native headless import/capture/ingest/replay workflow with official SHA-256 pinned release archive.
+- [x] GF-P0-182 Add source regression tests for 3-actor 4-rate chunk capture, native contact bounds, hostile partitions, virtual navigation and interrupted replay.
+- [ ] GF-P0-183 Run specialized Godot workflow successfully with true headless generated scene parsing, runtime observed native physics and import receipts.
+- [ ] GF-P0-184 Complete multi-actor native semantic physics using real game NPC/controller instead of bounded reference proxies.
+- [ ] GF-P0-185 Feed qualified native physics/event evidence to authorized playable game scenes with real Godot rendered-world QA.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
 - [ ] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups.
@@ -242,6 +258,12 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-53 Instrument true renderer frames, depth/normal/shadow buffers, material IDs and per-chunk draw/visibility counters with native provenance.
 - [ ] GF-P1-54 Expose replay timeline and frame evidence diffs in Jeeves/Galaxy Studio UI with per-chunk graph, notes and native observation filtering.
 - [ ] GF-P1-55 Integrate runtime save/restore and replay journal branches with the canonical Forge production game state and GDD revision authority.
+- [ ] GF-P1-56 Add native scene-authorized moving/static actor builder per RPG entity/asset graph, not only proxy spheres.
+- [ ] GF-P1-57 Stream individual native chunk LOD/composition/physics/mesh/source deltas to durable GDD ledger and UI panels.
+- [ ] GF-P1-58 Implement crash-resumable batch compacted source ingestion, checkpoint snapshots, event replay and deep native chunk validation.
+- [ ] GF-P1-59 Couple real Godot scene camera, renderer shadow, GPU buffer, collision and animation cues into chunk sensory receipts.
+- [ ] GF-P1-60 Build real-time clickable Studio UI for native evidence pages, chunk migration and RPG/GDD review.
+- [ ] GF-P1-61 Integrate GPS/survey/map route into real game character controllers and NPC navigation while avoiding device geolocation.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
@@ -291,6 +313,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-44 Develop ensemble adversarial benchmarks for source-vs-native physics divergence, lost chunk streams and corrupted replay.
 - [ ] GF-P2-45 Add multiworld branch/realm semantic rebasing on signed GDD transitions with cross-era compatibility.
 - [ ] GF-P2-46 Analyze true gameplay camera/sound/foliage/light continuity from captured native frames without inventing missing observations.
+- [ ] GF-P2-47 Learn authored game-navigation affordances from verified native movement/chunk data and GDD world-law notes.
+- [ ] GF-P2-48 Train/cross-verify AI world reasoning on hold-out native collision/game-map/weather evidence with no unreviewed canon promotion.
+- [ ] GF-P2-49 Support actual generated multi-era 2D/2.5D/3D game scene runtime adapters and per-frame native evidence.
+- [ ] GF-P2-50 Link Dragon and Jeeves multimodal training to observational native world deltas and source-verified virtual GPS fix errors.
 
 ## P3 — Production qualification and large-scale world operation
 
@@ -339,6 +365,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-43 Obtain independent engine binary provenance, native runtime log and gameplay screenshot acceptance for first install and console era builds.
 - [ ] GF-P3-44 Stress multi-actor, multi-GDD revision, multiplayer, portal and longform studio rollback against adverse I/O and FPS drift.
 - [ ] GF-P3-45 Benchmark model-assisted delta/canon reviews against verified game playthrough quality without promoting unreviewed AI output.
+- [ ] GF-P3-46 Qualify original game first-install native input, renderer and physics behavior across multiple windows, platforms and graphics backends.
+- [ ] GF-P3-47 Validate hour/day/week physics capture workloads with resumable ingestion, retention, backpressure and source checkpoint scrubbing.
+- [ ] GF-P3-48 Native engine 30/50/60/120 sustained FPS and GPU/CPU capture evidence benchmarks with measured render and frame latency.
+- [ ] GF-P3-49 Independently certify multi-actor native physics and virtual position/survey uncertainty through all game world-axis transitions.
+- [ ] GF-P3-50 Longform project recovery and canon/AI context/signoff evidence after merges and journal forks.
 
 ## Source references
 
