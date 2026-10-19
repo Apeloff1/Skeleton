@@ -36,6 +36,7 @@ func _ready() -> void:
     if typeof(data) != TYPE_DICTIONARY or data.get("schema") != "skeleton.game.frontier_godot_overlay.v1":
         push_error("Invalid frontier data")
         return
+    Engine.max_fps = int(data["requested_fps"])
     _create_character(data["geometry"], data["colliders"])
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
