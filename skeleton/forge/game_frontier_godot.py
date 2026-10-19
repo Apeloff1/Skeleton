@@ -94,6 +94,9 @@ var _native_landing_risk_meter: ProgressBar
 var _game_route_waypoints: Array = []
 var _game_route_cursor: int = 0
 var _game_route_label: Label
+var _virtual_source_fix_xyz: Vector3 = Vector3.ZERO
+var _virtual_source_fix_available: bool = false
+var _virtual_live_gps_label: Label
 var _virtual_camera_mode: int = 0
 var _virtual_camera_orbit_s: float = 0.0
 var _virtual_camera_mode_label: Label
@@ -122,6 +125,7 @@ func _ready() -> void:
     _create_character_suite_inspector(suite)
     _create_virtual_game_gps(data.get("virtual_game_gps", {}))
     _create_virtual_route_book(data.get("virtual_game_gps", {}))
+    _create_live_virtual_gps_delta(data.get("virtual_game_gps", {}))
     _create_chunk_evidence_inspector(data.get("chunk_evidence_summary", {}))
     _create_clouds(data["clouds"])
     _create_environment(data["world"])
@@ -367,6 +371,50 @@ func _update_native_flight_instruments() -> void:
         " | Ground speed (m/s): " + str(snappedf(groundspeed, .01)) + "\n" +
         "Virtual bearing (deg): " + str(snappedf(bearing, .1)) +
         " | Tick: " + str(_native_capture_tick)
+    )
+
+
+func _create_live_virtual_gps_delta(nav: Dictionary) -> void:
+    # Fixed author-selected fictional map fix plus actual rigid body movement.
+    # Never request Earth, hardware GPS or real-world geolocation.
+    if (nav.is_empty() or bool(nav.get("device_location_used", true))
+        or str(nav.get("authority", "")) !=
+        "virtual_game_navigation_candidate_no_world_mutation"):
+        return
+    var xyz: Variant = nav.get("world_xyz_m")
+    if typeof(xyz) != TYPE_ARRAY or xyz.size() != 3:
+        return
+    for coordinate in xyz:
+        if not is_finite(float(coordinate)):
+            push_error("Authored virtual game GPS has invalid coordinate")
+            return
+    _virtual_source_fix_xyz = _vec(xyz)
+    _virtual_source_fix_available = true
+    var hud := CanvasLayer.new()
+    hud.name = "GodotLiveVirtualGPSDelta"
+    var label := Label.new()
+    label.name = "VerifiedGameLocationDelta"
+    label.position = Vector2(20, 275)
+    label.add_theme_color_override("font_color",Color(.45,.91,.98))
+    hud.add_child(label)
+    add_child(hud)
+    _virtual_live_gps_label = label
+    _update_live_virtual_gps_delta()
+
+
+func _update_live_virtual_gps_delta() -> void:
+    if (not _virtual_source_fix_available or _aero_character == null
+        or _virtual_live_gps_label == null):
+        return
+    var offset: Vector3 = _aero_character.global_position - _virtual_source_fix_xyz
+    var horizontal: float = Vector2(offset.x,offset.z).length()
+    var azimuth: float = fposmod(rad_to_deg(atan2(offset.x,-offset.z)),360.0)
+    _virtual_live_gps_label.text = (
+        "LIVE FICTIONAL GAME GPS DRIFT (physics only)\n" +
+        "Distance from authored fix: " + str(snappedf(horizontal,.01)) +
+        " m horizontal / " + str(snappedf(offset.y,.01)) +
+        " m vertical\nBearing of displacement: " +
+        str(snappedf(azimuth,.1)) + " degrees"
     )
 
 
@@ -2019,6 +2067,7 @@ func _physics_process(delta: float) -> void:
     _inspect_approved_npc_proximity()
     _update_native_flight_instruments()
     _update_native_landing_risk()
+    _update_live_virtual_gps_delta()
 
 func _create_character(geometry: Dictionary, colliders: Array) -> void:
     var verts: Array = geometry["vertices"]

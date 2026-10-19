@@ -51,6 +51,8 @@ class NativeGodotProjectMaterializationTests(unittest.TestCase):
             self.assertIn("Required native Godot game interface is missing",script)
             self.assertIn("_update_native_landing_risk",script)
             self.assertIn("FictionalWorldRouteBook",script)
+            self.assertIn("GodotLiveVirtualGPSDelta",script)
+            self.assertIn("_update_live_virtual_gps_delta",script)
             self.assertIn("GameCinematicCameraDirector",script)
             self.assertIn("Overhead inspection",script)
             self.assertIn("_cycle_game_cinematic_camera",script)
