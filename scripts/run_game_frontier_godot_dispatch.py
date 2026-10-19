@@ -23,6 +23,7 @@ from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd
 from skeleton.jeeves.game_frontier_receipt_journal import FrameReceiptJournal
 from skeleton.jeeves.game_frontier_native_rpg_bridge import parse_native_rpg_pages
 from skeleton.jeeves.game_frontier_native_local_effect_audit import audit_native_local_effects
+from skeleton.jeeves.game_frontier_native_progression_audit import audit_native_progression
 from skeleton.jeeves.game_frontier_native_engine_dispatch import (
     compile_native_godot_dispatch,canonical_dispatch_json,dispatch_file_sha256,
 )
@@ -73,6 +74,7 @@ def _compile(args):
             max_frames=args.max_frames,
             frames_per_window=args.frames_per_window)
     audit_native_local_effects(bundle)
+    audit_native_progression(bundle)
     return scene,bundle
 
 
@@ -126,6 +128,7 @@ def _verify(args):
     scene,bundle=_compile(args)
     dispatch=args.project/"frontier/data/native_gameplay_dispatch.json"
     independent_effect_receipt=audit_native_local_effects(bundle)
+    independent_progression=audit_native_progression(bundle)
     expected=dispatch_file_sha256(bundle)
     bound=scene["native_capture"].get("native_gameplay_dispatch",{})
     if (bound.get("file_sha256")!=expected or
@@ -217,6 +220,7 @@ def _verify(args):
         "verified_faction_standings":len(receipt["faction_reputation"]),
         "verified_local_effects":len(receipt["local_effect_history"]),
         "independent_local_effect_receipt":independent_effect_receipt["receipt_digest"],
+        "independent_progression_receipt":independent_progression["receipt_digest"],
         "verified_health_visual_effects":len(receipt["visualized_health_effect_kinds"]),
         "verified_cue_count":len(expected_cues),
         "verified_fx_cues":len(expected_fx),
