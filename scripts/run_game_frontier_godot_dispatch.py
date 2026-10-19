@@ -69,7 +69,8 @@ def _compile(args):
             journal,pages,graph,approvals,checkpoint,
             actor_id=args.actor_id,
             scene_candidate_digest=settings["candidate_digest"],
-            max_frames=args.max_frames)
+            max_frames=args.max_frames,
+            frames_per_window=args.frames_per_window)
     return scene,bundle
 
 
@@ -179,6 +180,7 @@ def main(argv=None):
     parser.add_argument("--actor-id",default="hero")
     parser.add_argument("--track",default="production")
     parser.add_argument("--max-frames",type=int,default=4096)
+    parser.add_argument("--frames-per-window",type=int,default=256)
     parser.add_argument("--engine-receipt-json",type=Path)
     args=parser.parse_args(argv)
     if (args.operation=="verify")!=(args.engine_receipt_json is not None):

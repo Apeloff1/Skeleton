@@ -29,6 +29,7 @@ _ALLOWED=frozenset((
 def compile_native_godot_dispatch(
     journal,pages,quest_graph,approvals,checkpoint, *, actor_id: str,
     scene_candidate_digest: str, max_frames: int = 4096,
+    frames_per_window: int = 256,
 ) -> dict:
     """Cold-audit a checkpoint; materialize only verified approved actions.
 
@@ -36,7 +37,8 @@ def compile_native_godot_dispatch(
     scene; Godot validates the file digest against its source scene and
     applies the actions in order with an on-disk game-state receipt.
     """
-    if type(max_frames) is not int or not 1<=max_frames<=4096:
+    if (type(max_frames) is not int or not 1<=max_frames<=4096 or
+        type(frames_per_window) is not int or not 1<=frames_per_window<=4096):
         raise NativeQuestSessionError("bounded Godot dispatch export required")
     proof=audit_native_quest_checkpoint(
         journal,pages,quest_graph,approvals,checkpoint,
@@ -48,15 +50,15 @@ def compile_native_godot_dispatch(
     catalog=parse_native_quest_graph(quest_graph)
     commands=[]
     cursor=None
-    for first in range(0,last+1,256):
-        stop=min(last,first+255)
+    for first in range(0,last+1,frames_per_window):
+        stop=min(last,first+frames_per_window-1)
         response=advance_native_quest_window(
             journal,pages,quest_graph,approvals,
             actor_id=actor_id,scene_candidate_digest=scene_candidate_digest,
             through_frame=stop,previous_checkpoint=cursor,
             expected_checkpoint_digest=(
                 cursor["receipt_digest"] if cursor is not None else None),
-            max_frames=256)
+            max_frames=frames_per_window)
         for entry in response["entries"]:
             for approved in entry["approved_pages"]:
                 for index,action in enumerate(approved["actions"]):
