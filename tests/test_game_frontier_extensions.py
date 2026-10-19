@@ -176,6 +176,26 @@ class ChunkAndAssetTests(unittest.TestCase):
             sprite_to_3d(art,era="no-real-engine")
 
 
+class BiomeMotionTests(unittest.TestCase):
+    def test_character_impact_and_wind_move_shrubs_rocks_and_preserve_rays(self):
+        from skeleton.jeeves.game_frontier_biome_motion import (
+            ShrubState,SmallRockState,ContactForce,advance_biome_objects,
+        )
+        shrub=ShrubState("bush",Vec3(0,0,0),Vec3(0,0,1),
+                         Vec3(0,0,0),12,1,.3)
+        rock=SmallRockState("pebble",Vec3(0,0,.2),Vec3(0,0,0),.2,2)
+        contact=ContactForce(Vec3(0,0,.4),Vec3(5,0,0),1)
+        response=advance_biome_objects((shrub,),(rock,),
+                                       wind=Vec3(10,0,0),dt_s=.1,
+                                       contacts=(contact,))
+        self.assertEqual(response.impact_count,2)
+        self.assertGreater(response.shrubs[0].tip.x,0)
+        self.assertGreater(response.rocks[0].position.x,0)
+        self.assertGreater(response.rocks[0].rolling_radians,0)
+        self.assertGreaterEqual(response.rocks[0].position.z,.2)
+        self.assertEqual(response.authority,"reference_motion_not_engine_committed")
+
+
 class StudioTests(unittest.TestCase):
     def project(self):
         layer=MapLayer("terrain",2,2,("grass","stone"),(0,0,0,1))
@@ -226,6 +246,7 @@ class FullFrontierCandidateTests(unittest.TestCase):
         from skeleton.jeeves.game_frontier_worlds import (
             WorldVariant, WorldFamily, CameraSpec, ProjectionMode,
         )
+        from skeleton.jeeves.game_frontier_biome_motion import ShrubState,SmallRockState
         zero=BonePose(Vec3(0,0,0))
         scene=compile_frontier_scene(
             world_axes=WorldAxis(11,.4,.6,.7,.8,.9,.2),cell_x=0,cell_y=0,
@@ -253,6 +274,10 @@ class FullFrontierCandidateTests(unittest.TestCase):
             light_sources=(LightSource("sun",Vec3(0,0,10),800),),
             audio_source_distance_m=10,verify_all_era_chunks=True,
             original_pixel_asset=PixelAsset("grass",(".#","##")),
+            shrubs=(ShrubState("bush",Vec3(1,0,0),Vec3(1,0,1),
+                                Vec3(0,0,0),5,.2,.3),),
+            small_rocks=(SmallRockState("pebble",Vec3(2,0,.2),
+                                        Vec3(0,0,0),.2,2),),
         )
         m=scene.manifest
         self.assertEqual(m["atmosphere"]["altitude_m"],830)
@@ -264,6 +289,8 @@ class FullFrontierCandidateTests(unittest.TestCase):
         self.assertEqual(len(m["chunk_verification"]),len(tuple(EngineEra)))
         self.assertTrue(all(x["passed_both"] for x in m["chunk_verification"]))
         self.assertEqual(len(m["old_new_assets"]),2)
+        self.assertEqual(len(m["biome_motion"]["shrubs"]),1)
+        self.assertEqual(len(m["biome_motion"]["rocks"]),1)
         self.assertFalse(scene.approved_for_runtime)
         from json import loads
         files=emit_frontier_godot_overlay(scene,cloud_path_duration_s=2)
@@ -274,6 +301,8 @@ class FullFrontierCandidateTests(unittest.TestCase):
         self.assertIn("FrontierLiquidSurface",gd)
         self.assertIn("VerifiedLeafShadow",gd)
         self.assertIn("volumetric_transmission",gd)
+        self.assertIn("MotionAwareShrub",gd)
+        self.assertIn("ImpactAwareRock",gd)
 
 
 if __name__=="__main__":
