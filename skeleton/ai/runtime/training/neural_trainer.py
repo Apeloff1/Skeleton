@@ -74,12 +74,16 @@ class NeuralLocalTrainer:
 
     @staticmethod
     def _optimizer(config: Mapping[str, Any]) -> dict[str, Any]:
-        return {
-            "algorithm": _ALGORITHM,
+        opt = {
+            "algorithm": config.get("algorithm", _ALGORITHM),
             "learning_rate": config["learning_rate"],
             "gradient_clip": config["gradient_clip"],
             "slots": {},
         }
+        if config.get("optimizer", "sgd") != "sgd":
+            opt["optimizer"] = config["optimizer"]
+            opt["weight_decay"] = config.get("weight_decay", 0.0)
+        return opt
 
     @staticmethod
     def _usage(
@@ -336,6 +340,8 @@ class NeuralLocalTrainer:
         epochs: int = 8,
         learning_rate: float = 0.05,
         gradient_clip: float = 1.0,
+        optimizer: str = "sgd",
+        weight_decay: float = 0.0,
         worker_id: str = "local-neural-trainer",
         now: datetime | None = None,
     ) -> tuple[NumpyRecurrentLM, NeuralTrainingArtifact]:
@@ -346,6 +352,15 @@ class NeuralLocalTrainer:
             raise TrainingStateError("neural local trainer supports one worker and single parallelism")
         if isinstance(epochs, bool) or not isinstance(epochs, int) or not 1 <= epochs <= _MAX_EPOCHS:
             raise TrainingStateError("neural epochs must be in [1, 1024]")
+        if optimizer not in {"sgd", "adamw"}:
+            raise TrainingStateError("invalid neural optimizer")
+        if (
+            isinstance(weight_decay, bool)
+            or not isinstance(weight_decay, (int, float))
+            or not math.isfinite(weight_decay)
+            or not 0.0 <= float(weight_decay) <= 1.0
+        ):
+            raise TrainingStateError("invalid neural weight_decay")
         for name, value, maximum in (
             ("learning_rate", learning_rate, 10.0),
             ("gradient_clip", gradient_clip, 1000.0),
@@ -357,7 +372,7 @@ class NeuralLocalTrainer:
                 or not 0 < value <= maximum
             ):
                 raise TrainingStateError(f"invalid neural {name}")
-        config = {
+        config: dict[str, Any] = {
             "algorithm": _ALGORITHM,
             "model_id": f"skeleton-local-neural:{manifest.run_id}",
             "hidden_size": hidden_size,
@@ -367,6 +382,9 @@ class NeuralLocalTrainer:
             "learning_rate": float(learning_rate),
             "gradient_clip": float(gradient_clip),
         }
+        if optimizer != "sgd" or weight_decay != 0.0:
+            config["optimizer"] = optimizer
+            config["weight_decay"] = float(weight_decay)
         for name in ("hidden_size", "epochs", "learning_rate", "gradient_clip", "dtype"):
             if name in manifest.hyperparameters and manifest.hyperparameters[name] != config[name]:
                 raise TrainingStateError(f"neural {name} conflicts with immutable manifest")
@@ -444,7 +462,11 @@ class NeuralLocalTrainer:
                 next_usage = self._usage(binding, epoch, next_index, documents)
                 self._enforce_usage(manifest, next_usage, corpus_bytes=corpus_bytes)
                 observed = model.train_document(
-                    documents[index], learning_rate=learning_rate, gradient_clip=gradient_clip
+                    documents[index],
+                    learning_rate=learning_rate,
+                    gradient_clip=gradient_clip,
+                    optimizer=optimizer,
+                    weight_decay=weight_decay,
                 )
                 if observed != sizes[index] + 1:
                     raise TrainingStateError("neural update target usage drift")

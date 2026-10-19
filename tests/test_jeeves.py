@@ -78,6 +78,17 @@ class TestSamMatrix:
         sam.record_attempt("weak", success=False)
         assert "weak" in sam.review_queue()
 
+    def test_records_round_trip(self):
+        sam = SamMatrix()
+        sam.record_attempt("sprites", success=True, weight=0.08)
+        saved = sam.export_records()
+        restored = SamMatrix()
+        restored.load_records(saved)
+        again = restored.export_records()
+        assert again[0]["concept"] == "sprites"
+        assert again[0]["attempts"] == 1
+        assert again[0]["mastery"] == saved[0]["mastery"]
+
 
 class TestClomMatrix:
     def test_difficulty_adjustment(self):

@@ -26,8 +26,7 @@ from collections import deque
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field, replace
-from skeleton.compat.datetime_utc import UTC
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from importlib import metadata as package_metadata
 from importlib.util import find_spec

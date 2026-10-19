@@ -78,7 +78,7 @@ class NeuralLM:
                 out[v] += hd * row[v]
         return out
 
-    def _sgd(self, i: int, j: int, lr: float) -> float:
+    def _sgd(self, i: int, j: int, lr: float, *, weight_decay: float = 0.0) -> float:
         logits = self._logits(i)
         p = _softmax(logits)
         loss = -math.log(max(p[j], 1e-12))
@@ -87,6 +87,7 @@ class NeuralLM:
         D = self.dim
         V = self.V
         dE = _zeros(D)
+        decay = 1.0 - float(lr) * max(0.0, float(weight_decay))
         for d in range(D):
             acc = 0.0
             row = self.W[d]
@@ -94,27 +95,75 @@ class NeuralLM:
             for v in range(V):
                 g = dlog[v]
                 acc += row[v] * g
-                row[v] -= lr * hd * g
+                row[v] = row[v] * decay - lr * hd * g
             dE[d] = acc
         for v in range(V):
             self.b[v] -= lr * dlog[v]
         for d in range(D):
-            h[d] -= lr * dE[d]
+            h[d] = h[d] * decay - lr * dE[d]
         self.steps += 1
         return loss
 
-    def fit(self, texts: Iterable[str], *, lr: float = 0.08) -> int:
-        n = 0
-        for raw in texts:
+    def fit(
+        self,
+        texts: Iterable[str],
+        *,
+        lr: float = 0.08,
+        schedule: str = "constant",
+        weight_decay: float = 0.0,
+    ) -> int:
+        from skeleton.cortex.attn import cosine_lr
+
+        raw_list = list(texts)
+        pairs: List[Tuple[int, int]] = []
+        for raw in raw_list:
             body = tokens(raw)
             if len(body) < 2:
                 continue
             ids = [self._id(t) for t in body]
             for a, b in zip(ids, ids[1:]):
-                self._sgd(a, b, lr)
-                n += 1
+                pairs.append((a, b))
             self.fitted += 1
-        return n
+        total = max(1, len(pairs))
+        for idx, (a, b) in enumerate(pairs):
+            step_lr = cosine_lr(idx, total, base=lr) if schedule == "cosine" else lr
+            self._sgd(a, b, step_lr, weight_decay=weight_decay)
+        return len(pairs)
+
+    def self_learn(
+        self,
+        texts: Iterable[str],
+        *,
+        epochs: int = 3,
+        lr: float = 0.08,
+        weight_decay: float = 1e-4,
+    ) -> Dict[str, Any]:
+        """Self-learning pass with cosine schedule and perplexity ratchet rollback."""
+        corpus = [t for t in texts if t]
+        if not corpus:
+            return {"steps": 0, "ppl_before": float(self.V), "ppl_after": float(self.V), "accepted": False}
+        ppl_before = self.perplexity(corpus)
+        best_ppl = ppl_before
+        best_snap = self.snapshot()
+        steps = 0
+        for ep in range(max(1, int(epochs))):
+            ep_lr = lr * (0.85 ** ep)
+            steps += self.fit(corpus, lr=ep_lr, schedule="cosine", weight_decay=weight_decay)
+            cur_ppl = self.perplexity(corpus)
+            if cur_ppl <= best_ppl + 1e-9:
+                best_ppl = cur_ppl
+                best_snap = self.snapshot()
+            else:
+                restored = NeuralLM.from_snapshot(best_snap)
+                self.E = restored.E
+                self.W = restored.W
+                self.b = restored.b
+        return {
+            "steps": steps,
+            "ppl_before": round(ppl_before, 4),
+            "ppl_after": round(best_ppl, 4),
+            "accepted": best_ppl <= ppl_before + 1e-9,
+        }
 
     def logprob(self, text: str) -> float:
         body = tokens(text)

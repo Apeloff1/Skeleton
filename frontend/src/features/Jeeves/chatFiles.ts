@@ -165,6 +165,19 @@ export async function uploadChatAttachment(input: ChatAttachmentUploadInput): Pr
   return uploadProjection(data);
 }
 
+/** Upload a batch of files ("Upload all files") to the canonical conversation. */
+export async function uploadAllChatAttachments(inputs: ChatAttachmentUploadInput[]): Promise<UploadedChatAttachment[]> {
+  if (!Array.isArray(inputs) || inputs.length === 0) {
+    throw new Error('Select at least one file to upload.');
+  }
+  const uploaded: UploadedChatAttachment[] = [];
+  for (const input of inputs.slice(0, 4)) {
+    if (input.signal?.aborted) break;
+    uploaded.push(await uploadChatAttachment(input));
+  }
+  return uploaded;
+}
+
 export async function readChatAttachment(reference: string, threadId: string, options: AttachmentRequestOptions = {}): Promise<UploadedChatAttachment> {
   const data = await fileRequest(`/${attachmentId(reference)}?thread_id=${encodeURIComponent(threadId)}`, { method: 'GET' }, options);
   return uploadProjection(data);
