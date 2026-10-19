@@ -79,6 +79,16 @@ class AdvancedSceneTests(unittest.TestCase):
         self.assertIn("liquid",report["participating_domains"])
         self.assertTrue(report["reference_checks_passed"])
         self.assertEqual(len(report["evidence_digest"]),64)
+        from skeleton.forge.game_frontier_godot import emit_frontier_godot_overlay
+        from json import loads
+        overlay = emit_frontier_godot_overlay(first, cloud_path_duration_s=2)
+        source = overlay["frontier/frontier_scene.gd"]
+        data = loads(overlay["frontier/data/scene.json"])
+        self.assertIn("RigidBody3D.new()", source)
+        self.assertIn("apply_central_force(drag_n)", source)
+        self.assertEqual(data["advanced_physics"]["body"]["mass_kg"], 85)
+        self.assertEqual(data["realism_audit"]["authority"],
+                         "candidate_checks_only_not_native_validation")
 
     def test_advanced_collision_has_weight_impulse_and_energy_receipts(self):
         cfg=scene_params()
