@@ -1,0 +1,7 @@
+{
+  "operation": "api-stale-catalog-refusal",
+  "http_status": 400,
+  "response": {
+    "error": "capability catalog changed; refresh before execution"
+  }
+}

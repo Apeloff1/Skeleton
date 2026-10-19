@@ -13,10 +13,10 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
 
     assert "workflow_dispatch:" in workflow
     assert "schedule:" in workflow
-    assert 'cron: "2-52/10 * * * *"' in workflow
-    assert "workflow_run:" in workflow
-    assert 'workflows: ["Merge Readiness", "Prune redundant branches safely"]' in workflow
-    assert "types: [completed]" in workflow
+    # Recovery is hourly, rather than fanning out from each completed check.
+    assert 'cron: "7 * * * *"' in workflow
+    assert "workflow_run:" not in workflow
+    assert 'workflows: ["Merge Readiness", "Prune redundant branches safely"]' not in workflow
     assert "branches: [main]" in workflow
     assert "\n  push:\n    branches: [main]\n    paths: ['.github/workflows/queue-drain.yml']" in workflow
     assert "group: queue-drain-v6-${{ github.repository }}" in workflow
@@ -41,7 +41,8 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
 def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
     workflow = _workflow_text()
 
-    assert 'workflows: ["Merge Readiness", "Prune redundant branches safely"]' in workflow
+    assert 'cron: "7 * * * *"' in workflow
+    assert "workflow_run:" not in workflow
     assert 'workflows: ["Drain obsolete PR Actions"]' not in workflow
     assert "branches: [main]" in workflow
 
@@ -49,13 +50,12 @@ def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
 def test_queue_drain_recovery_does_not_require_upstream_success() -> None:
     workflow = _workflow_text()
 
-    assert "types: [completed]" in workflow
+    # Scheduled recovery does not depend on any upstream workflow conclusion.
+    assert 'cron: "7 * * * *"' in workflow
+    assert "workflow_run:" not in workflow
     assert "github.event.workflow_run.conclusion == 'success'" not in workflow
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
-    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in workflow
-    assert "Main failures still trigger immediate recovery." in workflow
-    assert "github.event.workflow_run.conclusion != 'cancelled'" in workflow
-    assert "github.event.workflow_run.conclusion != 'skipped'" in workflow
+    assert "github.event.workflow_run.conclusion != 'cancelled'" not in workflow
+    assert "github.event.workflow_run.conclusion != 'skipped'" not in workflow
 
 
 def test_queue_drain_reclaims_obsolete_same_repository_pr_runs() -> None:
@@ -156,7 +156,7 @@ def test_queue_drain_has_one_recovery_worker_and_independent_housekeeping() -> N
     assert "runs-on: ubuntu-24.04-arm" in workflow
     assert "gh workflow run actions-housekeeping-cli.yml" not in workflow
     assert "schedule:" in housekeeping
-    assert "cron: '23 */6 * * *'" in housekeeping
+    assert "cron: '23 4,16 * * *'" in housekeeping
     assert "def recover_pr_numbers()" not in workflow
 
 

@@ -8,21 +8,12 @@ gameplay, assets, upscaling, and music. It does not train or promote weights.
 """
 from __future__ import annotations
 
-from dataclasses import replace
 import gzip
+import json
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 
-from .companion_curriculum import measure_original_practice
-from .contracts import canonical_digest
-from .dual_runtime_export import render_dual_runtime_package
-from .mirror_room_runtime import MirrorRoomError, review_playable_project
-from .playable_compiler import compile_original_game
-from .playable_simulation import GameplayError, verify_replay
-from .playable_world import GameBuildIntent
-from .studio_tool_fabric import (
-    Actor, BUILTIN_TOOLS, ToolFabric,
-)
 from skeleton.ai.webcrawler.dragon_chip_music import GAME_MODES, compose
 from skeleton.ai.webcrawler.game_scale_assets import (
     animate_sprite,
@@ -35,6 +26,19 @@ from skeleton.ai.webcrawler.game_scale_assets import (
     synthesize_game_effect,
 )
 from skeleton.developer.jeeves_game_upscale import _expand, fidelity_plan
+
+from .companion_curriculum import measure_original_practice
+from .contracts import canonical_digest
+from .dual_runtime_export import render_dual_runtime_package
+from .mirror_room_runtime import MirrorRoomError, review_playable_project
+from .playable_compiler import compile_original_game
+from .playable_simulation import GameplayError, verify_replay
+from .playable_world import GameBuildIntent
+from .studio_tool_fabric import (
+    BUILTIN_TOOLS,
+    Actor,
+    ToolFabric,
+)
 
 SCHEMA = "skeleton.game_builder.role_triad.v1"
 ROLES = ("jeeves", "dragon", "adversarial")
@@ -81,6 +85,29 @@ _CORPUS = Path(__file__).resolve().parents[3] / "data" / "game_building"
 _SPRITE_KINDS = ("hero", "enemy", "collectible", "plant", "rock", "portal", "chest")
 _THEMES = ("fantasy", "cyber", "desert", "ice", "forest", "space")
 _TEMPOS = (84, 120, 174)
+_MAX_CORPUS_COMPRESSED = 8 * 1024 * 1024
+_MAX_CORPUS_DECODED = 64 * 1024 * 1024
+_MAX_CORPUS_LINE = 4096
+_MAX_CORPUS_ROWS = 500_000
+_MAX_KNOWLEDGE_LAWS = 4096
+_SOURCE_OWNERS = (
+    "ai/game_builder/studio_role_triad.py",
+    "ai/game_builder/contracts.py",
+    "ai/game_builder/studio_tool_fabric.py",
+    "ai/game_builder/playable_compiler.py",
+    "ai/game_builder/playable_world.py",
+    "ai/game_builder/playable_simulation.py",
+    "ai/game_builder/playable_export.py",
+    "ai/game_builder/tile_editor_export.py",
+    "ai/game_builder/mirror_room_runtime.py",
+    "ai/game_builder/companion_curriculum.py",
+    "ai/game_builder/dual_runtime_export.py",
+    "ai/game_builder/studio_native_psg.py",
+    "ai/webcrawler/dragon_chip_music.py",
+    "ai/webcrawler/dragon_game_blueprints.py",
+    "ai/webcrawler/game_scale_assets.py",
+    "developer/jeeves_game_upscale.py",
+)
 
 
 class RoleTriadError(ValueError):
@@ -93,6 +120,9 @@ def _lane(owner: str, evidence: dict) -> dict:
     body = {
         "owner": owner,
         "evidence": evidence,
+        "execution_kind": "deterministic_local_adapter",
+        "model_call_performed": False,
+        "independent_model_review": False,
         "weights_changed": False,
         "promotion": False,
         "human_review_forged": False,
@@ -160,28 +190,136 @@ def _frames_aligned(score) -> bool:
     return score.frames_per_step == expected and score.mode in GAME_MODES
 
 
-def _unique_knowledge() -> tuple[list[dict], list[dict]]:
-    pareto_path = _CORPUS / "pareto" / "game_design_pareto_corpus.txt.gz"
-    math_path = _CORPUS / "math_physics" / "game_math_physics_corpus.txt.gz"
-    if not pareto_path.is_file() or not math_path.is_file():
-        raise RoleTriadError("installed game-knowledge corpora are missing")
+def _source_lineage() -> dict:
+    root = Path(__file__).resolve().parents[2]
+    sources = []
+    for relative in _SOURCE_OWNERS:
+        target = root / relative
+        if target.is_symlink() or not target.is_file():
+            raise RoleTriadError("installed triad source owner is unavailable")
+        with target.open("rb") as handle:
+            raw = handle.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
+            raise RoleTriadError("triad source owner exceeds the identity budget")
+        sources.append({"path": "skeleton/" + relative,
+                        "sha256": sha256(raw).hexdigest(), "bytes": len(raw)})
+    body = {"sources": sources, "identity_kind": "installed_source_bytes",
+            "scope": "listed exercised owners and explicit domain dependencies",
+            "arbitrary_transitive_dependency_closure_attested": False,
+            "loaded_runtime_or_standard_library_attested": False}
+    return {**body, "digest": canonical_digest(body)}
+
+
+def _corpus_manifest() -> tuple[dict, str]:
+    path = _CORPUS / "manifest.json"
+    if path.is_symlink() or not path.is_file():
+        raise RoleTriadError("installed game-knowledge manifest is missing")
+    with path.open("rb") as handle:
+        raw = handle.read(128 * 1024 + 1)
+    if len(raw) > 128 * 1024:
+        raise RoleTriadError("game-knowledge manifest exceeds the evidence budget")
+    try:
+        manifest = json.loads(raw)
+    except (UnicodeError, ValueError) as exc:
+        raise RoleTriadError("invalid game-knowledge manifest") from exc
+    if (type(manifest) is not dict
+            or manifest.get("schema_version") != "skeleton.reference_corpus_manifest.v1"
+            or manifest.get("automatic_training_authorized") is not False
+            or type(manifest.get("entries")) is not list
+            or not 1 <= len(manifest["entries"]) <= 128):
+        raise RoleTriadError("unsupported game-knowledge provenance contract")
+    return manifest, sha256(raw).hexdigest()
+
+
+def _read_knowledge(relative: str, manifest: dict, consume) -> dict:
+    """Stream the pinned reference bytes with strict decompression limits.
+
+    Parsed rows remain local until compressed and decoded identities agree with
+    the installed manifest. Reference inclusion never authorizes model training.
+    """
+    path = _CORPUS / relative
+    declared = "data/game_building/" + relative
+    matches = [row for row in manifest["entries"]
+               if type(row) is dict and row.get("path") == declared]
+    if len(matches) != 1:
+        raise RoleTriadError("game-knowledge manifest entry is missing or duplicated")
+    entry = matches[0]
+    for key, maximum in (("compressed_bytes", _MAX_CORPUS_COMPRESSED),
+                         ("decoded_bytes", _MAX_CORPUS_DECODED),
+                         ("newline_count", _MAX_CORPUS_ROWS)):
+        if type(entry.get(key)) is not int or not 1 <= entry[key] <= maximum:
+            raise RoleTriadError("game-knowledge manifest exceeds the stream budget")
+    if path.is_symlink() or not path.is_file() or path.parent.is_symlink():
+        raise RoleTriadError("installed game-knowledge corpus is unavailable")
+    compressed_hash = sha256()
+    compressed_size = 0
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            compressed_size += len(chunk)
+            if compressed_size > entry["compressed_bytes"]:
+                raise RoleTriadError("compressed game-knowledge size changed")
+            compressed_hash.update(chunk)
+    if (compressed_size != entry["compressed_bytes"]
+            or compressed_hash.hexdigest() != entry.get("compressed_sha256")):
+        raise RoleTriadError("compressed game-knowledge identity changed")
+    decoded_hash = sha256()
+    decoded_size = rows = 0
+    try:
+        with gzip.open(path, "rb") as handle:
+            while True:
+                raw = handle.readline(_MAX_CORPUS_LINE + 1)
+                if not raw:
+                    break
+                decoded_size += len(raw)
+                rows += 1
+                if (len(raw) > _MAX_CORPUS_LINE
+                        or decoded_size > entry["decoded_bytes"]
+                        or rows > entry["newline_count"]):
+                    raise RoleTriadError("decoded game-knowledge exceeds declared bounds")
+                decoded_hash.update(raw)
+                consume(raw.decode("utf-8"))
+    except (OSError, EOFError, UnicodeError) as exc:
+        raise RoleTriadError("game-knowledge stream is corrupt") from exc
+    if (decoded_size != entry["decoded_bytes"]
+            or rows != entry["newline_count"]
+            or decoded_hash.hexdigest() != entry.get("decoded_sha256")):
+        raise RoleTriadError("decoded game-knowledge identity changed")
+    return {"path": declared, "compressed_sha256": compressed_hash.hexdigest(),
+            "decoded_sha256": decoded_hash.hexdigest(), "decoded_bytes": decoded_size,
+            "rows": rows, "training_authorized": False,
+            "content_class": manifest.get("content_class"),
+            "source_commit": manifest.get("source_commit")}
+
+
+def _unique_knowledge() -> tuple[list[dict], list[dict], dict]:
+    manifest, manifest_sha = _corpus_manifest()
     pareto: dict[str, int] = {}
-    with gzip.open(pareto_path, "rt", encoding="utf-8") as handle:
-        for line in handle:
+
+    def consume_pareto(line):
             parts = line.rstrip("\n").split("|")
             if len(parts) < 5:
-                continue
+                raise RoleTriadError("malformed Pareto reference row")
             pareto[parts[3]] = pareto.get(parts[3], 0) + 1
+            if len(pareto) > _MAX_KNOWLEDGE_LAWS:
+                raise RoleTriadError("too many unique Pareto reference laws")
+
     math_laws: dict[str, int] = {}
-    with gzip.open(math_path, "rt", encoding="utf-8") as handle:
-        for line in handle:
+
+    def consume_math(line):
             if "|Use in " not in line:
-                continue
+                raise RoleTriadError("malformed mathematical reference row")
             head, _note = line.rstrip("\n").rsplit("|Use in ", 1)
             bits = head.split("|", 2)
             if len(bits) < 3:
-                continue
+                raise RoleTriadError("malformed mathematical reference identity")
             math_laws[bits[1]] = math_laws.get(bits[1], 0) + 1
+            if len(math_laws) > _MAX_KNOWLEDGE_LAWS:
+                raise RoleTriadError("too many unique mathematical reference laws")
+
+    receipts = [
+        _read_knowledge("pareto/game_design_pareto_corpus.txt.gz", manifest, consume_pareto),
+        _read_knowledge("math_physics/game_math_physics_corpus.txt.gz", manifest, consume_math),
+    ]
     if _HOLDOUT_PARETO not in pareto or _HOLDOUT_MATH not in math_laws:
         raise RoleTriadError("knowledge holdout is not present in the installed corpora")
     pareto_rows = [
@@ -192,7 +330,21 @@ def _unique_knowledge() -> tuple[list[dict], list[dict]]:
         {"id": "math-" + topic, "text": topic, "repeats": count}
         for topic, count in sorted(math_laws.items())
     ]
-    return pareto_rows, math_rows
+    body = {"manifest_sha256": manifest_sha, "sources": receipts,
+            "provenance_kind": "generated_design_reference",
+            "measured_gameplay_evidence": False, "automatic_training_authorized": False}
+    return pareto_rows, math_rows, {**body, "digest": canonical_digest(body)}
+
+
+def _check_partition(admitted: list[dict], held: list[dict]) -> None:
+    admitted_ids = [row["id"] for row in admitted]
+    held_ids = [row["id"] for row in held]
+    if (len(admitted_ids) != len(set(admitted_ids))
+            or len(held_ids) != 2 or len(set(held_ids)) != 2
+            or set(admitted_ids).intersection(held_ids)
+            or any(row["text"] in {_HOLDOUT_PARETO, _HOLDOUT_MATH}
+                   for row in admitted)):
+        raise RoleTriadError("knowledge holdout leaked into the admitted set")
 
 
 def _knowledge(pareto_rows: list[dict], math_rows: list[dict]) -> dict:
@@ -203,8 +355,14 @@ def _knowledge(pareto_rows: list[dict], math_rows: list[dict]) -> dict:
     held = [row for row in (*pareto_rows, *math_rows) if row not in admitted]
     admitted_ids = {row["id"] for row in admitted}
     held_ids = {row["id"] for row in held}
-    if held_ids & admitted_ids or len(held) != 2:
-        raise RoleTriadError("knowledge holdout leaked into the admitted set")
+    _check_partition(admitted, held)
+    injected_holdout_rejected = False
+    try:
+        _check_partition([*admitted, held[0]], held)
+    except RoleTriadError:
+        injected_holdout_rejected = True
+    if not injected_holdout_rejected:
+        raise RoleTriadError("adversarial holdout injection was accepted")
     return _part("game_knowledge", {
         "jeeves": _lane("jeeves", {
             "admitted_laws": len(admitted),
@@ -220,7 +378,10 @@ def _knowledge(pareto_rows: list[dict], math_rows: list[dict]) -> dict:
         "adversarial": _lane("adversarial", {
             "holdout_ids": sorted(held_ids),
             "holdout_absent_from_admitted": held_ids.isdisjoint(admitted_ids),
-            "rejected_tamper": held_ids.isdisjoint(admitted_ids),
+            "injected_holdout_rejected": injected_holdout_rejected,
+            "verification_kind": "local_reference_partition_integrity",
+            "independent_quality_or_originality_review": False,
+            "rejected_tamper": injected_holdout_rejected,
         }),
     })
 
@@ -467,8 +628,17 @@ def connect_system_triad(*, seed: int = 17, mirror_attempts: int = 64,
         raise RoleTriadError("triad seed must be a 31-bit integer")
     if type(mirror_attempts) is not int or isinstance(mirror_attempts, bool) or not 64 <= mirror_attempts <= 512:
         raise RoleTriadError("adversarial attempts must be 64 to 512")
+    source_lineage = _source_lineage()
     catalog = tool_triad()
-    pareto_rows, math_rows = _unique_knowledge()
+    tool_contracts = [spec.to_payload() for spec in
+                      sorted(BUILTIN_TOOLS, key=lambda item: item.tool_id)]
+    pareto_rows, math_rows, knowledge_lineage = _unique_knowledge()
+    inputs = {"seed": seed, "mirror_attempts": mirror_attempts,
+              "source_lineage_digest": source_lineage["digest"],
+              "knowledge_lineage_digest": knowledge_lineage["digest"],
+              "tool_catalog_digest": canonical_digest({
+                  "routes": catalog, "contracts": tool_contracts})}
+    input_digest = canonical_digest(inputs)
     logic, gameplay = _play(seed, mirror_attempts)
     style, generation, upscale = _assets(seed)
     music, timing = _music(seed)
@@ -483,13 +653,29 @@ def connect_system_triad(*, seed: int = 17, mirror_attempts: int = 64,
         attack = parts[name]["lanes"]["adversarial"]["evidence"]
         if attack.get("rejected_tamper") is not True:
             raise RoleTriadError(name + " adversarial lane accepted a tampered artifact")
+        bound = {key: value for key, value in parts[name].items() if key != "digest"}
+        bound["input_digest"] = input_digest
+        bound["source_lineage_digest"] = source_lineage["digest"]
+        parts[name] = {**bound, "digest": canonical_digest(bound)}
+    if _source_lineage()["digest"] != source_lineage["digest"]:
+        raise RoleTriadError("triad source changed during the measured operation")
     body = {
         "schema": SCHEMA,
+        "inputs": inputs,
+        "input_digest": input_digest,
+        "source_lineage": source_lineage,
+        "knowledge_lineage": knowledge_lineage,
         "catalog": list(catalog),
+        "tool_contracts": tool_contracts,
         "catalog_count": len(catalog),
         "parts": [parts[name] for name in PARTS],
         "part_count": len(PARTS),
         "roles": list(ROLES),
+        "execution_kind": "deterministic_local_adapter_exercise",
+        "independent_model_review": False,
+        "model_calls_performed": 0,
+        "catalog_binding_does_not_mean_every_tool_was_executed": True,
+        "evidence_scope": "bounded original maze, procedural assets, music and reference integrity",
         "weights_changed": False,
         "reviewed_knowledge_promoted": False,
         "human_review_forged": False,

@@ -13,6 +13,13 @@ import type { ConversationMessage, ConversationThread } from '../../product/gove
 import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadAllChatAttachments, uploadChatAttachment } from './chatFiles';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
+import ChatModelCapabilities from './ChatModelCapabilities';
+import ChatAnswerDetails from './ChatAnswerDetails';
+import ChatCooperationDetails from './ChatCooperationDetails';
+import ChatResponseReviewControl from './ChatResponseReviewControl';
+import { cooperationConfigurationIssues, reviewedResponsePolicy } from '../../product/chatCooperation';
+import { chatProgressLabel } from '../../product/chatProgress';
+import { useChatReadiness } from '../../product/useChatReadiness';
 import { MAX_CONTEXT } from './workspace';
 import { getJeevesRequestContext } from '../../state/settingsStore';
 import ChatTaskActions from './workbench/ChatTaskActions';
@@ -78,9 +85,11 @@ function Dialog({ title, close, children }: { title: string; close: () => void; 
   </Modal>;
 }
 
-function MessageCard({ message, busy, notify, edit, regenerate }: {
+function MessageCard({ message, busy, notify, edit, regenerate, cooperation, reviewStopped }: {
   message: ConversationMessage; busy: boolean; notify: (text: string) => void;
   edit: (id: string, text: string) => Promise<void>; regenerate: (id: string) => Promise<void>;
+  cooperation?: import('../../product/chatCooperation').ChatCooperationSummary;
+  reviewStopped?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content || '');
@@ -114,7 +123,9 @@ function MessageCard({ message, busy, notify, edit, regenerate }: {
     </> : <>
       {user ? <Text selectable style={s.userText}>{text}</Text> : <MessageContent text={text} notify={notify} />}
       {!!attachmentRefs.length && <ChatAttachments references={attachmentRefs} threadId={message.thread_id} />}
+      {cooperation && <ChatCooperationDetails summary={cooperation} stopped={reviewStopped} />}
       {!user && !!text.trim() && <>
+        <ChatAnswerDetails message={message} />
         <ChatTaskActions text={text} conversationId={message.thread_id}
           messageId={message.message_id} notify={notify} />
         <ChatSceneActions text={text} conversationId={message.thread_id}
@@ -162,6 +173,7 @@ export type ChatWorkspaceProps = { initialThreadId?: string };
 export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = {}) {
   const router = useRouter();
   const { controller, state } = useChatController({ initialThreadId });
+  const { readiness, refresh: refreshReadiness } = useChatReadiness();
   const dragonAcademy = useDragonAcademy();
   const { width } = useWindowDimensions();
   const compact = width < 900;
@@ -173,6 +185,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const [query, setQuery] = useState('');
   const [archived, setArchived] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
+  const [reviewResponse, setReviewResponse] = useState(false);
+  const [reviewPolicy, setReviewPolicy] = useState(reviewedResponsePolicy);
+  const [reviewFieldError, setReviewFieldError] = useState<string | null>(null);
+  const [outputTokens, setOutputTokens] = useState<number | null>(null);
   const [manage, setManage] = useState<{ thread: ConversationThread; action: ManageAction } | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [exportFormat, setExportFormat] = useState<'json' | 'markdown'>('markdown');
@@ -211,8 +227,14 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const busy = ['submitting', 'streaming', 'reconnecting', 'cancelling'].includes(state.status);
   const loading = state.status === 'loading';
   const selectedModel = state.models.find(model => model.id === state.selectedModelId);
-  const modelReady = !!selectedModel?.available && selectedModel.selectable;
-  const canSend = !!draft.trim() && !state.pending && !busy && !loading && !uploading && !creating && state.ready && modelReady && state.activeThread?.state !== 'archived';
+  const observedModel = readiness?.models.models.find(model => model.id === selectedModel?.id);
+  const modelReady = readiness?.available === true && !!selectedModel?.available && selectedModel.selectable
+    && observedModel?.available === true && observedModel.selectable;
+  const answerTokenLimit = Math.min(outputTokens ?? selectedModel?.default_output_tokens ?? 1024, selectedModel?.max_output_tokens ?? 1024);
+  const reviewAvailable = readiness?.capabilities.cooperative_review === true;
+  const reviewIssues = cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], answerTokenLimit);
+  const reviewBudgetReady = !reviewResponse || reviewAvailable && !reviewFieldError && reviewIssues.length === 0;
+  const canSend = !!draft.trim() && !state.pending && !busy && !loading && !uploading && !creating && state.ready && modelReady && reviewBudgetReady && state.activeThread?.state !== 'archived';
   const messages = state.messages.filter(message => message.author_type === 'user' || message.author_type === 'assistant');
   const pending = state.pending?.threadId === state.activeThread?.thread_id ? state.pending : null;
   const threadGroups = useMemo(() => groupThreads(state.threads.filter(thread =>
@@ -246,12 +268,14 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     if (state.error?.kind !== 'authorization') return;
     uploadController.current?.abort();
     setDrafts({}); setFiles({}); setManage(null); setAttachmentConsent(false);
+    setReviewResponse(false); setReviewPolicy(reviewedResponsePolicy()); setReviewFieldError(null); setOutputTokens(null);
   }, [state.error?.kind]);
   useEffect(() => {
     if (previousAccountToken.current === accountToken) return;
     previousAccountToken.current = accountToken;
     uploadController.current?.abort();
     setDrafts({}); setFiles({}); setManage(null); setAttachmentConsent(false);
+    setReviewResponse(false); setReviewPolicy(reviewedResponsePolicy()); setReviewFieldError(null); setOutputTokens(null);
   }, [accountToken]);
   useEffect(() => {
     if (!attachmentConsent) return;
@@ -327,6 +351,8 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     try {
       await controller.send(text, {
         attachmentRefs: attachments,
+        maxOutputTokens: answerTokenLimit,
+        ...(reviewResponse ? { cooperation: reviewPolicy } : {}),
         ...(preferenceContext ? { context: preferenceContext } : {}),
       });
       const next = controller.getSnapshot();
@@ -479,7 +505,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           {state.activeThread && !narrow && <IconButton icon="ellipsis-horizontal" label="Conversation options" disabled={busy}
             onPress={() => { setManage({ thread: state.activeThread!, action: 'menu' }); setDialogError(null); }} />}
         </View>
-        <JeevesRuntimeStatus />
+        <JeevesRuntimeStatus readiness={readiness} refresh={refreshReadiness} />
         <View style={s.companionToggle}><MiniButton icon="sparkles-outline" label={companionOpen ? 'Hide companion' : 'Show companion'} onPress={() => setCompanionOpen(open => !open)} /></View>
         </View>
         {companionOpen && <ScrollView style={[s.companionDock, { top: headerHeight + 8, bottom: composerHeight + 12 }, compact && s.companionDockCompact]} keyboardShouldPersistTaps="handled">
@@ -523,14 +549,17 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
               </TouchableOpacity>)}</View>
             </View> : <View style={s.messagesColumn}>
               {messages.map(message => <MessageCard key={message.message_id} message={message} busy={busy || !!state.pending || state.activeThread?.state !== 'active'}
-                notify={notify} edit={controller.edit} regenerate={controller.regenerate} />)}
+                notify={notify} edit={controller.edit} regenerate={controller.regenerate}
+                cooperation={state.reviewedAnswer?.messageId === message.message_id ? state.reviewedAnswer.summary : undefined}
+                reviewStopped={state.reviewedAnswer?.messageId === message.message_id && state.reviewedAnswer.stopped} />)}
               {pending?.kind === 'chat' && !messages.some(message => message.author_type === 'user' && message.idempotency_key === pending.idempotencyKey) &&
                 <View style={[s.message, s.userMessage]}><Text style={s.messageAuthor}>You</Text><Text selectable style={s.userText}>{pending.message}</Text></View>}
               {pending && <View style={[s.message, s.assistantMessage]}>
                 <View style={s.row}><View style={s.avatar}><Ionicons name="sparkles-outline" size={14} color={C.primaryHover} /></View><Text style={s.messageAuthor}>Jeeves</Text></View>
                 {!!pending.streamText && <MessageContent text={pending.streamText} notify={notify} streaming={busy} />}
+                {pending.cooperation && <ChatCooperationDetails summary={pending.cooperation} />}
                 {busy && <View style={s.thinking}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>
-                  {state.status === 'cancelling' ? 'Stopping…' : state.status === 'reconnecting' ? 'Reconnecting…' : pending.streamText ? 'Writing…' : 'Thinking…'}
+                  {state.status === 'cancelling' ? 'Stop requested; waiting for confirmation…' : state.status === 'reconnecting' ? 'Reconnecting to the saved turn…' : pending.streamText ? 'Writing the provisional answer…' : chatProgressLabel(pending.state)}
                 </Text></View>}
                 {!busy && <View style={s.messageActions}><Text style={s.muted}>{pending.state === 'cancelled' ? 'Response stopped' : 'Response interrupted'}</Text>
                   <MiniButton icon="refresh-outline" label="Retry" onPress={() => run(controller.retry)} />
@@ -574,7 +603,11 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
                     disabled={!canSend} onPress={() => { void send(); }} style={[s.sendButton, !canSend && s.disabled]}><Ionicons name="arrow-up-outline" size={23} color={C.text} /></TouchableOpacity>}
               </View>
             </View>
-            <Text style={s.composerHint}>{pending && !busy ? 'Retry or stop the interrupted reply to continue.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
+            <ChatResponseReviewControl enabled={reviewResponse} change={setReviewResponse} disabled={busy || loading} available={reviewAvailable} answerTokenLimit={answerTokenLimit}
+              policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={observedModel}
+              fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues}
+              refreshModels={async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); }} />
+            <Text style={s.composerHint}>{reviewResponse && !reviewAvailable ? 'Response review is unavailable. Refresh readiness or turn off review to continue.' : !reviewBudgetReady ? reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.' : pending && !busy ? 'Retry or stop the interrupted reply to continue.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
           </>}
         </View></View>
       </View>
@@ -582,21 +615,23 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     {compact && sidebarOpen && <Modal visible animationType="slide" onRequestClose={() => setSidebarOpen(false)}>
       <SafeAreaView style={s.root}>{sidebar}</SafeAreaView></Modal>}
     {modelsOpen && <Dialog title="Choose a model" close={() => setModelsOpen(false)}>
-      <Text style={s.dialogBody}>Choose how you’d like Jeeves to respond.</Text>
+      <Text style={s.dialogBody}>Choose the configured model for the next new turn. Resuming a saved turn preserves its original model and review settings. Listed capabilities describe the model; this conversation’s granted tools remain separate.</Text>
       <ScrollView style={s.dialogScroll} contentContainerStyle={s.modelList} keyboardShouldPersistTaps="handled">
         {!state.models.length && <Text style={s.dialogBody}>No models are available right now. Refresh to check again.</Text>}
         {state.models.map(model => <TouchableOpacity key={model.id} accessibilityRole="button"
           accessibilityLabel={`${model.label}. ${model.selectable && model.available ? 'Ready' : model.readiness?.message || 'Unavailable'}`}
           accessibilityState={{ selected: model.id === state.selectedModelId, disabled: !model.selectable || !model.available || busy }}
           disabled={!model.selectable || !model.available || busy} style={[s.modelItem, model.id === state.selectedModelId && s.selectedModel]}
-          onPress={() => { controller.selectModel(model.id); setModelsOpen(false); input.current?.focus(); }}>
+          onPress={() => { controller.selectModel(model.id); setOutputTokens(null); setModelsOpen(false); input.current?.focus(); }}>
           <View style={s.between}><Text style={s.modelName}>{model.label}</Text>
             <Text style={[s.badge, (!model.selectable || !model.available) && s.unavailableBadge]}>{model.selectable && model.available ? 'Ready' : 'Unavailable'}</Text>
             {model.id === state.selectedModelId && <Ionicons name="checkmark-circle" size={19} color={C.primaryHover} />}</View>
-          <Text style={s.modelDetails}>{model.selectable && model.available ? `${model.credential_free ? 'Runs locally' : 'Connected model'}${model.context_window ? ` · ${Math.round(model.context_window / 1000)}K context` : ''}` : model.readiness?.message || 'This model is not ready to use.'}</Text>
+          <Text style={s.modelDetails}>{model.selectable && model.available ? model.credential_free ? 'Runs locally' : 'Connected model' : model.readiness?.message || 'This model is not ready to use.'}</Text>
+          <ChatModelCapabilities modelFamily={model.model_family} capabilities={model.capabilities} contextWindow={model.context_window} outputLimit={model.max_output_tokens} />
         </TouchableOpacity>)}
       </ScrollView>
-      <Button icon="refresh-outline" label="Refresh models" disabled={busy} onPress={() => run(controller.refreshModels)} />
+      {selectedModel && <View style={{ gap: 8 }}><Text style={s.dialogBody}>Shared answer token budget · {answerTokenLimit.toLocaleString()}</Text><View style={[s.row, { flexWrap: 'wrap' }]}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= (selectedModel.max_output_tokens ?? 0)).map(value => <MiniButton key={value} icon={answerTokenLimit === value ? 'checkmark-circle-outline' : 'ellipse-outline'} label={value.toLocaleString()} disabled={busy} onPress={() => setOutputTokens(value)} />)}</View></View>}
+      <Button icon="refresh-outline" label="Refresh models" disabled={busy} onPress={() => run(async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); })} />
     </Dialog>}
     {manage && <Dialog title={manage.action === 'rename' ? 'Rename conversation' : manage.action === 'delete' ? 'Delete conversation?' : manage.action === 'export' ? 'Export conversation' : 'Conversation options'} close={() => { if (!mutationBusy) setManage(null); }}>
       {manage.action === 'menu' ? <>

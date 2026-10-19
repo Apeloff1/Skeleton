@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -29,6 +30,15 @@ from skeleton.contracts.verification import (
     VerificationRisk,
 )
 from skeleton.intelligence.admission import ResourceBudget
+from skeleton.intelligence.cooperation import (
+    MAX_ARTIFACT_BYTES,
+    cooperation_stages,
+    cooperation_summary,
+    initial_cooperation_state,
+    normalize_cooperation_policy,
+    stage_prompt,
+    validate_cooperation_state,
+)
 from skeleton.intelligence.verification_runtime import (
     FinalizationDisposition,
     SemanticVerificationRuntime,
@@ -41,11 +51,13 @@ from skeleton.provider_runtime import (
     AIMessage,
     ProviderAdapter,
     ProviderRequest,
+    ProviderResponse,
     provider_context_selection,
     provider_context_temperature,
     provider_execution_identity,
     provider_response_matches_identity,
 )
+from skeleton.providers.contract import FinishReason, ProviderUsage
 from skeleton.skills.tool_contract import (
     ToolContractError,
     ToolEffect,
@@ -66,6 +78,14 @@ from skeleton.vault.data_governance import (
 
 class CognitiveExecutionError(RuntimeError):
     """Cognitive execution cannot safely continue."""
+
+
+class _VerificationStopped(CognitiveExecutionError):
+    """A parent execution cannot admit or publish semantic verification."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,6 +279,7 @@ def _bounded_nonnegative_int(
 def _parse_deadline(
     request: AIExecutionRequest,
 ) -> datetime | None:
+    deadlines = []
     raw = request.stop_policy.get("deadline")
     if raw is not None:
         if not isinstance(raw, str):
@@ -269,17 +290,21 @@ def _parse_deadline(
             raise CognitiveExecutionError("stop_policy.deadline is invalid") from exc
         if parsed.tzinfo is None or parsed.utcoffset() is None:
             raise CognitiveExecutionError("stop_policy.deadline must be timezone-aware")
-        return parsed.astimezone(UTC)
-
-    elapsed = request.resource_budget.get("max_elapsed_seconds")
-    if elapsed is None:
-        return None
-    if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)):
-        raise CognitiveExecutionError("resource_budget.max_elapsed_seconds must be numeric")
-    seconds = float(elapsed)
-    if seconds <= 0 or seconds > 86_400:
-        raise CognitiveExecutionError("resource_budget.max_elapsed_seconds is outside hard bounds")
-    return request.created_at + timedelta(seconds=seconds)
+        deadlines.append(parsed.astimezone(UTC))
+    for name in ("max_wall_seconds", "max_elapsed_seconds"):
+        elapsed = request.resource_budget.get(
+            name,
+            request.resource_budget.get("max_elapsed_seconds", 120.0) if name == "max_wall_seconds" else None,
+        )
+        if elapsed is None:
+            continue
+        if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)):
+            raise CognitiveExecutionError(f"resource_budget.{name} must be numeric")
+        seconds = float(elapsed)
+        if not math.isfinite(seconds) or not 0 < seconds <= 86_400:
+            raise CognitiveExecutionError(f"resource_budget.{name} is outside hard bounds")
+        deadlines.append(request.created_at + timedelta(seconds=seconds))
+    return min(deadlines) if deadlines else None
 
 
 def _history_from_payload(payload: Mapping[str, object]) -> tuple[AIMessage, ...]:
@@ -400,6 +425,7 @@ class CognitiveExecutionRuntime:
         semantic_verification_adapter: ProviderAdapter | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
         storage_meter: StorageMeter | None = None,
+        cooperative_adapters: Mapping[str, ProviderAdapter] | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -419,6 +445,11 @@ class CognitiveExecutionRuntime:
         self.semantic_verification_adapter = semantic_verification_adapter
         self.finalization_binding_hook = finalization_binding_hook
         self.storage_meter = storage_meter
+        self.cooperative_adapters = dict(cooperative_adapters or {})
+        if set(self.cooperative_adapters) - {"plan", "draft", "critique", "refine"} or any(
+            not hasattr(adapter, "generate") for adapter in self.cooperative_adapters.values()
+        ):
+            raise TypeError("cooperative adapters must be declared role provider adapters")
         self._verification_runtime = VerificationRuntime()
 
     def _provider_binding(self, request: AIExecutionRequest, tenant_id: str) -> dict[str, object]:
@@ -454,6 +485,28 @@ class CognitiveExecutionRuntime:
                 else provider_execution_identity(self.semantic_verification_adapter)
             ),
         }
+        cooperation = normalize_cooperation_policy(request.context_policy.get("cooperation"))
+        if cooperation is not None:
+            roles = cooperation["roles"]
+            assert isinstance(roles, Mapping)
+            if set(self.cooperative_adapters) != set(roles):
+                raise CognitiveExecutionError("cooperative role providers were not resolved exactly")
+            pinned_roles = {}
+            for role, adapter in self.cooperative_adapters.items():
+                selected = roles[role]
+                role_identity = provider_execution_identity(adapter)
+                if (
+                    not isinstance(selected, Mapping)
+                    or role_identity.get("mode") != "single"
+                    or (
+                        not provider_response_matches_identity(
+                            role_identity, str(selected["provider_id"]), str(selected["model_id"])
+                        )
+                    )
+                ):
+                    raise CognitiveExecutionError("cooperative role differs from exact model selection")
+                pinned_roles[role] = role_identity
+            identity["cooperation"] = {"policy": cooperation, "role_providers": pinned_roles}
         encoded = json.dumps(
             identity, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
         ).encode()
@@ -482,8 +535,24 @@ class CognitiveExecutionRuntime:
         turn_id: str,
     ) -> str:
         binding = payload.get("provider_execution_binding")
+        generator = binding.get("generator") if isinstance(binding, Mapping) else None
+        cooperative = payload.get("cooperation")
+        if isinstance(binding, Mapping) and isinstance(cooperative, Mapping):
+            policy = cooperative.get("policy")
+            if not isinstance(policy, Mapping):
+                raise CognitiveExecutionError("cooperation policy checkpoint is corrupt")
+            stages = cooperation_stages(policy)
+            cursor = cooperative.get("cursor")
+            if isinstance(cursor, bool) or not isinstance(cursor, int) or not 0 <= cursor < len(stages):
+                raise CognitiveExecutionError("cooperation provider phase is corrupt")
+            role_binding = binding.get("cooperation")
+            if not isinstance(role_binding, Mapping) or not isinstance(
+                role_binding.get("role_providers"), Mapping
+            ):
+                raise CognitiveExecutionError("cooperation provider binding is corrupt")
+            generator = role_binding["role_providers"].get(stages[cursor][1], generator)
         if not isinstance(binding, Mapping) or not provider_response_matches_identity(
-            binding.get("generator"), response.provider, response.model
+            generator, response.provider, response.model
         ):
             raise CognitiveExecutionError(
                 "provider response does not match a pinned declared provider/model route"
@@ -609,7 +678,32 @@ class CognitiveExecutionRuntime:
             raise CognitiveExecutionError("tool transfer purpose is invalid")
 
         deadline = _parse_deadline(request)
-        return {
+        policy = normalize_cooperation_policy(request.context_policy.get("cooperation"))
+        cooperative_state = None
+        if policy is not None:
+            stage_count = len(cooperation_stages(policy))
+            if allowed or len(normalized_history) > 100:
+                raise CognitiveExecutionError("cooperation requires tool-free bounded conversation context")
+            if (
+                int(request.resource_budget.get("max_model_turns", 8)) < stage_count
+                or int(request.resource_budget.get("max_provider_attempts", 3)) < stage_count
+                or int(request.resource_budget.get("max_output_tokens", 16384)) < 64 * stage_count
+            ):
+                raise CognitiveExecutionError("cooperation cannot fit its original operation budget")
+            cooperative_state = initial_cooperation_state(
+                policy,
+                prompt=prompt.strip(),
+                history=normalized_history,
+                context_digest=context_digest,
+                source_snapshot=request.context_policy.get("source_snapshot", []),
+            )
+            if cooperative_state["brief_digest"] != request.context_policy.get(
+                "cooperation_brief_digest"
+            ) or cooperative_state["history_digest"] != request.context_policy.get(
+                "cooperation_history_digest"
+            ):
+                raise CognitiveExecutionError("cooperation initial brief/history are not request-bound")
+        payload = {
             "instructions": instructions.strip(),
             "next_prompt": prompt.strip(),
             "history": normalized_history,
@@ -633,7 +727,12 @@ class CognitiveExecutionRuntime:
             "last_provider": None,
             "final_candidate": None,
             "provider_execution_binding": self._provider_binding(request, tenant_id.strip()),
+            "provider_reservations": [],
         }
+        if cooperative_state is not None:
+            payload["cooperation"] = cooperative_state
+            payload["next_prompt"] = stage_prompt(cooperative_state)
+        return payload
 
     def _checkpoint_payload(self, execution_id: str) -> dict[str, object]:
         checkpoint = self.repository.latest_checkpoint(execution_id)
@@ -812,6 +911,14 @@ class CognitiveExecutionRuntime:
                 )
 
             self._assert_provider_binding(execution, payload)
+            if self._provider_budget_exceeded(execution, payload):
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="provider_usage_exceeded_reservation",
+                    now=now,
+                )
 
             if execution.state is ExecutionState.WAITING_FOR_USER:
                 pending = self._pending_approvals(execution, payload)
@@ -968,6 +1075,219 @@ class CognitiveExecutionRuntime:
             )
         return tuple(tools)
 
+    @staticmethod
+    def _operation_provider_budget(request: AIExecutionRequest) -> ResourceBudget:
+        raw = dict(request.resource_budget)
+        defaults = ResourceBudget().as_dict()
+        values = {key: raw.get(key, value) for key, value in defaults.items()}
+        values["max_wall_seconds"] = raw.get("max_wall_seconds", raw.get("max_elapsed_seconds", 120.0))
+        return ResourceBudget(**values)
+
+    @staticmethod
+    def _provider_budget_totals(payload: Mapping[str, object]) -> dict[str, object]:
+        rows = payload.get("provider_reservations", [])
+        if not isinstance(rows, list) or len(rows) > 256:
+            raise CognitiveExecutionError("provider resource reservation ledger is corrupt")
+        totals = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cost_usd": 0.0,
+            "provider_attempts": 0,
+            "unknown_usage_reservations": 0,
+        }
+        ids = set()
+        for row in rows:
+            if (
+                not isinstance(row, Mapping)
+                or not isinstance(row.get("turn_id"), str)
+                or row["turn_id"] in ids
+            ):
+                raise CognitiveExecutionError("provider resource reservation identity is corrupt")
+            ids.add(row["turn_id"])
+            allocation = row.get("charged") if row.get("settled") is True else row.get("allocation")
+            if not isinstance(allocation, Mapping):
+                raise CognitiveExecutionError("provider resource reservation is corrupt")
+            for name in ("input_tokens", "output_tokens", "provider_attempts"):
+                value = allocation.get(name)
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise CognitiveExecutionError("provider resource token/attempt accounting is corrupt")
+                totals[name] += value
+            cost = allocation.get("cost_usd")
+            if (
+                isinstance(cost, bool)
+                or not isinstance(cost, (int, float))
+                or not math.isfinite(cost)
+                or cost < 0
+            ):
+                raise CognitiveExecutionError("provider resource cost accounting is corrupt")
+            totals["cost_usd"] += cost
+            if row.get("usage_unknown") or row.get("settled") is not True:
+                totals["unknown_usage_reservations"] += 1
+        return totals
+
+    def _remaining_provider_budget(
+        self,
+        execution: AIExecution,
+        payload: Mapping[str, object],
+        *,
+        remaining_stages: int = 1,
+        stage_output_cap: int | None = None,
+        single_attempt: bool = False,
+    ) -> ResourceBudget:
+        overall = self._operation_provider_budget(execution.request)
+        used = self._provider_budget_totals(payload)
+        input_left = overall.max_input_tokens - int(used["input_tokens"])
+        output_left = overall.max_output_tokens - int(used["output_tokens"])
+        attempts_left = overall.max_provider_attempts - int(used["provider_attempts"])
+        cost_left = overall.max_cost_usd - float(used["cost_usd"])
+        if input_left <= 0 or output_left <= 0 or attempts_left <= 0 or cost_left < -1e-9:
+            raise CognitiveExecutionError("operation provider budget exhausted")
+        if remaining_stages > 1 and (output_left < 64 * remaining_stages or attempts_left < remaining_stages):
+            raise CognitiveExecutionError("remaining cooperation cannot fit operation provider budget")
+        output_limit = output_left // remaining_stages
+        if stage_output_cap is not None:
+            output_limit = min(output_limit, stage_output_cap)
+        deadline = self._deadline(payload)
+        wall = overall.max_wall_seconds
+        if deadline is not None:
+            wall = min(wall, (deadline - datetime.now(UTC)).total_seconds())
+        if wall <= 0:
+            raise CognitiveExecutionError("operation provider deadline exhausted")
+        # Hosted providers often omit monetary usage. Keep each unknown
+        # dispatch charged at a finite share while preserving room for the
+        # remaining explicitly granted tool/repair turns.
+        turn_slots = _positive_int(execution.request.resource_budget, "max_model_turns", 8, maximum=64)
+        cost_slots = max(
+            remaining_stages, min(attempts_left, turn_slots - int(payload.get("model_turns", 0)))
+        )
+        return ResourceBudget(
+            max_input_tokens=min(
+                max(0, input_left // remaining_stages),
+                int(execution.request.context_policy.get("provider_input_limit", overall.max_input_tokens)),
+            ),
+            max_output_tokens=output_limit,
+            max_cost_usd=max(0.0, cost_left) / max(1, cost_slots),
+            max_wall_seconds=wall,
+            max_provider_attempts=1 if single_attempt else min(2, attempts_left),
+            max_tool_calls=max(0, overall.max_tool_calls - int(payload.get("tool_calls", 0))),
+            max_artifact_bytes=overall.max_artifact_bytes,
+            max_storage_bytes=overall.max_storage_bytes,
+            max_concurrency=overall.max_concurrency,
+            max_queue_depth=overall.max_queue_depth,
+        )
+
+    @staticmethod
+    def _zero_cost_provider(adapter: ProviderAdapter) -> bool:
+        routes = provider_execution_identity(adapter).get("routes", [])
+        return bool(routes) and all(row.get("provider_id") == "local" for row in routes)
+
+    def _provider_budget_exceeded(self, execution: AIExecution, payload: Mapping[str, object]) -> bool:
+        used = self._provider_budget_totals(payload)
+        overall = self._operation_provider_budget(execution.request)
+        return (
+            any(row.get("exceeded_allocation") is True for row in payload.get("provider_reservations", []))
+            or int(used["input_tokens"]) > overall.max_input_tokens
+            or int(used["output_tokens"]) > overall.max_output_tokens
+            or int(used["provider_attempts"]) > overall.max_provider_attempts
+            or float(used["cost_usd"]) > overall.max_cost_usd + 1e-9
+        )
+
+    def _reserve_provider_resources(
+        self,
+        execution: AIExecution,
+        payload: dict[str, object],
+        turn_id: str,
+        budget: ResourceBudget,
+        *,
+        request_digest: str,
+        now: datetime | None,
+    ) -> AIExecution:
+        rows = list(payload.get("provider_reservations", []))
+        if any(row.get("turn_id") == turn_id for row in rows):
+            # A dispatch reservation without a response is uncertain physical
+            # work. Recovery may not silently issue another model request.
+            raise CognitiveExecutionError(
+                "provider dispatch reservation already exists; physical outcome is uncertain"
+            )
+        rows.append(
+            {
+                "turn_id": turn_id,
+                "request_digest": request_digest,
+                "settled": False,
+                "allocation": {
+                    "input_tokens": budget.max_input_tokens,
+                    "output_tokens": budget.max_output_tokens,
+                    "cost_usd": budget.max_cost_usd,
+                    "provider_attempts": budget.max_provider_attempts,
+                },
+            }
+        )
+        payload["provider_reservations"] = rows
+        execution, _ = self._checkpoint(execution, payload, now=now)
+        return execution
+
+    @staticmethod
+    def _settle_provider_resources(
+        payload: dict[str, object], turn_id: str, usage: Mapping[str, object]
+    ) -> bool:
+        rows = list(payload.get("provider_reservations", []))
+        matches = [index for index, row in enumerate(rows) if row.get("turn_id") == turn_id]
+        if len(matches) != 1:
+            raise CognitiveExecutionError("provider response lacks an exact durable resource reservation")
+        index = matches[0]
+        row = dict(rows[index])
+        allocation = dict(row["allocation"])
+        charged = dict(allocation)
+        unknown = []
+        estimated = (
+            "estimate" in str(usage.get("usage_source", "unknown"))
+            or usage.get("usage_source", "unknown") == "unknown"
+        )
+        for name in ("input_tokens", "output_tokens"):
+            value = usage.get(name)
+            if not estimated and isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                charged[name] = value
+            else:
+                unknown.append(name)
+        raw_cost = usage.get("billed_cost")
+        if raw_cost is None:
+            raw_cost = usage.get("estimated_cost")
+        try:
+            cost = float(raw_cost) if raw_cost is not None and not isinstance(raw_cost, bool) else None
+        except (ValueError, TypeError, OverflowError):
+            cost = None
+        currency = usage.get("currency")
+        local_zero = cost == 0 and str(usage.get("usage_source", "")).startswith("local")
+        if cost is not None and math.isfinite(cost) and cost >= 0 and (currency == "USD" or local_zero):
+            charged["cost_usd"] = cost
+        else:
+            unknown.append("cost_usd")
+        exceeded = any(
+            charged[key] > allocation[key] + (1e-9 if key == "cost_usd" else 0) for key in allocation
+        )
+        row.update(
+            {"settled": True, "charged": charged, "usage_unknown": unknown, "exceeded_allocation": exceeded}
+        )
+        rows[index] = row
+        payload["provider_reservations"] = rows
+        return exceeded
+
+    def _execution_usage(
+        self, payload: Mapping[str, object], disposition: str | None = None
+    ) -> dict[str, object]:
+        usage = {
+            "model_turns": int(payload.get("model_turns", 0)),
+            "tool_calls": int(payload.get("tool_calls", 0)),
+            "provider_usage": list(payload.get("usage_events", [])),
+            "provider_budget_charged": self._provider_budget_totals(payload),
+        }
+        if disposition is not None:
+            usage["verification_disposition"] = disposition
+        state = payload.get("cooperation")
+        if isinstance(state, Mapping):
+            usage["cooperation"] = cooperation_summary(state)
+        return usage
+
     async def _run_provider_turn(
         self,
         execution: AIExecution,
@@ -977,6 +1297,27 @@ class CognitiveExecutionRuntime:
         now: datetime | None,
     ) -> ExecutionRunResult:
         self._assert_provider_binding(execution, payload)
+        cooperation = normalize_cooperation_policy(execution.request.context_policy.get("cooperation"))
+        state = None
+        remaining_stages = 1
+        stage_id = None
+        active_provider = self.provider
+        if cooperation is not None:
+            state = validate_cooperation_state(
+                payload.get("cooperation"),
+                cooperation,
+                context_digest=str(payload.get("context_digest")),
+                source_snapshot=execution.request.context_policy.get("source_snapshot", []),
+                expected_brief_digest=execution.request.context_policy.get("cooperation_brief_digest"),
+                expected_history_digest=execution.request.context_policy.get("cooperation_history_digest"),
+            )
+            stages = cooperation_stages(cooperation)
+            cursor = int(state["cursor"])
+            if cursor >= len(stages):
+                raise CognitiveExecutionError("completed cooperation cannot dispatch another provider stage")
+            stage_id, role = stages[cursor]
+            active_provider = self.cooperative_adapters.get(role, self.provider)
+            remaining_stages = len(stages) - cursor
         max_turns = _positive_int(
             execution.request.resource_budget,
             "max_model_turns",
@@ -1009,9 +1350,13 @@ class CognitiveExecutionRuntime:
             f"{execution.execution_id}:provider:{model_turns}:{turn_index}",
         )
         tools = await self._provider_tools(payload)
+        if cooperation is not None and tools:
+            raise CognitiveExecutionError("cooperative response stages cannot execute tools")
         deadline = self._deadline(payload)
         context_policy = dict(execution.request.context_policy)
         structured_output_schema_raw = context_policy.get("structured_output_schema")
+        if cooperation is not None and remaining_stages > 1:
+            structured_output_schema_raw = None
         structured_output_schema = None
         if structured_output_schema_raw is not None:
             if not isinstance(structured_output_schema_raw, Mapping):
@@ -1032,34 +1377,38 @@ class CognitiveExecutionRuntime:
                     error_code="structured_output_schema_invalid",
                     now=now,
                 )
-        execution_budget = dict(execution.request.resource_budget)
-        provider_budget = ResourceBudget(
-            max_input_tokens=int(execution_budget.get("max_input_tokens", 200_000)),
-            max_output_tokens=int(execution_budget.get("max_output_tokens", 16_384)),
-            max_cost_usd=float(execution_budget.get("max_cost_usd", 10.0)),
-            max_wall_seconds=float(
-                execution_budget.get(
-                    "max_wall_seconds",
-                    execution_budget.get("max_elapsed_seconds", 120.0),
-                )
-            ),
-            max_provider_attempts=int(execution_budget.get("max_provider_attempts", 3)),
-            max_tool_calls=int(execution_budget.get("max_tool_calls", 32)),
-            max_artifact_bytes=int(
-                execution_budget.get(
-                    "max_artifact_bytes",
-                    100 * 1024 * 1024,
-                )
-            ),
-            max_storage_bytes=int(
-                execution_budget.get(
-                    "max_storage_bytes",
-                    100 * 1024 * 1024,
-                )
-            ),
-            max_concurrency=int(execution_budget.get("max_concurrency", 32)),
-            max_queue_depth=int(execution_budget.get("max_queue_depth", 1_000)),
-        )
+        stage_cap = int(cooperation["max_stage_output_tokens"]) if cooperation else None
+        declared_limits = getattr(active_provider, "generation_limits", None)
+        if callable(declared_limits):
+            limits = declared_limits()
+            limit = limits.get("max_output_tokens") if isinstance(limits, Mapping) else None
+            if type(limit) is not int or limit < (64 if cooperation is not None else 1):
+                raise CognitiveExecutionError("provider has no usable output allowance")
+            stage_cap = limit if stage_cap is None else min(stage_cap, limit)
+        try:
+            provider_budget = self._remaining_provider_budget(
+                execution,
+                payload,
+                remaining_stages=remaining_stages,
+                stage_output_cap=stage_cap,
+                single_attempt=cooperation is not None or self._zero_cost_provider(active_provider),
+            )
+        except CognitiveExecutionError:
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="operation_provider_budget_exhausted",
+                now=now,
+            )
+        if provider_budget.max_cost_usd <= 0 and not self._zero_cost_provider(active_provider):
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="operation_provider_cost_budget_exhausted",
+                now=now,
+            )
         raw_snapshot = context_policy.get("source_snapshot", [])
         if not isinstance(raw_snapshot, list):
             raise CognitiveExecutionError("execution context source snapshot is corrupt")
@@ -1072,19 +1421,8 @@ class CognitiveExecutionRuntime:
         provider_request = ProviderRequest(
             instructions=instructions,
             prompt=prompt,
-            history=_history_from_payload(payload),
-            max_output_tokens=(
-                int(execution.request.resource_budget["max_output_tokens"])
-                if isinstance(
-                    execution.request.resource_budget.get("max_output_tokens"),
-                    int,
-                )
-                and not isinstance(
-                    execution.request.resource_budget.get("max_output_tokens"),
-                    bool,
-                )
-                else None
-            ),
+            history=_history_from_payload(state if state is not None else payload),
+            max_output_tokens=provider_budget.max_output_tokens,
             data_class=str(
                 context_policy.get(
                     "data_class",
@@ -1116,12 +1454,18 @@ class CognitiveExecutionRuntime:
                 else str(context_policy["compiler_version"])
             ),
             model=(
-                (provider_context_selection(context_policy) or {}).get("model_id")
-                if context_policy.get("provider_model") is None
-                else str(context_policy["provider_model"])
+                str(cooperation["roles"][role]["model_id"])
+                if cooperation is not None and role in cooperation["roles"]
+                else (
+                    (provider_context_selection(context_policy) or {}).get("model_id")
+                    if context_policy.get("provider_model") is None
+                    else str(context_policy["provider_model"])
+                )
             ),
             temperature=provider_context_temperature(context_policy),
-            estimated_cost_usd=float(context_policy.get("estimated_cost_usd", 0.0)),
+            estimated_cost_usd=(
+                0.0 if self._zero_cost_provider(active_provider) else provider_budget.max_cost_usd
+            ),
             resource_budget=provider_budget,
             structured_output_schema=structured_output_schema,
             tools=tools,
@@ -1138,18 +1482,45 @@ class CognitiveExecutionRuntime:
             ),
             deadline=deadline,
         )
+        request_material = {
+            "instructions": provider_request.instructions,
+            "prompt": provider_request.prompt,
+            "history": [{"role": item.role, "content": item.content} for item in provider_request.history],
+            "context_digest": provider_request.context_digest,
+            "stage_id": stage_id,
+            "provider": provider_execution_identity(active_provider),
+            "output_limit": provider_request.max_output_tokens,
+            "structured_output_schema": provider_request.structured_output_schema,
+        }
+        request_digest = hashlib.sha256(
+            json.dumps(
+                request_material,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode()
+        ).hexdigest()
+        execution = self._reserve_provider_resources(
+            execution,
+            payload,
+            turn_id,
+            provider_budget,
+            request_digest=request_digest,
+            now=now,
+        )
         # Recheck immediately before dispatch after asynchronous tool/schema
         # preparation; the durable initial binding is never silently replaced.
         self._assert_provider_binding(self.repository.get(execution.execution_id), payload)
         cooperative_cancellation = bool(
             getattr(
-                self.provider,
+                active_provider,
                 "supports_cooperative_cancellation",
                 False,
             )
         )
         if deadline is None and not cooperative_cancellation:
-            response = await self.provider.generate(provider_request)
+            response = await active_provider.generate(provider_request)
         else:
             logical_now = datetime.now(UTC) if now is None else now.astimezone(UTC)
             deadline_budget = None if deadline is None else (deadline - logical_now).total_seconds()
@@ -1162,7 +1533,7 @@ class CognitiveExecutionRuntime:
                     now=now,
                 )
 
-            provider_task = asyncio.create_task(self.provider.generate(provider_request))
+            provider_task = asyncio.create_task(active_provider.generate(provider_request))
             loop = asyncio.get_running_loop()
             started_wait = loop.time()
             try:
@@ -1270,6 +1641,7 @@ class CognitiveExecutionRuntime:
         # execution snapshot. Re-read canonical state, account for the provider
         # work that actually happened, and fence the late result before it can
         # become user-visible success.
+        exceeded_reservation = self._settle_provider_resources(payload, turn_id, response.usage.as_dict())
         durable_after_provider = self.repository.get(execution.execution_id)
         self._assert_provider_binding(durable_after_provider, payload)
         if durable_after_provider.cancellation_requested or self._deadline_expired(payload, now=now):
@@ -1291,6 +1663,9 @@ class CognitiveExecutionRuntime:
                         "turn_index": turn_index,
                         "provider_ref": late_provider_ref,
                         "provider_request_id": response.request_id,
+                        "provider": response.provider,
+                        "model": response.model,
+                        "request_digest": request_digest,
                         "provider_response_id": response.response_id,
                         "text": response.text,
                         "structured_output": (
@@ -1366,8 +1741,21 @@ class CognitiveExecutionRuntime:
                 "last_provider": {
                     "turn_id": turn_id,
                     "turn_index": turn_index,
+                    "phase_usage": (
+                        {
+                            "cooperation_stage": stage_id,
+                            "cooperation_role": role,
+                            "cooperation_stage_index": int(state["cursor"]) + 1,
+                            "cooperation_stage_total": len(cooperation_stages(cooperation)),
+                        }
+                        if state is not None
+                        else {}
+                    ),
                     "provider_ref": provider_ref,
                     "provider_request_id": response.request_id,
+                    "provider": response.provider,
+                    "model": response.model,
+                    "request_digest": request_digest,
                     "provider_response_id": response.response_id,
                     "text": response.text,
                     "structured_output": (
@@ -1399,7 +1787,19 @@ class CognitiveExecutionRuntime:
             context_digest=context_digest,
             provider_request_id=response.request_id,
             provider_response_id=response.response_id,
-            usage_delta=response.usage.as_dict(),
+            usage_delta={
+                **response.usage.as_dict(),
+                **(
+                    {
+                        "cooperation_stage": stage_id,
+                        "cooperation_role": role,
+                        "cooperation_stage_index": int(state["cursor"]) + 1,
+                        "cooperation_stage_total": len(cooperation_stages(cooperation)),
+                    }
+                    if state is not None
+                    else {}
+                ),
+            },
             checkpoint_ref=checkpoint_ref,
             status="provider_completed",
         )
@@ -1408,6 +1808,14 @@ class CognitiveExecutionRuntime:
             expected_execution_version=execution.version,
             now=now,
         )
+        if exceeded_reservation:
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="provider_usage_exceeded_reservation",
+                now=now,
+            )
         execution = self._transition(
             execution,
             ExecutionState.CLASSIFYING_OUTPUT,
@@ -1438,6 +1846,21 @@ class CognitiveExecutionRuntime:
                 now=now,
             )
 
+        reservations = payload.get("provider_reservations", [])
+        if (
+            not isinstance(reservations, list)
+            or not reservations
+            or reservations[-1].get("turn_id") != provider.get("turn_id")
+            or reservations[-1].get("settled") is not True
+        ):
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="provider_dispatch_outcome_uncertain",
+                now=now,
+            )
+
         expected_turn = int(provider.get("turn_index", -1))
         if execution.latest_turn_index < expected_turn:
             checkpoint = self.repository.latest_checkpoint(execution.execution_id)
@@ -1464,7 +1887,10 @@ class CognitiveExecutionRuntime:
                         if provider.get("provider_response_id") is None
                         else str(provider["provider_response_id"])
                     ),
-                    usage_delta=(dict(provider.get("usage") or {})),
+                    usage_delta={
+                        **dict(provider.get("usage") or {}),
+                        **dict(provider.get("phase_usage") or {}),
+                    },
                     checkpoint_ref=checkpoint.checkpoint_ref,
                     status="provider_completed",
                 ),
@@ -1501,6 +1927,34 @@ class CognitiveExecutionRuntime:
         if len(calls) != len(raw_calls):
             raise CognitiveExecutionError("provider tool call checkpoint is corrupt")
 
+        cooperation = normalize_cooperation_policy(execution.request.context_policy.get("cooperation"))
+        cooperative_state = None
+        if cooperation is not None:
+            cooperative_state = validate_cooperation_state(
+                payload.get("cooperation"),
+                cooperation,
+                context_digest=str(payload.get("context_digest")),
+                source_snapshot=execution.request.context_policy.get("source_snapshot", []),
+                expected_brief_digest=execution.request.context_policy.get("cooperation_brief_digest"),
+                expected_history_digest=execution.request.context_policy.get("cooperation_history_digest"),
+            )
+            prior_artifacts = cooperative_state["artifacts"]
+            if (
+                prior_artifacts
+                and prior_artifacts[-1]["provider_receipt"] == provider.get("provider_ref")
+                and int(cooperative_state["cursor"]) < len(cooperation_stages(cooperation))
+            ):
+                execution = self._transition(execution, ExecutionState.REPAIRING, now=now)
+                return await self._drive(execution.execution_id, approval_refs=approval_refs, now=now)
+            if calls:
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="cooperation_tool_calls_refused",
+                    now=now,
+                )
+
         if calls:
             return await self._prepare_tool_batch(
                 execution,
@@ -1511,6 +1965,11 @@ class CognitiveExecutionRuntime:
             )
 
         structured_schema = execution.request.context_policy.get("structured_output_schema")
+        if (
+            cooperation is not None
+            and int(cooperative_state["cursor"]) < len(cooperation_stages(cooperation)) - 1
+        ):
+            structured_schema = None
         if structured_schema is not None:
             structured = provider.get("structured_output")
             if not isinstance(structured, dict):
@@ -1561,6 +2020,16 @@ class CognitiveExecutionRuntime:
                 now=now,
             )
 
+        if cooperation is not None:
+            execution, complete = self._consume_cooperative_candidate(
+                execution,
+                payload,
+                candidate.strip(),
+                now=now,
+            )
+            if not complete:
+                execution = self._transition(execution, ExecutionState.REPAIRING, now=now)
+                return await self._drive(execution.execution_id, approval_refs=approval_refs, now=now)
         payload["final_candidate"] = candidate.strip()
         execution = self._transition(
             execution,
@@ -1569,6 +2038,72 @@ class CognitiveExecutionRuntime:
         )
         execution, _ = self._checkpoint(execution, payload, now=now)
         return await self._verify_and_finalize(execution, payload, now=now)
+
+    def _consume_cooperative_candidate(
+        self,
+        execution: AIExecution,
+        payload: dict[str, object],
+        candidate: str,
+        *,
+        now: datetime | None,
+    ) -> tuple[AIExecution, bool]:
+        policy = normalize_cooperation_policy(execution.request.context_policy.get("cooperation"))
+        assert policy is not None
+        state = validate_cooperation_state(
+            payload.get("cooperation"),
+            policy,
+            context_digest=str(payload.get("context_digest")),
+            source_snapshot=execution.request.context_policy.get("source_snapshot", []),
+            expected_brief_digest=execution.request.context_policy.get("cooperation_brief_digest"),
+            expected_history_digest=execution.request.context_policy.get("cooperation_history_digest"),
+        )
+        provider = payload.get("last_provider")
+        if not isinstance(provider, Mapping) or not isinstance(provider.get("provider_ref"), str):
+            raise CognitiveExecutionError("cooperative candidate lacks a canonical provider receipt")
+        artifacts = list(state["artifacts"])
+        stages = cooperation_stages(policy)
+        cursor = int(state["cursor"])
+        consumed = [row for row in artifacts if row["provider_receipt"] == provider["provider_ref"]]
+        if consumed:
+            # Recovery after the cursor checkpoint but before its state transition
+            # must not reinterpret or dispatch this completed phase again.
+            if consumed[-1] != artifacts[-1] or consumed[-1]["text"] != candidate:
+                raise CognitiveExecutionError("cooperative provider response replay differs")
+            return execution, cursor == len(stages)
+        if cursor >= len(stages) or len(candidate.encode()) > MAX_ARTIFACT_BYTES:
+            raise CognitiveExecutionError("cooperative candidate exceeds its phase contract")
+        for key in ("provider", "model", "request_digest"):
+            if not isinstance(provider.get(key), str) or not provider[key]:
+                raise CognitiveExecutionError("cooperative candidate identity is incomplete")
+        artifacts.append(
+            {
+                "stage_id": stages[cursor][0],
+                "role": stages[cursor][1],
+                "text": candidate,
+                "output_digest": hashlib.sha256(candidate.encode()).hexdigest(),
+                "request_digest": provider["request_digest"],
+                "provider_receipt": provider["provider_ref"],
+                "provider": provider["provider"],
+                "model": provider["model"],
+            }
+        )
+        state = {**state, "cursor": cursor + 1, "artifacts": artifacts}
+        validate_cooperation_state(
+            state,
+            policy,
+            context_digest=str(payload.get("context_digest")),
+            source_snapshot=execution.request.context_policy.get("source_snapshot", []),
+            expected_brief_digest=execution.request.context_policy.get("cooperation_brief_digest"),
+            expected_history_digest=execution.request.context_policy.get("cooperation_history_digest"),
+        )
+        payload["cooperation"] = state
+        complete = cursor + 1 == len(stages)
+        if complete:
+            payload["final_candidate"] = candidate
+        else:
+            payload["next_prompt"] = stage_prompt(state)
+        execution, _ = self._checkpoint(execution, payload, now=now)
+        return execution, complete
 
     async def _repair_structured_output(
         self,
@@ -2315,6 +2850,345 @@ class CognitiveExecutionRuntime:
             disposition="block",
         )
 
+    async def _semantic_finalize(
+        self,
+        execution: AIExecution,
+        claim: VerificationClaim,
+        *,
+        evidence: tuple[EvidenceReference, ...],
+        evidence_text: Mapping[str, str],
+        postconditions: tuple[PostconditionObservation, ...],
+        instant: datetime,
+        action_effect: str | None,
+        externally_observable: bool,
+        now: datetime | None,
+    ):
+        """Run semantic review inside the parent's durable authority and ledger."""
+        adapter = self.semantic_verification_adapter
+        if adapter is None:
+            raise _VerificationStopped("semantic_verifier_unavailable")
+        execution_id = execution.execution_id
+        payload = self._checkpoint_payload(execution_id)
+        self._assert_provider_binding(execution, payload)
+        binding = payload["provider_execution_binding"]
+        verifier_routes = {(row["provider_id"], row["model_id"]) for row in binding["verifier"]["routes"]}
+        generator_identities = [binding["generator"]]
+        if isinstance(binding.get("cooperation"), Mapping):
+            generator_identities.extend(binding["cooperation"]["role_providers"].values())
+        verifier_weights = {
+            row["local_activation"]["model_digest"]
+            for row in binding["verifier"]["routes"]
+            if isinstance(row.get("local_activation"), Mapping)
+            and isinstance(row["local_activation"].get("model_digest"), str)
+        }
+        if any(
+            verifier_routes.intersection((row["provider_id"], row["model_id"]) for row in identity["routes"])
+            or verifier_weights.intersection(
+                row["local_activation"]["model_digest"]
+                for row in identity["routes"]
+                if isinstance(row.get("local_activation"), Mapping)
+                and isinstance(row["local_activation"].get("model_digest"), str)
+            )
+            for identity in generator_identities
+        ):
+            raise _VerificationStopped("semantic_verifier_not_independent")
+        overall = self._operation_provider_budget(execution.request)
+        used = self._provider_budget_totals(payload)
+        max_turns = _positive_int(execution.request.resource_budget, "max_model_turns", 8, maximum=64)
+        rounds = min(
+            2,
+            max_turns - int(payload.get("model_turns", 0)),
+            overall.max_provider_attempts - int(used["provider_attempts"]),
+            (overall.max_output_tokens - int(used["output_tokens"])) // 64,
+        )
+        if rounds < 1 and payload.get("semantic_review") is None:
+            raise _VerificationStopped("semantic_verification_budget_exhausted")
+        output_cap = 800
+        declared_limits = getattr(adapter, "generation_limits", None)
+        if callable(declared_limits):
+            limits = declared_limits()
+            limit = limits.get("max_output_tokens") if isinstance(limits, Mapping) else None
+            if type(limit) is not int or limit < 64:
+                raise _VerificationStopped("semantic_verifier_output_unavailable")
+            output_cap = min(output_cap, limit)
+        saved_plan = payload.get("semantic_review")
+        if saved_plan is None:
+            payload["semantic_review"] = {
+                "claim_digest": claim.digest,
+                "claim_created_at": claim.created_at.isoformat(),
+                "claim_turn_id": claim.turn_id,
+                "claim_provenance_refs": list(claim.provenance_refs),
+                "rounds": rounds,
+                "output_cap": output_cap,
+                "responses": {},
+            }
+            execution, _ = self._checkpoint(execution, payload, now=now)
+        elif isinstance(saved_plan, Mapping) and saved_plan.get("claim_digest") == claim.digest:
+            rounds, output_cap = saved_plan.get("rounds"), saved_plan.get("output_cap")
+            if (
+                type(rounds) is not int
+                or not 1 <= rounds <= 2
+                or type(output_cap) is not int
+                or not 64 <= output_cap <= 800
+            ):
+                raise CognitiveExecutionError("semantic review plan is corrupt")
+        else:
+            raise CognitiveExecutionError("semantic review claim changed")
+        round_cursor = 0
+        bound_digests: dict[str, str] = {}
+
+        async def bind(request: ProviderRequest) -> ProviderRequest:
+            nonlocal round_cursor
+            current = self.repository.get(execution_id)
+            state = self._checkpoint_payload(execution_id)
+            self._assert_provider_binding(current, state)
+            if current.cancellation_requested:
+                raise _VerificationStopped("cancellation_requested")
+            if self._deadline_expired(state, now=now):
+                raise _VerificationStopped("execution_deadline_exceeded")
+            turn_id = _stable_uuid(
+                "skeleton-semantic-agent-turn",
+                f"{execution_id}:{claim.claim_id}:{round_cursor}",
+            )
+            cached = state["semantic_review"]["responses"].get(turn_id)
+            reservations = [
+                row for row in state.get("provider_reservations", []) if row.get("turn_id") == turn_id
+            ]
+            if round_cursor >= rounds or (cached is None and int(state.get("model_turns", 0)) >= max_turns):
+                raise _VerificationStopped("semantic_verification_budget_exhausted")
+            if cached is not None:
+                if len(reservations) != 1 or reservations[0].get("settled") is not True:
+                    raise CognitiveExecutionError("semantic replay lacks a settled resource reservation")
+                allocation = reservations[0]["allocation"]
+                budget = replace(
+                    overall,
+                    max_input_tokens=allocation["input_tokens"],
+                    max_output_tokens=allocation["output_tokens"],
+                    max_cost_usd=allocation["cost_usd"],
+                    max_provider_attempts=allocation["provider_attempts"],
+                    max_wall_seconds=max(
+                        0.001,
+                        min(
+                            overall.max_wall_seconds,
+                            (self._deadline(state) - datetime.now(UTC)).total_seconds(),
+                        ),
+                    ),
+                )
+            else:
+                try:
+                    budget = self._remaining_provider_budget(
+                        current,
+                        state,
+                        remaining_stages=rounds - round_cursor,
+                        stage_output_cap=min(output_cap, request.max_output_tokens),
+                        single_attempt=True,
+                    )
+                except CognitiveExecutionError as exc:
+                    raise _VerificationStopped("semantic_verification_budget_exhausted") from exc
+            if budget.max_cost_usd <= 0 and not self._zero_cost_provider(adapter):
+                raise _VerificationStopped("operation_provider_cost_budget_exhausted")
+            policy = current.request.context_policy
+            source_snapshot = tuple(tuple(row) for row in policy.get("source_snapshot", []))
+            bound = replace(
+                request,
+                max_output_tokens=budget.max_output_tokens,
+                model=adapter.model,
+                data_class=str(policy.get("data_class", "internal")),
+                purpose=str(policy.get("provider_purpose", "model-inference")),
+                tenant_id=str(state["tenant_id"]),
+                operation_id=current.operation_id,
+                execution_id=execution_id,
+                turn_id=turn_id,
+                admission_operation_id=_stable_uuid(
+                    "skeleton-provider-admission", execution_id + ":" + turn_id
+                ),
+                context_id=policy.get("context_id"),
+                context_digest=str(state["context_digest"]),
+                context_source_snapshot=source_snapshot,
+                context_compiler_version=policy.get("compiler_version"),
+                deadline=self._deadline(state),
+                resource_budget=budget,
+                estimated_cost_usd=0.0 if self._zero_cost_provider(adapter) else budget.max_cost_usd,
+            )
+            request_material = {
+                "instructions": bound.instructions,
+                "prompt": bound.prompt,
+                "context_digest": bound.context_digest,
+                "source_snapshot": list(source_snapshot),
+                "provider": provider_execution_identity(adapter),
+                "output_limit": bound.max_output_tokens,
+                "schema": bound.structured_output_schema,
+                "stage": "semantic_verification",
+            }
+            request_digest = hashlib.sha256(
+                json.dumps(
+                    request_material,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                ).encode()
+            ).hexdigest()
+            if cached is None:
+                self._reserve_provider_resources(
+                    current, state, turn_id, budget, request_digest=request_digest, now=now
+                )
+            elif (
+                cached.get("request_digest") != request_digest
+                or reservations[0].get("request_digest") != request_digest
+            ):
+                raise CognitiveExecutionError("semantic replay request differs from its durable reservation")
+            bound_digests[turn_id] = request_digest
+            round_cursor += 1
+            return bound
+
+        async def resolve(request: ProviderRequest) -> ProviderResponse | None:
+            state = self._checkpoint_payload(execution_id)
+            cached = state["semantic_review"]["responses"].get(str(request.turn_id))
+            if cached is None:
+                return None
+            if cached.get("request_digest") != bound_digests.get(str(request.turn_id)):
+                raise CognitiveExecutionError("semantic response replay binding changed")
+            raw = dict(cached["response"])
+            raw["usage"] = ProviderUsage(**raw["usage"])
+            raw["finish_reason"] = FinishReason(raw["finish_reason"])
+            raw["tool_calls"] = tuple(_provider_call_from_dict(row) for row in raw["tool_calls"])
+            raw["context_source_snapshot"] = tuple(tuple(row) for row in raw["context_source_snapshot"])
+            response = ProviderResponse(**raw)
+            if _provider_response_binding(response, str(request.turn_id))[1] != cached.get("fingerprint"):
+                raise CognitiveExecutionError("semantic stored response fingerprint changed")
+            return response
+
+        async def observe(request: ProviderRequest, response: ProviderResponse) -> None:
+            current = self.repository.get(execution_id)
+            state = self._checkpoint_payload(execution_id)
+            self._assert_provider_binding(current, state)
+            # Even an invalid verdict or mismatched response consumed physical
+            # model work. Persist its usage before protocol/identity rejection.
+            provider_ref, fingerprint = _provider_response_binding(response, str(request.turn_id))
+            responses = dict(state["semantic_review"]["responses"])
+            cached = responses.get(str(request.turn_id))
+            if cached is None:
+                exceeded = self._settle_provider_resources(
+                    state, str(request.turn_id), response.usage.as_dict()
+                )
+                state["model_turns"] = int(state.get("model_turns", 0)) + 1
+                state["usage_events"] = [*state.get("usage_events", []), response.usage.as_dict()]
+                raw = asdict(response)
+                raw["tool_calls"] = [row.as_dict() for row in response.tool_calls]
+                encoded = json.dumps(
+                    raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+                )
+                if len(encoded.encode()) > 128 * 1024:
+                    self._checkpoint(current, state, now=now)
+                    raise CognitiveExecutionError("semantic stored response exceeds its durable bound")
+                responses[str(request.turn_id)] = {
+                    "request_digest": bound_digests[str(request.turn_id)],
+                    "response": json.loads(encoded),
+                    "fingerprint": fingerprint,
+                    "turn_index": current.latest_turn_index + 1,
+                }
+                state["semantic_review"] = {**state["semantic_review"], "responses": responses}
+                current, _ = self._checkpoint(current, state, now=now)
+            else:
+                if cached.get("fingerprint") != fingerprint or cached.get(
+                    "request_digest"
+                ) != bound_digests.get(str(request.turn_id)):
+                    raise CognitiveExecutionError("semantic observed response replay differs")
+                exceeded = self._provider_budget_exceeded(current, state)
+            binding = state["provider_execution_binding"]
+            if not provider_response_matches_identity(
+                binding.get("verifier"), response.provider, response.model
+            ):
+                raise CognitiveExecutionError("semantic response differs from pinned verifier")
+            if (
+                response.context_digest != request.context_digest
+                or response.context_id != request.context_id
+                or response.context_source_snapshot != request.context_source_snapshot
+                or response.context_compiler_version != request.context_compiler_version
+                or response.data_class != request.data_class
+            ):
+                raise CognitiveExecutionError("semantic response context or classification drift")
+            bindings = dict(state.get("provider_response_bindings", {}))
+            prior = bindings.get(provider_ref)
+            if prior is not None and prior != fingerprint:
+                raise CognitiveExecutionError("semantic provider response identity reused")
+            bindings[provider_ref] = fingerprint
+            state["provider_response_bindings"] = bindings
+            if provider_ref not in state.get("provider_receipts", []):
+                state["provider_receipts"] = [*state.get("provider_receipts", []), provider_ref]
+            current, checkpoint_ref = self._checkpoint(current, state, now=now)
+            turns = self.repository.turns(execution_id)
+            if not any(turn.turn_id == request.turn_id for turn in turns):
+                current = self._append_turn(
+                    AgentTurn(
+                        operation_id=current.operation_id,
+                        execution_id=execution_id,
+                        turn_id=str(request.turn_id),
+                        parent_turn_id=turns[-1].turn_id if turns else None,
+                        turn_index=current.latest_turn_index + 1,
+                        phase=ExecutionState.VERIFYING,
+                        context_digest=str(state["context_digest"]),
+                        provider_request_id=response.request_id,
+                        provider_response_id=response.response_id,
+                        usage_delta={
+                            **response.usage.as_dict(),
+                            "stage": "semantic_verification",
+                            "round_index": round_cursor,
+                        },
+                        checkpoint_ref=checkpoint_ref,
+                        status="semantic_verification_completed",
+                    ),
+                    expected_execution_version=current.version,
+                    now=now,
+                )
+            if exceeded or self._provider_budget_exceeded(current, state):
+                raise _VerificationStopped("provider_usage_exceeded_reservation")
+            if current.cancellation_requested:
+                raise _VerificationStopped("cancellation_requested")
+            if self._deadline_expired(state, now=now):
+                raise _VerificationStopped("execution_deadline_exceeded")
+
+        semantic_task = asyncio.create_task(
+            SemanticVerificationRuntime(
+                adapter,
+                max_rounds=rounds,
+                max_repairs=min(1, rounds - 1),
+                max_output_tokens=output_cap,
+                request_binder=bind,
+                response_observer=observe,
+                response_resolver=resolve,
+            ).finalize(
+                claim,
+                evidence=evidence,
+                evidence_text=evidence_text,
+                postconditions=postconditions,
+                verified_at=instant,
+                action_effect=action_effect,
+                externally_observable_action=externally_observable,
+                force_semantic=True,
+            )
+        )
+        try:
+            while not semantic_task.done():
+                await asyncio.wait({semantic_task}, timeout=0.05)
+                current = self.repository.get(execution_id)
+                if current.cancellation_requested:
+                    semantic_task.cancel()
+                    try:
+                        await semantic_task
+                    except asyncio.CancelledError:
+                        pass
+                    raise _VerificationStopped("cancellation_requested")
+            return await semantic_task
+        except asyncio.CancelledError:
+            semantic_task.cancel()
+            try:
+                await semantic_task
+            except asyncio.CancelledError:
+                pass
+            raise
+
     async def _verify_candidate(
         self,
         execution: AIExecution,
@@ -2351,6 +3225,9 @@ class CognitiveExecutionRuntime:
             raise CognitiveExecutionError("execution tenant_id is invalid")
         tenant_id = tenant_id.strip()
         instant = datetime.now(UTC) if now is None else now.astimezone(UTC)
+        claim_created_at = instant
+        verification_payload = self._checkpoint_payload(execution.execution_id)
+        saved_semantic = verification_payload.get("semantic_review")
         turns = self.repository.turns(execution.execution_id)
         turn_id = (
             turns[-1].turn_id
@@ -2360,6 +3237,24 @@ class CognitiveExecutionRuntime:
                 execution.execution_id + ":verification",
             )
         )
+        provenance_refs = tuple(str(item) for item in verification_payload.get("provider_receipts", []))
+        if saved_semantic is not None:
+            if not isinstance(saved_semantic, Mapping):
+                raise CognitiveExecutionError("semantic review checkpoint is corrupt")
+            try:
+                claim_created_at = datetime.fromisoformat(saved_semantic["claim_created_at"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise CognitiveExecutionError("semantic review timestamp is corrupt") from exc
+            if claim_created_at.tzinfo is None or claim_created_at.utcoffset() is None:
+                raise CognitiveExecutionError("semantic review timestamp has no timezone")
+            turn_id = saved_semantic.get("claim_turn_id")
+            refs = saved_semantic.get("claim_provenance_refs")
+            if not isinstance(refs, list) or not all(
+                isinstance(ref, str) and ref in verification_payload.get("provider_receipts", [])
+                for ref in refs
+            ):
+                raise CognitiveExecutionError("semantic review provenance changed")
+            provenance_refs = tuple(refs)
         verification_profile = execution.request.context_policy.get(
             "verification_profile",
             "evidence_required",
@@ -2416,7 +3311,7 @@ class CognitiveExecutionRuntime:
             text=candidate.strip(),
             kind=claim_kind,
             risk=risk,
-            created_at=instant,
+            created_at=claim_created_at,
             operation_id=_tool_operation_uuid(execution.operation_id),
             turn_id=turn_id,
             context_id=_stable_uuid(
@@ -2424,10 +3319,7 @@ class CognitiveExecutionRuntime:
                 execution.execution_id + ":" + context_digest,
             ),
             context_digest=context_digest,
-            provenance_refs=tuple(
-                str(item)
-                for item in self._checkpoint_payload(execution.execution_id).get("provider_receipts", [])
-            ),
+            provenance_refs=provenance_refs,
             generated_by_model=True,
         )
 
@@ -2445,21 +3337,18 @@ class CognitiveExecutionRuntime:
         if assessment.policy.level >= VerificationLevel.INDEPENDENT or (
             execution.request.context_policy.get("semantic_verification_required") is True
         ):
-            adapter = self.semantic_verification_adapter
-            if adapter is None:
-                semantic = None
-            else:
-                semantic = await SemanticVerificationRuntime(adapter).finalize(
-                    claim,
-                    evidence=evidence,
-                    evidence_text=evidence_text,
-                    postconditions=postconditions,
-                    verified_at=instant,
-                    action_effect=action_effect,
-                    externally_observable_action=externally_observable,
-                    force_semantic=True,
-                )
-                assessment = semantic.final_assessment
+            semantic = await self._semantic_finalize(
+                execution,
+                claim,
+                evidence=evidence,
+                evidence_text=evidence_text,
+                postconditions=postconditions,
+                instant=instant,
+                action_effect=action_effect,
+                externally_observable=externally_observable,
+                now=now,
+            )
+            assessment = semantic.final_assessment
 
         canonical_receipt = materialize_verification_receipt(
             claim,
@@ -2625,12 +3514,42 @@ class CognitiveExecutionRuntime:
         if not isinstance(context_digest, str):
             raise CognitiveExecutionError("context digest checkpoint is corrupt")
 
-        verification = await self._verify_candidate(
-            execution,
-            candidate,
-            context_digest,
-            now=now,
-        )
+        try:
+            verification = await self._verify_candidate(execution, candidate, context_digest, now=now)
+        except _VerificationStopped as exc:
+            current = self.repository.get(execution.execution_id)
+            return self._finalize_non_success(
+                current,
+                self._checkpoint_payload(execution.execution_id),
+                status="cancelled" if exc.code == "cancellation_requested" else "failed",
+                error_code=exc.code,
+                now=now,
+            )
+        # Semantic callbacks commit reservations, responses and AgentTurns.
+        # Never finalize using the pre-verification checkpoint/version.
+        execution = self.repository.get(execution.execution_id)
+        payload = self._checkpoint_payload(execution.execution_id)
+        self._assert_provider_binding(execution, payload)
+        if execution.cancellation_requested or self._deadline_expired(payload, now=now):
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="cancelled" if execution.cancellation_requested else "failed",
+                error_code=(
+                    "cancellation_requested"
+                    if execution.cancellation_requested
+                    else "execution_deadline_exceeded"
+                ),
+                now=now,
+            )
+        if self._provider_budget_exceeded(execution, payload):
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="provider_usage_exceeded_reservation",
+                now=now,
+            )
         verification_ref = _verification_ref(verification)
         disposition = verification.disposition or "block"
         final_output = verification.final_output or candidate.strip()
@@ -2683,12 +3602,7 @@ class CognitiveExecutionRuntime:
                 evidence_refs=verification.evidence_refs,
                 provider_receipts=tuple(str(item) for item in payload.get("provider_receipts", [])),
                 tool_receipts=tuple(str(item) for item in payload.get("tool_receipts", [])),
-                usage={
-                    "model_turns": int(payload.get("model_turns", 0)),
-                    "tool_calls": int(payload.get("tool_calls", 0)),
-                    "provider_usage": list(payload.get("usage_events", [])),
-                    "verification_disposition": "qualified",
-                },
+                usage=self._execution_usage(payload, "qualified"),
                 stream_terminal_event=terminal_event,
                 completed_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
             )
@@ -2723,12 +3637,7 @@ class CognitiveExecutionRuntime:
             tool_receipts=tuple(str(item) for item in payload.get("tool_receipts", [])),
             memory_refs=bindings.memory_refs,
             artifact_refs=bindings.artifact_refs,
-            usage={
-                "model_turns": int(payload.get("model_turns", 0)),
-                "tool_calls": int(payload.get("tool_calls", 0)),
-                "provider_usage": list(payload.get("usage_events", [])),
-                "verification_disposition": "publish",
-            },
+            usage=self._execution_usage(payload, "publish"),
             stream_terminal_event=terminal_event,
             completed_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
         )
@@ -2759,12 +3668,7 @@ class CognitiveExecutionRuntime:
             evidence_refs=(() if verification is None else verification.evidence_refs),
             provider_receipts=tuple(str(item) for item in payload.get("provider_receipts", [])),
             tool_receipts=tuple(str(item) for item in payload.get("tool_receipts", [])),
-            usage={
-                "model_turns": int(payload.get("model_turns", 0)),
-                "tool_calls": int(payload.get("tool_calls", 0)),
-                "provider_usage": list(payload.get("usage_events", [])),
-                "error_code": error_code,
-            },
+            usage={**self._execution_usage(payload), "error_code": error_code},
             stream_terminal_event=terminal_event,
             completed_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
         )

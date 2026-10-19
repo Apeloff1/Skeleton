@@ -45,12 +45,14 @@ def audit(root: Path = ROOT) -> list[str]:
         return ["unrecognized CI tier registry schema"]
     specialised = policy.get("specialized_manual_only")
     core = policy.get("core_automatic_pr")
-    if (not isinstance(specialised, list) or not isinstance(core, list)
-            or not specialised or not core
-            or any(not isinstance(p, str) or not p.endswith(".yml") or "/" in p
-                   for p in specialised + core)):
+    reusable = policy.get("required_reusable_workflows")
+    tiers = (specialised, core, reusable)
+    if (any(not isinstance(group, list) or not group for group in tiers)
+            or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
+                   for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
-    if len(set(specialised + core)) != len(specialised + core):
+    names = specialised + core + reusable
+    if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
     if not isinstance(rules, dict) or not rules or any(x is not True for x in rules.values()):
@@ -88,6 +90,22 @@ def audit(root: Path = ROOT) -> list[str]:
                 failures.append(f"{name}: archived specialist must retain manual-only definition; got {sorted(found)}")
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(f"{name}: cannot inspect archived specialist ({exc})")
+    for name in reusable:
+        try:
+            found = events((root / WORKFLOWS / name).read_text(encoding="utf-8"))
+            if found != {"workflow_call", "workflow_dispatch"}:
+                failures.append(
+                    f"{name}: required reusable workflow must be callable and manually dispatchable, "
+                    f"without standalone push/PR triggers; got {sorted(found)}"
+                )
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{name}: cannot inspect required reusable workflow ({exc})")
+        try:
+            archived = (root / ARCHIVE / name).read_text(encoding="utf-8")
+            if events(archived) != {"workflow_dispatch"}:
+                failures.append(f"{name}: archived predecessor must remain dispatch-only")
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{name}: missing archived reusable predecessor ({exc})")
     for name in core:
         try:
             found = events((root / WORKFLOWS / name).read_text(encoding="utf-8"))
@@ -101,6 +119,9 @@ def audit(root: Path = ROOT) -> list[str]:
                 or "python -m compileall -q skeleton" not in readiness
                 or "  pull_request:" not in readiness):
             failures.append("fast Merge Readiness smoke contract missing")
+        for name in reusable:
+            if f"uses: ./.github/workflows/{name}" not in readiness:
+                failures.append(f"{name}: required reusable workflow not called by Merge Readiness")
     except (OSError, UnicodeError) as exc:
         failures.append(f"Merge Readiness missing ({exc})")
     try:

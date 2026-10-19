@@ -30,10 +30,22 @@ class WorkflowTierTests(unittest.TestCase):
                 (root / ".github/workflows" / source.name).write_text(source.read_text())
             for source in (ROOT / ".github/workflows").glob("*.yaml"):
                 (root / ".github/workflows" / source.name).write_text(source.read_text())
-            for name in registry["specialized_manual_only"]:
+            for name in registry["specialized_manual_only"] + registry["required_reusable_workflows"]:
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
+            reusable = root / ".github/workflows" / registry["required_reusable_workflows"][0]
+            reusable_original = reusable.read_text()
+            reusable.write_text(reusable_original.replace("  workflow_call:", "  pull_request:"))
+            self.assertTrue(any("required reusable workflow must be callable" in p for p in audit(root)))
+            reusable.write_text(reusable_original)
+            readiness = root / ".github/workflows/merge-readiness.yml"
+            readiness_original = readiness.read_text()
+            readiness.write_text(readiness_original.replace(
+                "uses: ./.github/workflows/ci.yml", "uses: ./.github/workflows/missing-ci.yml"
+            ))
+            self.assertTrue(any("required reusable workflow not called" in p for p in audit(root)))
+            readiness.write_text(readiness_original)
             evidence = root / ".github/workflows" / "signed-evidence-manual.yml"
             evidence.write_text(
                 "name: Signed evidence\n"

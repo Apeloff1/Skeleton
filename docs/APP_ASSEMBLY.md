@@ -422,7 +422,7 @@ identity is attached there as `canonical_application` while new clients use
 
 ## Frontend endpoint boundary
 
-`frontend/utils/apiBase.ts` is the single endpoint resolver for browser and
+`frontend/src/utils/apiBase.ts` is the single endpoint resolver for browser and
 native clients. Backend clients consume `API_BASE`; Skeleton-engine clients
 consume `SKELETON_API_BASE`.
 

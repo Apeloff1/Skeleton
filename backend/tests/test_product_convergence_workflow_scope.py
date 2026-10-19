@@ -5,7 +5,10 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github" / "workflows" / "product-convergence.yml"
+ACTIVE_WORKFLOW = ROOT / ".github" / "workflows" / "product-convergence.yml"
+ARCHIVED_WORKFLOW = ROOT / ".github" / "workflows-archive" / "product-convergence.yml"
+# Validate trigger scope and zero-work close semantics if the workflow returns.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 TEST_RE = re.compile(r"tests/[A-Za-z0-9_./-]+\.py")
 
 

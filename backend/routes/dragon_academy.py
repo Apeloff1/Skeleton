@@ -214,9 +214,14 @@ def native_production_art_preview(
 
     if body.target not in TARGETS:
         raise HTTPException(status_code=422, detail="Original sprite tile preview adapter unavailable")
-    # Cartridge video asset palette classes are intentionally bounded: other
-    # UI themes map into a compatible handheld 2bpp tone class.
-    actual_palette = body.palette if body.palette in ("dmg_green", "handheld", "vga_dusk") else "handheld"
+    # Accept every explicitly supported original palette, but never silently
+    # reinterpret an unknown video palette as a supported cartridge asset.
+    # That would make a rejected request appear valid and misreport provenance.
+    from skeleton.ai.webcrawler.dragon_game_design import PALETTES
+
+    if body.palette not in PALETTES:
+        raise HTTPException(status_code=422, detail="Unsupported original sprite palette")
+    actual_palette = body.palette
     try:
         art, tiles = make_art(
             hero=body.hero,
@@ -938,7 +943,9 @@ def native_living_world_restore(
     try:
         with sqlite3.connect(str(_database_path()), timeout=5) as db:
             db.execute("PRAGMA busy_timeout=5000")
-            return {"ok": True, **restore(db, world, owner, body.slot)}
+            # Match the actual JSON response when invoked directly as well as
+            # through FastAPI: persisted tuples are projected as JSON arrays.
+            return {"ok": True, **jsonable_encoder(restore(db, world, owner, body.slot))}
     except FileNotFoundError:
         raise HTTPException(
             status_code=404, detail="No original game save exists in this user's slot"
@@ -2156,6 +2163,21 @@ class NativePuzzleGridValidationRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     levels: list[NativeOriginalGrid] = Field(min_length=1, max_length=8)
+
+    @model_validator(mode="after")
+    def require_bounded_puzzle_actors(self):
+        # Shape and character admission alone allows boards with a player in
+        # every cell. Reject impossible actor layouts before solver work.
+        for rows in self.levels:
+            flat = "".join(rows)
+            players = flat.count("@")
+            crates = flat.count("$")
+            goals = flat.count("o")
+            if players != 1 or crates not in (1, 2, 3) or goals != crates:
+                raise ValueError(
+                    "Original puzzle needs one player and 1..3 crates with matching goals"
+                )
+        return self
 
 
 @router.post("/native/production/puzzle/validate")

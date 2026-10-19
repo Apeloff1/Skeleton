@@ -36,10 +36,14 @@ from core.chat_sessions import (
     initialize_chat_runtime,
     inherit_history_dependencies,
     assert_current_dependencies,
+    cooperation_result_projection,
+    cooperation_progress_projection,
 )
 from core.model_catalog import (
     ModelSelectionError,
     context_budget_for_selection,
+    cooperation_context_selection,
+    cooperation_context_budget,
     estimate_context_tokens,
     model_catalog,
     resolve_selection,
@@ -64,7 +68,7 @@ from skeleton.contracts.context import (
     ContextTrust,
 )
 from skeleton.contracts.conversation import ConversationAuthorType, ConversationMessage
-from skeleton.context.compiler import ContextCompiler
+from skeleton.context.compiler import ContextCompiler, ContextCompilationError
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
 from skeleton.ai.assistant.live_evidence import bind_provider_receipt_set
@@ -336,6 +340,10 @@ class AIChatRequest(BaseModel):
     attachment_refs: tuple[str, ...] = Field(default=(), max_length=4)
     memory_references: list[AIChatMemoryReference] = Field(default_factory=list, max_length=8)
     crawler_context: AIChatCrawlerContext | None = None
+    cooperation: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional finite engine-owned plan, draft, critique and refinement policy.",
+    )
     response_mode: Literal["wait", "deferred"] = Field(
         default="wait",
         description=(
@@ -348,6 +356,10 @@ class AIChatRequest(BaseModel):
     def selected_pair(self):
         if (self.provider_id is None) != (self.model_id is None):
             raise ValueError("select both provider_id and model_id or use automatic routing")
+        if self.cooperation is not None:
+            from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+            self.cooperation = normalize_cooperation_policy(self.cooperation)
         return self
 
 
@@ -429,7 +441,14 @@ def _chat_request_digest(request: AIChatRequest) -> str:
         "context_sha256": context_digest,
         "memory_policy": memory_policy,
     }
-    for name in ("provider_id", "model_id", "max_output_tokens", "temperature", "crawler_context"):
+    for name in (
+        "provider_id",
+        "model_id",
+        "max_output_tokens",
+        "temperature",
+        "crawler_context",
+        "cooperation",
+    ):
         value = getattr(request, name)
         if value is not None:
             payload[name] = value.model_dump(mode="json") if isinstance(value, BaseModel) else value
@@ -450,7 +469,7 @@ def _chat_request_digest(request: AIChatRequest) -> str:
 def _chat_request_digest_candidates(request: AIChatRequest) -> set[str]:
     """Recognize main-issued and earlier current-issued immutable request hashes."""
     candidates = {_chat_request_digest(request)}
-    if not request.memory_references and request.crawler_context is None:
+    if not request.memory_references and request.crawler_context is None and request.cooperation is None:
         payload = {
             "schema_version": "backend.ai.chat-request.v1",
             "message": request.message,
@@ -498,6 +517,17 @@ def _chat_identity(user: dict) -> tuple[str, str]:
 def _chat_error(exc: Exception) -> HTTPException:
     if isinstance(exc, HTTPException):
         return exc
+    if isinstance(exc, ModelSelectionError):
+        return HTTPException(status_code=exc.status_code, detail=exc.readiness)
+    if isinstance(exc, ContextCompilationError):
+        return HTTPException(
+            status_code=422,
+            detail={
+                "code": "chat_context_unavailable",
+                "message": "The current message and sources cannot fit or satisfy the selected model context policy.",
+                "action": "Choose fewer sources, shorten the message or select a larger model context.",
+            },
+        )
     if isinstance(exc, ConversationNotFound):
         return HTTPException(status_code=404, detail="Conversation not found")
     if isinstance(exc, ConversationConflict):
@@ -581,6 +611,105 @@ async def _release_chat_turn_execution(lease) -> None:
         )
 
 
+async def _replayed_cooperation(*, thread, user_message, assistant_message, tenant_id, owner_id, policy=None):
+    """Read the canonical result projection without coupling transcript reads to uptime."""
+
+    try:
+        if policy is None:
+            _metadata, command = await read_prepared(
+                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+            )
+            if command is None:
+                return None
+            policy = command.execution_request.context_policy.get("cooperation")
+        if policy is None:
+            return None
+        client = EngineClient.from_env()
+        if client is None:
+            return None
+        operation_id, execution_id = _chat_turn_ids(thread.thread_id, user_message.message_id)
+        result = await asyncio.wait_for(
+            client.terminal_result_if_available(
+                execution_id=execution_id,
+                actor_id=owner_id,
+                tenant_id=tenant_id,
+                trace_id="chat:" + operation_id,
+            ),
+            timeout=2,
+        )
+        if (
+            result is None
+            or result.operation_id != operation_id
+            or result.execution_id != execution_id
+            or result.final_output != assistant_message.content
+            or result.provider_receipts != assistant_message.provider_receipt_refs
+        ):
+            return None
+        return cooperation_result_projection(
+            result,
+            policy=policy,
+            source_snapshot=assistant_message.context_source_snapshot,
+            expected_brief_digest=hashlib.sha256(user_message.content.strip().encode("utf-8")).hexdigest(),
+        )
+    except Exception:
+        # This is an optional public progress projection. The canonical
+        # conversation/result references remain readable during engine loss.
+        logger.warning("chat cooperation projection unavailable thread=%s", thread.thread_id)
+        return None
+
+
+async def _terminal_chat_evidence(
+    *, thread, user_message, tenant_id, owner_id, terminal_state, command=None, status=None
+):
+    """Recover optional public terminal evidence from its original engine only."""
+
+    empty = {"cooperation": None, "engine_provider_receipts": [], "failure_code": None}
+
+    async def project():
+        nonlocal command, status
+        operation_id, execution_id = _chat_turn_ids(thread.thread_id, user_message.message_id)
+        if status is None:
+            client = EngineClient.from_env()
+            if client is None:
+                return empty
+            status = await client.status(
+                execution_id, actor_id=owner_id, tenant_id=tenant_id, trace_id="chat:" + operation_id
+            )
+        if (
+            status.get("operation_id") != operation_id
+            or status.get("execution_id") != execution_id
+            or not (
+                status.get("execution_state") == terminal_state
+                or (
+                    terminal_state == "failed"
+                    and status.get("execution_state") == "completed"
+                    and status.get("result_status") == "degraded"
+                )
+            )
+        ):
+            return empty
+        code = status.get("failure_code")
+        if not isinstance(code, str) or re.fullmatch(r"[a-z0-9_]{1,128}", code) is None:
+            code = None
+        if command is None:
+            _metadata, command = await read_prepared(
+                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+            )
+        cooperation = cooperation_progress_projection(status, command=command)
+        return {
+            "cooperation": cooperation,
+            "engine_provider_receipts": [] if cooperation is None else list(status["provider_receipts"]),
+            "failure_code": code,
+        }
+
+    try:
+        return await asyncio.wait_for(project(), timeout=2)
+    except Exception:
+        # Historical terminal conversations stay readable during engine loss.
+        logger.warning("chat terminal evidence unavailable thread=%s", thread.thread_id)
+        return empty
+
+
 def _compile_chat_context(
     *,
     thread,
@@ -596,6 +725,7 @@ def _compile_chat_context(
     budget: ContextBudget | None = None,
     attachment_segments: tuple[ContextSegment, ...] = (),
     dragon_segments: tuple[ContextSegment, ...] = (),
+    cooperation: dict[str, Any] | None = None,
 ) -> ContextEnvelope:
     """Compile the one authoritative immutable context snapshot for a chat turn."""
 
@@ -661,21 +791,23 @@ def _compile_chat_context(
             )
             for segment in segments
         ]
+    prepared_budget = dragon_context_budget(
+        budget
+        if budget is not None
+        else (
+            CHAT_CONTEXT_BUDGET
+            if selection is None
+            else context_budget_for_selection(selection, output_tokens=output_tokens)
+        )
+    )
+    prepared_budget = cooperation_context_budget(prepared_budget, cooperation)
     return ContextCompiler().compile(
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=user_message.message_id,
         tenant_id=tenant_id,
         purpose=purpose,
-        budget=dragon_context_budget(
-            budget
-            if budget is not None
-            else (
-                CHAT_CONTEXT_BUDGET
-                if selection is None
-                else context_budget_for_selection(selection, output_tokens=output_tokens)
-            )
-        ),
+        budget=prepared_budget,
         segments=segments,
         tools_enabled=False,
         compiled_at=user_message.created_at,
@@ -1186,6 +1318,9 @@ async def _prepare_new_chat_execution(
     inventory = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
     try:
         selection = resolve_selection(inventory, provider_id=request.provider_id, model_id=request.model_id)
+        selection = cooperation_context_selection(
+            inventory, selection, request.cooperation, output_tokens=request.max_output_tokens
+        )
         if request.temperature is not None and not selection["supports_temperature"]:
             raise ModelSelectionError("model_temperature_unsupported")
         context_budget_for_selection(selection, output_tokens=request.max_output_tokens)
@@ -1271,6 +1406,7 @@ async def _prepare_new_chat_execution(
         extra_segments=extra,
         selection=selection,
         output_tokens=request.max_output_tokens,
+        cooperation=request.cooperation,
     )
     selected = {(segment.segment_id, segment.content_digest) for segment in context.selected_segments}
     if any((segment.segment_id, segment.content_digest) not in selected for segment in attachment_segments):
@@ -1323,6 +1459,7 @@ async def _prepare_new_chat_execution(
         provider_id=selection["selection_provider_id"],
         model_id=selection["selection_model_id"],
         temperature=request.temperature,
+        cooperation=request.cooperation,
         context_seed_refs=(
             "conversation:" + thread.thread_id,
             "conversation-message:" + message.message_id,
@@ -1337,6 +1474,59 @@ async def _prepare_new_chat_execution(
     )
     await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
     return message, metadata
+
+
+async def _user_request_refs_for_replay(
+    authority: Any,
+    user_message: Any,
+    *,
+    thread_id: str,
+    tenant_id: str,
+    owner_id: str,
+) -> tuple[str, ...]:
+    """Read server-persisted replay identity without fabricating missing evidence.
+
+    Mongo conversation authority stores request refs separately to bind immutable
+    execution metadata, whereas the SQLite reference repository and some
+    compatible authority implementations persist them on the user message.
+    Prefer the authoritative lookup whenever it is available. Never fall back
+    after that lookup raises, because a storage error must fail closed.
+    """
+    lookup = getattr(authority, "user_request_refs", None)
+    if lookup is not None:
+        return tuple(
+            await lookup(
+                thread_id,
+                user_message.message_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+        )
+    return tuple(getattr(user_message, "attachment_refs", ()) or ())
+
+
+def _chat_context_attachment_refs(
+    request: AIChatRequest,
+    request_digest: str,
+    *,
+    include_prepared: bool,
+) -> tuple[str, ...]:
+    """Build immutable source evidence before any durable chat admission.
+
+    The request identity is always bound, ephemeral context gets a separate
+    digest, and preparation provenance is explicit. Existing turns still load
+    their original server-owned references instead of rebuilding them.
+    """
+    refs: list[str] = []
+    if request.context:
+        refs.append(
+            "ephemeral-context-sha256:" + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
+        )
+    refs.append("chat-request-sha256:" + request_digest)
+    if include_prepared:
+        refs.append("chat-prepared-execution:v1")
+    refs.extend(request.attachment_refs)
+    return tuple(refs)
 
 
 @router.post("/chat", dependencies=[Depends(dragon_foreground)])
@@ -1375,8 +1565,12 @@ async def ai_chat(
         existing_refs = ()
         edited_unbound = False
         if existing_turn_user is not None:
-            existing_refs = await conversation_authority.user_request_refs(
-                request.thread_id, existing_turn_user.message_id, tenant_id=tenant_id, owner_id=owner_id
+            existing_refs = await _user_request_refs_for_replay(
+                conversation_authority,
+                existing_turn_user,
+                thread_id=request.thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
             )
             identities = [
                 ref.removeprefix("chat-request-sha256:")
@@ -1391,15 +1585,15 @@ async def ai_chat(
                         "the original chat key is bound to different request semantics"
                     )
                 request_digest = matches.pop()
-        context_refs: list[str] = []
-        if request.context:
-            context_refs.append(
-                "ephemeral-context-sha256:" + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
-            )
-        context_refs.append("chat-request-sha256:" + request_digest)
-        if existing_turn_user is None or edited_unbound or "chat-prepared-execution:v1" in existing_refs:
-            context_refs.append("chat-prepared-execution:v1")
-        context_attachment_refs = tuple((*context_refs, *request.attachment_refs))
+        context_attachment_refs = _chat_context_attachment_refs(
+            request,
+            request_digest,
+            include_prepared=(
+                existing_turn_user is None
+                or edited_unbound
+                or "chat-prepared-execution:v1" in existing_refs
+            ),
+        )
         if existing_turn_user is not None and not edited_unbound:
             context_attachment_refs = existing_refs
 
@@ -1413,6 +1607,27 @@ async def ai_chat(
         else:
             parent_message_id = existing_transcript[-1].message_id if existing_transcript else None
         if existing_turn_user is None:
+            # No canonical user append or repository mutation should be attempted
+            # when the required engine is absent. A new turn is not replayable
+            # without a durable engine execution command.
+            try:
+                preflight_client = EngineClient.from_env()
+            except EngineClientError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "engine_configuration_invalid",
+                        "message": "The AI engine configuration is unavailable.",
+                    },
+                ) from exc
+            if preflight_client is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "engine_unavailable",
+                        "message": "Connect the AI engine before sending a message.",
+                    },
+                )
             initial_thread = await conversation_authority.get_thread(
                 request.thread_id, tenant_id=tenant_id, owner_id=owner_id
             )
@@ -1514,6 +1729,14 @@ async def ai_chat(
             "provider_request_id": None,
             "engine_provider_receipts": list(existing_assistant.provider_receipt_refs),
             "engine_runtime_provider": _engine_runtime_provider(existing_assistant.provider_receipt_refs),
+            "cooperation": await _replayed_cooperation(
+                thread=thread,
+                user_message=user_message,
+                assistant_message=existing_assistant,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                policy=request.cooperation,
+            ),
             "latency_ms": 0.0,
             "replayed": True,
             "operation_id": existing_assistant.operation_id,
@@ -1721,6 +1944,7 @@ async def ai_chat(
     response_acceptance = None
     if engine_client is not None:
         engine_started = time.monotonic()
+        command = prepared_command
         try:
             engine_result = None
             if retrying_incomplete_turn and request.response_mode == "wait":
@@ -1909,6 +2133,14 @@ async def ai_chat(
                     execution_id,
                 )
             await _release_chat_turn_execution(turn_lease)
+            terminal_evidence = await _terminal_chat_evidence(
+                thread=thread,
+                user_message=user_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                terminal_state=("cancelled" if exc.status == "cancelled" else "failed"),
+                command=command,
+            )
             return {
                 "success": False,
                 "response": "The AI execution could not be safely completed. Retry the request.",
@@ -1917,6 +2149,8 @@ async def ai_chat(
                 "model": "engine-routed",
                 "error": "AI execution failed",
                 "error_code": exc.failure_code or "engine_execution_failed",
+                **terminal_evidence,
+                "failure_code": exc.failure_code or terminal_evidence["failure_code"],
                 "operation_id": operation_id,
                 "turn_state": (None if chat_turn is None else chat_turn.snapshot.state.value),
                 "engine_execution_id": execution_id,
@@ -1969,6 +2203,20 @@ async def ai_chat(
                 "context": context_envelope.binding_dict(),
                 "timestamp": _utcnow(),
             }
+        try:
+            cooperation = cooperation_result_projection(
+                engine_result,
+                policy=request.cooperation,
+                source_snapshot=context_envelope.source_snapshot,
+                expected_brief_digest=(
+                    hashlib.sha256(request.message.strip().encode("utf-8")).hexdigest()
+                    if prepared_command is None
+                    else prepared_command.execution_request.context_policy.get("cooperation_brief_digest")
+                ),
+            )
+        except EngineClientError as exc:
+            await _release_chat_turn_execution(turn_lease)
+            raise HTTPException(status_code=502, detail="AI review evidence could not be verified") from exc
         result = {
             "success": True,
             "response": engine_result.final_output,
@@ -1984,6 +2232,7 @@ async def ai_chat(
             "engine_tool_receipts": list(getattr(engine_result, "tool_receipts", ())),
             "engine_memory_refs": list(getattr(engine_result, "memory_refs", ())),
             "engine_artifact_refs": list(getattr(engine_result, "artifact_refs", ())),
+            "cooperation": cooperation,
         }
     elif memory_write_intent is not None:
         await _release_chat_turn_execution(turn_lease)
@@ -2222,6 +2471,7 @@ async def ai_chat(
         "engine_tool_receipts": result.get("engine_tool_receipts", []),
         "engine_memory_refs": result.get("engine_memory_refs", []),
         "engine_artifact_refs": result.get("engine_artifact_refs", []),
+        "cooperation": result.get("cooperation"),
         "response_acceptance_receipt": (
             None if response_acceptance is None else response_acceptance.artifact_ref
         ),
@@ -2311,6 +2561,13 @@ async def get_ai_chat_turn(
             "engine_memory_refs": list(assistant_message.memory_refs),
             "engine_evidence_refs": list(assistant_message.citation_refs),
             "engine_artifact_refs": list(assistant_message.artifact_refs),
+            "cooperation": await _replayed_cooperation(
+                thread=thread,
+                user_message=user_message,
+                assistant_message=assistant_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            ),
             "thread": thread.as_dict(),
             "user_message": user_message.as_dict(),
             "assistant_message": assistant_message.as_dict(),
@@ -2341,11 +2598,19 @@ async def get_ai_chat_turn(
                 )
             except Exception as exc:
                 raise _chat_error(exc) from exc
+        terminal_evidence = await _terminal_chat_evidence(
+            thread=thread,
+            user_message=user_message,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            terminal_state=state,
+        )
         return {
             "success": False,
             "accepted": True,
             "terminal": True,
             "state": state,
+            **terminal_evidence,
             "response": None,
             "ai_generated": False,
             "provider": "skeleton-engine",
@@ -2412,12 +2677,17 @@ async def get_ai_chat_turn(
                 )
         execution_state = str(engine_status.get("execution_state") or "unknown")
         if execution_state not in {"completed", "failed", "cancelled"}:
+            pending_cooperation = cooperation_progress_projection(engine_status, command=prepared_command)
             return {
                 "success": True,
                 "accepted": True,
                 "terminal": False,
                 "state": execution_state,
                 "cancellation_requested": bool(engine_status.get("cancellation_requested")),
+                "cooperation": pending_cooperation,
+                "engine_provider_receipts": (
+                    [] if pending_cooperation is None else list(engine_status["provider_receipts"])
+                ),
                 "response": None,
                 "ai_generated": False,
                 "provider": "skeleton-engine",
@@ -2510,12 +2780,22 @@ async def get_ai_chat_turn(
                     failure_code=exc.failure_code,
                 )
             await _release_chat_turn_execution(poll_lease)
+            terminal_evidence = await _terminal_chat_evidence(
+                thread=latest_thread,
+                user_message=user_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                terminal_state=("cancelled" if exc.status == "cancelled" else "failed"),
+                command=prepared_command,
+                status=engine_status,
+            )
             return {
                 "success": False,
                 "accepted": True,
                 "terminal": True,
                 "state": ("cancelled" if exc.status == "cancelled" else "failed"),
-                "failure_code": exc.failure_code,
+                **terminal_evidence,
+                "failure_code": exc.failure_code or terminal_evidence["failure_code"],
                 "response": None,
                 "ai_generated": False,
                 "provider": "skeleton-engine",
@@ -2599,6 +2879,20 @@ async def get_ai_chat_turn(
             user_message=user_message,
             operation_id=operation_id,
             execution_id=execution_id,
+        )
+        deferred_cooperation = cooperation_result_projection(
+            engine_result,
+            policy=(
+                None
+                if prepared_command is None
+                else prepared_command.execution_request.context_policy.get("cooperation")
+            ),
+            source_snapshot=binding.source_snapshot,
+            expected_brief_digest=(
+                None
+                if prepared_command is None
+                else prepared_command.execution_request.context_policy.get("cooperation_brief_digest")
+            ),
         )
     except EngineClientError as exc:
         raise HTTPException(
@@ -2839,6 +3133,7 @@ async def get_ai_chat_turn(
         "engine_tool_receipts": list(engine_result.tool_receipts),
         "engine_memory_refs": list(engine_result.memory_refs),
         "engine_artifact_refs": list(engine_result.artifact_refs),
+        "cooperation": deferred_cooperation,
         "response_acceptance_receipt": (deferred_response_acceptance.artifact_ref),
         "thread": committed_thread.as_dict(),
         "user_message": user_message.as_dict(),
@@ -2945,6 +3240,10 @@ async def get_ai_chat_turn_events(
         "engine_execution_id": execution_id,
         "turn_state": turn.snapshot.state.value,
         "terminal": turn.snapshot.terminal,
+        # Operation terminality and delivery completeness are different. A
+        # bounded page may stop before the immutable terminal event.
+        "has_more": page.cursor.last_seen_sequence < turn.snapshot.next_sequence - 1,
+        "journal_next_sequence": turn.snapshot.next_sequence,
         "events": [event.as_dict() for event in page.events],
         "cursor": page.cursor.as_dict(),
         "page_digest": page.digest,
@@ -2954,7 +3253,7 @@ async def get_ai_chat_turn_events(
     if request is None or "text/event-stream" not in request.headers.get("accept", "").lower():
         return result
     final = None
-    if page.terminal and turn.snapshot.terminal:
+    if turn.snapshot.terminal and not result["has_more"]:
         final = await get_ai_chat_turn(thread_id, idempotency_key=idempotency_key, user=user)
 
     async def frames():
@@ -2963,7 +3262,9 @@ async def get_ai_chat_turn_events(
             data = json.dumps(
                 record, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
             )
-            yield f"id: {event.sequence}\nevent: engine.{event.kind}\ndata: {data}\n\n"
+            yield (
+                f"id: {event.sequence}:{event.event_digest}\n" f"event: engine.{event.kind}\ndata: {data}\n\n"
+            )
         if final is not None and final.get("terminal") is True:
             data = json.dumps(
                 final, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False, default=str
@@ -3233,7 +3534,17 @@ async def cancel_ai_chat_turn(
     }
 
 
-_CHAT_STREAMS: set[str] = set()
+_CHAT_STREAMS: dict[str, tuple[str, str]] = {}
+
+
+def _chat_stream_capacity(scope: tuple[str, str]) -> bool:
+    """Bound per-process observers fairly without owning durable executions."""
+
+    return (
+        len(_CHAT_STREAMS) < 32
+        and sum(value == scope for value in _CHAT_STREAMS.values()) < 4
+        and sum(value[0] == scope[0] for value in _CHAT_STREAMS.values()) < 16
+    )
 
 
 @router.get("/models")
@@ -3312,6 +3623,7 @@ async def chat_readiness(user=Depends(require_role("viewer"))):
             "explicit_model_selection": True,
             "explicit_memory_context": True,
             "crawler_context": True,
+            "cooperative_review": True,
         },
         "actions": actions,
     }
@@ -3532,6 +3844,7 @@ async def stream_ai_chat_turn(
     user=Depends(require_role("viewer")),
 ):
     """Replay immutable real chat transitions; disconnect never cancels execution."""
+    stream_scope = _chat_identity(user)
     header_cursor = request.headers.get("last-event-id")
     if header_cursor:
         try:
@@ -3552,7 +3865,7 @@ async def stream_ai_chat_turn(
     await get_ai_chat_turn_events(
         thread_id, idempotency_key, after_sequence, last_event_digest, 100, user=user
     )
-    if len(_CHAT_STREAMS) >= 32:
+    if not _chat_stream_capacity(stream_scope):
         raise HTTPException(
             status_code=429,
             detail={
@@ -3574,14 +3887,15 @@ async def stream_ai_chat_turn(
         )
 
     async def generate():
-        if len(_CHAT_STREAMS) >= 32:
+        if not _chat_stream_capacity(stream_scope):
             yield frame(
                 "chat.error",
                 {"code": "chat_stream_capacity", "message": "Too many active chat streams; retry shortly."},
             )
             return
-        _CHAT_STREAMS.add(stream_id)
+        _CHAT_STREAMS[stream_id] = stream_scope
         sequence, event_digest = after_sequence, last_event_digest
+        progress_digest = None
         started = time.monotonic()
         last_heartbeat = started
         try:
@@ -3589,13 +3903,31 @@ async def stream_ai_chat_turn(
                 # StreamingResponse owns the single ASGI disconnect listener.
                 # A second receive consumer conflicts with body-replay middleware.
                 status = await get_ai_chat_turn(thread_id, idempotency_key, user=user)
+                progress = status.get("cooperation")
+                if progress is not None:
+                    current_progress_digest = hashlib.sha256(
+                        json.dumps(progress, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
+                            "utf-8"
+                        )
+                    ).hexdigest()
+                    if current_progress_digest != progress_digest:
+                        progress_digest = current_progress_digest
+                        yield frame(
+                            "chat.progress",
+                            {
+                                "operation_id": status["operation_id"],
+                                "engine_execution_id": status["engine_execution_id"],
+                                "cooperation": progress,
+                                "engine_provider_receipts": status.get("engine_provider_receipts", []),
+                            },
+                        )
                 page = await get_ai_chat_turn_events(
                     thread_id, idempotency_key, sequence, event_digest, 100, user=user
                 )
                 for event in page["events"]:
                     sequence, event_digest = event["sequence"], event["event_digest"]
                     yield frame("chat.event", event, str(sequence) + ":" + event_digest)
-                if status.get("terminal"):
+                if status.get("terminal") and not page["has_more"]:
                     yield frame(
                         "chat.final", {**status, "thread_id": thread_id, "idempotency_key": idempotency_key}
                     )
@@ -3633,7 +3965,7 @@ async def stream_ai_chat_turn(
                 },
             )
         finally:
-            _CHAT_STREAMS.discard(stream_id)
+            _CHAT_STREAMS.pop(stream_id, None)
 
     return StreamingResponse(
         generate(),

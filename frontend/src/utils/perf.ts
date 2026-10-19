@@ -52,7 +52,8 @@ async function _restorePerf(): Promise<void> {
   if (_perfRestored) return;
   _perfRestored = true;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // Delayed optional storage load keeps startup lean.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const raw = await AsyncStorage.getItem(PERF_STORAGE_KEY);
     if (raw) {
@@ -73,7 +74,8 @@ function _schedulePerfFlush() {
   if (_perfFlushT) clearTimeout(_perfFlushT);
   _perfFlushT = setTimeout(async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // Delay storage loading until diagnostics are requested.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const AsyncStorage = require('@react-native-async-storage/async-storage').default;
       await AsyncStorage.setItem(PERF_STORAGE_KEY, JSON.stringify(_perfLog.slice(-PERF_LOG_MAX)));
     } catch { /* swallow */ }

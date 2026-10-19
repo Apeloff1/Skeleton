@@ -9,10 +9,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 from typing import Any
+from uuid import uuid4
 
 from skeleton.ai.assistant.turn_ownership import (
     TurnLeasePolicy,
+    TurnLeaseBusy,
+    TurnLeaseExpired,
+    TurnLeaseStale,
     TurnLeaseToken,
     TurnOwnershipReceipt,
 )
@@ -28,7 +33,6 @@ from skeleton.persistence.chat_turn_repository import (
     PersistedChatTurn,
 )
 
-
 _ROUTE_STAGES = (
     TurnState.RECEIVED,
     TurnState.ADMITTED,
@@ -42,6 +46,7 @@ _ROUTE_STAGES = (
     TurnState.COMPLETE,
 )
 _STAGE_INDEX = {state: index for index, state in enumerate(_ROUTE_STAGES)}
+logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -77,9 +82,7 @@ class ChatTurnLifecycle:
                 or existing.binding.tenant_id != tenant_id
                 or existing.binding.owner_id != owner_id
             ):
-                raise ValueError(
-                    "existing durable turn does not match canonical retry identity"
-                )
+                raise ValueError("existing durable turn does not match canonical retry identity")
             turn = existing
         else:
             binding = ChatTurnBinding.from_conversation(thread, user_message)
@@ -168,9 +171,7 @@ class ChatTurnLifecycle:
         if current is target:
             return turn
         if current not in _STAGE_INDEX or target not in _STAGE_INDEX:
-            raise ValueError(
-                f"route lifecycle cannot linearly advance {current.value} -> {target.value}"
-            )
+            raise ValueError(f"route lifecycle cannot linearly advance {current.value} -> {target.value}")
         current_index = _STAGE_INDEX[current]
         target_index = _STAGE_INDEX[target]
         if current_index > target_index:
@@ -258,13 +259,35 @@ class ChatTurnLifecycle:
         )
         if turn is None or turn.snapshot.state in TERMINAL_STATES:
             return turn
-        return await self.advance(
-            turn,
-            TurnState.COMPLETE,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            reason_code="conversation-assistant-already-committed",
-        )
+        try:
+            lease = await self.acquire_execution(
+                turn,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                holder_id="chat-reconcile:" + str(uuid4()),
+            )
+        except TurnLeaseBusy:
+            # The authoritative assistant row is already readable. Its active
+            # finalizer retains journal ownership; observing that result must
+            # not race an unfenced completion event against it.
+            return turn
+        try:
+            current = await self.get_if_present(operation_id, tenant_id=tenant_id, owner_id=owner_id)
+            if current is None:
+                return None
+            return await self.advance(
+                current,
+                TurnState.COMPLETE,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                reason_code="conversation-assistant-already-committed",
+                lease=lease,
+            )
+        finally:
+            try:
+                await self.release_execution(lease)
+            except (TurnLeaseStale, TurnLeaseExpired):
+                logger.info("chat reconciliation ownership changed operation=%s", operation_id)
 
 
 __all__ = ["ChatTurnLifecycle"]

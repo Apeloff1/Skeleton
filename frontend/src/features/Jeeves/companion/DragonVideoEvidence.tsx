@@ -12,7 +12,7 @@ export default function DragonVideoEvidence({cues,onReview}:{cues:readonly Watch
  };
  return <View style={styles.wrap}>
   <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={()=>setExpanded(v=>!v)} style={styles.header}>
-   <Text style={styles.heading}>📓 Dragon's video notebook · {cues.length} observations</Text>
+   <Text style={styles.heading}>📓 Dragon&apos;s video notebook · {cues.length} observations</Text>
    <Text style={styles.meta}>{expanded?'Hide':'Review'}</Text>
   </Pressable>
   {expanded&&<ScrollView style={styles.list} nestedScrollEnabled>

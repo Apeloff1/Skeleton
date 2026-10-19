@@ -9,13 +9,11 @@ and strips hosted-provider/proxy credentials from the child environment.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
 import hashlib
 import json
 import logging
 import math
 import os
-from pathlib import Path
 import re
 import shutil
 import signal
@@ -24,7 +22,10 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Any, Callable, Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+from typing import Any
 
 from skeleton.skills.tool_contract import (
     ToolContractError,
@@ -40,7 +41,6 @@ from .local import (
     LocalModelAdapter,
     LocalToolCall,
 )
-
 
 _COMPLETION_EOG_TRAILERS = (" [end of text]\n\n\n", " [end of text]\n")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -195,9 +195,7 @@ class LlamaCppConfig:
             ("gpu_layers", self.gpu_layers, 0, 1_048_576),
         ):
             if value is not None and (
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or not lower <= value <= upper
+                isinstance(value, bool) or not isinstance(value, int) or not lower <= value <= upper
             ):
                 raise ValueError(f"{name} must be in [{lower}, {upper}]")
         if (
@@ -208,7 +206,8 @@ class LlamaCppConfig:
         ):
             raise ValueError("temperature must be finite and in [0, 10]")
         if not isinstance(self.output_framing, str) or self.output_framing not in {
-            "raw", "llama_completion_eog"
+            "raw",
+            "llama_completion_eog",
         }:
             raise ValueError("output_framing must be raw or llama_completion_eog")
         normalized_args: list[str] = []
@@ -222,11 +221,7 @@ class LlamaCppConfig:
             if not item.startswith("--"):
                 managed = managed or any(
                     item == flag
-                    or (
-                        item.startswith(flag)
-                        and len(item) > len(flag)
-                        and item[len(flag)] not in {"-", "_"}
-                    )
+                    or (item.startswith(flag) and len(item) > len(flag) and item[len(flag)] not in {"-", "_"})
                     for flag in _MANAGED_SHORT_FLAGS
                 )
             if managed:
@@ -234,13 +229,10 @@ class LlamaCppConfig:
             remote = option in _REMOTE_ACQUISITION_FLAGS
             if not item.startswith("--"):
                 remote = remote or any(
-                    item == flag or item.startswith(flag + "=")
-                    for flag in _REMOTE_ACQUISITION_SHORT_FLAGS
+                    item == flag or item.startswith(flag + "=") for flag in _REMOTE_ACQUISITION_SHORT_FLAGS
                 )
             if remote:
-                raise ValueError(
-                    f"extra_args may not enable remote model acquisition {item}"
-                )
+                raise ValueError(f"extra_args may not enable remote model acquisition {item}")
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
 
@@ -278,8 +270,12 @@ class ConsumerHardwareBudget:
 
     def __post_init__(self) -> None:
         for name in (
-            "ram_bytes", "physical_cpu_cores", "kv_bytes_per_token",
-            "target_context_tokens", "max_decode_threads", "prefill_batch_tokens",
+            "ram_bytes",
+            "physical_cpu_cores",
+            "kv_bytes_per_token",
+            "target_context_tokens",
+            "max_decode_threads",
+            "prefill_batch_tokens",
         ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
@@ -338,9 +334,8 @@ def estimate_gqa_kv_bytes_per_token(
         raise ValueError("query head count must be divisible by KV head count")
     if key_bytes_per_element > 8 or value_bytes_per_element > 8:
         raise ValueError("KV element width must be <= 8 bytes")
-    return layers * kv_heads * (
-        key_head_dim * key_bytes_per_element
-        + value_head_dim * value_bytes_per_element
+    return (
+        layers * kv_heads * (key_head_dim * key_bytes_per_element + value_head_dim * value_bytes_per_element)
     )
 
 
@@ -358,6 +353,7 @@ def detect_consumer_hardware_budget(
     Cgroup v2 memory and CPU quotas and process affinity tighten the budget.
     Optional explicit overrides support constrained and headless deployments.
     """
+
     def positive(value: object, name: str) -> int:
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise LlamaCppRuntimeError(f"invalid detected {name}")
@@ -468,18 +464,16 @@ def plan_consumer_llama_cpp(
     available_for_kv = budget.ram_bytes - fixed
     minimum_kv = budget.kv_bytes_per_token * 128
     if available_for_kv < minimum_kv:
-        raise LlamaCppRuntimeError(
-            "GGUF weights, KV cache and runtime headroom exceed consumer RAM budget"
-        )
+        raise LlamaCppRuntimeError("GGUF weights, KV cache and runtime headroom exceed consumer RAM budget")
     requested = config.context_size or budget.target_context_tokens
     possible = min(requested, available_for_kv // budget.kv_bytes_per_token)
     context = (possible // 128) * 128
     if context < 128:
         raise LlamaCppRuntimeError("consumer RAM budget cannot support minimum context")
-    threads = min(config.threads or budget.physical_cpu_cores,
-                  budget.physical_cpu_cores, budget.max_decode_threads)
-    batch = min(config.batch_size or budget.prefill_batch_tokens,
-                budget.prefill_batch_tokens, context)
+    threads = min(
+        config.threads or budget.physical_cpu_cores, budget.physical_cpu_cores, budget.max_decode_threads
+    )
+    batch = min(config.batch_size or budget.prefill_batch_tokens, budget.prefill_batch_tokens, context)
     chosen = replace(config, context_size=context, threads=threads, batch_size=batch)
     kv_total = context * budget.kv_bytes_per_token
     return ConsumerLlamaPlan(
@@ -534,15 +528,13 @@ def _identity(path_value: str, *, executable: bool, reject_symlink: bool) -> Art
         if resolved_command is None:
             raise FileNotFoundError(f"local runtime executable not found: {path_value}")
         raw = Path(resolved_command)
-    lexical=Path(os.path.abspath(raw))
+    lexical = Path(os.path.abspath(raw))
     try:
         resolved = raw.resolve(strict=True)
     except OSError as exc:
         raise FileNotFoundError(f"local artifact not found: {raw}") from exc
-    if reject_symlink and lexical!=resolved:
-        raise LlamaCppRuntimeError(
-            f"artifact symlinked path component rejected: {raw}"
-        )
+    if reject_symlink and lexical != resolved:
+        raise LlamaCppRuntimeError(f"artifact symlinked path component rejected: {raw}")
     if not resolved.is_file():
         raise LlamaCppRuntimeError(f"local artifact is not a regular file: {resolved}")
     if executable and not os.access(resolved, os.X_OK):
@@ -555,8 +547,11 @@ def _identity(path_value: str, *, executable: bool, reject_symlink: bool) -> Art
     if before_tuple != after_tuple:
         raise LlamaCppRuntimeError(f"artifact changed while hashing: {resolved}")
     return ArtifactIdentity(
-        path=str(resolved), sha256=digest, size_bytes=after.st_size,
-        mtime_ns=after.st_mtime_ns, inode=getattr(after, "st_ino", None),
+        path=str(resolved),
+        sha256=digest,
+        size_bytes=after.st_size,
+        mtime_ns=after.st_mtime_ns,
+        inode=getattr(after, "st_ino", None),
     )
 
 
@@ -587,17 +582,38 @@ def _digest(value: object) -> str:
 class LlamaCppModel:
     """Run an exact, identity-bound local model through llama.cpp's CLI."""
 
+    model_family = "gguf_open_weight"
+    protocol_capabilities = ("text-generation", "tool-calls", "structured-output")
+    tokenizer_kind = "utf8_bytes_upper_bound"
+
+    def count_input_tokens(self, request: LocalInferenceRequest) -> int:
+        # The CLI owns its GGUF tokenizer. UTF-8 bytes conservatively admit
+        # byte-fallback tokenizers without pretending a word regex is exact.
+        return len(self._render_prompt(request).encode("utf-8")) + 1
+
+    def check_readiness(self) -> None:
+        """Cheap stat-based readiness; dispatch still owns full SHA admission."""
+        if (
+            not _stat_matches(self._runtime)
+            or not _stat_matches(self._model)
+            or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
+        ):
+            raise LlamaCppRuntimeError("activated local runtime/model file changed or is unavailable")
+
     def __init__(self, config: LlamaCppConfig) -> None:
         if not isinstance(config, LlamaCppConfig):
             raise TypeError("config must be LlamaCppConfig")
         self.config = config
         self._runtime = _identity(config.executable, executable=True, reject_symlink=False)
         self._model = _identity(
-            config.model_path, executable=False, reject_symlink=config.reject_model_symlink,
+            config.model_path,
+            executable=False,
+            reject_symlink=config.reject_model_symlink,
         )
         self._gguf_header = inspect_gguf(Path(self._model.path))
         self.model_id = (
-            config.model_id.strip() if config.model_id is not None
+            config.model_id.strip()
+            if config.model_id is not None
             else f"llama.cpp:{Path(self._model.path).stem}:{self._model.sha256[:12]}"
         )
 
@@ -612,23 +628,29 @@ class LlamaCppModel:
     @property
     def execution_profile_digest(self) -> str:
         """Bind decoding/resource policy without changing executable identity."""
-        return _digest({
-            "schema": "skeleton.llama-cpp.execution-profile.v1",
-            "runtime": self.runtime_digest,
-            "model": self.model_digest,
-            "context_size": self.config.context_size,
-            "threads": self.config.threads,
-            "batch_size": self.config.batch_size,
-            "gpu_layers": self.config.gpu_layers,
-            "temperature": float(self.config.temperature),
-            "extra_args": list(self.config.extra_args),
-            "output_framing": self.config.output_framing,
-            "output_framing_suffixes": (list(_COMPLETION_EOG_TRAILERS) if self.config.output_framing == "llama_completion_eog" else []),
-            "timeout_seconds": float(self.config.timeout_seconds),
-            "max_output_bytes": self.config.max_output_bytes,
-            "max_stderr_bytes": self.config.max_stderr_bytes,
-            "environment_digest": _digest(self._effective_environment()),
-        })
+        return _digest(
+            {
+                "schema": "skeleton.llama-cpp.execution-profile.v1",
+                "runtime": self.runtime_digest,
+                "model": self.model_digest,
+                "context_size": self.config.context_size,
+                "threads": self.config.threads,
+                "batch_size": self.config.batch_size,
+                "gpu_layers": self.config.gpu_layers,
+                "temperature": float(self.config.temperature),
+                "extra_args": list(self.config.extra_args),
+                "output_framing": self.config.output_framing,
+                "output_framing_suffixes": (
+                    list(_COMPLETION_EOG_TRAILERS)
+                    if self.config.output_framing == "llama_completion_eog"
+                    else []
+                ),
+                "timeout_seconds": float(self.config.timeout_seconds),
+                "max_output_bytes": self.config.max_output_bytes,
+                "max_stderr_bytes": self.config.max_stderr_bytes,
+                "environment_digest": _digest(self._effective_environment()),
+            }
+        )
 
     @property
     def model_artifact(self) -> ArtifactIdentity:
@@ -682,11 +704,13 @@ class LlamaCppModel:
             if tool_id in seen_tool_ids:
                 raise LlamaCppRuntimeError("duplicate local tool_id")
             seen_tool_ids.add(tool_id)
-            allowed.append({
-                "tool_id": tool_id,
-                "description": str(item.get("description", "")),
-                "input_schema": item.get("input_schema", {}),
-            })
+            allowed.append(
+                {
+                    "tool_id": tool_id,
+                    "description": str(item.get("description", "")),
+                    "input_schema": item.get("input_schema", {}),
+                }
+            )
         contract = (
             "\n\n[Skeleton local tool protocol]\n"
             "When a tool is required, output exactly one JSON object and no prose: "
@@ -699,8 +723,13 @@ class LlamaCppModel:
                 if request.structured_output_schema is not None
                 else ""
             )
-            + "Allowed tools: " + _stable_json(allowed)
+            + "Allowed tools: "
+            + _stable_json(allowed)
         )
+        if request.tool_choice in {"required", "specific"}:
+            contract += "\nA tool call is required for this turn; do not return a prose-only answer."
+        if request.tool_choice == "specific":
+            contract += "\nRequired tool_id: " + str(request.specific_tool_id)
         return prompt + contract
 
     def _normalized_structured_output_schema(
@@ -710,17 +739,11 @@ class LlamaCppModel:
         if request.structured_output_schema is None:
             return None
         try:
-            schema = validate_json_schema(
-                request.structured_output_schema
-            )
+            schema = validate_json_schema(request.structured_output_schema)
         except ToolContractError as exc:
-            raise LlamaCppRuntimeError(
-                f"invalid structured output schema: {exc}"
-            ) from exc
+            raise LlamaCppRuntimeError(f"invalid structured output schema: {exc}") from exc
         if schema.get("type") not in {None, "object"}:
-            raise LlamaCppRuntimeError(
-                "local structured output schema must describe an object"
-            )
+            raise LlamaCppRuntimeError("local structured output schema must describe an object")
         return schema
 
     def _tool_response_schema(self, request: LocalInferenceRequest) -> dict[str, Any]:
@@ -732,24 +755,16 @@ class LlamaCppModel:
             }
         )
         if not allowed_tool_ids:
-            raise LlamaCppRuntimeError(
-                "tool response schema requires at least one declared tool_id"
-            )
-        structured_schema = self._normalized_structured_output_schema(
-            request
-        )
-        return {
+            raise LlamaCppRuntimeError("tool response schema requires at least one declared tool_id")
+        structured_schema = self._normalized_structured_output_schema(request)
+        schema = {
             "type": "object",
             "additionalProperties": False,
             "required": ["skeleton_local_response"],
             "properties": {
                 "skeleton_local_response": {"const": 1},
                 "text": {"type": "string", "minLength": 1},
-                "structured_output": (
-                    {"type": "object"}
-                    if structured_schema is None
-                    else structured_schema
-                ),
+                "structured_output": ({"type": "object"} if structured_schema is None else structured_schema),
                 "tool_calls": {
                     "type": "array",
                     "minItems": 1,
@@ -778,6 +793,10 @@ class LlamaCppModel:
                 {"required": ["tool_calls"]},
             ],
         }
+        if request.tool_choice in {"required", "specific"}:
+            schema["required"].append("tool_calls")
+            schema["anyOf"] = [{"required": ["tool_calls"]}]
+        return schema
 
     def _generation_schema(
         self,
@@ -795,9 +814,18 @@ class LlamaCppModel:
         schema_file: Path | None = None,
     ) -> list[str]:
         command = [
-            self._runtime.path, "-m", self._model.path, "-f", str(prompt_file),
-            "-n", str(request.max_output_tokens), "--seed", str(request.seed),
-            "--temp", format(float(self.config.temperature), ".12g"), "--no-display-prompt",
+            self._runtime.path,
+            "-m",
+            self._model.path,
+            "-f",
+            str(prompt_file),
+            "-n",
+            str(request.max_output_tokens),
+            "--seed",
+            str(request.seed),
+            "--temp",
+            format(float(self.config.temperature), ".12g"),
+            "--no-display-prompt",
         ]
         if self.config.context_size is not None:
             command.extend(("-c", str(self.config.context_size)))
@@ -814,7 +842,8 @@ class LlamaCppModel:
 
     def _effective_environment(self) -> dict[str, str]:
         env = {
-            key: value for key, value in os.environ.items()
+            key: value
+            for key, value in os.environ.items()
             if key in _INHERITED_ENV_ALLOWLIST
             and key not in _PROVIDER_SECRET_NAMES
             and key not in _PROXY_NAMES
@@ -875,8 +904,7 @@ class LlamaCppModel:
             raise LlamaCppRuntimeError("non-finite JSON constant in local model output")
 
         try:
-            return json.loads(text, object_pairs_hook=unique_object,
-                              parse_constant=reject_constant)
+            return json.loads(text, object_pairs_hook=unique_object, parse_constant=reject_constant)
         except (json.JSONDecodeError, RecursionError) as exc:
             categories = {
                 "Extra data": "extra_data",
@@ -889,27 +917,35 @@ class LlamaCppModel:
                 "Invalid control character at": "invalid_control",
             }
             prefix_class = (
-                "object" if text.startswith("{") else "array" if text.startswith("[")
-                else "empty" if not text else "other"
+                "object"
+                if text.startswith("{")
+                else "array" if text.startswith("[") else "empty" if not text else "other"
             )
             logging.getLogger(__name__).warning(
                 "Local JSON failure: exception=%s category=%s pos=%s line=%s column=%s "
                 "chars=%d prefix=%s declared_eog_tail=%s",
                 type(exc).__name__,
                 "depth" if isinstance(exc, RecursionError) else categories.get(exc.msg, "other_decoder"),
-                getattr(exc, "pos", None), getattr(exc, "lineno", None), getattr(exc, "colno", None),
-                len(text), prefix_class, text.endswith(" [end of text]"),
+                getattr(exc, "pos", None),
+                getattr(exc, "lineno", None),
+                getattr(exc, "colno", None),
+                len(text),
+                prefix_class,
+                text.endswith(" [end of text]"),
             )
             raise LlamaCppRuntimeError("local model output is not valid bounded JSON") from exc
 
     def _parse_output(
-        self, raw: str, request: LocalInferenceRequest,
+        self,
+        raw: str,
+        request: LocalInferenceRequest,
     ) -> tuple[str | None, tuple[LocalToolCall, ...], Mapping[str, Any] | None, str]:
         text = raw.strip()
         if not text:
             raise LlamaCppRuntimeError("local runtime produced empty output")
         allowed_tool_ids = {
-            str(item.get("tool_id", "")).strip() for item in request.tools
+            str(item.get("tool_id", "")).strip()
+            for item in request.tools
             if str(item.get("tool_id", "")).strip()
         }
         if text.startswith("{"):
@@ -954,10 +990,7 @@ class LlamaCppModel:
                 structured = payload.get("structured_output")
                 if structured is not None and not isinstance(structured, dict):
                     raise LlamaCppRuntimeError("structured_output must be an object")
-                if (
-                    structured is not None
-                    and request.structured_output_schema is not None
-                ):
+                if structured is not None and request.structured_output_schema is not None:
                     try:
                         validate_json_value(
                             request.structured_output_schema,
@@ -965,9 +998,7 @@ class LlamaCppModel:
                             path="structured_output",
                         )
                     except ToolContractError as exc:
-                        raise LlamaCppRuntimeError(
-                            f"structured output validation failed: {exc}"
-                        ) from exc
+                        raise LlamaCppRuntimeError(f"structured output validation failed: {exc}") from exc
                 if not calls and payload_text is None and structured is None:
                     raise LlamaCppRuntimeError("local response envelope contains no output")
                 return payload_text, tuple(calls), structured, "tool_calls" if calls else "completed"
@@ -975,13 +1006,9 @@ class LlamaCppModel:
             try:
                 structured_payload = self._load_protocol_json(text)
             except LlamaCppRuntimeError as exc:
-                raise LlamaCppRuntimeError(
-                    "local structured output is not valid JSON"
-                ) from exc
+                raise LlamaCppRuntimeError("local structured output is not valid JSON") from exc
             if not isinstance(structured_payload, dict):
-                raise LlamaCppRuntimeError(
-                    "local structured output must be a JSON object"
-                )
+                raise LlamaCppRuntimeError("local structured output must be a JSON object")
             try:
                 validate_json_value(
                     request.structured_output_schema,
@@ -989,9 +1016,7 @@ class LlamaCppModel:
                     path="structured_output",
                 )
             except ToolContractError as exc:
-                raise LlamaCppRuntimeError(
-                    f"structured output validation failed: {exc}"
-                ) from exc
+                raise LlamaCppRuntimeError(f"structured output validation failed: {exc}") from exc
             return None, (), structured_payload, "completed"
         return text, (), None, "completed"
 
@@ -1051,9 +1076,15 @@ class LlamaCppModel:
 
             with stdout_file.open("wb") as stdout_handle, stderr_file.open("wb") as stderr_handle:
                 process = subprocess.Popen(
-                    command, stdin=subprocess.DEVNULL, stdout=stdout_handle, stderr=stderr_handle,
-                    cwd=temp_dir, env=self._child_environment(temp_dir), shell=False,
-                    start_new_session=(os.name != "nt"), close_fds=(os.name != "nt"),
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    stdout=stdout_handle,
+                    stderr=stderr_handle,
+                    cwd=temp_dir,
+                    env=self._child_environment(temp_dir),
+                    shell=False,
+                    start_new_session=(os.name != "nt"),
+                    close_fds=(os.name != "nt"),
                 )
                 timed_out = False
                 output_overflow = False
@@ -1101,7 +1132,9 @@ class LlamaCppModel:
                 stderr_handle.flush()
 
             if timed_out:
-                raise TimeoutError(f"local llama.cpp runtime exceeded {self.config.timeout_seconds}s deadline")
+                raise TimeoutError(
+                    f"local llama.cpp runtime exceeded {self.config.timeout_seconds}s deadline"
+                )
             if output_overflow:
                 raise LlamaCppRuntimeError("local runtime stdout exceeded configured bound")
             if stderr_overflow:
@@ -1125,14 +1158,13 @@ class LlamaCppModel:
             self._assert_artifacts_stable(interrupt=interrupt)
             if self.execution_profile_digest != execution_profile:
                 raise LlamaCppRuntimeError("local execution policy changed during generation")
-            visible_bytes = (stdout_bytes if stop_output_end is None
-                             else stdout_bytes[:stop_output_end])
+            visible_bytes = stdout_bytes if stop_output_end is None else stdout_bytes[:stop_output_end]
             raw = visible_bytes.decode("utf-8", errors="strict")
             if request.stop:
                 matches = [raw.find(marker) for marker in request.stop]
                 matches = [position for position in matches if position >= 0]
                 if matches:
-                    raw = raw[:min(matches)]
+                    raw = raw[: min(matches)]
             # Operator-declared completion protocol only: the exact fixed
             # upstream EOG trailer is outside generated content. Preserve the
             # full original stdout checksum below. No JSON substring recovery.
@@ -1141,27 +1173,24 @@ class LlamaCppModel:
                 # single-LF form remains the explicit older completion form.
                 for trailer in _COMPLETION_EOG_TRAILERS:
                     if raw.endswith(trailer):
-                        raw = raw[:-len(trailer)]
+                        raw = raw[: -len(trailer)]
                         break
             text, tool_calls, structured, finish_reason = self._parse_output(raw, request)
             input_estimate = _approx_tokens(rendered_prompt)
             output_estimate = _approx_tokens(raw)
             if cancel.is_set():
                 raise LocalInferenceCancelled("local generation cancelled")
-            response_digest = _digest({
-                "runtime": self.runtime_digest,
-                "model": self.model_digest,
-                "request": request.digest,
-                "stdout": hashlib.sha256(stdout_bytes).hexdigest(),
-                "execution_profile": execution_profile,
-            })[:32]
+            response_digest = _digest(
+                {
+                    "runtime": self.runtime_digest,
+                    "model": self.model_digest,
+                    "request": request.digest,
+                    "stdout": hashlib.sha256(stdout_bytes).hexdigest(),
+                    "execution_profile": execution_profile,
+                }
+            )[:32]
             response_id = (
-                "local:llama:"
-                + self.runtime_digest
-                + ":"
-                + self.model_digest
-                + ":"
-                + response_digest
+                "local:llama:" + self.runtime_digest + ":" + self.model_digest + ":" + response_digest
             )
             return LocalInferenceResult(
                 text=text,
@@ -1171,23 +1200,30 @@ class LlamaCppModel:
                 output_tokens=output_estimate,
                 finish_reason=finish_reason,
                 response_id=response_id,
-                execution_receipt_digest=_digest({
-                    "schema": "skeleton.llama-cpp.execution-receipt.v1",
-                    "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
-                    "output_framing": self.config.output_framing,
-                    "request": request.digest,
-                    "execution_profile": execution_profile,
-                    "response_id": response_id,
-                    "text": text,
-                    "tool_calls": [
-                        {"call_id": call.call_id, "tool_id": call.tool_id,
-                         "arguments": dict(call.arguments)} for call in tool_calls
-                    ],
-                    "structured_output": structured,
-                    "finish_reason": finish_reason,
-                    "input_tokens_estimate": input_estimate,
-                    "output_tokens_estimate": output_estimate,
-                }),
+                execution_receipt_digest=_digest(
+                    {
+                        "schema": "skeleton.llama-cpp.execution-receipt.v1",
+                        "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
+                        "output_framing": self.config.output_framing,
+                        "request": request.digest,
+                        "execution_profile": execution_profile,
+                        "response_id": response_id,
+                        "text": text,
+                        "tool_calls": [
+                            {
+                                "call_id": call.call_id,
+                                "tool_id": call.tool_id,
+                                "arguments": dict(call.arguments),
+                            }
+                            for call in tool_calls
+                        ],
+                        "structured_output": structured,
+                        "finish_reason": finish_reason,
+                        "input_tokens_estimate": input_estimate,
+                        "output_tokens_estimate": output_estimate,
+                    }
+                ),
+                usage_source="local_model_estimate",
                 tool_calls=tool_calls,
                 structured_output=structured,
                 latency_ms=(time.monotonic() - started) * 1000.0,
@@ -1195,8 +1231,14 @@ class LlamaCppModel:
 
 
 def build_llama_cpp_adapter(
-    config: LlamaCppConfig, *, cache_size: int = 0, default_seed: int = 0,
+    config: LlamaCppConfig,
+    *,
+    cache_size: int = 0,
+    default_seed: int = 0,
     consumer_budget: ConsumerHardwareBudget | None = None,
+    max_concurrency: int = 1,
+    max_queue_size: int = 256,
+    max_batch_size: int = 256,
 ) -> LocalModelAdapter:
     """Build an offline adapter, optionally applying measured consumer limits."""
     if consumer_budget is not None:
@@ -1205,25 +1247,33 @@ def build_llama_cpp_adapter(
         except OSError as exc:
             raise LlamaCppRuntimeError("cannot size local GGUF for consumer planning") from exc
         config = plan_consumer_llama_cpp(
-            config, consumer_budget, model_bytes=model_bytes,
+            config,
+            consumer_budget,
+            model_bytes=model_bytes,
         ).configuration
     return LocalModelAdapter(
-        LocalInferenceEngine(LlamaCppModel(config), cache_size=cache_size),
+        LocalInferenceEngine(
+            LlamaCppModel(config),
+            cache_size=cache_size,
+            max_concurrency=max_concurrency,
+            max_queue_size=max_queue_size,
+            max_batch_size=max_batch_size,
+        ),
         default_seed=default_seed,
     )
 
 
 __all__ = [
     "ArtifactIdentity",
+    "ConsumerHardwareBudget",
+    "ConsumerLlamaPlan",
     "GgufHeader",
     "LlamaCppConfig",
     "LlamaCppModel",
     "LlamaCppRuntimeError",
-    "ConsumerHardwareBudget",
-    "ConsumerLlamaPlan",
+    "build_llama_cpp_adapter",
     "detect_consumer_hardware_budget",
     "estimate_gqa_kv_bytes_per_token",
-    "plan_consumer_llama_cpp",
-    "build_llama_cpp_adapter",
     "inspect_gguf",
+    "plan_consumer_llama_cpp",
 ]

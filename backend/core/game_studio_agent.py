@@ -158,6 +158,9 @@ def _public(row):
     if "completion_mode" in row:
         result["completion_mode"] = row["completion_mode"]
     result["completion"] = row.get("completion_receipt")
+    if row.get("quality_gate") is not None:
+        result["quality_gate"] = row["quality_gate"]
+        result["quality"] = (row.get("completion_receipt") or {}).get("quality")
     result["workflow"] = {
         "remaining_actions": len(row.get("workflow", [])),
         "active": bool(row.get("workflow")),
@@ -326,7 +329,7 @@ async def _recover_own_edit(scope, row, token, *, metadata_only=False):
                     409,
                 )
             return {**row, "_authorized_prepared_editor": revision_id}
-        await _dispatch_fence(scope, row, token, pending)
+        await _dispatch_fence(scope, row, token, pending, allowed_editor_operation_id=revision_id)
         guard_sources = []
         for refs in row["evidence_dependencies"]:
             guard_sources.extend(refs.get("derived_sources", []) + refs.get("external_sources", []))
@@ -388,6 +391,13 @@ async def create(scope, project_id, body):
         replay_body = body
         if "max_output_tokens" in prior.get("intent", {}):
             replay_body = {"max_output_tokens": 1024, **body}
+        if replay_body.get("quality_gate") is not None:
+            from routes.game_studio_agent import StudioQualityGate
+
+            replay_body = {
+                **replay_body,
+                "quality_gate": StudioQualityGate.model_validate(replay_body["quality_gate"]).model_dump(),
+            }
         if prior["request_digest"] != _digest(replay_body):
             raise GameLearningError(
                 "idempotency_conflict", "This goal key already describes another request.", 409
@@ -418,6 +428,29 @@ async def create(scope, project_id, body):
         raise GameLearningError(
             "studio_goal_token_budget", "Planner output budget must be 256..4096 tokens.", 422
         )
+    quality_gate = body.get("quality_gate")
+    if quality_gate is not None:
+        from pydantic import ValidationError
+        from routes.game_studio_agent import StudioQualityGate
+
+        try:
+            quality_gate = StudioQualityGate.model_validate(quality_gate).model_dump()
+        except ValidationError as exc:
+            raise GameLearningError(
+                "studio_quality_policy_invalid", "Select a bounded measured quality policy.", 422
+            ) from exc
+        if (
+            mode != "original"
+            or body["execution_mode"] != "run"
+            or not {"simulate", "review"}.issubset(requirements)
+            or (quality_gate["restore_on_regression"] and not body["allow_edits"])
+        ):
+            raise GameLearningError(
+                "studio_quality_policy_invalid",
+                "Measured quality needs an original simulation/review run and explicit restoration edit grants.",
+                422,
+            )
+        body = {**body, "quality_gate": quality_gate}
     digest = _digest(body)
     project = await workspace._project(project_id, scope, body["expected_version"])
     if requirements and mode == "native":
@@ -466,6 +499,13 @@ async def create(scope, project_id, body):
                 ) from exc
     binding = await workspace._input(scope, project, require_execution=False)
     await workspace._authority(scope, binding)
+    quality_baseline = None
+    if quality_gate and quality_gate.get("baseline_review_job_id"):
+        from core import game_studio_review as reviews
+
+        baseline = await reviews._load_review(scope, project_id, quality_gate["baseline_review_job_id"])
+        quality_baseline = _quality_baseline_pin(baseline)
+        binding_dependencies = _dependencies(baseline["input"])
     # Existing revision capacity is shared; these journals do not extend it.
     if await _rows.count_documents({**scope, "project_id": project_id}) >= 512:
         raise GameLearningError("revision_capacity", "Project revision journals have reached capacity.", 413)
@@ -516,6 +556,11 @@ async def create(scope, project_id, body):
         row["completion_requirements"] = requirements
     if "completion_mode" in body:
         row["completion_mode"] = mode
+    if quality_gate is not None:
+        row["quality_gate"] = quality_gate
+        row["quality_baseline"] = quality_baseline
+        if quality_baseline is not None:
+            row["evidence_dependencies"].append(binding_dependencies)
     row["state_digest"] = _state_digest(row)
     row["storage_receipt"] = await workspace._admit(
         scope, "game-learning-revision", goal_id, len(_json(jsonable_encoder(row)))
@@ -565,9 +610,19 @@ async def inspect(scope, goal_id):
         try:
             result["completion"] = await _completion_progress(scope, row)
             result["outcome"]["workflow_requirements_verified"] = result["completion"]["verified"]
+            if row.get("quality_gate") is not None:
+                result["quality"] = result["completion"].get("quality")
         except GameLearningError as exc:
             result["completion"] = {"verified": False, "error": {"code": exc.code, "message": exc.message}}
             result["outcome"]["workflow_requirements_verified"] = False
+            if row.get("quality_gate") is not None:
+                result["quality"] = {
+                    "schema_version": "skeleton.game.studio_quality_progress.v1",
+                    "status": "unavailable",
+                    "verified": False,
+                    "quality_certified": False,
+                    "error": {"code": exc.code, "message": exc.message},
+                }
     if row.get("schema_version") == SCHEMA and (row.get("pending_job_id") or row.get("pending_play_id")):
         try:
             await _authorize_history(scope, row)
@@ -594,6 +649,12 @@ async def inspect(scope, goal_id):
                         if pending["status"] in {"completed", "failed", "cancelled", "stopped", "blocked"}
                         else "wait"
                     )
+                ),
+                automatic_continuation_available=bool(
+                    row.get("status") in {"ready", "waiting"}
+                    and not row.get("stop_requested")
+                    and not row.get("error")
+                    and pending["status"] in {"completed", "failed", "cancelled", "stopped", "blocked"}
                 ),
             )
             result["pending_work_receipt"] = _feedback(pending)
@@ -1032,6 +1093,346 @@ async def _completion_progress(scope, row, project=None):
     return result
 
 
+def _quality_baseline_pin(job):
+    """Pin an issued positive original observation, never client-supplied scores."""
+    from core import game_studio_review as reviews
+
+    if job.get("status") != "completed" or job["input"].get("review_baseline"):
+        raise GameLearningError(
+            "studio_quality_baseline_invalid", "Choose a completed original reference review.", 409
+        )
+    report = reviews._checked_result(job)
+    identity = report.get("source_identity", {})
+    if (
+        not isinstance(identity.get("authoring_comparison"), dict)
+        or identity["authoring_comparison"].get("kind") != "successor"
+        or identity.get("controller") not in {"explicit_actions", "registered_action_cycle"}
+        or type(report.get("execution", {}).get("steps")) is not int
+        or report["execution"]["steps"] < 1
+        or type(report.get("metrics", {}).get("available_frames")) is not int
+        or report["metrics"]["available_frames"] < 1
+    ):
+        raise GameLearningError(
+            "studio_quality_baseline_invalid",
+            "The baseline needs current original-runtime frames and an issued matched-workload contract.",
+            409,
+        )
+    return {
+        "job_id": job["job_id"],
+        "review_digest": report["review_digest"],
+        "input_digest": _digest(job["input"]),
+        "head_digest": job["input"]["tree_digest"],
+        "source_content_digest": _digest({item["path"]: item["content"] for item in job["input"]["files"]}),
+        "project_version": job["input"]["project_version"],
+        "protocol_digest": _digest(identity["review_protocol"]),
+    }
+
+
+async def _quality_progress(scope, row, project, *, allowed_editor_operation_id=None):
+    """Resolve a finite refinement loop from the existing immutable owner jobs.
+
+    The initial reference stays pinned across all rounds. A failed candidate is
+    never promoted; an explicitly granted restoration reuses the ordinary world
+    editor. Every candidate still needs its own current-source simulation and
+    review before package/export. This does not certify subjective game quality.
+    """
+    policy = row.get("quality_gate")
+    if policy is None:
+        return None
+    from core import game_studio_review as reviews
+    from skeleton.jeeves.game_studio_review import compare_executed_reviews
+
+    options = (
+        {"allowed_editor_operation_id": allowed_editor_operation_id} if allowed_editor_operation_id else {}
+    )
+
+    head = _digest(project["files"])
+    review_steps = [
+        step
+        for step in row["steps"]
+        if step.get("executed") and step["decision"]["operation"] == "project.review" and step.get("job_id")
+    ]
+    pin = row.get("quality_baseline")
+    baseline = None
+    if pin is not None:
+        baseline = await reviews._load_review(
+            scope, row["project_id"], pin["job_id"], historical=True, **options
+        )
+        if _quality_baseline_pin(baseline) != pin:
+            raise GameLearningError(
+                "studio_quality_baseline_changed", "The exact issued quality baseline differs.", 503
+            )
+    else:
+        # Selection is deterministic and anchored to this goal's sealed action
+        # journal. Failed/unfinished reviews cannot become a silent new baseline.
+        for step in review_steps:
+            job = await workspace.jobs.find_one(
+                {"_id": step["job_id"], **scope, "project_id": row["project_id"], "kind": "review"}
+            )
+            if job is None:
+                raise GameLearningError(
+                    "studio_quality_job_absent", "An issued baseline review is unavailable.", 503
+                )
+            if job.get("status") != "completed":
+                continue
+            baseline = await reviews._load_review(
+                scope, row["project_id"], job["job_id"], historical=True, **options
+            )
+            pin = _quality_baseline_pin(baseline)
+            break
+    refinements = [
+        step
+        for step in row["steps"]
+        if step.get("executed")
+        and step["decision"]["operation"] == "world.edit"
+        and step.get("quality_role") != "restore_incumbent"
+        and (pin is None or step.get("input_version", 0) >= pin["project_version"])
+    ]
+    restored = [step for step in row["steps"] if step.get("quality_role") == "restore_incumbent"]
+    result = {
+        "schema_version": "skeleton.game.studio_quality_progress.v1",
+        "policy_digest": _digest(policy),
+        "project_id": row["project_id"],
+        "project_version": project["version"],
+        "head_digest": head,
+        "baseline": pin,
+        "candidate": None,
+        "status": "baseline_required" if pin is None else "candidate_required",
+        "refinement_rounds": len(refinements),
+        "remaining_refinement_rounds": max(0, policy["max_refinement_rounds"] - len(refinements)),
+        "restorations": len(restored),
+        "incumbent_source_restored": (
+            bool(
+                restored
+                and _digest({item["path"]: item["content"] for item in project["files"]})
+                == pin["source_content_digest"]
+                and (not refinements or restored[-1]["index"] > refinements[-1]["index"])
+            )
+            if pin
+            else False
+        ),
+        "failures": [],
+        "regressions": [],
+        "verified": False,
+        "quality_certified": False,
+        "scope": "Operator-selected numerical bounds and matched bounded observation only; no subjective quality, held-out generalization or automatic model training claim.",
+    }
+    if baseline is not None:
+        candidates = [step for step in review_steps if step["job_id"] != baseline["job_id"]]
+        for step in reversed(candidates):
+            if step.get("output_digest") != head:
+                continue
+            issued = await workspace.jobs.find_one(
+                {"_id": step["job_id"], **scope, "project_id": row["project_id"], "kind": "review"}
+            )
+            if issued is None:
+                raise GameLearningError(
+                    "studio_quality_job_absent", "An issued candidate review is unavailable.", 503
+                )
+            if issued.get("status") != "completed":
+                continue
+            candidate = await reviews._load_review(
+                scope, row["project_id"], step["job_id"], historical=True, **options
+            )
+            if (
+                candidate["input"]["project_version"] != project["version"]
+                or candidate["input"]["tree_digest"] != head
+            ):
+                continue
+            report = reviews._checked_result(candidate)
+            comparison = compare_executed_reviews(
+                reviews._checked_result(baseline), report, mode="source_revision"
+            )
+            execution, metrics = report.get("execution", {}), report.get("metrics", {})
+            counts = {
+                severity: sum(item.get("severity") == severity for item in report.get("findings", []))
+                for severity in ("error", "warning", "info")
+            }
+            failures = []
+            for name, measured, minimum in (
+                ("available_frames", metrics.get("available_frames"), policy["min_available_frames"]),
+                ("executed_steps", execution.get("steps"), policy["min_executed_steps"]),
+            ):
+                if type(measured) is not int or measured < minimum:
+                    failures.append(
+                        {"code": "insufficient_" + name, "observed": measured, "minimum": minimum}
+                    )
+            for severity in ("error", "warning"):
+                maximum = policy["max_" + severity + "_findings"]
+                if counts[severity] > maximum:
+                    failures.append(
+                        {
+                            "code": "excess_" + severity + "_findings",
+                            "observed": counts[severity],
+                            "maximum": maximum,
+                        }
+                    )
+            if comparison["status"] != "paired_observation":
+                failures.append(
+                    {"code": "unmatched_review_protocol", "reasons": comparison["comparability_failures"]}
+                )
+            regressions = comparison["observed_regressions"]
+            if policy["require_no_regression"] and regressions:
+                failures.append({"code": "measured_regression", "metrics": regressions})
+            result.update(
+                candidate={
+                    "job_id": candidate["job_id"],
+                    "review_digest": report["review_digest"],
+                    "input_digest": _digest(candidate["input"]),
+                    "head_digest": head,
+                    "executed_steps": execution.get("steps"),
+                    "available_frames": metrics.get("available_frames"),
+                    "finding_counts": counts,
+                    "priority_findings": [
+                        {
+                            **{key: item[key] for key in ("finding_id", "code", "severity") if key in item},
+                            "message": str(item.get("message", ""))[:400],
+                            "evidence_refs": [str(ref)[:256] for ref in item.get("evidence_refs", [])[:4]],
+                            "partial_projection": True,
+                        }
+                        for item in report.get("findings", [])[:4]
+                    ],
+                    "comparison_digest": comparison["comparison_digest"],
+                    "comparison_status": comparison["status"],
+                },
+                failures=failures,
+                regressions=regressions,
+                status="accepted" if not failures else "rejected",
+                verified=not failures,
+            )
+            break
+    result["receipt_digest"] = _digest(result)
+    return result
+
+
+async def _quality_restore_payload(scope, row, project, *, allowed_editor_operation_id=None):
+    """Construct exact incumbent sections from the issued baseline, never prose."""
+    from core import game_studio_review as reviews
+
+    options = (
+        {"allowed_editor_operation_id": allowed_editor_operation_id} if allowed_editor_operation_id else {}
+    )
+    quality = await _quality_progress(scope, row, project, **options)
+    if not quality or quality["status"] != "rejected" or not row["quality_gate"]["restore_on_regression"]:
+        raise GameLearningError(
+            "studio_quality_restore_unavailable", "No rejected candidate grants restoration.", 409
+        )
+    baseline = await reviews._load_review(
+        scope, row["project_id"], quality["baseline"]["job_id"], historical=True, **options
+    )
+    files = {item["path"]: item["content"] for item in baseline["input"]["files"]}
+    spec = json.loads(files["game/successor/spec.json"])
+    current_files = {item["path"]: item["content"] for item in project["files"]}
+    current_spec = json.loads(current_files["game/successor/spec.json"])
+    # The existing editor deliberately refuses identity/origin changes. Binding
+    # the original content tree proves that its six editable sections restore
+    # the exact incumbent rather than a superficially similar reconstruction.
+    from skeleton.jeeves.game_successor_runtime import emit_successor_project
+
+    restored = {item["path"]: item["content"] for item in project["files"]}
+    restored.update(emit_successor_project(spec))
+    if _digest(restored) != quality["baseline"]["source_content_digest"]:
+        raise GameLearningError(
+            "studio_quality_restore_source_mismatch",
+            "Exact incumbent restoration cannot preserve all source files.",
+            409,
+        )
+    return {
+        "expected_spec_digest": _digest(current_spec),
+        "restore_review_job_id": baseline["job_id"],
+    }, quality
+
+
+async def _quality_action_payload(
+    scope, row, pending, operation, payload, *, allowed_editor_operation_id=None
+):
+    """Enforce acceptance at dispatch as well as in model guidance/grammar."""
+    if row.get("quality_gate") is None:
+        return payload
+    project = await workspace._project(row["project_id"], scope, row["head_version"])
+    options = (
+        {"allowed_editor_operation_id": allowed_editor_operation_id} if allowed_editor_operation_id else {}
+    )
+    quality = await _quality_progress(scope, row, project, **options)
+    if operation in {"desktop.build", "project.export", "artifact.export", "successor.export"}:
+        completion = await _original_completion_progress(scope, row, project)
+        if (
+            not quality["verified"]
+            or not completion["checks"]["simulate"]["verified"]
+            or not completion["checks"]["review"]["verified"]
+        ):
+            raise GameLearningError(
+                "studio_quality_gate_unverified",
+                "Current-source simulation and measured acceptance must precede packaging/export.",
+                409,
+            )
+    if operation == "world.edit":
+        if quality["status"] == "baseline_required":
+            raise GameLearningError(
+                "studio_quality_baseline_required", "Run the actual pre-edit baseline review first.", 409
+            )
+        if quality["status"] == "rejected" and row["quality_gate"]["restore_on_regression"]:
+            restored, _quality = await _quality_restore_payload(scope, row, project, **options)
+            pending["quality_role"] = "restore_incumbent"
+            # Only editor/version/idempotency host fields survive the override.
+            return {
+                **restored,
+                **{key: payload[key] for key in ("expected_version", "idempotency_key") if key in payload},
+            }
+        if not quality["remaining_refinement_rounds"]:
+            raise GameLearningError(
+                "studio_quality_refinements_exhausted",
+                "The finite measured refinement budget is exhausted.",
+                409,
+            )
+        if payload.get("restore_review_job_id") is not None:
+            raise GameLearningError(
+                "studio_quality_ungranted_restore",
+                "This quality decision may restore only its exact rejected incumbent.",
+                403,
+            )
+        if row["quality_gate"]["restore_on_regression"] and (
+            row["max_steps"] - row["cursor"] < 4
+            or row["max_model_calls"] - row["model_calls"] < 3
+            or row["max_jobs"] - row["jobs_started"] < 1
+        ):
+            raise GameLearningError(
+                "studio_quality_recovery_budget",
+                "Keep the incumbent: this candidate lacks finite simulation/review/restoration capacity. Create a new explicitly bounded goal.",
+                409,
+            )
+        pending["quality_role"] = "refine_candidate"
+    if operation == "project.review":
+        if quality["status"] == "rejected" and row["quality_gate"]["restore_on_regression"]:
+            raise GameLearningError(
+                "studio_quality_restore_required",
+                "Restore the rejected candidate's incumbent before another review.",
+                409,
+            )
+        # The host, rather than the model, freezes every workload/controller
+        # parameter after the reference. A changed source remains the one
+        # deliberate independent variable in the measured comparison.
+        baseline = quality.get("baseline")
+        if baseline is not None:
+            from core import game_studio_review as reviews
+
+            issuer = await reviews._load_review(scope, row["project_id"], baseline["job_id"], historical=True)
+            payload = {
+                key: value for key, value in payload.items() if key in {"expected_version", "idempotency_key"}
+            }
+            for key in ("seed", "episode_steps", "capture_every", "actions"):
+                if key in issuer["request"]:
+                    payload[key] = issuer["request"][key]
+        else:
+            payload = {
+                key: value
+                for key, value in payload.items()
+                if key not in {"source_id", "policy_id", "baseline_review_job_id", "actions"}
+            }
+        pending["quality_role"] = "baseline_observation" if baseline is None else "candidate_observation"
+    return payload
+
+
 async def _original_completion_progress(scope, row, project=None):
     """Verify original source execution and packaging without implying binary play."""
     from core import game_console_build as builds
@@ -1230,6 +1631,10 @@ async def _original_completion_progress(scope, row, project=None):
     }
     await workspace._authority(scope, await workspace._input(scope, project, require_execution=False))
     requirements = row.get("completion_requirements", [])
+    quality = await _quality_progress(scope, row, project)
+    missing = [name for name in requirements if not checks[name]["verified"]]
+    if quality is not None and not quality["verified"]:
+        missing.append("quality")
     result = {
         "schema_version": "skeleton.game.studio_original_completion.v1",
         "completion_mode": "original",
@@ -1238,10 +1643,12 @@ async def _original_completion_progress(scope, row, project=None):
         "head_digest": head,
         "requirements": requirements,
         "checks": checks,
-        "missing": [name for name in requirements if not checks[name]["verified"]],
-        "verified": bool(requirements) and all(checks[name]["verified"] for name in requirements),
+        "missing": missing,
+        "verified": bool(requirements) and not missing,
         "scope": "Original source edit, measured simulation/review and compiled browser-rendered desktop packaging/export facts only; no subjective quality, desktop execution or console hardware certification.",
     }
+    if quality is not None:
+        result["quality"] = quality
     result["receipt_digest"] = _digest(result)
     return result
 
@@ -1299,18 +1706,44 @@ def _original_workflow_stage(row, context, allowed):
     checks = context.get("completion", {}).get("checks", {})
     original = context.get("original_project", {})
     exports = checks.get("export", {})
+    quality = context.get("completion", {}).get("quality")
     if not original.get("adopted_world"):
         if original.get("candidate"):
             stage, operations = "original_adopt", {"successor.inspect", "successor.adopt"}
         else:
             stage, operations = "original_create", {"successor.synthesize"}
+    elif quality and quality["status"] == "baseline_required":
+        stage, operations = "original_baseline", {"project.review"}
+    elif quality and quality["status"] == "rejected":
+        if row["quality_gate"]["restore_on_regression"]:
+            stage, operations = "original_restore", {"world.edit"}
+        elif quality["remaining_refinement_rounds"] and row["allow_edits"]:
+            stage, operations = "original_refine", {"world.inspect", "world.edit"}
+        else:
+            raise GameLearningError(
+                "studio_quality_gate_rejected",
+                "Measured acceptance failed; no further authorized refinement is available.",
+                409,
+            )
+    elif quality and quality["incumbent_source_restored"]:
+        if quality["remaining_refinement_rounds"] and row["allow_edits"]:
+            stage, operations = "original_refine", {"world.inspect", "world.edit"}
+        else:
+            raise GameLearningError(
+                "studio_quality_refinements_exhausted",
+                "The incumbent was restored; the finite refinement budget is exhausted.",
+                409,
+            )
     elif "edit" in requirements and not checks.get("edit", {}).get("verified"):
         stage, operations = "original_edit", {"world.inspect", "world.edit"}
     elif any(name in requirements for name in ("simulate", "review")) and not checks.get("simulate", {}).get(
         "verified"
     ):
         stage, operations = "original_simulate", {"simulate", "world.inspect"}
-    elif "review" in requirements and not checks.get("review", {}).get("verified"):
+    elif "review" in requirements and (
+        not checks.get("review", {}).get("verified")
+        or (quality and quality["status"] == "candidate_required")
+    ):
         stage, operations = "original_review", {"project.review"}
     elif any(name in requirements for name in ("package", "export")) and not checks.get("package", {}).get(
         "verified"
@@ -1330,6 +1763,8 @@ def _original_workflow_stage(row, context, allowed):
             stage, operations = "original_export", {"project.export", "artifact.export"}
     else:
         stage, operations = "original_complete", {"project.inspect"}
+    if quality and stage == "original_simulate":
+        operations = {"simulate"}
     allowed = allowed & operations
     guidance = {
         "stage": stage,
@@ -1338,12 +1773,26 @@ def _original_workflow_stage(row, context, allowed):
         "verified": {name: value.get("verified", False) for name, value in checks.items()},
         "remaining_operations": sorted(allowed),
     }
+    if quality is not None:
+        guidance["measured_quality"] = quality
+        guidance["quality_guidance"] = (
+            "Keep the immutable baseline and exact seed/controller/capture/episode protocol. "
+            "Rejected candidates cannot package or export. Refinement consumes the original finite grants; "
+            "restoration is a host-constructed exact baseline edit, not a model-authored replacement. "
+            "Numerical acceptance does not certify subjective game quality."
+        )
     if stage == "original_create":
         guidance["authored_profiles"] = original.get("authored_profiles", [])
         guidance["source_cardinality"] = [1, 3]
     if stage == "original_adopt":
         guidance["candidate"] = original["candidate"]
-    if stage in {"original_edit", "original_simulate", "original_review", "original_package"}:
+    if stage in {
+        "original_edit",
+        "original_refine",
+        "original_simulate",
+        "original_review",
+        "original_package",
+    }:
         guidance["actions"] = original.get("actions", [])
     if stage == "original_package":
         guidance["desktop_targets"] = original.get("desktop_targets", [])
@@ -1428,6 +1877,80 @@ async def _original_project_context(scope, row, project):
         for target in catalog["targets"]
     ]
     return result
+
+
+async def _review_lessons(scope, row, project, *, limit=4):
+    """Reuse issued observations with explicit compatibility, without a new store."""
+    from core import game_studio_review as reviews
+    from skeleton.jeeves.game_studio_review import review_implementation_digest
+
+    records = (
+        await workspace.jobs.find(
+            {**scope, "project_id": row["project_id"], "kind": "review", "status": "completed"},
+            {"_id": 1},
+        )
+        .sort("updated_at", -1)
+        .limit(limit)
+        .max_time_ms(2000)
+        .to_list(length=limit)
+    )
+    output, dependencies, evidence = [], [], []
+    implementation = review_implementation_digest()
+    head = _digest(project["files"])
+    for record in records:
+        try:
+            issuer = await reviews._load_review(scope, row["project_id"], record["_id"], historical=True)
+            report = reviews._checked_result(issuer)
+            identity = report.get("source_identity", {})
+            applicable = (
+                issuer["input"]["tree_digest"] == head
+                and identity.get("reviewer_implementation_digest") == implementation
+            )
+            output.append(
+                {
+                    "job_id": issuer["job_id"],
+                    "review_digest": report["review_digest"],
+                    "source_head_digest": issuer["input"]["tree_digest"],
+                    "applicable_to_current_tree": applicable,
+                    "reuse": (
+                        "exact_source_observation"
+                        if applicable
+                        else "historical_constraint_requires_fresh_execution"
+                    ),
+                    "execution": {
+                        key: report.get("execution", {}).get(key)
+                        for key in ("steps", "return", "trace_digest")
+                    },
+                    "priority_findings": [
+                        {
+                            "finding_id": item.get("finding_id"),
+                            "code": item.get("code"),
+                            "severity": item.get("severity"),
+                            "required_inspection": str(item.get("required_inspection", ""))[:400],
+                            "evidence_refs": [str(ref)[:256] for ref in item.get("evidence_refs", [])[:4]],
+                            "remedial_proposal_digests": item.get("remedial_proposal_digests", [])[:4],
+                            "partial_projection": True,
+                        }
+                        for item in report.get("triangle_review", {}).get("priority_findings", [])[:4]
+                    ],
+                    "quality_certified": False,
+                    "training_authorized": False,
+                }
+            )
+            dependencies.append(_dependencies(issuer["input"]))
+            evidence.append(
+                {
+                    "ref": "review:" + issuer["job_id"] + ":" + report["review_digest"],
+                    "kind": "historical_review",
+                    "job_id": issuer["job_id"],
+                    "review_digest": report["review_digest"],
+                    "input_digest": _digest(issuer["input"]),
+                    "applicable_to_current_tree": applicable,
+                }
+            )
+        except GameLearningError as exc:
+            output.append({"job_id": record["_id"], "evidence_withheld": exc.code})
+    return output, dependencies, evidence
 
 
 async def _context(scope, row, project, binding):
@@ -1606,6 +2129,10 @@ async def _context(scope, row, project, binding):
         }
     if row.get("completion_mode") == "original":
         result["original_project"] = await _original_project_context(scope, row, project)
+        observations, review_dependencies, review_evidence = await _review_lessons(scope, row, project)
+        result["review_lessons"] = observations
+        dependencies.extend(review_dependencies)
+        evidence.extend(review_evidence)
     while len(_json(result)) > 192 * 1024 and result.get("authoring_documents"):
         result["authoring_documents"].pop()
     _json(result, 192 * 1024)
@@ -1678,7 +2205,12 @@ def _original_stage_owner_schemas(schemas, context, *, workflow_stage=None):
         shape = subset(operation)
         shape["properties"][field] = {**shape["properties"][field], "enum": identities}
 
-    if workflow_stage == "original_simulate":
+    if workflow_stage == "original_restore":
+        shape = subset("world.edit", ("changes", "edits", "restore_review_job_id"))
+        shape["x-host-authority"] = (
+            "Exact incumbent changes are reconstructed by the quality-policy owner after the model selects this operation."
+        )
+    elif workflow_stage == "original_simulate":
         shape = subset(
             "simulate", ("source_id", "session_id", "expected_session_version", "reset", "action", "actions")
         )
@@ -1705,8 +2237,12 @@ def _original_stage_owner_schemas(schemas, context, *, workflow_stage=None):
         shape["properties"]["steps"] = steps
         if "steps" not in shape["required"]:
             shape["required"].append("steps")
-    elif workflow_stage == "original_review":
+    elif workflow_stage in {"original_review", "original_baseline"}:
         subset("project.review", ("source_id", "policy_id", "baseline_review_job_id", "actions"))
+    elif workflow_stage in {"original_edit", "original_refine"} and context.get("completion", {}).get(
+        "quality"
+    ):
+        subset("world.edit", ("restore_review_job_id",))
     elif workflow_stage == "original_package":
         subset("desktop.build", ("timeout_seconds",))
         supported = set(schemas["desktop.build"]["properties"]["target_id"]["enum"])
@@ -1796,7 +2332,11 @@ async def _prepare(scope, row, token):
                 "payload": {},
                 "explanation": "What this actual operation achieves",
                 "done": False,
-                "follow_up": "Optional array of <=3 granted {operation,payload,explanation} commands; children wait for actual receipts",
+                "follow_up": (
+                    "Omit or use an empty array: measured-quality decisions replan after each actual operation"
+                    if row.get("quality_gate") is not None
+                    else "Optional array of <=3 granted {operation,payload,explanation} commands; children wait for actual receipts"
+                ),
             },
             "receipt_reference_tokens": sorted(_RECEIPT_REFS),
             "completion_requirements": row.get("completion_requirements", []),
@@ -1820,6 +2360,7 @@ async def _prepare(scope, row, token):
     response_schema = _planner_response_schema(
         allowed,
         allow_done=allow_done,
+        max_follow_up=0 if row.get("quality_gate") is not None else 3,
         payload_schemas=_planner_payload_schemas(
             schemas, allowed, context, workflow_stage=workflow.get("stage") if workflow else None
         ),
@@ -1961,7 +2502,7 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
                     )
                     if op in edits
                 }
-            if name == "world.edit":
+            if name == "world.edit" and stage != "original_restore":
                 operations[name]["fields"] = {
                     "expected_spec_digest": {"type": "string"},
                     "changes": {"type": "object"},
@@ -1970,11 +2511,20 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
                 operations[name][
                     "choose"
                 ] = "Exactly one of changes or edits; inspect current fields/entities first."
+                if "restore_review_job_id" in shape.get("properties", {}):
+                    operations[name]["fields"]["restore_review_job_id"] = {"type": "string"}
+                    operations[name][
+                        "choose"
+                    ] = "Exactly one of changes, edits, or restore_review_job_id from an actual completed scoped review; immutable world identity/origins must match."
                 operations[name]["edit_fields"] = {
                     value["properties"]["op"]["const"]: value.get("required", [])
                     for value in shape.get("$defs", {}).values()
                     if isinstance(value.get("properties", {}).get("op", {}).get("const"), str)
                 }
+            elif name == "world.edit":
+                operations[name][
+                    "host_restore"
+                ] = "Supply the current expected_spec_digest only. The host reconstructs all exact incumbent authoring sections from the issued baseline."
             if shape.get("$defs") and name != "world.edit":
                 operations[name]["$defs"] = {key: field_shape(value) for key, value in shape["$defs"].items()}
         source_project = context["project"]
@@ -2010,6 +2560,8 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
         prompt = dump(data)
         # Admit complete actual observations atomically; never label a truncated result as complete.
         observations = []
+        for lesson in context.get("review_lessons", []):
+            observations.append({"historical_review_lesson": lesson})
         for job in context.get("jobs", []):
             result = job.get("result", {})
             if not isinstance(result, dict):
@@ -2263,6 +2815,17 @@ async def _assert_citations(scope, row, pending, decision):
                     409,
                 )
             await workspace._authority(scope, job["input"])
+        if item["kind"] == "historical_review":
+            from core import game_studio_review as reviews
+
+            job = await reviews._load_review(scope, row["project_id"], item["job_id"], historical=True)
+            if (
+                _digest(job["input"]) != item["input_digest"]
+                or reviews._checked_result(job)["review_digest"] != item["review_digest"]
+            ):
+                raise GameLearningError(
+                    "studio_evidence_stale", "Cited historical review identity differs.", 409
+                )
         if item["kind"] == "measured_reference_observation":
             from core.dragon_runtime import assert_reference_practice, reviewed_scope_from_workspace
 
@@ -2277,6 +2840,12 @@ async def _accept_response(scope, row, token):
     }
     if not pending.get("workflow_decision"):
         follow = parsed.get("follow_up", [])
+        if follow and row.get("quality_gate") is not None:
+            raise GameLearningError(
+                "studio_quality_replan_required",
+                "Measured quality decisions require fresh actual evidence after each operation.",
+                422,
+            )
         if len(follow) + 1 > row["max_steps"] - row["cursor"]:
             raise GameLearningError(
                 "studio_workflow_budget",
@@ -2335,6 +2904,7 @@ async def _accept_response(scope, row, token):
                     "studio_play_budget_invalid", "AI playback requires a positive bounded frame budget.", 422
                 )
             payload["max_steps"] = min(supplied_steps, 256)
+        payload = await _quality_action_payload(scope, row, pending, decision["operation"], payload)
         _action_scope(row, decision["operation"], payload)
         command = StudioCommand(decision["operation"], row["project_id"], payload).as_dict()
     pending = {**pending, "phase": "action", "decision": decision, "command": command}
@@ -2494,6 +3064,8 @@ async def _finish_step(scope, row, token):
         "output_version": project["version"],
         "output_digest": _digest(project["files"]),
     }
+    if pending.get("quality_role"):
+        step["quality_role"] = pending["quality_role"]
     step["step_digest"] = _digest(step)
     for refs in pending["dependencies"]:
         await _authorize_history(scope, {"evidence_dependencies": [refs]})
@@ -2920,7 +3492,13 @@ def _state_digest(row):
     payload = {key: row.get(key) for key in _STATE_FIELDS}
     if "max_output_tokens" in row:
         payload["max_output_tokens"] = row["max_output_tokens"]
-    for name in ("completion_requirements", "completion_receipt", "completion_mode"):
+    for name in (
+        "completion_requirements",
+        "completion_receipt",
+        "completion_mode",
+        "quality_gate",
+        "quality_baseline",
+    ):
         if name in row:
             payload[name] = row[name]
     return _digest(jsonable_encoder(_bson_canonical(payload)))
@@ -2964,6 +3542,15 @@ def _validate_journal(row):
             "completion_mode"
         ) != intent.get("completion_mode"):
             raise GameLearningError("studio_goal_journal_corrupt", "Original workflow mode differs.", 503)
+    if row.get("quality_gate") is not None or intent.get("quality_gate") is not None:
+        if row.get("quality_gate") != intent.get("quality_gate"):
+            raise GameLearningError("studio_goal_journal_corrupt", "Original quality policy differs.", 503)
+        if row.get("completion_mode") != "original" or not {"simulate", "review"}.issubset(
+            row.get("completion_requirements", [])
+        ):
+            raise GameLearningError(
+                "studio_goal_journal_corrupt", "Measured quality workflow grants differ.", 503
+            )
     if "max_output_tokens" in row or "max_output_tokens" in intent:
         if (
             type(row.get("max_output_tokens")) is not int
@@ -3070,7 +3657,38 @@ def _recovery_projection(row):
         )
     )
     current = row.get("schema_version") == SCHEMA
+    status = row.get("status")
+    failed_planner = bool(
+        pending.get("phase") in {"model", "response"}
+        and pending.get("canonical_probe", {}).get("terminal")
+        and pending.get("canonical_probe", {}).get("state") != "completed"
+    )
+    next_action = (
+        "retry"
+        if current and status in {"ready", "waiting", "blocked"} and (row.get("error") or failed_planner)
+        else (
+            "advance"
+            if current
+            and status in {"ready", "waiting"}
+            and not (row.get("pending_job_id") or row.get("pending_play_id"))
+            else (
+                "wait"
+                if current and status == "waiting"
+                else (
+                    "retry"
+                    if current and status == "blocked"
+                    else (
+                        "resume"
+                        if current and status == "paused"
+                        else "authorize" if current and status == "expired" else "inspect"
+                    )
+                )
+            )
+        )
+    )
     return {
+        "next_action": next_action,
+        "automatic_continuation_available": next_action == "advance" and not row.get("stop_requested"),
         "can_retry": current and row.get("status") in {"blocked", "ready", "waiting"},
         "can_resume": current and row.get("status") == "paused",
         "can_renew": current and row.get("status") not in {"completed", "cancelled", "planned"},
@@ -3308,6 +3926,8 @@ async def retry(scope, goal_id, body):
                         "decision_digest",
                         "command",
                         "command_digest",
+                        "canonical_probe",
+                        "poll",
                     }
                 }
                 pending.update(
@@ -3406,8 +4026,8 @@ async def catalog(scope):
         "bounds": {
             "workflow_actions": 4,
             "steps": 16,
-            "model_calls": 8,
-            "jobs": 4,
+            "model_calls": 16,
+            "jobs": 8,
             "renewal_seconds": 3600,
             "max_output_tokens": {"minimum": 256, "maximum": 4096, "default": 1024},
             "planner_poll_seconds": PLANNER_POLL_SECONDS,
@@ -3436,6 +4056,16 @@ async def catalog(scope):
                 ],
                 "scope": "Actual original source runtime and numerical review, compiled browser-rendered desktop package and exports; no subjective-quality or desktop-execution certification.",
                 "source_change_invalidates_downstream_receipts": True,
+                "measured_quality": {
+                    "schema_version": "skeleton.game.studio_quality_policy.v1",
+                    "opt_in": True,
+                    "baseline": "Exact scoped original review, or the first actual pre-edit review issued by this goal",
+                    "max_refinement_rounds": 4,
+                    "matched_protocol": "Host-frozen seed, episode length, capture interval and registered/explicit controller",
+                    "acceptance": "Current-source simulation, review, frame/step/finding thresholds and optional no-regression gate",
+                    "rejected_candidate": "Never packaged/exported; explicitly granted exact incumbent restoration consumes ordinary steps",
+                    "quality_certified": False,
+                },
             },
         },
         "builder_workflow": {
@@ -3668,14 +4298,21 @@ def _planner_payload_schemas(schemas, allowed, context, *, workflow_stage=None):
                 and all(c in "0123456789abcdef" for c in spec_digest)
             ):
                 properties["expected_spec_digest"]["enum"] = [spec_digest]
-            if "changes" in properties and "edits" in properties:
+            alternatives = [
+                name for name in ("changes", "edits", "restore_review_job_id") if name in properties
+            ]
+            if len(alternatives) > 1:
                 branches = []
-                for selected, omitted in (("changes", "edits"), ("edits", "changes")):
+                for selected in alternatives:
                     selected_schema = properties[selected]
                     if "anyOf" in selected_schema:
                         non_null = [item for item in selected_schema["anyOf"] if item.get("type") != "null"]
                         selected_schema = non_null[0] if len(non_null) == 1 else {"anyOf": non_null}
-                    branch_properties = {key: value for key, value in properties.items() if key != omitted}
+                    branch_properties = {
+                        key: value
+                        for key, value in properties.items()
+                        if key not in alternatives or key == selected
+                    }
                     branch_properties[selected] = selected_schema
                     branches.append(
                         {
@@ -3702,7 +4339,7 @@ def _planner_payload_schemas(schemas, allowed, context, *, workflow_stage=None):
     return result
 
 
-def _planner_response_schema(allowed, *, allow_done=True, payload_schemas=None):
+def _planner_response_schema(allowed, *, allow_done=True, payload_schemas=None, max_follow_up=3):
     action = {
         "type": "object",
         "additionalProperties": False,
@@ -3735,7 +4372,7 @@ def _planner_response_schema(allowed, *, allow_done=True, payload_schemas=None):
                     **properties,
                     "operation": {"type": "string", "enum": sorted(allowed)},
                     "done": {"type": "boolean", "enum": [False]},
-                    "follow_up": {"type": "array", "maxItems": 3, "items": action},
+                    "follow_up": {"type": "array", "maxItems": max_follow_up, "items": action},
                 },
             },
             {
@@ -3768,7 +4405,7 @@ def _planner_response_schema(allowed, *, allow_done=True, payload_schemas=None):
             "e": properties["explanation"],
             "v": properties["evidence_refs"],
             "s": properties["schema_version"],
-            "f": {"type": "array", "maxItems": 3, "items": {"$ref": "#/$defs/a"}},
+            "f": {"type": "array", "maxItems": max_follow_up, "items": {"$ref": "#/$defs/a"}},
         }
         actions, decisions = [], []
         for index, operation in enumerate(sorted(allowed)):
@@ -3920,7 +4557,7 @@ def _action_scope(row, operation, payload):
             )
 
 
-async def _dispatch_fence(scope, row, token, pending, *, phase="action"):
+async def _dispatch_fence(scope, row, token, pending, *, phase="action", allowed_editor_operation_id=None):
     current = await _row(scope, row["goal_id"])
     live = current.get("pending") or {}
     if (
@@ -3950,3 +4587,20 @@ async def _dispatch_fence(scope, row, token, pending, *, phase="action"):
         raise GameLearningError(
             "studio_goal_stop_requested", "Owner requested a stop before the next actual action.", 409
         )
+    if phase == "action" and pending.get("command") and current.get("quality_gate") is not None:
+        command = pending["command"]
+        frozen = dict(pending)
+        checked = await _quality_action_payload(
+            scope,
+            current,
+            frozen,
+            command["operation"],
+            command["payload"],
+            allowed_editor_operation_id=allowed_editor_operation_id,
+        )
+        if checked != command["payload"] or frozen.get("quality_role") != pending.get("quality_role"):
+            raise GameLearningError(
+                "studio_quality_dispatch_changed",
+                "The exact quality-policy command no longer matches live evidence.",
+                409,
+            )

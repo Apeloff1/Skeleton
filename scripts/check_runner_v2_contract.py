@@ -9,6 +9,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "skeleton" / "pr_automation"
 WORKFLOW = ROOT / ".github" / "workflows" / "pr-automation-index.yml"
+# ace886be / .github/CI_SLIM_POLICY.md: the runner workflow is archived (inert).
+# Its definition is still contract-checked so a later restore cannot regress.
+ARCHIVED_WORKFLOW = ROOT / ".github" / "workflows-archive" / "pr-automation-index.yml"
 LEGACY_RUNNER = PACKAGE / "runner.py"
 MODULES = (
     "runner_contracts.py",
@@ -307,11 +310,12 @@ def _cross_file_findings() -> list[str]:
 
 def check() -> tuple[str, ...]:
     findings: list[str] = []
-    if not WORKFLOW.is_file():
-        findings.append("missing PR automation workflow")
+    workflow = WORKFLOW if WORKFLOW.is_file() else ARCHIVED_WORKFLOW
+    if not workflow.is_file():
+        findings.append("missing PR automation workflow (active or archived)")
     else:
         findings.extend(
-            _workflow_findings(WORKFLOW.read_text(encoding="utf-8"))
+            _workflow_findings(workflow.read_text(encoding="utf-8"))
         )
 
     if not LEGACY_RUNNER.is_file():

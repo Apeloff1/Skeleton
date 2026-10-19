@@ -43,11 +43,42 @@ def _terminal(execution_id: str) -> EngineTerminalResult:
     )
 
 
+class _TenantScopedInventoryFixture:
+    """Test clients implement the real tenant-scoped inventory boundary.
+
+    The engine no longer accepts unscoped provider_status as model-selection
+    authority. These fixtures provide a valid explicitly scoped hosted model;
+    negative inventory tests remain separate and fail closed.
+    """
+
+    async def tenant_model_inventory(self, *, actor_id: str, tenant_id: str):
+        assert actor_id and tenant_id
+        return {
+            "available": True,
+            "active": "openai",
+            "providers": [{
+                "id": "openai",
+                "model": "fixture-model",
+                "available": True,
+                "architecture_acknowledged": True,
+                "execution_mode": "hosted",
+                "credential_free": False,
+                "configured": True,
+                "context_window": 8192,
+                "max_output_tokens": 4096,
+                "default_output_tokens": 1024,
+                "limits_source": "engine_chat_policy",
+                "tokenizer": "approximate_text",
+                "capabilities": ["text-generation"],
+                "supports_temperature": True,
+            }],
+        }
+
 @pytest.mark.asyncio
 async def test_engine_text_compiles_bounded_tool_free_command() -> None:
     captured = []
 
-    class FakeClient:
+    class FakeClient(_TenantScopedInventoryFixture):
         config = EngineClientConfig(
             base_url="http://skeleton:8001",
             service_principal="codedock-backend",
@@ -130,7 +161,7 @@ async def test_engine_text_compiles_bounded_tool_free_command() -> None:
 async def test_engine_text_retry_rebuilds_stable_semantic_identity() -> None:
     captured = []
 
-    class FakeClient:
+    class FakeClient(_TenantScopedInventoryFixture):
         config = EngineClientConfig(
             base_url="http://skeleton:8001",
             service_principal="codedock-backend",
@@ -178,7 +209,7 @@ async def test_engine_text_retry_rebuilds_stable_semantic_identity() -> None:
 
 @pytest.mark.asyncio
 async def test_engine_text_normalizes_transport_failure_without_secret() -> None:
-    class OfflineClient:
+    class OfflineClient(_TenantScopedInventoryFixture):
         config = EngineClientConfig(
             base_url="http://skeleton:8001",
             execution_timeout_s=5,
@@ -275,7 +306,7 @@ async def test_engine_text_privacy_denial_is_sanitized(monkeypatch) -> None:
 async def test_engine_text_projects_evidence_as_untrusted_context_not_prompt() -> None:
     captured = []
 
-    class FakeClient:
+    class FakeClient(_TenantScopedInventoryFixture):
         config = EngineClientConfig(
             base_url="http://skeleton:8001",
             service_principal="codedock-backend",

@@ -111,7 +111,7 @@ const CONFIG: Config = {
 interface CacheEntry { body: any; status: number; expiresAt: number }
 const _cache = new Map<string, CacheEntry>();
 const _inflight = new Map<string, Promise<any>>();
-const _offlineQueue: Array<() => Promise<any>> = [];
+const _offlineQueue: (() => Promise<any>)[] = [];
 
 const _telemetry: TelemetrySnapshot = {
   totalRequests: 0, inFlight: 0, successes: 0, failures: 0, retries: 0,
@@ -226,7 +226,8 @@ _rehydrateCache(); // fire-and-forget at module load
 let _isOnline = true;
 let _netInfo: any = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // Optional native module is synchronously detected at runtime.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   _netInfo = require('@react-native-community/netinfo')?.default ?? null;
   if (_netInfo?.addEventListener) {
     _netInfo.addEventListener((state: any) => {

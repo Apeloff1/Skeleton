@@ -1,0 +1,58 @@
+{
+  "observations": [
+    {
+      "operation": "api-capability-atlas",
+      "http_status": 200,
+      "digest": "fa20f2c9ff7298e26ab6fc9c32b297c33cbf25baafc14185299952723b7ba923",
+      "error": null
+    },
+    {
+      "operation": "api-current-catalog-read",
+      "http_status": 200,
+      "digest": "f8d71c97e6672c3fecc4622da78810047e6fe5afc98f5e19439b45143c28e0f2",
+      "error": null
+    },
+    {
+      "operation": "api-stale-catalog-refusal",
+      "http_status": 400,
+      "digest": null,
+      "error": "capability catalog changed; refresh before execution"
+    },
+    {
+      "operation": "api-session-is-not-confirmation",
+      "http_status": 403,
+      "digest": null,
+      "error": "operator authorization is required for this capability"
+    },
+    {
+      "operation": "api-duplicate-json-refusal",
+      "http_status": 400,
+      "digest": null,
+      "error": "malformed local editor JSON"
+    },
+    {
+      "operation": "api-nonfinite-json-refusal",
+      "http_status": 400,
+      "digest": null,
+      "error": "malformed local editor JSON"
+    },
+    {
+      "operation": "api-structural-budget-refusal",
+      "http_status": 400,
+      "digest": null,
+      "error": "action data exceeds structural limits"
+    },
+    {
+      "operation": "api-fourteen-field-native-art-proposal",
+      "http_status": 200,
+      "digest": "5464ebb38845c90c65eb50ff9c5bf25b257f3afbf9549d861d1085948e7df258",
+      "error": null
+    }
+  ],
+  "native_argument_count": 14,
+  "catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+  "native_source_sha256": "8900eff68702a40cf41225a6ba6ac46b5068b9b5d3b39ecb249f99c80681150b",
+  "source_committed": false,
+  "model_calls_performed": 0,
+  "automated_test_suite": false
+}

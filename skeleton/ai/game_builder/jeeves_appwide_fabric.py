@@ -10,15 +10,15 @@ forge, crawler, editor, AI, shell, dragon, frontend and module families.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from hashlib import sha256
 import difflib
 import json
 import os
-from pathlib import Path
-from collections import Counter
 import re
 import stat
+from collections import Counter
+from dataclasses import dataclass
+from hashlib import sha256
+from pathlib import Path
 
 SCHEMA = "skeleton.ai.jeeves_appwide_inventory.v1"
 ACTION_SCHEMA = "skeleton.ai.jeeves_appwide_action_receipt.v1"
@@ -28,6 +28,7 @@ MAX_PATCH = 120_000
 MAX_QUERY = 180
 MAX_PAGE = 100
 MAX_DEPTH = 32
+MAX_SCAN_ENTRIES = 400_000
 FORBIDDEN_NAMES = frozenset({
     ".git", ".hg", ".svn", "__pycache__", ".pytest_cache",
     ".mypy_cache", ".ruff_cache", ".tox", ".venv", "venv",
@@ -36,7 +37,7 @@ FORBIDDEN_NAMES = frozenset({
 PRIVATE = re.compile(
     r"(?:^|[./_-])(?:\.env|credentials|password|private|secret|"
     r"token|api[_-]?key|oauth|session|cookie|ssh|vault|id_rsa|id_ed25519|\.pem|\.key|\.p12)(?:$|[./_-])",
-    re.I)
+    re.IGNORECASE)
 INVENTORY_ROOTS = (
     "skeleton", "backend", "frontend", "apps", "docs",
     "tests", "scripts", "tools", "packages", "satellites",
@@ -108,6 +109,12 @@ def _kind(path):
     return "resource"
 
 
+def _file_identity(status):
+    """Local freshness fence, distinct from the source content digest."""
+    return (status.st_dev, status.st_ino, status.st_size,
+            status.st_mtime_ns, status.st_ctime_ns)
+
+
 @dataclass(frozen=True)
 class Entry:
     path: str
@@ -116,6 +123,7 @@ class Entry:
     domains: tuple[str,...]
     readable: bool
     executable_adapter_bound: bool = False
+    file_identity: tuple[int, ...] | None = None
 
     def payload(self):
         return {"path":self.path,"bytes":self.bytes,"kind":self.kind,
@@ -143,13 +151,21 @@ class AppwideInventory:
         files={}
         blocked={}
         stack=[(self.root,0)]
+        inspected = 0
         while stack:
             directory,depth=stack.pop()
             if depth>MAX_DEPTH:
                 blocked[directory.relative_to(self.root).as_posix()]="max_depth"
                 continue
             try:
-                rows=sorted(os.scandir(directory),key=lambda x:x.name)
+                rows = []
+                with os.scandir(directory) as iterator:
+                    for item in iterator:
+                        inspected += 1
+                        if inspected > MAX_SCAN_ENTRIES:
+                            raise JeevesAppwideError("inventory entry budget exceeded")
+                        rows.append(item)
+                rows.sort(key=lambda x:x.name)
             except OSError:
                 blocked[directory.relative_to(self.root).as_posix()]="unreadable_directory"
                 continue
@@ -168,6 +184,9 @@ class AppwideInventory:
                     blocked[rel]="symlink_not_followed"
                     continue
                 if stat.S_ISDIR(attrs.st_mode):
+                    if PRIVATE.search(rel):
+                        blocked[rel]="private_runtime_subtree"
+                        continue
                     stack.append((path,depth+1))
                     continue
                 if not stat.S_ISREG(attrs.st_mode):
@@ -179,11 +198,14 @@ class AppwideInventory:
                 private=bool(PRIVATE.search(rel))
                 files[rel]=Entry(rel,attrs.st_size,_kind(rel),
                                  tuple(_classification(rel)),
-                                 not private)
+                                 not private, file_identity=_file_identity(attrs))
         self._files=dict(sorted(files.items()))
         self._blocked=dict(sorted(blocked.items()))
-        self._digest=digest([[x.path,x.bytes,x.kind,x.readable]
-                             for x in self._files.values()])
+        self._digest=digest({
+            "files": [[x.path,x.bytes,x.kind,x.readable,list(x.file_identity)]
+                      for x in self._files.values()],
+            "blocked": self._blocked,
+        })
         return self.report()
 
     def _require_scanned(self):
@@ -204,6 +226,8 @@ class AppwideInventory:
             "domains":dict(sorted(domains.items())),
             "root_counts":dict(sorted(roots.items())),
             "snapshot_digest":self._digest,
+            "snapshot_identity_kind":"local_metadata_and_file_freshness_fence",
+            "snapshot_is_full_content_digest":False,
             "visible_regular_files_discoverable":True,
             "excluded_and_unreadable_paths_are_not_executable":True,
             "all_files_executable":False,
@@ -262,6 +286,8 @@ class AppwideInventory:
                 raise JeevesAppwideError("repository file changed after scan") from exc
             if stat.S_ISLNK(status.st_mode):
                 raise JeevesAppwideError("symlink/subtree swap blocked")
+        if not stat.S_ISREG(status.st_mode) or _file_identity(status) != e.file_identity:
+            raise JeevesAppwideError("source identity changed since inventory scan")
         try:
             if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
                 flags=os.O_RDONLY | os.O_NOFOLLOW
@@ -275,7 +301,11 @@ class AppwideInventory:
                         handles.append(current)
                     fd=os.open(pieces[-1],flags,dir_fd=current)
                     with os.fdopen(fd,"rb") as stream:
+                        if _file_identity(os.fstat(stream.fileno())) != e.file_identity:
+                            raise JeevesAppwideError("source replaced after inventory scan")
                         data=stream.read(max_size+1)
+                        if _file_identity(os.fstat(stream.fileno())) != e.file_identity:
+                            raise JeevesAppwideError("source changed during bounded read")
                 finally:
                     for fd in reversed(handles):
                         os.close(fd)
@@ -285,7 +315,11 @@ class AppwideInventory:
                 if target.resolve(strict=True).is_relative_to(self.root) is False:
                     raise JeevesAppwideError("unsafe changed source junction")
                 with target.open("rb") as stream:
+                    if _file_identity(os.fstat(stream.fileno())) != e.file_identity:
+                        raise JeevesAppwideError("source replaced after inventory scan")
                     data=stream.read(max_size+1)
+                    if _file_identity(os.fstat(stream.fileno())) != e.file_identity:
+                        raise JeevesAppwideError("source changed during bounded read")
         except OSError as exc:
             raise JeevesAppwideError("source file unreadable or symlink swapped") from exc
         if len(data)>max_size or len(data)!=e.bytes:
@@ -302,6 +336,7 @@ class AppwideInventory:
             "path":path,"content":content,
             "sha256":sha256(content.encode("utf-8")).hexdigest(),
             "inventory_snapshot":self._digest,
+            "inventory_is_content_attestation":False,
             "read_only":True,
         }
         return result
@@ -370,13 +405,46 @@ OPERATIONS = {
     "game.compile.original":("compute", "bounded replay-verified browser game compiler",True),
     "game.compile.native":("compute", "bounded original game plus native source compiler",True),
     "game.mirror.review":("compute", "adversarial original game replay and source mirror",True),
-    "system.triad":("compute", "Jeeves, Dragon, and adversarial connection of every game-builder part",True),
+    "system.triad":("compute", "bounded deterministic gameplay, assets, music and reference-integrity role exercise",True),
     "companion.simulate":("compute", "consent-bound Dragon state machine rehearsal",False),
     "crawler.catalog":("read", "existing source workers and acquisition state",False),
     "tool.fabric":("read", "native canonical tool contract and executor status",False),
     "tool.plan":("proposal", "finite typed operator-supervised tool plan",True),
     "model.improvement":("proposal", "shadow-model and code change review plan",False),
 
+}
+
+# Required and optional fields for adapters that consume arguments themselves.
+# Canonical production adapters retain their own stricter typed contracts.
+_PARAMETERS = {
+    "inventory.report": ((), ()),
+    "inventory.search": ((), ("query", "domain", "offset", "limit", "expected_snapshot")),
+    "ai.contracts": (("paths",), ("expected_snapshot", "expected_sources")),
+    "ai.impact": (("paths", "changed"), ("expected_snapshot",)),
+    "ai.context": (("paths", "query"), ("budget_chars", "limit", "expected_snapshot")),
+    "ai.duplicates": (("paths",), ("expected_snapshot", "threshold")),
+    "ai.completion": ((), ("expected_snapshot",)),
+    "ai.deathmarch": ((), ("offset", "limit", "expected_report_digest", "expected_snapshot")),
+    "source.inspect": (("path",), ()),
+    "source.propose": (("path", "expected_sha256", "replacement", "reason"), ()),
+    "editor.catalog": ((), ()),
+    "editor.preview": (("editor",), ("settings",)),
+    "editor.template": (("editor",), ("settings",)),
+    "forge.tools": ((), ("actor", "phase")),
+    "director.rpg": (("scene",), ("settings", "max_nodes")),
+    "director.world": (("scene",), ("settings", "max_states")),
+    "studio.tree": (("project",), ()),
+    "studio.file": (("project", "path"), ()),
+    "studio.propose": (("project", "path", "text", "expected_sha256", "reason"), ()),
+    "studio.assembly": (("project",), ()),
+    "jeeves.work_order": (("project", "prompt"), ("cast", "region", "act", "scene")),
+    "jeeves.chapter_chat": (("project", "prompt"),
+                            ("session", "cast", "region", "act", "scene")),
+    "system.triad": ((), ("seed", "mirror_attempts")),
+    "crawler.plan": ((), ("regimes", "bias_rows", "contradiction_rows",
+                           "uncertainty_by_regime", "limit")),
+    "companion.visual": (("event_kind",), ()),
+    "learning.improvement_proposal": (("path", "replacement", "reason", "evidence"), ()),
 }
 
 
@@ -390,30 +458,69 @@ class JeevesAppwideRuntime:
         self.workspace=workspace
 
     def catalog(self):
+        from .jeeves_app_runtime import capability_catalog
+        canonical_catalog = capability_catalog()
+        canonical_actions = {row["id"]:row for row in canonical_catalog["actions"]}
+        adapters = []
+        for name, row in sorted(OPERATIONS.items()):
+            if name in _PARAMETERS:
+                required, optional = _PARAMETERS[name]
+            else:
+                contract = canonical_actions[name]
+                required = ("project", *contract["required_parameters"])
+                optional = contract["optional_parameters"]
+            adapters.append({"name":name,"effect":row[0],"scope":row[1],
+                             "operator_gate":row[2],
+                             "required_parameters":list(required),
+                             "optional_parameters":list(optional)})
+        catalog_digest = digest({
+            "canonical_catalog_digest": canonical_catalog["digest"],
+            "registered_adapters": adapters,
+        })
         evidence={
             "schema":"skeleton.ai.jeeves_operational_surface.v1",
+            "catalog_digest":catalog_digest,
+            "canonical_catalog_digest":canonical_catalog["digest"],
+            "catalog_source_owners":canonical_catalog["source_owners"],
             "inventory_digest":self.inventory._digest,
             "files_known":len(self.inventory._files),
-            "registered_adapters":[{
-                "name":name,"effect":row[0],"scope":row[1],
-                "operator_gate":row[2],
-            } for name,row in sorted(OPERATIONS.items())],
+            "registered_adapters":adapters,
             "registered_action_count":len(OPERATIONS),
             "unregistered_code_execution_denied":True,
             "application_wide_edit_permissions_inherited":False,
         }
         return {**evidence,"digest":digest(evidence)}
 
-    def invoke(self,action,params=None,*,authorized=False):
+    def invoke(self,action,params=None,*,authorized=False,
+               expected_catalog_digest=None, expected_inventory_digest=None):
         if type(action) is not str or action not in OPERATIONS:
             raise JeevesAppwideError("no reviewed adapter for requested action")
         if type(params) is not dict:
             raise JeevesAppwideError("typed action parameters required")
+        if type(authorized) is not bool:
+            raise JeevesAppwideError("explicit boolean operator intent required")
         operation=OPERATIONS[action]
         if operation[2] and authorized is not True:
             raise PermissionError("explicit operator confirmation required")
         inv=self.inventory
         ws=self.workspace
+        catalog = self.catalog()
+        if (expected_catalog_digest is not None
+                and expected_catalog_digest != catalog["catalog_digest"]):
+            raise JeevesAppwideError("capability catalog changed; refresh before invocation")
+        if (expected_inventory_digest is not None
+                and expected_inventory_digest != inv._digest):
+            raise JeevesAppwideError("inventory changed; refresh before invocation")
+        from .jeeves_app_runtime import _bounded_arguments
+        try:
+            params = _bounded_arguments(params)
+        except ValueError as exc:
+            raise JeevesAppwideError("bounded finite action parameters required") from exc
+        if action in _PARAMETERS:
+            required, optional = _PARAMETERS[action]
+            if not set(required) <= set(params) or set(params) - set(required) - set(optional):
+                raise JeevesAppwideError("missing or unsupported parameters for " + action)
+        input_digest = digest(params)
         project=params.get("project")
         if action=="inventory.report":
             result=inv.report()
@@ -450,13 +557,13 @@ class JeevesAppwideRuntime:
             from .system_editors import preview_editor
             result=preview_editor(params["editor"],params.get("settings"))
         elif action=="editor.template":
-            from .system_editors import make_editor_document,editor_path
+            from .system_editors import editor_path, make_editor_document
             name=params["editor"]
             result={"path":editor_path(name),
                     "document":make_editor_document(name,params.get("settings")),
                     "staged":False,"requires_approval":True}
         elif action=="forge.tools":
-            from .studio_tool_fabric import ToolFabric,Actor,Phase
+            from .studio_tool_fabric import Actor, Phase, ToolFabric
             who=Actor(params.get("actor","jeeves"))
             phase=Phase(params.get("phase","original"))
             result={"actor":who.value,"phase":phase.value,
@@ -516,15 +623,18 @@ class JeevesAppwideRuntime:
             "crawler.catalog","tool.fabric","tool.plan","model.improvement"):
             if ws is None or project != ws.active():
                 raise JeevesAppwideError("active project needed for production adapters")
-            from .jeeves_app_runtime import dispatch_app_action
             from .jeeves_app_runtime import ACTIONS as canonical_actions
+            from .jeeves_app_runtime import dispatch_app_action
             require_canonical = canonical_actions[action][3]
             if require_canonical and not authorized:
                 raise PermissionError("reviewed production operation requires approval")
             # The existing typed dispatcher remains the single actual
             # compiler/forge/companion executor; no substitute stack.
             underlying=dispatch_app_action(
-                ws,project,action,params,authorized=authorized)
+                ws,project,action,
+                {key:value for key,value in params.items() if key != "project"},
+                authorized=authorized,
+                expected_catalog_digest=catalog["canonical_catalog_digest"])
             result={
                 "canonical_adapter":action,
                 "canonical_receipt_digest":underlying["digest"],
@@ -545,8 +655,9 @@ class JeevesAppwideRuntime:
                 uncertainty_by_regime=params.get("uncertainty_by_regime"),
                 limit=params.get("limit",10))],"crawl_started":False}
         elif action=="companion.visual":
-            from ..webcrawler.dragon_visual_state import visual_state
             from types import SimpleNamespace
+
+            from ..webcrawler.dragon_visual_state import visual_state
             event=params.get("event_kind")
             if type(event) is not str or event not in (
                 "frontier_discovered","dragon_travel","visual_probe",
@@ -584,10 +695,17 @@ class JeevesAppwideRuntime:
             }
         else:
             raise JeevesAppwideError("unreachable tool routing state")
+        if digest(params) != input_digest:
+            raise JeevesAppwideError("adapter changed its frozen request parameters")
+        if self.catalog()["catalog_digest"] != catalog["catalog_digest"]:
+            raise JeevesAppwideError("capability source changed during invocation")
         body={
             "schema":ACTION_SCHEMA,"action":action,
+            "catalog_digest":catalog["catalog_digest"],
+            "canonical_catalog_digest":catalog["canonical_catalog_digest"],
+            "catalog_pin_requested":expected_catalog_digest is not None,
             "effect":operation[0],
-            "input_digest":digest(params),
+            "input_digest":input_digest,
             "inventory_digest":inv._digest,
             "result":result,
             "read_only_or_review_only":action not in ("studio.propose",) and

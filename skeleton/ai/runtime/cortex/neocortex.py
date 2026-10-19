@@ -805,6 +805,33 @@ class JeevesCortex:
         self._seal = seal
         return seal
 
+    def speculative_speak(self, stimulus: str, *, n: int = 8, proposals: int = 4) -> Dict[str, Any]:
+        """Draft with the RMS mouth and publish only the speaking mouth's greedy ids."""
+        from skeleton.cortex.speculative import greedy_speculative
+        from skeleton.cortex.transformer import UNK
+
+        verifier = self.transformer
+        draft = getattr(self, "neo_rms", None)
+        if verifier is None or draft is None:
+            raise CortexError("speculative speak requires the speaking mouth and the RMS mouth")
+        if int(verifier.V) != int(draft.V) or list(verifier.itos) != list(draft.itos):
+            raise CortexError("speculative mouths must share a vocabulary")
+        ids = verifier._ids(stimulus or "") or [verifier.unk]
+        published, result = greedy_speculative(verifier, draft, ids, n, proposals=proposals)
+        return {
+            "text": " ".join(
+                verifier.itos[token] if 0 <= token < len(verifier.itos) else UNK
+                for token in published
+            ),
+            "token_ids": list(published),
+            "proposed": result.proposed,
+            "accepted_draft_tokens": result.accepted_count,
+            "acceptance_rate": result.acceptance_rate,
+            "weights_changed": False,
+            "authoritative_mouth": "transformer",
+            "draft_mouth": "neo_rms",
+        }
+
     def speak(self, stimulus: str, *, n: int = 12, seed: int = 0, mouth: str = "gelu") -> str:
         xf = self.mouth(mouth)
         if xf is None:

@@ -15,15 +15,15 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionResult
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
-from skeleton.kernel.runtime_supervision import (
-    RuntimeServiceLifecycle,
-    RuntimeSupervisionError,
-    WorkLease,
-)
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     FinalizationBindingHook,
     VerificationHook,
+)
+from skeleton.kernel.runtime_supervision import (
+    RuntimeServiceLifecycle,
+    RuntimeSupervisionError,
+    WorkLease,
 )
 from skeleton.provider_runtime import (
     AIMessage,
@@ -406,12 +406,28 @@ class EngineExecutionCoordinator:
             else None
         )
 
+        from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+        cooperative_adapters = {}
+        cooperation = normalize_cooperation_policy(command.execution_request.context_policy.get("cooperation"))
+        if cooperation is not None:
+            try:
+                for role, selection in cooperation["roles"].items():
+                    role_context = dict(command.execution_request.context_policy)
+                    role_context["provider_selection"] = dict(selection)
+                    role_context.pop("provider_model", None)
+                    cooperative_adapters[role] = self.provider_registry.require_for_context(role_context)
+            except ProviderUnavailableError:
+                await self._finalize_failure(execution_id, "cooperative_provider_unavailable")
+                return
+
         runtime = CognitiveExecutionRuntime(
             self.service.repository,
             provider,
             self.tool_runtime,
             verification_hook=self.verification_hook,
             semantic_verification_adapter=semantic_verification_adapter,
+            cooperative_adapters=cooperative_adapters,
             finalization_binding_hook=self.finalization_binding_hook,
             storage_meter=(
                 lambda resource_id, write_id, payload, meter_now=None: (

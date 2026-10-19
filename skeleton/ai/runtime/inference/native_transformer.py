@@ -1,4 +1,5 @@
 """Adapter from Skeleton's repository-owned transformer to local inference."""
+
 from __future__ import annotations
 
 import hashlib
@@ -6,7 +7,11 @@ import json
 import threading
 import time
 
-from skeleton.ai.model_runtime import GenerationConfig, NativeLLMRuntime, RuntimeContractError
+from skeleton.ai.model_runtime import (
+    GenerationConfig,
+    NativeLLMRuntime,
+    RuntimeContractError,
+)
 
 from .local import (
     LocalInferenceCancelled,
@@ -20,26 +25,20 @@ from .local import (
 class NativeTransformerModel:
     """Expose NativeLLMRuntime through the canonical LocalModelBackend contract."""
 
-    def __init__(
-        self,
-        runtime: NativeLLMRuntime,
-        *,
-        model_id: str = "skeleton-native-transformer",
-        backup_runtime: NativeLLMRuntime | None = None,
-    ) -> None:
+    model_family = "native_transformer"
+    protocol_capabilities = ("text-generation",)
+    tokenizer_kind = "native_tokenizer"
+
+    def __init__(self, runtime: NativeLLMRuntime, *, model_id: str = "skeleton-native-transformer") -> None:
         if not isinstance(runtime, NativeLLMRuntime):
             raise TypeError("runtime must be NativeLLMRuntime")
-        if backup_runtime is not None and not isinstance(backup_runtime, NativeLLMRuntime):
-            raise TypeError("backup_runtime must be NativeLLMRuntime or None")
         if not isinstance(model_id, str) or not model_id.strip():
             raise ValueError("model_id must be non-empty")
         self.runtime = runtime
-        self.backup_runtime = backup_runtime
         self.model_id = model_id.strip()
         self._model_digest = runtime.model_digest
         self._tokenizer_digest = runtime.tokenizer.digest
         self._runtime_digest = self._compute_runtime_digest()
-        self._backup_failover_count = 0
 
     @property
     def model_digest(self) -> str:
@@ -47,11 +46,15 @@ class NativeTransformerModel:
 
     @property
     def runtime_digest(self) -> str:
+        self._assert_identity()
         return self._runtime_digest
 
-    @property
-    def backup_failover_count(self) -> int:
-        return self._backup_failover_count
+    def assert_identity(self) -> None:
+        self._assert_identity()
+
+    def count_input_tokens(self, request: LocalInferenceRequest) -> int:
+        self._assert_identity()
+        return len(self.runtime.encode(request.rendered_input).token_ids)
 
     def _compute_runtime_digest(self) -> str:
         payload = {
@@ -95,84 +98,43 @@ class NativeTransformerModel:
         if cancel.is_set():
             raise LocalInferenceCancelled("local generation cancelled")
 
+        self._assert_identity()
+        prompt = request.rendered_input
+        prompt_sequence = self.runtime.encode(prompt)
         started = time.perf_counter()
-        default_policy = (
-            request.temperature == 1.0
-            and request.top_k == 0
-            and request.top_p == 1.0
-            and request.min_p == 0.0
-            and request.repetition_penalty == 1.0
-        )
-        config = (
+
+        def interrupt() -> None:
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local generation cancelled")
+
+        stream = self.runtime.stream(
+            prompt,
             GenerationConfig(
                 max_new_tokens=request.max_output_tokens,
                 seed=request.seed,
                 temperature=0.0,
                 use_cache=True,
-            )
-            if default_policy
-            else GenerationConfig(
-                max_new_tokens=request.max_output_tokens,
-                seed=request.seed,
-                temperature=request.temperature,
-                top_k=request.top_k,
-                top_p=request.top_p,
-                min_p=request.min_p,
-                repetition_penalty=request.repetition_penalty,
-                use_cache=True,
-            )
+            ),
+            interrupt=interrupt,
         )
-        prompt = request.rendered_input
-        prompt_sequence: tuple[int, ...] = ()
-        stream = None
-        result = None
-        active_runtime = self.runtime
-        try:
-            self._assert_identity()
-            prompt_sequence = self.runtime.encode(prompt)
-            stream = self.runtime.stream(
-                prompt,
-                config,
-            )
+        with stream:
             for _event in stream:
-                if cancel.is_set():
-                    raise LocalInferenceCancelled("local generation cancelled")
-            result = stream.result
-            if result is None:
-                raise RuntimeError("native transformer completed without a terminal result")
-            self._assert_identity()
-        except LocalInferenceCancelled:
-            raise
-        except Exception:
-            if self.backup_runtime is None:
-                raise
-            self.backup_runtime.tokenizer.assert_unchanged()
-            self.backup_runtime.assert_model_unchanged()
-            active_runtime = self.backup_runtime
-            prompt_sequence = self.backup_runtime.encode(prompt)
-            b_stream = self.backup_runtime.stream(prompt, config)
-            for _event in b_stream:
-                if cancel.is_set():
-                    raise LocalInferenceCancelled("local generation cancelled")
-            result = b_stream.result
-            if result is None:
-                raise RuntimeError("backup native transformer completed without a terminal result")
-            self._backup_failover_count += 1
+                interrupt()
+        result = stream.result
+        if result is None:
+            raise RuntimeError("native transformer completed without a terminal result")
+        self._assert_identity()
 
         text = result.text
         output_tokens = len(result.generated_ids)
         finish_reason = (
-            result.finish_reason
-            if result.finish_reason in {"completed", "length"}
-            else "completed"
+            result.finish_reason if result.finish_reason in {"completed", "length"} else "completed"
         )
         stop_index = self._first_stop_index(text, request.stop)
         if stop_index is not None:
             text = text[:stop_index]
-            # String stops are a compatibility surface above token generation.
-            # Re-tokenize the published prefix so usage and response identity
-            # describe exactly the content returned to the caller.
-            output_tokens = 0 if not text else len(active_runtime.tokenizer.encode_ids(text))
+            # Usage accounts for actual generation work, including a stop
+            # delimiter that is withheld from the published text.
             finish_reason = "completed"
 
         published_digest = hashlib.sha256(
@@ -213,10 +175,9 @@ def build_native_transformer_adapter(
     model_id: str = "skeleton-native-transformer",
     cache_size: int = 128,
     default_seed: int = 0,
-    backup_runtime: NativeLLMRuntime | None = None,
 ) -> LocalModelAdapter:
     """Build the canonical provider-neutral adapter for the owned transformer."""
-    backend = NativeTransformerModel(runtime, model_id=model_id, backup_runtime=backup_runtime)
+    backend = NativeTransformerModel(runtime, model_id=model_id)
     engine = LocalInferenceEngine(backend, cache_size=cache_size)
     return LocalModelAdapter(
         engine,
@@ -228,7 +189,6 @@ def build_native_transformer_adapter(
             "tokenizer_digest": runtime.tokenizer.digest,
             "architecture_digest": runtime.architecture.digest,
             "device": runtime.device.to_dict(),
-            "has_backup_runtime": backup_runtime is not None,
         },
     )
 

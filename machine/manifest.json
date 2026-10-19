@@ -807,7 +807,7 @@
       "qualification": "manifest admission is not trained-model or runtime qualification"
     },
     "session_adapter": "skeleton/app/local_ai.py",
-    "runtime_status_projection": "frontend/features/Jeeves/JeevesRuntimeStatus.tsx reads existing /api/ai/providers and /api/jeeves/free-tier; never selects a provider",
+    "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx reads existing /api/ai/chat/readiness; never executes or selects a provider",
     "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred"
   }
 }

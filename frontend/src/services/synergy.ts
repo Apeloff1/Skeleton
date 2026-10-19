@@ -52,9 +52,9 @@ export interface UserContext {
       engagement: number;
       preferred_pace: string;
     };
-    recent_interactions: Array<{ type: string; topic: string }>;
+    recent_interactions: { type: string; topic: string }[];
   };
-  recommendations?: Array<Record<string, any>>;
+  recommendations?: Record<string, any>[];
   insights?: {
     total_ai_interactions: number;
     interactions_this_week: number;
@@ -94,7 +94,7 @@ export interface DashboardData {
     avg_stress_level: number;
     pomodoro_sessions: number;
   };
-  recommendations: Array<Record<string, any>>;
+  recommendations: Record<string, any>[];
 }
 
 class SynergyService {

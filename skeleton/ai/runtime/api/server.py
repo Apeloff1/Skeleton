@@ -65,6 +65,7 @@ class ServerState:
         self.swarm_tenant_broker: Optional[Any] = None
         self.health: Optional[Any] = None
         self.metrics: Optional[Any] = None
+        self.realtime_hub: Optional[Any] = None
         self.cockpit: Optional[Any] = None
         self.npc_pipeline: Optional[Any] = None
         self.game_logic_pipeline: Optional[Any] = None
@@ -1013,6 +1014,43 @@ def _gate_body_limits() -> tuple[tuple[str, int], ...]:
     )
 
 
+def _bind_realtime(app: Any, state: Any) -> None:
+    """Wire the realtime hub into observability and the jobs fan-out.
+
+    * SLO samples flow into the existing ``ServerState.metrics`` collector
+      (served by ``/api/v1/metrics``) under ``realtime.*``.
+    * If app services (#4097) are mounted, the hub subscribes to the shared
+      ``AppServices.events`` FanOutPublisher via a ``JobEventPublisher``
+      sink. Without them this is a no-op, so either PR can merge first.
+    """
+    from skeleton.realtime import HubJobEventSink, attach_hub
+
+    hub = getattr(app.state, "realtime_hub", None)
+    if hub is None:
+        return
+    hub.slo.bind_sink(getattr(state, "metrics", None))
+    state.realtime_hub = hub
+    hub.start()
+    sink = HubJobEventSink(hub)
+    app.state.realtime_job_sink = sink
+    services = getattr(app.state, "app_services", None) or getattr(state, "app_services", None)
+    if getattr(app.state, "realtime_unsubscribe", None) is None:
+        app.state.realtime_unsubscribe = attach_hub(getattr(services, "events", None), sink)
+
+
+async def _close_realtime(app: Any) -> None:
+    unsubscribe = getattr(app.state, "realtime_unsubscribe", None)
+    if callable(unsubscribe):
+        try:
+            unsubscribe()
+        except Exception:
+            pass
+    app.state.realtime_unsubscribe = None
+    hub = getattr(app.state, "realtime_hub", None)
+    if hub is not None:
+        await hub.aclose()
+
+
 def create_app() -> Any:
     from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
 
@@ -1065,16 +1103,23 @@ def create_app() -> Any:
     app.include_router(engine_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
+    # Realtime transport (ADR-realtime-transport, #4101): canonical SSE stream
+    # GET /api/v1/events + POST /api/v1/presence, hub lifecycle owned here.
+    from skeleton.api.realtime_routes import router as realtime_router
+    from skeleton.realtime import RealtimeHub, sealed_principal_authorizer
+    # Hub default is deny-all; the gate-verified principal opens channels and
+    # per-event owner / job-grant checks decide delivery (Jenkins S1-1).
+    realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer)
+    app.state.realtime_hub = realtime_hub
+    app.state.realtime_unsubscribe = None
+    app.include_router(realtime_router, prefix="/api/v1")
+
     from skeleton.api.middleware import GatePolicy, install_gate
     gate_policy = GatePolicy(
         open_prefixes=_gate_open_prefixes(),
         body_limits=_gate_body_limits(),
     )
     install_gate(app, policy=gate_policy)
-    # #3622 follow-up (TD: create_app is the only HTTP entry): fold a registered
-    # agent_edge gateway in behind the same install_gate stack.
-    from skeleton.api.agent_edge_mount import install_registered_agent_edge
-    install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(
@@ -1100,11 +1145,13 @@ def create_app() -> Any:
         if _canonical_memory_mongo_configured():
             await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
+        _bind_realtime(app, state)
         runtime_lifecycle.mark_ready(reason="engine-recovery-complete")
 
     @app.on_event("shutdown")
     async def shutdown():
         runtime_lifecycle.begin_drain(reason="engine-fastapi-shutdown")
+        await _close_realtime(app)
         state = get_state()
         await state.close_canonical_memory_writer()
         await state.close_engine_execution_service()

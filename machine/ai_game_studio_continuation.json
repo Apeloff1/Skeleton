@@ -30,8 +30,8 @@
     "source_authority": "Current project/tree every step; all previous source/teacher dependencies reauthorized before model/context reuse; own committed edits recover only by exact issued editor receipt and committed source identity",
     "bounds": {
       "steps": 16,
-      "model_calls": 8,
-      "jobs": 4,
+      "model_calls": 16,
+      "jobs": 8,
       "grant_seconds": 3600,
       "goal_journal_bytes": 8388608,
       "planner_prompt_bytes": 262144,
@@ -42,7 +42,8 @@
       "goals_per_project": 64,
       "workflow_actions": 4,
       "renewal_requests": 64,
-      "model_attempts_per_decision": 3
+      "model_attempts_per_decision": 3,
+      "quality_follow_up_actions": 0
     },
     "idempotency": "Frozen canonical model prompt/key and exact typed action/key persisted before dispatch; completed advance/control keys retained without eviction; retry of own edits checks exact application revision receipt",
     "stop": "Pause/cancel owner-only including withdrawn-source projects, at already-issued operation boundary; expiry checked before model and before next action",
@@ -55,7 +56,7 @@
     "journal_integrity": "V2 journals bind immutable initial intent/grants and exact contiguous decision/action/outcome receipt hashes, history chain and sealed state digest. Legacy v1 remains explicit unverified/read-only inspection; no silent migration or fabricated historical checks. Privileged complete valid history rewriting is outside unsigned hash authority.",
     "recovery": "Explicit owner-scoped retry reuses frozen exact planner/action keys or resumes exact issued typed child work. A separately budgeted new canonical planner attempt requires authenticated terminal proof; 404/not-admitted/running/unconfigured observations retain the original key because delayed intake remains possible. No source/grant/model budget escalation.",
     "renewal": "Finite explicit expected-version/idempotent authorization renewal up to3600 seconds, bounded64 renewals; never reset model/action/job counters or alter original execution/edit grants.",
-    "workflow": "Optional strict planner workflow up to4 typed commands, sequentially checkpointed with actual child-job/play terminal joins; exact prior issued receipt identity references are data, never executable interpolation. No fabricated completion or automatic production authority.",
+    "workflow": "Optional strict planner workflow up to4 typed commands for ordinary goals, sequentially checkpointed with actual child-job/play terminal joins; measured-quality goals constrain follow_up to empty and replan from actual evidence after each operation. Exact prior issued receipt references remain data, never executable interpolation. No fabricated completion or automatic production authority.",
     "interfaces": [
       "inspect",
       "list_goals",
@@ -67,7 +68,7 @@
       "catalog"
     ],
     "single_decision_compatibility": "Strict existing skeleton.game.studio_decision.v1 single-command response remains accepted within a freshly issued v2 goal; no v1 journal upgrade.",
-    "workflow_receipt_references": "Optional v2 follow_up (<=3) selects only granted typed operations. Fixed @receipt:tokens in identity fields resolve exclusively canonical goal last_job/last_play/current step output IDs/digests, never arbitrary object paths or strings/code. Every queued child joins actual terminal state before next command.",
+    "workflow_receipt_references": "Optional ordinary-goal v2 follow_up (<=3) selects only granted typed operations. Measured-quality goals require an empty follow_up array in grammar and owner validation. Fixed @receipt:tokens in identity fields resolve only canonical goal last_job/last_play/current-step output IDs/digests, never arbitrary paths/code. Every queued child joins actual terminal state before another command.",
     "prepared_mutation_recovery": "Exact console/world/champion typed operation, immutable request/save body, matching owned editor revision and current head are required. Prepared same-operation save retries reauthorize source/teacher/ancestor rights under original Dragon guard; time-only renewal can authorize frozen prepared metadata without publishing source.",
     "structured_planner": "Frozen validated response JSON schema flows only EngineChat.with_json_schema through canonical EngineText/context-policy/provider grammar. Actual text and deterministic operation/execution IDs are compared with authenticated canonical terminal proof before accepting decisions.",
     "goal_capacity": "Existing project keeps bounded idempotent goal reservation IDs; exact reservation+insert retry does not leak quota increments. Shared revision/storage limits remain unchanged.",
@@ -90,7 +91,20 @@
       "detach": "Shield bounded canonical EngineChat waiters on HTTP poll timeout; no additional provider boundary or background journal publisher. Reuse exact pending model key and call count. Actual canonical running/not-admitted/unknown remains pending; fresh attempts require terminal proof.",
       "create_replay": "Route preserves explicit max_output_tokens presence. Existing v2 missing-budget intents may replay only their exact original request body when new field is omitted, retaining original4096 grant/hash/counters. Explicit budget addition conflicts. Fresh goals default1024 only after historical prior lookup; new defaulted intents replay consistently."
     },
-    "structured_decision_consistency": "Provider grammar uses oneOf two complete object branches: done=false requires a granted string operation; done=true requires null operation and no nonempty follow_up. Existing strict host decision validation remains authoritative. Prior pending schemas/blocked receipts remain immutable."
+    "structured_decision_consistency": "Provider grammar uses oneOf two complete object branches: done=false requires a granted string operation; done=true requires null operation and no nonempty follow_up. Existing strict host decision validation remains authoritative. Prior pending schemas/blocked receipts remain immutable.",
+    "budget_defaults": {
+      "model_calls": 4,
+      "jobs": 2,
+      "steps": 8,
+      "max_output_tokens": 1024,
+      "authorization_seconds": 600
+    },
+    "foreground_continuation": {
+      "owner": "Existing frontend game-learning assistant and existing request-driven application goal owner",
+      "admission": "Explicit operator continuation control, current visible/focused route, same account/goal, unexpired finite authorization, ready/waiting status, no stop request/error, and live owner next_action/automatic_continuation_available hint",
+      "execution": "Serial version-fenced advances with bounded wait/backoff. GET inspection starts no planner work; a detached canonical planner joins through an advance retaining its exact original key. Actual terminal child status enables a join; interrupted children remain explicit operator recovery.",
+      "stop": "Pause/cancel/expiry/error/terminal state, account or goal change, hidden document or unfocused route stops browser continuation. No automatic authorization renewal, failed-model replacement, blocked-action retry or new scheduler."
+    }
   },
   "related_contracts": [
     "machine/ai_game_studio_review.json"
@@ -120,20 +134,101 @@
     "admission": "Original mode accepts an owned existing successor or ordinary base project; it rejects implicit canonical console-editor, studio-session or studio-rules conversion before goal admission. Creating/adopting an original requires explicit edit authorization. Existing source/teacher/lease/finite-budget authorities remain mandatory.",
     "creation": "Registered authored-profile identities and exact completed goal-issued candidate receipts are model-visible data. Synthesis and adoption use existing successor owners and successor-adopt prepared-edit recovery; each actual decision remains model-produced and owner-validated.",
     "proofs": "Current-head source-changing successor.adopt/world.edit; positive committed simulation steps/transitions and actual rendered frame bound to the exact current source; completed digest-checked current-source numerical review; actual current-source desktop binary_ready issuer with exact artifact identity; re-read source and matching desktop artifact export bytes. Creation/source emission/queued jobs never count as compiled packages.",
-    "refinement": "After an actual current-source review, authorized world.edit remains available before packaging. Any source change invalidates prior simulation/review/package/export checks and requires new current-head evidence. No forced arbitrary changes, automatic edits or subjective-quality certification.",
+    "refinement": "Ordinary original goals retain optional authorized world editing before packaging. Opt-in measured-quality goals establish an actual reference before candidate edits, freeze the admitted review protocol, require current-source simulation/review and measured acceptance before packaging/export, and consume finite refinement credits. Source changes invalidate downstream facts; rejected evidence and source checkpoints remain retained. No subjective-quality or production-promotion certification.",
     "scope": "Original simulation measures the registered source runtime, not execution of a desktop executable. Current desktop output is a compiled browser-rendered launcher; target execution, cartridge support, universal console coverage and subjective game quality are not certified by these facts.",
     "context": "Bounded host-observed registered profiles, actual desktop toolchain readiness, original spec identity/actions, remaining model/job grants and actual issued review findings/candidate/artifact identities are retained in new capacity-bound planner context. No model call is required merely to discover registered target IDs.",
-    "forms": "New structured decisions preserve every admitted owner operation and constraint, including exactly one or three synthesis sources, actual observed registered authored-profile IDs and mutually exclusive world changes/edits branches. Repeated identical nested owner schemas may share bounded acyclic decision-root definitions, keeping full inventory within the unchanged64KiB EngineChat serialization bound; compact prompt descriptions retain typed edit names while full forms enforce all constraints. No removal of unrelated tool functionality. Historical frozen schemas remain unchanged.",
+    "forms": "New structured decisions preserve every admitted owner operation and constraint, including exactly one or three synthesis sources, actual observed registered authored-profile IDs and mutually exclusive world changes/edits/restore_review_job_id branches. Repeated identical nested owner schemas may share bounded acyclic decision-root definitions, keeping full inventory within the unchanged64KiB EngineChat serialization bound; compact prompt descriptions retain typed edit names while full forms enforce all constraints. No removal of unrelated tool functionality. Historical frozen schemas remain unchanged.",
     "positive_simulation_stage_forms": "New ORIGINAL_SIMULATE decisions require the canonical simulation owner's positive bounded integer steps field and exclude the mutually exclusive action/actions alternatives. The model chooses the step count; the host never substitutes actions/counts. Ordinary/reset-only operations, native stages and every historical frozen prompt/schema/key remain unchanged. This is a stage requirement, not a change to the simulation owner API or goal budgets.",
     "stage_owner_identity_subsets": "New original-stage owner-form subsets and matching prompt forms retain canonical owner definitions/annotations and bounds. Fresh current-world simulation omits foreign source/session/reset/controller overrides and requires positive model-chosen steps; the first current-world review uses the canonical seeded controller with bounded numeric review options and omits unissued source/policy/baseline/actions. Desktop packaging offers only observed ready registered target IDs and uses the owner's default timeout. Adoption and package export permit only exact verified candidate/artifact identities from current context, with no unproven receipt-token alternative. General/native/no-stage forms, owner APIs, existing frozen requests and finite goal budgets remain unchanged.",
     "limits": {
       "requirements": 5,
       "steps": 16,
-      "model_calls": 8,
-      "jobs": 4
+      "model_calls": 16,
+      "jobs": 8
     },
     "runtime": "Existing EngineChat, workspace jobs/simulation, successor/review/desktop owners and typed tool facade only; no new runtime, provider, store or promotion authority.",
-    "validation": "Static source/schema checks and separately authorized genuine app operations only; no automated tests per user."
+    "validation": "Static source/schema checks and separately authorized genuine app operations only; no automated tests per user.",
+    "measured_quality": {
+      "status": "implementation_candidate",
+      "operator_guide": "docs/ai/STUDIO_MEASURED_QUALITY.md",
+      "policy_schema": "skeleton.game.studio_quality_policy.v1",
+      "progress_schema": "skeleton.game.studio_quality_progress.v1",
+      "admission": "Optional quality_gate on a new original run, requiring simulate and review completion requirements. restore_on_regression requires explicit allow_edits. Policy is normalized and sealed to the original idempotent intent/state. Omitting it preserves existing behavior and historical request digests.",
+      "policy": {
+        "baseline_review_job_id": {
+          "optional": true,
+          "authority": "Exact completed current-source same-project scoped original review with positive steps/frames and an issued authoring-comparison contract; no chained baseline"
+        },
+        "max_refinement_rounds": {
+          "minimum": 1,
+          "maximum": 4,
+          "default": 2
+        },
+        "min_available_frames": {
+          "minimum": 1,
+          "maximum": 25,
+          "default": 2
+        },
+        "min_executed_steps": {
+          "minimum": 1,
+          "maximum": 512,
+          "default": 1
+        },
+        "max_error_findings": {
+          "minimum": 0,
+          "maximum": 128,
+          "default": 0
+        },
+        "max_warning_findings": {
+          "minimum": 0,
+          "maximum": 128,
+          "default": 128
+        },
+        "require_no_regression": {
+          "default": true,
+          "strict_boolean": true
+        },
+        "restore_on_regression": {
+          "default": true,
+          "strict_boolean": true
+        }
+      },
+      "baseline": "If no explicit reference is supplied, the first completed positive original review issued in this goal becomes its deterministic pre-edit reference. Candidate edits are refused until it exists. Pin job/review/input/versioned-head/protocol identities plus a separate exact path/content-tree digest; the reference never silently advances to a candidate.",
+      "review_protocol": "After the reference, the host supplies its seed, episode length, capture interval and explicit/registered action controller for each candidate review. The model cannot select a favorable different workload or substitute a frozen policy. Same original-runtime action/observation/reward/workload contract and actual implementation identity must match.",
+      "acceptance": "Verify positive committed exact-current-source simulation and frame, completed current-source review, requested step/frame minima, configured observed error/warning maxima and a paired source_revision observation; reject measured regression when configured. Packaging/source/binary exports recheck these facts at dispatch as well as in planner guidance.",
+      "finite_recovery": "A candidate world.edit counts as a refinement round; exact incumbent restoration is separately labelled restore_incumbent and spends ordinary action/model grants. Before another candidate edit with restoration enabled, reserve capacity for simulation/review/restoration. Quality decisions have zero queued follow-ups and must replan after actual evidence. No counter reset, implicit grant increase, automatic renewal or hidden model attempt.",
+      "restoration": "After rejection and an explicit restoration grant, the model selects the sole permitted world.edit; the host substitutes only its pinned restore_review_job_id. Existing successor owner loads the actual completed scoped review with live authority, requires identical immutable identity/origins, emits the exact original spec including omitted optional fields, and uses ordinary versioned prepared-editor recovery. Complete path/content tree must match the reference; project/file revision counters remain monotonic. Pause/cancel/expiry/unavailable dependencies stop further work rather than applying a mutation afterward.",
+      "progress": {
+        "statuses": [
+          "baseline_required",
+          "candidate_required",
+          "accepted",
+          "rejected",
+          "unavailable"
+        ],
+        "fields": [
+          "policy_digest",
+          "project_id",
+          "project_version",
+          "head_digest",
+          "baseline",
+          "candidate",
+          "refinement_rounds",
+          "remaining_refinement_rounds",
+          "restorations",
+          "incumbent_source_restored",
+          "failures",
+          "regressions",
+          "verified",
+          "quality_certified",
+          "receipt_digest"
+        ],
+        "quality_certified": false,
+        "unavailable": "Inspection clears cached acceptance when current evidence or authority cannot be verified."
+      },
+      "historical_review_lessons": "At most4 completed same-project scoped review observations, at most4 findings and4 evidence refs per finding with bounded prose, may inform new original-goal context. Exact current source/reviewer matches are labelled applicable; older observations are historical constraints requiring fresh execution. Recheck input/review/citation identity and all live source/teacher/policy authority. Existing immutable jobs remain the only store; no model-weight-training authorization.",
+      "limits": "Original action/model/job/time grants and owner leases always dominate refinement maxima. Numerical acceptance never establishes subjective game quality, held-out generalization, target-OS execution, universal-console support or enterprise promotion."
+    }
   },
   "readiness_owners": {
     "application": "backend/core/game_studio_health.py",

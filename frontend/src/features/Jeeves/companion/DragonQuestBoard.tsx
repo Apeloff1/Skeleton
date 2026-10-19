@@ -11,7 +11,7 @@ import{
 
 const C={fg:'#f8fafc',muted:'#aab7ca',mint:'#86efac',gold:'#fbbf24',rose:'#f9a8d4',bg:'#111827'};
 type Icon=keyof typeof Ionicons.glyphMap;
-const skills:ReadonlyArray<{key:string;label:string;icon:Icon;color:string;detail:string}>=[
+const skills:readonly {key:string;label:string;icon:Icon;color:string;detail:string}[]=[
  {key:'research',label:'Research',icon:'telescope-outline',color:'#60a5fa',detail:'Reviewed knowledge'},
  {key:'game_design',label:'Design',icon:'shapes-outline',color:'#fda4af',detail:'Playtested designs'},
  {key:'prototyping',label:'Forge',icon:'hammer-outline',color:'#fbbf24',detail:'Original demo attempts'},

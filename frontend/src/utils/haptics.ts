@@ -62,7 +62,11 @@ export function isHapticsMuted(): boolean { return effectiveLevel() === 'off'; }
 
 function _haptics(): any | null {
   if (Platform.OS === 'web') return null;
-  try { return require('expo-haptics'); } catch { return null; }
+  try {
+    // Native haptics is optional and intentionally loaded only off web.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-haptics');
+  } catch { return null; }
 }
 
 function _safe(fn: () => any): void {

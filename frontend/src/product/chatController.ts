@@ -14,6 +14,7 @@ import {
   type ChatEngineProgress, type ChatModel,
 } from './aiChatClient';
 import { ChatClientError, asChatError } from './chatErrors';
+import { normalizeChatCooperation, reconcileChatCooperation, type ChatCooperationPolicy, type ChatCooperationSummary } from './chatCooperation';
 
 export type PendingChatTurn = {
   kind: 'chat' | 'regeneration';
@@ -30,6 +31,8 @@ export type PendingChatTurn = {
   operationId?: string | null;
   executionId?: string | null;
   progress?: ChatEngineProgress | null;
+  cooperation?: ChatCooperationSummary | null;
+  requestCooperation?: ChatCooperationPolicy;
   accepted: boolean;
   serverResumeAvailable?: boolean;
 };
@@ -46,6 +49,7 @@ export type ChatControllerState = {
   error: ChatClientError | null;
   notice: string | null;
   hasMoreThreads: boolean;
+  reviewedAnswer: { messageId: string; summary: ChatCooperationSummary; stopped?: boolean } | null;
 };
 
 export type ChatControllerOptions = {
@@ -58,9 +62,10 @@ export type SendChatOptions = {
   memoryPolicy?: ConversationTurnMemoryPolicy;
   maxOutputTokens?: number;
   temperature?: number;
+  cooperation?: ChatCooperationPolicy;
 };
 
-type PendingReference = { threadId: string; idempotencyKey: string; lastEventId: number; kind?: 'chat' | 'regeneration'; messageId?: string };
+type PendingReference = { threadId: string; idempotencyKey: string; lastEventId: number; kind?: 'chat' | 'regeneration'; messageId?: string; cooperationPolicy?: ChatCooperationPolicy };
 type SavedSelection = {
   schema_version: 1;
   activeThreadId: string | null;
@@ -88,7 +93,7 @@ export class ChatController {
   private snapshot: ChatControllerState = {
     ready: false, threads: [], activeThread: null, messages: [], models: [],
     selectedModelId: null, status: 'loading', pending: null, error: null,
-    notice: null, hasMoreThreads: false,
+    notice: null, hasMoreThreads: false, reviewedAnswer: null,
   };
   private listeners = new Set<() => void>();
   private initializing: Promise<void> | null = null;
@@ -132,7 +137,7 @@ export class ChatController {
     if (this.authToken !== null && getAuthToken() !== this.authToken) {
       this.observing?.abort(); this.activeRead?.abort(); this.listRead?.abort(); this.lifetime.abort();
       this.snapshot = { ...this.snapshot, ready: false, threads: [], activeThread: null, messages: [],
-        pending: null, models: [], status: 'error', error: new ChatClientError('Sign in again to continue.', { kind: 'authorization' }) };
+        pending: null, models: [], reviewedAnswer: null, status: 'error', error: new ChatClientError('Sign in again to continue.', { kind: 'authorization' }) };
       this.listeners.forEach(listener => listener());
       return;
     }
@@ -202,7 +207,7 @@ export class ChatController {
     if (!this.storageKey) return null;
     try {
       const raw = await AsyncStorage.getItem(this.storageKey);
-      if (!raw || raw.length > 65536) return null;
+      if (!raw || raw.length > 131072) return null;
       const value = JSON.parse(raw) as SavedSelection;
       if (value.schema_version !== 1 || !Array.isArray(value.pendingTurns) || value.pendingTurns.length > 32) return null;
       for (const pending of value.pendingTurns) {
@@ -211,6 +216,10 @@ export class ChatController {
           || !Number.isSafeInteger(pending.lastEventId) || pending.lastEventId < 0
           || (pending.kind !== undefined && pending.kind !== 'chat' && pending.kind !== 'regeneration')
           || (pending.kind === 'regeneration' && (typeof pending.messageId !== 'string' || !pending.messageId || pending.messageId.length > 64))) return null;
+        if (pending.cooperationPolicy !== undefined) {
+          try { pending.cooperationPolicy = normalizeChatCooperation(pending.cooperationPolicy); }
+          catch { delete pending.cooperationPolicy; } // Keep the durable key; only the server may resume its frozen request.
+        }
       }
       return value;
     } catch { return null; }
@@ -225,7 +234,7 @@ export class ChatController {
       this.submission = null; this.regenerationSubmission = null; this.mutationRetry = null;
       this.cancellationRequests.clear();
       this.emit({ ready: false, activeThread: null, messages: [], threads: [], pending: null,
-        models: [], selectedModelId: null, status: 'loading', error: null, notice: null });
+        models: [], selectedModelId: null, reviewedAnswer: null, status: 'loading', error: null, notice: null });
     }
     if (this.initializing) return this.initializing;
     if (this.snapshot.ready && !(this.snapshot.status === 'error' && !this.snapshot.activeThread && !this.snapshot.threads.length)) return Promise.resolve();
@@ -288,7 +297,7 @@ export class ChatController {
     this.activeRead?.abort(); this.observing?.abort();
     const controller = new AbortController(); this.activeRead = controller;
     this.submission = null; this.regenerationSubmission = null; this.mutationRetry = null;
-    this.emit({ status: 'loading', error: null, pending: null, messages: [], activeThread: null });
+    this.emit({ status: 'loading', error: null, pending: null, messages: [], activeThread: null, reviewedAnswer: null });
     try {
       await this.identity();
       const snapshot = await reconstructConversation(threadId, this.request(controller.signal));
@@ -341,6 +350,27 @@ export class ChatController {
           error: pending.accepted ? null : new ChatClientError('This turn is saved. Resume to submit it.', { kind: 'unavailable', code: 'awaiting_admission' }) });
         this.rememberPending(pending);
         if (pending.accepted) void this.observe(pending, epoch).catch(() => {});
+        return;
+      }
+      // Only the latest saved answer needs an extra read. This is an actual
+      // turn lookup, never regeneration or reconstruction of model prose.
+      const user = [...snapshot.messages].reverse().find(message => message.author_type === 'user');
+      const assistant = user && snapshot.messages.find(message => message.author_type === 'assistant' && message.causal_user_message_id === user.message_id);
+      if (user) {
+        try {
+          const turn = validateChatTurn(await getConversationTurn(threadId, user.idempotency_key, this.request(controller.signal)), threadId, user.idempotency_key);
+          if (epoch === this.selectionEpoch && turn.cooperation) {
+            if (assistant && turn.assistant_message?.message_id === assistant.message_id && turn.cooperation.complete) {
+              this.emit({ reviewedAnswer: { messageId: assistant.message_id, summary: turn.cooperation } });
+            } else if (turn.terminal && !turn.success && turn.user_message?.message_id === user.message_id) {
+              this.emit({ reviewedAnswer: { messageId: user.message_id, summary: turn.cooperation, stopped: true } });
+            }
+          }
+        } catch (error) {
+          const failure = asChatError(error);
+          if (failure.kind === 'authorization' || failure.kind === 'cancelled') throw failure;
+          // Canonical conversation reads stay available without an engine.
+        }
       }
     } catch (error) {
       const failure = asChatError(error);
@@ -354,12 +384,15 @@ export class ChatController {
       // No transcript bytes are persisted. Rebuild provisional output from durable events on remount.
       lastEventId: 0,
       state: turn.state ?? 'running', startedAt: turn.user_message?.created_at ?? new Date().toISOString(),
-      operationId: turn.operation_id, executionId: turn.engine_execution_id, accepted: turn.accepted !== false, serverResumeAvailable: turn.server_resume_available };
+      operationId: turn.operation_id, executionId: turn.engine_execution_id, cooperation: turn.cooperation,
+      requestCooperation: this.pendingReferences.get(threadId)?.cooperationPolicy,
+      accepted: turn.accepted !== false, serverResumeAvailable: turn.server_resume_available };
   }
 
   private rememberPending(pending: PendingChatTurn): void {
     this.pendingReferences.set(pending.threadId, { threadId: pending.threadId,
-      idempotencyKey: pending.idempotencyKey, lastEventId: pending.lastEventId, kind: pending.kind, messageId: pending.messageId });
+      idempotencyKey: pending.idempotencyKey, lastEventId: pending.lastEventId, kind: pending.kind, messageId: pending.messageId,
+      ...(pending.requestCooperation ? { cooperationPolicy: normalizeChatCooperation(pending.requestCooperation) } : {}) });
     while (this.pendingReferences.size > 32) this.pendingReferences.delete(this.pendingReferences.keys().next().value!);
     this.saveSelection();
   }
@@ -398,6 +431,7 @@ export class ChatController {
       throw new ChatClientError('Wait for this reply or stop it before sending another message.', { kind: 'conflict' });
     }
     if (!message.trim() || message.length > 100000) throw new ChatClientError('Enter a message of up to 100,000 characters.', { kind: 'validation' });
+    if (options.cooperation) options = { ...options, cooperation: normalizeChatCooperation(options.cooperation) };
     if ((options.context?.length ?? 0) > 100000 || (options.attachmentRefs?.length ?? 0) > 4
       || new Set(options.attachmentRefs ?? []).size !== (options.attachmentRefs?.length ?? 0)
       || options.attachmentRefs?.some(ref => !/^chat-attachment:\/\/[0-9a-f-]{36}$/.test(ref))
@@ -431,7 +465,8 @@ export class ChatController {
       if (epoch !== this.selectionEpoch || this.snapshot.activeThread?.thread_id !== thread.thread_id) throw new ChatClientError('The conversation changed before submission.', { kind: 'cancelled' });
       const pending: PendingChatTurn = { kind: 'chat', threadId: thread.thread_id, idempotencyKey: newKey('chat'), message,
         context: options.context, attachmentRefs: [...(options.attachmentRefs ?? [])], streamText: '',
-        lastEventId: 0, state: 'submitting', startedAt: new Date().toISOString(), accepted: false };
+        lastEventId: 0, state: 'submitting', startedAt: new Date().toISOString(), accepted: false,
+        ...(options.cooperation ? { requestCooperation: normalizeChatCooperation(options.cooperation) } : {}) };
       this.submission = { thread, pending, model, options: { ...options, attachmentRefs: [...pending.attachmentRefs] } };
       this.mutationRetry = null;
       this.emit({ pending, status: 'submitting', error: null, notice: null });
@@ -453,7 +488,7 @@ export class ChatController {
       if (turn.user_message) this.mergeMessages([turn.user_message]);
       if (turn.terminal) { await this.settle(turn, epoch); return; }
       const pending = { ...submission.pending, accepted: turn.accepted !== false, state: turn.state ?? 'running',
-        operationId: turn.operation_id, executionId: turn.engine_execution_id };
+        operationId: turn.operation_id, executionId: turn.engine_execution_id, cooperation: turn.cooperation };
       submission.pending = pending;
       if (!pending.accepted) {
         this.emit({ pending, status: 'error', error: new ChatClientError('This turn is saved. Resume to submit it.', { kind: 'unavailable', code: 'awaiting_admission' }) });
@@ -498,7 +533,11 @@ export class ChatController {
         onText: (streamText: string) => updatePending({ streamText }),
         onProgress: (progress: ChatEngineProgress) => updatePending({ progress,
           state: typeof progress.payload.state === 'string' ? progress.payload.state : progress.type }),
-        onTurn: (value: ConversationTurn) => { if (current() && value.state) updatePending({ state: value.state }); },
+        onTurn: (value: ConversationTurn) => {
+          if (!current()) return;
+          const cooperation = value.cooperation ? reconcileChatCooperation(this.snapshot.pending?.cooperation, value.cooperation) : undefined;
+          updatePending({ ...(value.state ? { state: value.state } : {}), ...(cooperation ? { cooperation } : {}) });
+        },
       };
       const turn = pending.kind === 'regeneration'
         ? await followRegenerationTurn(pending.threadId, pending.messageId!, pending.idempotencyKey, followOptions)
@@ -514,13 +553,19 @@ export class ChatController {
     if (epoch !== this.selectionEpoch) return;
     const threadId = turn.thread?.thread_id ?? this.snapshot.activeThread?.thread_id;
     if (!threadId) return;
+    const pending = this.snapshot.pending;
+    const boundProgress = pending && (turn.operation_id ? turn.operation_id === pending.operationId
+      : turn.user_message?.idempotency_key === pending.idempotencyKey) ? pending.cooperation : undefined;
+    const cooperation = turn.cooperation ? reconcileChatCooperation(boundProgress, turn.cooperation) : boundProgress;
     this.pendingReferences.delete(threadId);
     if (this.snapshot.pending) this.cancellationRequests.delete(this.snapshot.pending.idempotencyKey);
     this.submission = null; this.regenerationSubmission = null;
     if (turn.thread) this.upsertThread(turn.thread);
     this.mergeMessages([turn.user_message, turn.assistant_message, turn.terminal_message].filter(Boolean) as ConversationMessage[]);
+    if (turn.assistant_message && cooperation?.complete) this.emit({ reviewedAnswer: { messageId: turn.assistant_message.message_id, summary: cooperation } });
+    else if (!turn.success && turn.user_message && cooperation) this.emit({ reviewedAnswer: { messageId: turn.user_message.message_id, summary: cooperation, stopped: true } });
     this.emit({ pending: null, status: turn.success ? 'idle' : 'error',
-      error: turn.success ? null : new ChatClientError(turn.state === 'cancelled' || turn.state === 'withdrawn' ? 'Reply stopped.' : 'The reply could not be completed.', {
+      error: turn.success ? null : new ChatClientError(turn.state === 'cancelled' || turn.state === 'withdrawn' ? 'Reply stopped.' : turn.failure_code === 'execution_deadline_exceeded' ? 'This turn reached its time limit before the reply finished. Start a new message to try again.' : 'The reply could not be completed.', {
         kind: turn.state === 'cancelled' || turn.state === 'withdrawn' ? 'cancelled' : 'execution', code: turn.failure_code ?? turn.state ?? 'execution_failed', retryable: false,
       }) });
     this.saveSelection();
@@ -599,7 +644,8 @@ export class ChatController {
       }
       if (epoch !== this.selectionEpoch) return;
       if (turn.terminal) { await this.settle(turn, epoch); return; }
-      const recovered = { ...pending, accepted: turn.accepted !== false, operationId: turn.operation_id, executionId: turn.engine_execution_id };
+      const recovered = { ...pending, accepted: turn.accepted !== false, operationId: turn.operation_id, executionId: turn.engine_execution_id,
+        ...(turn.cooperation ? { cooperation: reconcileChatCooperation(pending.cooperation, turn.cooperation) } : {}) };
       if (!recovered.accepted) {
         const failure = new ChatClientError('The saved request is awaiting admission. Resume again when the engine is available.', { kind: 'unavailable', code: 'awaiting_admission' });
         this.emit({ pending: recovered, status: 'error', error: failure }); throw failure;

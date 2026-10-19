@@ -50,13 +50,13 @@ export interface CodeReviewResponse {
     max_nesting_depth: number;
   };
   security_analysis: {
-    issues: Array<{
+    issues: {
       type: string;
       severity: string;
       line: number;
       snippet: string;
       recommendation: string;
-    }>;
+    }[];
     issues_count: number;
     high_severity: number;
   };
@@ -100,13 +100,13 @@ export interface LearningModule {
   difficulty: number;
   topics?: string[];
   learning_objectives?: string[];
-  key_concepts?: Array<{ term: string; definition: string }>;
-  code_examples?: Array<{ language: string; title: string; code: string }>;
+  key_concepts?: { term: string; definition: string }[];
+  code_examples?: { language: string; title: string; code: string }[];
 }
 
 export interface EmotionDetectionRequest {
   user_id: string;
-  recent_actions: Array<{ action_type: string; [key: string]: any }>;
+  recent_actions: { action_type: string; [key: string]: any }[];
   text_input?: string;
 }
 
@@ -131,11 +131,11 @@ export interface PsychologyProfile {
     growth_mindset_score: number;
     resilience_score: number;
   };
-  recommendations: Array<{
+  recommendations: {
     type: string;
     title: string;
     suggestions: string[];
-  }>;
+  }[];
 }
 
 // ============================================================================

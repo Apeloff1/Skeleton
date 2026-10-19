@@ -3717,6 +3717,26 @@ async def system_info():
         "languages_available": len(LANGUAGE_DOCK_REGISTRY)
     }
 
+# Read language add-ons through the shared thread-safe sync pool. The legacy
+# module-global Motor client binds to the first event loop that uses it; a
+# second TestClient/lifespan loop otherwise raises "Event loop is closed".
+# Run PyMongo I/O outside the async request loop, without hiding DB failures.
+async def _read_language_addons(limit: int = 100):
+    from core.databases import get_sync_db
+
+    return await asyncio.to_thread(
+        lambda: list(get_sync_db().language_addons.find().limit(limit))
+    )
+
+
+async def _read_language_addon(language_key: str):
+    from core.databases import get_sync_db
+
+    return await asyncio.to_thread(
+        get_sync_db().language_addons.find_one, {"language_key": language_key}
+    )
+
+
 # Languages & Dock System
 @api_router.get("/languages")
 async def get_languages():
@@ -3730,7 +3750,7 @@ async def get_languages():
             "templates_available": lang_type in CODE_TEMPLATES
         })
     
-    addons = await db.language_addons.find().to_list(100)
+    addons = await _read_language_addons()
     for addon in addons:
         addon['_id'] = str(addon['_id'])
         addon['type'] = 'addon'
@@ -3754,7 +3774,7 @@ async def get_language(language_key: str):
     except ValueError:
         pass
     
-    addon = await db.language_addons.find_one({"language_key": language_key})
+    addon = await _read_language_addon(language_key)
     if addon:
         addon['_id'] = str(addon['_id'])
         return addon
@@ -4019,21 +4039,34 @@ async def delete_file(file_id: str):
 # Addons
 @api_router.post("/addons", response_model=LanguageAddon)
 async def create_addon(data: dict):
-    existing = await db.language_addons.find_one({"language_key": data.get("language_key")})
-    if existing:
-        raise HTTPException(status_code=400, detail="Addon exists")
+    from core.databases import get_sync_db
+    from pymongo.errors import DuplicateKeyError
+
     addon = LanguageAddon(**data)
-    await db.language_addons.insert_one(addon.dict())
+
+    def insert_unique_addon():
+        collection = get_sync_db().language_addons
+        # Serialize duplicate detection with the database's unique index rather
+        # than racing a separate find and insert from concurrent requests.
+        collection.create_index("language_key", unique=True)
+        collection.insert_one(addon.dict())
+
+    try:
+        await asyncio.to_thread(insert_unique_addon)
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=400, detail="Addon exists") from exc
     return addon
 
 @api_router.get("/addons")
 async def get_addons():
-    addons = await db.language_addons.find().to_list(100)
+    addons = await _read_language_addons()
     return {"addons": [LanguageAddon(**a) for a in addons]}
 
 @api_router.delete("/addons/{addon_id}")
 async def delete_addon(addon_id: str):
-    await db.language_addons.delete_one({"id": addon_id})
+    from core.databases import get_sync_db
+
+    await asyncio.to_thread(get_sync_db().language_addons.delete_one, {"id": addon_id})
     return {"success": True}
 
 # Preferences

@@ -20,7 +20,8 @@ function _getModule() {
   try {
     // dynamic require so a failed native module (e.g. on web in preview)
     // doesn't crash the bundle.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // Optional native notifications module must remain a guarded runtime load.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     _notifModule = require('expo-notifications');
     // Default handler — show banner + play sound when foreground.
     _notifModule.setNotificationHandler?.({

@@ -49,7 +49,7 @@ export interface ForgeCockpitViewProps {
 export function CockpitTabBar({ tab, onTab, badges, reduceMotion }: Pick<ForgeCockpitViewProps, 'tab' | 'onTab' | 'badges' | 'reduceMotion'>) {
   const systemReduce = useReduceMotion();
   const reduce = reduceMotion ?? systemReduce;
-  const refs = React.useRef<Array<{ focus?: () => void } | null>>([]);
+  const refs = React.useRef<({ focus?: () => void } | null)[]>([]);
   const viaKey = React.useRef(false);
   const index = COCKPIT_TABS.indexOf(tab);
   React.useEffect(() => {
