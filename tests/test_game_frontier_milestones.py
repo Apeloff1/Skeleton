@@ -161,7 +161,7 @@ class GeometryTests(unittest.TestCase):
         ), loop=False)
         neutral = pose_skinned_mesh(skeleton, mesh, clip, 0)
         rotated = pose_skinned_mesh(skeleton, mesh, clip, 1000)
-        self.assertNotEqual(neutral[-2], rotated[-2])
+        self.assertNotEqual(neutral[len(neutral)//2], rotated[len(rotated)//2])
 
 
 def math_pi_half() -> float:
