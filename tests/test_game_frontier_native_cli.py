@@ -154,7 +154,7 @@ class OperatorCLIRegressionTests(unittest.TestCase):
 
     def test_cli_timeline_query_returns_hash_bound_chunk_frames(self):
         self.capture.write_text("".join(
-            json.dumps(self.sample(n))+"\\n" for n in range(8)))
+            json.dumps(self.sample(n))+"\n" for n in range(8)))
         code,out,err=self.run_command("ingest","--capture-jsonl",str(self.capture))
         self.assertEqual(code,0,err)
         code,out,err=self.run_command("timeline","--start-frame","2",
