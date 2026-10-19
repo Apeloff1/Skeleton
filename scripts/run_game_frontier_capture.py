@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 from skeleton.jeeves.game_frontier_frame_coherence import bind_signed_gdd
 from skeleton.jeeves.game_frontier_native_capture import GodotPhysicsCaptureIngestor
 from skeleton.jeeves.game_frontier_receipt_journal import FrameReceiptJournal
+from skeleton.jeeves.game_frontier_native_audit import analyze_native_capture
 
 
 def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
@@ -36,7 +37,7 @@ def _operator_json(path: Path, *, limit: int = 24*1024*1024) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation",choices=("ingest","verify","fork","timeline"),
+    parser.add_argument("operation",choices=("ingest","verify","fork","timeline","analyze"),
                         help="Do not combine a new capture with replay or fork")
     parser.add_argument("--signed-gdd",type=Path,required=True)
     parser.add_argument("--scene-json",type=Path,required=True)
@@ -49,6 +50,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-frame",type=int,default=0)
     parser.add_argument("--page-limit",type=int,default=128)
     parser.add_argument("--actor-id")
+    parser.add_argument("--audit-max-frames",type=int,default=256)
+    parser.add_argument("--acceleration-threshold",type=float,default=120.)
+    parser.add_argument("--energy-delta-threshold",type=float,default=2000.)
     parser.add_argument("--chunk-x",type=int)
     parser.add_argument("--chunk-y",type=int)
     parser.add_argument("--changes-only",action="store_true")
@@ -62,11 +66,17 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("fork requires --fork-track and --through")
     if (arguments.chunk_x is None)!=(arguments.chunk_y is None):
         parser.error("timeline chunk filters require both --chunk-x and --chunk-y")
+    if arguments.operation not in ("timeline","analyze") and (
+        arguments.start_frame!=0 or arguments.actor_id is not None):
+        parser.error("frame cursor and actor filter apply only to timeline/analyze")
     if arguments.operation!="timeline" and (
-        arguments.start_frame!=0 or arguments.page_limit!=128 or
-        arguments.actor_id is not None or arguments.chunk_x is not None or
+        arguments.page_limit!=128 or arguments.chunk_x is not None or
         arguments.changes_only):
-        parser.error("timeline filters are only valid with timeline operation")
+        parser.error("chunk filters and page limit apply only to timeline")
+    if arguments.operation!="analyze" and (
+        arguments.audit_max_frames!=256 or arguments.acceleration_threshold!=120. or
+        arguments.energy_delta_threshold!=2000.):
+        parser.error("audit thresholds and budget apply only to analyze")
     if arguments.operation!="ingest" and arguments.resume:
         parser.error("--resume applies only to ingest")
     if arguments.operation!="ingest" and arguments.capture_jsonl is not None:
@@ -112,6 +122,13 @@ def main(argv: list[str] | None = None) -> int:
             elif arguments.operation=="verify":
                 report={"operation":"verify","journal":journal.stats(),
                         "replay":journal.replay(through=arguments.through)}
+            elif arguments.operation=="analyze":
+                report={"operation":"analyze","diagnostics":analyze_native_capture(
+                    journal,start_frame=arguments.start_frame,
+                    max_frames=arguments.audit_max_frames,
+                    actor_id=arguments.actor_id,
+                    acceleration_threshold_mps2=arguments.acceleration_threshold,
+                    energy_change_threshold_j=arguments.energy_delta_threshold)}
             elif arguments.operation=="timeline":
                 report={"operation":"timeline","page":journal.evidence_page(
                     start_frame=arguments.start_frame,limit=arguments.page_limit,
