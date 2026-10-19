@@ -71,3 +71,71 @@ being overstated as either infringement or clearance.
 Use the existing Backend Quality CI gate for syntax and the four focused
 regression suites: working context, adversarial verifiers, code delivery
 quality and final copyright/creative release. This adds no standalone gate.
+
+
+## Continuous release evidence journal (October 2026 milestone extension)
+
+A host-side release journal joins the already existing source-verification
+planes into one content-addressed, replayable delivery handoff. It is produced
+only after the live runtime obtains verified host results; registering checkers
+or preparing a design does **not** constitute release evidence.
+
+The journal enforces these milestones as executable contracts:
+
+1. A unique run identifier, unchanged user goal and policy metadata.
+2. Complete, scoped tool observations rather than model-generated evidence.
+3. Independent context integrity verification and source-scope verification.
+4. An adversarial mutation reviewer for both context verifiers.
+5. Required code/game quality receipts and requested additional requirements.
+6. An independent quality receipt adversary and exact source continuity.
+7. Evidence-based baseline comparison and absolute objective thresholds.
+8. Copyright/origin and independent creative rewrite checks for exact assets
+   and the final answer text.
+9. A final reviewer adversary, after the final two content reviewers.
+10. An ordered, hash-linked release handoff that can be independently replayed.
+
+Stages use JEL- base36 counters and sequential page numbers. The final digest
+binds run ID, pinned goal, exact answer digest, reviewed source digest, and the
+last hash-chain receipt. Host run tracing and evidence ledger receive compact
+receipt IDs, not source text. Explicit run API
+AdaptiveJeevesRuntime.release_evidence_journal(run_id) reads the sealed record.
+
+A restored journal is **not** accepted solely because its hashes look
+well-formed: verify_release_evidence_journal requires the original observations,
+goal, source and host reviewer receipts and deterministically regenerates the
+journal. Missing checkers, stale source, changed answer, review-stage omissions,
+changed objectives or adversarial proof failures block release.
+
+The code audit reviewer, copyright reviewer and creative rewrite reviewer remain
+separate independent host responsibilities. This receipt chain does not grant
+copyright clearance or turn fixture review into production measurements.
+
+
+## The 100-capability acceptance target
+
+The typed catalog in delivery_assurance_milestones.py contains exactly 100
+specific acceptance targets across context, verifier scrutiny, code quality,
+game quality, objective measurement, rights, creative continuity, receipts,
+operations and release admission. Codes M001–M100 are source-defined stable
+identities; each block of ten is scoped to one domain. The runtime exposes
+AdaptiveJeevesRuntime.assurance_milestone_catalog() for the user interface
+and milestone consoles.
+
+The MilestoneBoard deliberately begins at **0/100** on a pinned commit. A
+checklist is not completion evidence. Each pass requires (a) a real source
+commit, (b) artifact fingerprint, (c) named scope, (d) separate checker
+identities and distinct evidence references, and (e) prerequisite passes
+within the domain. Blocked results are recorded separately, never counted
+as complete. Duplicate records are idempotent only if bit-for-bit identical.
+An amended checkpoint requires a fresh source-bound board; previous source
+bytes and historical evidence cannot silently be certified for a new commit.
+The full receipt chain is replay-validated and its summary reports passed,
+blocked and unverified separately.
+
+The host remains responsible for making real checks and retaining their
+actual outputs. Two claimed checker identities are necessary metadata,
+**not** proof of institutional independence or of a completed check. Release
+journal stage receipts and milestone-board passes serve different purposes:
+the former seals an individual verified delivery; the latter tracks the
+hundred longer-horizon capability targets without pretending that an
+implemented type or a proposed integration proves E2E completion.

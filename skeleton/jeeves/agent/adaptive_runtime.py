@@ -37,6 +37,12 @@ from .code_delivery_quality import (
     QualityVerifierAdversary, required_delivery_kind,
 )
 from .code_scrutiny_loop import Discovery, Repair
+from .delivery_evidence_journal import (
+    ReleaseEvidenceJournal, build_release_evidence_journal,
+)
+from .delivery_assurance_milestones import (
+    ASSURANCE_MILESTONES, AssuranceMilestone,
+)
 from .final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
     FinalReviewAdversary, MeasuredCriterion, SourceProvenance,
@@ -302,6 +308,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self._final_review_proofs: dict[str, str] = {}
         self._final_reviewer = ComparativeObjectiveFinalReviewer()
         self._final_reviewer_adversary = FinalReviewAdversary()
+        self._release_evidence_journals: dict[str, ReleaseEvidenceJournal] = {}
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1281,6 +1288,16 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         with self._adaptive_lock:
             return self._final_review_reports.get(require_id("run_id", run_id))
 
+    def release_evidence_journal(self, run_id: str) -> ReleaseEvidenceJournal | None:
+        """Retrieve the verified, content-free release milestone receipt chain."""
+        with self._adaptive_lock:
+            return self._release_evidence_journals.get(require_id("run_id", run_id))
+
+    @staticmethod
+    def assurance_milestone_catalog() -> tuple[AssuranceMilestone, ...]:
+        """One hundred acceptance targets; never infer completion from plans."""
+        return ASSURANCE_MILESTONES
+
     def _verify_final_content_review(
         self, state: _RunState, answer: str,
         *, kind: str, quality: QualityReleaseReceipt | None,
@@ -1453,11 +1470,53 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     confidence=1.0,
                 ))
             final_kind = required_final_kind(state.inputs.goal)
+            quality = self._delivery_quality_reports.get(state.run_id)
             if final_kind is not None:
-                return self._verify_final_content_review(
-                    state, draft.answer, kind=final_kind,
-                    quality=self._delivery_quality_reports.get(state.run_id),
+                cleared, failure = self._verify_final_content_review(
+                    state, draft.answer, kind=final_kind, quality=quality,
                 )
+                if not cleared:
+                    return False, failure
+            final = self._final_review_reports.get(state.run_id) if final_kind else None
+            final_sources = None
+            if final_kind is not None:
+                # Re-read after external reviewer callbacks to catch changes
+                # between the reviewed snapshot and delivery handoff.
+                final_sources = dict(
+                    self._final_review_bindings[state.run_id].source_reader(draft.answer)
+                )
+            journal = build_release_evidence_journal(
+                state.run_id, state.inputs.goal, tuple(state.observations),
+                prepared, draft.answer, quality=quality, final=final,
+                final_sources=final_sources,
+            )
+            with self._adaptive_lock:
+                self._release_evidence_journals[state.run_id] = journal
+            state.trace.emit("adaptive.delivery_evidence_journal_sealed", {
+                "run_id": state.run_id,
+                "journal": journal.fingerprint,
+                "release": journal.release_digest,
+                "stage_count": journal.milestone_count,
+                "stages": list(journal.stage_names),
+                "kind": journal.kind,
+            })
+            from .types import EvidenceKind
+            state.ledger.append(EvidenceArtifact(
+                evidence_id=stable_id("deliveryjournal", {
+                    "run": state.run_id, "receipt": journal.release_digest,
+                }),
+                kind=EvidenceKind.DERIVED,
+                source="jeeves-release-evidence-journal",
+                payload={
+                    "journal": journal.fingerprint,
+                    "release": journal.release_digest,
+                    "source_digest": journal.source_digest,
+                    "answer_digest": journal.answer_digest,
+                    "stages": list(journal.stage_names),
+                    "receipts": [entry.digest for entry in journal.stages],
+                },
+                observed_at=self._wall_clock(), confidence=1.0,
+            ))
             return True, None
         except Exception as exc:
             return False, f"{type(exc).__name__}: {str(exc)[:320]}"
