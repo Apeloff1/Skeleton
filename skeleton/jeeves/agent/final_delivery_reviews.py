@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, replace
+from pathlib import PurePosixPath
 from typing import Callable, Mapping, Sequence
 
 from .code_delivery_quality import required_delivery_kind
@@ -59,10 +60,19 @@ def required_final_kind(goal: Goal) -> str | None:
     return existing_kind
 
 
+def _safe_source_path(path: object) -> bool:
+    """Require one canonical repository-relative spelling for rights evidence."""
+    if not isinstance(path, str) or not path or path in {".", ".."}:
+        return False
+    if path.startswith("/") or "\\" in path or any(ord(ch) < 32 for ch in path):
+        return False
+    normalized = PurePosixPath(path)
+    return ".." not in normalized.parts and str(normalized) == path
+
+
 def _digest_sources(sources: Mapping[str, str]) -> str:
     if not sources or any(
-        not isinstance(path, str) or not path or path.startswith("/")
-        or ".." in path.split("/") or not isinstance(content, str)
+        not _safe_source_path(path) or not isinstance(content, str)
         for path, content in sources.items()
     ):
         raise FinalReviewError("final review requires nonempty safe text sources")
@@ -153,7 +163,7 @@ class SourceProvenance:
     license_condition_evidence: str = ""
 
     def __post_init__(self) -> None:
-        if not self.path or self.path.startswith("/") or ".." in self.path.split("/"):
+        if not _safe_source_path(self.path):
             raise FinalReviewError("invalid provenance path")
         if self.origin not in {
             "original", "user_authorized", "licensed", "public_domain", "unknown",
