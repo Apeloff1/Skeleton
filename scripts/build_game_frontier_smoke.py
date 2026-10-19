@@ -45,7 +45,13 @@ def build_smoke_project(out:Path, *, fps:int=60, frames:int=20) -> dict:
         candidate,cloud_path_duration_s=2,enable_native_capture=True,
         native_capture_all_actors=True,native_capture_max_frames=frames,
         enable_native_reference_controls=True,
-        native_reference_test_drive_ticks=min(frames-1,12))
+        native_reference_test_drive_ticks=min(frames-1,12),
+        native_gameplay_zones=({
+            "id":"spawn_marker", "actor_id":"hero",
+            "center_xyz_m":[0.,0.,30.], "radius_m":1.0,
+            "event_page_id":"hero_spawn_region",
+            "action_kind":"show_dialogue",
+        },))
     project_godot='''config_version=5
 
 [application]

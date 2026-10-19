@@ -44,6 +44,8 @@ var _native_last_action: Dictionary = {}
 var _native_move_force_n: float = 240.0
 var _native_max_horizontal_speed_mps: float = 8.0
 var _native_jump_impulse_ns: float = 120.0
+var _native_gameplay_zones: Array = []
+var _native_previous_zone_members: Array = []
 
 func _vec(data: Array) -> Vector3:
     return Vector3(float(data[0]), float(data[2]), -float(data[1]))
@@ -499,6 +501,34 @@ func _configure_native_capture(settings: Dictionary) -> void:
             push_error("Invalid reference controls")
             return
         _native_controls_enabled = true
+    _native_gameplay_zones = settings.get("gameplay_zones", [])
+    for zone_item in _native_gameplay_zones:
+        var zone: Dictionary = zone_item
+        # Real Godot Area3D preview and collision volume. Gameplay receipts
+        # deliberately use center-point XYZ to avoid shape contact ambiguity.
+        var region := Area3D.new()
+        region.name = "AuthoredGameZone_" + str(zone["id"])
+        region.position = _vec(zone["center_xyz_m"])
+        region.monitorable = false
+        region.collision_layer = 0
+        region.collision_mask = 1
+        var shape := SphereShape3D.new()
+        shape.radius = float(zone["radius_m"])
+        var hitbox := CollisionShape3D.new()
+        hitbox.shape = shape
+        region.add_child(hitbox)
+        var preview := MeshInstance3D.new()
+        var sphere := SphereMesh.new()
+        sphere.radius = shape.radius
+        sphere.height = shape.radius * 2.0
+        preview.mesh = sphere
+        var tint := StandardMaterial3D.new()
+        tint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        tint.albedo_color = Color(0.1, 0.75, 0.95, 0.13)
+        tint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        preview.material_override = tint
+        region.add_child(preview)
+        add_child(region)
     # Fixed user:// destination, not a user-supplied external path.
     _native_capture_file = FileAccess.open("user://frontier_native_physics.jsonl", FileAccess.WRITE)
     if _native_capture_file == null:
@@ -510,6 +540,20 @@ func _native_chunk_less(a: Dictionary, b: Dictionary) -> bool:
     if int(first[0]) != int(second[0]):
         return int(first[0]) < int(second[0])
     return int(first[1]) < int(second[1])
+
+func _native_zone_event(member: Dictionary, transition: String) -> Dictionary:
+    for zone_item in _native_gameplay_zones:
+        var zone: Dictionary = zone_item
+        if str(zone["id"]) == str(member["zone_id"]):
+            return {
+                "zone_id": member["zone_id"],
+                "actor_id": member["actor_id"],
+                "transition": transition,
+                "event_page_id": zone["event_page_id"],
+                "action_kind": zone["action_kind"],
+                "authority": "proposal_only_no_world_mutation",
+            }
+    return {}
 
 func _record_native_physics() -> void:
     if _native_capture_file == null:
@@ -598,6 +642,39 @@ func _record_native_physics() -> void:
     }
     if _native_controls_enabled:
         row["previous_step_control"] = _native_last_action.duplicate(true)
+    if not _native_gameplay_zones.is_empty():
+        var occupants: Array = []
+        for zone_item in _native_gameplay_zones:
+            var zone: Dictionary = zone_item
+            for actor_item in recorded:
+                var actor: Dictionary = actor_item
+                if str(actor["id"]) != str(zone["actor_id"]):
+                    continue
+                var point: Vector3 = _vec(actor["world_xyz_m"])
+                var center: Vector3 = _vec(zone["center_xyz_m"])
+                var radius: float = float(zone["radius_m"])
+                if point.distance_squared_to(center) <= radius * radius:
+                    occupants.append({
+                        "zone_id": zone["id"], "actor_id": zone["actor_id"],
+                    })
+        var changes: Array = []
+        for item in occupants:
+            if not _native_previous_zone_members.has(item):
+                changes.append(_native_zone_event(item, "enter"))
+        for item in _native_previous_zone_members:
+            if not occupants.has(item):
+                changes.append(_native_zone_event(item, "exit"))
+        changes.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
+            if str(a["zone_id"]) != str(b["zone_id"]):
+                return str(a["zone_id"]) < str(b["zone_id"])
+            if str(a["actor_id"]) != str(b["actor_id"]):
+                return str(a["actor_id"]) < str(b["actor_id"])
+            return str(a["transition"]) < str(b["transition"]))
+        row["native_zone_schema"] = "skeleton.game.native_zones.v1"
+        row["gameplay_zones"] = _native_gameplay_zones
+        row["native_zone_occupancy"] = occupants
+        row["native_zone_events"] = changes
+        _native_previous_zone_members = occupants.duplicate(true)
     _native_capture_file.store_line(JSON.stringify(row))
     _native_capture_file.flush()
     _native_capture_tick += 1
@@ -762,6 +839,7 @@ def emit_frontier_godot_overlay(
     native_capture_all_actors: bool = False,
     enable_native_reference_controls: bool = False,
     native_reference_test_drive_ticks: int = 0,
+    native_gameplay_zones: tuple[Mapping, ...] = (),
 ) -> dict[str, str]:
     """Emit a Godot scene + fixed GDScript + snapshot and wind path JSON.
 
@@ -787,6 +865,11 @@ def emit_frontier_godot_overlay(
         enable_native_reference_controls and not enable_native_capture or
         native_reference_test_drive_ticks and not enable_native_reference_controls):
         raise FrontierGodotError("bounded native reference controller opt-in required")
+    from skeleton.jeeves.game_frontier_native_zones import (
+        normalize_gameplay_zones, NativeZoneError,
+    )
+    if native_gameplay_zones and not enable_native_capture:
+        raise FrontierGodotError("gameplay zones require opt-in native capture")
     manifest = candidate.manifest
     actual = sha256(json.dumps(manifest, sort_keys=True,
                                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
@@ -874,6 +957,12 @@ def emit_frontier_godot_overlay(
                     "native_rigid_reference" if row["id"] == actor_id
                     else "generated_source_proxy")
                 sources.append(x)
+        try:
+            signed_gameplay_zones = normalize_gameplay_zones(
+                native_gameplay_zones,
+                allowed_actors={item["id"] for item in sources})
+        except NativeZoneError as exc:
+            raise FrontierGodotError("invalid or unauthorized authored game zones") from exc
         # Bind native measurements to the signed scene's original body.
         # The source is candidate-only, not authority over a finished game.
         body = advanced["body"]
@@ -889,6 +978,7 @@ def emit_frontier_godot_overlay(
         native_config = {
             "enabled": True, "max_frames": native_capture_max_frames,
             "primary_source_dynamics": primary_source_dynamics,
+            "gameplay_zones": signed_gameplay_zones,
             "reference_controls": {
                 "enabled": enable_native_reference_controls,
                 "move_force_n": 240., "max_speed_mps": 8.,
@@ -983,6 +1073,7 @@ def attach_frontier_overlay(
     native_capture_all_actors: bool = False,
     enable_native_reference_controls: bool = False,
     native_reference_test_drive_ticks: int = 0,
+    native_gameplay_zones: tuple[Mapping, ...] = (),
 ) -> dict[str, str]:
     """Safely attach an emitted reference scene to an existing Forge Godot project.
 
@@ -1009,6 +1100,7 @@ def attach_frontier_overlay(
         native_capture_all_actors=native_capture_all_actors,
         enable_native_reference_controls=enable_native_reference_controls,
         native_reference_test_drive_ticks=native_reference_test_drive_ticks,
+        native_gameplay_zones=native_gameplay_zones,
     )
     conflicts = tuple(sorted(set(project_files).intersection(overlay)))
     if any(project_files[key] != overlay[key] for key in conflicts):

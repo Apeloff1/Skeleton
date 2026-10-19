@@ -18,6 +18,11 @@ from .game_frontier_native_dynamics import (
 )
 
 
+from .game_frontier_native_zones import (
+    inspect_native_gameplay_zones, NativeZoneError,
+)
+
+
 class NativeChunkError(ValueError):
     pass
 
@@ -49,6 +54,10 @@ def inspect_native_chunks(sample: Mapping, *, expected_chunk_size_m: float = 32.
         not isinstance(sample,Mapping)):
         raise NativeChunkError("valid bounded typed source required")
     units=float(expected_chunk_size_m)
+    try:
+        zone_proof=inspect_native_gameplay_zones(sample)
+    except NativeZoneError as exc:
+        raise NativeChunkError("reported game zone membership invalid") from exc
     try:
         dynamics=inspect_native_dynamics(sample)
     except NativeDynamicsError as exc:
@@ -106,6 +115,9 @@ def inspect_native_chunks(sample: Mapping, *, expected_chunk_size_m: float = 32.
         "native_partition_confirmed":native_matches,
         "authority":"reported_native_physics_partition_not_GPU_attestation",
     }
+    if zone_proof is not None:
+        source["native_zone_digest"]=zone_proof["receipt_digest"]
+        source["native_zone_occupant_count"]=zone_proof["occupant_count"]
     if dynamics is not None:
         source["native_dynamics_digest"]=dynamics["receipt_digest"]
         source["native_dynamics_verified"]=True
@@ -234,6 +246,13 @@ def compare_native_chunk_transitions(
         "verifier_b_motion_partition_conservation":True,
         "authority":"runtime_sample_consistency_not_native_attestation",
     }
+    try:
+        zone_proof=inspect_native_gameplay_zones(current,previous=previous)
+    except NativeZoneError as exc:
+        raise NativeChunkError("native zone event/transition proof invalid") from exc
+    if zone_proof is not None:
+        root["native_zone_transition_digest"]=zone_proof["receipt_digest"]
+        root["native_zone_event_count"]=zone_proof["event_count"]
     try:
         dynamics_delta=compare_native_dynamics(current,previous=previous)
     except NativeDynamicsError as exc:
