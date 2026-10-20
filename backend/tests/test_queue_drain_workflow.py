@@ -34,8 +34,13 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     assert "'.github/workflows/queue-drain.yml'" in workflow
     assert "'.github/workflows/pr-obsolete-run-drain.yml'" in workflow
     assert "github.event.workflow_run.conclusion == 'success'" not in workflow
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
-    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in workflow
+    # The active drainer has a trusted schedule, manual dispatch and
+    # default-branch change trigger. No untrusted workflow_run event may grant
+    # the actions:write cancellation scope.
+    assert "\\n  workflow_run:\\n" not in workflow
+    assert "  schedule:" in workflow
+    assert "  workflow_dispatch:" in workflow
+    assert "branches: [main]" in workflow
 
 
 def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
