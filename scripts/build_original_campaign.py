@@ -17,11 +17,15 @@ from skeleton.jeeves.game_frontier_expedition_campaign import (
 )
 from skeleton.jeeves.game_frontier_expedition_assets import VisualDesign
 from scripts.build_original_expedition import export_new_game
+from skeleton.jeeves.game_frontier_campaign_delivery import (
+    prepare_campaign_bundle, verify_campaign_bundle, publish_campaign_bundle,
+)
 
 
 def build_full_original_campaign(project_id:str, *,
     gdd_digest:str,seed:int,islands:int,controller_id:str="dual_stick",
     detail:float=0.25,destination:Path|None=None,
+    archive:Path|None=None,
 )->dict:
     design=VisualDesign(seed=seed,detail_scale=detail)
     candidate=compile_original_campaign(
@@ -33,8 +37,16 @@ def build_full_original_campaign(project_id:str, *,
         seed=seed,islands=islands,controller_id=controller_id,
         visual_design=design,
     )
+    bundle=None
+    if archive is not None:
+        bundle=prepare_campaign_bundle(candidate["files"],project_id=project_id,
+            gdd_digest=gdd_digest,world_digest=candidate["manifest"]["world_digest"])
+        verify_campaign_bundle(bundle["archive"],bundle["report"],
+            original_files=candidate["files"])
     if destination is not None:
         export_new_game(destination,candidate["files"])
+    if archive is not None:
+        publish_campaign_bundle(bundle["archive"],archive)
     manifest=candidate["manifest"]
     return {
         "schema":"skeleton.game.original_campaign_cli_report.v1",
@@ -78,6 +90,9 @@ def build_full_original_campaign(project_id:str, *,
         "world_assurance_axes":manifest["world_assurance_axes"],
         "game_manifest_receipt":manifest["receipt_digest"],
         "independent_recompile_verified":review["all_source_bytes_verified"],
+        "delivery_archive_sha256":bundle["report"]["bundle_sha256"] if bundle else None,
+        "delivery_seven_stage_receipts":len(bundle["report"]["journal"]) if bundle else 0,
+        "delivery_release_approved":False,
         "native_executed":False,
         "production_release_approved":False,
     }
@@ -94,13 +109,14 @@ def main(argv=None)->int:
     parser.add_argument("--controller",default="dual_stick")
     parser.add_argument("--detail",type=float,default=0.25)
     parser.add_argument("--export",type=Path,required=True)
+    parser.add_argument("--archive",type=Path,help="Optional deterministic ZIP candidate; never overwritten")
     args=parser.parse_args(argv)
     try:
         result=build_full_original_campaign(
             args.project_id,gdd_digest=args.gdd_sha256,
             seed=args.seed,islands=args.islands,
             controller_id=args.controller,detail=args.detail,
-            destination=args.export,
+            destination=args.export,archive=args.archive,
         )
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
