@@ -7,8 +7,7 @@ pass all checks and still be unqualified for production publication.
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping
 import math
 import re
 from typing import Any
@@ -241,9 +240,11 @@ def audit_lod_fidelity(lod: Mapping[str, Any]) -> GateResult:
     for mid, levels in sorted(by_mesh.items()):
         if 0 not in levels or len(levels) < 2:
             findings.append(Finding("lod", "missing_lod_levels", mid))
-        for level in sorted(levels)[1:]:
-            if levels[level] >= levels[min(x for x in levels if x < level)]:
+        previous = None
+        for level in sorted(levels):
+            if previous is not None and levels[level] >= levels[previous]:
                 findings.append(Finding("lod", "nondecreasing_triangles", f"{mid}:{level}"))
+            previous = level
     prior: dict[str, tuple[int, float, int]] = {}
     for index, row in enumerate(samples):
         row = _record(row, "LOD sample")
@@ -341,6 +342,17 @@ def audit_frontier_candidate(bundle: Mapping[str, Any]) -> dict[str, Any]:
     bundle = _record(bundle, "source candidate")
     original = audit_deep_candidate(bundle)
     frontier = _record(bundle.get("frontier"), "frontier")
+    source = original["source_digest"]
+    if _sha(frontier.get("source_sha256"), "frontier root source") != source:
+        raise QualityGateError("frontier root references foreign source")
+    for family in ("lineage", "timeline", "routes", "motion", "lod", "localization"):
+        record = _record(frontier.get(family), family)
+        if _sha(record.get("source_sha256"), family + " source") != source:
+            raise QualityGateError("frontier evidence combines unrelated project sources")
+    comparison = _record(frontier.get("comparison"), "comparison")
+    candidate = _record(comparison.get("candidate"), "comparison candidate")
+    if _sha(candidate.get("source_sha256"), "comparison candidate source") != source:
+        raise QualityGateError("comparative acceptance points at foreign candidate")
     results = (
         audit_asset_lineage(frontier.get("lineage")),
         audit_longform_continuity(frontier.get("timeline")),
