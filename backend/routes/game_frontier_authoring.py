@@ -41,6 +41,15 @@ class TileSelection(Request):
     height: int = Field(ge=1, le=256, strict=True)
 
 
+class GameplayProbe(Request):
+    position_xyz_m: list[float] = Field(min_length=3, max_length=3)
+    mass_kg: float = Field(default=75.0, gt=0, le=100000)
+    now_ms: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
+    current_signals: dict[str, float] = Field(default_factory=dict, max_length=128)
+    previous_signals: dict[str, float] = Field(default_factory=dict, max_length=128)
+    flags: dict[str, bool] = Field(default_factory=dict, max_length=512)
+
+
 class NativeBuild(Request):
     seed: int = Field(default=42, ge=0, le=2**63 - 1, strict=True)
     islands: int = Field(default=12, ge=3, le=64, strict=True)
@@ -102,3 +111,11 @@ async def export_game_to_project(project_id: str, body: NativeExport,
                                  user=Depends(get_current_user)):
     return await _call(studio.export_native_project(
         _write_scope(user), project_id, body.model_dump()))
+
+
+
+@router.post("/projects/{project_id}/gameplay/simulate")
+async def simulate_authored_gameplay(project_id: str, body: GameplayProbe,
+                                                 user=Depends(get_current_user)):
+    return await _call(studio.simulate_gameplay(
+        _scope(user), project_id, body.model_dump()))
