@@ -10,7 +10,6 @@ from collections.abc import Mapping
 from hashlib import sha256
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 
