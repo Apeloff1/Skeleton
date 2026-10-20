@@ -47,6 +47,11 @@ READ_OPERATIONS = (
     "expedition.release.inspect",
     "expedition.production.inspect",
     "expedition.production.ending",
+    "game.quality.audit",
+    "game.quality.inspect",
+    "game.quality.history",
+    "game.quality.challenge",
+    "game.quality.repair.plan",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -84,6 +89,7 @@ WRITE_OPERATIONS = (
     "expedition.production.start",
     "expedition.production.act",
     "expedition.production.choose",
+    "game.quality.record",
 )
 OPERATIONS = frozenset((*READ_OPERATIONS, *WRITE_OPERATIONS))
 
