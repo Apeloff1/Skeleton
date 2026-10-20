@@ -52,7 +52,7 @@ def test_story_authoring_uses_gameplay_prerequisites_without_forging_game_flags(
     ep.step(ExpeditionAction("travel","launch_updraft"))
     assert [s.scene_id for s in director.offered(ep)]==["threshold"]
     second=director.choose(ep,"threshold","remember")
-    assert second.previous_receipt==first.receipt
+    assert second.prior_receipt==first.receipt
     assert "memory_kept" in director.flags
     path=find_route(w,p,w.destinations[0])
     # Replay the route to its real destination, not a dialogue shortcut.
@@ -87,6 +87,32 @@ def test_changed_gdd_changes_canon_identity_without_reusing_dialogue_receipts():
     with pytest.raises(ExpeditionError,match="another canonical"):
         CanonDirector.restore(b,ExpeditionEpisode(w,p),genesis)
 
+
+
+
+def test_nonempty_story_restores_only_with_replayed_historical_game_sources():
+    w,p=game()
+    ep=ExpeditionEpisode(w,p)
+    director=CanonDirector(original_expedition_story(w,GDD),w)
+    earliest=ep.snapshot()
+    director.choose(ep,"departure","chart")
+    ep.step(ExpeditionAction("travel","launch_updraft"))
+    mid=ep.snapshot()
+    director.choose(ep,"threshold","remember")
+    checkpoint=director.snapshot()
+    sources={
+        earliest["receipt_head"]:earliest,
+        mid["receipt_head"]:mid,
+    }
+    restored=CanonDirector.restore(
+        director.book,ep,checkpoint,gameplay_snapshots=sources,
+    )
+    assert restored.snapshot()==checkpoint
+    assert restored.head==director.head
+    altered=dict(sources)
+    altered.pop(mid["receipt_head"])
+    with pytest.raises(ExpeditionError,match="missing source game"):
+        CanonDirector.restore(director.book,ep,checkpoint,gameplay_snapshots=altered)
 
 def test_restorable_genesis_and_nonempty_replay_fail_closed():
     w,p=game()

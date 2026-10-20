@@ -179,7 +179,15 @@ class CanonDirector:
         return {**data,"snapshot_digest":_digest(data)}
 
     @classmethod
-    def restore(cls,book:StoryBook,episode:ExpeditionEpisode,checkpoint:Mapping)->"CanonDirector":
+    def restore(cls,book:StoryBook,episode:ExpeditionEpisode,
+                checkpoint:Mapping, *,
+                gameplay_snapshots:Mapping[str,Mapping]|None=None)->"CanonDirector":
+        """Rebuild complete canonical choices using their exact historical game states.
+
+        A game timeline is mandatory for nonempty choices. Every supplied
+        episode is re-executed from original actions before accepting dialogue;
+        preserving only final flags is never enough for legal plot continuity.
+        """
         if not isinstance(checkpoint,Mapping) or set(checkpoint)!={
             "schema","story_digest","world_digest","choices","head","flags","snapshot_digest",
         }:
@@ -190,16 +198,35 @@ class CanonDirector:
             raise ExpeditionError("canonical story checkpoint hash invalid")
         if checkpoint["story_digest"]!=book.digest or checkpoint["world_digest"]!=episode.world.digest:
             raise ExpeditionError("story checkpoint belongs to another canonical game")
-        # Narrative replay needs historical game checkpoints for exact proof.
-        # Reuse only a zero-choice snapshot here; other choices require the
-        # caller to replay corresponding gameplay states first.
-        if checkpoint["choices"]:
+        choices=checkpoint["choices"]
+        if (not isinstance(choices,list) or len(choices)>9999
+                or not isinstance(checkpoint["flags"],list)):
+            raise ExpeditionError("canonical story replay budget exceeded")
+        if choices and not isinstance(gameplay_snapshots,Mapping):
             raise ExpeditionError("story replay requires full historical gameplay timeline")
         director=cls(book,episode.world)
-        if director.head!=checkpoint["head"] or checkpoint["flags"]!=[]:
-            raise ExpeditionError("canonical story genesis snapshot changed")
+        prior_game_step=-1
+        for entry in choices:
+            if not isinstance(entry,Mapping) or set(entry)!={
+                "scene","choice","game_receipt",
+            }:
+                raise ExpeditionError("story replay entry is incomplete")
+            game_ref=entry["game_receipt"]
+            if game_ref not in gameplay_snapshots:
+                raise ExpeditionError("story replay missing source game checkpoint")
+            original=ExpeditionEpisode.restore(
+                episode.world,episode.traveler,gameplay_snapshots[game_ref],
+            )
+            if original.snapshot()["receipt_head"]!=game_ref:
+                raise ExpeditionError("story replay references altered gameplay receipt")
+            if len(original.actions)<prior_game_step:
+                raise ExpeditionError("story replay timestamps moved backward")
+            prior_game_step=len(original.actions)
+            director.choose(original,entry["scene"],entry["choice"])
+        if (director.head!=checkpoint["head"]
+                or sorted(director.flags)!=checkpoint["flags"]):
+            raise ExpeditionError("canonical story replay changed authored continuity")
         return director
-
 
 def original_expedition_story(world:ExpeditionWorld,gdd_digest:str)->StoryBook:
     """Author an original three-act story grounded only in available game nodes."""
