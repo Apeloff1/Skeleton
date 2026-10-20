@@ -109,6 +109,6 @@ def load_authored_document(source: str, *, project_id: str) -> StudioProject:
         )
     except (KeyError, IndexError, AttributeError, TypeError, ValueError) as exc:
         raise StudioError("authored original Studio source is incomplete or invalid") from exc
-    if compile_studio_project(project) != value:
+    if json.loads(authored_document(project)) != value:
         raise StudioError("authoring file has inconsistent source receipt or unsupported fields")
     return project
