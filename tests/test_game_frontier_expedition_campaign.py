@@ -105,3 +105,59 @@ def test_game_package_is_source_bound_without_fabricated_native_approval():
     assert record["dragon_verified_route_checks"]==4
     assert not a["dragon"]["training_weight_promotion_allowed"]
     assert not a["qa"]["release_approved"]
+
+
+
+def test_full_campaign_integrates_actual_quest_cinematics_audio_and_render_lod():
+    result=compile_game()
+    files=result["files"]
+    manifest=result["manifest"]
+    assert "game/frontier/quests.json" in files
+    assert "game/frontier/storyboard.json" in files
+    assert "game/frontier/cinematic.gd" in files
+    assert "game/frontier/cinematic.tscn" in files
+    assert "game/frontier/audio_pcm.json" in files
+    assert "game/frontier/audio_manifest.json" in files
+    assert "game/frontier/lod_runtime.json" in files
+    assert "game/frontier/render_journal.json" in files
+    assert "game/frontier/dragon_adversary.json" in files
+    assert "game/frontier/dragon_attacks.json" in files
+    assert "game/frontier/crash_test_policy.json" in files
+    assert result["questbook"].world_digest==result["world"].digest
+    assert result["storyboard"].world_digest==result["world"].digest
+    assert result["audio"]["score"].world_digest==result["world"].digest
+    assert manifest["storyboard_digest"]==result["storyboard"].digest
+    assert manifest["original_audio_receipt"]==result["audio"]["manifest"]["receipt_digest"]
+    assert manifest["render_lod_receipt"]==result["render"]["receipt_digest"]
+    assert manifest["dragon_adversarial_receipt"]==result["dragon_adversary"]["receipt_digest"]
+    assert result["dragon_attacks"]["all_attacks_rejected"]
+    assert not manifest["fault_recovery_executed_by_compiler"]
+    assert not manifest["native_engine_executed_by_compiler"]
+
+
+def test_integrated_godot_script_executes_game_audio_narrative_lod_and_cinematic():
+    built=compile_game()
+    gd=built["files"]["game/frontier/expedition.gd"]
+    assert "_install_soundscape()" in gd
+    assert "AudioStreamWAV.new()" in gd
+    assert "func _advance_quests()" in gd
+    assert "func _resolve_ending()" in gd
+    assert "func _refresh_lod()" in gd
+    assert 'EXPEDITION_QUEST' in gd
+    assert 'EXPEDITION_ENDING' in gd
+    assert "CINEMATIC_SCENE" in gd
+    assert "game/frontier/cinematic.gd" in built["files"]
+
+
+def test_full_campaign_quest_and_audio_source_tamper_fail_independent_recompile():
+    candidate=compile_game()
+    for path in ("game/frontier/quests.json","game/frontier/audio_pcm.json",
+                 "game/frontier/cinematic.gd","game/frontier/lod_runtime.json",
+                 "game/frontier/dragon_adversary.json"):
+        changed=deepcopy(candidate)
+        changed["files"][path]+="\n# unaudited"
+        with pytest.raises(ExpeditionError,match="differs"):
+            verify_original_campaign(
+                changed,project_id="campaign",gdd_digest=GDD,
+                seed=13,islands=5,
+            )

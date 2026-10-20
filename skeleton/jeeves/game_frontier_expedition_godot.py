@@ -49,6 +49,11 @@ const PLAYER_FILE = "res://game/frontier/player.json"
 const CONTROLLER_FILE = "res://game/frontier/controller.json"
 const CANON_FILE = "res://game/frontier/canon.json"
 const VISUALS_FILE = "res://game/frontier/visuals_manifest.json"
+const QUESTS_FILE = "res://game/frontier/quests.json"
+const AUDIO_FILE = "res://game/frontier/audio_pcm.json"
+const LOD_FILE = "res://game/frontier/lod_runtime.json"
+const CINEMATIC_SCENE = "res://game/frontier/cinematic.tscn"
+const STORYBOARD_FILE = "res://game/frontier/storyboard.json"
 const AUTOPLAY_FILE = "res://game/frontier/autoplay.json"
 const MAX_GAME_EDGES = 65536
 var world: Dictionary = {}
@@ -72,6 +77,15 @@ var hud: Label
 var controller_hud: Label
 var canon: Dictionary = {}
 var visuals: Dictionary = {}
+var quests: Dictionary = {}
+var storyboard: Dictionary = {}
+var quest_flags: Dictionary = {}
+var quest_progress: Dictionary = {}
+var lod_policy: Dictionary = {}
+var marker_by_id: Dictionary = {}
+var lod_frame: int = 0
+var cinematic: Node3D
+var sound_player: AudioStreamPlayer
 var story_flags: Dictionary = {}
 var completed_scenes: Dictionary = {}
 var actor: MeshInstance3D
@@ -156,6 +170,8 @@ func _ready() -> void:
     _load_optional_authored_game()
     _setup_scene()
     _install_controller()
+    _install_soundscape()
+    _advance_quests()
     _refresh_ui()
     print("EXPEDITION_READY " + str(world.get("project", "")) +
           " " + str(waypoint_by_id.size()) + " " + str(edge_by_id.size()))
@@ -222,6 +238,109 @@ func _load_optional_authored_game() -> void:
             visuals = style
         else:
             push_error("Optional visual asset manifest differs from original world")
+    if FileAccess.file_exists(QUESTS_FILE):
+        var quest_source: Dictionary = _load_json(QUESTS_FILE)
+        if (quest_source.get("schema", "") == "skeleton.game.canon_quest_endings.v1"
+                and str(quest_source.get("world", "")) == str(world.get("world_digest", ""))):
+            quests = quest_source
+        else:
+            push_error("Optional quest source is not game-bound")
+    if FileAccess.file_exists(STORYBOARD_FILE):
+        var authored_clips: Dictionary = _load_json(STORYBOARD_FILE)
+        if (authored_clips.get("schema", "") == "skeleton.game.original_storyboard.v1"
+                and str(authored_clips.get("world", "")) == str(world.get("world_digest", ""))):
+            storyboard = authored_clips
+        else:
+            push_error("Cinematics are authored for another world")
+    if FileAccess.file_exists(LOD_FILE):
+        var lod: Dictionary = _load_json(LOD_FILE)
+        if (lod.get("schema", "") == "skeleton.game.original_lod_runtime.v1"
+                and str(lod.get("world_digest", "")) == str(world.get("world_digest", ""))):
+            lod_policy = lod
+        else:
+            push_error("Render LOD source belongs to another world")
+
+func _install_soundscape() -> void:
+    if not FileAccess.file_exists(AUDIO_FILE):
+        return
+    var data: Dictionary = _load_json(AUDIO_FILE)
+    if (data.get("schema", "") != "skeleton.game.original_audio_pcm.v1"
+            or str(data.get("world_digest", "")) != str(world.get("world_digest", ""))):
+        push_error("Original soundscape was built for another game")
+        return
+    var raw: PackedByteArray = Marshalls.base64_to_raw(str(data.get("pcm_base64", "")))
+    var rate: int = int(data.get("rate", 0))
+    if raw.size() < 200 or raw.size() > 3000000 or rate not in [8000,16000,22050,44100]:
+        push_error("Original soundscape PCM exceeds resource budget")
+        return
+    var wav := AudioStreamWAV.new()
+    wav.format = AudioStreamWAV.FORMAT_16_BITS
+    wav.mix_rate = rate
+    wav.stereo = false
+    wav.data = raw
+    sound_player = AudioStreamPlayer.new()
+    sound_player.stream = wav
+    sound_player.volume_db = -18.0
+    add_child(sound_player)
+    sound_player.play()
+    print("EXPEDITION_AUDIO_READY " + str(world.get("world_digest", "")))
+
+func _advance_quests() -> void:
+    for quest in quests.get("quests", []):
+        var quest_id := str(quest.get("quest_id", ""))
+        var steps: Array = quest.get("stages", [])
+        var index: int = int(quest_progress.get(quest_id, 0))
+        if index >= steps.size():
+            continue
+        var stage: Dictionary = steps[index]
+        if str(stage.get("waypoint", "")) != current_id:
+            continue
+        var eligible: bool = true
+        for required in stage.get("requires_game_flags", []):
+            if not flags.has(str(required)):
+                eligible = false
+        for required in stage.get("requires_items", []):
+            if not inventory.has(str(required)):
+                eligible = false
+        for required in stage.get("requires_story_flags", []):
+            if not story_flags.has(str(required)):
+                eligible = false
+        if not eligible:
+            continue
+        quest_progress[quest_id] = index+1
+        for token in stage.get("unlocks", []):
+            quest_flags[str(token)] = true
+        print("EXPEDITION_QUEST " + JSON.stringify({
+            "world_digest":str(world.get("world_digest", "")),
+            "quest":quest_id,"stage":str(stage.get("stage_id", "")),
+            "step":index+1,"game_receipt_head":receipt_head,
+        }))
+
+func _resolve_ending() -> void:
+    if not won:
+        return
+    var qualified: Array = []
+    for ending in quests.get("endings", []):
+        var valid: bool = true
+        for flag in ending.get("needs_game_flags", []):
+            if not flags.has(str(flag)) and not inventory.has(str(flag)):
+                valid = false
+        for flag in ending.get("needs_story_flags", []):
+            if not story_flags.has(str(flag)):
+                valid = false
+        for flag in ending.get("needs_quest_flags", []):
+            if not quest_flags.has(str(flag)):
+                valid = false
+        if valid:
+            qualified.append(ending)
+    qualified.sort_custom(func(a, b): return int(a["priority"]) > int(b["priority"]))
+    if qualified.size()>0:
+        print("EXPEDITION_ENDING " + JSON.stringify({
+            "source":str(world.get("world_digest", "")),
+            "ending_id":str(qualified[0]["ending_id"]),
+            "game_receipt_head":receipt_head,
+            "quest_flags":quest_flags.keys(),
+        }))
 
 func _story_scene() -> Dictionary:
     for scene in canon.get("scenes", []):
@@ -253,6 +372,7 @@ func _choose_story(index: int) -> void:
     for grant in choice.get("advances", []):
         story_flags[str(grant)] = true
     completed_scenes[str(scene["scene_id"])] = true
+    _advance_quests()
     print("EXPEDITION_STORY " + JSON.stringify({
         "world_digest":str(world.get("world_digest", "")),
         "scene":str(scene["scene_id"]), "choice":str(choice["choice_id"]),
@@ -323,6 +443,7 @@ func _setup_scene() -> void:
         marker.position = _where(node)
         marker.set_meta("waypoint_id", str(node["waypoint_id"]))
         add_child(marker)
+        marker_by_id[str(node["waypoint_id"])] = marker
     var segments := ImmediateMesh.new()
     segments.surface_begin(Mesh.PRIMITIVE_LINES)
     for edge in world["edges"]:
@@ -365,6 +486,11 @@ func _setup_scene() -> void:
     controller_hud.position = Vector2(16, 580)
     controller_hud.add_theme_color_override("font_color", Color(0.8, 0.9, 1))
     layer.add_child(controller_hud)
+    if ResourceLoader.exists(CINEMATIC_SCENE):
+        var packed: PackedScene = load(CINEMATIC_SCENE)
+        if packed != null:
+            cinematic = packed.instantiate()
+            add_child(cinematic)
 
 func _place_actor() -> void:
     actor.position = _where(waypoint_by_id[current_id]) + Vector3(0, 3, 0)
@@ -482,6 +608,14 @@ func _travel(edge: Dictionary) -> void:
     if world.get("destinations", []).has(current_id) and health > 0:
         won = true
     _commit("travel",str(edge["edge_id"]))
+    _advance_quests()
+    if cinematic != null and cinematic.has_method("play_clip"):
+        for clip in storyboard.get("clips", []):
+            if str(clip.get("waypoint", "")) == current_id:
+                cinematic.call("play_clip", str(clip.get("clip_id", "")),
+                               str(world.get("world_digest", "")))
+                break
+    _resolve_ending()
     _refresh_ui()
 
 func _rest() -> void:
@@ -550,7 +684,32 @@ func _unhandled_input(event: InputEvent) -> void:
         _rest()
         get_viewport().set_input_as_handled()
 
+func _refresh_lod() -> void:
+    if lod_policy.is_empty() or camera == null:
+        return
+    var near: float = float(lod_policy.get("near_m", 80))
+    var far: float = float(lod_policy.get("far_m", 240))
+    var updates: int = 0
+    for node_id in marker_by_id:
+        if updates >= 64:
+            break
+        var marker: MeshInstance3D = marker_by_id[node_id]
+        var distance: float = marker.position.distance_to(camera.position)
+        var level: int = 0 if distance < near else 1 if distance < far else 2
+        if int(marker.get_meta("lod", -1)) == level:
+            continue
+        var path := "res://game/frontier/assets/" + str(node_id) + "_lod" + str(level) + ".obj"
+        if ResourceLoader.exists(path):
+            var candidate: Resource = load(path)
+            if candidate is Mesh:
+                marker.mesh = candidate
+                marker.set_meta("lod", level)
+                updates += 1
+
 func _process(delta: float) -> void:
+    lod_frame += 1
+    if lod_frame % 30 == 0:
+        _refresh_lod()
     if camera != null and actor != null:
         var goal := actor.position + Vector3(0, 28, 45)
         camera.position = camera.position.lerp(goal, minf(1.0,delta*3.0))

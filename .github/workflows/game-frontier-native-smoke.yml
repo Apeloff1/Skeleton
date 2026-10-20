@@ -136,6 +136,13 @@ jobs:
               )
               assert verified["won"]
               assert verified["executed_actions"]>=1
+              assert "EXPEDITION_AUDIO_READY " in out, "Native WAV audio unavailable: "+repr(out[-3000:])
+              assert "EXPEDITION_ENDING " in out, "Native quest ending missing: "+repr(out[-3000:])
+              assert "EXPEDITION_CINEMATIC_COMPLETE " in out or "EXPEDITION_OBSERVATION " in out
+              assert "game/frontier/quests.json" in candidate["files"]
+              assert "game/frontier/cinematic.gd" in candidate["files"]
+              assert "game/frontier/lod_runtime.json" in candidate["files"]
+              assert candidate["dragon_attacks"]["all_attacks_rejected"]
               print(json.dumps({
                   "original_3d_assets":candidate["manifest"]["unique_game_assets"],
                   "actual_gameplay_qa_cases":candidate["manifest"]["actual_qa_cases"],

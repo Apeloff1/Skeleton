@@ -8,9 +8,13 @@ Never labels a candidate as a shipped game or signs nonexistent legal reviews.
 from __future__ import annotations
 
 from hashlib import sha256
+from base64 import b64encode
+from dataclasses import asdict
 from typing import Mapping
 
-from .game_frontier_expedition import ExpeditionError,_digest,_json,Traveler
+from .game_frontier_expedition import (
+    ExpeditionError,_digest,_json,Traveler,ExpeditionEpisode,
+)
 from .game_frontier_expedition_generation import (
     ArchipelagoProfile,author_archipelago,
 )
@@ -27,6 +31,21 @@ from .game_frontier_expedition_narrative import original_expedition_story
 from .game_frontier_expedition_dragon import observe_original_games
 from .game_frontier_expedition_qa import run_expedition_qa
 from .game_frontier_expedition_release import evaluate_expedition_release
+from .game_frontier_expedition_quests import original_quest_book
+from .game_frontier_expedition_audio import export_original_soundscape
+from .game_frontier_expedition_cinematics import (
+    original_game_storyboard,storyboard_frame_receipts,export_storyboard_godot,
+)
+from .game_frontier_expedition_render import (
+    View,LODPolicy,render_lod_timeline,
+)
+from .game_frontier_expedition_dragon_review import (
+    adversarial_dragon_review,adversarial_attack_matrix,
+)
+from .game_frontier_expedition_crash import CrashPolicy
+from .game_frontier_expedition_input import (
+    AxisBinding,AxisCalibration,
+)
 
 
 def original_campaign_player()->Traveler:
@@ -71,6 +90,22 @@ def compile_original_campaign(
         controller_profile=controller,
     )
     dragon=observe_original_games((world,),player,alternative_budget=3)
+    dragon_review=adversarial_dragon_review(
+        dragon,(world,),player,alternative_budget=3,
+    )
+    dragon_attacks=adversarial_attack_matrix(dragon,(world,),player)
+    questbook=original_quest_book(ExpeditionEpisode(world,player),story)
+    storyboard=original_game_storyboard(world,gdd_digest)
+    storyboard_frames=storyboard_frame_receipts(storyboard,sample_stride=6)
+    sound=export_original_soundscape(world,seconds=1)
+    render_frames=render_lod_timeline(
+        world,assets["manifest"],(
+            View(1,0,0,0,500),
+            View(2,35,0,12,500),
+            View(3,105,30,25,500),
+        ),policy=LODPolicy(triangle_budget=25000),
+    )
+    crash_policy=CrashPolicy(game_cycles=5)
     qa=run_expedition_qa(
         world.project_id,world.source_digest,
         seeds=(seed,seed+1),islands=islands,alternatives=3,
@@ -80,8 +115,44 @@ def compile_original_campaign(
         raise ExpeditionError("candidate without legal/native evidence must not be approved")
     files={**native_files,**assets["files"]}
     files["game/frontier/canon.json"]=_json(story.as_dict()).decode("utf-8")
+    files["game/frontier/quests.json"]=_json(questbook.as_dict()).decode("utf-8")
+    files.update(export_storyboard_godot(storyboard,world))
+    files["game/frontier/audio_pcm.json"]=_json({
+        "schema":"skeleton.game.original_audio_pcm.v1",
+        "world_digest":world.digest,
+        "score_digest":sound["score"].digest,
+        "rate":sound["score"].sample_rate,
+        "wav_sha256":sound["manifest"]["audio_sha256"],
+        "pcm_base64":b64encode(sound["wav"][44:]).decode("ascii"),
+    }).decode("utf-8")
+    files["game/frontier/audio_manifest.json"]=_json(
+        sound["manifest"]
+    ).decode("utf-8")
+    files["game/frontier/lod_runtime.json"]=_json({
+        "schema":"skeleton.game.original_lod_runtime.v1",
+        "world_digest":world.digest,
+        "asset_receipt":assets["manifest"]["receipt_digest"],
+        "near_m":80.0,"far_m":240.0,
+        "triangle_budget":25000,
+        "native_fps_measured":False,
+    }).decode("utf-8")
+    files["game/frontier/render_journal.json"]=_json(
+        render_frames
+    ).decode("utf-8")
+    files["game/frontier/crash_test_policy.json"]=_json({
+        "schema":"skeleton.game.crash_test_policy.v1",
+        "world_digest":world.digest,
+        "policy":asdict(crash_policy),
+        "fault_simulations_executed_by_compiler":False,
+    }).decode("utf-8")
     files["game/frontier/visuals_manifest.json"]=_json(assets["manifest"]).decode("utf-8")
     files["game/frontier/dragon_study.json"]=_json(dragon).decode("utf-8")
+    files["game/frontier/dragon_adversary.json"]=_json(
+        dragon_review
+    ).decode("utf-8")
+    files["game/frontier/dragon_attacks.json"]=_json(
+        dragon_attacks
+    ).decode("utf-8")
     files["game/frontier/qa_report.json"]=_json(qa).decode("utf-8")
     files["game/frontier/release_review.json"]=_json(release).decode("utf-8")
     proofs={
@@ -90,6 +161,15 @@ def compile_original_campaign(
         "gdd_digest":gdd_digest,
         "controller_digest":controller.digest,
         "story_digest":story.digest,
+        "questbook_digest":questbook.digest,
+        "storyboard_digest":storyboard.digest,
+        "cinematic_frame_receipt":storyboard_frames["receipt_digest"],
+        "original_audio_receipt":sound["manifest"]["receipt_digest"],
+        "render_lod_receipt":render_frames["receipt_digest"],
+        "dragon_adversarial_receipt":dragon_review["receipt_digest"],
+        "dragon_attack_matrix_receipt":dragon_attacks["receipt_digest"],
+        "fault_recovery_budget":asdict(crash_policy),
+        "fault_recovery_executed_by_compiler":False,
         "asset_receipt":asset_proof["geometry_receipt"],
         "native_candidate_receipt":native_proof["receipt_digest"],
         "dragon_receipt":dragon["receipt_digest"],
@@ -111,7 +191,12 @@ def compile_original_campaign(
     return {
         "world":world,"player":player,
         "files":files,"manifest":proofs,
-        "story":story,"dragon":dragon,"qa":qa,"release_review":release,
+        "story":story,"questbook":questbook,
+        "storyboard":storyboard,"audio":sound,
+        "render":render_frames,"dragon":dragon,
+        "dragon_adversary":dragon_review,
+        "dragon_attacks":dragon_attacks,
+        "qa":qa,"release_review":release,
     }
 
 
@@ -129,7 +214,13 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
     if (compiled.get("manifest")!=expected["manifest"]
             or compiled.get("files")!=expected["files"]
             or compiled.get("story")!=expected["story"]
+            or compiled.get("questbook")!=expected["questbook"]
+            or compiled.get("storyboard")!=expected["storyboard"]
+            or compiled.get("audio")!=expected["audio"]
+            or compiled.get("render")!=expected["render"]
             or compiled.get("dragon")!=expected["dragon"]
+            or compiled.get("dragon_adversary")!=expected["dragon_adversary"]
+            or compiled.get("dragon_attacks")!=expected["dragon_attacks"]
             or compiled.get("qa")!=expected["qa"]):
         raise ExpeditionError("recompiled original game differs from reviewed artifact")
     return {
