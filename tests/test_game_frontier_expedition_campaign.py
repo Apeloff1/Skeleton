@@ -161,3 +161,50 @@ def test_full_campaign_quest_and_audio_source_tamper_fail_independent_recompile(
                 changed,project_id="campaign",gdd_digest=GDD,
                 seed=13,islands=5,
             )
+
+
+
+def test_every_advanced_original_game_system_is_part_of_the_campaign_and_source_replay():
+    candidate=compile_game()
+    for path in (
+        "game/frontier/actor_rig.gd",
+        "game/frontier/actor_rig.json",
+        "game/frontier/elasticbodyskin3d.json",
+        "game/frontier/society.json",
+        "game/frontier/performance.gd",
+        "game/frontier/performance.json",
+        "game/frontier/visual_comparison.json",
+        "game/frontier/controller_latency.json",
+        "game/frontier/production_telemetry.json",
+        "game/frontier/seven_plane_assurance.json",
+    ):
+        assert path in candidate["files"]
+    manifest=candidate["manifest"]
+    assert manifest["seven_plane_source_checks"]==6
+    assert len(manifest["npc_society_receipt"])==64
+    assert len(manifest["elastic_skin_receipt"])==64
+    assert candidate["seven_plane_assurance"]["total"]==7
+    assert not candidate["seven_plane_assurance"]["production_release_approved"]
+    assert not candidate["controller_qa"]["full_hardware_qualification"]
+    assert not candidate["dragon_vision"]["neural_weights_promoted"]
+    assert verify_original_campaign(
+        candidate,project_id="campaign",gdd_digest=GDD,seed=13,islands=5
+    )["all_source_bytes_verified"]
+
+
+def test_advanced_game_artifacts_cannot_be_replaced_after_source_recompile():
+    candidate=compile_game()
+    for filename in (
+        "game/frontier/actor_rig.json",
+        "game/frontier/performance.json",
+        "game/frontier/society.json",
+        "game/frontier/controller_latency.json",
+        "game/frontier/seven_plane_assurance.json",
+    ):
+        tampered=deepcopy(candidate)
+        tampered["files"][filename]+="unauthorized content"
+        with pytest.raises(ExpeditionError,match="differs"):
+            verify_original_campaign(
+                tampered,project_id="campaign",gdd_digest=GDD,
+                seed=13,islands=5,
+            )

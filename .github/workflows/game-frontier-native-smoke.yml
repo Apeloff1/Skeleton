@@ -143,6 +143,13 @@ jobs:
               assert "EXPEDITION_ENDING " in out, "Native quest ending missing: "+repr(out[-3000:])
               assert "EXPEDITION_NPC_READY " in out, "Native original NPC scene absent: "+repr(out[-3000:])
               assert "EXPEDITION_ECOLOGY_READY " in out, "Native original foliage not instantiated: "+repr(out[-3000:])
+              assert "EXPEDITION_RIG_READY " in out, "Native authored skeleton did not load: "+repr(out[-3000:])
+              assert "EXPEDITION_PERFORMANCE_READY " in out, "Native authored facial performance not loaded: "+repr(out[-3000:])
+              assert "game/frontier/society.json" in candidate["files"]
+              assert "game/frontier/actor_rig.gd" in candidate["files"]
+              assert "game/frontier/performance.gd" in candidate["files"]
+              assert candidate["manifest"]["seven_plane_source_checks"]==6
+              assert not candidate["seven_plane_assurance"]["production_release_approved"]
               assert "EXPEDITION_CINEMATIC_COMPLETE " in out or "EXPEDITION_OBSERVATION " in out
               assert "game/frontier/quests.json" in candidate["files"]
               assert "game/frontier/cinematic.gd" in candidate["files"]

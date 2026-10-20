@@ -17,6 +17,14 @@ def test_full_campaign_cli_builds_runnable_authored_artifacts_and_all_receipts(t
     assert report["independent_recompile_verified"]
     assert report["original_generated_meshes"]>10
     assert report["original_npc_cast"]==3
+    assert len(report["original_skeletal_rig_digest"])==64
+    assert len(report["elastic_skin_receipt"])==64
+    assert len(report["faction_economy_receipt"])==64
+    assert len(report["facial_performance_receipt"])==64
+    assert len(report["dragon_visual_receipt"])==64
+    assert len(report["controller_latency_receipt"])==64
+    assert len(report["production_watchdog_receipt"])==64
+    assert report["release_planes_source_checked"]==6
     assert report["original_foliage_instances"]>10
     assert report["source_replayed_story_branches"]==2
     assert report["source_replayed_distinct_endings"]==2

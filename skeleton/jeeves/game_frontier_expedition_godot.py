@@ -54,6 +54,10 @@ const AUDIO_FILE = "res://game/frontier/audio_pcm.json"
 const AUDIO_MIX_FILE = "res://game/frontier/audio_mix.json"
 const ECOLOGY_SCRIPT = "res://game/frontier/ecology.gd"
 const NPC_FILE = "res://game/frontier/npcs.json"
+const ACTOR_RIG_SCRIPT = "res://game/frontier/actor_rig.gd"
+const PERFORMANCE_SCRIPT = "res://game/frontier/performance.gd"
+const SOCIETY_FILE = "res://game/frontier/society.json"
+const SEVEN_PLANE_FILE = "res://game/frontier/seven_plane_assurance.json"
 const LOD_FILE = "res://game/frontier/lod_runtime.json"
 const CINEMATIC_SCENE = "res://game/frontier/cinematic.tscn"
 const STORYBOARD_FILE = "res://game/frontier/storyboard.json"
@@ -94,6 +98,8 @@ var sound_player: AudioStreamPlayer
 var story_flags: Dictionary = {}
 var completed_scenes: Dictionary = {}
 var actor: MeshInstance3D
+var performance_player: Node3D
+var society_source: Dictionary = {}
 
 func _load_json(path: String) -> Dictionary:
     if not FileAccess.file_exists(path):
@@ -243,6 +249,13 @@ func _load_optional_authored_game() -> void:
             visuals = style
         else:
             push_error("Optional visual asset manifest differs from original world")
+    if FileAccess.file_exists(SOCIETY_FILE):
+        var social: Dictionary = _load_json(SOCIETY_FILE)
+        if (social.get("schema", "") == "skeleton.game.original_society.v1"
+                and str(social.get("world", "")) == str(world.get("world_digest", ""))):
+            society_source = social
+        else:
+            push_error("Optional original NPC society source differs from game")
     if FileAccess.file_exists(NPC_FILE):
         var actors: Dictionary = _load_json(NPC_FILE)
         if (actors.get("schema", "") == "skeleton.game.original_npc_cast.v1"
@@ -509,6 +522,16 @@ func _setup_scene() -> void:
     actor.material_override = actor_material
     add_child(actor)
     _place_actor()
+    if ResourceLoader.exists(ACTOR_RIG_SCRIPT):
+        var rig_visual := Node3D.new()
+        rig_visual.set_meta("expected_world", str(world.get("world_digest", "")))
+        rig_visual.set_script(load(ACTOR_RIG_SCRIPT))
+        actor.add_child(rig_visual)
+    if ResourceLoader.exists(PERFORMANCE_SCRIPT):
+        performance_player = Node3D.new()
+        performance_player.set_meta("expected_world", str(world.get("world_digest", "")))
+        performance_player.set_script(load(PERFORMANCE_SCRIPT))
+        actor.add_child(performance_player)
     camera = Camera3D.new()
     camera.current = true
     camera.far = 100000.0
@@ -654,6 +677,8 @@ func _travel(edge: Dictionary) -> void:
             if str(clip.get("waypoint", "")) == current_id:
                 cinematic.call("play_clip", str(clip.get("clip_id", "")),
                                str(world.get("world_digest", "")))
+                if performance_player != null and performance_player.has_method("play_performance"):
+                    performance_player.call("play_performance", str(clip.get("clip_id", "")))
                 break
     _resolve_ending()
     _refresh_ui()

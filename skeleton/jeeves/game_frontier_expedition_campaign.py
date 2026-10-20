@@ -56,6 +56,21 @@ from .game_frontier_expedition_ecology import (
 from .game_frontier_expedition_input import (
     AxisBinding,AxisCalibration,
 )
+from .game_frontier_expedition_animation import (
+    original_actor_rig,simulate_elastic_skin,export_actor_rig_godot,
+)
+from .game_frontier_expedition_society import simulate_original_society
+from .game_frontier_expedition_performance import (
+    author_performance,export_performance_godot,
+)
+from .game_frontier_expedition_visual_lab import (
+    original_procedural_preview_frames,compare_original_visuals,
+)
+from .game_frontier_expedition_controller_latency import (
+    qualify_game_controller,simulated_controller_trace,
+)
+from .game_frontier_expedition_watchdog import simulate_production_health
+from .game_frontier_expedition_seven_review import objectively_review_seven_planes
 
 
 def original_campaign_player()->Traveler:
@@ -123,6 +138,34 @@ def compile_original_campaign(
         if observed.snapshot()!=actual.snapshot():
             raise ExpeditionError("NPC independent build replay differed")
         npc_records.append({"design":asdict(design),"proof":actual.snapshot()})
+    # Seven additional independently replayable original game-production systems.
+    rig,walk_cycle=original_actor_rig(world.digest)
+    soft_skin=simulate_elastic_skin(rig,walk_cycle,frames=48)
+    society=simulate_original_society(world,tuple(npc_designs))
+    performance=author_performance(story,storyboard)
+    preview_rgb=(original_procedural_preview_frames(world.digest),)
+    vision=compare_original_visuals(preview_rgb)
+    measured_controller=qualify_game_controller(
+        controller,simulated_controller_trace(controller),
+        world_digest=world.digest,
+    )
+    watchdog=simulate_production_health(world.digest,ticks=12)
+    seven_axes=objectively_review_seven_planes(world.digest,{
+        "rig":{"rig_digest":rig.digest,"soft_body_receipt":soft_skin["receipt_digest"],
+               "world":world.digest},
+        "society":society,
+        "performance":performance,
+        "dragon_vision":vision,
+        "controller_latency":measured_controller,
+        "production_watchdog":watchdog,
+        "rights_and_native":{
+            "world":world.digest,"rights_signed":False,
+            "native_game_executed":False,"physical_controller_verified":False,
+            "long_duration_days":0,
+        },
+    })
+    if seven_axes["production_release_approved"] or seven_axes["passed"]!=6:
+        raise ExpeditionError("original studio cannot bypass unsigned release assurance")
     render_frames=render_lod_timeline(
         world,assets["manifest"],(
             View(1,0,0,0,500),
@@ -143,6 +186,14 @@ def compile_original_campaign(
     files["game/frontier/quests.json"]=_json(questbook.as_dict()).decode("utf-8")
     files.update(export_storyboard_godot(storyboard,world))
     files.update(export_ecology_godot(world,ecology_policy))
+    files.update(export_actor_rig_godot(rig,walk_cycle))
+    files.update(export_performance_godot(story,storyboard))
+    files["game/frontier/elasticbodyskin3d.json"]=_json(soft_skin).decode("utf-8")
+    files["game/frontier/society.json"]=_json(society).decode("utf-8")
+    files["game/frontier/visual_comparison.json"]=_json(vision).decode("utf-8")
+    files["game/frontier/controller_latency.json"]=_json(measured_controller).decode("utf-8")
+    files["game/frontier/production_telemetry.json"]=_json(watchdog).decode("utf-8")
+    files["game/frontier/seven_plane_assurance.json"]=_json(seven_axes).decode("utf-8")
     files["game/frontier/npcs.json"]=_json({
         "schema":"skeleton.game.original_npc_cast.v1",
         "world_digest":world.digest,
@@ -219,6 +270,16 @@ def compile_original_campaign(
         "story_digest":story.digest,
         "questbook_digest":questbook.digest,
         "storyboard_digest":storyboard.digest,
+        "rig_digest":rig.digest,
+        "elastic_skin_receipt":soft_skin["receipt_digest"],
+        "npc_society_receipt":society["snapshot_digest"],
+        "performance_receipt":performance["receipt_digest"],
+        "dragon_visual_receipt":vision["receipt_digest"],
+        "controller_latency_receipt":measured_controller["receipt_digest"],
+        "production_watchdog_receipt":watchdog["snapshot_digest"],
+        "seven_plane_assurance_receipt":seven_axes["receipt_digest"],
+        "seven_plane_source_checks":seven_axes["passed"],
+        "real_hardware_test_completed":False,
         "branch_plot_receipt":branch_proof["receipt_digest"],
         "full_branch_playthroughs":branch_proof["opening_branches_executed"],
         "different_endings_earned":branch_proof["distinct_endings_reached"],
@@ -260,6 +321,10 @@ def compile_original_campaign(
         "adaptive_music":mix,
         "plot_proof":branch_proof,
         "npcs":npc_records,"ecology":ecology,
+        "rig":rig,"walk_cycle":walk_cycle,"elastic_skin":soft_skin,
+        "society":society,"performance":performance,
+        "dragon_vision":vision,"controller_qa":measured_controller,
+        "production_watchdog":watchdog,"seven_plane_assurance":seven_axes,
         "ecology_frame":ecology_sample,
         "render":render_frames,"dragon":dragon,
         "dragon_adversary":dragon_review,
@@ -287,6 +352,15 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
             or compiled.get("audio")!=expected["audio"]
             or compiled.get("adaptive_music")!=expected["adaptive_music"]
             or compiled.get("plot_proof")!=expected["plot_proof"]
+            or compiled.get("rig")!=expected["rig"]
+            or compiled.get("walk_cycle")!=expected["walk_cycle"]
+            or compiled.get("elastic_skin")!=expected["elastic_skin"]
+            or compiled.get("society")!=expected["society"]
+            or compiled.get("performance")!=expected["performance"]
+            or compiled.get("dragon_vision")!=expected["dragon_vision"]
+            or compiled.get("controller_qa")!=expected["controller_qa"]
+            or compiled.get("production_watchdog")!=expected["production_watchdog"]
+            or compiled.get("seven_plane_assurance")!=expected["seven_plane_assurance"]
             or compiled.get("npcs")!=expected["npcs"]
             or compiled.get("ecology")!=expected["ecology"]
             or compiled.get("ecology_frame")!=expected["ecology_frame"]
