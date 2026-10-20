@@ -66,21 +66,31 @@ def _sid(prefix,i):
 
 
 def _no_cycle(quest: StudioQuest):
+    """Iterative depth-first cycle rejection for up to 4096 quest stages."""
     edges={s.stage_id:s.next_stage_ids for s in quest.stages}
     state={}
-    def visit(node):
-        if state.get(node)==1:
-            raise StudioError("cyclic narrative stage path is forbidden")
-        if state.get(node)==2:
-            return
-        state[node]=1
-        for nxt in edges[node]:
-            if nxt not in edges:
-                raise StudioError("narrative branch has missing destination")
-            visit(nxt)
-        state[node]=2
-    for name in edges:
-        visit(name)
+    for root in edges:
+        if state.get(root)==2:
+            continue
+        stack=[(root,False)]
+        while stack:
+            node,closing=stack.pop()
+            if closing:
+                state[node]=2
+                continue
+            if state.get(node)==1:
+                raise StudioError("cyclic narrative stage path is forbidden")
+            if state.get(node)==2:
+                continue
+            state[node]=1
+            stack.append((node,True))
+            for nxt in reversed(edges[node]):
+                if nxt not in edges:
+                    raise StudioError("narrative branch has missing destination")
+                if state.get(nxt)==1:
+                    raise StudioError("cyclic narrative stage path is forbidden")
+                if state.get(nxt)!=2:
+                    stack.append((nxt,False))
 
 
 def _write_quest(project,position,quest):
