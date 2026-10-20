@@ -49,6 +49,8 @@ export default function ChatResponseReviewControl({ enabled, change, disabled = 
   const knownContexts = [mainModel, ...chosenModels].filter((model): model is ChatCooperationModel => !!model)
     .map(model => model.context_window).filter((value): value is number => typeof value === 'number' && value > 0);
   const sharedContext = mainModel && chosenModels.every(Boolean) && knownContexts.length ? Math.min(...knownContexts) : null;
+  const observedDigests = chosenModels.map(model => model?.activation?.model_digest).filter((value): value is string => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value));
+  const distinctDigests = new Set(observedDigests).size;
   const pickedPair = rolePicker ? policy.roles[rolePicker] : null;
   const pickerTitle = COOPERATION_ROLES.find(row => row.role === rolePicker)?.label || '';
 
@@ -109,6 +111,7 @@ export default function ChatResponseReviewControl({ enabled, change, disabled = 
           })}
           <Text style={s.detail}>{sharedContext ? `Shared context capacity is at most ${sharedContext.toLocaleString()} tokens across the chosen models.` : 'The engine checks the shared context capacity of inherited and explicitly chosen models.'} The saved conversation and generated stage material must fit; the engine refuses incompatible requests rather than dropping context.</Text>
           <Text style={s.detail}>Several roles may use the same model. Multiple stages or models do not certify independent review or better results.</Text>
+          {observedDigests.length > 0 && <Text style={s.detail}>Weight fingerprints are observed for {observedDigests.length} of 4 roles: {distinctDigests} distinct {distinctDigests === 1 ? 'fingerprint' : 'fingerprints'}. Different catalog aliases for the same weights share a fingerprint.</Text>}
         </>}
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh models for response review" accessibilityState={{ disabled: refreshing || disabled }} disabled={refreshing || disabled} onPress={() => { setRefreshing(true); void refreshModels().catch(() => {}).finally(() => setRefreshing(false)); }} style={s.button}><Text style={s.label}>{refreshing ? 'Refreshing observed models…' : 'Refresh observed models'}</Text></TouchableOpacity>
         {issueText.map((issue, index) => <Text key={index} accessibilityRole="alert" style={s.error}>{issue}</Text>)}

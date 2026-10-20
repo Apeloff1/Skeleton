@@ -223,7 +223,7 @@
         "skeleton_data"
       ],
       "durability": "persistent named volume in Compose via /app/data; explicit :memory: defaults remain local/test-only",
-      "production_role": "authoritative cognitive execution/result/submission/approval/tool-receipt/quota state plus durable cross-process pressure coordination",
+      "production_role": "authoritative cognitive execution/result/submission/approval/tool-receipt/quota state plus durable cross-process pressure coordination Working-order continuation preserves immutable terminal result JSON/digests while additive ai_execution_result feedback markers pin exact outcome/checkpoint/scope/model/source deduplication, ai_execution_learning_retention_state bounds derived outcome rows, maintenance result projections preserve completed continuations, and verified postcommit acknowledgements compact predictor receipt payloads without replaying Adam. All remain in this same execution SQLite file. ai_execution_coordinator_identity pins one engine namespace per file; OS inode custody is ephemeral coordination held through coordinator drain, not a new persistence authority. Operator continuation adds actual learning policy version/digest feedback-marker provenance and same-row circuit failure/source/generation reset metadata; numeric export reads retained diagnostics with metadata provenance checks and creates no new store.",
       "network": "in-process only",
       "authentication": "inherits authenticated engine service boundary, delegated authority and tenant binding",
       "backup": "back up the /app/data engine SQLite set with skeleton_data using transactionally consistent SQLite/volume backup; operation-state online-backup rehearsal establishes the required SQLite restore mechanism while whole-bundle deployment backup remains operator controlled",
@@ -247,7 +247,8 @@
         "skeleton/testing/test_shared_pressure.py",
         "machine/state_backup_policy.json",
         "scripts/state_backup_bundle.py"
-      ]
+      ],
+      "runtime_optimization": "Same execution SQLite authority contains versioned runtime control policy, idempotent terminal numeric outcome ledger, tenant/scope/task/model learner checkpoints and bounded replay/optimizer state; existing idle effects ledger contains maintenance tasks/attempts/backoff/circuit state. No new database or store. Host control policy changes append same-transaction versioned audit receipts with actor digest and tenant-bound projections. Learner checkpoint lifecycle mutations use tenant/model/state-version CAS plus the same-transaction global control audit. Idle maintenance extends existing same-file tables with fenced host/scope ownership and drain-confirmed recovery. Bounded-content learner maintenance receipts deduplicate continuation IDs atomically with replay optimizer changes."
     },
     {
       "id": "verification-evidence-unbound",

@@ -5295,6 +5295,158 @@
       "owner": "skeleton/provider_runtime.py",
       "legacy_alias": "skeleton/ai/runtime/provider_runtime.py",
       "policy": "Non-owning re-export of canonical public classes/functions with attribute lookup delegation for existing private imports. No copied SDK, credentials, registry state, network implementation or alternate provider class identity. Existing skeleton/ai/providers/runtime.py facade remains non-owning."
+    },
+    "adaptive_runtime_optimization": {
+      "authority": "existing engine coordinator, provider registry and execution repository; no new service/provider/store",
+      "owners": {
+        "control": "skeleton/intelligence/runtime_control.py",
+        "inference": "skeleton/ai/runtime/inference/adaptive_serving.py",
+        "learning": "skeleton/intelligence/runtime_learning.py",
+        "maintenance": "skeleton/jeeves/ai/studio_maintenance.py",
+        "ratchet": "skeleton/learning/mirror_room"
+      },
+      "interfaces": {
+        "engine": "GET/PATCH /api/v1/engine/runtime-control",
+        "application": "GET/PATCH /api/ai/runtime-control",
+        "schema_version": "skeleton.ai.runtime_control.v1",
+        "identity": "authenticated actor_id and tenant_id echoed; GET scoped learning; PATCH application administrator plus trusted engine service principal",
+        "policy": "global host-serving and maintenance controls, tenant-scoped learning; expected_version CAS"
+      },
+      "invariants": [
+        "adaptive effective capacity never exceeds configured operator capacity and is excluded from activation identity",
+        "explicit model selections, original budgets, privacy, verification and ratchet floors remain authoritative",
+        "no implicit remote offload, provider fallback, network work, model-weight promotion or self-certification",
+        "same-database terminal outcome ledger is idempotent and numeric-only; bounded MLP/Adam/replay records source/model provenance and quarantines invalid state",
+        "maintenance is owned by existing engine coordinator lifespan and existing idle effect ledger; fresh telemetry, bounded cooperative work, foreground preemption",
+        "ratchet predictor only selects TRAIN candidates; independent measured campaign and promotion receipts retain authority",
+        "operator UI uses authenticated API and admin-only versioned writes; observatory remains read-only",
+        "additional idle predictor replay requires explicit maintenance.augmentation_enabled; it never fine-tunes transformer weights or calls a provider",
+        "operator policy mutations append a bounded-content immutable versioned control receipt in the same execution database transaction; tenant-scoped projections never expose another tenant actor metadata"
+      ],
+      "studio_quality_adaptation": {
+        "owner": "skeleton/learning/mirror_room/adaptation.py",
+        "application_ingress": [
+          "backend/core/game_studio_agent.py",
+          "backend/routes/game_studio_agent.py"
+        ],
+        "policy": "explicit opt-in quality_gate.adaptive_ranking within existing scoped studio goal authorization",
+        "state": "bounded numeric outcome ranker/checkpoint in existing goal row through existing CAS/storage admission; no new store",
+        "observations": "matched real baseline/current source reviews with exact project/baseline/protocol/reviewer provenance; operational observations, never synthetic TRAIN/validation receipts or creative quality certification",
+        "authority": "bounded edit advice only; existing source-current review, restoration, consent, export and independent promotion gates remain unchanged",
+        "operator_surface": [
+          "frontend/src/features/Jeeves/StudioGoalQualityPanel.tsx",
+          "frontend/src/product/gameStudioAgentClient.ts"
+        ]
+      },
+      "runtime_completion_pass": {
+        "catalog_owner": "skeleton/ai/runtime/inference/catalog.py",
+        "catalog_configuration": "AI_LOCAL_MODEL_CATALOG_PATH explicit bounded digest-pinned local catalog, mutually exclusive with single artifact/deployment; existing ProviderRegistry exact provider/model identity, explicit primary and optional independent verifier; no implicit download or hosted fallback",
+        "admission": "existing local serving owner adds trusted tenant fairness separate from cache/operation/preemption identities; static operator ceilings and physical worker custody remain authoritative; host/per-route cache-action epochs persist in existing policy to reconcile every worker without losing intervening commands",
+        "learner_lifecycle": {
+          "owner": "skeleton/persistence/execution_repository.py",
+          "helper": "skeleton/intelligence/runtime_learning.py",
+          "interfaces": [
+            "GET /api/ai/runtime-control/learning/partitions/{partition_id}/checkpoint",
+            "POST /api/ai/runtime-control/learning/partitions/{partition_id}/checkpoint",
+            "equivalent sealed /api/v1/engine/runtime-control/learning/partitions/{partition_id}/checkpoint"
+          ],
+          "authority": "administrator plus engine service grant; tenant/model-bound finite checkpoint, exact state version CAS and same-transaction global policy version/audit receipt; no provider model promotion or output-quality claim",
+          "model": "prequential operational residual/drift/novelty confidence, bounded replay/last-healthy optimizer rollback and cold-start after import/reset",
+          "wire": "export/import opaque canonical checkpoint_json at most 256 KiB UTF-8 to preserve Python numeric digest input across browser JSON; parsed previews confer no authority; object checkpoint remains service-compatible"
+        },
+        "studio_numeric_memory": {
+          "owner": "backend/core/game_studio_agent.py with canonical mirror_room numeric ranker",
+          "policy": "quality_gate.numeric_memory_policy=goal_only|reuse_compatible|reset default goal_only; cross-goal reuse requires both donor and recipient explicitly opted into compatible reuse",
+          "authority": "same scoped tenant/principal/project/baseline/protocol/reviewer/feature/floor identities; existing sealed goal records/CAS/storage only; no unconsented review training",
+          "operator_surfaces": [
+            "StudioGoalQualityPanel.tsx",
+            "GameStudioAssistantPanel.tsx",
+            "gameStudioAgentClient.ts"
+          ]
+        },
+        "maintenance": "same-database durable host/scope ownership leases with fencing, cooperative heartbeat, positive physical-drain proof before stale-owner replay; expiry alone never proves a worker stopped; unknown remote ownership stays blocked; learner replay effects deduplicate the stable continuation_id and commit the optimizer mutation with its result receipt in the same execution SQLite transaction",
+        "boundaries": "no new service/store/provider boundary or automatic production-weight training; all learned controls remain subordinate to exact selections, grants, source pins, independent validation and promotion floors",
+        "working_order_continuation": {
+          "owners": [
+            "skeleton/provider_runtime.py",
+            "skeleton/api/engine_runtime.py",
+            "skeleton/intelligence/runtime_control.py",
+            "skeleton/persistence/execution_repository.py",
+            "skeleton/jeeves/ai/studio_maintenance.py",
+            "scripts/configure_ai_chat.py"
+          ],
+          "installation": "Existing stdlib configuration helper accepts mutually exclusive artifact, deployment and catalog inputs; prepares explicit portable readonly Compose bindings and derived container manifests without modifying original operator artifacts, downloading weights or invoking inference. Existing explicit seed-admin bootstrap can be configured by paired admin-email/password-file flags; no first-registrant elevation. New private configurations include required master/seal keys, preserve existing persistent keys on intentional replacement and include assistant.runtime.control only in the existing scoped backend service grant.",
+          "inference": "Existing GGUF backend reads bounded actual metadata, clamps trained context, accounts per-process weight/KV/scratch estimates, and propagates trusted tenant/deadline/work-class scopes through bounded batch scheduling. Existing provider owner remains the only activation and dispatch boundary.",
+          "learning_retention": {
+            "owner": "skeleton/persistence/execution_repository.py",
+            "storage": "Existing engine execution SQLite only; additive feedback markers on ai_execution_result bind exact outcome, checkpoint version, tenant/scope/partition/model/source and training status without changing immutable result_json/result_digest. Bounded derived-row retention reconstructs pruned observations from exact canonical records and preserves totals and deduplication. Same-DB ai_execution_learning_retention_state scopes bounded live-row/cursor/overflow counters; legacy reconciliation scans cap+1 rows and omits extra derived JSON while canonical feedback/training still commits. Maintenance payloads and fresh advice preserve runtime_learning_scope_id; queue dedupe includes that scope, and extra idle replay consumes only deferred replay credits granted by new canonical observations.",
+            "policy": {
+              "retained_outcomes": {
+                "default": 10000,
+                "minimum": 128,
+                "maximum": 100000
+              },
+              "outcome_max_age_days": {
+                "default": 90,
+                "minimum": 1,
+                "maximum": 3650
+              },
+              "maintenance_receipt_retention": {
+                "default": 2048,
+                "minimum": 16,
+                "maximum": 100000
+              }
+            }
+          },
+          "idle_recovery": "Existing maintenance controller adds fair recovery scanning, paired task/lease fence recovery, bounded completed-continuation projections in same database and proven-drain operational-row cleanup. Completed physical work may be reused only with exact continuation/handler/source/fence bindings and a fresh admitted assignment; it does not fabricate compliance, promotion or evaluation evidence. The same-store jeeves_idle_maintenance_chunk projection reserves before callback, caches bounded exact completed result values and retains pending postcommit acknowledgement; default maximum_chunk_results=1024 and maximum_ack_retries_per_tick=4. Host callbacks never execute while the idle executor persistence lock is held.",
+          "maintenance_ack": "Optional host completion acknowledgement runs only after verified durable chunk/cursor/effect receipt commit, binds task continuation and exact handler/result/completion receipt digests, and permits acknowledged predictor receipt payload compaction to a small permanent replay tombstone. Acknowledgement failure never regresses committed cursor or repeats optimizer work.",
+          "operator_projection": "Existing authenticated model inventory, chat readiness and runtime controls report exact model identities, current unavailable codes, durable dependency availability and bounded learning/maintenance retention; account changes and stale observations confer no authority. Optional serving_state separates live draining/active/queued/effective capacity from immutable activation; drained routes are unavailable for new product selections, and configured semantic-verifier metadata reports actual registry facts only.",
+          "authority": "Implementation and source compilation only; file existence, metadata reconciliation and build success confer no enterprise qualification or model promotion.",
+          "execution_recovery": "Existing engine coordinator recovers nonterminal submissions in bounded indexed keyset pages and at most 32 simultaneous recovery drivers; existing operation admission and provider budgets stay authoritative. A periodic bounded recovery pass resumes orphaned durable work without replaying provider side effects beyond canonical checkpoint/turn rules. Driver setup failures reach canonical terminalization rather than silently abandoning accepted commands. Exactly one coordinator owns a persistent execution database at a time using a nonblocking operating-system file lock over the existing database inode, held through physical task drain. Startup and periodic recovery never race a live peer coordinator. This is process coordination, not another durable store or a provider dispatch/replay grant; existing unresolved-dispatch uncertainty rules remain unchanged. In-memory repositories are connection-local. Same-store ai_execution_coordinator_identity pins one canonical engine namespace per physical file across restart, rejecting incompatible reuse before model activation; generic standalone repository namespace support is unchanged. OS custody pins the acquiring PID to reject forked copies, and Windows locking reserves a non-data byte beyond SQLite maximum EOF without extending the file.",
+          "studio_recovery": "Existing studio goal owner reconciles issued child receipts even after dispatch/model budgets are exhausted. Existing retry interface accepts explicit restore_incumbent only under original restoration/edit/run policy, remaining action allowance, current-source editor CAS and a sealed host decision receipt; it uses no fabricated model receipt or extra budget.",
+          "maintenance_retry": {
+            "interfaces": [
+              "POST /api/ai/runtime-control/maintenance/tasks/{task_id}/retry",
+              "equivalent sealed /api/v1/engine/runtime-control/maintenance/tasks/{task_id}/retry"
+            ],
+            "owner": "Existing StudioMaintenanceController.retry_failed under RuntimeOptimizationControl host composition",
+            "authority": "Authenticated administrator plus existing engine service runtime-control grant; exact tenant-derived scope, task/source/attempt guards, terminal failed state, unchanged handler and released/proven-drained custody. Preserve continuation and attempts, reset queue failures/backoff only, re-enter normal admission and append existing maintenance event. No extra provider/model/action grant or automatic command replay."
+          }
+        },
+        "operator_and_learning_continuation": {
+          "shared_policy_contract": "skeleton/contracts/runtime_optimization.py pure bounded field metadata/validation; same existing serving, learning and maintenance owners validate merged policies before atomic runtime-control CAS. GET runtime-control adds policy_controls for actual editable bounds/scopes and local route operator ceilings; no new policy authority.",
+          "dataset_export": {
+            "owner": "skeleton/persistence/execution_repository.py",
+            "interfaces": [
+              "GET /api/ai/runtime-control/learning/dataset",
+              "equivalent sealed /api/v1/engine/runtime-control/learning/dataset"
+            ],
+            "authority": "Admin plus existing engine runtime-control service grant, authenticated tenant/scope, optional partition and include_untrained filter; canonical retained numeric diagnostics only. Default128/max256 rows, fixed highwater/keyset cursor <=6KiB binds all filters, <=256 metadata-only canonical provenance checks. Opaque canonical dataset_json <=1MiB with <=3MiB escaped transport; explicit per-page provenance/digests and retention-gap limitations, no full-history/immutable snapshot claim. No prompts, model responses, tool payloads or provider credentials.",
+            "policy_markers": "Additive ai_execution_result learning_policy_version and learning_policy_digest bind actual terminal-transaction policy; legacy marker values stay explicitly unknown."
+          },
+          "maintenance_circuit_reset": {
+            "owner": "skeleton/jeeves/ai/studio_maintenance.py",
+            "interface": "POST /api/ai/runtime-control/maintenance/circuits/{kind}/reset and sealed engine equivalent",
+            "authority": "Admin plus engine runtime-control grant; tenant-derived scope, exact kind/generation/failure/source checks in existing circuit row transaction. Deny held/running custody. Clears breaker counters/cooldown only; original task backoff/retry/enabled policy and continuation remain unchanged. Additive failure/source/generation metadata in same SQLite circuit rows; old unbound rows cannot be manually reset."
+          },
+          "crawler_source_use": {
+            "owner": "backend/core/dragon_crawler.py with existing Dragon practice adapter",
+            "interface": "POST /api/dragon-academy/crawler/sessions/{id}/sources/{source_id}/use",
+            "storage": "Existing Mongo session source_use_policies <=64 entries: enabled/max_age_seconds60..86400/version/changed_at. Exact expected version plus session CAS and command idempotency; same existing roles/ownership, owner can withdraw but only editor/admin restore/change use.",
+            "authority": "All source reads/search/context/export and assert_context enforce current use/freshness; new crawler_reference.v2 binds policy version; v1 admissible only unchanged default. Session erasure removes map. No implicit recrawl, rights/consent upgrade or review/model promotion."
+          },
+          "studio_continuation": {
+            "owner": "backend/core/game_studio_agent.py",
+            "interfaces": [
+              "Existing goal advance adds max_planner_decisions1..4 and wait_for_work_seconds0..10",
+              "POST existing scoped goal source-refresh with expected goal/project/tree identities and idempotency"
+            ],
+            "authority": "Original total model/job/action/wall grants stay authoritative; serial decisions rebuild source-current context from real editor/child receipts. Explicit source re-pin only with no unresolved work, preserve baseline/history/grants/consent and withhold structurally incompatible numeric advice. Bounded round feedback derives actual matched baseline/candidate review+edit receipts, including rejected/restored candidates, without invented quality scores."
+          },
+          "inference_preparation": "Existing local/native owners add immutable per-request LocalPreparedInput plus prepare_input/validate_prepared_input/infer_prepared: exact request/model/runtime/profile/tokenizer/source/issuer/trusted-scope bindings; reused count/estimate/token sequence, no cross-request cache or new store. Resource telemetry uses fresh CPU deltas and actual platform/cgroup/process memory; missing signals remain unknown.",
+          "qualification": "Build/source compilation only. Existing ownership, review floors, consent, grants and enterprise qualification state are unchanged."
+        }
+      }
     }
   },
   "conversation_runtime_contract": {

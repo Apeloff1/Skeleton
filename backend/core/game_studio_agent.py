@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import json
+import math
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi.encoders import jsonable_encoder
 from pymongo import ReturnDocument
+from pymongo.errors import PyMongoError
 
 from core.game_learning import GameLearningError, _digest, _json, _key, _now, _time, workspace
 from core.game_studio_tools import (
@@ -102,6 +105,18 @@ PLANNER_SYSTEM = (
     "The host supplies current expected_version and idempotency_key; use shown manifest/spec digests. "
     "Set done=true and operation=null when the bounded goal is satisfied or cannot be achieved with its grants."
 )
+NUMERIC_LEARNING_SCHEMA = "skeleton.game.studio_numeric_adaptation.v1"
+NUMERIC_MEMORY_SCHEMA = "skeleton.game.studio_numeric_memory.v1"
+NUMERIC_MEMORY_SCAN = 32
+NUMERIC_MEMORY_DONOR_ATTEMPTS = 8
+NUMERIC_MEMORY_GOALS = 8
+NUMERIC_MEMORY_OBSERVATIONS = 32
+NUMERIC_SHARED_POLICIES = frozenset({"reuse_compatible", "reset"})
+RESTORATION_SCHEMA = "skeleton.game.studio_quality_recovery.v1"
+RESTORATION_AUTHORITY = "host_quality_restoration"
+ADVANCE_SLICE_SECONDS = 20
+FEEDBACK_SCHEMA = "skeleton.game.studio_candidate_feedback.v1"
+SOURCE_REFRESH_SCHEMA = "skeleton.game.studio_source_refresh.v1"
 
 
 async def _indexes():
@@ -132,6 +147,7 @@ def _public(row):
         "expires_at",
         "created_at",
         "updated_at",
+        "history_digest",
         "steps",
         "error",
         "pending_job_id",
@@ -152,15 +168,33 @@ def _public(row):
     result["outcome"] = {
         "completion_reason": row.get("completion_reason"),
         "goal_satisfaction_verified": False,
-        "workflow_requirements_verified": bool(row.get("completion_receipt", {}).get("verified")),
+        "workflow_requirements_verified": bool((row.get("completion_receipt") or {}).get("verified")),
     }
     result["completion_requirements"] = row.get("completion_requirements", [])
     if "completion_mode" in row:
         result["completion_mode"] = row["completion_mode"]
     result["completion"] = row.get("completion_receipt")
+    result["source_refresh_receipts"] = row.get("source_refresh_receipts", [])
+    if row.get("candidate_feedback"):
+        result["candidate_feedback"] = {
+            **row["candidate_feedback"],
+            "source_current": row["candidate_feedback"]["source_head_digest"] == row.get("head_digest"),
+        }
+    result["last_advance"] = row.get("advance_receipts", [])[-1] if row.get("advance_receipts") else None
     if row.get("quality_gate") is not None:
         result["quality_gate"] = row["quality_gate"]
         result["quality"] = (row.get("completion_receipt") or {}).get("quality")
+        if row["quality_gate"].get("adaptive_ranking"):
+            learning = row.get("quality_learning") or {}
+            result["adaptive_learning"] = {
+                "schema_version": NUMERIC_LEARNING_SCHEMA,
+                "status": learning.get("status", "waiting_for_baseline"),
+                **learning.get("learning_status", {}),
+                "numeric_memory": _numeric_memory_projection(row, learning),
+                "advice": learning.get("advice", []) if learning.get("source_head_digest") == row.get("head_digest") else [],
+                "production_authority": False,
+                "scope": "Numeric ranking from explicitly admitted matched original reviews under the selected memory policy; proposals require the existing editor, current-source review and acceptance gates.",
+            }
     result["workflow"] = {
         "remaining_actions": len(row.get("workflow", [])),
         "active": bool(row.get("workflow")),
@@ -179,6 +213,8 @@ def _public(row):
                 "max_output_tokens",
                 "canonical_probe",
                 "poll",
+                "decision_authority",
+                "host_decision_receipt",
             )
             if key in pending
         }
@@ -249,6 +285,7 @@ async def _authorize_history(scope, row, *, dragon_guarded=False, allowed_editor
                 raise GameLearningError(
                     "studio_goal_policy_changed", "Historical policy evidence changed.", 409
                 )
+    await _authorize_numeric_origins(scope, row)
 
 
 async def _current(scope, row):
@@ -369,6 +406,28 @@ async def _recover_own_edit(scope, row, token, *, metadata_only=False):
     await _authorize_history(scope, row)
     binding = await workspace._input(scope, project, require_execution=False)
     await workspace._authority(scope, binding)
+    recovered = {**pending, "recovered_edit": True}
+    if raw["operation"] == "world.edit" and not metadata_only:
+        from core.game_successor import world
+
+        # The exact editor revision above already committed the mutation. Read
+        # the real owner's current result instead of asking the pre-edit quality
+        # fence to authorize that mutation again against its post-edit head.
+        issued = await world(scope, row["project_id"])
+        if issued.get("project", {}).get("version") != project["version"]:
+            raise GameLearningError("studio_goal_head_changed", "The recovered world projection differs from its exact committed revision.", 409)
+        result = _compact({key: value for key, value in issued.items() if key != "project"}
+            | {"project": _project_summary(issued["project"])})
+        outcome = {"result": result, "job_id": None, "play_id": None,
+            "output_version": project["version"], "output_digest": _digest(project["files"])}
+        editor_receipt = {"schema_version": "skeleton.game.studio_editor_recovery.v1",
+            "operation_id": operation["_id"], "operation_request_digest": operation["request_digest"],
+            "revision_id": revision_id, "revision_request_digest": revision["request_digest"],
+            "output_version": project["version"], "output_digest": _digest(project["files"]),
+            "result_authority": "current_world_projection_after_exact_committed_revision"}
+        editor_receipt["receipt_digest"] = _digest(editor_receipt)
+        recovered.update(phase="outcome", action_outcome=outcome,
+            outcome_digest=_digest(outcome), recovered_editor_receipt=editor_receipt)
     return await _set(
         scope,
         row["goal_id"],
@@ -376,7 +435,7 @@ async def _recover_own_edit(scope, row, token, *, metadata_only=False):
         {
             "head_version": project["version"],
             "head_digest": _digest(project["files"]),
-            "pending": {**pending, "recovered_edit": True},
+            "pending": recovered,
         },
     )
 
@@ -394,10 +453,12 @@ async def create(scope, project_id, body):
         if replay_body.get("quality_gate") is not None:
             from routes.game_studio_agent import StudioQualityGate
 
-            replay_body = {
-                **replay_body,
-                "quality_gate": StudioQualityGate.model_validate(replay_body["quality_gate"]).model_dump(),
-            }
+            normalized = StudioQualityGate.model_validate(replay_body["quality_gate"]).model_dump()
+            old_policy = prior.get("intent", {}).get("quality_gate") or {}
+            for field, default in (("adaptive_ranking", False), ("numeric_memory_policy", "goal_only")):
+                if field not in old_policy and normalized.get(field) == default:
+                    normalized.pop(field, None)
+            replay_body = {**replay_body, "quality_gate": normalized}
         if prior["request_digest"] != _digest(replay_body):
             raise GameLearningError(
                 "idempotency_conflict", "This goal key already describes another request.", 409
@@ -612,6 +673,10 @@ async def inspect(scope, goal_id):
             result["outcome"]["workflow_requirements_verified"] = result["completion"]["verified"]
             if row.get("quality_gate") is not None:
                 result["quality"] = result["completion"].get("quality")
+                available, reason = _restoration_capability(row, result["quality"])
+                result["recovery"].update(
+                    can_restore_incumbent=available, restore_incumbent_reason=reason,
+                )
         except GameLearningError as exc:
             result["completion"] = {"verified": False, "error": {"code": exc.code, "message": exc.message}}
             result["outcome"]["workflow_requirements_verified"] = False
@@ -664,6 +729,21 @@ async def inspect(scope, goal_id):
                 dependency_error={"code": exc.code, "message": str(exc)},
                 next_action="inspect_dependency",
             )
+    if row.get("schema_version") == SCHEMA:
+        try:
+            settled = await _settled_source_children(scope, row)
+            available, reason = _source_refresh_capability({**row, **settled})
+            if available and row.get("_worker_token") and _time(row["_lease_until"]) > _now():
+                available, reason = False, "goal_operation_active"
+            if available:
+                observed, _binding, _revision = await _refreshed_source(scope, row)
+                result["recovery"].update(
+                    observed_project_version=observed["version"],
+                    observed_tree_digest=_digest(observed["files"]),
+                )
+            result["recovery"].update(source_refresh_available=available, source_refresh_reason=reason)
+        except GameLearningError as exc:
+            result["recovery"].update(source_refresh_available=False, source_refresh_reason=exc.code)
     return result
 
 
@@ -1128,6 +1208,38 @@ def _quality_baseline_pin(job):
     }
 
 
+def _review_pair_assessment(baseline_report, report, policy):
+    """Apply the same immutable numeric floors to current and historical pairs."""
+    from skeleton.jeeves.game_studio_review import compare_executed_reviews
+
+    comparison = compare_executed_reviews(baseline_report, report, mode="source_revision")
+    execution, metrics = report.get("execution", {}), report.get("metrics", {})
+    counts = {
+        severity: sum(item.get("severity") == severity for item in report.get("findings", []))
+        for severity in ("error", "warning", "info")
+    }
+    failures = []
+    for name, measured, minimum in (
+        ("available_frames", metrics.get("available_frames"), policy["min_available_frames"]),
+        ("executed_steps", execution.get("steps"), policy["min_executed_steps"]),
+    ):
+        if type(measured) is not int or measured < minimum:
+            failures.append({"code": "insufficient_" + name, "observed": measured, "minimum": minimum})
+    for severity in ("error", "warning"):
+        maximum = policy["max_" + severity + "_findings"]
+        if counts[severity] > maximum:
+            failures.append(
+                {"code": "excess_" + severity + "_findings", "observed": counts[severity], "maximum": maximum}
+            )
+    if comparison["status"] != "paired_observation":
+        failures.append(
+            {"code": "unmatched_review_protocol", "reasons": comparison["comparability_failures"]}
+        )
+    if policy["require_no_regression"] and comparison["observed_regressions"]:
+        failures.append({"code": "measured_regression", "metrics": comparison["observed_regressions"]})
+    return comparison, counts, failures
+
+
 async def _quality_progress(scope, row, project, *, allowed_editor_operation_id=None):
     """Resolve a finite refinement loop from the existing immutable owner jobs.
 
@@ -1140,7 +1252,6 @@ async def _quality_progress(scope, row, project, *, allowed_editor_operation_id=
     if policy is None:
         return None
     from core import game_studio_review as reviews
-    from skeleton.jeeves.game_studio_review import compare_executed_reviews
 
     options = (
         {"allowed_editor_operation_id": allowed_editor_operation_id} if allowed_editor_operation_id else {}
@@ -1240,40 +1351,11 @@ async def _quality_progress(scope, row, project, *, allowed_editor_operation_id=
             ):
                 continue
             report = reviews._checked_result(candidate)
-            comparison = compare_executed_reviews(
-                reviews._checked_result(baseline), report, mode="source_revision"
+            comparison, counts, failures = _review_pair_assessment(
+                reviews._checked_result(baseline), report, policy
             )
             execution, metrics = report.get("execution", {}), report.get("metrics", {})
-            counts = {
-                severity: sum(item.get("severity") == severity for item in report.get("findings", []))
-                for severity in ("error", "warning", "info")
-            }
-            failures = []
-            for name, measured, minimum in (
-                ("available_frames", metrics.get("available_frames"), policy["min_available_frames"]),
-                ("executed_steps", execution.get("steps"), policy["min_executed_steps"]),
-            ):
-                if type(measured) is not int or measured < minimum:
-                    failures.append(
-                        {"code": "insufficient_" + name, "observed": measured, "minimum": minimum}
-                    )
-            for severity in ("error", "warning"):
-                maximum = policy["max_" + severity + "_findings"]
-                if counts[severity] > maximum:
-                    failures.append(
-                        {
-                            "code": "excess_" + severity + "_findings",
-                            "observed": counts[severity],
-                            "maximum": maximum,
-                        }
-                    )
-            if comparison["status"] != "paired_observation":
-                failures.append(
-                    {"code": "unmatched_review_protocol", "reasons": comparison["comparability_failures"]}
-                )
             regressions = comparison["observed_regressions"]
-            if policy["require_no_regression"] and regressions:
-                failures.append({"code": "measured_regression", "metrics": regressions})
             result.update(
                 candidate={
                     "job_id": candidate["job_id"],
@@ -1303,6 +1385,682 @@ async def _quality_progress(scope, row, project, *, allowed_editor_operation_id=
             break
     result["receipt_digest"] = _digest(result)
     return result
+
+
+def _candidate_edit_payload_digest(payload):
+    return _digest(
+        {
+            key: value
+            for key, value in payload.items()
+            if key not in {"expected_version", "idempotency_key", "expected_spec_digest"}
+        }
+    )
+
+
+async def _advance_candidate_feedback(scope, row, token):
+    """Link actual goal-issued edits and reviews, including rejected old heads.
+
+    These are bounded operational lessons for the planner, never training
+    permissions, production promotion, or subjective game-quality scores.
+    """
+    if row.get("quality_gate") is None or row.get("stop_requested") or _time(row["expires_at"]) <= _now():
+        return row
+    from core import game_studio_review as reviews
+
+    project, _binding = await _current(scope, row)
+    input_digest = _digest(
+        {
+            "history_digest": row["history_digest"],
+            "head_digest": _digest(project["files"]),
+            "last_job_receipt_digest": _digest(row.get("last_job_receipt")),
+        }
+    )
+    if (row.get("candidate_feedback") or {}).get("input_digest") == input_digest:
+        return row
+    quality = await _quality_progress(scope, row, project)
+    pin = quality.get("baseline") if quality else None
+    if pin is None:
+        return row
+    baseline = await reviews._load_review(scope, row["project_id"], pin["job_id"], historical=True)
+    if _quality_baseline_pin(baseline) != pin:
+        raise GameLearningError(
+            "studio_feedback_baseline_changed", "Candidate feedback requires the exact pinned baseline.", 503
+        )
+    baseline_report = reviews._checked_result(baseline)
+    rounds, dependencies, excluded = [], [_dependencies(baseline["input"])], 0
+    reviews_seen = set()
+    for step in row["steps"]:
+        job_id = step.get("job_id")
+        if (
+            not step.get("executed")
+            or step["decision"].get("operation") != "project.review"
+            or not job_id
+            or job_id == pin["job_id"]
+            or job_id in reviews_seen
+        ):
+            continue
+        reviews_seen.add(job_id)
+        issued = await workspace.jobs.find_one(
+            {"_id": job_id, **scope, "project_id": row["project_id"], "kind": "review"}
+        )
+        if issued is None:
+            raise GameLearningError(
+                "studio_feedback_review_absent", "An issued candidate feedback review is unavailable.", 503
+            )
+        if issued.get("status") != "completed":
+            continue
+        candidate = await reviews._load_review(scope, row["project_id"], job_id, historical=True)
+        report = reviews._checked_result(candidate)
+        if (
+            candidate["input"]["tree_digest"] != step["output_digest"]
+            or candidate["input"]["project_version"] != step["output_version"]
+        ):
+            raise GameLearningError(
+                "studio_feedback_source_changed",
+                "Candidate feedback source differs from its exact issued step.",
+                503,
+            )
+        comparison, _counts, failures = _review_pair_assessment(baseline_report, report, row["quality_gate"])
+        if comparison["status"] != "paired_observation":
+            excluded += 1
+            continue
+        # The latest source-changing edit identifies the candidate. Include
+        # consecutive edits on that branch, stopping at baseline/restoration.
+        edits, expected_head = [], candidate["input"]["tree_digest"]
+        for previous in reversed(row["steps"][: step["index"]]):
+            if not previous.get("executed") or previous["decision"].get("operation") not in EDIT:
+                continue
+            if (
+                previous.get("quality_role") == "restore_incumbent"
+                or previous.get("output_version", 0) <= pin["project_version"]
+            ):
+                break
+            if previous.get("output_version", 0) <= candidate["input"]["project_version"]:
+                if previous.get("output_digest") != expected_head:
+                    break
+                edits.append(previous)
+                expected_head = previous["input_digest"]
+        edits.reverse()
+        if not edits:
+            continue
+        restored = any(
+            item.get("quality_role") == "restore_incumbent"
+            and item.get("index", -1) > step["index"]
+            and item.get("input_digest") == candidate["input"]["tree_digest"]
+            for item in row["steps"]
+        )
+        fact = {
+            "review_job_id": job_id,
+            "review_digest": report["review_digest"],
+            "review_input_digest": _digest(candidate["input"]),
+            "head_digest": candidate["input"]["tree_digest"],
+            "project_version": candidate["input"]["project_version"],
+            "status": "rejected" if failures else "accepted",
+            "edit_step_digests": [item["step_digest"] for item in edits],
+            "edit_payload_digests": [
+                _candidate_edit_payload_digest(item["command"]["payload"]) for item in edits
+            ],
+            "edit_spec_digests": [item["command"]["payload"].get("expected_spec_digest") for item in edits],
+            "edit_input_digests": [item["input_digest"] for item in edits],
+            "comparison_digest": comparison["comparison_digest"],
+            "failures": failures,
+            "regressions": comparison["observed_regressions"],
+            "restored": restored,
+            "applicable_to_current_tree": candidate["input"]["tree_digest"] == _digest(project["files"]),
+        }
+        fact["feedback_digest"] = _digest(fact)
+        rounds.append(fact)
+        dependencies.append(_dependencies(candidate["input"]))
+    feedback = {
+        "schema_version": FEEDBACK_SCHEMA,
+        "baseline": pin,
+        "source_head_digest": _digest(project["files"]),
+        "input_digest": input_digest,
+        "rounds": rounds[-4:],
+        "excluded_unmatched_reviews": excluded,
+        "training_authorized": False,
+        "production_authority": False,
+    }
+    deps = {_digest(item): item for item in (*row["evidence_dependencies"], *dependencies)}
+    changes = {"candidate_feedback": feedback, "evidence_dependencies": list(deps.values())}
+    if row.get("quality_baseline") is None:
+        changes["quality_baseline"] = pin
+    return await _set(scope, row["goal_id"], token, changes)
+
+
+def _numeric_review_spec(job):
+    from skeleton.jeeves.game_successor_runtime import validate_successor_spec
+
+    content = next((item["content"] for item in job["input"]["files"] if item["path"] == "game/successor/spec.json"), None)
+    if content is None:
+        raise GameLearningError("studio_numeric_source_absent", "Numeric advice requires an issued original world.", 409)
+    return validate_successor_spec(json.loads(content))
+
+
+def _numeric_dimensions(spec):
+    """Search a bounded neighborhood; the canonical editor validates proposals."""
+    from skeleton.learning.mirror_room import NumericDimension
+
+    # Reward definitions, goals, health, damage and source identities are not
+    # optimization knobs. These are ordinary inspected control/timing fields.
+    allowed = {
+        "movement": {"acceleration", "max_speed", "friction", "gravity", "max_fall_speed"},
+        "jump": {"velocity", "coyote_seconds", "buffer_seconds"},
+        "combat": {"projectile_speed", "cooldown", "invulnerability_seconds"},
+        "adventure": {"interact_radius", "melee_cooldown"},
+        "fishing": {"cast_range", "bite_min_seconds", "bite_max_seconds", "reel_speed", "tension_gain", "tension_release", "catch_window_seconds", "rod_strength"},
+        "farming": {"growth_days", "water_decay", "soil_quality", "season_days", "day_seconds", "weather_wet_probability"},
+    }
+    dimensions, parameters = [], {}
+    for section, names in sorted(allowed.items()):
+        for name in sorted(names):
+            value = spec.get("mechanics", {}).get(section, {}).get(name)
+            if type(value) not in (int, float) or not math.isfinite(value):
+                continue
+            key = "mechanics." + section + "." + name
+            radius = max(abs(float(value)) * 0.5, 0.1)
+            lower, upper = float(value) - radius, float(value) + radius
+            if value >= 0:
+                lower = max(0.0, lower)
+            span = upper - lower
+            dimensions.append(NumericDimension(key, lower, upper, span * 0.1, min_step=span * 0.0001))
+            parameters[key] = float(value)
+    return tuple(dimensions), parameters
+
+
+def _numeric_shape(spec, dimensions):
+    shape = copy.deepcopy(spec)
+    for dimension in dimensions:
+        _, section, name = dimension.name.split(".")
+        if name not in shape.get("mechanics", {}).get(section, {}):
+            return None
+        shape["mechanics"][section][name] = "numeric-ranking-dimension"
+    return _digest(shape)
+
+
+def _numeric_parameters(spec, dimensions):
+    result = {}
+    for dimension in dimensions:
+        _, section, name = dimension.name.split(".")
+        value = spec.get("mechanics", {}).get(section, {}).get(name)
+        if type(value) not in (int, float) or not math.isfinite(value) or not dimension.lower <= value <= dimension.upper:
+            return None
+        result[dimension.name] = float(value)
+    return result
+
+
+def _numeric_acceptance_policy(policy):
+    return {key: policy[key] for key in (
+        "schema_version", "min_available_frames", "min_executed_steps",
+        "max_error_findings", "max_warning_findings", "require_no_regression", "restore_on_regression",
+    )}
+
+
+def _numeric_export_allowed(row):
+    policy = row.get("quality_gate") or {}
+    return (
+        row.get("schema_version") == SCHEMA
+        and row.get("execution_mode") == "run"
+        and row.get("completion_mode") == "original"
+        and policy.get("adaptive_ranking") is True
+        and policy.get("numeric_memory_policy", "goal_only") in NUMERIC_SHARED_POLICIES
+        and row.get("status") != "cancelled"
+        and row.get("stop_requested") != "cancel"
+        and not row.get("numeric_source_invalidated", False)
+    )
+
+
+def _numeric_memory_projection(row, learning):
+    policy = (row.get("quality_gate") or {}).get("numeric_memory_policy", "goal_only")
+    memory = learning.get("numeric_memory") or {}
+    origins = memory.get("origins", [])
+    return {
+        "policy": policy, "status": memory.get("status", "waiting_for_baseline"),
+        "reused_goals": memory.get("reused_goals", 0),
+        "reused_observations": memory.get("reused_observations", 0),
+        "provenance_goals": len(origins), "epoch": memory.get("epoch"),
+        "reset_barrier": policy == "reset", "exclusion_counts": memory.get("exclusion_counts", {}),
+    }
+
+
+def _validate_numeric_memory(row, learning):
+    memory = learning.get("numeric_memory")
+    if memory is None:
+        if (row.get("quality_gate") or {}).get("numeric_memory_policy", "goal_only") != "goal_only":
+            raise GameLearningError("studio_goal_journal_corrupt", "Shared numeric policy requires a sealed memory record.", 503)
+        return
+    def digest(value):
+        return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+    def identity(value):
+        return isinstance(value, str) and value == value.strip() and 1 <= len(value) <= 128
+    def count(value, maximum):
+        return type(value) is int and 0 <= value <= maximum
+    policy = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+    if (not isinstance(memory, dict) or memory.get("schema_version") != NUMERIC_MEMORY_SCHEMA
+        or memory.get("policy") != policy or not digest(memory.get("reuse_context_digest"))
+        or not identity(memory.get("epoch"))
+        or memory.get("status") not in {"goal_only", "reset", "no_compatible_history", "reused_checkpoint", "rebuilt_replay", "merged_replay"}
+        or not count(memory.get("reused_goals"), NUMERIC_MEMORY_GOALS - 1)
+        or not count(memory.get("reused_observations"), NUMERIC_MEMORY_OBSERVATIONS)
+        or not isinstance(memory.get("origins"), list) or len(memory["origins"]) > NUMERIC_MEMORY_GOALS
+        or not isinstance(memory.get("exclusion_counts"), dict) or len(memory["exclusion_counts"]) > NUMERIC_MEMORY_DONOR_ATTEMPTS + 2
+        or any(not identity(key) or not count(value, NUMERIC_MEMORY_SCAN) for key, value in memory["exclusion_counts"].items())):
+        raise GameLearningError("studio_goal_journal_corrupt", "Numeric memory policy, bounds or provenance schema differs.", 503)
+    goals, observations = set(), set()
+    for origin in memory["origins"]:
+        if (not isinstance(origin, dict) or set(origin) != {"goal_id", "request_digest", "observations"}
+            or not identity(origin.get("goal_id")) or origin["goal_id"] in goals or not digest(origin.get("request_digest"))
+            or not isinstance(origin.get("observations"), list) or not 1 <= len(origin["observations"]) <= NUMERIC_MEMORY_OBSERVATIONS):
+            raise GameLearningError("studio_goal_journal_corrupt", "Numeric origin identity is malformed or duplicated.", 503)
+        goals.add(origin["goal_id"])
+        for item in origin["observations"]:
+            if (not isinstance(item, dict) or set(item) != {"observation_digest", "job_id"}
+                or not digest(item.get("observation_digest")) or item["observation_digest"] in observations
+                or not identity(item.get("job_id"))):
+                raise GameLearningError("studio_goal_journal_corrupt", "Numeric observation binding is malformed or duplicated.", 503)
+            observations.add(item["observation_digest"])
+    if policy == "goal_only":
+        if goals or memory["reused_goals"] or memory["reused_observations"] or memory["status"] != "goal_only" or memory["epoch"] != "initial":
+            raise GameLearningError("studio_goal_journal_corrupt", "Goal-local learning cannot import or export numeric history.", 503)
+    else:
+        raw = learning["archive"].get("observations", [])
+        if (not isinstance(raw, list) or len(raw) > NUMERIC_MEMORY_OBSERVATIONS
+            or observations != {_digest(item) for item in raw}
+            or memory["reused_goals"] > len(goals) or memory["reused_observations"] > len(raw)):
+            raise GameLearningError("studio_goal_journal_corrupt", "Shared numeric checkpoint provenance does not cover its bounded observations.", 503)
+        if policy == "reset" and (memory["epoch"] != row["goal_id"] or memory["reused_goals"] or memory["reused_observations"] or memory["status"] != "reset" or goals - {row["goal_id"]}):
+            raise GameLearningError("studio_goal_journal_corrupt", "A numeric reset cannot retain old shared optimizer state.", 503)
+    if "donor_goal_id" in memory and (not identity(memory["donor_goal_id"]) or not digest(memory.get("donor_archive_digest"))
+        or memory.get("donor_checkpoint_digest") is not None and not digest(memory["donor_checkpoint_digest"])):
+        raise GameLearningError("studio_goal_journal_corrupt", "Numeric checkpoint import lineage differs.", 503)
+    if "merged_donor_goals" in memory and not count(memory["merged_donor_goals"], NUMERIC_MEMORY_DONOR_ATTEMPTS):
+        raise GameLearningError("studio_goal_journal_corrupt", "Numeric replay fan-in exceeds its finite donor ceiling.", 503)
+
+
+def _numeric_observation_from_review(*, row, baseline, candidate, dimensions, baseline_parameters, shape, learner, context_digest, experiment_id, pin):
+    """Reconstruct one numeric fact from current-authority immutable receipts."""
+    from core import game_studio_review as reviews
+    from skeleton.jeeves.game_studio_review import compare_executed_reviews
+    from skeleton.learning.mirror_room import TrainingObservation
+
+    before, report = reviews._checked_result(baseline), reviews._checked_result(candidate)
+    comparison = compare_executed_reviews(before, report, mode="source_revision")
+    spec = _numeric_review_spec(candidate)
+    parameters = _numeric_parameters(spec, dimensions)
+    if (comparison["status"] != "paired_observation" or _numeric_shape(spec, dimensions) != shape
+        or parameters is None or parameters == baseline_parameters):
+        return None
+    measurements = [item for item in comparison["measurements"] if not item["advisory"] and item["metric"] in {"task_return", "observed_goal", "observed_death"}]
+    if not measurements:
+        return None
+    utility = sum((1.0 if item["preferred_direction"] == "higher" else -1.0) * item["delta"] / max(1.0, abs(item["baseline"])) for item in measurements) / len(measurements)
+    cost = sum(float(value) for frame in report.get("frames", []) for name, value in frame.get("timings", {}).items() if name in {"step_wall_ms", "render_wall_ms"}) / 1000.0
+    policy = row["quality_gate"]
+    errors = sum(item.get("severity") == "error" for item in report.get("findings", []))
+    warnings = sum(item.get("severity") == "warning" for item in report.get("findings", []))
+    frames, steps = report.get("metrics", {}).get("available_frames"), report.get("execution", {}).get("steps")
+    passed = (type(frames) is int and frames >= policy["min_available_frames"]
+        and type(steps) is int and steps >= policy["min_executed_steps"]
+        and errors <= policy["max_error_findings"] and warnings <= policy["max_warning_findings"]
+        and not (policy["require_no_regression"] and comparison["observed_regressions"]))
+    return TrainingObservation(
+        context_digest=context_digest, feature_schema_digest=learner.feature_schema_digest,
+        experiment_id=experiment_id, run_id=row["goal_id"], generation=max(1, candidate["input"]["project_version"]),
+        parent_behavior_digest=pin["source_content_digest"],
+        candidate_behavior_digest=_digest({item["path"]: item["content"] for item in candidate["input"]["files"]}),
+        candidate_id="review-" + candidate["job_id"], training_report_digest=comparison["comparison_digest"],
+        scenario_digests=(pin["protocol_digest"],), features=learner.numeric_features(baseline_parameters, parameters),
+        training_utility_delta=utility, cost_units=cost, guardrails_passed=passed,
+        scenario_utilities={pin["protocol_digest"]: utility},
+    )
+
+
+async def _authorize_numeric_origins(scope, row):
+    """Recheck donor consent at the same boundary as source/policy authority."""
+    learning = row.get("quality_learning") or {}
+    memory = learning.get("numeric_memory") or {}
+    for origin in memory.get("origins", []):
+        if origin["goal_id"] == row.get("goal_id"):
+            continue
+        try:
+            donor = await _row(scope, origin["goal_id"])
+        except PyMongoError as exc:
+            raise GameLearningError("studio_numeric_memory_store_unavailable", "Numeric sharing authority could not be confirmed.", 503) from exc
+        donor_memory = (donor.get("quality_learning") or {}).get("numeric_memory") or {}
+        if (donor.get("project_id") != row.get("project_id") or not _numeric_export_allowed(donor)
+            or donor["request_digest"] != origin["request_digest"]
+            or donor_memory.get("reuse_context_digest") != memory.get("reuse_context_digest")
+            or donor_memory.get("epoch") != memory.get("epoch")):
+            raise GameLearningError("studio_numeric_memory_withdrawn", "A numeric lesson's original scoped sharing grant is unavailable.", 409)
+
+
+async def _verify_numeric_archive(scope, row, archive, origins, *, baseline, dimensions, baseline_parameters, shape, learner, context_digest, experiment_id, pin, reuse_context, epoch, verification_cache=None):
+    from core import game_studio_review as reviews
+
+    if archive.lessons or len(archive.observations) > NUMERIC_MEMORY_OBSERVATIONS or len(origins) > NUMERIC_MEMORY_GOALS:
+        raise GameLearningError("studio_numeric_memory_capacity", "Shared numeric provenance exceeds its finite goal or observation horizon.", 409)
+    by_goal = {item["goal_id"]: item for item in origins}
+    if len(by_goal) != len(origins) or {item.run_id for item in archive.observations} != set(by_goal):
+        raise GameLearningError("studio_numeric_memory_provenance", "Numeric checkpoint provenance does not cover its observations exactly.", 409)
+    dependencies = [_dependencies(baseline["input"])]
+    cache = verification_cache if verification_cache is not None else {"goals": {}, "reviews": {}, "observations": {}}
+    for goal_id, origin in by_goal.items():
+        source_goal = row if goal_id == row["goal_id"] else cache["goals"].get(goal_id)
+        if source_goal is None:
+            source_goal = await _row(scope, goal_id)
+            cache["goals"][goal_id] = source_goal
+        source_learning = source_goal.get("quality_learning") or {}
+        source_memory = source_learning.get("numeric_memory") or {}
+        if (source_goal.get("project_id") != row["project_id"] or source_goal["request_digest"] != origin["request_digest"]
+            or not _numeric_export_allowed(source_goal)
+            or _numeric_acceptance_policy(source_goal["quality_gate"]) != _numeric_acceptance_policy(row["quality_gate"])
+            or (goal_id != row["goal_id"] and (source_memory.get("reuse_context_digest") != reuse_context or source_memory.get("epoch") != epoch))):
+            raise GameLearningError("studio_numeric_memory_consent", "A numeric observation lacks compatible original sharing consent.", 409)
+        bindings = {item["observation_digest"]: item for item in origin["observations"]}
+        observations = tuple(item for item in archive.observations if item.run_id == goal_id)
+        if len(bindings) != len(origin["observations"]) or set(bindings) != {item.digest for item in observations}:
+            raise GameLearningError("studio_numeric_memory_provenance", "Numeric review bindings do not match retained observation identities.", 409)
+        issued = {step["job_id"] for step in source_goal["steps"] if step.get("executed") and step.get("job_id") and step.get("decision", {}).get("operation") == "project.review"}
+        for observation in observations:
+            binding = bindings[observation.digest]
+            if binding["job_id"] not in issued:
+                raise GameLearningError("studio_numeric_memory_unissued", "A reused numeric review was not issued by its opted-in goal.", 409)
+            if observation.digest in cache["observations"] and cache["observations"][observation.digest] != binding["job_id"]:
+                raise GameLearningError("studio_numeric_memory_receipt_changed", "A numeric fact aliases different issued review identities.", 409)
+            candidate = cache["reviews"].get(binding["job_id"])
+            if candidate is None:
+                candidate = await reviews._load_review(scope, row["project_id"], binding["job_id"], historical=True)
+                cache["reviews"][binding["job_id"]] = candidate
+            if observation.digest not in cache["observations"]:
+                expected = _numeric_observation_from_review(row=source_goal, baseline=baseline, candidate=candidate, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=learner, context_digest=context_digest, experiment_id=experiment_id, pin=pin)
+                if expected is None or expected.digest != observation.digest:
+                    raise GameLearningError("studio_numeric_memory_receipt_changed", "A numeric observation differs from its exact currently authorized review.", 409)
+                cache["observations"][observation.digest] = binding["job_id"]
+            dependencies.append(_dependencies(candidate["input"]))
+    if archive.checkpoints:
+        checkpoint = archive.checkpoints[0]
+        if (len(archive.checkpoints) != 1 or checkpoint.observations_seen != len(archive.observations)
+            or checkpoint.context_digest != context_digest or checkpoint.feature_schema_digest != learner.feature_schema_digest
+            or checkpoint.experiment_id != experiment_id or checkpoint.generator_id != learner.generator_id
+            or checkpoint.architecture != (4 * len(dimensions) + 3, 16, 8, 2)
+            or checkpoint.training_steps + checkpoint.rejected_updates != checkpoint.observations_seen * learner.learning_policy.updates_per_observation
+            or set(checkpoint.step_sizes) != {item.name for item in dimensions}
+            or any(not item.min_step <= checkpoint.step_sizes[item.name] <= item.max_step for item in dimensions)):
+            raise GameLearningError("studio_numeric_memory_hidden_history", "Shared optimizer state includes observations outside its checked provenance horizon.", 409)
+    return list({_digest(item): item for item in dependencies}.values())
+
+
+async def _select_numeric_memory(scope, row, *, reuse_context, learner, pin, baseline, dimensions, baseline_parameters, shape):
+    """Join bounded verified replay facts; never average optimizer forks."""
+    from skeleton.learning.mirror_room import MirrorRoomError, TrainingLearningArchive
+
+    mode = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+    fresh = {"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context,
+        "policy": mode, "epoch": row["goal_id"] if mode == "reset" else "initial",
+        "status": "reset" if mode == "reset" else "goal_only" if mode == "goal_only" else "no_compatible_history",
+        "reused_goals": 0, "reused_observations": 0, "origins": [], "exclusion_counts": {}}
+    if mode != "reuse_compatible":
+        return TrainingLearningArchive(), fresh, []
+    query = {**scope, "project_id": row["project_id"], "kind": "studio_agent_goal", "_id": {"$ne": row["goal_id"]},
+        "created_at": {"$lte": row["created_at"]}, "quality_gate.adaptive_ranking": True,
+        "quality_gate.numeric_memory_policy": {"$in": sorted(NUMERIC_SHARED_POLICIES)},
+        "quality_learning.numeric_memory.reuse_context_digest": reuse_context}
+    resets = await _rows.find({**query, "quality_gate.numeric_memory_policy": "reset"}, {"_id": 1}).sort([("created_at", -1), ("_id", -1)]).limit(1).max_time_ms(2000).to_list(length=1)
+    if resets:
+        barrier = await _row(scope, resets[0]["_id"])
+        barrier_memory = (barrier.get("quality_learning") or {}).get("numeric_memory") or {}
+        if (barrier_memory.get("policy") != "reset" or barrier_memory.get("epoch") != barrier["goal_id"]
+            or barrier_memory.get("reuse_context_digest") != reuse_context):
+            raise GameLearningError("studio_numeric_reset_invalid", "The scoped numeric history reset marker differs.", 409)
+        fresh["epoch"] = barrier["goal_id"]
+    records = await _rows.find({**query, "quality_learning.numeric_memory.epoch": fresh["epoch"]}, {"_id": 1}).sort([("created_at", -1), ("_id", -1)]).limit(NUMERIC_MEMORY_SCAN).max_time_ms(2000).to_list(length=NUMERIC_MEMORY_SCAN)
+    owner_context = _digest({"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context, "epoch": fresh["epoch"]})
+    experiment = "studio-memory-" + owner_context[:32]
+    context = learner.numeric_context_digest(context_digest=owner_context, experiment_id=experiment, workload_digest=pin["protocol_digest"])
+    cache = {"goals": {}, "reviews": {}, "observations": {}}
+    eligible = []
+    reserved = max(1, NUMERIC_MEMORY_OBSERVATIONS - row["max_steps"])
+    for record in records[:NUMERIC_MEMORY_DONOR_ATTEMPTS]:
+        try:
+            donor = await _row(scope, record["_id"])
+            cache["goals"][donor["goal_id"]] = donor
+            if not _numeric_export_allowed(donor):
+                raise GameLearningError("donor_consent_unavailable", "The prior numeric sharing grant is unavailable.", 409)
+            learning = donor.get("quality_learning") or {}
+            memory = learning.get("numeric_memory") or {}
+            archive = TrainingLearningArchive.from_payload(learning["archive"], expected_digest=learning["archive_digest"])
+            origin_order = list(dict.fromkeys(item.run_id for item in archive.observations))
+            # Leave room for this goal. Dropped history must also be removed
+            # from weights; replay-only import rebuilds a bounded fresh model.
+            retained_goals = set(origin_order[-(NUMERIC_MEMORY_GOALS - 1):])
+            retained = tuple(item for item in archive.observations if item.run_id in retained_goals)[-reserved:]
+            checked_origins = {item.run_id for item_archive, _origins, _goal in eligible for item in item_archive.observations}
+            available_origins = max(0, NUMERIC_MEMORY_GOALS - 1 - len(checked_origins))
+            new_origin_order = list(dict.fromkeys(item.run_id for item in retained if item.run_id not in checked_origins))
+            admitted_origins = checked_origins | set(new_origin_order[-available_origins:] if available_origins else ())
+            retained = tuple(item for item in retained if item.run_id in admitted_origins)
+            proof_budget = max(0, NUMERIC_MEMORY_OBSERVATIONS - len(cache["observations"]))
+            new_facts = [item.digest for item in retained if item.digest not in cache["observations"]]
+            admitted_facts = set(cache["observations"]) | set(new_facts[-proof_budget:] if proof_budget else ())
+            bounded = tuple(item for item in retained if item.digest in admitted_facts)
+            if bounded != retained:
+                fresh["exclusion_counts"]["review_verification_budget"] = fresh["exclusion_counts"].get("review_verification_budget", 0) + 1
+            retained = bounded
+            retained_digests = {item.digest for item in retained}
+            origins = []
+            for origin in memory.get("origins", []):
+                bindings = [item for item in origin["observations"] if item["observation_digest"] in retained_digests]
+                if bindings:
+                    origins.append({**origin, "observations": bindings})
+            compacted = retained != archive.observations or any(item.observations_seen != len(retained) for item in archive.checkpoints)
+            if not retained:
+                continue
+            if compacted:
+                archive = TrainingLearningArchive(observations=retained)
+            await _verify_numeric_archive(scope, row, archive, origins, baseline=baseline, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=learner, context_digest=context, experiment_id=experiment, pin=pin, reuse_context=reuse_context, epoch=fresh["epoch"], verification_cache=cache)
+            eligible.append((archive, origins, donor))
+        except (GameLearningError, MirrorRoomError, KeyError, TypeError, ValueError) as exc:
+            code = exc.code if isinstance(exc, GameLearningError) else "invalid_numeric_journal"
+            fresh["exclusion_counts"][code] = fresh["exclusion_counts"].get(code, 0) + 1
+    if len(records) > NUMERIC_MEMORY_DONOR_ATTEMPTS:
+        fresh["exclusion_counts"]["donor_scan_budget"] = len(records) - NUMERIC_MEMORY_DONOR_ATTEMPTS
+    if eligible:
+        merged = TrainingLearningArchive()
+        origin_bindings = {}
+        for archive, origins, _donor in eligible:
+            for observation in archive.observations:
+                merged = merged.with_observation(observation)
+            for origin in origins:
+                entry = origin_bindings.setdefault(origin["goal_id"], {"goal_id": origin["goal_id"], "request_digest": origin["request_digest"], "observations": {}})
+                for binding in origin["observations"]:
+                    entry["observations"][binding["observation_digest"]] = binding
+        ordered = sorted(merged.observations, key=lambda item: (_time(cache["goals"][item.run_id]["created_at"]), item.generation, item.candidate_id, item.digest))
+        retained_goals = set(list(dict.fromkeys(item.run_id for item in ordered))[-(NUMERIC_MEMORY_GOALS - 1):])
+        retained = tuple(item for item in ordered if item.run_id in retained_goals)[-reserved:]
+        digests = {item.digest for item in retained}
+        origins = []
+        for goal_id in dict.fromkeys(item.run_id for item in retained):
+            origin = origin_bindings[goal_id]
+            origins.append({**origin, "observations": [item for key, item in origin["observations"].items() if key in digests]})
+        # A checkpoint may continue only if it already represents this complete
+        # retained fact set. Parallel branches otherwise rebuild one ranker from
+        # their union, preserving every retained observation's original identity.
+        complete = next((item for item in eligible if item[0].checkpoints and {value.digest for value in item[0].observations} == digests), None)
+        selected = complete if complete is not None else eligible[0]
+        result_archive = complete[0] if complete is not None else TrainingLearningArchive(observations=retained)
+        donor = selected[2]
+        learning = donor["quality_learning"]
+        result = {**fresh, "status": "reused_checkpoint" if complete is not None else "merged_replay" if len(eligible) > 1 else "rebuilt_replay",
+            "origins": origins, "reused_goals": len(origins), "reused_observations": len(retained),
+            "donor_goal_id": donor["goal_id"], "donor_archive_digest": learning["archive_digest"],
+            "donor_checkpoint_digest": learning.get("learning_status", {}).get("checkpoint_digest"),
+            "merged_donor_goals": len(eligible)}
+        dependencies = [_dependencies(baseline["input"])]
+        for origin in origins:
+            dependencies.extend(_dependencies(cache["reviews"][item["job_id"]]["input"]) for item in origin["observations"])
+        return result_archive, result, list({_digest(item): item for item in dependencies}.values())
+    return TrainingLearningArchive(), fresh, []
+
+
+async def _advance_quality_learning(scope, row, token):
+    """Learn numeric ranking within the existing admitted, leased goal journal.
+
+    Shared history additionally requires matching original sharing grants and
+    current source authority. No ROM bytes, source text, teacher traces, quality
+    labels or provider weights enter the model. Advice cannot execute an edit.
+    """
+    if (
+        not (row.get("quality_gate") or {}).get("adaptive_ranking")
+        or row.get("stop_requested")
+        or row.get("numeric_source_invalidated")
+        or _time(row["expires_at"]) <= _now()
+    ):
+        return row
+    from core import game_studio_review as reviews
+    from skeleton.jeeves.game_studio_review import compare_executed_reviews
+    from skeleton.jeeves.game_successor_runtime import validate_successor_spec, SuccessorRuntimeError
+    from skeleton.learning.mirror_room import AdaptiveLearningPolicy, DeterministicCoordinateLearner, MirrorRoomError, TrainingLearningArchive
+
+    project, _binding = await _current(scope, row)
+    quality = await _quality_progress(scope, row, project)
+    if not quality or not quality.get("baseline"):
+        return row
+    pin = quality["baseline"]
+    baseline = await reviews._load_review(scope, row["project_id"], pin["job_id"], historical=True)
+    if _quality_baseline_pin(baseline) != pin:
+        raise GameLearningError("studio_numeric_baseline_changed", "Numeric ranking baseline identity changed.", 503)
+    baseline_report = reviews._checked_result(baseline)
+    baseline_spec = _numeric_review_spec(baseline)
+    dimensions, baseline_parameters = _numeric_dimensions(baseline_spec)
+    if not dimensions:
+        return row
+    shape = _numeric_shape(baseline_spec, dimensions)
+    identity = baseline_report["source_identity"]
+    legacy_context = _digest({
+        "schema_version": NUMERIC_LEARNING_SCHEMA, **scope,
+        "goal_id": row["goal_id"], "project_id": row["project_id"],
+        "baseline": pin, "quality_policy": row["quality_gate"],
+        "source_shape_digest": shape, "reviewer": identity["reviewer_implementation_digest"],
+        "review_protocol": identity["review_protocol"],
+        "reward": "mean-oriented-relative-task-return-goal-death/v1",
+        "cost": "observed-offline-operation-seconds/v1",
+    })
+    previous = row.get("quality_learning")
+    try:
+        learning_policy = AdaptiveLearningPolicy(minimum_rank_observations=1, replay_batch_size=8, max_candidate_pool=64)
+        probe = DeterministicCoordinateLearner(generator_id="studio-numeric-ranker-v1", dimensions=dimensions, learning_policy=learning_policy)
+        reuse_context = _digest({
+            "schema_version": NUMERIC_MEMORY_SCHEMA, **scope, "project_id": row["project_id"],
+            "baseline": pin, "source_shape_digest": shape,
+            "feature_schema_digest": probe.feature_schema_digest,
+            "reviewer": identity["reviewer_implementation_digest"], "review_protocol": identity["review_protocol"],
+            "acceptance": _numeric_acceptance_policy(row["quality_gate"]),
+            "reward": "mean-oriented-relative-task-return-goal-death/v1", "cost": "observed-offline-operation-seconds/v1",
+        })
+        mode = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+        dependencies = []
+        if previous:
+            archive = TrainingLearningArchive.from_payload(previous["archive"], expected_digest=previous["archive_digest"])
+            memory = copy.deepcopy(previous.get("numeric_memory"))
+            if memory is None:
+                # Legacy explicit learning remains goal-local. Its previous
+                # grant never silently becomes consent to share with new goals.
+                memory = {"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context,
+                    "policy": "goal_only", "epoch": "initial", "status": "goal_only",
+                    "reused_goals": 0, "reused_observations": 0, "origins": [], "exclusion_counts": {}}
+            elif memory["reuse_context_digest"] != reuse_context or memory["policy"] != mode:
+                raise GameLearningError("studio_numeric_context_changed", "Stored numeric memory belongs to a different protocol or sharing grant.", 409)
+        else:
+            archive, memory, dependencies = await _select_numeric_memory(scope, row, reuse_context=reuse_context, learner=probe, pin=pin, baseline=baseline, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape)
+        shared = mode in NUMERIC_SHARED_POLICIES
+        owner_context = _digest({"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context, "epoch": memory["epoch"]}) if shared else legacy_context
+        experiment = "studio-memory-" + owner_context[:32] if shared else "studio-" + row["goal_id"]
+        if previous and previous.get("owner_context_digest") != owner_context:
+            raise GameLearningError("studio_numeric_context_changed", "Stored numeric learning belongs to a different source or protocol.", 409)
+        context = probe.numeric_context_digest(context_digest=owner_context, experiment_id=experiment, workload_digest=pin["protocol_digest"])
+        if shared and previous:
+            dependencies = await _verify_numeric_archive(scope, row, archive, memory["origins"], baseline=baseline, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=probe, context_digest=context, experiment_id=experiment, pin=pin, reuse_context=reuse_context, epoch=memory["epoch"])
+        learner = DeterministicCoordinateLearner(
+            generator_id="studio-numeric-ranker-v1", dimensions=dimensions, training_archive=archive,
+            learning_policy=learning_policy,
+        )
+        learner.bind_numeric_observations(context_digest=owner_context, experiment_id=experiment, workload_digest=pin["protocol_digest"])
+        status = "learning" if learner.learning_status["observations_seen"] else "bootstrap"
+        candidate_pin = quality.get("candidate")
+        if candidate_pin and candidate_pin.get("comparison_status") == "paired_observation":
+            candidate = await reviews._load_review(scope, row["project_id"], candidate_pin["job_id"], historical=True)
+            candidate_report = reviews._checked_result(candidate)
+            comparison = compare_executed_reviews(baseline_report, candidate_report, mode="source_revision")
+            if comparison["status"] != "paired_observation" or comparison["comparison_digest"] != candidate_pin["comparison_digest"]:
+                raise GameLearningError("studio_numeric_review_changed", "Numeric ranking needs the exact matched issued review.", 503)
+            observation = _numeric_observation_from_review(row=row, baseline=baseline, candidate=candidate, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=learner, context_digest=context, experiment_id=experiment, pin=pin)
+            if observation is not None:
+                learner.admit_numeric_observation(observation)
+                status = "learning"
+                if shared:
+                    origins = {item["goal_id"]: item for item in memory["origins"]}
+                    origin = origins.setdefault(row["goal_id"], {"goal_id": row["goal_id"], "request_digest": row["request_digest"], "observations": []})
+                    binding = {"observation_digest": observation.digest, "job_id": candidate["job_id"]}
+                    if binding not in origin["observations"]:
+                        origin["observations"].append(binding)
+                    memory["origins"] = list(origins.values())
+                    dependencies.append(_dependencies(candidate["input"]))
+            else:
+                status = "source_shape_changed"
+        current_spec = _numeric_review_spec({"input": {"files": project["files"]}})
+        current_parameters = _numeric_parameters(current_spec, dimensions)
+        advice = []
+        if _numeric_shape(current_spec, dimensions) == shape and current_parameters is not None:
+            for proposed in learner.rank_numeric_edits(parameters=current_parameters, generation=row["cursor"] + 1, limit=3):
+                revised, edits = copy.deepcopy(current_spec), []
+                for name, value in proposed.items():
+                    if value == current_parameters[name]:
+                        continue
+                    path = name.split(".")
+                    revised[path[0]][path[1]][path[2]] = value
+                    edits.append({"op": "set_field", "path": path, "value": value})
+                try:
+                    validate_successor_spec(revised)
+                except SuccessorRuntimeError:
+                    continue
+                if edits:
+                    proposal = {"expected_spec_digest": _digest(current_spec), "edits": edits}
+                    repeated = any(
+                        fact["status"] == "rejected"
+                        and any(
+                            spec_digest == proposal["expected_spec_digest"]
+                            and payload_digest == _candidate_edit_payload_digest(proposal)
+                            for spec_digest, payload_digest in zip(
+                                fact.get("edit_spec_digests", []), fact["edit_payload_digests"]
+                            )
+                        )
+                        for fact in (row.get("candidate_feedback") or {}).get("rounds", [])
+                    )
+                    if not repeated:
+                        advice.append(proposal)
+        else:
+            status = "source_shape_changed"
+        learning = {
+            "schema_version": NUMERIC_LEARNING_SCHEMA, "owner_context_digest": owner_context,
+            "baseline_review_digest": pin["review_digest"], "status": status,
+            "archive": learner.training_archive.payload(), "archive_digest": learner.training_archive.digest,
+            "learning_status": dict(learner.learning_status), "advice": advice,
+            "source_head_digest": _digest(project["files"]),
+            "numeric_memory": memory,
+            "training_authorized": True, "production_authority": False,
+        }
+        # The ordinary state digest, CAS lease and admitted byte count seal the
+        # whole optimizer/replay update together with its actual owner context.
+        deps = {_digest(item): item for item in (*row["evidence_dependencies"], *dependencies)}
+        if previous == learning and len(deps) == len(row["evidence_dependencies"]):
+            return row
+        return await _set(scope, row["goal_id"], token, {"quality_learning": learning, "evidence_dependencies": list(deps.values())})
+    except MirrorRoomError as exc:
+        raise GameLearningError("studio_numeric_learning_invalid", "Stored numeric ranking state or measured outcome is invalid.", 409) from exc
+    except (SuccessorRuntimeError, json.JSONDecodeError) as exc:
+        raise GameLearningError("studio_numeric_source_invalid", "Numeric ranking needs a valid current original world.", 409) from exc
+    except PyMongoError as exc:
+        raise GameLearningError("studio_numeric_memory_store_unavailable", "The scoped numeric journal could not be confirmed; no unverified history was imported.", 503) from exc
 
 
 async def _quality_restore_payload(scope, row, project, *, allowed_editor_operation_id=None):
@@ -1341,6 +2099,127 @@ async def _quality_restore_payload(scope, row, project, *, allowed_editor_operat
         "expected_spec_digest": _digest(current_spec),
         "restore_review_job_id": baseline["job_id"],
     }, quality
+
+
+def _restoration_capability(row, quality=None):
+    """Only a fresh inspect/recovery may offer the exact host rollback."""
+    if row.get("schema_version") != SCHEMA:
+        return False, "legacy_read_only"
+    if (row.get("execution_mode") != "run" or not row.get("allow_edits")
+        or not (row.get("quality_gate") or {}).get("restore_on_regression")):
+        return False, "restoration_not_granted"
+    if row.get("status") in {"completed", "cancelled", "expired", "paused", "planned"} or row.get("stop_requested"):
+        return False, "goal_not_active"
+    if _time(row["expires_at"]) <= _now():
+        return False, "authorization_expired"
+    if row.get("pending") or row.get("pending_job_id") or row.get("pending_play_id"):
+        return False, "issued_work_requires_reconciliation"
+    if row["cursor"] >= row["max_steps"]:
+        return False, "action_budget_exhausted"
+    if quality is None:
+        return False, "inspect_current_quality"
+    if quality.get("status") != "rejected" or not quality.get("candidate") or not quality.get("baseline"):
+        return False, "no_measured_rejected_candidate"
+    if quality.get("head_digest") != row.get("head_digest"):
+        return False, "quality_source_changed"
+    return True, None
+
+
+def _validate_host_restoration(row, record, *, committed=False):
+    """A host rollback has its own receipt and never borrows model lineage."""
+    authority = record.get("decision_authority")
+    receipt = record.get("host_decision_receipt")
+    if authority is None and receipt is None:
+        return False
+    command = record.get("command") if isinstance(record.get("command"), dict) else {}
+    payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}
+    policy = row.get("quality_gate") or {}
+    decision = record.get("decision") or {}
+    input_version = record.get("input_version" if committed else "head_version")
+    input_digest = record.get("input_digest" if committed else "head_digest")
+    if (authority != RESTORATION_AUTHORITY or not isinstance(receipt, dict)
+        or receipt.get("schema_version") != RESTORATION_SCHEMA
+        or receipt.get("receipt_digest") != _digest({key: value for key, value in receipt.items() if key != "receipt_digest"})
+        or receipt.get("goal_id") != row["goal_id"] or receipt.get("goal_request_digest") != row["request_digest"]
+        or receipt.get("index") != record.get("index") or receipt.get("input_version") != input_version
+        or receipt.get("input_digest") != input_digest or receipt.get("policy_digest") != _digest(policy)
+        or receipt.get("command_digest") != record.get("command_digest")
+        or row.get("execution_mode") != "run" or not row.get("allow_edits") or not policy.get("restore_on_regression")
+        or record.get("quality_role") != "restore_incumbent"
+        or command.get("operation") != "world.edit" or command.get("project_id") != row["project_id"]
+        or set(payload) != {"expected_spec_digest", "restore_review_job_id", "expected_version", "idempotency_key"}
+        or payload.get("expected_version") != input_version
+        or payload.get("idempotency_key") != row["goal_id"] + ":action:" + str(record.get("index"))
+        or not isinstance(receipt.get("baseline"), dict) or not isinstance(receipt.get("candidate"), dict)
+        or payload.get("restore_review_job_id") != receipt["baseline"].get("job_id")
+        or receipt["candidate"].get("head_digest") != input_digest
+        or not receipt["candidate"].get("review_digest") or not receipt.get("quality_receipt_digest")
+        or decision.get("schema_version") != DECISION_SCHEMA or decision.get("operation") != "world.edit"
+        or decision.get("done") is not False or decision.get("payload") != payload
+        or decision.get("evidence_refs") or decision.get("follow_up")
+        or any(record.get(name) is not None for name in ("model_key", "model_receipt", "prompt_digest", "response_digest", "raw_decision", "prompt"))):
+        raise GameLearningError("studio_goal_recovery_receipt_corrupt", "Host restoration differs from its exact original grant, source, or independent decision receipt.", 503)
+    if not committed and record.get("phase") not in {"action", "outcome"}:
+        raise GameLearningError("studio_goal_recovery_receipt_corrupt", "Host restoration cannot issue a canonical model operation.", 503)
+    return True
+
+
+def _validate_editor_recovery(row, record, *, committed=False):
+    receipt = record.get("recovered_editor_receipt")
+    if receipt is None:
+        return
+    command = record.get("command") if isinstance(record.get("command"), dict) else {}
+    payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}
+    output = record if committed else record.get("action_outcome") or {}
+    input_version = record.get("input_version" if committed else "head_version")
+    if (not isinstance(receipt, dict) or not isinstance(output, dict) or type(input_version) is not int
+        or not isinstance(payload.get("idempotency_key"), str)):
+        raise GameLearningError("studio_goal_editor_recovery_corrupt", "Recovered editor receipt has no exact typed source outcome.", 503)
+    operation_id = _key(row["project_id"], "successor-world", payload.get("idempotency_key", ""))
+    if (receipt.get("schema_version") != "skeleton.game.studio_editor_recovery.v1"
+        or receipt.get("receipt_digest") != _digest({key: value for key, value in receipt.items() if key != "receipt_digest"})
+        or command.get("operation") != "world.edit" or command.get("project_id") != row["project_id"]
+        or receipt.get("operation_id") != operation_id or receipt.get("operation_request_digest") != _digest(payload)
+        or receipt.get("revision_id") != _key(row["project_id"], "editor", "successor-world:" + operation_id)
+        or not receipt.get("revision_request_digest")
+        or receipt.get("output_version") != input_version + 1
+        or receipt.get("output_version") != output.get("output_version")
+        or receipt.get("output_digest") != output.get("output_digest")
+        or receipt.get("result_authority") != "current_world_projection_after_exact_committed_revision"
+        or (not committed and record.get("phase") != "outcome")):
+        raise GameLearningError("studio_goal_editor_recovery_corrupt", "Recovered edit differs from its exact operation, committed revision, or source outcome.", 503)
+
+
+async def _prepare_incumbent_restoration(scope, row):
+    project, binding = await _current(scope, row)
+    payload, quality = await _quality_restore_payload(scope, row, project)
+    available, reason = _restoration_capability(row, quality)
+    if not available:
+        raise GameLearningError("studio_quality_restore_unavailable", "Exact incumbent recovery is unavailable: " + reason + ".", 409)
+    payload.update(expected_version=project["version"], idempotency_key=row["goal_id"] + ":action:" + str(row["cursor"]))
+    _action_scope(row, "world.edit", payload)
+    command = StudioCommand("world.edit", row["project_id"], payload).as_dict()
+    decision = {"schema_version": DECISION_SCHEMA, "operation": "world.edit", "payload": payload,
+        "explanation": "Restore the exact issued incumbent after the measured candidate was rejected under the original restoration grant.", "done": False}
+    receipt = {"schema_version": RESTORATION_SCHEMA, "goal_id": row["goal_id"],
+        "goal_request_digest": row["request_digest"], "index": row["cursor"],
+        "policy_digest": _digest(row["quality_gate"]), "input_version": project["version"],
+        "input_digest": _digest(project["files"]), "baseline": quality["baseline"],
+        "candidate": quality["candidate"], "quality_receipt_digest": quality["receipt_digest"],
+        "command_digest": _digest(command)}
+    receipt["receipt_digest"] = _digest(receipt)
+    from core import game_studio_review as reviews
+
+    dependencies = [_dependencies(binding)]
+    for pin in (quality["baseline"], quality["candidate"]):
+        issued = await reviews._load_review(scope, row["project_id"], pin["job_id"], historical=True)
+        dependencies.append(_dependencies(issued["input"]))
+    return {"index": row["cursor"], "phase": "action", "head_version": project["version"],
+        "head_digest": _digest(project["files"]), "dependencies": dependencies,
+        "max_output_tokens": row.get("max_output_tokens", 4096),
+        "decision_authority": RESTORATION_AUTHORITY, "host_decision_receipt": receipt,
+        "quality_role": "restore_incumbent", "decision": decision, "decision_digest": _digest(decision),
+        "command": command, "command_digest": _digest(command)}
 
 
 async def _quality_action_payload(
@@ -2163,6 +3042,32 @@ async def _context(scope, row, project, binding):
     result["evidence_catalog"] = evidence[:128]
     if row.get("completion_requirements"):
         result["completion"] = await _completion_progress(scope, row, project)
+    feedback = row.get("candidate_feedback")
+    if feedback and feedback["source_head_digest"] == _digest(project["files"]):
+        result["candidate_feedback"] = feedback
+        for fact in feedback["rounds"]:
+            evidence.append(
+                {
+                    "ref": "review:" + fact["review_job_id"] + ":" + fact["review_digest"],
+                    "kind": "historical_review",
+                    "job_id": fact["review_job_id"],
+                    "review_digest": fact["review_digest"],
+                    "input_digest": fact["review_input_digest"],
+                    "applicable_to_current_tree": fact["applicable_to_current_tree"],
+                }
+            )
+        result["evidence_catalog"] = list({item["ref"]: item for item in evidence}.values())[:128]
+    learning = row.get("quality_learning")
+    if (row.get("quality_gate") or {}).get("adaptive_ranking") and learning:
+        result["numeric_adaptation"] = {
+            "status": learning["status"],
+            "learning_status": learning["learning_status"],
+            "numeric_memory": _numeric_memory_projection(row, learning),
+            "advice": learning["advice"] if learning.get("source_head_digest") == _digest(project["files"]) else [],
+            "instruction": "These are optional numeric edit proposals learned from this goal's matched original review facts. Inspect the relevant mechanics, keep the exact source digest, and use only granted world.edit fields. Advice never replaces current-source simulation, review, restoration, or acceptance gates.",
+            "quality_certified": False,
+            "production_authority": False,
+        }
     while len(_json(result)) > 192 * 1024 and result.get("authoring_documents"):
         result["authoring_documents"].pop()
     _json(result, 192 * 1024)
@@ -2558,6 +3463,33 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
         }
         dump = lambda value: json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
         prompt = dump(data)
+        feedback = context.get("candidate_feedback")
+        if feedback and feedback["rounds"]:
+            fact = feedback["rounds"][-1]
+            proposed = {
+                **data,
+                "candidate_feedback": {
+                    "baseline": feedback["baseline"],
+                    "source_head_digest": feedback["source_head_digest"],
+                    "latest_round": fact,
+                    "instruction": "Retained measured edit/review outcome, including after restoration. Avoid repeating the exact failed edit under the same source/protocol; inspect and design a different bounded candidate. Historical evidence never replaces fresh current-source acceptance.",
+                    "training_authorized": False,
+                    "production_authority": False,
+                },
+            }
+            if fits(dump(proposed)):
+                data, prompt = proposed, dump(proposed)
+        numeric = context.get("numeric_adaptation")
+        if numeric and "world.edit" in allowed:
+            proposed = {**data, "numeric_adaptation": {
+                "status": numeric["status"], "advice": numeric["advice"][:1],
+                "observations_seen": numeric["learning_status"]["observations_seen"],
+                "numeric_memory": {key: numeric["numeric_memory"][key] for key in ("policy", "status", "reused_goals", "reused_observations")},
+                "scope": "Optional numeric proposals; inspect and preserve current-source editor/review/restoration gates.",
+                "production_authority": False,
+            }}
+            if fits(dump(proposed)):
+                data, prompt = proposed, dump(proposed)
         # Admit complete actual observations atomically; never label a truncated result as complete.
         observations = []
         for lesson in context.get("review_lessons", []):
@@ -2640,13 +3572,17 @@ def _observe_planner_waiter(task):
         task.exception()
 
 
-async def _model(scope, row, token):
+async def _model(scope, row, token, *, poll_seconds=PLANNER_POLL_SECONDS, deadline=None):
     from core.engine_chat import EngineChat
 
     pending = row["pending"]
     await _current(scope, row)
     for refs in pending["dependencies"]:
         await _authorize_history(scope, {"evidence_dependencies": [refs]})
+
+    def probe_budget():
+        return 5 if deadline is None else max(0.0, min(5.0, deadline - asyncio.get_running_loop().time()))
+
     system = PLANNER_SYSTEM
     chat = EngineChat(
         session_id="studio-goal:" + row["goal_id"],
@@ -2665,7 +3601,15 @@ async def _model(scope, row, token):
         remaining = (_time(row["expires_at"]) - _now()).total_seconds()
         if remaining <= 0:
             raise GameLearningError("studio_goal_expired", "This goal authorization has expired.", 409)
+        if deadline is not None:
+            remaining = min(remaining, deadline - asyncio.get_running_loop().time())
+            if remaining <= 0:
+                return row
         await _dispatch_fence(scope, row, token, pending, phase="model")
+        if deadline is not None:
+            remaining = min(remaining, deadline - asyncio.get_running_loop().time())
+            if remaining <= 0:
+                return row
         waiter_key = (scope["tenant_id"], scope["owner_id"], row["goal_id"], pending["model_key"])
         waiter = _planner_waiters.get(waiter_key)
         if waiter is None:
@@ -2682,11 +3626,16 @@ async def _model(scope, row, token):
             _planner_waiters[waiter_key] = waiter
             waiter.add_done_callback(_observe_planner_waiter)
         response = await asyncio.wait_for(
-            asyncio.shield(waiter), timeout=min(PLANNER_POLL_SECONDS, remaining)
+            asyncio.shield(waiter), timeout=min(PLANNER_POLL_SECONDS, remaining, poll_seconds)
         )
     except asyncio.TimeoutError:
         try:
-            probe = await asyncio.wait_for(_planner_probe(scope, pending), timeout=5)
+            wait = probe_budget()
+            probe = (
+                await asyncio.wait_for(_planner_probe(scope, pending), timeout=wait)
+                if wait > 0
+                else {"state": "unknown", "terminal": False}
+            )
         except Exception:
             probe = {"state": "unknown", "terminal": False}
         return await _set(
@@ -2714,7 +3663,12 @@ async def _model(scope, row, token):
         raise
     except Exception as exc:
         try:
-            probe = await asyncio.wait_for(_planner_probe(scope, pending), timeout=5)
+            wait = probe_budget()
+            probe = (
+                await asyncio.wait_for(_planner_probe(scope, pending), timeout=wait)
+                if wait > 0
+                else {"state": "unknown", "terminal": False}
+            )
             if probe.get("terminal"):
                 await _set(scope, row["goal_id"], token, {"pending": {**pending, "canonical_probe": probe}})
         except Exception:
@@ -2756,8 +3710,19 @@ async def _model(scope, row, token):
             503,
         )
     try:
-        probe = await asyncio.wait_for(_planner_probe(scope, pending), timeout=5)
+        wait = probe_budget()
+        if wait <= 0:
+            # The exact canonical waiter retains this actual result. Join and
+            # verify it on the next request; no unverified decision is accepted.
+            return row
+        probe = await asyncio.wait_for(_planner_probe(scope, pending), timeout=wait)
     except Exception as exc:
+        if (
+            isinstance(exc, asyncio.TimeoutError)
+            and deadline is not None
+            and asyncio.get_running_loop().time() >= deadline
+        ):
+            return row
         raise GameLearningError(
             "studio_planner_unavailable",
             "The actual planner response is retained; its canonical receipt probe is temporarily unavailable. Retry the same request.",
@@ -3044,15 +4009,15 @@ async def _finish_step(scope, row, token):
         "play_id": play_id,
         "job_id": job_id,
         "command": pending["command"],
-        "prompt_digest": pending["prompt_digest"],
-        "model_key": pending["model_key"],
-        "response_digest": pending["response_digest"],
+        "prompt_digest": pending.get("prompt_digest"),
+        "model_key": pending.get("model_key"),
+        "response_digest": pending.get("response_digest"),
         "decision_digest": _digest(decision),
         "result_digest": _digest(result),
         "previous_step_digest": row["history_digest"],
         "index": pending["index"],
         "decision": decision,
-        "model_receipt": pending["model_receipt"],
+        "model_receipt": pending.get("model_receipt"),
         "workflow_position": pending.get("workflow_position", 0),
         "receipt_bindings": pending.get("receipt_bindings", []),
         "command_digest": _digest(pending["command"]) if pending["command"] else None,
@@ -3066,6 +4031,11 @@ async def _finish_step(scope, row, token):
     }
     if pending.get("quality_role"):
         step["quality_role"] = pending["quality_role"]
+    if pending.get("decision_authority"):
+        step["decision_authority"] = pending["decision_authority"]
+        step["host_decision_receipt"] = pending["host_decision_receipt"]
+    if pending.get("recovered_editor_receipt"):
+        step["recovered_editor_receipt"] = pending["recovered_editor_receipt"]
     step["step_digest"] = _digest(step)
     for refs in pending["dependencies"]:
         await _authorize_history(scope, {"evidence_dependencies": [refs]})
@@ -3114,7 +4084,84 @@ async def _finish_step(scope, row, token):
     return await _set(scope, row["goal_id"], token, changes)
 
 
+async def _reconcile_boundary(scope, row, token):
+    """Settle issued work independently of the remaining dispatch budget.
+
+    Child observations and completion are facts about already admitted work.
+    Requiring another action slot to acknowledge them strands the final job at
+    the budget boundary. This path never admits work or calls the planner.
+    """
+    if _time(row["expires_at"]) <= _now():
+        return await _set(scope, row["goal_id"], token, {"status": "expired"}), False
+    if row.get("stop_requested"):
+        status = "paused" if row["stop_requested"] == "pause" else "cancelled"
+        return await _set(scope, row["goal_id"], token, {"status": status}), False
+    if row.get("pending_job_id"):
+        job = await workspace.get_job(scope, row["pending_job_id"])
+        if job["status"] == "interrupted":
+            row = await _set(scope, row["goal_id"], token, {
+                "status": "blocked", "last_job_receipt": _feedback(job),
+                "error": {"code": "studio_goal_job_interrupted", "message": "The actual worker was interrupted; use the job controls to resume or cancel it."},
+            })
+            return row, False
+        if job["status"] not in {"completed", "failed", "cancelled", "blocked"}:
+            return row, False
+        row = await _set(scope, row["goal_id"], token, {
+            "pending_job_id": None, "status": "ready", "last_job_receipt": _compact(job),
+        })
+    if row.get("pending_play_id"):
+        from routes.game_learning import _plays
+
+        play = await _plays().get(scope, row["pending_play_id"])
+        if play["status"] == "interrupted":
+            row = await _set(scope, row["goal_id"], token, {
+                "status": "blocked", "last_play_receipt": _feedback(play),
+                "error": {"code": "studio_goal_play_interrupted", "message": "AI playback was interrupted; use its live playback controls to resume or stop it."},
+            })
+            return row, False
+        if play["status"] not in {"completed", "stopped", "failed", "cancelled", "blocked"}:
+            return row, False
+        row = await _set(scope, row["goal_id"], token, {
+            "pending_play_id": None, "status": "ready", "last_play_receipt": _feedback(play),
+        })
+    row = await _advance_candidate_feedback(scope, row, token)
+    row = await _advance_quality_learning(scope, row, token)
+    completion = None
+    if not row.get("pending") and row.get("completion_requirements"):
+        completion = await _completion_progress(scope, row)
+        if completion["verified"]:
+            row = await _set(scope, row["goal_id"], token, {
+                "status": "completed", "completion_reason": "verified_workflow_complete",
+                "completion_receipt": completion, "error": None, "workflow": [],
+            })
+            return row, False
+    if row["cursor"] >= row["max_steps"] or (
+        row["model_calls"] >= row["max_model_calls"]
+        and row.get("pending") is None and not row.get("workflow")
+    ):
+        row = await _set(scope, row["goal_id"], token, {
+            "status": "blocked" if completion else "completed",
+            "completion_reason": "bounded_budget_exhausted",
+            "error": {"code": "studio_goal_budget_reached", "message": "Bounded execution budget reached; inspect actual receipts."} if completion else None,
+            **({"completion_receipt": completion} if completion else {}),
+        })
+        return row, False
+    return row, True
+
+
 async def advance(scope, goal_id, body):
+    for field, default, lower, upper in (
+        ("steps", 1, 1, 4),
+        ("max_planner_decisions", 1, 1, 4),
+        ("wait_for_work_seconds", 0, 0, 10),
+    ):
+        value = body.get(field, default)
+        if type(value) is not int or not lower <= value <= upper:
+            raise GameLearningError(
+                "studio_goal_advance_bounds",
+                "Select bounded integer advance steps, planner decisions and issued-work waiting.",
+                422,
+            )
     scope = workspace._scope(scope["tenant_id"], scope["owner_id"])
     row = await _row(scope, goal_id)
     _require_v2(row)
@@ -3140,6 +4187,32 @@ async def advance(scope, goal_id, body):
             "studio_goal_request_budget", "Goal has reached its bounded128advance request budget.", 413
         )
     now, token = _now(), uuid4().hex
+    advance_intent = (
+        active
+        if exact_retry
+        else {
+            "key": key,
+            "digest": request_digest,
+            "start_cursor": row["cursor"],
+            "end_cursor": min(row["max_steps"], row["cursor"] + body["steps"]),
+            "max_planner_decisions": body.get("max_planner_decisions", 1),
+            "wait_for_work_seconds": body.get("wait_for_work_seconds", 0),
+            "planner_keys": [],
+            "work_wait_ms": 0,
+            "deadline_at": min(_time(row["expires_at"]), now + timedelta(seconds=ADVANCE_SLICE_SECONDS)),
+        }
+    )
+    if exact_retry and "planner_keys" not in advance_intent:
+        advance_intent = {
+            **advance_intent,
+            "planner_keys": list(
+                dict.fromkeys(
+                    step["model_key"]
+                    for step in row["steps"][advance_intent["start_cursor"] :]
+                    if step.get("model_key")
+                )
+            ),
+        }
     claimed = await _rows.find_one_and_update(
         {
             "_id": goal_id,
@@ -3152,29 +4225,11 @@ async def advance(scope, goal_id, body):
             "$set": {
                 "_worker_token": token,
                 "_lease_until": now + timedelta(seconds=LEASE_SECONDS),
-                "_active_advance": (
-                    active
-                    if exact_retry
-                    else {
-                        "key": key,
-                        "digest": request_digest,
-                        "start_cursor": row["cursor"],
-                        "end_cursor": min(row["max_steps"], row["cursor"] + body["steps"]),
-                    }
-                ),
+                "_active_advance": advance_intent,
                 "state_digest": _state_digest(
                     {
                         **row,
-                        "_active_advance": (
-                            active
-                            if exact_retry
-                            else {
-                                "key": key,
-                                "digest": request_digest,
-                                "start_cursor": row["cursor"],
-                                "end_cursor": min(row["max_steps"], row["cursor"] + body["steps"]),
-                            }
-                        ),
+                        "_active_advance": advance_intent,
                     }
                 ),
             }
@@ -3198,114 +4253,114 @@ async def advance(scope, goal_id, body):
                     ]
                 },
             )
-        advance_deadline = asyncio.get_running_loop().time() + 90
-        model_waited = False
+        intent = row["_active_advance"]
+        # A transport retry retains the same finite slice and decision list.
+        # Older frozen advances retain their original single-decision bound.
+        slice_seconds = min(
+            ADVANCE_SLICE_SECONDS,
+            max(
+                0.0,
+                (
+                    _time(intent.get("deadline_at", now + timedelta(seconds=ADVANCE_SLICE_SECONDS))) - _now()
+                ).total_seconds(),
+            ),
+        )
+        advance_deadline = asyncio.get_running_loop().time() + slice_seconds
+        model_polled = set()
+        yield_reason = "goal_boundary"
         row = await _recover_own_edit(scope, row, token)
         await _current(scope, row)
-        for _ in range(min(body["steps"], max(0, row["_active_advance"]["end_cursor"] - row["cursor"]))):
+        while True:
             if asyncio.get_running_loop().time() >= advance_deadline:
+                yield_reason = "time_slice_elapsed"
                 break
-            if _time(row["expires_at"]) <= _now():
-                row = await _set(scope, goal_id, token, {"status": "expired"})
-                break
-            if row.get("stop_requested"):
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {"status": "paused" if row["stop_requested"] == "pause" else "cancelled"},
+            try:
+                row, dispatch_available = await asyncio.wait_for(
+                    _reconcile_boundary(scope, row, token),
+                    timeout=max(0.001, advance_deadline - asyncio.get_running_loop().time()),
                 )
+            except asyncio.TimeoutError:
+                row = await _row(scope, goal_id)
+                yield_reason = "time_slice_elapsed"
                 break
-            if row.get("pending_job_id"):
-                job = await workspace.get_job(scope, row["pending_job_id"])
-                if job["status"] == "interrupted":
-                    row = await _set(
-                        scope,
-                        goal_id,
-                        token,
-                        {
-                            "status": "blocked",
-                            "last_job_receipt": _feedback(job),
-                            "error": {
-                                "code": "studio_goal_job_interrupted",
-                                "message": "The actual worker was interrupted; use the job controls to resume or cancel it.",
-                            },
-                        },
+            intent = row["_active_advance"]
+            if not dispatch_available:
+                if (
+                    row["status"] == "waiting"
+                    and not row.get("error")
+                    and (row.get("pending_job_id") or row.get("pending_play_id"))
+                ):
+                    wait_ms = min(
+                        500,
+                        intent.get("wait_for_work_seconds", 0) * 1000 - intent.get("work_wait_ms", 0),
+                        max(0, int((advance_deadline - asyncio.get_running_loop().time()) * 1000)),
                     )
-                    break
-                if job["status"] not in {"completed", "failed", "cancelled", "blocked"}:
-                    break
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {"pending_job_id": None, "status": "ready", "last_job_receipt": _compact(job)},
-                )
-            if row.get("pending_play_id"):
-                from routes.game_learning import _plays
-
-                play = await _plays().get(scope, row["pending_play_id"])
-                if play["status"] == "interrupted":
-                    row = await _set(
-                        scope,
-                        goal_id,
-                        token,
-                        {
-                            "status": "blocked",
-                            "last_play_receipt": _feedback(play),
-                            "error": {
-                                "code": "studio_goal_play_interrupted",
-                                "message": "AI playback was interrupted; use its live playback controls to resume or stop it.",
+                    if wait_ms > 0:
+                        row = await _set(
+                            scope,
+                            goal_id,
+                            token,
+                            {
+                                "_active_advance": {
+                                    **intent,
+                                    "work_wait_ms": intent.get("work_wait_ms", 0) + wait_ms,
+                                }
                             },
-                        },
-                    )
-                    break
-                if play["status"] not in {"completed", "stopped", "failed", "cancelled", "blocked"}:
-                    break
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {"pending_play_id": None, "status": "ready", "last_play_receipt": _feedback(play)},
-                )
-            if row["cursor"] >= row["max_steps"] or (
-                row["model_calls"] >= row["max_model_calls"]
-                and row.get("pending") is None
-                and not row.get("workflow")
-            ):
-                completion = (
-                    await _completion_progress(scope, row) if row.get("completion_requirements") else None
-                )
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {
-                        "status": "blocked" if completion and not completion["verified"] else "completed",
-                        "completion_reason": "bounded_budget_exhausted",
-                        "error": {
-                            "code": "studio_goal_budget_reached",
-                            "message": "Bounded execution budget reached; inspect actual receipts.",
-                        },
-                        **({"completion_receipt": completion} if completion else {}),
-                    },
-                )
+                        )
+                        await asyncio.sleep(wait_ms / 1000)
+                        continue
+                    yield_reason = "waiting_for_work"
+                break
+            if row["cursor"] >= intent["end_cursor"]:
+                yield_reason = "batch_step_limit"
                 break
             if row.get("pending") is None:
-                if model_waited and not row.get("workflow"):
-                    # Yield after an issued operation instead of starting a second
-                    # model poll inside the same HTTP request's timeout window.
+                if not row.get("workflow") and len(intent.get("planner_keys", [])) >= intent.get(
+                    "max_planner_decisions", 1
+                ):
+                    yield_reason = "batch_model_limit"
                     break
-                row = (
-                    await _next_workflow_action(scope, row, token)
-                    if row.get("workflow")
-                    else await _prepare(scope, row, token)
-                )
+                remaining = advance_deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    yield_reason = "time_slice_elapsed"
+                    break
+                try:
+                    row = await asyncio.wait_for(
+                        (
+                            _next_workflow_action(scope, row, token)
+                            if row.get("workflow")
+                            else _prepare(scope, row, token)
+                        ),
+                        timeout=remaining,
+                    )
+                except asyncio.TimeoutError:
+                    row = await _row(scope, goal_id)
+                    yield_reason = "time_slice_elapsed"
+                    break
+            if row["pending"]["phase"] in {"model", "response"}:
+                model_key = row["pending"]["model_key"]
+                intent = row["_active_advance"]
+                keys = intent.get("planner_keys", [])
+                if model_key not in keys:
+                    if len(keys) >= intent.get("max_planner_decisions", 1):
+                        yield_reason = "batch_model_limit"
+                        break
+                    row = await _set(
+                        scope,
+                        goal_id,
+                        token,
+                        {"_active_advance": {**intent, "planner_keys": [*keys, model_key]}},
+                    )
             if row["pending"]["phase"] == "model":
-                if model_waited:
+                if model_key in model_polled:
+                    yield_reason = "planner_pending"
                     break
-                model_waited = True
-                row = await _model(scope, row, token)
+                remaining = advance_deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    yield_reason = "time_slice_elapsed"
+                    break
+                model_polled.add(model_key)
+                row = await _model(scope, row, token, poll_seconds=remaining, deadline=advance_deadline)
             elif row["pending"]["phase"] == "response":
                 row = await _accept_response(scope, row, token)
             # Recheck stop/expiry after potentially slow model execution.
@@ -3326,9 +4381,13 @@ async def advance(scope, goal_id, body):
                 break
             if row.get("pending", {}).get("phase") == "model":
                 # A detached poll has no planner decision or action receipt to settle.
+                yield_reason = "planner_pending"
+                break
+            if asyncio.get_running_loop().time() >= advance_deadline and row["pending"]["phase"] != "outcome":
+                yield_reason = "time_slice_elapsed"
                 break
             row = await _finish_step(scope, row, token)
-            if row["status"] != "ready":
+            if row["status"] not in {"ready", "waiting"}:
                 break
         row = await _set(
             scope,
@@ -3338,7 +4397,15 @@ async def advance(scope, goal_id, body):
                 "_active_advance": None,
                 "advance_receipts": [
                     *row.get("advance_receipts", []),
-                    {"key": key, "digest": request_digest},
+                    {
+                        "key": key,
+                        "digest": request_digest,
+                        "start_cursor": row["_active_advance"]["start_cursor"],
+                        "end_cursor": row["cursor"],
+                        "planner_decisions": len(row["_active_advance"].get("planner_keys", [])),
+                        "work_wait_ms": row["_active_advance"].get("work_wait_ms", 0),
+                        "yield_reason": yield_reason,
+                    },
                 ],
             },
         )
@@ -3498,6 +4565,10 @@ def _state_digest(row):
         "completion_mode",
         "quality_gate",
         "quality_baseline",
+        "quality_learning",
+        "candidate_feedback",
+        "source_refresh_receipts",
+        "numeric_source_invalidated",
     ):
         if name in row:
             payload[name] = row[name]
@@ -3515,6 +4586,154 @@ def _require_v2(row):
             "This legacy goal has unverified historical receipts; create a fresh goal to execute.",
             409,
         )
+
+
+def _validate_studio_continuity(row):
+    def sha(value):
+        return (
+            isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+        )
+
+    def count(value, maximum):
+        return type(value) is int and 0 <= value <= maximum
+
+    def corrupt(message):
+        raise GameLearningError("studio_goal_continuity_corrupt", message, 503)
+
+    if "numeric_source_invalidated" in row and type(row["numeric_source_invalidated"]) is not bool:
+        corrupt("Numeric source compatibility must remain an explicit boolean.")
+    if row.get("numeric_source_invalidated") and (row.get("quality_learning") or {}).get("advice"):
+        corrupt("Incompatible source cannot retain executable numeric advice.")
+    receipts = row.get("source_refresh_receipts", [])
+    if not isinstance(receipts, list) or len(receipts) > 16:
+        corrupt("Source refresh history exceeds its original bounded journal.")
+    keys = set()
+    for receipt in receipts:
+        if (
+            not isinstance(receipt, dict)
+            or receipt.get("schema_version") != SOURCE_REFRESH_SCHEMA
+            or not isinstance(receipt.get("key"), str)
+            or not 1 <= len(receipt["key"]) <= 512
+            or receipt["key"] in keys
+            or not sha(receipt.get("digest"))
+            or not sha(receipt.get("previous_head_digest"))
+            or not sha(receipt.get("head_digest"))
+            or not sha(receipt.get("revision_request_digest"))
+            or not sha(receipt.get("discarded_workflow_digest"))
+            or not isinstance(receipt.get("revision_id"), str)
+            or not 1 <= len(receipt["revision_id"]) <= 128
+            or not count(receipt.get("previous_head_version"), row["head_version"])
+            or not count(receipt.get("head_version"), row["head_version"])
+            or receipt["head_version"] <= receipt["previous_head_version"]
+            or not count(receipt.get("discarded_workflow_actions"), 4)
+            or not count(receipt.get("cursor"), row["cursor"])
+            or not count(receipt.get("model_calls"), row["model_calls"])
+            or not count(receipt.get("jobs_started"), row["jobs_started"])
+            or type(receipt.get("numeric_source_compatible")) is not bool
+            or receipt.get("grants_changed") is not False
+            or receipt.get("counters_reset") is not False
+            or receipt.get("receipt_digest")
+            != _digest({key: value for key, value in receipt.items() if key != "receipt_digest"})
+        ):
+            corrupt("Source refresh differs from its exact source revision, fixed grants, or sealed receipt.")
+        keys.add(receipt["key"])
+    feedback = row.get("candidate_feedback")
+    if feedback is not None:
+        if (
+            not isinstance(feedback, dict)
+            or feedback.get("schema_version") != FEEDBACK_SCHEMA
+            or feedback.get("baseline") != row.get("quality_baseline")
+            or not sha(feedback.get("source_head_digest"))
+            or not sha(feedback.get("input_digest"))
+            or not isinstance(feedback.get("rounds"), list)
+            or len(feedback["rounds"]) > 4
+            or not count(feedback.get("excluded_unmatched_reviews"), 16)
+            or feedback.get("training_authorized") is not False
+            or feedback.get("production_authority") is not False
+        ):
+            corrupt("Candidate feedback differs from its immutable baseline or nonproduction scope.")
+        edits_by_digest = {
+            step.get("step_digest"): step
+            for step in row["steps"]
+            if step.get("executed") and step["decision"].get("operation") in EDIT
+        }
+        reviews_by_id = {
+            step.get("job_id"): step
+            for step in row["steps"]
+            if step.get("executed") and step["decision"].get("operation") == "project.review"
+        }
+        seen = set()
+        for fact in feedback["rounds"]:
+            if (
+                not isinstance(fact, dict)
+                or not isinstance(fact.get("status"), str)
+                or fact["status"] not in {"accepted", "rejected"}
+                or not sha(fact.get("review_digest"))
+                or not sha(fact.get("review_input_digest"))
+                or not sha(fact.get("head_digest"))
+                or not sha(fact.get("comparison_digest"))
+                or not isinstance(fact.get("review_job_id"), str)
+                or fact["review_job_id"] in seen
+                or not isinstance(fact.get("edit_step_digests"), list)
+                or not 1 <= len(fact["edit_step_digests"]) <= 16
+                or any(
+                    not isinstance(fact.get(name), list) or len(fact[name]) != len(fact["edit_step_digests"])
+                    for name in ("edit_payload_digests", "edit_spec_digests", "edit_input_digests")
+                )
+                or not isinstance(fact.get("failures"), list)
+                or len(fact["failures"]) > 5
+                or fact["status"] != ("rejected" if fact["failures"] else "accepted")
+                or not isinstance(fact.get("regressions"), list)
+                or len(fact["regressions"]) > 128
+                or type(fact.get("restored")) is not bool
+                or type(fact.get("applicable_to_current_tree")) is not bool
+                or fact["applicable_to_current_tree"]
+                != (fact["head_digest"] == feedback["source_head_digest"])
+                or fact.get("feedback_digest")
+                != _digest({key: value for key, value in fact.items() if key != "feedback_digest"})
+            ):
+                corrupt(
+                    "Candidate feedback is malformed, duplicated, or detached from its exact measured round."
+                )
+            review = reviews_by_id.get(fact["review_job_id"])
+            if (
+                review is None
+                or review["output_digest"] != fact["head_digest"]
+                or review["output_version"] != fact.get("project_version")
+            ):
+                corrupt("Candidate feedback review was not issued for this exact goal source.")
+            for index, digest in enumerate(fact["edit_step_digests"]):
+                edit = edits_by_digest.get(digest)
+                if (
+                    edit is None
+                    or edit["index"] >= review["index"]
+                    or _candidate_edit_payload_digest(edit["command"]["payload"])
+                    != fact["edit_payload_digests"][index]
+                    or edit["command"]["payload"].get("expected_spec_digest")
+                    != fact["edit_spec_digests"][index]
+                    or edit["input_digest"] != fact["edit_input_digests"][index]
+                ):
+                    corrupt("Candidate feedback edit linkage differs from immutable executed source steps.")
+            seen.add(fact["review_job_id"])
+    active = row.get("_active_advance")
+    if active and "max_planner_decisions" in active:
+        if (
+            not count(active["max_planner_decisions"], 4)
+            or active["max_planner_decisions"] < 1
+            or not count(active.get("wait_for_work_seconds"), 10)
+            or not isinstance(active.get("planner_keys"), list)
+            or len(active["planner_keys"]) > active["max_planner_decisions"]
+            or any(not isinstance(key, str) or not 1 <= len(key) <= 256 for key in active["planner_keys"])
+            or len(set(active["planner_keys"])) != len(active["planner_keys"])
+            or not count(active.get("work_wait_ms"), active["wait_for_work_seconds"] * 1000)
+        ):
+            corrupt("Advance continuation exceeds its finite decision or child-wait request.")
+        try:
+            _time(active["deadline_at"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise GameLearningError(
+                "studio_goal_continuity_corrupt", "Advance requires its original finite deadline.", 503
+            ) from exc
 
 
 def _validate_journal(row):
@@ -3545,12 +4764,25 @@ def _validate_journal(row):
     if row.get("quality_gate") is not None or intent.get("quality_gate") is not None:
         if row.get("quality_gate") != intent.get("quality_gate"):
             raise GameLearningError("studio_goal_journal_corrupt", "Original quality policy differs.", 503)
+        numeric_policy = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+        if numeric_policy not in {"goal_only", "reuse_compatible", "reset"} or (numeric_policy != "goal_only" and row["quality_gate"].get("adaptive_ranking") is not True):
+            raise GameLearningError("studio_goal_journal_corrupt", "Numeric memory differs from its original explicit learning grant.", 503)
         if row.get("completion_mode") != "original" or not {"simulate", "review"}.issubset(
             row.get("completion_requirements", [])
         ):
             raise GameLearningError(
                 "studio_goal_journal_corrupt", "Measured quality workflow grants differ.", 503
             )
+    if row.get("quality_learning") is not None:
+        learning = row["quality_learning"]
+        if (not (row.get("quality_gate") or {}).get("adaptive_ranking")
+            or not isinstance(learning, dict) or learning.get("schema_version") != NUMERIC_LEARNING_SCHEMA
+            or learning.get("training_authorized") is not True or learning.get("production_authority") is not False
+            or not isinstance(learning.get("archive"), dict) or _digest(learning["archive"]) != learning.get("archive_digest")
+            or not isinstance(learning.get("advice"), list) or len(learning["advice"]) > 3
+            or not isinstance(learning.get("learning_status"), dict)):
+            raise GameLearningError("studio_goal_journal_corrupt", "Numeric learning state differs from its explicit scoped grant or archive digest.", 503)
+        _validate_numeric_memory(row, learning)
     if "max_output_tokens" in row or "max_output_tokens" in intent:
         if (
             type(row.get("max_output_tokens")) is not int
@@ -3592,11 +4824,15 @@ def _validate_journal(row):
             raise GameLearningError(
                 "studio_goal_history_corrupt", "Goal step/result receipt chain differs.", 503
             )
+        _validate_host_restoration(row, step, committed=True)
+        _validate_editor_recovery(row, step, committed=True)
         chain = step["step_digest"]
     if row.get("history_digest") != chain:
         raise GameLearningError("studio_goal_history_corrupt", "Goal history head differs.", 503)
     pending = row.get("pending")
     if pending:
+        host_restoration = _validate_host_restoration(row, pending)
+        _validate_editor_recovery(row, pending)
         if "max_output_tokens" in pending and pending["max_output_tokens"] != row.get(
             "max_output_tokens", 4096
         ):
@@ -3610,7 +4846,7 @@ def _validate_journal(row):
         if (
             pending.get("index") != row["cursor"]
             or pending.get("phase") not in {"model", "response", "action", "outcome"}
-            or pending.get("prompt_digest") != _digest({"prompt": pending.get("prompt")})
+            or (not host_restoration and pending.get("prompt_digest") != _digest({"prompt": pending.get("prompt")}))
         ):
             raise GameLearningError("studio_goal_pending_corrupt", "Pending action identity differs.", 503)
         if pending.get("structured_output_schema") and pending.get(
@@ -3619,7 +4855,7 @@ def _validate_journal(row):
             raise GameLearningError(
                 "studio_goal_schema_corrupt", "Frozen planner output schema differs.", 503
             )
-        if pending["phase"] != "model" and (
+        if not host_restoration and pending["phase"] != "model" and (
             pending.get("response_digest") != _digest({"text": pending.get("raw_decision")})
             or not pending.get("model_receipt", {}).get("execution_id")
         ):
@@ -3639,6 +4875,7 @@ def _validate_journal(row):
             raise GameLearningError(
                 "studio_goal_pending_corrupt", "Pending typed decision/command differs.", 503
             )
+    _validate_studio_continuity(row)
 
 
 def _recovery_projection(row):
@@ -3686,6 +4923,7 @@ def _recovery_projection(row):
             )
         )
     )
+    restore_available, restore_reason = _restoration_capability(row)
     return {
         "next_action": next_action,
         "automatic_continuation_available": next_action == "advance" and not row.get("stop_requested"),
@@ -3696,6 +4934,26 @@ def _recovery_projection(row):
         "reason": (row.get("error") or {}).get("code"),
         "pending_kind": target,
         "pending_id": row.get("pending_job_id") or row.get("pending_play_id"),
+        "remaining_steps": max(0, row.get("max_steps", 0) - row.get("cursor", 0)),
+        "remaining_model_calls": max(0, row.get("max_model_calls", 0) - row.get("model_calls", 0)),
+        "remaining_jobs": max(0, row.get("max_jobs", 0) - row.get("jobs_started", 0)),
+        "reconciliation_only": bool(
+            current
+            and (
+                row.get("cursor", 0) >= row.get("max_steps", 0)
+                or (
+                    row.get("model_calls", 0) >= row.get("max_model_calls", 0)
+                    and not pending
+                    and not row.get("workflow")
+                )
+            )
+        ),
+        "can_restore_incumbent": restore_available,
+        "restore_incumbent_reason": restore_reason,
+        "source_refresh_available": False,
+        "source_refresh_reason": "inspect_current_source",
+        "observed_project_version": None,
+        "observed_tree_digest": None,
         "legacy_read_only": not current,
         "can_new_planner_attempt": current
         and pending.get("phase") in {"model", "response"}
@@ -3782,6 +5040,227 @@ async def authorize_goal(scope, goal_id, body):
                 "authorization_receipts": [*row.get("authorization_receipts", []), receipt],
             },
         )
+        return _public(row)
+    finally:
+        await _release(scope, goal_id, token, heartbeat)
+
+
+def _source_refresh_capability(row):
+    if row.get("schema_version") != SCHEMA:
+        return False, "legacy_read_only"
+    if row.get("status") in {"completed", "cancelled", "planned"} or row.get("stop_requested") == "cancel":
+        return False, "goal_finished"
+    if _time(row["expires_at"]) <= _now():
+        return False, "authorization_expired"
+    if row.get("pending") or row.get("pending_job_id") or row.get("pending_play_id"):
+        return False, "issued_work_requires_reconciliation"
+    if len(row.get("source_refresh_receipts", [])) >= 16:
+        return False, "source_refresh_budget_exhausted"
+    return True, None
+
+
+async def _refreshed_source(scope, row, *, expected_version=None, expected_digest=None):
+    """Read a committed source revision under all previous and current rights."""
+    await _authorize_history(scope, row)
+    project = await workspace._project(row["project_id"], scope, expected_version)
+    head = _digest(project["files"])
+    if expected_digest is not None and head != expected_digest:
+        raise GameLearningError(
+            "studio_source_refresh_conflict",
+            "Project content changed before source refresh; inspect its exact current revision.",
+            409,
+        )
+    if workspace._editor_pending(project):
+        raise GameLearningError(
+            "studio_source_refresh_prepared",
+            "A prepared editor operation must settle before source refresh.",
+            409,
+        )
+    if project["version"] <= row["head_version"] or head == row["head_digest"]:
+        raise GameLearningError(
+            "studio_source_refresh_unchanged", "No newer committed source head needs refreshing.", 409
+        )
+    revision = await _rows.find_one(
+        {
+            "_id": {"$in": project.get("revision_ids", [])},
+            **scope,
+            "project_id": row["project_id"],
+            "version": project["version"],
+        }
+    )
+    if revision is None or _digest(revision.get("files")) != head:
+        raise GameLearningError(
+            "studio_source_refresh_revision_absent",
+            "Current head lacks its exact owned committed editor revision.",
+            409,
+        )
+    files = {item["path"]: item["content"] for item in project["files"]}
+    kind = workspace.authored_environment_kind(files)
+    if row.get("completion_mode") == "original":
+        if kind != "successor":
+            raise GameLearningError(
+                "studio_source_refresh_workflow_changed",
+                "This original workflow may refresh only a committed original successor world.",
+                409,
+            )
+        from skeleton.jeeves.game_successor_runtime import validate_successor_spec, SuccessorRuntimeError
+
+        try:
+            validate_successor_spec(json.loads(files["game/successor/spec.json"]))
+        except (SuccessorRuntimeError, json.JSONDecodeError) as exc:
+            raise GameLearningError(
+                "studio_source_refresh_invalid",
+                "Current source needs a valid canonical original world before refresh.",
+                422,
+            ) from exc
+    elif row.get("completion_requirements") and kind != "console_editor":
+        raise GameLearningError(
+            "studio_source_refresh_workflow_changed",
+            "This native workflow requires its committed console editor source.",
+            409,
+        )
+    binding = await workspace._input(scope, project, require_execution=False)
+    await workspace._authority(scope, binding)
+    return project, binding, revision
+
+
+async def _settled_source_children(scope, row):
+    """Read terminal issued work; never resume a worker to refresh source."""
+    changes = {}
+    if row.get("pending_job_id"):
+        job = await workspace.get_job(scope, row["pending_job_id"])
+        if job["status"] not in {"completed", "failed", "cancelled", "blocked"}:
+            raise GameLearningError(
+                "studio_source_refresh_child_active",
+                "Wait for or explicitly control the exact issued job before refreshing source.",
+                409,
+            )
+        changes.update(pending_job_id=None, last_job_receipt=_compact(job))
+    if row.get("pending_play_id"):
+        from routes.game_learning import _plays
+
+        play = await _plays().get(scope, row["pending_play_id"])
+        if play["status"] not in {"completed", "stopped", "failed", "cancelled", "blocked"}:
+            raise GameLearningError(
+                "studio_source_refresh_child_active",
+                "Wait for or explicitly control the exact issued play before refreshing source.",
+                409,
+            )
+        changes.update(pending_play_id=None, last_play_receipt=_feedback(play))
+    return changes
+
+
+async def refresh_source(scope, goal_id, body):
+    row, token = await _mutation_claim(scope, goal_id, body, "source_refresh_receipts")
+    if token is None:
+        return _public(row)
+    heartbeat = asyncio.create_task(_heartbeat(scope, goal_id, token))
+    try:
+        settled = await _settled_source_children(scope, row)
+        available, reason = _source_refresh_capability({**row, **settled})
+        if not available:
+            raise GameLearningError(
+                "studio_source_refresh_unavailable", "Source refresh is unavailable: " + reason + ".", 409
+            )
+        project, binding, revision = await _refreshed_source(
+            scope,
+            row,
+            expected_version=body["expected_project_version"],
+            expected_digest=body["expected_tree_digest"],
+        )
+        compatible = True
+        learning = row.get("quality_learning")
+        if (row.get("quality_gate") or {}).get("adaptive_ranking") and row.get("quality_baseline"):
+            from core import game_studio_review as reviews
+
+            baseline = await reviews._load_review(
+                scope, row["project_id"], row["quality_baseline"]["job_id"], historical=True
+            )
+            reference = _numeric_review_spec(baseline)
+            dimensions, _parameters = _numeric_dimensions(reference)
+            current = _numeric_review_spec({"input": {"files": project["files"]}})
+            compatible = (
+                _numeric_shape(reference, dimensions) == _numeric_shape(current, dimensions)
+                and _numeric_parameters(current, dimensions) is not None
+            )
+        if learning:
+            learning = {
+                **learning,
+                "advice": [],
+                "source_head_digest": _digest(project["files"]),
+                "status": "awaiting_current_source_observation" if compatible else "source_shape_changed",
+            }
+        receipt = {
+            "schema_version": SOURCE_REFRESH_SCHEMA,
+            "key": body["idempotency_key"],
+            "digest": _digest(body),
+            "previous_head_version": row["head_version"],
+            "previous_head_digest": row["head_digest"],
+            "head_version": project["version"],
+            "head_digest": _digest(project["files"]),
+            "revision_id": revision["_id"],
+            "revision_request_digest": revision["request_digest"],
+            "discarded_workflow_digest": _digest(row.get("workflow", [])),
+            "discarded_workflow_actions": len(row.get("workflow", [])),
+            "joined_job_id": row.get("pending_job_id"),
+            "joined_play_id": row.get("pending_play_id"),
+            "interrupted_advance_key": (row.get("_active_advance") or {}).get("key"),
+            "numeric_source_compatible": compatible,
+            "grants_changed": False,
+            "counters_reset": False,
+            "cursor": row["cursor"],
+            "model_calls": row["model_calls"],
+            "jobs_started": row["jobs_started"],
+            "completed_at": _now().isoformat(),
+        }
+        receipt["receipt_digest"] = _digest(receipt)
+        # Re-read immediately before the goal CAS. External edits remain fenced
+        # by the exact version/head on the next ordinary dispatch as well.
+        fresh = await workspace._project(row["project_id"], scope, project["version"])
+        if _digest(fresh["files"]) != receipt["head_digest"] or workspace._editor_pending(fresh):
+            raise GameLearningError(
+                "studio_source_refresh_conflict", "Source changed during refresh admission.", 409
+            )
+        deps = {_digest(item): item for item in (*row["evidence_dependencies"], _dependencies(binding))}
+        changes = {
+            **settled,
+            "head_version": project["version"],
+            "head_digest": receipt["head_digest"],
+            "workflow": [],
+            "completion_receipt": None,
+            "completion_reason": None,
+            "candidate_feedback": None,
+            "error": None,
+            "status": (
+                "paused" if row.get("stop_requested") == "pause" or row["status"] == "paused" else "ready"
+            ),
+            "numeric_source_invalidated": not compatible,
+            "evidence_dependencies": list(deps.values()),
+            "source_refresh_receipts": [*row.get("source_refresh_receipts", []), receipt],
+        }
+        if row.get("_active_advance"):
+            active = row["_active_advance"]
+            if len(row.get("advance_receipts", [])) >= 128:
+                raise GameLearningError(
+                    "studio_goal_request_budget",
+                    "A source refresh cannot exceed the retained advance receipt budget.",
+                    413,
+                )
+            changes.update(
+                _active_advance=None,
+                advance_receipts=[
+                    *row.get("advance_receipts", []),
+                    {
+                        "key": active["key"],
+                        "digest": active["digest"],
+                        "interrupted": True,
+                        "source_refreshed": True,
+                    },
+                ],
+            )
+        if learning is not None:
+            changes["quality_learning"] = learning
+        row = await _set(scope, goal_id, token, changes)
         return _public(row)
     finally:
         await _release(scope, goal_id, token, heartbeat)
@@ -3884,7 +5363,15 @@ async def retry(scope, goal_id, body):
             "completed_at": _now().isoformat(),
         }
         changes = {"error": None, "status": "ready"}
-        if target == "planner":
+        if target == "restore_incumbent":
+            # Reconcile only issued work before deriving the exact rollback.
+            # This may acknowledge a final review but cannot admit a new one.
+            row, _dispatch_available = await _reconcile_boundary(scope, row, token)
+            pending = await _prepare_incumbent_restoration(scope, row)
+            changes.update(pending=pending, completion_reason=None)
+            receipt["host_decision_receipt_digest"] = pending["host_decision_receipt"]["receipt_digest"]
+            receipt["command_digest"] = pending["command_digest"]
+        elif target == "planner":
             pending = row.get("pending")
             if not pending or pending["phase"] not in {"model", "response"}:
                 raise GameLearningError(
@@ -4589,6 +6076,14 @@ async def _dispatch_fence(scope, row, token, pending, *, phase="action", allowed
         )
     if phase == "action" and pending.get("command") and current.get("quality_gate") is not None:
         command = pending["command"]
+        if pending.get("decision_authority") == RESTORATION_AUTHORITY:
+            project = await workspace._project(current["project_id"], scope, current["head_version"])
+            _payload, quality = await _quality_restore_payload(
+                scope, current, project, allowed_editor_operation_id=allowed_editor_operation_id,
+            )
+            receipt = pending["host_decision_receipt"]
+            if any(receipt[key] != quality[key] for key in ("baseline", "candidate")) or receipt["quality_receipt_digest"] != quality["receipt_digest"]:
+                raise GameLearningError("studio_quality_restore_changed", "Exact rejected candidate or incumbent evidence changed before restoration.", 409)
         frozen = dict(pending)
         checked = await _quality_action_payload(
             scope,

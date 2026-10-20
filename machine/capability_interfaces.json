@@ -406,9 +406,12 @@
         "ResumeToken",
         "ChildExecutionRequest",
         "child join policy",
-        "interactive steering command"
+        "interactive steering command",
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS",
+        "bounded admin learner checkpoint export/import/reset/last-healthy restore under exact tenant/model/state+policy CAS with canonical audit receipts; exact named local model cooperation and per-model serving controls",
+        "Admin runtime-control full policy catalog, bounded retained numeric dataset export and exact generation/failure/source-pinned maintenance circuit reset under existing sealed service/tenant boundary"
       ],
-      "target_failure_contract": "checkpoint and stop safely",
+      "target_failure_contract": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden",
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
@@ -431,7 +434,9 @@
         "child budget/authority/depth tests",
         "interactive interrupt/replace tests"
       ],
-      "status": "present"
+      "status": "present",
+      "working_order_continuation": "Existing admin runtime control adds scoped failed-maintenance retry under exact source/attempt custody guards, aggregate execution recovery status and bounded retention diagnostics. Same engine/provider/store owners; no implicit replay, model promotion or authority transfer.",
+      "operator_and_learning_continuation": "Same engine/provider/SQLite owners; strict per-section finite policy bounds, fixed-watermark scoped numeric pages with opaque canonical JSON, explicit same-row breaker CAS, fresh resource telemetry and immutable per-request local token preparation. No new service, model-weight promotion, retry grant or qualification."
     },
     {
       "id": "runtime_dependency:application-api->retrieval",

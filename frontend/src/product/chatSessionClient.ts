@@ -10,9 +10,9 @@ import { validateConversationProjection } from './conversationProjection';
 import { createConversation, projectCanonicalHistory, MAX_CONVERSATIONS, type CanonicalChatTurn, type ChatBody, type ChatHistoryProjection, type Conversation } from '../features/Jeeves/workspace';
 import type { ChatProgress, ChatResponse, WorkspaceStorage } from '../features/Jeeves/WorkspaceController';
 import { normalizeChatCooperation, reconcileChatCooperation, validateChatCooperationReceipts, validateChatCooperationSummary, type ChatCooperationSummary } from './chatCooperation';
-import { validateChatModel } from './chatModelCatalog';
+import { validateChatModel, type ChatModelRuntimeFacts } from './chatModelCatalog';
 
-export type ChatModel = { id: string; provider_id: string; model_id: string; label: string; available: boolean; selectable: boolean; active: boolean; credential_free: boolean; context_window: number; max_output_tokens: number; default_output_tokens: number; model_family?: string; tokenizer?: string; limits_source?: string; capabilities: string[]; readiness: { code: string; message: string; action?: string | null } };
+export type ChatModel = { id: string; provider_id: string; model_id: string; label: string; available: boolean; selectable: boolean; active: boolean; fallback?: boolean; credential_free: boolean; context_window: number; max_output_tokens: number; default_output_tokens: number; model_family?: string; tokenizer?: string; limits_source?: string; activation?: Record<string, unknown> | null; capabilities: string[]; readiness: { code: string; message: string; action?: string | null } } & ChatModelRuntimeFacts;
 export type ChatReadiness = {
   schema_version: string; available: boolean; configured: boolean;
   checks: Record<string, { available: boolean; code: string }>;

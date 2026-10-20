@@ -398,6 +398,13 @@ def provision(args) -> dict:
                 "platform": platform_diagnostic,
                 "threads": args.threads,
                 "context_size": context_size,
+                "activation": {
+                    "AI_PROVIDER": "local",
+                    "AI_LOCAL_MODEL_PATH": "",
+                    "AI_LOCAL_DEPLOYMENT_PATH": "/app/local-ai/deployment.json",
+                    "AI_LOCAL_MODEL_CATALOG_PATH": "",
+                    "SKELETON_LOCAL_MODEL_DIR": target.as_posix(),
+                },
             }
         ownership = target.stat()
         if (
@@ -450,6 +457,8 @@ def provision(args) -> dict:
             "temperature": 0.0,
             "extra_args": _profile_args(),
             "output_framing": "llama_completion_eog",
+            "runtime_scratch_bytes": 512 * 1024 * 1024,
+            "kv_bytes_per_token": None,
         },
     }
     candidate = target / ".deployment-candidate.json"
@@ -491,6 +500,8 @@ def provision(args) -> dict:
             "AI_PROVIDER": "local",
             "AI_LOCAL_MODEL_PATH": "",
             "AI_LOCAL_DEPLOYMENT_PATH": "/app/local-ai/deployment.json",
+            "AI_LOCAL_MODEL_CATALOG_PATH": "",
+            "SKELETON_LOCAL_MODEL_DIR": target.as_posix(),
         },
         "inference_executed": False,
     }

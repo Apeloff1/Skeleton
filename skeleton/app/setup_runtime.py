@@ -138,6 +138,28 @@ def _atomic_write(path: Path, text: str) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _operator_admin_values(email: str, password: str) -> tuple[str, str]:
+    """Validate existing explicit seed values without changing their authority."""
+
+    email = email.strip().lower()
+    if (
+        len(email) > 254
+        or email.count("@") != 1
+        or any(char.isspace() or ord(char) < 32 for char in email)
+        or not all(email.split("@"))
+    ):
+        raise ValueError("operator admin email must be a valid non-empty email address")
+    if (
+        len(password) < 16
+        or len(password.encode("utf-8")) > 72
+        or any(ord(char) < 32 or ord(char) == 127 for char in password)
+    ):
+        raise ValueError(
+            "admin password must contain at least 16 characters, at most 72 UTF-8 bytes and no control characters"
+        )
+    return email, password
+
+
 def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str, str] | None:
     """Admit an explicit operator account without exposing a password in argv."""
 
@@ -171,15 +193,7 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         password = password[:-2]
     elif password.endswith("\n"):
         password = password[:-1]
-    if (
-        len(password) < 16
-        or len(password.encode("utf-8")) > 72
-        or any(ord(char) < 32 or ord(char) == 127 for char in password)
-    ):
-        raise ValueError(
-            "admin password must contain at least 16 characters, at most 72 UTF-8 bytes and no control characters"
-        )
-    return email, password
+    return _operator_admin_values(email, password)
 
 
 def _prepare_model_directory(root: Path, values: dict[str, str]) -> bool:
@@ -394,12 +408,18 @@ def ensure_runtime_environment(
         text = _replace_env_value(text, "AI_PROVIDER", provider)
         values["AI_PROVIDER"] = provider
         configured.append("AI_PROVIDER")
-    if values["AI_PROVIDER"].strip().lower() == "local" and not any(
-        values.get(key, "").strip() for key in ("AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH")
-    ):
-        warnings.append(
-            "AI is unavailable until a trained local model is configured; application services can still start"
-        )
+    if values["AI_PROVIDER"].strip().lower() == "local":
+        local_configurations = sum(bool(values.get(key, "").strip()) for key in (
+            "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH",
+        ))
+        if local_configurations == 0:
+            warnings.append(
+                "AI is unavailable until a local artifact, deployment or model catalog is configured; application services can still start"
+            )
+        elif local_configurations > 1:
+            warnings.append(
+                "Local AI configuration conflicts: choose exactly one of AI_LOCAL_MODEL_PATH, AI_LOCAL_DEPLOYMENT_PATH or AI_LOCAL_MODEL_CATALOG_PATH; existing operator values were preserved"
+            )
 
     if _prepare_model_directory(root, values):
         warnings.append("Local AI mount directory prepared; no model files acquired or provider activated")

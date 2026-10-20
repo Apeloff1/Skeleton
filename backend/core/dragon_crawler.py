@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import threading
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 from uuid import NAMESPACE_URL, uuid4, uuid5
@@ -30,6 +31,8 @@ LEASE_SECONDS = 120
 MAX_CONCURRENT_SLICES = 4
 MAX_AUTO_SLICES = 64
 MAX_AUTO_SECONDS = 3600
+MAX_SOURCE_AGE_SECONDS = 86400
+MAX_SOURCE_POLICIES = 64
 TERMINAL_STATES = {"completed", "budget_exhausted", "cancelled", "deleted"}
 
 
@@ -193,6 +196,8 @@ class DragonCrawlerApplication:
                 "finite_autonomous_crawl": available and scheduled,
                 "durable_resume": available,
                 "source_export": available,
+                "source_use_control": available,
+                "capture_age_limits": available,
                 "automatic_review": False,
                 "model_training": False,
                 "trusted_device_idle": False,
@@ -267,6 +272,9 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_integrity", "Crawler snapshot owner does not match its durable scope.", 503
             )
+        policies = self._source_policies(row)
+        if set(policies) - set(snapshot["sources"]):
+            raise CrawlerError("crawler_integrity", "Source-use policies refer to missing captures.", 503)
         return row
 
     def _worker_state(self, row: dict) -> dict:
@@ -1257,6 +1265,7 @@ class DragonCrawlerApplication:
                     "automation": "",
                     "worker_automation_epoch": "",
                     "safety_control": "",
+                    "source_use_policies": "",
                 },
             },
         )
@@ -1359,7 +1368,207 @@ class DragonCrawlerApplication:
             )
 
     @staticmethod
-    def _source_projection(source: dict, *, text: bool = True) -> dict:
+    def _source_policies(row: dict) -> dict:
+        policies = row.get("source_use_policies", {})
+        if not isinstance(policies, dict) or len(policies) > MAX_SOURCE_POLICIES:
+            raise CrawlerError("crawler_integrity", "Source-use policy storage exceeds its bound.", 503)
+        for source_id, policy in policies.items():
+            if (
+                not isinstance(source_id, str)
+                or len(source_id) != 64
+                or any(char not in "0123456789abcdef" for char in source_id)
+                or not isinstance(policy, dict)
+                or set(policy) != {"version", "enabled", "max_age_seconds", "changed_at"}
+                or type(policy["version"]) is not int
+                or not 1 <= policy["version"] <= 2**31 - 1
+                or type(policy["enabled"]) is not bool
+                or type(policy["max_age_seconds"]) is not int
+                or not 60 <= policy["max_age_seconds"] <= MAX_SOURCE_AGE_SECONDS
+                or not isinstance(policy["changed_at"], str)
+                or len(policy["changed_at"]) > 64
+            ):
+                raise CrawlerError("crawler_integrity", "Stored source-use policy is invalid.", 503)
+            try:
+                changed = datetime.fromisoformat(policy["changed_at"])
+                if changed.tzinfo is None:
+                    raise ValueError("timezone required")
+            except ValueError as exc:
+                raise CrawlerError(
+                    "crawler_integrity", "Stored source-use timestamp is invalid.", 503
+                ) from exc
+        return policies
+
+    def _capture_policy(self, row: dict, source: dict) -> dict:
+        return self._source_policies(row).get(
+            source["source_id"],
+            {
+                "version": 0,
+                "enabled": True,
+                "max_age_seconds": MAX_SOURCE_AGE_SECONDS,
+                "changed_at": None,
+            },
+        )
+
+    def _capture_freshness(self, row: dict, source: dict) -> dict:
+        policy = self._capture_policy(row, source)
+        now = _now()
+        expiry = min(
+            _utc(row["consent_expires_at"]).timestamp(), source["fetched_at"] + policy["max_age_seconds"]
+        )
+        state = (
+            "session_revoked"
+            if row["status"] in {"cancelled", "deleted"}
+            else (
+                "consent_expired"
+                if _utc(row["consent_expires_at"]) <= now
+                else (
+                    "withdrawn"
+                    if not policy["enabled"]
+                    else (
+                        "capture_time_invalid"
+                        if source["fetched_at"] > now.timestamp() + 300
+                        else "stale" if expiry <= now.timestamp() else "current"
+                    )
+                )
+            )
+        )
+        return {
+            "usable": state == "current",
+            "state": state,
+            "capture_age_seconds": max(0, int(now.timestamp() - source["fetched_at"])),
+            "valid_until": datetime.fromtimestamp(expiry, tz=timezone.utc).isoformat(),
+            "remote_freshness_verified": False,
+        }
+
+    def _assert_source_use(self, row: dict, source: dict) -> None:
+        self._source_use(row)
+        state = self._capture_freshness(row, source)["state"]
+        if state != "current":
+            raise CrawlerError(
+                (
+                    "crawler_source_stale"
+                    if state in {"stale", "capture_time_invalid"}
+                    else "crawler_source_withdrawn"
+                ),
+                "This captured source is withdrawn or outside its current capture-age limit.",
+                403,
+            )
+
+    def _source_reference(self, row: dict, source: dict) -> dict:
+        self._assert_source_use(row, source)
+        return {
+            "schema_version": "skeleton.dragon.crawler_reference.v2",
+            "session_id": row["_id"],
+            "source_id": source["source_id"],
+            "source_digest": _digest(source),
+            "request_digest": row["request_digest"],
+            "consent_id": row["consent"]["consent_id"],
+            "source_use_version": self._capture_policy(row, source)["version"],
+        }
+
+    async def configure_source_use(
+        self, scope: dict[str, str], identifier: str, source_id: str, body: dict, *, principal: dict
+    ) -> dict:
+        if authenticated_scope(principal) != scope:
+            raise CrawlerError("crawler_source_use_denied", "The current source owner is required.", 403)
+        if (
+            set(body) != {"expected_version", "idempotency_key", "enabled", "max_age_seconds"}
+            or type(body.get("expected_version")) is not int
+            or body["expected_version"] < 1
+            or type(body.get("enabled")) is not bool
+            or type(body.get("max_age_seconds")) is not int
+            or not 60 <= body["max_age_seconds"] <= MAX_SOURCE_AGE_SECONDS
+        ):
+            raise CrawlerError(
+                "crawler_source_use_invalid", "Choose an explicit source-use setting and capture-age limit."
+            )
+        row = await self._owned(scope, identifier)
+        _, run_type = _core()
+        try:
+            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
+        except ValueError:
+            raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
+        current = self._capture_policy(row, source)
+        if principal.get("role") not in {"editor", "admin"} and (
+            body["enabled"] or body["max_age_seconds"] != current["max_age_seconds"]
+        ):
+            raise CrawlerError(
+                "crawler_source_use_denied",
+                "Editor permission is required to enable source use or change its capture-age limit.",
+                403,
+            )
+        operation = _operation(body["idempotency_key"])
+        digest = _digest({"action": "source_use", "source_id": source_id, **body})
+        previous = self._prior(row, operation, digest, safety=body["enabled"] is False)
+        if previous is None:
+            if row["version"] != body["expected_version"]:
+                raise CrawlerError(
+                    "crawler_conflict", "Reload current source settings before changing them.", 409
+                )
+            if body["enabled"]:
+                self._source_use(row)
+            if current["version"] >= 2**31 - 1:
+                raise CrawlerError(
+                    "crawler_source_use_limit", "This source reached its policy revision bound.", 409
+                )
+            now = _now()
+            policy = {
+                "version": current["version"] + 1,
+                "enabled": body["enabled"],
+                "max_age_seconds": body["max_age_seconds"],
+                "changed_at": now.isoformat(),
+            }
+            receipt = await self._admit(
+                scope,
+                identifier,
+                {
+                    "source_id": source_id,
+                    "source_use_policy": policy,
+                    "source_digest": _digest(source),
+                    "request_digest": row["request_digest"],
+                },
+            )
+            result = await self.sessions.update_one(
+                {
+                    "_id": identifier,
+                    **scope,
+                    "version": row["version"],
+                    "status": {"$ne": "deleted"},
+                    **({"$expr": {"$gt": ["$consent_expires_at", "$$NOW"]}} if body["enabled"] else {}),
+                },
+                {
+                    "$set": {
+                        "source_use_policies." + source_id: policy,
+                        "updated_at": now,
+                        "storage_receipt": receipt,
+                        (
+                            "safety_control"
+                            if len(row.get("operations", {})) >= MAX_OPERATIONS
+                            else "operations." + operation
+                        ): {
+                            "operation": operation,
+                            "request_digest": digest,
+                            "action": "source_use",
+                            "state": "completed",
+                            "source_id": source_id,
+                            "source_use_version": policy["version"],
+                        },
+                    },
+                    "$inc": {"version": 1},
+                },
+            )
+            if not result.modified_count:
+                raise CrawlerError(
+                    "crawler_conflict", "The crawl changed before source-use settings were committed.", 409
+                )
+            row = await self._owned(scope, identifier)
+        return {
+            "ok": True,
+            "session": self._projection(row),
+            "source": self._source_projection(source, row=row, text=False),
+        }
+
+    def _source_projection(self, source: dict, *, row: dict | None = None, text: bool = True) -> dict:
         result = dict(source)
         result.update(
             url=source["canonical_url"],
@@ -1370,6 +1579,9 @@ class DragonCrawlerApplication:
         )
         if not text:
             result.pop("text", None)
+        if row is not None:
+            result["use_policy"] = self._capture_policy(row, source)
+            result["freshness"] = self._capture_freshness(row, source)
         return result
 
     async def sources(
@@ -1407,7 +1619,7 @@ class DragonCrawlerApplication:
             "ok": True,
             "sources": [
                 {
-                    **self._source_projection(source, text=False),
+                    **self._source_projection(source, row=row, text=False),
                     "capture_sequence": captures.get(source["source_id"]),
                 }
                 for source in page
@@ -1430,19 +1642,12 @@ class DragonCrawlerApplication:
             source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
         except ValueError:
             raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
-        reference = {
-            "schema_version": "skeleton.dragon.crawler_reference.v1",
-            "session_id": identifier,
-            "source_id": source_id,
-            "source_digest": _digest(source),
-            "request_digest": row["request_digest"],
-            "consent_id": row["consent"]["consent_id"],
-        }
+        reference = self._source_reference(row, source)
         await self.assert_context(scope, [reference])
         return {
-            "source": self._source_projection(source),
+            "source": self._source_projection(source, row=row),
             "reference": reference,
-            "valid_until": _utc(row["consent_expires_at"]).isoformat(),
+            "valid_until": self._capture_freshness(row, source)["valid_until"],
         }
 
     async def source_chunk(
@@ -1486,27 +1691,73 @@ class DragonCrawlerApplication:
             "captured_at": source["fetched_at"],
         }
 
+    def _search_current(
+        self, row: dict, runtime, query: str, *, limit: int = 8, distinct_sources: bool = False
+    ) -> dict:
+        """Apply current source authority before the canonical passage ranker."""
+        from skeleton.ai.webcrawler.dragon_mission_quality import (
+            rank_query_passages,
+            scan_untrusted_instructions,
+        )
+
+        if (
+            not isinstance(query, str)
+            or not query.strip()
+            or len(query) > 512
+            or len(query.encode("utf-8")) > 1024
+            or any(ord(char) < 32 and char not in "\n\t" for char in query)
+            or type(limit) is not int
+            or not 1 <= limit <= 8
+        ):
+            raise CrawlerError("crawler_search_bounds", "Choose a bounded source query and result limit.")
+        self._source_use(row)
+        hits = []
+        for source in runtime.sources():
+            if not self._capture_freshness(row, source)["usable"]:
+                continue
+            for passage in rank_query_passages(source["text"], query, limit=1 if distinct_sources else limit):
+                span = passage.span
+                hits.append(
+                    {
+                        "source_id": source["source_id"],
+                        "canonical_url": source["canonical_url"],
+                        "title": source["title"],
+                        "content_hash": source["content_hash"],
+                        "preserved_text_hash": source["preserved_text_hash"],
+                        "passage_hash": hashlib.sha256(span.text.encode()).hexdigest(),
+                        "start": span.start,
+                        "end": span.end,
+                        "text": span.text,
+                        "lexical_score": passage.weighted_score,
+                        "review_state": "unreviewed",
+                        "authority": "external_evidence_only",
+                    }
+                )
+            hits.sort(key=lambda hit: (-hit["lexical_score"], hit["source_id"], hit["start"]))
+            del hits[limit:]
+        for hit in hits:
+            hit["instruction_risks"] = [
+                asdict(risk) for risk in scan_untrusted_instructions(hit["text"], limit=16)
+            ]
+        evidence = {
+            "schema_version": "skeleton.ai.dragon.crawl_evidence.v1",
+            "run_id": row["snapshot"]["run_id"],
+            "query": query,
+            "hits": hits,
+            "verified_knowledge": False,
+            "training_permission": False,
+        }
+        evidence["evidence_digest"] = _digest(evidence)
+        return evidence
+
     async def search(self, scope: dict[str, str], identifier: str, query: str, *, limit: int = 8) -> dict:
         row = await self._owned(scope, identifier)
-        if row["status"] == "cancelled" or _utc(row["consent_expires_at"]) <= _now():
-            raise CrawlerError(
-                "crawler_context_revoked", "Current capture/use consent is required for retrieval.", 403
-            )
         _, run_type = _core()
         runtime = run_type.from_snapshot(_plain(row["snapshot"]))
-        evidence = runtime.search(query, limit=limit)
+        evidence = self._search_current(row, runtime, query, limit=limit)
         references = []
         for source_id in dict.fromkeys(hit["source_id"] for hit in evidence["hits"]):
-            references.append(
-                {
-                    "schema_version": "skeleton.dragon.crawler_reference.v1",
-                    "session_id": identifier,
-                    "source_id": source_id,
-                    "source_digest": _digest(runtime.source_read(source_id)),
-                    "request_digest": row["request_digest"],
-                    "consent_id": row["consent"]["consent_id"],
-                }
-            )
+            references.append(self._source_reference(row, runtime.source_read(source_id)))
         await self.assert_context(scope, references)
         return {**evidence, "session_id": identifier, "version": int(row["version"])}
 
@@ -1538,14 +1789,14 @@ class DragonCrawlerApplication:
         _, run_type = _core()
         search_query = " ".join(terms)[:512]
         async for row in rows:
-            await self._owned(scope, row["_id"])
+            row = await self._owned(scope, row["_id"])
             runtime = run_type.from_snapshot(_plain(row["snapshot"]))
-            for hit in runtime.search(search_query, limit=8)["hits"]:
+            for hit in self._search_current(row, runtime, search_query, limit=8, distinct_sources=True)[
+                "hits"
+            ]:
                 # Re-capturing one page in multiple sessions is not several
                 # independent sources, and must not create duplicate context
                 # segment IDs for the same source/passage.
-                if any(item[3]["content_hash"] == hit["content_hash"] for item in candidates):
-                    continue
                 source = runtime.source_read(hit["source_id"])
                 if (
                     source["text"][hit["start"] : hit["end"]] != hit["text"]
@@ -1556,7 +1807,15 @@ class DragonCrawlerApplication:
                         "Selected evidence is not the exact captured source passage.",
                         503,
                     )
-                candidates.append((hit["lexical_score"], source["fetched_at"], row, source, hit))
+                candidate = (hit["lexical_score"], source["fetched_at"], row, source, hit)
+                duplicate = next(
+                    (item for item in candidates if item[3]["content_hash"] == hit["content_hash"]), None
+                )
+                if duplicate is not None:
+                    if candidate[:2] <= duplicate[:2]:
+                        continue
+                    candidates.remove(duplicate)
+                candidates.append(candidate)
                 candidates.sort(key=lambda value: (value[0], value[1]), reverse=True)
                 # Retain only the selected bounded source records, rather
                 # than every account snapshot while scanning history.
@@ -1568,14 +1827,7 @@ class DragonCrawlerApplication:
                 break
             text = hit["text"][:remaining]
             remaining -= len(text)
-            reference = {
-                "schema_version": "skeleton.dragon.crawler_reference.v1",
-                "session_id": row["_id"],
-                "source_id": source["source_id"],
-                "source_digest": _digest(source),
-                "request_digest": row["request_digest"],
-                "consent_id": row["consent"]["consent_id"],
-            }
+            reference = self._source_reference(row, source)
             documents.append(
                 {
                     "source_id": source["source_id"],
@@ -1585,6 +1837,8 @@ class DragonCrawlerApplication:
                     "source_ref": "dragon-crawl://" + row["_id"] + "/" + source["source_id"],
                     "source_url": source["canonical_url"],
                     "captured_at": source["fetched_at"],
+                    "valid_until": self._capture_freshness(row, source)["valid_until"],
+                    "source_use_version": reference["source_use_version"],
                     "review_state": "unreviewed",
                     "source_classification": "untrusted_external_material",
                     "authority": "external_evidence_only",
@@ -1593,7 +1847,9 @@ class DragonCrawlerApplication:
                     "passage_start": hit["start"],
                     "passage_end": hit["start"] + len(text),
                     "instruction_risks": [
-                        risk for risk in hit["instruction_risks"] if risk["start"] < len(text)
+                        {**risk, "end": min(risk["end"], len(text))}
+                        for risk in hit["instruction_risks"]
+                        if risk["start"] < len(text)
                     ],
                 }
             )
@@ -1606,20 +1862,31 @@ class DragonCrawlerApplication:
             raise CrawlerError("crawler_reference_bounds", "Crawler source references exceed their bound.")
         _, run_type = _core()
         for reference in references:
+            legacy_fields = {
+                "schema_version",
+                "session_id",
+                "source_id",
+                "source_digest",
+                "request_digest",
+                "consent_id",
+            }
+            is_v2 = (
+                isinstance(reference, dict)
+                and reference.get("schema_version") == "skeleton.dragon.crawler_reference.v2"
+            )
             if (
                 not isinstance(reference, dict)
-                or set(reference)
-                != {
-                    "schema_version",
-                    "session_id",
-                    "source_id",
-                    "source_digest",
-                    "request_digest",
-                    "consent_id",
-                }
-                or reference["schema_version"] != "skeleton.dragon.crawler_reference.v1"
+                or set(reference) != legacy_fields | ({"source_use_version"} if is_v2 else set())
+                or reference["schema_version"]
+                not in {"skeleton.dragon.crawler_reference.v1", "skeleton.dragon.crawler_reference.v2"}
                 or any(
-                    not isinstance(value, str) or not 1 <= len(value) <= 256 for value in reference.values()
+                    not isinstance(reference[key], str) or not 1 <= len(reference[key]) <= 256
+                    for key in legacy_fields
+                )
+                or is_v2
+                and (
+                    type(reference["source_use_version"]) is not int
+                    or not 0 <= reference["source_use_version"] <= 2**31 - 1
                 )
             ):
                 raise CrawlerError("crawler_reference_invalid", "Crawler source reference is invalid.", 403)
@@ -1641,6 +1908,14 @@ class DragonCrawlerApplication:
                 ) from None
             if _digest(source) != reference["source_digest"]:
                 raise CrawlerError("crawler_context_changed", "The captured source evidence changed.", 403)
+            self._assert_source_use(row, source)
+            version = self._capture_policy(row, source)["version"]
+            if version != (reference["source_use_version"] if is_v2 else 0):
+                raise CrawlerError(
+                    "crawler_source_policy_changed",
+                    "Source-use settings changed; select the current source and review any design reference again.",
+                    403,
+                )
 
     async def _defer_recovery(self, row: dict) -> bool:
         """Rotate a bounded busy/skipped page without changing execution authority."""

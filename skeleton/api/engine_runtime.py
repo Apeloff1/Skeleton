@@ -4,22 +4,26 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import stat
 import traceback
 from datetime import datetime, timezone
-from typing import Iterable
+from pathlib import Path
+from typing import Callable, Iterable
 
 from skeleton.api.engine_service import (
     EngineExecutionCommand,
     EngineExecutionService,
     EngineServiceError,
 )
-from skeleton.contracts.ai_execution import AIExecutionResult
+from skeleton.contracts.ai_execution import AIExecutionRequest, AIExecutionResult
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     FinalizationBindingHook,
     VerificationHook,
 )
+from skeleton.intelligence.runtime_control import RuntimeOptimizationControl
 from skeleton.kernel.runtime_supervision import (
     RuntimeServiceLifecycle,
     RuntimeSupervisionError,
@@ -55,6 +59,77 @@ class EngineExecutionCoordinatorError(RuntimeError):
     """Engine execution could not be scheduled or reconciled safely."""
 
 
+class _ExecutionDatabaseOwner:
+    """Exclusive live coordinator custody over the existing database inode.
+
+    SQLite transactions fence durable state; this OS lock prevents a second
+    live coordinator from treating a peer's in-flight turn as crash recovery.
+    It never proves an uncertain provider dispatch completed or permits replay.
+    """
+
+    def __init__(self, repository) -> None:
+        self._descriptor: int | None = None
+        self._path: Path | None = None
+        self._identity: tuple[int, int] | None = None
+        self._process_id = os.getpid()
+        if str(repository.path) == ":memory:":
+            return
+        descriptor = None
+        try:
+            # Match sqlite3.connect's literal path; expanduser would select a
+            # different file when an API caller passes a literal '~' directory.
+            path = Path(repository.path).resolve(strict=True)
+            descriptor = os.open(path, os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
+            info = os.fstat(descriptor)
+            if not stat.S_ISREG(info.st_mode):
+                raise OSError("execution database must be a regular file")
+            if os.name == "nt":
+                import msvcrt
+
+                # Windows byte locks are mandatory. Reserve a non-data byte
+                # beyond SQLite's maximum database size (2**48 bytes), without
+                # writing or extending the file; never lock its header/pages.
+                os.lseek(descriptor, 1 << 50, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            current = path.stat()
+            if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+                raise OSError("execution database changed during owner acquisition")
+            self._descriptor, self._path = descriptor, path
+            self._identity = (info.st_dev, info.st_ino)
+        except (OSError, ImportError, ValueError) as exc:
+            if descriptor is not None:
+                os.close(descriptor)
+            raise EngineExecutionCoordinatorError(
+                "execution database requires one live coordinator with supported file locking"
+            ) from exc
+
+    def require_current(self) -> None:
+        if os.getpid() != self._process_id:
+            raise EngineExecutionCoordinatorError(
+                "execution coordinator ownership cannot be inherited across fork"
+            )
+        if self._path is None:
+            return
+        if self._descriptor is None:
+            raise EngineExecutionCoordinatorError("execution database ownership is closed")
+        try:
+            info = self._path.stat()
+            current = (info.st_dev, info.st_ino)
+        except OSError as exc:
+            raise EngineExecutionCoordinatorError("execution database ownership is unavailable") from exc
+        if current != self._identity:
+            raise EngineExecutionCoordinatorError("execution database changed behind its live coordinator")
+
+    def close(self) -> None:
+        descriptor, self._descriptor = self._descriptor, None
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 class EngineExecutionCoordinator:
     """Single-process launcher over durable execution state.
 
@@ -69,6 +144,7 @@ class EngineExecutionCoordinator:
         service: EngineExecutionService,
         *,
         provider_registry: ProviderRegistry | None = None,
+        provider_registry_factory: Callable[[], ProviderRegistry] | None = None,
         tool_runtime: AsyncToolRuntime | None = None,
         verification_hook: VerificationHook | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
@@ -77,21 +153,51 @@ class EngineExecutionCoordinator:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
         self.service = service
-        self.provider_registry = provider_registry or ProviderRegistry.from_env()
-        self.tool_runtime = tool_runtime or AsyncToolRuntime()
-        self.verification_hook = verification_hook
-        self.finalization_binding_hook = finalization_binding_hook
-        if lifecycle is not None and not isinstance(
-            lifecycle,
-            RuntimeServiceLifecycle,
-        ):
-            raise TypeError("lifecycle must be RuntimeServiceLifecycle")
-        self.lifecycle = lifecycle
-        self._lock = asyncio.Lock()
-        self._tasks: dict[str, asyncio.Task[None]] = {}
-        self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
-        self._supervision_faults: list[str] = []
-        self._closed = False
+        self._database_owner = _ExecutionDatabaseOwner(service.repository)
+        try:
+            service.repository.claim_coordinator_namespace()
+            if provider_registry is not None and provider_registry_factory is not None:
+                raise ValueError("provide a provider registry or its factory, not both")
+            if provider_registry_factory is not None and not callable(provider_registry_factory):
+                raise TypeError("provider_registry_factory must be callable")
+            self.provider_registry = (
+                provider_registry_factory()
+                if provider_registry_factory is not None
+                else provider_registry if provider_registry is not None else ProviderRegistry.from_env()
+            )
+            self.tool_runtime = tool_runtime or AsyncToolRuntime()
+            self.verification_hook = verification_hook
+            self.finalization_binding_hook = finalization_binding_hook
+            if lifecycle is not None and not isinstance(
+                lifecycle,
+                RuntimeServiceLifecycle,
+            ):
+                raise TypeError("lifecycle must be RuntimeServiceLifecycle")
+            self.lifecycle = lifecycle
+            self._lock = asyncio.Lock()
+            self._tasks: dict[str, asyncio.Task[None]] = {}
+            self._foreground_requests: dict[asyncio.Task[None], AIExecutionRequest] = {}
+            self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
+            self._supervision_faults: list[str] = []
+            self._closed = False
+            self.runtime_control = RuntimeOptimizationControl(
+                self.service.repository,
+                self.provider_registry,
+                supervision_probe=self.supervision_snapshot,
+            )
+            self._maintenance_stop = asyncio.Event()
+            self._maintenance_task: asyncio.Task[None] | None = None
+            self._recovery_cursor: tuple[datetime, str] | None = None
+            self._recovery_lock = asyncio.Lock()
+            self._recovery_scanned = 0
+            self._recovery_started = 0
+            self._recovery_error: str | None = None
+            self._driver_failures = 0
+            self._driver_finalization_failures = 0
+            self._last_driver_error: str | None = None
+        except BaseException:
+            self._database_owner.close()
+            raise
 
     async def ensure_started(
         self,
@@ -102,18 +208,17 @@ class EngineExecutionCoordinator:
         if not isinstance(command, EngineExecutionCommand):
             raise TypeError("command must be EngineExecutionCommand")
         if self._closed:
-            raise EngineExecutionCoordinatorError(
-                "engine execution coordinator is closed"
-            )
+            raise EngineExecutionCoordinatorError("engine execution coordinator is closed")
         if self._supervision_faults:
-            raise EngineExecutionCoordinatorError(
-                "engine execution coordinator supervision is faulted"
-            )
+            raise EngineExecutionCoordinatorError("engine execution coordinator supervision is faulted")
+        self._require_database_owner()
         execution_id = command.execution_request.execution_id
         if self.service.repository.result(execution_id) is not None:
             return
 
         async with self._lock:
+            if self._closed:
+                raise EngineExecutionCoordinatorError("engine execution coordinator is closed")
             existing = self._tasks.get(execution_id)
             if existing is not None and not existing.done():
                 return
@@ -133,16 +238,19 @@ class EngineExecutionCoordinator:
                     ) from exc
 
             try:
+                self.runtime_control.foreground_started()
                 task = asyncio.create_task(
                     self._drive(command),
                     name="engine-execution:" + execution_id,
                 )
             except BaseException:
+                self.runtime_control.foreground_finished(command.execution_request)
                 if lease is not None:
                     self.lifecycle.release_work(lease)
                 raise
 
             self._tasks[execution_id] = task
+            self._foreground_requests[task] = command.execution_request
             if lease is not None:
                 self._lifecycle_leases[task] = lease
             task.add_done_callback(
@@ -157,6 +265,13 @@ class EngineExecutionCoordinator:
         if normalized and normalized not in self._supervision_faults:
             self._supervision_faults.append(normalized)
 
+    def _require_database_owner(self) -> None:
+        try:
+            self._database_owner.require_current()
+        except EngineExecutionCoordinatorError:
+            self._record_supervision_fault("execution database ownership unavailable")
+            raise
+
     def _release_lifecycle_lease(
         self,
         task: asyncio.Task[None],
@@ -168,16 +283,12 @@ class EngineExecutionCoordinator:
             released = self.lifecycle.release_work(lease)
         except RuntimeSupervisionError as exc:
             self._record_supervision_fault(
-                "lifecycle lease release failed for "
-                + lease.work_id
-                + ": "
-                + str(exc)
+                "lifecycle lease release failed for " + lease.work_id + ": " + str(exc)
             )
             return
         if not released:
             self._record_supervision_fault(
-                "lifecycle lease disappeared before task retirement: "
-                + lease.work_id
+                "lifecycle lease disappeared before task retirement: " + lease.work_id
             )
 
     def _task_done(
@@ -189,6 +300,15 @@ class EngineExecutionCoordinator:
         if current is task:
             self._tasks.pop(execution_id, None)
         self._release_lifecycle_lease(task)
+        request = self._foreground_requests.pop(task, None)
+        if request is not None:
+            try:
+                self.runtime_control.foreground_finished(request)
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Runtime outcome upkeep deferred (%s)",
+                    type(exc).__name__,
+                )
         if task.cancelled():
             return
         # Retrieve the exception so the event loop never reports an unobserved
@@ -201,16 +321,8 @@ class EngineExecutionCoordinator:
     def supervision_snapshot(self) -> dict[str, object]:
         """Return identity-safe local supervision state for health/evidence."""
 
-        tasks = tuple(
-            sorted(
-                execution_id
-                for execution_id, task in self._tasks.items()
-                if not task.done()
-            )
-        )
-        lease_ids = tuple(
-            sorted(lease.work_id for lease in self._lifecycle_leases.values())
-        )
+        tasks = tuple(sorted(execution_id for execution_id, task in self._tasks.items() if not task.done()))
+        lease_ids = tuple(sorted(lease.work_id for lease in self._lifecycle_leases.values()))
         return {
             "closed": self._closed,
             "active_execution_ids": tasks,
@@ -219,6 +331,22 @@ class EngineExecutionCoordinator:
             "active_lease_count": len(lease_ids),
             "supervision_faults": tuple(self._supervision_faults),
             "faulted": bool(self._supervision_faults),
+            "runtime_maintenance": {
+                "owned": self._maintenance_task is not None,
+                "running": self._maintenance_task is not None and not self._maintenance_task.done(),
+                "stopping": self._maintenance_stop.is_set(),
+            },
+            "recovery": {
+                "maximum_recovery_drivers": 32,
+                "page_limit": 128,
+                "scan_in_progress": self._recovery_cursor is not None,
+                "scanned": self._recovery_scanned,
+                "started": self._recovery_started,
+                "last_error": self._recovery_error,
+                "driver_failures": self._driver_failures,
+                "driver_finalization_failures": self._driver_finalization_failures,
+                "last_driver_error": self._last_driver_error,
+            },
         }
 
     async def ensure_execution(self, execution_id: str) -> None:
@@ -226,9 +354,7 @@ class EngineExecutionCoordinator:
             str(execution_id),
         )
         if stored is None:
-            raise EngineExecutionCoordinatorError(
-                "engine submission is unavailable for execution"
-            )
+            raise EngineExecutionCoordinatorError("engine submission is unavailable for execution")
         await self.ensure_started(stored.command)
 
     async def interrupt_cancelled_execution(self, execution_id: str) -> None:
@@ -244,13 +370,9 @@ class EngineExecutionCoordinator:
         try:
             execution = self.service.repository.get(execution_id)
         except Exception as exc:
-            raise EngineExecutionCoordinatorError(
-                "engine execution is unavailable for cancellation"
-            ) from exc
+            raise EngineExecutionCoordinatorError("engine execution is unavailable for cancellation") from exc
         if not execution.cancellation_requested:
-            raise EngineExecutionCoordinatorError(
-                "execution cancellation has not been requested"
-            )
+            raise EngineExecutionCoordinatorError("execution cancellation has not been requested")
         if execution.terminal or self.service.repository.result(execution_id) is not None:
             return
 
@@ -280,11 +402,64 @@ class EngineExecutionCoordinator:
                     pass
 
     async def recover(self) -> tuple[str, ...]:
-        recovered: list[str] = []
-        for execution in self.service.repository.recoverable():
-            stored = self.service.submissions.get_by_execution_id(
-                execution.execution_id
+        recovered = await self._recover_pending(allow_starting=True, include_waiting=True)
+        if self._maintenance_task is None and not self._closed:
+            self._maintenance_task = asyncio.create_task(
+                self._maintain_runtime(),
+                name="engine-runtime-maintenance",
             )
+        return recovered
+
+    async def _recover_pending(
+        self,
+        *,
+        allow_starting: bool = False,
+        include_waiting: bool = False,
+    ) -> tuple[str, ...]:
+        async with self._recovery_lock:
+            return await self._recover_page(
+                allow_starting=allow_starting,
+                include_waiting=include_waiting,
+            )
+
+    async def _recover_page(
+        self,
+        *,
+        allow_starting: bool,
+        include_waiting: bool,
+    ) -> tuple[str, ...]:
+        """Resume a bounded page without eagerly allocating every old driver.
+
+        Interactive approval/input endpoints still resume waiting work directly.
+        Periodic recovery never polls those unchanged checkpoints for input.
+        Canonical turn/dispatch fencing remains responsible for effect replay.
+        """
+        if self._closed or self._supervision_faults:
+            return ()
+        self._require_database_owner()
+        available = max(0, 32 - sum(not task.done() for task in self._tasks.values()))
+        if not available:
+            return ()
+        cursor = self._recovery_cursor
+        page = await asyncio.to_thread(
+            self.service.repository.recoverable_page,
+            limit=128,
+            after_updated_at=None if cursor is None else cursor[0],
+            after_execution_id=None if cursor is None else cursor[1],
+            include_waiting=include_waiting,
+        )
+        recovered: list[str] = []
+        scanned = 0
+        for execution in page:
+            if self._closed or len(recovered) >= available:
+                break
+            scanned += 1
+            self._recovery_scanned += 1
+            self._recovery_cursor = (execution.updated_at, execution.execution_id)
+            existing = self._tasks.get(execution.execution_id)
+            if existing is not None and not existing.done():
+                continue
+            stored = self.service.submissions.get_by_execution_id(execution.execution_id)
             if stored is None:
                 await self._finalize_failure(
                     execution.execution_id,
@@ -293,13 +468,18 @@ class EngineExecutionCoordinator:
                 continue
             await self.ensure_started(
                 stored.command,
-                allow_starting=True,
+                allow_starting=allow_starting,
             )
             recovered.append(execution.execution_id)
+            self._recovery_started += 1
+        if scanned == len(page) and len(page) < 128:
+            self._recovery_cursor = None
+        self._recovery_error = None
         return tuple(recovered)
 
     async def shutdown(self) -> None:
         self._closed = True
+        self._maintenance_stop.set()
         async with self._lock:
             task_items = tuple(self._tasks.items())
 
@@ -317,32 +497,29 @@ class EngineExecutionCoordinator:
         for execution_id, task in task_items:
             self._task_done(execution_id, task)
 
+        # A maintenance callback is bounded and cooperative. Keep custody of
+        # the worker until it physically drains before closing its database.
+        if self._maintenance_task is not None:
+            await self._maintenance_task
+            self._maintenance_task = None
+        self.runtime_control.close()
+
         async with self._lock:
             stranded_tasks = tuple(
-                execution_id
-                for execution_id, task in self._tasks.items()
-                if not task.done()
+                execution_id for execution_id, task in self._tasks.items() if not task.done()
             )
             self._tasks = {
-                execution_id: task
-                for execution_id, task in self._tasks.items()
-                if not task.done()
+                execution_id: task for execution_id, task in self._tasks.items() if not task.done()
             }
 
         if stranded_tasks:
-            self._record_supervision_fault(
-                "shutdown left active tasks: " + ",".join(sorted(stranded_tasks))
-            )
+            self._record_supervision_fault("shutdown left active tasks: " + ",".join(sorted(stranded_tasks)))
         if self._lifecycle_leases:
-            leaked = tuple(
-                sorted(
-                    lease.work_id
-                    for lease in self._lifecycle_leases.values()
-                )
-            )
-            self._record_supervision_fault(
-                "shutdown left lifecycle leases: " + ",".join(leaked)
-            )
+            leaked = tuple(sorted(lease.work_id for lease in self._lifecycle_leases.values()))
+            self._record_supervision_fault("shutdown left lifecycle leases: " + ",".join(leaked))
+
+        if not stranded_tasks and not self._lifecycle_leases:
+            self._database_owner.close()
 
         if self._supervision_faults:
             raise EngineExecutionCoordinatorError(
@@ -350,7 +527,81 @@ class EngineExecutionCoordinator:
                 + "; ".join(self._supervision_faults)
             )
 
-    async def _drive(
+    async def _maintain_runtime(self) -> None:
+        while not self._maintenance_stop.is_set():
+            lease = None
+            try:
+                if self.lifecycle is not None:
+                    lease = self.lifecycle.acquire_work("engine-maintenance:runtime")
+                worker = asyncio.create_task(asyncio.to_thread(self.runtime_control.tick))
+                try:
+                    await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    while not worker.done():
+                        try:
+                            await asyncio.shield(worker)
+                        except asyncio.CancelledError:
+                            continue
+                    worker.result()
+                    raise
+            except RuntimeSupervisionError:
+                # STARTING/DRAINING never grants background work.
+                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Runtime maintenance deferred (%s)",
+                    type(exc).__name__,
+                )
+            finally:
+                if lease is not None and self.lifecycle is not None:
+                    try:
+                        self.lifecycle.release_work(lease)
+                    except RuntimeSupervisionError:
+                        self._record_supervision_fault("runtime maintenance lease release failed")
+            if not self._maintenance_stop.is_set():
+                try:
+                    await self._recover_pending()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    self._recovery_error = type(exc).__name__
+                    logging.getLogger(__name__).warning(
+                        "Engine pending recovery deferred (%s)",
+                        type(exc).__name__,
+                    )
+            try:
+                await asyncio.wait_for(self._maintenance_stop.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                pass
+
+    async def _drive(self, command: EngineExecutionCommand) -> None:
+        try:
+            self.runtime_control.reconcile()
+            await self._execute(command)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            # Setup (role selection, verifier binding, checkpoint lookup) can
+            # fail before the model loop's own terminalization guard. An
+            # accepted command must not disappear with an unobserved task.
+            self._driver_failures += 1
+            self._last_driver_error = type(exc).__name__
+            logging.getLogger(__name__).warning(
+                "Engine driver setup failed (%s)",
+                type(exc).__name__,
+            )
+            try:
+                await self._finalize_failure(
+                    command.execution_request.execution_id,
+                    "engine_coordinator_exception",
+                )
+            except Exception:
+                self._driver_finalization_failures += 1
+                # Retain the durable nonterminal command for the next bounded
+                # recovery pass if persistence is temporarily unavailable.
+                raise
+
+    async def _execute(
         self,
         command: EngineExecutionCommand,
     ) -> None:
@@ -400,16 +651,14 @@ class EngineExecutionCoordinator:
             "verification_adapter_for",
             None,
         )
-        semantic_verification_adapter = (
-            verifier_selector(provider)
-            if callable(verifier_selector)
-            else None
-        )
+        semantic_verification_adapter = verifier_selector(provider) if callable(verifier_selector) else None
 
         from skeleton.intelligence.cooperation import normalize_cooperation_policy
 
         cooperative_adapters = {}
-        cooperation = normalize_cooperation_policy(command.execution_request.context_policy.get("cooperation"))
+        cooperation = normalize_cooperation_policy(
+            command.execution_request.context_policy.get("cooperation")
+        )
         if cooperation is not None:
             try:
                 for role, selection in cooperation["roles"].items():
@@ -428,6 +677,7 @@ class EngineExecutionCoordinator:
             verification_hook=self.verification_hook,
             semantic_verification_adapter=semantic_verification_adapter,
             cooperative_adapters=cooperative_adapters,
+            runtime_pressure_probe=self.runtime_control.pressure,
             finalization_binding_hook=self.finalization_binding_hook,
             storage_meter=(
                 lambda resource_id, write_id, payload, meter_now=None: (
@@ -441,15 +691,10 @@ class EngineExecutionCoordinator:
                 )
             ),
         )
-        history = tuple(
-            AIMessage(role=role, content=content)
-            for role, content in handoff.history
-        )
+        history = tuple(AIMessage(role=role, content=content) for role, content in handoff.history)
 
         try:
-            checkpoint = self.service.repository.latest_checkpoint(
-                execution_id
-            )
+            checkpoint = self.service.repository.latest_checkpoint(execution_id)
             approval_refs = self.service.active_approval_refs(
                 execution_id,
             )
@@ -468,9 +713,7 @@ class EngineExecutionCoordinator:
                     approval_refs=approval_refs,
                 )
             if self.service.repository.result(execution_id) is not None:
-                self.service.complete_execution_admission(
-                    execution_id
-                )
+                self.service.complete_execution_admission(execution_id)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -510,12 +753,7 @@ class EngineExecutionCoordinator:
                 "model_turns": 0,
                 "tool_calls": 0,
             },
-            stream_terminal_event=(
-                "stream-terminal:"
-                + current.execution_id
-                + ":failed:"
-                + str(error_code)
-            ),
+            stream_terminal_event=("stream-terminal:" + current.execution_id + ":failed:" + str(error_code)),
             completed_at=now,
         )
         try:

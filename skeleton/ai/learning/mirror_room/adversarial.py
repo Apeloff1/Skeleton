@@ -17,7 +17,7 @@ Nothing in this module has production mutation authority.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 from types import MappingProxyType
 from typing import Mapping, Protocol, Sequence, runtime_checkable
@@ -43,10 +43,15 @@ from .contracts import (
 from .engine import (
     CandidateGenerator,
     MirrorRoom,
+    _bind_training_learner,
+    _learner_archive,
+    _learner_curriculum,
     _merge_hard_examples,
+    _observe_training_outcome,
     _sealed_split_digest,
 )
 from .evaluation import ComparisonReport, PairedEvaluator
+from .memory import TrainingLearningArchive
 from .sandbox import MirrorSandbox, SandboxExecutor, SandboxUsage
 from .observability import MirrorRoomObservatory, get_default_observatory
 
@@ -753,8 +758,11 @@ class AdversarialCampaignReceipt:
     delivery_ready: bool
     production_authority: bool = False
     direct_self_modify: bool = False
+    training_archive: TrainingLearningArchive = field(default_factory=TrainingLearningArchive)
 
     def __post_init__(self) -> None:
+        if not isinstance(self.training_archive, TrainingLearningArchive):
+            raise MirrorRoomError("campaign learner checkpoint must use TRAIN-only archive")
         if not isinstance(self.policy, AdversarialRatchetPolicy):
             raise MirrorRoomError(
                 "policy must be AdversarialRatchetPolicy"
@@ -982,6 +990,7 @@ class AdversarialCampaignReceipt:
                     "cost_units": self.usage.cost_units,
                 },
                 "delivery_ready": self.delivery_ready,
+                "training_archive_digest": self.training_archive.digest,
                 "production_authority": False,
                 "direct_self_modify": False,
             }
@@ -1393,6 +1402,7 @@ class AdversarialMirrorRoom:
 
         base_room = MirrorRoom(self.spec, self.executor)
         train, validation, holdout = base_room._partition(scenarios)
+        _bind_training_learner(generator, spec=self.spec, executor_id=executor_id, scenarios=train)
         self._validate_full_campaign_capacity(
             train_count=len(train),
             validation_count=len(validation),
@@ -1434,10 +1444,12 @@ class AdversarialMirrorRoom:
             required_strict_metric_gain = (
                 self.policy.strict_metric_gain_threshold(attempt)
             )
+            train_ids = {item.scenario_id for item in train}
+            curriculum = _learner_curriculum(generator, train, tuple(item for item in hard_examples if item.scenario_id in train_ids))
             feedback = LearningFeedback(
                 generation=attempt,
                 champion=baseline,
-                training_scenarios=train,
+                training_scenarios=curriculum.scenarios,
                 hard_examples=hard_examples,
                 prior_candidate_id=prior_candidate_id,
             )
@@ -1486,13 +1498,17 @@ class AdversarialMirrorRoom:
                 baseline=baseline,
                 candidate=candidate,
                 scenarios=(
-                    *train,
+                    *curriculum.scenarios,
                     *tuple(adversarial_corpus),
                 ),
                 split=ScenarioSplit.TRAIN,
                 enforce_gate=True,
                 comparison_family_size=self.policy.attempts_required,
             )
+            # Learn from every real challenge attempt before independent
+            # validation. The learner extracts its fixed TRAIN subset, so
+            # growing adversarial corpora do not change reward semantics.
+            _observe_training_outcome(generator, generation=attempt, parent=baseline, candidate=candidate, report=challenge_report)
             validation_report = evaluator.compare(
                 run_id=f"{run_id}:ratchet-validation",
                 baseline=baseline,
@@ -1699,6 +1715,7 @@ class AdversarialMirrorRoom:
             sealed_holdout_digest=_sealed_split_digest(holdout),
             usage=sandbox.usage,
             delivery_ready=delivery_ready,
+            training_archive=_learner_archive(generator),
         )
         self._observe("finish", campaign)
         return campaign

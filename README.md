@@ -174,11 +174,56 @@ deadline and resource allowance. Live progress and final details show actual
 provider receipts and model identities. Configure roles and recovery using the
 [cooperative AI guide](docs/ai/COOPERATIVE_AI_EXECUTION.md).
 
+Expand the AI conversation status bar to open **Runtime optimization**. It shows
+observed local pressure, admission capacity, numeric outcome learning and idle
+maintenance. Administrators can change versioned policies and trim/clear derived
+caches or drain/resume admission. Serving and maintenance controls affect the host;
+learning is tenant scoped. See the [runtime operator setup](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md#adaptive-runtime-and-maintenance)
+for defaults, persistence and conflict recovery. These controls do not implicitly
+offload to external providers or train/promote transformer weights.
+The separate **Replay adaptation** switch starts off and permits bounded idle
+updates to the operational predictor from recorded numeric outcomes.
+An optional digest-pinned local catalog supports up to eight configured models;
+the panel shows each model's own capacity, tenant fairness and pressure. Learner
+inspection adds prequential drift, confidence and last-healthy rollback state.
+Administrators can export/import a bounded numeric checkpoint or reset/restore a
+partition using exact tenant/model identity and policy plus learner-version checks.
+Checkpoint download and import preserve the original JSON text, including numeric
+spellings, so the server can verify the original integrity digests.
+The [local configuration helper](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md#configure-existing-weights-for-compose)
+now accepts artifacts, GGUF deployments and catalogs, prepares read-only container
+bindings, supplies required startup secrets and supports explicit administrator
+bootstrap. Runtime status reports model draining, bounded restart recovery,
+learner retention and failed-maintenance retry eligibility.
+The advanced policy form uses the server's actual editable fields and installed
+capacity limits. Administrators can also preview and download bounded pages of
+retained numeric learning data, and reset an eligible maintenance circuit against
+its exact failure, source and generation. Neither action starts training work.
+
 Studio goals can opt into [measured quality refinement](docs/ai/STUDIO_MEASURED_QUALITY.md):
 pin a baseline review, edit the original source, compare a candidate under the
 same simulation protocol, and restore the baseline source when a candidate
 regresses. Lessons retain their source and review references for compatible
 future work. Continuation uses the existing finite grant.
+Adaptive advice keeps numeric memory **Only this goal** by default. **Remember
+compatible goals** requires both goals to opt in and preserve exact scoped review
+identities; **Start a new shared history** creates a fresh epoch after its verified
+baseline. These are bounded numeric lessons, not permission to reuse source text
+or promote model weights.
+The optional **Learn numeric control suggestions during this goal** setting adds
+a bounded predictor for compatible numeric edits from matched review outcomes.
+Its suggestions remain subject to the same source, review and restoration gates.
+Outstanding play/review/editor receipts reconcile even after dispatch budgets are
+used. Eligible measured regressions expose an explicit **Restore incumbent** action
+through the existing source/editor gates, without needing another model response.
+Continuation can process up to four serial decisions per bounded request, within
+the original goal allowance. Explicit **Refresh source** re-pins a manually edited
+project after outstanding work has settled. Matched candidate feedback retains
+rejected and restored rounds for the next planning decision.
+
+The crawler source library supports individual withdrawal and capture-age limits.
+Jeeves excludes withdrawn, expired and stale captures; changing source policy
+invalidates old reference pins until the source is reviewed again.
 
 See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
 and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).
@@ -230,6 +275,9 @@ service readiness and recovery boundaries.
 - Docker service health, AI availability, native target readiness and production
   acceptance are separate states. This repository does not certify every console,
   arbitrary-ROM semantic understanding, or superiority over commercial games.
+- Adaptive serving, operational MLP learning and maintenance are a construction
+  draft, not enterprise certification. No automated tests were run for this build,
+  as requested; implementation and compilation do not establish production quality.
 
 Exact historical observations are in the
 [creation qualification](docs/ai/STUDIO_CREATION_QUALIFICATION_2026-10-15.md).

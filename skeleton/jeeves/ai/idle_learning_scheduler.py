@@ -58,6 +58,14 @@ class IdleWorkKind(str, Enum):
     CANDIDATE_PREPARATION = "candidate_preparation"
     MIRROR_PROPOSAL = "mirror_proposal"
     KNOWLEDGE_REFRESH = "knowledge_refresh"
+    # Local derived-state maintenance uses the same host admission and durable
+    # effect authority. These names do not confer network, training or release
+    # authority on a handler registered by the owning engine.
+    CACHE_CLEANUP = "cache_cleanup"
+    CHECKPOINT_COMPACTION = "checkpoint_compaction"
+    REPLAY_DEDUP = "replay_dedup"
+    LEARNER_SNAPSHOT = "learner_snapshot"
+    ELIGIBLE_AUGMENTATION = "eligible_augmentation"
 
 
 @dataclass(frozen=True, slots=True)

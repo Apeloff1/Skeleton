@@ -45,7 +45,10 @@ from skeleton.intelligence.verification_runtime import (
     VerificationRuntime,
     materialize_verification_receipt,
 )
-from skeleton.persistence.execution_repository import SQLiteExecutionRepository
+from skeleton.persistence.execution_repository import (
+    ExecutionRepositoryError,
+    SQLiteExecutionRepository,
+)
 from skeleton.provider_contract import ProviderToolCall, ProviderToolDefinition
 from skeleton.provider_runtime import (
     AIMessage,
@@ -426,6 +429,7 @@ class CognitiveExecutionRuntime:
         finalization_binding_hook: FinalizationBindingHook | None = None,
         storage_meter: StorageMeter | None = None,
         cooperative_adapters: Mapping[str, ProviderAdapter] | None = None,
+        runtime_pressure_probe: Callable[[], float] | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -446,6 +450,9 @@ class CognitiveExecutionRuntime:
         self.finalization_binding_hook = finalization_binding_hook
         self.storage_meter = storage_meter
         self.cooperative_adapters = dict(cooperative_adapters or {})
+        if runtime_pressure_probe is not None and not callable(runtime_pressure_probe):
+            raise TypeError("runtime_pressure_probe must be callable")
+        self.runtime_pressure_probe = runtime_pressure_probe
         if set(self.cooperative_adapters) - {"plan", "draft", "critique", "refine"} or any(
             not hasattr(adapter, "generate") for adapter in self.cooperative_adapters.values()
         ):
@@ -732,6 +739,20 @@ class CognitiveExecutionRuntime:
         if cooperative_state is not None:
             payload["cooperation"] = cooperative_state
             payload["next_prompt"] = stage_prompt(cooperative_state)
+        # Operational learning is numeric and subordinate to this immutable
+        # request. Its advice may defer idle work, never change model selection,
+        # requested review stages, verification or resource grants.
+        try:
+            pressure = 0.0 if self.runtime_pressure_probe is None else self.runtime_pressure_probe()
+            rounds = 1 if policy is None else int(policy["review_rounds"])
+            payload["runtime_learning"] = self.repository.runtime_learning_recommendation(
+                tenant_id=tenant_id.strip(),
+                scope_id=str(request.context_policy.get("runtime_learning_scope_id", "tenant")),
+                request=request, checkpoint_payload=payload, pressure=pressure,
+                allowed_rounds=rounds, requested_rounds=rounds,
+            )
+        except (ExecutionRepositoryError, ValueError, TypeError):
+            payload["runtime_learning"] = {"readiness": "unavailable", "advisory_only": True, "pressure": 0.0}
         return payload
 
     def _checkpoint_payload(self, execution_id: str) -> dict[str, object]:

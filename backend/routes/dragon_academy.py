@@ -2648,6 +2648,11 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
 
 
+class CrawlerSourceUseRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    max_age_seconds: int = Field(ge=60, le=86400, strict=True)
+
+
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
     owner = _principal(user)
     return {"tenant_id": (user.get("tenant_id") or user["email"]).strip(), "owner_id": owner}
@@ -2861,6 +2866,21 @@ async def crawler_source_text(
             offset=offset,
             max_chars=max_chars,
             expected_content_digest=expected_content_digest,
+        )
+    )
+
+
+@router.post("/crawler/sessions/{session_id}/sources/{source_id}/use")
+async def crawler_source_use(
+    body: CrawlerSourceUseRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(
+        crawler_application.configure_source_use(
+            scope, session_id, source_id, body.model_dump(), principal=user
         )
     )
 

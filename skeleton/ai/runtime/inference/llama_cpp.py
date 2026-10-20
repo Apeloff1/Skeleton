@@ -100,6 +100,7 @@ _MANAGED_SHORT_FLAGS = (
     "-ngl",
     "-j",
     "-jf",
+    "-s",
 )
 _REMOTE_ACQUISITION_FLAGS = {
     "--hf-repo",
@@ -107,8 +108,14 @@ _REMOTE_ACQUISITION_FLAGS = {
     "--model-url",
     "--url",
     "--download",
+    "--hf-repo-v",
+    "--hf-token",
+    "--rpc",
+    "--rpc-server",
+    "--host",
+    "--port",
 }
-_REMOTE_ACQUISITION_SHORT_FLAGS = ("-hf",)
+_REMOTE_ACQUISITION_SHORT_FLAGS = ("-hf", "-hfr", "-hff", "-hfv", "-hft")
 
 
 class LlamaCppRuntimeError(RuntimeError):
@@ -130,6 +137,65 @@ class GgufHeader:
             raise ValueError("GGUF tensor_count must be positive")
         if self.metadata_count < 0:
             raise ValueError("GGUF metadata_count must be non-negative")
+
+
+@dataclass(frozen=True, slots=True)
+class GgufServingMetadata:
+    """Bounded serving geometry read from the already identity-bound GGUF."""
+
+    architecture: str | None = None
+    context_length: int | None = None
+    embedding_length: int | None = None
+    block_count: int | None = None
+    head_count: int | None = None
+    head_count_kv: int | None = None
+    key_length: int | None = None
+    value_length: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.architecture is not None and (
+            not isinstance(self.architecture, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", self.architecture)
+        ):
+            raise ValueError("GGUF architecture must be a bounded identifier")
+        for name in (
+            "context_length", "embedding_length", "block_count", "head_count",
+            "head_count_kv", "key_length", "value_length",
+        ):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or not 0 < value <= 2_147_483_647):
+                raise ValueError("GGUF serving dimensions must be bounded positive integers")
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "architecture": self.architecture,
+            "context_length": self.context_length,
+            "embedding_length": self.embedding_length,
+            "block_count": self.block_count,
+            "head_count": self.head_count,
+            "head_count_kv": self.head_count_kv,
+            "key_length": self.key_length,
+            "value_length": self.value_length,
+        }
+
+    @property
+    def kv_bytes_per_token_upper_bound(self) -> int | None:
+        heads = self.head_count
+        kv_heads = self.head_count_kv or heads
+        layers = self.block_count
+        key = self.key_length
+        value = self.value_length
+        if key is None and self.embedding_length and heads and self.embedding_length % heads == 0:
+            key = self.embedding_length // heads
+        if value is None:
+            value = key
+        if not all(type(item) is int and 0 < item <= 65536 for item in (layers, heads, kv_heads, key, value)):
+            return None
+        if kv_heads > heads or heads % kv_heads:
+            return None
+        # f32 is the largest regular llama.cpp KV element. Quantized caches
+        # reduce this logical bound; allocator/scratch headroom is separate.
+        return layers * kv_heads * (key + value) * 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,6 +233,8 @@ class LlamaCppConfig:
     reject_model_symlink: bool = True
     rehash_artifacts_each_run: bool = False
     output_framing: str = "raw"
+    runtime_scratch_bytes: int = 512 * 1024 * 1024
+    kv_bytes_per_token: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -193,11 +261,14 @@ class LlamaCppConfig:
             ("threads", self.threads, 1, 4096),
             ("batch_size", self.batch_size, 1, 1_048_576),
             ("gpu_layers", self.gpu_layers, 0, 1_048_576),
+            ("kv_bytes_per_token", self.kv_bytes_per_token, 1, 1024 * 1024 * 1024),
         ):
             if value is not None and (
                 isinstance(value, bool) or not isinstance(value, int) or not lower <= value <= upper
             ):
                 raise ValueError(f"{name} must be in [{lower}, {upper}]")
+        if type(self.runtime_scratch_bytes) is not int or not 0 <= self.runtime_scratch_bytes <= 64 * 1024**3:
+            raise ValueError("runtime_scratch_bytes must be an integer in [0, 64 GiB]")
         if (
             isinstance(self.temperature, bool)
             or not isinstance(self.temperature, (int, float))
@@ -232,7 +303,7 @@ class LlamaCppConfig:
                     item == flag or item.startswith(flag + "=") for flag in _REMOTE_ACQUISITION_SHORT_FLAGS
                 )
             if remote:
-                raise ValueError(f"extra_args may not enable remote model acquisition {item}")
+                raise ValueError(f"extra_args may not enable network access {item}")
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
 
@@ -240,7 +311,7 @@ class LlamaCppConfig:
         for key, value in dict(self.environment).items():
             if not isinstance(key, str) or not _ENV_KEY.fullmatch(key):
                 raise ValueError(f"invalid environment key {key!r}")
-            if key in _PROVIDER_SECRET_NAMES or key in _PROXY_NAMES:
+            if key in _PROVIDER_SECRET_NAMES or key in _PROXY_NAMES or key.startswith("LLAMA_ARG_"):
                 raise ValueError(f"forbidden environment key {key}")
             if not isinstance(value, str) or "\x00" in value:
                 raise ValueError(f"invalid environment value for {key}")
@@ -474,7 +545,11 @@ def plan_consumer_llama_cpp(
         config.threads or budget.physical_cpu_cores, budget.physical_cpu_cores, budget.max_decode_threads
     )
     batch = min(config.batch_size or budget.prefill_batch_tokens, budget.prefill_batch_tokens, context)
-    chosen = replace(config, context_size=context, threads=threads, batch_size=batch)
+    chosen = replace(
+        config, context_size=context, threads=threads, batch_size=batch,
+        runtime_scratch_bytes=budget.runtime_scratch_bytes,
+        kv_bytes_per_token=budget.kv_bytes_per_token,
+    )
     kv_total = context * budget.kv_bytes_per_token
     return ConsumerLlamaPlan(
         configuration=chosen,
@@ -518,6 +593,110 @@ def inspect_gguf(path: Path) -> GgufHeader:
         version=version,
         tensor_count=tensor_count,
         metadata_count=metadata_count,
+    )
+
+
+def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
+    """Read selected scalar metadata; never materialize tokenizer vocabularies."""
+    if header.metadata_count > 65_536:
+        raise LlamaCppRuntimeError("GGUF metadata entry count exceeds serving bound")
+    formats = {
+        0: "<B", 1: "<b", 2: "<H", 3: "<h", 4: "<I", 5: "<i",
+        6: "<f", 7: "<?", 10: "<Q", 11: "<q", 12: "<d",
+    }
+    suffixes = {
+        "context_length", "embedding_length", "block_count", "attention.head_count",
+        "attention.head_count_kv", "attention.key_length", "attention.value_length",
+    }
+    selected: dict[str, Any] = {}
+    seen: set[str] = set()
+    try:
+        with path.open("rb") as handle:
+            limit = min(path.stat().st_size, 24 + 64 * 1024 * 1024)
+            handle.seek(24)
+
+            def take(count: int) -> bytes:
+                if count < 0 or handle.tell() + count > limit:
+                    raise LlamaCppRuntimeError("GGUF metadata exceeds bounded file region")
+                data = handle.read(count)
+                if len(data) != count:
+                    raise LlamaCppRuntimeError("truncated GGUF metadata")
+                return data
+
+            def skip(count: int) -> None:
+                if count < 0 or handle.tell() + count > limit:
+                    raise LlamaCppRuntimeError("GGUF metadata exceeds bounded file region")
+                handle.seek(count, os.SEEK_CUR)
+
+            def string(*, retain: bool, maximum: int = 4096) -> str | None:
+                length = struct.unpack("<Q", take(8))[0]
+                if not retain:
+                    skip(length)
+                    return None
+                if length > maximum:
+                    raise LlamaCppRuntimeError("GGUF serving metadata string exceeds bound")
+                return take(length).decode("utf-8", errors="strict")
+
+            def value(kind: int, *, retain: bool) -> Any:
+                fmt = formats.get(kind)
+                if fmt is not None:
+                    raw = take(struct.calcsize(fmt))
+                    if kind == 7 and raw not in {b"\x00", b"\x01"}:
+                        raise LlamaCppRuntimeError("invalid GGUF boolean metadata")
+                    return struct.unpack(fmt, raw)[0] if retain else None
+                if kind == 8:
+                    return string(retain=retain)
+                if kind != 9:
+                    raise LlamaCppRuntimeError("unsupported GGUF metadata value type")
+                item_type, count = struct.unpack("<IQ", take(12))
+                if count > 2_097_152 or item_type == 9:
+                    raise LlamaCppRuntimeError("GGUF metadata array exceeds serving bound")
+                if retain:
+                    raise LlamaCppRuntimeError("GGUF serving geometry must use scalar metadata")
+                if item_type == 8:
+                    for _ in range(count):
+                        string(retain=False)
+                elif item_type in formats:
+                    skip(count * struct.calcsize(formats[item_type]))
+                else:
+                    raise LlamaCppRuntimeError("unsupported GGUF metadata array type")
+                return None
+
+            for _ in range(header.metadata_count):
+                key = string(retain=True, maximum=1024)
+                if not key or key in seen:
+                    raise LlamaCppRuntimeError("empty or duplicate GGUF metadata key")
+                seen.add(key)
+                retain = key == "general.architecture" or any(key.endswith("." + suffix) for suffix in suffixes)
+                kind = struct.unpack("<I", take(4))[0]
+                observed = value(kind, retain=retain)
+                if retain:
+                    if len(selected) >= 512:
+                        raise LlamaCppRuntimeError("GGUF serving metadata key count exceeds bound")
+                    selected[key] = observed
+    except (OSError, UnicodeError, struct.error) as exc:
+        raise LlamaCppRuntimeError("cannot read bounded GGUF serving metadata") from exc
+    architecture = selected.get("general.architecture")
+    if architecture is not None and (
+        not isinstance(architecture, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", architecture)
+    ):
+        raise LlamaCppRuntimeError("GGUF architecture metadata is invalid")
+
+    def integer(suffix: str) -> int | None:
+        raw = selected.get(f"{architecture}.{suffix}") if architecture is not None else None
+        if raw is not None and (type(raw) is not int or not 0 < raw <= 2_147_483_647):
+            raise LlamaCppRuntimeError("GGUF serving geometry is not a bounded positive integer")
+        return raw
+
+    return GgufServingMetadata(
+        architecture=architecture,
+        context_length=integer("context_length"),
+        embedding_length=integer("embedding_length"),
+        block_count=integer("block_count"),
+        head_count=integer("attention.head_count"),
+        head_count_kv=integer("attention.head_count_kv"),
+        key_length=integer("attention.key_length"),
+        value_length=integer("attention.value_length"),
     )
 
 
@@ -594,7 +773,8 @@ class LlamaCppModel:
     def check_readiness(self) -> None:
         """Cheap stat-based readiness; dispatch still owns full SHA admission."""
         if (
-            not _stat_matches(self._runtime)
+            self.model_id != self._admitted_model_id
+            or not _stat_matches(self._runtime)
             or not _stat_matches(self._model)
             or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
         ):
@@ -611,11 +791,26 @@ class LlamaCppModel:
             reject_symlink=config.reject_model_symlink,
         )
         self._gguf_header = inspect_gguf(Path(self._model.path))
+        self._serving_metadata = _serving_metadata(Path(self._model.path), self._gguf_header)
+        self._process_lock = threading.Lock()
+        self._active_processes: set[int] = set()
+        self._draining_processes: set[int] = set()
+        self._spawning_processes = 0
+        self._processes_started = 0
+        self._processes_exited = 0
+        self._termination_requests = 0
+        if not _stat_matches(self._model):
+            raise LlamaCppRuntimeError("GGUF artifact changed while reading serving metadata")
+        if self._serving_metadata.architecture in {
+            "clip", "bert", "nomic-bert", "nomic-bert-moe", "jina-bert-v2", "t5encoder", "whisper",
+        }:
+            raise LlamaCppRuntimeError("GGUF architecture is not a text-generation model")
         self.model_id = (
             config.model_id.strip()
             if config.model_id is not None
             else f"llama.cpp:{Path(self._model.path).stem}:{self._model.sha256[:12]}"
         )
+        self._admitted_model_id = self.model_id
 
     @property
     def model_digest(self) -> str:
@@ -633,6 +828,7 @@ class LlamaCppModel:
                 "schema": "skeleton.llama-cpp.execution-profile.v1",
                 "runtime": self.runtime_digest,
                 "model": self.model_digest,
+                "model_id": self._admitted_model_id,
                 "context_size": self.config.context_size,
                 "threads": self.config.threads,
                 "batch_size": self.config.batch_size,
@@ -649,8 +845,65 @@ class LlamaCppModel:
                 "max_output_bytes": self.config.max_output_bytes,
                 "max_stderr_bytes": self.config.max_stderr_bytes,
                 "environment_digest": _digest(self._effective_environment()),
+                "serving_metadata": self._serving_metadata.as_dict(),
+                "runtime_scratch_bytes": self.config.runtime_scratch_bytes,
+                "kv_bytes_per_token": self.config.kv_bytes_per_token,
+                "seed_policy": "uint32_mod_4294967295_without_random_sentinel",
             }
         )
+
+    def _effective_context(self) -> int:
+        configured = self.config.context_size
+        if configured is None:
+            raise LlamaCppRuntimeError("GGUF serving requires an explicit context_size")
+        trained = self._serving_metadata.context_length
+        return configured if trained is None else min(configured, trained)
+
+    def generation_limits(self) -> dict[str, Any]:
+        """Publish the same bounded context passed to the exact CLI process."""
+        context = self._effective_context()
+        return {
+            "context_window": context,
+            "max_output_tokens": min(8192, max(1, context // 2)),
+            "max_total_tokens": context,
+            "shared_context": True,
+            "tokenizer": self.tokenizer_kind,
+            "max_output_utf8_bytes": min(self.config.max_output_bytes, 4 * 1024 * 1024),
+            "limits_source": "activated_local_backend",
+        }
+
+    def execution_snapshot(self) -> dict[str, Any]:
+        with self._process_lock:
+            return {
+                "kind": "llama_cpp_cli",
+                "active_processes": len(self._active_processes),
+                "draining_processes": len(self._draining_processes),
+                "spawning_processes": self._spawning_processes,
+                "processes_started": self._processes_started,
+                "processes_exited": self._processes_exited,
+                "termination_requests": self._termination_requests,
+                "trained_context_known": self._serving_metadata.context_length is not None,
+                "trained_context_tokens": self._serving_metadata.context_length,
+                "kv_estimate_available": bool(
+                    self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound
+                ),
+                "memory_estimate_source": self.memory_estimate_source,
+            }
+
+    @property
+    def memory_estimate_source(self) -> str:
+        known_kv = self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound
+        return "gguf_process_weights_scratch_and_kv" if known_kv is not None else "gguf_process_weights_scratch_kv_unknown"
+
+    def estimate_memory_bytes(self, request: LocalInferenceRequest) -> int:
+        if not isinstance(request, LocalInferenceRequest):
+            raise TypeError("request must be LocalInferenceRequest")
+        # Each CLI invocation is a separate process. Charge full GGUF pages,
+        # scratch and context KV conservatively, including GPU-offloaded
+        # models; this is host admission, not measured VRAM or shared-page use.
+        context = self._effective_context()
+        kv = self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound or 0
+        return self._model.size_bytes + self.config.runtime_scratch_bytes + context * kv
 
     @property
     def model_artifact(self) -> ArtifactIdentity:
@@ -664,7 +917,13 @@ class LlamaCppModel:
     def gguf_header(self) -> GgufHeader:
         return self._gguf_header
 
+    @property
+    def serving_metadata(self) -> GgufServingMetadata:
+        return self._serving_metadata
+
     def _assert_artifacts_stable(self, *, interrupt: Callable[[], None] | None = None) -> None:
+        if self.model_id != self._admitted_model_id:
+            raise LlamaCppRuntimeError("activated local model identifier changed")
         for label, identity in (("runtime", self._runtime), ("model", self._model)):
             if interrupt is not None:
                 interrupt()
@@ -822,13 +1081,12 @@ class LlamaCppModel:
             "-n",
             str(request.max_output_tokens),
             "--seed",
-            str(request.seed),
+            str(request.seed % 0xFFFFFFFF),
             "--temp",
             format(float(self.config.temperature), ".12g"),
             "--no-display-prompt",
         ]
-        if self.config.context_size is not None:
-            command.extend(("-c", str(self.config.context_size)))
+        command.extend(("-c", str(self._effective_context())))
         if self.config.threads is not None:
             command.extend(("-t", str(self.config.threads)))
         if self.config.batch_size is not None:
@@ -885,10 +1143,20 @@ class LlamaCppModel:
                 process.kill()
         except (OSError, ProcessLookupError):
             pass
-        try:
-            process.wait(timeout=1.0)
-        except subprocess.TimeoutExpired:
-            pass
+        # Killing requests termination; it does not prove that the OS worker
+        # has gone. Keep ownership until wait actually reaps the model process,
+        # including an uninterruptible process or a temporarily failed signal.
+        while process.poll() is None:
+            try:
+                process.wait(timeout=0.25)
+            except subprocess.TimeoutExpired:
+                try:
+                    if os.name != "nt":
+                        os.killpg(process.pid, signal.SIGKILL)
+                    else:
+                        process.kill()
+                except (OSError, ProcessLookupError):
+                    pass
 
     @staticmethod
     def _load_protocol_json(text: str) -> Any:
@@ -1038,8 +1306,15 @@ class LlamaCppModel:
         self._assert_artifacts_stable(interrupt=interrupt)
         execution_profile = self.execution_profile_digest
         rendered_prompt = self._render_prompt(request)
-        if len(rendered_prompt.encode("utf-8")) > 4 * 1024 * 1024:
+        rendered_bytes = len(rendered_prompt.encode("utf-8"))
+        if rendered_bytes > 4 * 1024 * 1024:
             raise LlamaCppRuntimeError("rendered local prompt exceeds 4 MiB")
+        limits = self.generation_limits()
+        output_limit = limits["max_output_utf8_bytes"]
+        if request.max_output_tokens > limits["max_output_tokens"]:
+            raise LlamaCppRuntimeError("requested output exceeds admitted GGUF completion limit")
+        if rendered_bytes + 1 + request.max_output_tokens > limits["max_total_tokens"]:
+            raise LlamaCppRuntimeError("rendered input and completion exceed admitted GGUF context")
 
         with tempfile.TemporaryDirectory(prefix="skeleton-llama-") as temp_name:
             temp_dir = Path(temp_name)
@@ -1075,38 +1350,95 @@ class LlamaCppModel:
                 raise LocalInferenceCancelled("local generation cancelled before launch")
 
             with stdout_file.open("wb") as stdout_handle, stderr_file.open("wb") as stderr_handle:
-                process = subprocess.Popen(
-                    command,
-                    stdin=subprocess.DEVNULL,
-                    stdout=stdout_handle,
-                    stderr=stderr_handle,
-                    cwd=temp_dir,
-                    env=self._child_environment(temp_dir),
-                    shell=False,
-                    start_new_session=(os.name != "nt"),
-                    close_fds=(os.name != "nt"),
-                )
+                with self._process_lock:
+                    self._spawning_processes += 1
+                try:
+                    process = subprocess.Popen(
+                        command,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        cwd=temp_dir,
+                        env=self._child_environment(temp_dir),
+                        shell=False,
+                        start_new_session=(os.name != "nt"),
+                        close_fds=True,
+                        creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
+                    )
+                except BaseException:
+                    with self._process_lock:
+                        self._spawning_processes -= 1
+                    raise
+                with self._process_lock:
+                    self._spawning_processes -= 1
+                    self._active_processes.add(process.pid)
+                    self._processes_started += 1
                 timed_out = False
                 output_overflow = False
                 stderr_overflow = False
+                stdout_overflow_event = threading.Event()
+                stderr_overflow_event = threading.Event()
+                pump_errors: list[BaseException] = []
+                pumps: list[threading.Thread] = []
+
+                def capture(stream: Any, target: Any, maximum: int, overflow: threading.Event) -> None:
+                    written = 0
+                    try:
+                        read = getattr(stream, "read1", stream.read)
+                        while True:
+                            chunk = read(65_536)
+                            if not chunk:
+                                break
+                            remaining = max(0, maximum + 1 - written)
+                            retained = chunk[:remaining]
+                            if retained:
+                                target.write(retained)
+                                target.flush()
+                                written += len(retained)
+                            if written > maximum or len(chunk) > remaining:
+                                overflow.set()
+                            # Continue draining a full pipe until termination;
+                            # neither memory nor private files grow past cap+1.
+                    except BaseException as exc:
+                        pump_errors.append(exc)
+                    finally:
+                        try:
+                            stream.close()
+                        except OSError as exc:
+                            pump_errors.append(exc)
+
                 stop_output_end: int | None = None
                 stop_markers = tuple(marker.encode("utf-8") for marker in request.stop)
                 stop_tail = b""
                 stop_scanned = 0
                 tail_size = max((len(marker) - 1 for marker in stop_markers), default=0)
                 try:
+                    if process.stdout is None or process.stderr is None:
+                        raise LlamaCppRuntimeError("local runtime output pipes are unavailable")
+                    for name, stream, target, maximum, overflow in (
+                        ("stdout", process.stdout, stdout_handle, output_limit, stdout_overflow_event),
+                        ("stderr", process.stderr, stderr_handle, self.config.max_stderr_bytes, stderr_overflow_event),
+                    ):
+                        pump = threading.Thread(
+                            target=capture, args=(stream, target, maximum, overflow),
+                            name="skeleton-llama-" + name, daemon=False,
+                        )
+                        pumps.append(pump)
+                        pump.start()
                     while process.poll() is None:
                         if cancel.is_set():
                             raise LocalInferenceCancelled("local generation cancelled")
                         if time.monotonic() - started > float(self.config.timeout_seconds):
                             timed_out = True
                             break
-                        if stdout_file.stat().st_size > self.config.max_output_bytes:
+                        if stdout_overflow_event.is_set():
                             output_overflow = True
                             break
-                        if stderr_file.stat().st_size > self.config.max_stderr_bytes:
+                        if stderr_overflow_event.is_set():
                             stderr_overflow = True
                             break
+                        if pump_errors:
+                            raise LlamaCppRuntimeError("local runtime output capture failed") from pump_errors[0]
                         if stop_markers:
                             with stdout_file.open("rb") as output_reader:
                                 output_reader.seek(stop_scanned)
@@ -1124,13 +1456,33 @@ class LlamaCppModel:
                 finally:
                     # Filesystem errors and interrupted callers must release
                     # the child just as cancellation and output limits do.
+                    if process.poll() is None or any(pump.is_alive() for pump in pumps):
+                        with self._process_lock:
+                            self._draining_processes.add(process.pid)
+                            if process.poll() is None:
+                                self._termination_requests += 1
                     self._terminate(process)
+                    for pump in pumps:
+                        while pump.is_alive():
+                            pump.join(timeout=0.25)
+                    if process.stdout is not None:
+                        process.stdout.close()
+                    if process.stderr is not None:
+                        process.stderr.close()
+                    with self._process_lock:
+                        self._active_processes.discard(process.pid)
+                        self._draining_processes.discard(process.pid)
+                        self._processes_exited += 1
                 return_code = process.poll()
                 if return_code is None:
                     raise LlamaCppRuntimeError("local runtime could not be terminated")
                 stdout_handle.flush()
                 stderr_handle.flush()
+                output_overflow = output_overflow or stdout_overflow_event.is_set()
+                stderr_overflow = stderr_overflow or stderr_overflow_event.is_set()
 
+            if pump_errors:
+                raise LlamaCppRuntimeError("local runtime output capture failed") from pump_errors[0]
             if timed_out:
                 raise TimeoutError(
                     f"local llama.cpp runtime exceeded {self.config.timeout_seconds}s deadline"
@@ -1144,10 +1496,10 @@ class LlamaCppModel:
             # A fast producer can grow past the polling threshold before
             # termination. Never allocate that entire file into memory.
             with stdout_file.open("rb") as handle:
-                stdout_bytes = handle.read(self.config.max_output_bytes + 1)
+                stdout_bytes = handle.read(output_limit + 1)
             with stderr_file.open("rb") as handle:
                 stderr_bytes = handle.read(self.config.max_stderr_bytes + 1)
-            if len(stdout_bytes) > self.config.max_output_bytes:
+            if len(stdout_bytes) > output_limit:
                 raise LlamaCppRuntimeError("local runtime stdout exceeded configured bound")
             if len(stderr_bytes) > self.config.max_stderr_bytes:
                 raise LlamaCppRuntimeError("local runtime stderr exceeded configured bound")
@@ -1176,8 +1528,8 @@ class LlamaCppModel:
                         raw = raw[: -len(trailer)]
                         break
             text, tool_calls, structured, finish_reason = self._parse_output(raw, request)
-            input_estimate = _approx_tokens(rendered_prompt)
-            output_estimate = _approx_tokens(raw)
+            input_estimate = rendered_bytes + 1
+            output_estimate = min(request.max_output_tokens, len(raw.encode("utf-8")) + 1)
             if cancel.is_set():
                 raise LocalInferenceCancelled("local generation cancelled")
             response_digest = _digest(
@@ -1268,6 +1620,7 @@ __all__ = [
     "ConsumerHardwareBudget",
     "ConsumerLlamaPlan",
     "GgufHeader",
+    "GgufServingMetadata",
     "LlamaCppConfig",
     "LlamaCppModel",
     "LlamaCppRuntimeError",

@@ -3173,9 +3173,22 @@ class ProviderRegistry:
         architecture_loader: Callable[[str], ProviderArchitectureReceipt] = load_provider_architecture,
     ) -> None:
         normalized_adapters = tuple(adapters)
-        self._adapters = {adapter.provider_id: adapter for adapter in normalized_adapters}
-        if len(self._adapters) != len(normalized_adapters):
-            raise ValueError("provider ids must be unique")
+        self._adapters: dict[str, ProviderAdapter] = {}
+        self._model_adapters: dict[tuple[str, str | None], ProviderAdapter] = {}
+        for adapter in normalized_adapters:
+            provider_id = adapter.provider_id
+            model_id = getattr(adapter, "model", None)
+            identity = (provider_id, model_id)
+            if identity in self._model_adapters:
+                raise ValueError("provider/model identities must be unique")
+            if provider_id in self._adapters and provider_id != "local":
+                raise ValueError("hosted provider ids must be unique")
+            if provider_id == "local" and provider_id in self._adapters and (
+                not isinstance(model_id, str) or not model_id or model_id != model_id.strip()
+            ):
+                raise ValueError("additional local models require an exact model identity")
+            self._adapters.setdefault(provider_id, adapter)
+            self._model_adapters[identity] = adapter
         self.active_id = active.strip().lower()
         normalized_fallbacks = tuple(str(item).strip().lower() for item in fallback_ids)
         if len(set(normalized_fallbacks)) != len(normalized_fallbacks):
@@ -3205,6 +3218,7 @@ class ProviderRegistry:
                 raise
             model_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
             deployment_path = os.getenv("AI_LOCAL_DEPLOYMENT_PATH", "").strip()
+            catalog_path = os.getenv("AI_LOCAL_MODEL_CATALOG_PATH", "").strip()
             if any(
                 os.getenv(name, "").strip()
                 for name in (
@@ -3216,10 +3230,12 @@ class ProviderRegistry:
                 code = "local_external_fallback_denied"
             elif os.getenv("AI_VERIFICATION_MODEL", "").strip():
                 code = "local_external_verifier_denied"
-            elif not model_path and not deployment_path:
+            elif not model_path and not deployment_path and not catalog_path:
                 code = "local_model_not_configured"
-            elif model_path and deployment_path:
+            elif sum(bool(value) for value in (model_path, deployment_path, catalog_path)) != 1:
                 code = "local_configuration_invalid"
+            elif catalog_path:
+                code = "local_catalog_invalid"
             else:
                 code = "local_artifact_invalid"
             return cls([_UnavailableLocalAdapter(code)], active="local")
@@ -3242,6 +3258,9 @@ class ProviderRegistry:
             "AI_VERIFICATION_MODEL",
             "",
         ).strip()
+        catalog_path = os.getenv("AI_LOCAL_MODEL_CATALOG_PATH", "").strip()
+        if catalog_path and active != "local":
+            raise ProviderUnavailableError("local model catalogs require AI_PROVIDER=local")
 
         if active == "local":
             if any(secondary_values.values()):
@@ -3252,11 +3271,28 @@ class ProviderRegistry:
                 raise ProviderUnavailableError("local provider mode forbids semantic verifier configuration")
             model_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
             deployment_path = os.getenv("AI_LOCAL_DEPLOYMENT_PATH", "").strip()
-            if bool(model_path) == bool(deployment_path):
+            if sum(bool(value) for value in (model_path, deployment_path, catalog_path)) != 1:
                 raise ProviderUnavailableError(
-                    "local provider requires exactly one artifact or deployment manifest"
+                    "local provider requires exactly one artifact, deployment manifest or model catalog"
                 )
             capacity = _local_execution_capacity()
+            if catalog_path:
+                try:
+                    from skeleton.ai.runtime.inference.catalog import LocalModelCatalogError, load_local_model_catalog
+
+                    activation = load_local_model_catalog(
+                        catalog_path,
+                        cache_size=_env_int("AI_LOCAL_MODEL_CACHE_SIZE", 0, minimum=0),
+                        default_seed=_env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0),
+                        **capacity,
+                    )
+                except (LocalModelCatalogError, OSError, TypeError, ValueError) as exc:
+                    raise ProviderUnavailableError("local provider catalog failed activation") from exc
+                return cls(
+                    activation.adapters,
+                    active="local",
+                    verification_adapter=activation.verification_adapter,
+                )
             if deployment_path:
                 try:
                     from skeleton.ai.runtime.inference.deployment import (
@@ -3410,7 +3446,7 @@ class ProviderRegistry:
             or model_id != model_id.strip()
         ):
             raise ProviderUnavailableError("explicit provider selection is malformed")
-        adapter = self._adapters.get(provider_id)
+        adapter = self._model_adapters.get((provider_id, model_id))
         if adapter is None or getattr(adapter, "model", None) != model_id:
             raise ProviderUnavailableError("selected provider/model is not configured")
         self._architecture_receipt(provider_id)
@@ -3474,6 +3510,53 @@ class ProviderRegistry:
             "routing": routing,
         }
 
+    def runtime_serving_engines(self) -> tuple[Any, ...]:
+        """Return registered local serving owners, without activating a route.
+
+        Runtime pressure and maintenance never create a provider, resolve
+        credentials, change a selected model or alter activation identity.
+        Shared engines are returned once even when several adapters use them.
+        """
+        engines: list[Any] = []
+        seen: set[int] = set()
+        for adapter in self._model_adapters.values():
+            if adapter.provider_id != "local":
+                continue
+            engine = getattr(adapter, "engine", None)
+            if (
+                engine is not None
+                and id(engine) not in seen
+                and callable(getattr(engine, "configure_serving", None))
+                and callable(getattr(engine, "maintain", None))
+            ):
+                engines.append(engine)
+                seen.add(id(engine))
+        return tuple(engines)
+
+    def runtime_serving_routes(self) -> tuple[dict[str, Any], ...]:
+        """Name each local serving owner by its configured exact route identity."""
+
+        routes: list[dict[str, Any]] = []
+        for (provider_id, model_id), adapter in sorted(
+            self._model_adapters.items(), key=lambda item: (item[0][0], item[0][1] or "")
+        ):
+            engine = getattr(adapter, "engine", None)
+            if (
+                provider_id == "local"
+                and isinstance(model_id, str)
+                and engine is not None
+                and callable(getattr(engine, "configure_serving", None))
+                and callable(getattr(engine, "maintain", None))
+            ):
+                routes.append({
+                    "route_id": provider_id + ":" + model_id,
+                    "provider_id": provider_id,
+                    "model_id": model_id,
+                    "model_digest": getattr(getattr(engine, "model", None), "model_digest", None),
+                    "engine": engine,
+                })
+        return tuple(routes)
+
     def verification_adapter_for(
         self,
         generator: ProviderAdapter,
@@ -3493,15 +3576,28 @@ class ProviderRegistry:
         if not adapter.available:
             return None
         self._architecture_receipt(adapter.provider_id)
-        same_provider = adapter.provider_id == generator.provider_id
-        same_model = getattr(adapter, "model", None) == getattr(
-            generator,
-            "model",
-            None,
-        )
-        if same_provider and same_model:
-            return None
-        return adapter
+        return adapter if self._independent_models(generator, adapter) else None
+
+    @staticmethod
+    def _independent_models(generator: ProviderAdapter, verifier: ProviderAdapter) -> bool:
+        if (generator.provider_id, getattr(generator, "model", None)) == (
+            verifier.provider_id, getattr(verifier, "model", None),
+        ):
+            return False
+        if generator.provider_id == verifier.provider_id == "local":
+            digests = [
+                getattr(getattr(getattr(adapter, "engine", None), "model", None), "model_digest", None)
+                for adapter in (generator, verifier)
+            ]
+            if any(
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+                for digest in digests
+            ):
+                return False
+            return digests[0] != digests[1]
+        return True
 
     def architecture_receipt(self, provider_id: str | None = None) -> dict[str, Any]:
         target = (provider_id or self.active_id).strip().lower()
@@ -3511,7 +3607,9 @@ class ProviderRegistry:
 
     def statuses(self) -> list[dict[str, Any]]:
         statuses = []
-        for provider_id, adapter in sorted(self._adapters.items()):
+        for (provider_id, _model_id), adapter in sorted(
+            self._model_adapters.items(), key=lambda item: (item[0][0], item[0][1] or "")
+        ):
             local = provider_id == "local"
             try:
                 status = adapter.status()
@@ -3579,8 +3677,8 @@ class ProviderRegistry:
                     ),
                 }
             )
-            status["active"] = provider_id == self.active_id
-            status["fallback"] = provider_id in self._fallback_ids
+            status["active"] = adapter is self.active
+            status["fallback"] = provider_id in self._fallback_ids and adapter is self._adapters[provider_id]
             status["routing"] = (
                 self.redundancy_status() if provider_id == self.active_id and self._fallback_ids else None
             )
@@ -3588,8 +3686,9 @@ class ProviderRegistry:
             status["semantic_verifier_configured"] = bool(
                 verifier is not None
                 and verifier.provider_id == provider_id
-                and getattr(verifier, "model", None) != getattr(adapter, "model", None)
+                and self._independent_models(adapter, verifier)
             )
+            status["semantic_verifier_route"] = adapter is verifier
             try:
                 receipt = self._architecture_receipt(provider_id)
             except ProviderUnavailableError:
@@ -3627,12 +3726,14 @@ def _execution_source_identity() -> dict[str, object]:
         "intelligence/verification_runtime.py",
         "intelligence/verification_policy.py",
         "ai/runtime/inference/local.py",
+        "ai/runtime/inference/adaptive_serving.py",
         "ai/runtime/inference/artifact.py",
         "ai/runtime/inference/neural.py",
         "ai/runtime/inference/native_runtime.py",
         "ai/runtime/inference/native_transformer.py",
         "ai/runtime/inference/llama_cpp.py",
         "ai/runtime/inference/deployment.py",
+        "ai/runtime/inference/catalog.py",
         "cortex/attn.py",
         "cortex/bpe.py",
         "cortex/transformer.py",
@@ -3738,6 +3839,10 @@ def provider_execution_identity(adapter: ProviderAdapter) -> dict[str, object]:
                         "artifact_sha256",
                         "runtime_digest",
                         "manifest_digest",
+                        "source_model_id",
+                        "catalog_digest",
+                        "catalog_entry_digest",
+                        "catalog_source_sha256",
                     )
                 },
                 "default_seed": getattr(route, "default_seed", None),
