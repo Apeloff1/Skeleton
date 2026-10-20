@@ -73,7 +73,7 @@ def test_rig_rejects_disconnected_bones_and_foreign_animation():
         ))
     with pytest.raises(ExpeditionError,match="another skeleton"):
         sample_pose(original_actor_rig(game(seed=13).digest)[0],clip,0)
-    with pytest.raises(ExpeditionError,match="rotation limit"):
+    with pytest.raises(ExpeditionError,match="joint limit"):
         bad=AnimationClip("twist",rig.digest,2,(
             PoseKey(0,(0,0,0,99,0,0,0)),
             PoseKey(1,(0,0,0,99,0,0,0)),
