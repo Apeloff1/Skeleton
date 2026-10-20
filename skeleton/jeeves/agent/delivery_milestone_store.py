@@ -52,6 +52,18 @@ class StoredMilestoneQueue:
         return self.queue.fingerprint
 
 
+@dataclass(frozen=True, slots=True)
+class StoredMilestoneControl:
+    run_id: str
+    source_commit: str
+    artifact_digest: str
+    mode: str
+    generation: int
+    actor_ref: str
+    reason_ref: str
+    receipt: str
+
+
 T = TypeVar("T")
 
 
@@ -186,6 +198,18 @@ class SQLiteMilestoneQueueStore:
                 receipt_digest TEXT NOT NULL,
                 PRIMARY KEY(namespace, run_id, generation)
             );
+            CREATE TABLE IF NOT EXISTS milestone_queue_control (
+                namespace TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                source_commit TEXT NOT NULL,
+                artifact_digest TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                generation INTEGER NOT NULL,
+                actor_ref TEXT NOT NULL,
+                reason_ref TEXT NOT NULL,
+                receipt_digest TEXT NOT NULL,
+                PRIMARY KEY(namespace, run_id)
+            );
         """)
 
     def _open(self) -> None:
@@ -272,6 +296,170 @@ class SQLiteMilestoneQueueStore:
             ),
         )
 
+    def _control_receipt(
+        self, run_id: str, source: str, artifact: str,
+        mode: str, generation: int, actor: str, reason: str,
+    ) -> str:
+        return hashlib.sha256(json.dumps({
+            "namespace": self.namespace, "run": run_id,
+            "source": source, "artifact": artifact,
+            "mode": mode, "generation": generation,
+            "actor": actor, "reason": reason,
+        }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+    def _control_from_row(self, row: sqlite3.Row) -> StoredMilestoneControl:
+        mode, gen = row["mode"], row["generation"]
+        if (mode not in {"running", "paused", "cancelled"}
+                or type(gen) is not int or gen <= 0
+                or not isinstance(row["actor_ref"], str)
+                or not _KEY.fullmatch(row["actor_ref"])
+                or not isinstance(row["reason_ref"], str)
+                or not _KEY.fullmatch(row["reason_ref"])):
+            raise MilestoneCheckpointError("invalid durable operator-control record")
+        expected = self._control_receipt(
+            row["run_id"], row["source_commit"], row["artifact_digest"],
+            mode, gen, row["actor_ref"], row["reason_ref"],
+        )
+        if expected != row["receipt_digest"]:
+            raise MilestoneCheckpointError("durable operator control was altered")
+        return StoredMilestoneControl(
+            row["run_id"], row["source_commit"], row["artifact_digest"],
+            mode, gen, row["actor_ref"], row["reason_ref"], expected,
+        )
+
+    def _read_control(self, key: str) -> StoredMilestoneControl | None:
+        row = self._connection.execute(
+            """
+            SELECT * FROM milestone_queue_control
+            WHERE namespace=? AND run_id=?
+            """, (self.namespace, key),
+        ).fetchone()
+        return self._control_from_row(row) if row is not None else None
+
+    def operator_control(
+        self, run_id: str, *, source_commit: str,
+        artifact_digest: str,
+    ) -> StoredMilestoneControl | None:
+        """Read the source-bound, durable operator override if one exists."""
+        key = self._key(run_id)
+        with self._lock:
+            self._open()
+            self._connection.execute("BEGIN")
+            try:
+                row = self._connection.execute(
+                    """
+                    SELECT source_commit, artifact_digest
+                    FROM milestone_queue_checkpoint
+                    WHERE namespace=? AND run_id=?
+                    """, (self.namespace, key),
+                ).fetchone()
+                if row is None:
+                    raise MilestoneCheckpointError("operator control requires initialized queue")
+                if (row["source_commit"] != source_commit
+                        or row["artifact_digest"] != artifact_digest):
+                    raise MilestoneCheckpointError("operator control source mismatch")
+                record = self._read_control(key)
+                if record is not None and (
+                    record.source_commit != source_commit
+                    or record.artifact_digest != artifact_digest
+                ):
+                    raise MilestoneCheckpointError("operator control has foreign source")
+                self._connection.execute("COMMIT")
+                return record
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def set_operator_control(
+        self, run_id: str, *, source_commit: str, artifact_digest: str,
+        mode: str, actor_ref: str, reason_ref: str,
+        expected_generation: int | None = None,
+    ) -> StoredMilestoneControl:
+        """Explicit host action: pause, resume, or irreversibly cancel a run.
+
+        Authorization of the host operator remains the caller's responsibility.
+        All modifications require the pinned source and optimistic generation.
+        The cancelled mode is terminal and may not silently resume.
+        """
+        key = self._key(run_id)
+        if not isinstance(mode, str) or mode not in {"running", "paused", "cancelled"}:
+            raise MilestoneCheckpointError("unknown operator control mode")
+        if (not isinstance(actor_ref, str) or not _KEY.fullmatch(actor_ref)
+                or not isinstance(reason_ref, str)
+                or not _KEY.fullmatch(reason_ref)):
+            raise MilestoneCheckpointError("operator action needs scoped actor and reason refs")
+        if expected_generation is not None and (
+            type(expected_generation) is not int or expected_generation <= 0
+        ):
+            raise MilestoneCheckpointError("operator generation must be positive")
+        with self._lock:
+            self._open()
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                state = self._connection.execute(
+                    """
+                    SELECT source_commit, artifact_digest
+                    FROM milestone_queue_checkpoint
+                    WHERE namespace=? AND run_id=?
+                    """, (self.namespace, key),
+                ).fetchone()
+                if state is None or (
+                    state["source_commit"] != source_commit
+                    or state["artifact_digest"] != artifact_digest
+                ):
+                    raise MilestoneCheckpointError("operator control needs exact queue source")
+                previous = self._read_control(key)
+                if previous is None:
+                    if expected_generation is not None:
+                        raise MilestoneCheckpointConflict("operator control has no prior generation")
+                    generation = 1
+                else:
+                    if (previous.source_commit != source_commit
+                            or previous.artifact_digest != artifact_digest):
+                        raise MilestoneCheckpointError("operator control source mismatch")
+                    if (previous.mode == mode and previous.actor_ref == actor_ref
+                            and previous.reason_ref == reason_ref):
+                        self._connection.execute("COMMIT")
+                        return previous
+                    if previous.mode == "cancelled":
+                        raise MilestoneCheckpointError("cancelled work may not resume")
+                    if previous.generation != expected_generation:
+                        raise MilestoneCheckpointConflict("operator control changed since last read")
+                    generation = previous.generation + 1
+                receipt = self._control_receipt(
+                    key, source_commit, artifact_digest, mode,
+                    generation, actor_ref, reason_ref,
+                )
+                if previous is None:
+                    self._connection.execute(
+                        """
+                        INSERT INTO milestone_queue_control
+                        (namespace,run_id,source_commit,artifact_digest,
+                         mode,generation,actor_ref,reason_ref,receipt_digest)
+                        VALUES (?,?,?,?,?,?,?,?,?)
+                        """,
+                        (self.namespace,key,source_commit,artifact_digest,
+                         mode,generation,actor_ref,reason_ref,receipt),
+                    )
+                else:
+                    self._connection.execute(
+                        """
+                        UPDATE milestone_queue_control
+                        SET mode=?,generation=?,actor_ref=?,reason_ref=?,receipt_digest=?
+                        WHERE namespace=? AND run_id=? AND generation=?
+                        """,
+                        (mode,generation,actor_ref,reason_ref,receipt,
+                         self.namespace,key,previous.generation),
+                    )
+                self._connection.execute("COMMIT")
+                return StoredMilestoneControl(
+                    key, source_commit, artifact_digest, mode,
+                    generation, actor_ref, reason_ref, receipt,
+                )
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def save(
         self, run_id: str, queue: MilestoneQueue,
         *, expected_fingerprint: str | None = None,
@@ -299,6 +487,24 @@ class SQLiteMilestoneQueueStore:
                     """, (self.namespace, key),
                 ).fetchone()
                 previous_receipt = self._verify_history(key, old)
+                operator = self._read_control(key)
+                if operator is not None and (
+                    operator.source_commit != queue.source_commit
+                    or operator.artifact_digest != queue.artifact_digest
+                ):
+                    raise MilestoneCheckpointError("operator control source has drifted")
+                if old is not None and operator is not None:
+                    if (old["payload_sha256"] != payload_sha
+                            or old["queue_fingerprint"] != digest):
+                        if operator.mode == "cancelled":
+                            raise MilestoneCheckpointError("cancelled queue cannot advance")
+                        if operator.mode == "paused":
+                            old_queue = _decode(old["payload"])
+                            if any(
+                                event.action == "claim"
+                                for event in queue.events[len(old_queue.events):]
+                            ):
+                                raise MilestoneCheckpointError("paused queue cannot claim work")
                 if old is not None:
                     # Do not trust a stored fingerprint without authenticating
                     # the actual saved bytes and re-validating the chain.

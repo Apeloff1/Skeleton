@@ -138,3 +138,44 @@ def test_duplicate_binding_must_be_explicitly_rejected(tmp_path):
             instance.bind_assurance_checkpoint_store(
                 RUN, store, source_commit=COMMIT, artifact_digest=ARTIFACT,
             )
+
+
+
+def test_runtime_exposes_host_authorized_durable_pause_and_cancel(tmp_path):
+    instance = runtime()
+    with SQLiteMilestoneQueueStore(tmp_path / "operator-runtime.sqlite") as store:
+        instance.bind_assurance_checkpoint_store(
+            RUN, store, source_commit=COMMIT, artifact_digest=ARTIFACT,
+        )
+        instance.begin_assurance_work_queue(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+        )
+        paused = instance.set_assurance_operator_control(
+            RUN, mode="paused", actor_ref="host:operator",
+            reason_ref="ticket:hold",
+        )
+        assert paused.generation == 1
+        assert instance.assurance_operator_control(RUN).mode == "paused"
+        with pytest.raises(MilestoneCheckpointError, match="paused"):
+            instance.claim_assurance_work(RUN, owner="host-worker", now=10)
+        assert instance.assurance_work_queue(RUN).board.completion_count == 0
+        instance.set_assurance_operator_control(
+            RUN, mode="running", actor_ref="host:operator",
+            reason_ref="ticket:release", expected_generation=1,
+        )
+        lease = instance.claim_assurance_work(
+            RUN, owner="host-worker", now=10,
+        )
+        assert lease.milestone_id == "M001"
+        instance.set_assurance_operator_control(
+            RUN, mode="cancelled", actor_ref="host:operator",
+            reason_ref="ticket:cancel", expected_generation=2,
+        )
+        with pytest.raises(MilestoneCheckpointError, match="cancelled"):
+            instance.settle_assurance_work(
+                RUN, lease=lease, now=11,
+                primary=checker("host-primary"),
+                independent=checker("host-secondary"),
+            )
+        assert instance.assurance_work_queue(RUN).board.completion_count == 0
+        assert instance.assurance_operator_control(RUN).mode == "cancelled"

@@ -286,3 +286,27 @@ Finite resource budgets keep each cycle controllable, while long-running game
 production may continue through a succession of durable cycles. Regression
 tests drive all 100 criteria through several checkpointed cycles, but do not
 certify any original MDM-001..MDM-100 masterplan milestone as complete.
+
+
+## Durable operator intervention and cancellation races
+
+The same source-bound SQLite authority now stores operator control states:
+running, paused or terminally cancelled. A host must explicitly authorize the
+operator identity and reason reference before calling the runtime's
+set_assurance_operator_control() or the underlying store. Controls are
+versioned with compare-and-swap generations, scoped to the exact queue source,
+checked against their canonical receipts, and survive process restarts.
+
+Pause prevents *new* work claims, but permits an already claimed reviewer to
+settle. Cancellation blocks any further queue-state changes. The store checks
+operator control in the same SQLite write transaction as queue settlement,
+preventing a race where the driver reads "running", an operator cancels, and
+a later worker publishes a result. A cancelled queue cannot be silently
+resumed. An interrupted host execution remains durably leased and must not be
+reported as successfully verified. Operator controls are independent from
+the ordinary user's authored game data and are never inferred from AI output.
+
+The durable work driver checks controls before recovery, before each claim
+and after external reviewers. Test fixtures exercise pause/resume/cancel,
+interleaved processes, stale generations, failed direct queue bypass attempts,
+tampered control receipts, and runtime integration.

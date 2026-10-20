@@ -50,7 +50,9 @@ from .delivery_milestone_workbench import (
 from .delivery_milestone_queue import (
     MilestoneQueue, WorkLease,
 )
-from .delivery_milestone_store import SQLiteMilestoneQueueStore
+from .delivery_milestone_store import (
+    SQLiteMilestoneQueueStore, StoredMilestoneControl,
+)
 from .final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
     FinalReviewAdversary, MeasuredCriterion, SourceProvenance,
@@ -1394,6 +1396,44 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             self._milestone_queues[key] = queue
             self._milestone_boards[key] = queue.board
             return queue
+
+    def set_assurance_operator_control(
+        self, run_id: str, *, mode: str,
+        actor_ref: str, reason_ref: str,
+        expected_generation: int | None = None,
+    ) -> StoredMilestoneControl:
+        """Persist a host-authorized pause, resume or terminal cancellation.
+
+        The application authorization layer must verify actor_ref before this
+        method is called. The runtime never infers operator authority from a
+        string or grants a model control over this method.
+        """
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            store = self._milestone_queue_stores.get(key)
+            if queue is None or store is None:
+                raise ValueError("operator control requires a bound durable queue")
+            return store.set_operator_control(
+                key, source_commit=queue.source_commit,
+                artifact_digest=queue.artifact_digest,
+                mode=mode, actor_ref=actor_ref, reason_ref=reason_ref,
+                expected_generation=expected_generation,
+            )
+
+    def assurance_operator_control(
+        self, run_id: str,
+    ) -> StoredMilestoneControl | None:
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            store = self._milestone_queue_stores.get(key)
+            if queue is None or store is None:
+                raise ValueError("operator control requires a bound durable queue")
+            return store.operator_control(
+                key, source_commit=queue.source_commit,
+                artifact_digest=queue.artifact_digest,
+            )
 
     def claim_assurance_work(
         self, run_id: str, *, owner: str, now: float,

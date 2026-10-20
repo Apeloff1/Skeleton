@@ -216,3 +216,133 @@ def test_failed_scoped_metrics_record_blocked_but_never_complete(tmp_path):
         assert result.candidate_completed == 0
         assert store.load(RUN, source_commit=COMMIT,
                           artifact_digest=ARTIFACT).queue.get("M001").status == "pending"
+
+
+
+def test_persisted_operator_pause_resume_and_cancel(tmp_path):
+    with init(tmp_path / "operator.sqlite") as store:
+        paused = store.set_operator_control(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            mode="paused", actor_ref="operator:lead",
+            reason_ref="incident:hold",
+        )
+        assert paused.generation == 1
+        assert run(store).status == "operator_paused"
+        assert store.load(RUN, source_commit=COMMIT,
+                          artifact_digest=ARTIFACT).generation == 1
+        running = store.set_operator_control(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            mode="running", actor_ref="operator:lead",
+            reason_ref="incident:resolved",
+            expected_generation=1,
+        )
+        assert running.generation == 2
+        report = run(store, policy=WorkCyclePolicy(max_claims=1))
+        assert report.passed == 1
+        cancelled = store.set_operator_control(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            mode="cancelled", actor_ref="operator:lead",
+            reason_ref="incident:terminal",
+            expected_generation=2,
+        )
+        assert cancelled.generation == 3
+        again = run(store)
+        assert again.status == "operator_cancelled"
+        assert again.attempted == 0
+        assert again.candidate_completed == 1
+        with pytest.raises(MilestoneCheckpointError, match="may not resume"):
+            store.set_operator_control(
+                RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+                mode="running", actor_ref="operator:lead",
+                reason_ref="incident:resolved",
+                expected_generation=3,
+            )
+
+
+def test_pause_blocks_direct_queue_claim_even_if_driver_bypassed(tmp_path):
+    with init(tmp_path / "paused-cas.sqlite") as store:
+        state = store.load(RUN, source_commit=COMMIT, artifact_digest=ARTIFACT)
+        store.set_operator_control(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            mode="paused", actor_ref="operator:lead",
+            reason_ref="ops:suspend",
+        )
+        claimed, _ = state.queue.claim("worker:a", 10)
+        with pytest.raises(MilestoneCheckpointError, match="paused queue"):
+            store.save(RUN, claimed, expected_fingerprint=state.fingerprint)
+        assert store.load(RUN, source_commit=COMMIT,
+                          artifact_digest=ARTIFACT).generation == 1
+
+
+def test_cancel_during_reviewer_prevents_durable_promotion(tmp_path):
+    from skeleton.jeeves.agent.delivery_milestone_store import SQLiteMilestoneQueueStore
+
+    path = tmp_path / "race-cancel.sqlite"
+    with init(path) as store:
+        second = SQLiteMilestoneQueueStore(path)
+        try:
+            base = pairs()
+            def cancel_as_review_happens(spec, commit, artifact):
+                second.set_operator_control(
+                    RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+                    mode="cancelled", actor_ref="host:operator",
+                    reason_ref="ops:abort",
+                )
+                return checker("host-one")(spec, commit, artifact)
+
+            base["M001"] = (cancel_as_review_happens, checker("host-two"))
+            result = run(store, reviewers=base,
+                         policy=WorkCyclePolicy(max_claims=1))
+            assert result.status == "operator_cancelled"
+            assert result.candidate_completed == 0
+            assert result.active_leases == 1
+            checkpoint = store.load(
+                RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            )
+            assert checkpoint.queue.get("M001").status == "leased"
+            assert checkpoint.queue.board.completion_count == 0
+            assert checkpoint.generation == 2
+        finally:
+            second.close()
+
+
+def test_stale_operator_generation_and_changed_source_fail_closed(tmp_path):
+    from skeleton.jeeves.agent.delivery_milestone_store import (
+        MilestoneCheckpointConflict,
+    )
+    with init(tmp_path / "stale-control.sqlite") as store:
+        first = store.set_operator_control(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            mode="paused", actor_ref="host:operator", reason_ref="ops:pause",
+        )
+        with pytest.raises(MilestoneCheckpointConflict):
+            store.set_operator_control(
+                RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+                mode="running", actor_ref="host:operator",
+                reason_ref="ops:continue", expected_generation=3,
+            )
+        with pytest.raises(MilestoneCheckpointError, match="exact queue source"):
+            store.set_operator_control(
+                RUN, source_commit="f" * 40, artifact_digest=ARTIFACT,
+                mode="running", actor_ref="host:operator",
+                reason_ref="ops:continue", expected_generation=first.generation,
+            )
+        assert store.operator_control(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+        ).mode == "paused"
+
+
+def test_operator_control_detects_modified_db_receipt(tmp_path):
+    with init(tmp_path / "forged.sqlite") as store:
+        store.set_operator_control(
+            RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            mode="paused", actor_ref="host:operator", reason_ref="ops:pause",
+        )
+        store._connection.execute(
+            "UPDATE milestone_queue_control SET receipt_digest = ?",
+            ("f" * 64,),
+        )
+        with pytest.raises(MilestoneCheckpointError, match="altered"):
+            store.operator_control(
+                RUN, source_commit=COMMIT, artifact_digest=ARTIFACT,
+            )

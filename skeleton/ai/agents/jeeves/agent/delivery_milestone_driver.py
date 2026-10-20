@@ -18,7 +18,9 @@ from dataclasses import dataclass
 from typing import Callable, Mapping
 
 from .delivery_milestone_queue import MilestoneQueue, QueueContractError
-from .delivery_milestone_store import SQLiteMilestoneQueueStore
+from .delivery_milestone_store import (
+    MilestoneCheckpointError, SQLiteMilestoneQueueStore,
+)
 from .delivery_milestone_workbench import (
     ExecutionVerdict, HostChecker,
 )
@@ -174,6 +176,20 @@ def execute_durable_work_cycle(
     initial_digest = queue.fingerprint
     beginning = _now(clock)
     last_clock = beginning
+    initial_control = store.operator_control(
+        run_id, source_commit=source_commit, artifact_digest=artifact_digest,
+    )
+    if initial_control is not None and initial_control.mode != "running":
+        history = store.checkpoint_history(run_id)
+        return WorkCycleResult(
+            run_id, source_commit, artifact_digest,
+            "operator_paused" if initial_control.mode == "paused" else "operator_cancelled",
+            0, 0, 0, queue.board.completion_count,
+            sum(item.status == "leased" for item in queue.work),
+            sum(item.status == "pending" for item in queue.work),
+            initial_digest, queue.fingerprint, saved.generation,
+            history[-1]["receipt_digest"], (),
+        )
 
     def observe_time() -> float:
         nonlocal last_clock
@@ -199,6 +215,12 @@ def execute_durable_work_cycle(
         now = observe_time()
         if now - beginning >= limit.max_wall_seconds:
             status = "time_budget_exhausted"
+            break
+        control = store.operator_control(
+            run_id, source_commit=source_commit, artifact_digest=artifact_digest,
+        )
+        if control is not None and control.mode != "running":
+            status = "operator_paused" if control.mode == "paused" else "operator_cancelled"
             break
         if stop_requested is not None:
             decision = stop_requested()
@@ -264,10 +286,27 @@ def execute_durable_work_cycle(
             status = "invalid_host_review"
             error_type = type(exc).__name__
             break
-        # If the settlement cannot be stored, do NOT report a completed step.
-        saved = store.save(
-            run_id, settled, expected_fingerprint=queue.fingerprint,
+        # Cancellation after the host measurement but before settlement must
+        # never admit the result. The transaction also checks the same control
+        # row, closing the read-to-write cancellation race.
+        control = store.operator_control(
+            run_id, source_commit=source_commit, artifact_digest=artifact_digest,
         )
+        if control is not None and control.mode == "cancelled":
+            status = "operator_cancelled"
+            break
+        try:
+            saved = store.save(
+                run_id, settled, expected_fingerprint=queue.fingerprint,
+            )
+        except MilestoneCheckpointError:
+            control = store.operator_control(
+                run_id, source_commit=source_commit, artifact_digest=artifact_digest,
+            )
+            if control is not None and control.mode == "cancelled":
+                status = "operator_cancelled"
+                break
+            raise
         queue = saved.queue
         attempted += 1
         passed += int(verdict.passed)
