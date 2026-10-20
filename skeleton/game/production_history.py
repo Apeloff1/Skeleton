@@ -94,11 +94,30 @@ class QualityHistoryStore:
                 raise QualityGateError("wrong report authority schema")
             if obj.get("release_certified") is not False:
                 raise QualityGateError("quality review cannot manufacture production approval")
-            if obj.get("evidence_digest") != _digest(obj.get("gates")):
+            expected_gates = (
+                "world", "canon", "assets", "replay", "performance", "rights",
+                "traceability", "quests", "accessibility", "controls",
+                "resources", "session", "package",
+            )
+            gates = obj.get("gates")
+            if (type(gates) is not list or len(gates) != len(expected_gates) or
+                    tuple(g.get("name") for g in gates if type(g) is dict) != expected_gates):
+                raise QualityGateError("journal requires all thirteen canonical quality gates")
+            merged_findings = []
+            for gate in gates:
+                if (type(gate.get("passed")) is not bool or
+                        type(gate.get("findings")) is not list or
+                        type(gate.get("evidence_digest")) is not str or
+                        len(gate["evidence_digest"]) != 64 or
+                        gate["passed"] is not (not gate["findings"])):
+                    raise QualityGateError("individual source gate status is malformed")
+                merged_findings.extend(gate["findings"])
+            if obj.get("findings") != merged_findings:
+                raise QualityGateError("journal findings differ from component evidence")
+            if obj.get("evidence_digest") != _digest(gates):
                 raise QualityGateError("reported gates and evidence digest conflict")
-            if obj.get("candidate_passed") is not (
-                not any(not g.get("passed") for g in obj["gates"])
-            ):
+            if type(obj.get("candidate_passed")) is not bool or (
+                    obj["candidate_passed"] is not (not merged_findings)):
                 raise QualityGateError("quality reviewer status differs from gate outcomes")
             if _encode(obj) != raw:
                 raise QualityGateError("noncanonical quality journal record")
