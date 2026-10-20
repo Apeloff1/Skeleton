@@ -247,6 +247,19 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
                 islands=payload.get("islands", 12),
                 include_godot=False,
             )
+        if operation == "game.studio.author.gameplay":
+            _only(payload, ("position_xyz_m", "mass_kg", "now_ms",
+                            "current_signals", "previous_signals", "flags"),
+                  required=("position_xyz_m",))
+            return await forge_author.simulate_gameplay(
+                scope, command.project_id, {
+                    "position_xyz_m": payload["position_xyz_m"],
+                    "mass_kg": payload.get("mass_kg", 75.0),
+                    "now_ms": payload.get("now_ms", 0),
+                    "current_signals": payload.get("current_signals", {}),
+                    "previous_signals": payload.get("previous_signals", {}),
+                    "flags": payload.get("flags", {}),
+                })
         if operation == "game.studio.author.export":
             required = ("expected_revision", "expected_sha256", "idempotency_key")
             _only(payload, (*required, "seed", "islands"), required=required)
