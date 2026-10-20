@@ -79,6 +79,9 @@ from .game_frontier_visual_capture import export_native_capture_godot
 from .game_frontier_postproduction import compile_frame_postproduction
 from .game_frontier_controller_parity import verify_all_controller_eras
 from .game_frontier_soak import simulated_process_recovery
+from .game_frontier_campaign_seven_audits import (
+    compile_seven_campaign_audits, verify_seven_campaign_audits,
+)
 
 
 def original_campaign_player()->Traveler:
@@ -181,6 +184,8 @@ def compile_original_campaign(
     })
     if seven_axes["production_release_approved"] or seven_axes["passed"]!=6:
         raise ExpeditionError("original studio cannot bypass unsigned release assurance")
+    seven_campaign_audits=compile_seven_campaign_audits(world,player,assets)
+    verify_seven_campaign_audits(world,player,assets,seven_campaign_audits)
     render_frames=render_lod_timeline(
         world,assets["manifest"],(
             View(1,0,0,0,500),
@@ -218,6 +223,8 @@ def compile_original_campaign(
     files["game/frontier/controller_latency.json"]=_json(measured_controller).decode("utf-8")
     files["game/frontier/production_telemetry.json"]=_json(watchdog).decode("utf-8")
     files["game/frontier/seven_plane_assurance.json"]=_json(seven_axes).decode("utf-8")
+    for audit_id,audit in sorted(seven_campaign_audits.items()):
+        files["game/frontier/qa_seven/"+audit_id+".json"]=_json(audit).decode("utf-8")
     files["game/frontier/npcs.json"]=_json({
         "schema":"skeleton.game.original_npc_cast.v1",
         "world_digest":world.digest,
@@ -312,6 +319,8 @@ def compile_original_campaign(
         "controller_latency_receipt":measured_controller["receipt_digest"],
         "production_watchdog_receipt":watchdog["snapshot_digest"],
         "seven_plane_assurance_receipt":seven_axes["receipt_digest"],
+        "seven_campaign_audits_receipt":seven_campaign_audits["delivery"]["receipt_digest"],
+        "seven_campaign_source_checked":seven_campaign_audits["delivery"]["source_checks_passed"],
         "seven_plane_source_checks":seven_axes["passed"],
         "real_hardware_test_completed":False,
         "branch_plot_receipt":branch_proof["receipt_digest"],
@@ -362,6 +371,7 @@ def compile_original_campaign(
         "dragon_vision":vision,"postproduction":postproduction,
         "controller_qa":measured_controller,
         "production_watchdog":watchdog,"seven_plane_assurance":seven_axes,
+        "seven_campaign_audits":seven_campaign_audits,
         "ecology_frame":ecology_sample,
         "render":render_frames,"dragon":dragon,
         "dragon_adversary":dragon_review,
@@ -405,6 +415,7 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
             or compiled.get("controller_qa")!=expected["controller_qa"]
             or compiled.get("production_watchdog")!=expected["production_watchdog"]
             or compiled.get("seven_plane_assurance")!=expected["seven_plane_assurance"]
+            or compiled.get("seven_campaign_audits")!=expected["seven_campaign_audits"]
             or compiled.get("npcs")!=expected["npcs"]
             or compiled.get("ecology")!=expected["ecology"]
             or compiled.get("ecology_frame")!=expected["ecology_frame"]
