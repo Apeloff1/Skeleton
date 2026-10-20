@@ -8,7 +8,7 @@ from scripts.check_jeeves_agent_mirror import REQUIRED, check_parity
 def test_current_jeeves_delivery_mirrors_match_exact_source():
     result = check_parity()
     assert result["status"] == "passed", result
-    assert result["checked"] == 13
+    assert result["checked"] == 14
     assert all(row["canonical_sha256"] == row["mirror_sha256"]
                for row in result["files"])
 

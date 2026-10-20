@@ -162,6 +162,7 @@ jobs:
             skeleton/jeeves/agent/delivery_milestone_workbench.py \
             skeleton/jeeves/agent/delivery_milestone_queue.py \
             skeleton/jeeves/agent/delivery_milestone_store.py \
+            skeleton/jeeves/agent/delivery_milestone_driver.py \
             skeleton/jeeves/agent/runtime.py \
             skeleton/jeeves/agent/adaptive_runtime.py
           python -m pytest -q --noconftest \
@@ -174,6 +175,7 @@ jobs:
             tests/test_jeeves_delivery_milestone_workbench.py \
             tests/test_jeeves_delivery_milestone_queue.py \
             tests/test_jeeves_delivery_milestone_store.py \
+            tests/test_jeeves_delivery_milestone_driver.py \
             tests/test_jeeves_durable_milestone_runtime.py \
             tests/test_ai_100_real_milestone_execution.py \
             tests/test_jeeves_agent_mirror.py \

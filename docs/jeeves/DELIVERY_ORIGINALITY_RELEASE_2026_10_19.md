@@ -264,3 +264,25 @@ This history is a same-database integrity mechanism, not an external
 anchoring/signature service. An attacker who can rewrite the complete SQLite
 database could recompute both history and state; higher-assurance deployment
 requires a trusted off-database audit sink and independently verified anchors.
+
+
+## Bounded durable host execution cycles
+
+The source-bound scheduler executes actual host-provided reviewer callbacks
+in bounded cycles through the delivery_milestone_driver module. It loads an
+already-initialized SQLite queue, expires abandoned leases, requires separately
+registered independent host checkers, persists each lease before invoking
+reviewers, and commits every verified settlement before reporting completion.
+
+Each cycle sets a claim budget, duration limit and operator stop hook. Host
+exceptions, lease expiry and time-budget overrun leave the in-flight lease
+recorded until explicit recovery, rather than silently replaying an
+unknown outcome. Cross-process optimistic checkpoint conflicts fail closed.
+The journal binds run identity, pinned source, prior/final queue digests,
+generation history and accepted verdicts. The scheduler never invents
+measurement values, checker independence or production signoff.
+
+Finite resource budgets keep each cycle controllable, while long-running game
+production may continue through a succession of durable cycles. Regression
+tests drive all 100 criteria through several checkpointed cycles, but do not
+certify any original MDM-001..MDM-100 masterplan milestone as complete.
