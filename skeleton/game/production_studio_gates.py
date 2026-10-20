@@ -277,6 +277,7 @@ def audit_save_evolution(data: Mapping[str, Any]) -> GateResult:
     migrations = _items(data.get("migrations"), "migrations", 1024)
     findings: list[Finding] = []
     routes: dict[int, int] = {}
+    transition_proofs: dict[int, tuple[str, str]] = {}
     for migration in migrations:
         migration = _record(migration, "migration")
         start, end = migration.get("from_version"), migration.get("to_version")
@@ -287,6 +288,11 @@ def audit_save_evolution(data: Mapping[str, Any]) -> GateResult:
         if start in routes:
             findings.append(Finding("save_migrations", "ambiguous_migration", str(start)))
         routes[start] = end
+        if (type(migration.get("input_sha256")) is str and
+                type(migration.get("output_sha256")) is str):
+            transition_proofs[start] = (
+                migration["input_sha256"], migration["output_sha256"]
+            )
         try:
             _sha(migration.get("transform_sha256"), "migration transform")
             _sha(migration.get("input_sha256"), "migration input")
@@ -295,6 +301,12 @@ def audit_save_evolution(data: Mapping[str, Any]) -> GateResult:
             findings.append(Finding("save_migrations", "missing_migration_digest", str(start)))
         if migration.get("independently_replayed") is not True:
             findings.append(Finding("save_migrations", "unverified_transform", str(start)))
+    for start, end in sorted(routes.items()):
+        if end in transition_proofs and start in transition_proofs and (
+                transition_proofs[start][1] != transition_proofs[end][0]):
+            findings.append(Finding("save_migrations", "unlinked_migration_bytes", str(start)))
+    if len(set(supported)) != len(supported):
+        findings.append(Finding("save_migrations", "duplicate_supported_version", "supported_versions"))
     for version in supported:
         if type(version) is not int or not 1 <= version <= current:
             raise QualityGateError("supported save version out of bounds")
@@ -325,8 +337,16 @@ def audit_dynamic_world(data: Mapping[str, Any]) -> GateResult:
             findings.append(Finding("dynamic_world", "duplicate_state", ident))
         by_id[ident] = state
         _sha(state.get("effect_sha256"), "weather effect source")
-        if state.get("hazardous") is True and not state.get("mitigation"):
-            findings.append(Finding("dynamic_world", "unmitigated_hazard", ident))
+        if type(state.get("hazardous")) is not bool:
+            raise QualityGateError("dynamic hazard designation must be explicit boolean")
+        if state["hazardous"]:
+            mitigation = state.get("mitigation", [])
+            if type(mitigation) not in (tuple, list):
+                raise QualityGateError("hazard mitigation must be bounded source action list")
+            if not mitigation or len(mitigation) > 128 or any(
+                    type(token) is not str or not token.strip() or len(token) > 128
+                    for token in mitigation):
+                findings.append(Finding("dynamic_world", "unmitigated_hazard", ident))
     for sid, state in by_id.items():
         transitions = _items(state.get("transitions"), "weather transitions", 256)
         if not transitions:
@@ -367,6 +387,8 @@ def audit_controller_latency(data: Mapping[str, Any]) -> GateResult:
     _sha(data.get("source_sha256"), "input source")
     limit95 = _number(data.get("max_p95_ms"), "p95 budget", low=0.01, high=1000)
     limit99 = _number(data.get("max_p99_ms"), "p99 budget", low=0.01, high=2000)
+    if limit99 < limit95:
+        raise QualityGateError("p99 response budget cannot be stricter than p95 budget")
     frames = _items(data.get("observations"), "latency observations", 100000)
     findings: list[Finding] = []
     per_device: dict[str, list[float]] = {}
