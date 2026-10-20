@@ -266,6 +266,8 @@ def audit_transport_paths(data: Mapping[str, Any]) -> GateResult:
     if origin not in node_ids or not destinations or not destinations <= node_ids:
         findings.append(Finding("transport_paths", "missing_terminal", origin))
     graph: dict[str, set[str]] = {key: set() for key in node_ids}
+    safe_graph: dict[str, set[str]] = {key: set() for key in node_ids}
+    hazardous_route_present = False
     link_ids: set[str] = set()
     covered_modes: set[str] = set()
     for link in links:
@@ -282,6 +284,8 @@ def audit_transport_paths(data: Mapping[str, Any]) -> GateResult:
         cost = _number(l.get("duration_s"), "route duration", high=10**7)
         if cost <= 0:
             findings.append(Finding("transport_paths", "zero_cost_route", lid))
+        if l.get("hazardous") is True:
+            hazardous_route_present = True
         if l.get("hazardous") is True and (l.get("mitigated") is not True or
                 l.get("fallback") is not True):
             findings.append(Finding("transport_paths", "hazard_no_fallback", lid))
@@ -289,8 +293,12 @@ def audit_transport_paths(data: Mapping[str, Any]) -> GateResult:
             findings.append(Finding("transport_paths", "dangling_route", lid))
         else:
             graph[a].add(b)
+            if l.get("hazardous") is not True:
+                safe_graph[a].add(b)
             if l.get("bidirectional") is True:
                 graph[b].add(a)
+                if l.get("hazardous") is not True:
+                    safe_graph[b].add(a)
     seen = {origin}
     queue = deque([origin])
     while queue:
@@ -301,6 +309,18 @@ def audit_transport_paths(data: Mapping[str, Any]) -> GateResult:
                 queue.append(nxt)
     for lost in sorted(destinations - seen):
         findings.append(Finding("transport_paths", "unreachable_destination", lost))
+    # A declared fallback must exist in topology after removing hazardous links.
+    if hazardous_route_present:
+        safe_seen = {origin}
+        safe_queue = deque([origin])
+        while safe_queue:
+            at = safe_queue.popleft()
+            for nxt in safe_graph.get(at, ()):
+                if nxt not in safe_seen:
+                    safe_seen.add(nxt)
+                    safe_queue.append(nxt)
+        for lost in sorted(destinations - safe_seen):
+            findings.append(Finding("transport_paths", "no_independent_fallback", lost))
     if len(covered_modes & MODES) < 2:
         findings.append(Finding("transport_paths", "single_mode_world", "transport"))
     return _result("transport_paths", findings, data)

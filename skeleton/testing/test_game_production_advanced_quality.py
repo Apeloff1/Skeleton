@@ -228,6 +228,14 @@ class AdvancedGameStudioTests(unittest.TestCase):
         self.assertIn("hazard_no_fallback", codes)
         self.assertIn("unreachable_destination", codes)
 
+    def test_hazard_declared_fallback_requires_real_nonhazardous_route(self):
+        c = candidate()
+        flight = c["studio"]["advanced"]["transport"]["links"][1]
+        flight.update(hazardous=True, mitigated=True, fallback=True)
+        codes = [x["code"] for x in audit_advanced_studio(c)["findings"]
+                 if x["gate"] == "transport_paths"]
+        self.assertIn("no_independent_fallback", codes)
+
     def test_opt_out_replay_required_even_when_opt_in_works(self):
         c = candidate()
         c["studio"]["advanced"]["privacy"]["observations"].pop()

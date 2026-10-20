@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
-from .production_quality import Finding, QualityGateError, _digest
+from .production_quality import QualityGateError, _digest
 from .production_deep_gates import _sha
 from .production_studio_assurance import ALL_GATES, CRITICAL, OWNERS
 from .production_advanced_gates import NAMES, audit_advanced_studio, verify_advanced_studio
