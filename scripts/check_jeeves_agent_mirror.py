@@ -24,6 +24,8 @@ REQUIRED = (
     "delivery_assurance_milestones.py",
     "delivery_evidence_journal.py",
     "delivery_milestone_queue.py",
+    "delivery_milestone_store.py",
+    "delivery_milestone_driver.py",
     "delivery_milestone_workbench.py",
     "delivery_milestones.py",
     "final_delivery_reviews.py",

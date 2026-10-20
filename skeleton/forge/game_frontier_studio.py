@@ -701,3 +701,139 @@ def compile_studio_frame(
         "context_cursor":latest_cursor,
         "authority":"studio_preview_proposed_not_engine_mutated",
     }
+
+
+
+def author_studio_expedition(project: StudioProject, profile, *, weather=None):
+    """Build a playable vertical realm with actual Forge prefab landmarks.
+
+    Seeded sky/cave/underwater traversal is enriched by explicitly authored
+    Studio placements. Each accepted placement becomes an interactable waypoint
+    linked to its nearest original world node, not a decorative plan entry.
+    The typed result runs under the real ExpeditionEpisode state machine.
+    """
+    from skeleton.jeeves.game_frontier_expedition import (
+        ExpeditionError, ExpeditionWorld, TravelEdge, Waypoint,
+    )
+    from skeleton.jeeves.game_frontier_expedition_generation import (
+        ArchipelagoProfile, author_archipelago,
+    )
+    if not isinstance(project, StudioProject) or not isinstance(profile, ArchipelagoProfile):
+        raise StudioError("actual typed Studio project and expedition profile required")
+    if project.projection not in {
+        ProjectionMode.FULL_3D, ProjectionMode.DEPTH_25,
+        ProjectionMode.DEPTH_26, ProjectionMode.DEPTH_27,
+        ProjectionMode.DEPTH_28, ProjectionMode.DEPTH_29,
+    }:
+        raise StudioError("vertical expedition requires 3D or 2.5D-2.9D authored projection")
+    if len(project.placements) > 512:
+        raise StudioError("expedition placement compilation budget exceeded")
+    anchor=compile_studio_project(project)["content_sha256"]
+    world=author_archipelago(project.project_id,anchor,profile,weather=weather)
+    waypoints=list(world.waypoints)
+    edges=list(world.edges)
+    originals=tuple(world.waypoints)
+    by_prefab={prefab.prefab_id:prefab for prefab in project.prefabs}
+    try:
+        for index,placement in enumerate(project.placements):
+            prefab=by_prefab[placement.prefab_id]
+            landmark=f"asset_{index:04d}"
+            kind={
+                "portal":"ruins","npc":"settlement","character":"settlement",
+                "building":"settlement","terrain":"ground","liquid":"underwater",
+                "foliage":"canopy",
+            }.get(prefab.kind,"ground")
+            node=Waypoint(
+                landmark,placement.x,placement.y,placement.z,kind,
+                landmark=f"Studio original {prefab.prefab_id}",
+                safe_rest=prefab.kind in {"building","npc"},
+                collectible=f"artifact_{index:04d}" if prefab.interaction_type=="pickup" else "",
+                quest_flag=f"visited_{index:04d}" if prefab.interaction_type!="none" else "",
+            )
+            nearest=min(
+                originals,
+                key=lambda item:
+                (item.x_m-placement.x)**2+(item.y_m-placement.y)**2
+                +(item.altitude_m-placement.z)**2,
+            )
+            distance=(
+                (nearest.x_m-placement.x)**2+(nearest.y_m-placement.y)**2
+                +(nearest.altitude_m-placement.z)**2
+            )**.5
+            waypoints.append(node)
+            edges.append(TravelEdge(
+                f"studio_access_{index:04d}",nearest.waypoint_id,
+                landmark,"rope_bridge",max(.01,distance),
+                max(1.,distance/3.),2,0.01,30,one_way=False,
+            ))
+        return ExpeditionWorld(
+            project.project_id,anchor,tuple(waypoints),tuple(edges),
+            world.arrival,world.destinations,world.weather,
+        )
+    except ExpeditionError as exc:
+        raise StudioError("authored Studio waypoint cannot enter playable expedition") from exc
+
+
+def compile_studio_expedition(project: StudioProject, profile, *, weather=None,
+                              playtest_routes: int = 4,
+                              include_godot: bool = True) -> dict:
+    """Compile, route-playtest and export a real Studio-derived game realm."""
+    from skeleton.jeeves.game_frontier_expedition import world_export
+    from skeleton.jeeves.game_frontier_expedition_generation import (
+        playtest_archipelago,
+    )
+    if type(playtest_routes) is not int or not 1<=playtest_routes<=16:
+        raise StudioError("playtest route budget must be bounded")
+    if type(include_godot) is not bool:
+        raise StudioError("Godot game export policy must be explicit")
+    world=author_studio_expedition(project,profile,weather=weather)
+    report=playtest_archipelago(world,max_routes=playtest_routes)
+    compiled=world_export(world)
+    assets=[
+        {
+            "waypoint":f"asset_{index:04d}",
+            "prefab_id":placement.prefab_id,
+            "asset_digest":next(p.asset_digest for p in project.prefabs
+                                if p.prefab_id==placement.prefab_id),
+            "source_xyz_m":[placement.x,placement.y,placement.z],
+        }
+        for index,placement in enumerate(project.placements)
+    ]
+    out={
+        "schema":"skeleton.forge.frontier_studio_expedition.v1",
+        "project_id":project.project_id,
+        "studio_source_digest":world.source_digest,
+        "world_digest":world.digest,
+        "waypoints":len(world.waypoints),
+        "travel_edges":len(world.by_edge),
+        "playtest":report,
+        "asset_bindings":assets,
+        "engine_candidate":compiled,
+        "native_playtest_completed":False,
+        "authority":"playable_deterministic_preview_not_native_engine_authority",
+    }
+    if include_godot:
+        from skeleton.jeeves.game_frontier_expedition import Traveler
+        from skeleton.jeeves.game_frontier_expedition_godot import (
+            emit_expedition_godot_project, verify_expedition_godot_project,
+        )
+        native_player=Traveler(
+            permitted_modes=frozenset((
+                "walk","rope_bridge","updraft","glide","airship",
+                "portal","climb","dive","swim",
+            )),
+            flags=frozenset((
+                "glider","airship_license","diving_gear","portal_key",
+            )),
+            equipment=frozenset(("instrument_navigation",)),
+            max_stamina=1000,skill=0.8,
+        )
+        files=emit_expedition_godot_project(world,native_player)
+        out["godot_project_files"]=files
+        out["godot_candidate_proof"]=verify_expedition_godot_project(
+            files,world,native_player,
+        )
+    out["receipt_digest"]=sha256(json.dumps(
+        out,sort_keys=True,separators=(",",":"),allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+    return out

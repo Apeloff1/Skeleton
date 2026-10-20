@@ -50,6 +50,9 @@ from .delivery_milestone_workbench import (
 from .delivery_milestone_queue import (
     MilestoneQueue, WorkLease,
 )
+from .delivery_milestone_store import (
+    SQLiteMilestoneQueueStore, StoredMilestoneControl,
+)
 from .final_delivery_reviews import (
     ComparativeObjectiveFinalReviewer, ContentChecker, FinalReleaseReview,
     FinalReviewAdversary, MeasuredCriterion, SourceProvenance,
@@ -318,6 +321,9 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self._release_evidence_journals: dict[str, ReleaseEvidenceJournal] = {}
         self._milestone_boards: dict[str, MilestoneBoard] = {}
         self._milestone_queues: dict[str, MilestoneQueue] = {}
+        # Optional host-attached SQLite authority for crash-safe work queues.
+        # The runtime never creates a file or claims durability implicitly.
+        self._milestone_queue_stores: dict[str, SQLiteMilestoneQueueStore] = {}
 
     def run(self, inputs: RunInputs) -> AgentResult:
         result = super().run(inputs)
@@ -1320,6 +1326,54 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         with self._adaptive_lock:
             return self._milestone_queues.get(require_id("run_id", run_id))
 
+    def bind_assurance_checkpoint_store(
+        self, run_id: str, store: SQLiteMilestoneQueueStore, *,
+        source_commit: str, artifact_digest: str,
+    ) -> MilestoneQueue | None:
+        """Attach external durable authority and restore its verified snapshot.
+
+        On restart, previously claimed leases remain source-bound and can be
+        explicitly expired by recover_assurance_work(). Existing in-memory
+        progress is not replaced unless both checkpoints match exactly.
+        """
+        key = require_id("run_id", run_id)
+        if not isinstance(store, SQLiteMilestoneQueueStore):
+            raise TypeError("assurance checkpoint store must be the SQLite adapter")
+        with self._adaptive_lock:
+            if key in self._milestone_queue_stores:
+                raise ValueError("checkpoint store is already bound to this run")
+            loaded = store.load(
+                key, source_commit=source_commit, artifact_digest=artifact_digest,
+            )
+            current = self._milestone_queues.get(key)
+            if loaded is not None and current is not None:
+                if loaded.queue.fingerprint != current.fingerprint:
+                    raise ValueError("durable and in-memory milestone checkpoints disagree")
+            elif loaded is None and current is not None:
+                if (current.source_commit != source_commit
+                        or current.artifact_digest != artifact_digest):
+                    raise ValueError("cannot bind a different milestone source snapshot")
+                store.save(key, current)
+            elif loaded is not None:
+                prior = self._milestone_boards.get(key)
+                if prior is not None and prior.fingerprint != loaded.queue.board.fingerprint:
+                    raise ValueError("restored queue conflicts with existing milestone board")
+                self._milestone_queues[key] = loaded.queue
+                self._milestone_boards[key] = loaded.queue.board
+            self._milestone_queue_stores[key] = store
+            return self._milestone_queues.get(key)
+
+    def _persist_assurance_queue(
+        self, key: str, previous: MilestoneQueue | None,
+        updated: MilestoneQueue,
+    ) -> None:
+        store = self._milestone_queue_stores.get(key)
+        if store is not None:
+            store.save(
+                key, updated,
+                expected_fingerprint=previous.fingerprint if previous else None,
+            )
+
     def begin_assurance_work_queue(
         self, run_id: str, *, source_commit: str, artifact_digest: str,
         max_attempts: int = 3, lease_seconds: float = 120.0,
@@ -1338,9 +1392,48 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             )
             if previous is not None and previous.source_commit != source_commit:
                 raise ValueError("queue would change pinned source commit")
+            self._persist_assurance_queue(key, None, queue)
             self._milestone_queues[key] = queue
             self._milestone_boards[key] = queue.board
             return queue
+
+    def set_assurance_operator_control(
+        self, run_id: str, *, mode: str,
+        actor_ref: str, reason_ref: str,
+        expected_generation: int | None = None,
+    ) -> StoredMilestoneControl:
+        """Persist a host-authorized pause, resume or terminal cancellation.
+
+        The application authorization layer must verify actor_ref before this
+        method is called. The runtime never infers operator authority from a
+        string or grants a model control over this method.
+        """
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            store = self._milestone_queue_stores.get(key)
+            if queue is None or store is None:
+                raise ValueError("operator control requires a bound durable queue")
+            return store.set_operator_control(
+                key, source_commit=queue.source_commit,
+                artifact_digest=queue.artifact_digest,
+                mode=mode, actor_ref=actor_ref, reason_ref=reason_ref,
+                expected_generation=expected_generation,
+            )
+
+    def assurance_operator_control(
+        self, run_id: str,
+    ) -> StoredMilestoneControl | None:
+        key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            queue = self._milestone_queues.get(key)
+            store = self._milestone_queue_stores.get(key)
+            if queue is None or store is None:
+                raise ValueError("operator control requires a bound durable queue")
+            return store.operator_control(
+                key, source_commit=queue.source_commit,
+                artifact_digest=queue.artifact_digest,
+            )
 
     def claim_assurance_work(
         self, run_id: str, *, owner: str, now: float,
@@ -1351,6 +1444,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             if queue is None:
                 raise ValueError("assurance work queue not registered")
             updated, lease = queue.claim(owner, now)
+            self._persist_assurance_queue(key, queue, updated)
             self._milestone_queues[key] = updated
             return lease
 
@@ -1371,6 +1465,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             latest = self._milestone_queues.get(key)
             if latest is None or latest.fingerprint != queue.fingerprint:
                 raise ValueError("concurrent work result: lease must be rechecked")
+            self._persist_assurance_queue(key, queue, updated)
             self._milestone_queues[key] = updated
             self._milestone_boards[key] = updated.board
             return verdict
@@ -1385,6 +1480,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             if queue is None:
                 raise ValueError("assurance work queue not registered")
             recovered = queue.expire(now)
+            self._persist_assurance_queue(key, queue, recovered)
             self._milestone_queues[key] = recovered
             return recovered
 
