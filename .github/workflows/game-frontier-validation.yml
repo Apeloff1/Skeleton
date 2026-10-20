@@ -25,6 +25,7 @@ on:
       - "skeleton/forge/game_frontier_studio*.py"
       - "skeleton/testing/test_game_production_*.py"
       - "skeleton/testing/test_game_frontier_studio_authoring.py"
+      - "skeleton/testing/test_game_frontier_studio_second_fifty.py"
       - ".github/workflows/game-frontier-validation.yml"
   workflow_dispatch:
 
@@ -60,4 +61,5 @@ jobs:
             skeleton/testing/test_game_production_studio_quality.py \
             skeleton/testing/test_game_production_advanced_quality.py \
             skeleton/testing/test_game_production_expanded_quality.py \
-            skeleton/testing/test_game_frontier_studio_authoring.py
+            skeleton/testing/test_game_frontier_studio_authoring.py \
+            skeleton/testing/test_game_frontier_studio_second_fifty.py
