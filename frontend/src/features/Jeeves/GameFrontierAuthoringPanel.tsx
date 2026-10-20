@@ -50,6 +50,26 @@ const GROUPS: { title: string; actions: string[] }[] = [
   { title: 'Procedural terrain', actions: [
     'terrain_noise','terrain_smooth','terrain_terrace','terrain_outline','terrain_erode',
   ] },
+  { title: 'World generators', actions: [
+    'terrain_height_noise', 'terrain_fractal', 'terrain_ridge', 'terrain_islands', 'terrain_crater', 
+    'terrain_meander_river', 'terrain_lake', 'terrain_coastline', 'terrain_talus', 'terrain_dunes', 
+    'terrain_voronoi', 'terrain_contours', 'terrain_floodplain', 'terrain_cave_automata', 
+    'terrain_room_dungeon', 'terrain_depth_maze', 'terrain_road_links', 'terrain_avoidance_path', 
+    'terrain_cliff_band', 'terrain_biome_mosaic'
+  ] },
+  { title: 'World population', actions: [
+    'formation_line', 'formation_arc', 'formation_ring', 'formation_spiral', 'formation_wedge', 
+    'formation_stagger', 'formation_jitter_grid', 'formation_scatter', 'formation_poisson', 
+    'formation_waypoint_path', 'formation_perimeter', 'actors_translate', 'actors_rotate', 
+    'actors_mirror', 'actors_reassign_prefab'
+  ] },
+  { title: 'Narrative director', actions: [
+    'narrative_branch_pair', 'narrative_branch_multi', 'narrative_extend_chain', 
+    'narrative_insert_stage', 'narrative_bypass_stage', 'narrative_relabel_quest', 
+    'narrative_fork_quest', 'narrative_merge_endings', 'event_clone', 'event_batch_retarget', 
+    'event_batch_retrigger', 'event_bind_quest', 'event_actor_dialogue_batch', 
+    'event_actor_audio_batch', 'event_actor_loot_batch'
+  ] },
 ];
 const SAMPLE: Record<string, Record<string, unknown>> = {
   tile_set: { x: 0, y: 0, tile: 1 }, rect_fill: { x: 0, y: 0, width: 3, height: 3, tile: 1 },
@@ -144,6 +164,84 @@ const SAMPLE: Record<string, Record<string, unknown>> = {
   terrain_outline: {"layer":"ground","x":0,"y":0,"width":8,"height":8,"target":1,"replacement":2},
   terrain_erode: {"layer":"ground","x":0,"y":0,"width":8,"height":8,"target":1,"replacement":0},
 };
+
+const NEW_PROCEDURAL = new Set<string>([
+  'terrain_height_noise','terrain_fractal','terrain_ridge','terrain_islands',
+  'terrain_crater','terrain_meander_river','terrain_lake','terrain_coastline',
+  'terrain_talus','terrain_dunes','terrain_voronoi','terrain_contours',
+  'terrain_floodplain','terrain_cave_automata','terrain_room_dungeon',
+  'terrain_depth_maze','terrain_road_links','terrain_avoidance_path',
+  'terrain_cliff_band','terrain_biome_mosaic',
+]);
+const NEW_FORMATIONS = new Set<string>([
+  'formation_line','formation_arc','formation_ring','formation_spiral',
+  'formation_wedge','formation_stagger','formation_jitter_grid',
+  'formation_scatter','formation_poisson','formation_waypoint_path','formation_perimeter',
+]);
+const NEW_NARRATIVE = new Set<string>([
+  'narrative_branch_pair','narrative_branch_multi','narrative_extend_chain',
+  'narrative_insert_stage','narrative_bypass_stage','narrative_relabel_quest',
+  'narrative_fork_quest','narrative_merge_endings',
+]);
+function newActionDefaults(name: string, layer: string): Record<string, unknown> | undefined {
+  if (NEW_PROCEDURAL.has(name)) {
+    const base: Record<string, unknown> = {
+      layer, x: 0, y: 0, width: 12, height: 12,
+      seed: 42, floor: 0, wall: 1, scale: 5, threshold: 0.5,
+    };
+    if (name === 'terrain_road_links') base.nodes = [[1,1],[5,5],[10,8]];
+    if (name === 'terrain_avoidance_path') Object.assign(base, {
+      start_x: 0, start_y: 0, end_x: 11, end_y: 11,
+    });
+    return base;
+  }
+  if (NEW_FORMATIONS.has(name)) {
+    return {
+      prefab_id: 'hero', count: 8, x: 0, y: 0, z: 0,
+      radius: 8, spacing: 2, seed: 42,
+      ...(name === 'formation_waypoint_path' ? {
+        waypoints: [[0,0,0],[10,0,0],[10,10,0]],
+      } : {}),
+      ...(name === 'formation_perimeter' ? { width: 10, height: 8 } : {}),
+    };
+  }
+  if (name === 'actors_translate') return { indices: [0], dx: 2, dy: 0, dz: 0 };
+  if (name === 'actors_rotate') return { indices: [0], angle_deg: 90, pivot_x: 0, pivot_y: 0 };
+  if (name === 'actors_mirror') return { indices: [0], axis: 'x', pivot_x: 0 };
+  if (name === 'actors_reassign_prefab') return { indices: [0], prefab_id: 'hero' };
+  if (NEW_NARRATIVE.has(name)) {
+    const common: Record<string, unknown> = { quest_id: 'first_quest' };
+    if (name === 'narrative_branch_pair' || name === 'narrative_branch_multi')
+      return { ...common, from_stage_id: 'begin', stage_prefix: 'alternative',
+        objectives: ['Find the secret route', 'Travel through the mountains'],
+        ...(name.endsWith('multi') ? { choices: 2 } : {}) };
+    if (name === 'narrative_extend_chain')
+      return { ...common, from_stage_id: 'begin',
+        stage_prefix: 'chapter', objectives: ['Find the relic', 'Return to the city'] };
+    if (name === 'narrative_insert_stage')
+      return { ...common, from_stage_id: 'begin', to_stage_id: 'ending',
+        new_stage_id: 'transition', objective: 'Explore the pass' };
+    if (name === 'narrative_bypass_stage') return { ...common, stage_id: 'middle' };
+    if (name === 'narrative_relabel_quest') return { ...common, new_quest_id: 'journey_revised' };
+    if (name === 'narrative_fork_quest')
+      return { ...common, new_quest_id: 'alternative_journey', title: 'Alternate journey' };
+    return { ...common, epilogue_id: 'epilogue', objective: 'Reunite at the harbor' };
+  }
+  if (name === 'event_clone')
+    return { event_id: 'opening', new_event_id: 'opening_alt', target: 'hero' };
+  if (name === 'event_batch_retarget')
+    return { event_ids: ['opening'], target: 'hero' };
+  if (name === 'event_batch_retrigger')
+    return { event_ids: ['opening'], trigger: 'enter' };
+  if (name === 'event_bind_quest')
+    return { event_id: 'start_journey', quest_id: 'first_quest', target: 'hero' };
+  if (name.startsWith('event_actor_'))
+    return { indices: [0,1], event_prefix: 'actor_event',
+      value: name.endsWith('loot_batch') ? 'healing_potion' :
+        name.endsWith('audio_batch') ? 'village_theme' : 'Welcome, adventurer' };
+  return undefined;
+}
+
 function label(name: string) { return name.replace(/_/g, ' '); }
 const palette = ['#1b4230','#62727f','#406c99','#7d704c','#8b5b83','#777c3e','#5e6274'];
 function Button({ title, press, disabled }: { title: string; press: () => void; disabled?: boolean }) {
@@ -207,8 +305,8 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   })).filter(group => group.actions.length), [doc, search]);
   const choose = (name: string) => {
     setAction(name);
-    const args = { ...(SAMPLE[name] || {}) };
-    if (['tile_set','rect_fill','line_draw','ellipse_fill','flood_fill','replace_tile',
+    const args = { ...(newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
+    if (!NEW_PROCEDURAL.has(name) && ['tile_set','rect_fill','line_draw','ellipse_fill','flood_fill','replace_tile',
       'checker_fill','stamp','region_paste','shift_layer','flip_horizontal','flip_vertical',
       'rotate_90','layer_remove','layer_duplicate','layer_reorder','layer_elevation',
       'palette_add','palette_replace','palette_swap','palette_remove','layer_resize',
