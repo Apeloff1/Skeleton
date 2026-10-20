@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from hashlib import sha256
 
 from .production_quality import QualityGateError, _digest
 from .production_deep_gates import _sha
