@@ -4,8 +4,9 @@ from __future__ import annotations
 from .production_quality import QualityGateError, _digest
 from .production_deep_gates import _sha
 from .production_studio_assurance import ALL_GATES, OWNERS as BASE_OWNERS
-from .production_advanced_assurance import NAMES as ADV_NAMES, NEW_OWNERS
-from .production_expanded_gates import SPECS, NAMES, OWNERS
+from .production_advanced_assurance import NAMES as ADV_NAMES, NEW_OWNERS, CRITICAL_ADVANCED
+from .production_studio_assurance import CRITICAL as EARLY_CRITICAL
+from .production_expanded_gates import SPECS, NAMES, OWNERS, CRITICAL
 
 ORDER = ALL_GATES + ADV_NAMES + NAMES
 
@@ -53,19 +54,38 @@ def verify_84_structure(report):
 
 
 def compare_84(before, after):
+    """Use exact finding identities; equal counts can conceal a regression."""
     verify_84_structure(before)
     verify_84_structure(after)
-    improved, regressed = [], []
+    improved, regressed, unchanged = [], [], []
     for a, b in zip(before["gates"], after["gates"], strict=True):
-        change = {"gate": a["name"], "before": len(a["findings"]),
-                  "after": len(b["findings"])}
-        if change["after"] < change["before"]:
-            improved.append(change)
-        elif change["after"] > change["before"]:
-            regressed.append(change)
-    return {"improved": improved, "regressed": regressed,
-            "strict_pareto_improvement": bool(improved) and not regressed,
-            "production_approved": False}
+        old = {(f["code"], f["subject"]) for f in a["findings"]}
+        new = {(f["code"], f["subject"]) for f in b["findings"]}
+        resolved = sorted(old - new)
+        introduced = sorted(new - old)
+        delta = {
+            "gate": a["name"], "before": len(old), "after": len(new),
+            "resolved": [{"code": code, "subject": subject} for code, subject in resolved],
+            "introduced": [{"code": code, "subject": subject} for code, subject in introduced],
+        }
+        if resolved:
+            improved.append(delta)
+        if introduced:
+            regressed.append(delta)
+        if not resolved and not introduced:
+            unchanged.append(delta)
+    result = {
+        "schema": "game.studio.production_84_objective_delta.v1",
+        "old_source_sha256": before["source_digest"],
+        "new_source_sha256": after["source_digest"],
+        "improved": improved, "regressed": regressed, "unchanged": unchanged,
+        "critical_regression": any(x["gate"] in
+            (EARLY_CRITICAL | CRITICAL_ADVANCED | CRITICAL) for x in regressed),
+        "strict_pareto_improvement": bool(improved) and not regressed,
+        "candidate_passed": after["candidate_passed"],
+        "production_approved": False,
+    }
+    return {**result, "receipt_digest": _digest(result)}
 
 
 def queue_84(report, *, limit=256):
@@ -74,10 +94,16 @@ def queue_84(report, *, limit=256):
     if type(limit) is not int or not 1 <= limit <= 512:
         raise QualityGateError("invalid work limit")
     owners = {**_REVIEW_OWNERS, **BASE_OWNERS, **NEW_OWNERS, **OWNERS}
-    work = [{"gate": x["gate"], "code": x["code"],
-             "subject": x["subject"], "owner": owners[x["gate"]],
-             "mutation_authorized": False}
-            for x in report["findings"]]
+    seen = set()
+    work = []
+    for finding in report["findings"]:
+        key = (finding["gate"], finding["code"], finding["subject"])
+        if key in seen:
+            continue
+        seen.add(key)
+        work.append({"gate": key[0], "code": key[1], "subject": key[2],
+                     "owner": owners[key[0]], "mutation_authorized": False})
+    work.sort(key=lambda x: (x["gate"], x["code"], x["subject"]))
     return {"items": work[:limit], "remaining": max(0, len(work)-limit),
             "source_sha256": report["source_digest"], "auto_repair": False}
 
