@@ -1,4 +1,4 @@
-"""Authenticated client for real Forge Studio tile, actor, quest and game creation."""
+/** Authenticated client for real Forge Studio tile, actor, quest and game creation. */
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders } from '../auth/gameforgeAuth';
 import { chatApiError, ChatClientError } from './chatErrors';
