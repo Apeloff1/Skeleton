@@ -8,8 +8,8 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "backend" / "scripts" / "pr_obsolete_run_from_workflow_run.py"
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-obsolete-run-drain.yml"
-SIGNAL_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-lifecycle-signal.yml"
+WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "pr-obsolete-run-drain.yml"
+SIGNAL_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "pr-lifecycle-signal.yml"
 
 
 def test_workflow_run_adapter_is_directly_executable_from_repo_root() -> None:
