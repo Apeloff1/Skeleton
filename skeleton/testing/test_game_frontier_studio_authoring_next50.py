@@ -182,6 +182,44 @@ class ForgeNewFiftyFunctionalAcceptance(unittest.TestCase):
         self.assertEqual(list(edited.layers[0].data),terrain["tiles"])
         self.assertEqual(record["source_cells"],record["rendered_cells"])
 
+    def test_native_walkable_dungeon_tiles_become_reachable_game_routes(self):
+        from skeleton.forge.game_frontier_studio import author_studio_expedition
+        from skeleton.jeeves.game_frontier_expedition import Traveler, find_route, verify_route
+        from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile
+        authored=execute_authoring(source(),"terrain_depth_maze",
+                                   TERRAIN_DATA["terrain_depth_maze"])
+        world=author_studio_expedition(
+            authored,ArchipelagoProfile(seed=25,islands=4,caverns=0,
+                        include_portals=False,include_underwater=False))
+        tile_nodes=[x for x in world.waypoints if x.waypoint_id.startswith("studio_tile_")]
+        self.assertGreater(len(tile_nodes),2)
+        tile_set={x.waypoint_id for x in tile_nodes}
+        walk_edges=[e for e in world.edges if e.edge_id.startswith("studio_path_")]
+        self.assertGreater(len(walk_edges),1)
+        self.assertTrue(all(e.source in tile_set and e.target in tile_set
+                            and e.mode=="walk" for e in walk_edges))
+        traveler=Traveler(permitted_modes=frozenset(("walk","rope_bridge")),max_stamina=1000)
+        target=tile_nodes[-1].waypoint_id
+        route=find_route(world,traveler,target)
+        self.assertEqual(target,route.destination)
+        proof=verify_route(world,traveler,route)
+        self.assertEqual(target,proof["final_state"]["location"])
+
+    def test_unwalkable_water_tiles_cannot_become_free_paths(self):
+        from skeleton.forge.game_frontier_studio_tile_navigation import add_studio_walkable_paths
+        from skeleton.jeeves.game_frontier_expedition_generation import (
+            author_archipelago,ArchipelagoProfile)
+        authored=source()
+        watery=replace(authored,layers=(MapLayer(
+            "terrain",12,12,("water","lava"),(0,)*144),))
+        generated=author_archipelago(
+            watery.project_id,project_digest(watery),
+            ArchipelagoProfile(seed=31,islands=3,caverns=0,
+                               include_portals=False,include_underwater=False))
+        updated=add_studio_walkable_paths(watery,generated)
+        self.assertEqual(len(generated.waypoints),len(updated.waypoints))
+        self.assertEqual(len(generated.edges),len(updated.edges))
+
     def test_godot_terrain_lod_respects_resource_budget(self):
         from skeleton.forge.game_frontier_studio_terrain_runtime import add_studio_native_terrain
         from skeleton.jeeves.game_frontier_expedition_godot import (
