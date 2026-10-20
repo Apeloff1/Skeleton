@@ -60,6 +60,10 @@ def test_m3_compass_and_sextant_are_source_geometry_not_device_gps(game):
     forged["edge_ids"].append("forged_jump")
     with pytest.raises(ExpeditionError):
         virtual_instruments(world, forged)
+    forged = deepcopy(chosen)
+    forged["waypoints"][1] = world.arrival
+    with pytest.raises(ExpeditionError):
+        virtual_instruments(world, forged)
 
 
 def test_m4_exploration_replays_authoritative_game_journal(game):
@@ -84,6 +88,10 @@ def test_m5_weather_itinerary_accounts_for_exact_executed_stamina(game):
     assert not report["physical_forecast_or_native_safety_qualification"]
     for row in report["legs"]:
         assert row["stamina_before"] >= row["stamina_after"]
+    wrong_path = deepcopy(chosen)
+    wrong_path["waypoints"][0] = "not_a_real_start"
+    with pytest.raises(ExpeditionError):
+        environmental_itinerary(world, player, wrong_path)
 
 
 def test_m6_game_director_cannot_forge_quest_flags_or_moves(game):
@@ -96,6 +104,15 @@ def test_m6_game_director_cannot_forge_quest_flags_or_moves(game):
     assert all(not c["grants_inventory_or_quest_state"] for c in report["cues"])
     changed = deepcopy(projection)
     changed["steps"][0]["position"] = "fake_place"
+    with pytest.raises(ExpeditionError):
+        contextual_director(world, changed)
+    changed = deepcopy(projection)
+    changed["steps"][0]["revealed"] = []
+    changed["receipt_digest"] = changed["receipt_digest"]
+    with pytest.raises(ExpeditionError):
+        contextual_director(world, changed)
+    changed = deepcopy(projection)
+    changed["steps"][0]["previous"] = "f"*64
     with pytest.raises(ExpeditionError):
         contextual_director(world, changed)
 

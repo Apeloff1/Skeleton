@@ -150,14 +150,17 @@ def virtual_instruments(world: ExpeditionWorld, route: Mapping) -> dict:
     """M3: compass/sextant/altimeter driven by authored geometry, not device GPS."""
     if not isinstance(world, ExpeditionWorld) or not isinstance(route, Mapping):
         raise ExpeditionError("typed virtual-world survey source required")
-    edges = route.get("edge_ids")
-    if type(edges) is not list or len(edges) > 4096:
-        raise ExpeditionError("virtual survey requires finite canonical route")
+    edges, path = route.get("edge_ids"), route.get("waypoints")
+    if (type(edges) is not list or type(path) is not list
+            or len(edges) > 4096 or len(path) != len(edges) + 1
+            or path[0] != world.arrival):
+        raise ExpeditionError("virtual survey requires complete canonical route")
     position = world.arrival
     readings = []
-    for edge_id in edges:
+    for index, edge_id in enumerate(edges, start=1):
         edge = world.by_edge.get(edge_id)
-        if edge is None or edge.source != position:
+        if (edge is None or edge.source != position
+                or edge.target != path[index]):
             raise ExpeditionError("survey route has unconnected or fictional edge")
         start, end = world.by_id[position], world.by_id[edge.target]
         dx, dy = end.x_m - start.x_m, end.y_m - start.y_m
@@ -176,7 +179,7 @@ def virtual_instruments(world: ExpeditionWorld, route: Mapping) -> dict:
             "fix_type": "authored_world_exact_position_not_measured_gnss",
         })
         position = edge.target
-    if position != route.get("waypoints", [None])[-1]:
+    if position != path[-1]:
         raise ExpeditionError("virtual instrumentation diverges from authored path")
     return _seal({
         "schema": "skeleton.game.virtual_instrument_trace.v1",
@@ -230,13 +233,17 @@ def exploration_journal(world: ExpeditionWorld, traveler: Traveler,
 def environmental_itinerary(world: ExpeditionWorld, traveler: Traveler,
                             route: Mapping) -> dict:
     """M5: actual weather/weight/stamina safety margins per playable edge."""
-    if not isinstance(route, Mapping) or type(route.get("edge_ids")) is not list:
-        raise ExpeditionError("hazard planning needs executed route")
+    if (not isinstance(route, Mapping) or type(route.get("edge_ids")) is not list
+            or type(route.get("waypoints")) is not list
+            or len(route["waypoints"]) != len(route["edge_ids"]) + 1
+            or route["waypoints"][0] != world.arrival):
+        raise ExpeditionError("hazard planning needs complete executed route")
     episode = ExpeditionEpisode(world, traveler)
     legs = []
-    for edge_id in route["edge_ids"]:
+    for index, edge_id in enumerate(route["edge_ids"], start=1):
         edge = world.by_edge.get(edge_id)
-        if edge is None or edge.source != episode.position:
+        if (edge is None or edge.source != episode.position
+                or edge.target != route["waypoints"][index]):
             raise ExpeditionError("hazard itinerary has non-authoritative edge")
         before = episode.stamina
         assessment = assess_travel(
@@ -274,17 +281,42 @@ def contextual_director(world: ExpeditionWorld, exploration: Mapping) -> dict:
     if not isinstance(world, ExpeditionWorld) or not isinstance(exploration, Mapping):
         raise ExpeditionError("director requires world and witnessed exploration")
     visits = exploration.get("steps")
-    if not isinstance(visits, list):
-        raise ExpeditionError("director cannot invent exploration observations")
+    if (exploration.get("world") != world.digest or not isinstance(visits, list)
+            or len(visits) > 4096
+            or exploration.get("receipt_digest") != _digest({
+                k: v for k, v in exploration.items() if k != "receipt_digest"
+            })):
+        raise ExpeditionError("director cannot invent or mutate exploration evidence")
+    # This function has no gameplay write permissions. Every visible position,
+    # transition, discovery and journal link must match the canonical map.
     seen = {world.arrival}
+    position = world.arrival
+    previous = _digest({"genesis": world.digest, "type": "game_exploration"})
     cues = []
-    for row in visits:
+    for index, row in enumerate(visits, start=1):
+        if not isinstance(row, Mapping):
+            raise ExpeditionError("director requires typed witnessed steps")
+        edge = world.by_edge.get(row.get("edge"))
         waypoint = row.get("position")
-        if waypoint not in world.by_id:
-            raise ExpeditionError("director is not allowed to invent game locations")
-        if waypoint in seen:
-            continue
+        if (edge is None or edge.source != position or edge.target != waypoint
+                or row.get("step") != index or row.get("previous") != previous):
+            raise ExpeditionError("director cannot invent an untraversed connection")
         seen.add(waypoint)
+        revealed = seen | {
+            e.target for e in world.by_edge.values() if e.source in seen
+        }
+        if (row.get("visited") != sorted(seen)
+                or row.get("revealed") != sorted(revealed)
+                or row.get("undiscovered") != sorted(set(world.by_id) - revealed)
+                or row.get("receipt_digest") != _digest({
+                    k: v for k, v in row.items() if k != "receipt_digest"
+                })):
+            raise ExpeditionError("director exploration receipt or visibility is forged")
+        previous = row["receipt_digest"]
+        position = waypoint
+        # Include only first-discovery cues, never repeated scripted rewards.
+        if waypoint in {v["at"] for v in cues}:
+            continue
         node = world.by_id[waypoint]
         prompt = {
             "sky_island": "Observe cloud shear before the next crossing",
@@ -302,6 +334,9 @@ def contextual_director(world: ExpeditionWorld, exploration: Mapping) -> dict:
             "recovery_point": node.safe_rest,
             "grants_inventory_or_quest_state": False,
         })
+    if (exploration.get("receipt_head") != previous
+            or exploration.get("visited") != sorted(seen)):
+        raise ExpeditionError("director exploration journal truncated or reordered")
     return _seal({
         "schema": "skeleton.game.authored_contextual_director.v1",
         "world": world.digest, "source_exploration_receipt":
