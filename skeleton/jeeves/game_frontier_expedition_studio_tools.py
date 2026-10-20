@@ -68,7 +68,7 @@ def expedition_studio_handlers(
         if run is not None:
             if type(run) is not str or not _RUN_ID.fullmatch(run):
                 raise ExpeditionError("invalid durable game session identity")
-            checkpoint=save_store.load(run,world,traveler)
+            checkpoint=save_store.load(run_key(command),world,traveler)
             if checkpoint is not None:
                 progress={
                     "generation":checkpoint.generation,
