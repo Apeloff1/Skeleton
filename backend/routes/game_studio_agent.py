@@ -24,6 +24,7 @@ class StudioQualityGate(Request):
     max_warning_findings: int = Field(default=128, ge=0, le=128, strict=True)
     require_no_regression: bool = Field(default=True, strict=True)
     restore_on_regression: bool = Field(default=True, strict=True)
+    adaptive_ranking: bool = Field(default=False, strict=True)
 
 
 class GoalCreate(WriteRequest):

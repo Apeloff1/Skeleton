@@ -406,9 +406,10 @@
         "ResumeToken",
         "ChildExecutionRequest",
         "child join policy",
-        "interactive steering command"
+        "interactive steering command",
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS"
       ],
-      "target_failure_contract": "checkpoint and stop safely",
+      "target_failure_contract": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden",
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",

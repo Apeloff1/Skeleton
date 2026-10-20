@@ -1,15 +1,15 @@
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
-import type { StudioQualityPolicy, StudioQualityProgress, StudioQualityMeasuredProgress } from '../../product/gameStudioAgentClient';
+import type { StudioQualityPolicy, StudioQualityProgress, StudioQualityMeasuredProgress, StudioNumericAdaptation } from '../../product/gameStudioAgentClient';
 import s, { gameLearningColors as C } from './GameLearningWorkspace.styles';
 import v from './GameConsoleStudio.styles';
 
 export type StudioQualityDraft = {
   rounds: string; frames: string; steps: string; errors: string; warnings: string; baseline: string;
-  restore: boolean;
+  restore: boolean; adaptiveRanking: boolean;
 };
 export const DEFAULT_QUALITY_DRAFT: StudioQualityDraft = {
-  rounds: '2', frames: '2', steps: '64', errors: '0', warnings: '128', baseline: '', restore: true,
+  rounds: '2', frames: '2', steps: '64', errors: '0', warnings: '128', baseline: '', restore: true, adaptiveRanking: false,
 };
 
 export function studioQualityPolicy(draft: StudioQualityDraft): StudioQualityPolicy {
@@ -26,6 +26,7 @@ export function studioQualityPolicy(draft: StudioQualityDraft): StudioQualityPol
     max_error_findings: number(draft.errors, 0, 128, 'Maximum error findings'),
     max_warning_findings: number(draft.warnings, 0, 128, 'Maximum warning findings'),
     require_no_regression: true, restore_on_regression: draft.restore,
+    adaptive_ranking: draft.adaptiveRanking,
   };
 }
 
@@ -60,6 +61,11 @@ export function StudioQualityForm({ enabled, available, changeEnabled, draft, ch
         <Text style={s.checkboxText}>{draft.restore ? '☑' : '☐'} Restore the pinned source if a candidate is rejected</Text>
       </TouchableOpacity>
       <Text style={s.dim}>Restoration uses this run’s edit grant. Refinement, simulation, review and packaging consume the visible action, model and background-job budgets above.</Text>
+      <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: draft.adaptiveRanking, disabled }} disabled={disabled}
+        onPress={() => changeDraft({ ...draft, adaptiveRanking: !draft.adaptiveRanking })} style={s.checkbox}>
+        <Text style={s.checkboxText}>{draft.adaptiveRanking ? '☑' : '☐'} Learn numeric control suggestions during this goal</Text>
+      </TouchableOpacity>
+      <Text style={s.dim}>Allow local learning from this goal’s matched original-game reviews. Jeeves uses the results to suggest mechanics edits; each edit still needs the recorded simulation and review checks.</Text>
     </>}
   </View>;
 }
@@ -74,7 +80,7 @@ const FAILURE_LABELS: Record<string, string> = {
   unmatched_review_protocol: 'The review workload does not match the baseline', measured_regression: 'A measured baseline regression was observed',
 };
 
-export function StudioQualityObservation({ value }: { value: StudioQualityProgress }) {
+export function StudioQualityObservation({ value, learning }: { value: StudioQualityProgress; learning?: StudioNumericAdaptation }) {
   if (value.status === 'unavailable') return <View style={s.source}>
     <Text accessibilityRole="header" style={s.projectName}>Measured acceptance unavailable</Text>
     <Text accessibilityRole="alert" style={s.notice}>{value.error.message}</Text>
@@ -102,6 +108,11 @@ export function StudioQualityObservation({ value }: { value: StudioQualityProgre
     {!!value.regressions.length && <Text style={s.notice}>Regressed measurements: {value.regressions.map(metric => metric.replaceAll('_', ' ')).join(', ')}</Text>}
     <Text style={s.muted}>{value.refinement_rounds} refinement rounds used · {value.remaining_refinement_rounds} remaining</Text>
     {value.incumbent_source_restored && <Text style={s.success}>The exact pinned source has been restored.</Text>}
+    {learning && <View style={s.source}>
+      <Text style={s.label}>Learning numeric control suggestions</Text>
+      <Text accessibilityLiveRegion="polite" style={s.muted}>{learning.observations_seen ?? 0} matched observations · {learning.training_steps ?? 0} local learning steps · {learning.advice.length} current proposals</Text>
+      {learning.status === 'source_shape_changed' && <Text style={s.dim}>The world changed beyond the numeric controls in this reference. Its measurements stay separate.</Text>}
+    </View>}
     <Text style={s.dim}>Acceptance is limited to these recorded simulation, review and regression checks. It does not certify overall game quality or an unobserved desktop play session.</Text>
     <Text selectable style={s.dim}>Observation {value.receipt_digest.slice(0, 16)}…</Text>
   </View>;

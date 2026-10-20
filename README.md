@@ -174,11 +174,24 @@ deadline and resource allowance. Live progress and final details show actual
 provider receipts and model identities. Configure roles and recovery using the
 [cooperative AI guide](docs/ai/COOPERATIVE_AI_EXECUTION.md).
 
+Expand the AI conversation status bar to open **Runtime optimization**. It shows
+observed local pressure, admission capacity, numeric outcome learning and idle
+maintenance. Administrators can change versioned policies and trim/clear derived
+caches or drain/resume admission. Serving and maintenance controls affect the host;
+learning is tenant scoped. See the [runtime operator setup](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md#adaptive-runtime-and-maintenance)
+for defaults, persistence and conflict recovery. These controls do not implicitly
+offload to external providers or train/promote transformer weights.
+The separate **Replay adaptation** switch starts off and permits bounded idle
+updates to the operational predictor from recorded numeric outcomes.
+
 Studio goals can opt into [measured quality refinement](docs/ai/STUDIO_MEASURED_QUALITY.md):
 pin a baseline review, edit the original source, compare a candidate under the
 same simulation protocol, and restore the baseline source when a candidate
 regresses. Lessons retain their source and review references for compatible
 future work. Continuation uses the existing finite grant.
+The optional **Learn numeric control suggestions during this goal** setting adds
+a bounded predictor for compatible numeric edits from matched review outcomes.
+Its suggestions remain subject to the same source, review and restoration gates.
 
 See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
 and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).
@@ -230,6 +243,9 @@ service readiness and recovery boundaries.
 - Docker service health, AI availability, native target readiness and production
   acceptance are separate states. This repository does not certify every console,
   arbitrary-ROM semantic understanding, or superiority over commercial games.
+- Adaptive serving, operational MLP learning and maintenance are a construction
+  draft, not enterprise certification. No automated tests were run for this build,
+  as requested; implementation and compilation do not establish production quality.
 
 Exact historical observations are in the
 [creation qualification](docs/ai/STUDIO_CREATION_QUALIFICATION_2026-10-15.md).

@@ -15,6 +15,7 @@ export type StudioQualityPolicy = {
   max_warning_findings: number;
   require_no_regression: boolean;
   restore_on_regression: boolean;
+  adaptive_ranking?: boolean;
 };
 export type StudioQualityMeasuredProgress = {
   schema_version: 'skeleton.game.studio_quality_progress.v1';
@@ -44,7 +45,15 @@ export type StudioGoal = {
   completion_mode?: StudioCompletionMode; completion_requirements?: string[]; completion?: { verified: boolean; missing?: string[]; checks?: Record<string, { verified: boolean; [key: string]: unknown }>; scope?: string; receipt_digest?: string };
   workflow?: { remaining_actions: number; active: boolean };
   quality_gate?: StudioQualityPolicy; quality?: StudioQualityProgress;
+  adaptive_learning?: StudioNumericAdaptation;
   [key: string]: unknown;
+};
+export type StudioNumericAdaptation = {
+  schema_version: 'skeleton.game.studio_numeric_adaptation.v1'; status: string;
+  context_digest?: string | null; checkpoint_digest?: string | null;
+  observations_seen?: number; training_steps?: number; rejected_updates?: number;
+  replay_size?: number; advice: { expected_spec_digest: string; edits: { op: 'set_field'; path: string[]; value: number }[] }[];
+  production_authority: false; scope: string;
 };
 export type StudioGoalRetryTarget = 'planner' | 'action' | 'job' | 'play' | 'reconcile';
 export type StudioGoalConfig = { goal: string; maxSteps: number; executionMode: 'plan' | 'run'; allowEdits: boolean; authorizationSeconds: number; maxModelCalls: number; maxJobs: number; max_output_tokens?: number; completionMode?: StudioCompletionMode; completionRequirements?: StudioCompletionRequirement[]; qualityGate?: StudioQualityPolicy };
@@ -62,11 +71,13 @@ function qualityPolicy(value: StudioQualityPolicy): StudioQualityPolicy {
     || !boundedInteger(value.min_executed_steps, 1, 512) || !boundedInteger(value.max_error_findings, 0, 128)
     || !boundedInteger(value.max_warning_findings, 0, 128) || typeof value.require_no_regression !== 'boolean'
     || typeof value.restore_on_regression !== 'boolean'
+    || value.adaptive_ranking !== undefined && typeof value.adaptive_ranking !== 'boolean'
     || value.baseline_review_job_id != null && (typeof value.baseline_review_job_id !== 'string' || !value.baseline_review_job_id || value.baseline_review_job_id.length > 128)) invalid('The measured quality policy is invalid.');
   return { schema_version: value.schema_version, ...(value.baseline_review_job_id ? { baseline_review_job_id: value.baseline_review_job_id } : {}),
     max_refinement_rounds: value.max_refinement_rounds, min_available_frames: value.min_available_frames,
     min_executed_steps: value.min_executed_steps, max_error_findings: value.max_error_findings,
-    max_warning_findings: value.max_warning_findings, require_no_regression: value.require_no_regression, restore_on_regression: value.restore_on_regression };
+    max_warning_findings: value.max_warning_findings, require_no_regression: value.require_no_regression, restore_on_regression: value.restore_on_regression,
+    adaptive_ranking: value.adaptive_ranking ?? false };
 }
 function qualityProgress(value: StudioQualityProgress, projectId: string): void {
   if (value?.status === 'unavailable') {
@@ -103,6 +114,13 @@ function goal(value: StudioGoal, projectId?: string) {
   if (value?.completion_mode !== undefined && !['native', 'original'].includes(value.completion_mode)) invalid('The saved goal workflow mode is invalid.');
   if (value?.quality_gate) qualityPolicy(value.quality_gate);
   if (value?.quality) qualityProgress(value.quality, value.project_id);
+  const adaptation = value?.adaptive_learning;
+  if (adaptation && (adaptation.schema_version !== 'skeleton.game.studio_numeric_adaptation.v1'
+    || adaptation.production_authority !== false || typeof adaptation.status !== 'string' || adaptation.status.length > 128
+    || !Array.isArray(adaptation.advice) || adaptation.advice.length > 3
+    || ['observations_seen', 'training_steps', 'rejected_updates', 'replay_size'].some(key => adaptation[key as keyof StudioNumericAdaptation] !== undefined && !boundedInteger(adaptation[key as keyof StudioNumericAdaptation], 0, 1000000))
+    || adaptation.advice.some(proposal => !digest(proposal.expected_spec_digest) || !Array.isArray(proposal.edits) || proposal.edits.length > 64
+      || proposal.edits.some(edit => edit.op !== 'set_field' || !Array.isArray(edit.path) || edit.path.length !== 3 || edit.path.some(part => typeof part !== 'string' || part.length > 128) || !Number.isFinite(edit.value))))) invalid('The numeric learning projection is invalid.');
   const recovery = value?.recovery;
   if (recovery && ([recovery.can_retry, recovery.can_resume, recovery.can_renew].some(flag => typeof flag !== 'boolean') || recovery.target !== null && !['planner', 'action', 'job', 'play', 'reconcile'].includes(recovery.target) || recovery.can_new_planner_attempt !== undefined && typeof recovery.can_new_planner_attempt !== 'boolean')) invalid('The goal recovery capabilities are invalid.');
   if (recovery && (recovery.automatic_continuation_available !== undefined && typeof recovery.automatic_continuation_available !== 'boolean' || recovery.next_action !== undefined && !['wait', 'retry', 'advance', 'inspect_dependency', 'resume', 'authorize', 'inspect'].includes(recovery.next_action))) invalid('The saved continuation hint is invalid.');

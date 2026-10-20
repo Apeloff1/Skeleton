@@ -173,6 +173,62 @@ Erasing a selected capture also blocks a later turn that would reuse its text
 through the same conversation history. Start a new conversation with current
 permitted context when a source has been withdrawn.
 
+## Adaptive runtime and maintenance
+
+In Jeeves chat, expand the AI conversation status bar to open **Runtime
+optimization**. The panel reports current capacity, queue pressure, derived cache,
+tenant learning partitions and maintenance tasks. It refreshes while visible and
+in the foreground. Account changes clear its observation. Unknown or stale state
+does not establish readiness; refresh after restoring the engine connection.
+
+Adaptive local serving is enabled by default. It responds to observed latency,
+queueing, failures and resource pressure within the configured static operator
+capacity. Its concurrency ceiling cannot increase that capacity. Disabling
+adaptive serving disables feedback adjustment; inference remains available under
+the configured admission policy.
+
+Tenant outcome learning is also enabled by default. A bounded online MLP learns
+from numeric completion, latency and resource outcomes in the existing execution
+ledger. Prompts and generated responses are not training data for this learner.
+Cold-start and quarantined partitions remain visible. Its predictions guide
+operational decisions; correctness, creative quality and ratchet promotion still
+require their existing independent evidence. These controls do not train or
+promote GGUF/transformer weights, select an unrequested model or implicitly
+offload work to an external provider.
+
+Authenticated viewers can inspect state. Only administrators can change policy.
+**Serving and maintenance changes affect the entire host; learning changes affect
+the current tenant.** Idle maintenance is disabled by default. Enabling it admits
+bounded local housekeeping that yields to foreground work. It requires a durable
+execution database and is unavailable with an in-memory execution store. Compose
+already binds the engine execution database at `/app/data/engine_execution.sqlite`
+inside its existing data volume. Preserve that volume to retain versioned policy,
+numeric outcomes, learner state and maintenance receipts across restarts.
+
+**Replay adaptation** is a separate default-off maintenance switch. With idle
+self-maintenance enabled, it permits bounded extra local predictor updates from
+recorded numeric outcomes. It performs no provider work or transformer-weight
+training and does not establish game quality.
+
+Measured studio goals have a separate **Learn numeric control suggestions during
+this goal** opt-in. It journals bounded numeric edit observations and predictor
+state in the existing scoped goal record, then supplies compatible suggestions
+to the planner. Changed source structures and mismatched review protocols do
+not become training evidence. Existing review, rollback and export gates remain
+authoritative.
+
+**Trim cache** removes eligible derived cache entries; **Clear cache** discards the
+derived cache. **Drain new work** stops new admission; **Resume admission** opens
+it again. Running work retains its execution ownership and original budgets.
+Every command carries the observed policy version. A conflict reloads current
+state and requires you to review and reapply the change; commands are never
+silently replayed. If a request is unconfirmed, inspect refreshed state before
+trying again.
+
+This runtime implementation is a construction draft, not enterprise certification.
+No automated tests were authored or run for this build, following the user's
+instruction; compilation alone does not establish production quality.
+
 ## Capture sources with Dragons
 
 Open `/crawler` and sign in with an account allowed to create captures. The

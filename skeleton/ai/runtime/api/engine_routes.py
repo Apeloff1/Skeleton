@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from skeleton.api.engine_authority import EngineAuthorityError
 from skeleton.api.engine_service import (
@@ -42,6 +42,54 @@ class EngineCancelBody(BaseModel):
     actor_id: str = Field(min_length=1, max_length=512)
     tenant_id: str = Field(min_length=1, max_length=512)
     reason: str = Field(min_length=1, max_length=2048)
+
+
+class EngineRuntimeServingPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool | None = None
+    max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+
+
+class EngineRuntimeEnabledPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool
+
+
+class EngineRuntimeMaintenancePatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool | None = None
+    augmentation_enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self):
+        if not self.model_fields_set or any(
+            getattr(self, field) is None for field in self.model_fields_set
+        ):
+            raise ValueError("maintenance policy requires non-null fields")
+        return self
+
+
+class EngineRuntimeControlPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    expected_version: int = Field(ge=1, le=2**63 - 1)
+    serving: EngineRuntimeServingPatch | None = None
+    learning: EngineRuntimeEnabledPatch | None = None
+    maintenance: EngineRuntimeMaintenancePatch | None = None
+    action: str | None = Field(default=None, pattern="^(trim_cache|clear_cache|drain|resume)$")
+
+    @model_validator(mode="after")
+    def validate_patch(self):
+        fields = self.model_fields_set - {"actor_id", "tenant_id", "expected_version"}
+        if not fields or any(getattr(self, field) is None for field in fields):
+            raise ValueError("runtime control requires a non-null patch")
+        if self.serving is not None:
+            if not self.serving.model_fields_set or any(
+                getattr(self.serving, field) is None for field in self.serving.model_fields_set
+            ):
+                raise ValueError("serving policy requires non-null fields")
+        return self
 
 
 class EngineImageGenerateBody(BaseModel):
@@ -306,6 +354,65 @@ def _media_adapter(coordinator):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="engine media provider unavailable",
         ) from exc
+
+
+def _authorize_runtime_control(
+    request: Request, service: EngineExecutionService, service_token: str,
+    *, tenant_id: str, write: bool = False,
+) -> None:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        grant = service.authorities.grant_for(principal)
+    except EngineAuthorityError as exc:
+        raise HTTPException(status_code=403, detail="engine runtime authority denied") from exc
+    scope = "engine:runtime-control" if write else "engine:read"
+    if scope not in grant.scopes or not grant.allows_tenant(tenant_id):
+        raise HTTPException(status_code=403, detail="engine runtime authority denied")
+    if write and not grant.allows_capability("assistant.runtime.control"):
+        raise HTTPException(status_code=403, detail="engine runtime capability denied")
+
+
+@router.get("/runtime-control")
+def runtime_control_snapshot(
+    request: Request,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+    actor_id: Annotated[str, Query(min_length=1, max_length=512)],
+    tenant_id: Annotated[str, Query(min_length=1, max_length=512)],
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=tenant_id)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.snapshot(actor_id=actor_id, tenant_id=tenant_id)
+    except (ExecutionRepositoryError, ValueError, TypeError) as exc:
+        _raise_engine_error(exc)
+
+
+@router.patch("/runtime-control")
+def configure_runtime_control(
+    request: Request,
+    body: EngineRuntimeControlPatch,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    # The application checks the authenticated operator's administrator role;
+    # the engine separately grants this sealed application service write scope.
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.configure(
+            actor_id=body.actor_id, tenant_id=body.tenant_id, expected_version=body.expected_version,
+            serving=None if body.serving is None else body.serving.model_dump(exclude_unset=True),
+            learning=None if body.learning is None else body.learning.model_dump(),
+            maintenance=None if body.maintenance is None else body.maintenance.model_dump(exclude_unset=True),
+            action=body.action,
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError) as exc:
+        _raise_engine_error(exc)
 
 
 def _decode_media(raw: str, field: str, *, maximum: int = 20 * 1024 * 1024) -> bytes:

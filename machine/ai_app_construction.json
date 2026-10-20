@@ -5295,6 +5295,49 @@
       "owner": "skeleton/provider_runtime.py",
       "legacy_alias": "skeleton/ai/runtime/provider_runtime.py",
       "policy": "Non-owning re-export of canonical public classes/functions with attribute lookup delegation for existing private imports. No copied SDK, credentials, registry state, network implementation or alternate provider class identity. Existing skeleton/ai/providers/runtime.py facade remains non-owning."
+    },
+    "adaptive_runtime_optimization": {
+      "authority": "existing engine coordinator, provider registry and execution repository; no new service/provider/store",
+      "owners": {
+        "control": "skeleton/intelligence/runtime_control.py",
+        "inference": "skeleton/ai/runtime/inference/adaptive_serving.py",
+        "learning": "skeleton/intelligence/runtime_learning.py",
+        "maintenance": "skeleton/jeeves/ai/studio_maintenance.py",
+        "ratchet": "skeleton/learning/mirror_room"
+      },
+      "interfaces": {
+        "engine": "GET/PATCH /api/v1/engine/runtime-control",
+        "application": "GET/PATCH /api/ai/runtime-control",
+        "schema_version": "skeleton.ai.runtime_control.v1",
+        "identity": "authenticated actor_id and tenant_id echoed; GET scoped learning; PATCH application administrator plus trusted engine service principal",
+        "policy": "global host-serving and maintenance controls, tenant-scoped learning; expected_version CAS"
+      },
+      "invariants": [
+        "adaptive effective capacity never exceeds configured operator capacity and is excluded from activation identity",
+        "explicit model selections, original budgets, privacy, verification and ratchet floors remain authoritative",
+        "no implicit remote offload, provider fallback, network work, model-weight promotion or self-certification",
+        "same-database terminal outcome ledger is idempotent and numeric-only; bounded MLP/Adam/replay records source/model provenance and quarantines invalid state",
+        "maintenance is owned by existing engine coordinator lifespan and existing idle effect ledger; fresh telemetry, bounded cooperative work, foreground preemption",
+        "ratchet predictor only selects TRAIN candidates; independent measured campaign and promotion receipts retain authority",
+        "operator UI uses authenticated API and admin-only versioned writes; observatory remains read-only",
+        "additional idle predictor replay requires explicit maintenance.augmentation_enabled; it never fine-tunes transformer weights or calls a provider",
+        "operator policy mutations append a bounded-content immutable versioned control receipt in the same execution database transaction; tenant-scoped projections never expose another tenant actor metadata"
+      ],
+      "studio_quality_adaptation": {
+        "owner": "skeleton/learning/mirror_room/adaptation.py",
+        "application_ingress": [
+          "backend/core/game_studio_agent.py",
+          "backend/routes/game_studio_agent.py"
+        ],
+        "policy": "explicit opt-in quality_gate.adaptive_ranking within existing scoped studio goal authorization",
+        "state": "bounded numeric outcome ranker/checkpoint in existing goal row through existing CAS/storage admission; no new store",
+        "observations": "matched real baseline/current source reviews with exact project/baseline/protocol/reviewer provenance; operational observations, never synthetic TRAIN/validation receipts or creative quality certification",
+        "authority": "bounded edit advice only; existing source-current review, restoration, consent, export and independent promotion gates remain unchanged",
+        "operator_surface": [
+          "frontend/src/features/Jeeves/StudioGoalQualityPanel.tsx",
+          "frontend/src/product/gameStudioAgentClient.ts"
+        ]
+      }
     }
   },
   "conversation_runtime_contract": {

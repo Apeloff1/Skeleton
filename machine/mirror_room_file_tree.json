@@ -27,7 +27,7 @@
         "role": "learning-domain admission classification"
       },
       {
-        "path": "frontend/features/MirrorRoom",
+        "path": "frontend/src/features/MirrorRoom",
         "role": "typed visual quality observatory"
       },
       {
@@ -35,7 +35,7 @@
         "role": "Expo route"
       },
       {
-        "path": "frontend/utils/routeRegistry.ts",
+        "path": "frontend/src/utils/routeRegistry.ts",
         "role": "frontend route discovery"
       },
       {
@@ -64,5 +64,15 @@
     "delivery remains locked until the 100-attempt campaign gates pass",
     "Mirror Room API is explicitly classified in the learning route-policy domain",
     "frontend discovery surfaces point to the governed observatory route"
-  ]
+  ],
+  "train_adaptation": {
+    "owner": "skeleton/learning/mirror_room/adaptation.py",
+    "integration": [
+      "memory.py",
+      "engine.py",
+      "adversarial.py"
+    ],
+    "state": "bounded TRAIN-only observation archive and versioned deterministic neural optimizer checkpoints in existing memory authority",
+    "authority": "candidate ranking and operational guidance only; no quality floor relaxation or promotion bypass"
+  }
 }

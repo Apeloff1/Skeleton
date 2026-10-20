@@ -18,8 +18,10 @@ import asyncio
 import hashlib
 import json
 import math
+import os
 import random
 import re
+import secrets
 import threading
 import time
 from collections import Counter, OrderedDict
@@ -43,8 +45,12 @@ from skeleton.provider_runtime import (
 from skeleton.providers.contract import FinishReason, ProviderToolCall, ProviderUsage
 from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 
+from .adaptive_serving import AdaptiveServingController, ServingResources
+
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
+_RESOURCE_SAMPLE_LOCK = threading.Lock()
+_RESOURCE_CPU_SAMPLE: tuple[float, int, float | None] | None = None
 
 
 class LocalInferenceCancelled(RuntimeError):
@@ -647,6 +653,104 @@ class CallableLocalModel:
         return result
 
 
+@dataclass(slots=True)
+class _ServingTicket:
+    sequence: int
+    work_class: str
+    scope_id: str
+    preemption_scope_id: str
+    enqueued_at: float
+    deadline: float
+    cancel: threading.Event
+    retired: str | None = None
+    started_at: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _CachedInference:
+    result: LocalInferenceResult
+    created_at: float
+    expires_at: float
+    size_bytes: int
+
+
+def sample_serving_resources() -> ServingResources:
+    """Best-effort bounded local samples; missing host signals stay unknown."""
+    global _RESOURCE_CPU_SAMPLE  # disposable process-local measurement only
+    memory_used = None
+    available = None
+    rss = None
+    cpu = None
+    sources: list[str] = []
+
+    def read(path: str) -> str:
+        with open(path, encoding="ascii") as handle:
+            return handle.read(16_384).strip()
+
+    host_cpus = float(os.cpu_count() or 1)
+    cpus = host_cpus
+    try:
+        quota, period = read("/sys/fs/cgroup/cpu.max").split()
+        if quota != "max" and float(period) > 0:
+            cpus = min(cpus, max(0.01, float(quota) / float(period)))
+    except (OSError, ValueError):
+        pass
+    try:
+        cpu = max(0.0, os.getloadavg()[0] / host_cpus)
+        sources.append("host_load")
+    except (AttributeError, OSError, ValueError):
+        pass
+    try:
+        usage = next(
+            int(line.split()[1]) for line in read("/sys/fs/cgroup/cpu.stat").splitlines()
+            if line.startswith("usage_usec ")
+        )
+        now = time.monotonic()
+        with _RESOURCE_SAMPLE_LOCK:
+            previous = _RESOURCE_CPU_SAMPLE
+            if previous is not None and now - previous[0] >= 0.25:
+                elapsed = now - previous[0]
+                cpu = max(0.0, (usage - previous[1]) / 1_000_000.0 / elapsed / cpus)
+                _RESOURCE_CPU_SAMPLE = (now, usage, cpu)
+            elif previous is None:
+                _RESOURCE_CPU_SAMPLE = (now, usage, cpu)
+            else:
+                cpu = previous[2]
+        sources.append("cgroup_cpu")
+    except (OSError, ValueError, IndexError, StopIteration):
+        pass
+    try:
+        values = {}
+        for line in read("/proc/meminfo").splitlines():
+            name, _, value = line.partition(":")
+            if name in {"MemTotal", "MemAvailable"}:
+                values[name] = int(value.strip().split()[0]) * 1024
+        total = values.get("MemTotal", 0)
+        if total > 0 and "MemAvailable" in values:
+            available = max(0, values["MemAvailable"])
+            memory_used = min(1.0, max(0.0, 1.0 - available / total))
+            sources.append("host_memory")
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        maximum = read("/sys/fs/cgroup/memory.max")
+        current = int(read("/sys/fs/cgroup/memory.current"))
+        if maximum != "max" and int(maximum) > 0:
+            total = int(maximum)
+            remaining = max(0, total - current)
+            fraction = min(1.0, max(0.0, current / total))
+            available = remaining if available is None else min(available, remaining)
+            memory_used = fraction if memory_used is None else max(memory_used, fraction)
+            sources.append("cgroup_memory")
+    except (OSError, ValueError):
+        pass
+    try:
+        rss = int(read("/proc/self/statm").split()[1]) * int(os.sysconf("SC_PAGE_SIZE"))
+    except (OSError, AttributeError, ValueError, IndexError):
+        pass
+    return ServingResources(memory_used, cpu, rss, available, ",".join(sources) or "unavailable")
+
+
 class LocalInferenceEngine:
     def __init__(
         self,
@@ -679,11 +783,29 @@ class LocalInferenceEngine:
         self.max_batch_size = max_batch_size
         self.max_queue_size = max_queue_size
         self._execution_slots = threading.BoundedSemaphore(max_concurrency)
-        self._cache: OrderedDict[str, LocalInferenceResult] = OrderedDict()
+        self._cache: OrderedDict[str, _CachedInference] = OrderedDict()
         # Every critical section is synchronous. A thread lock, unlike an
         # asyncio lock, has one authority across desktop/event-loop lifetimes.
         self._cache_lock = threading.Lock()
         self._capacity_lock = threading.Lock()
+        self._serving = AdaptiveServingController(max_concurrency)
+        self._tickets: OrderedDict[int, _ServingTicket] = OrderedDict()
+        self._interactive_tickets: OrderedDict[int, _ServingTicket] = OrderedDict()
+        self._background_tickets: OrderedDict[int, _ServingTicket] = OrderedDict()
+        self._running: dict[int, _ServingTicket] = {}
+        self._next_ticket = 0
+        self._draining = False
+        self._preemptions = 0
+        self._queue_expired = 0
+        self._cache_bytes = 0
+        self._cache_evictions = 0
+        self._cache_expirations = 0
+        self._identity_invalidations = 0
+        self._cache_identity: str | None = None
+        self._singleflight: dict[tuple[str, asyncio.AbstractEventLoop], asyncio.Future[LocalInferenceResult]] = {}
+        self._singleflight_hits = 0
+        self._singleflight_waiters = 0
+        self._cache_epoch = 0
         self._active = 0
         self._queued = 0
         self._completed = 0
@@ -692,9 +814,24 @@ class LocalInferenceEngine:
         self._overloaded = 0
         self._cache_hits = 0
 
-    def snapshot(self) -> dict[str, int]:
+    def _sample_pressure_locked(self, now: float) -> None:
+        if self._serving.sample_due(now):
+            self._serving.update(sample_serving_resources(), now=now, queued=self._queued)
+
+    def _effective_cache_limit_locked(self) -> int:
+        maximum = self._serving.policy.cache_max_bytes
+        if not self._serving.policy.enabled:
+            return maximum
+        if self._serving.level == "critical":
+            return 0
+        return maximum // 2 if self._serving.level == "elevated" else maximum
+
+    def snapshot(self) -> dict[str, Any]:
         """Return bounded operational counts without prompts or model output."""
         with self._capacity_lock:
+            self._sample_pressure_locked(time.monotonic())
+            background_active = sum(item.work_class == "background" for item in self._running.values())
+            background_queued = len(self._background_tickets)
             snapshot = {
                 "active": self._active,
                 "queued": self._queued,
@@ -703,31 +840,155 @@ class LocalInferenceEngine:
                 "cancelled": self._cancelled,
                 "overloaded": self._overloaded,
                 "cache_hits": self._cache_hits,
+                "preemptions": self._preemptions,
+                "queue_expired": self._queue_expired,
+            }
+            cache_limit = self._effective_cache_limit_locked()
+            serving = {
+                "policy": self._serving.policy.as_dict(),
+                "capacity": {
+                    "operator_max_concurrency": self.max_concurrency,
+                    "effective_concurrency": self._serving.effective_concurrency,
+                    "background_limit": self._serving.background_limit,
+                    "active_interactive": self._active - background_active,
+                    "active_background": background_active,
+                    "queued_interactive": self._queued - background_queued,
+                    "queued_background": background_queued,
+                },
+                "pressure": self._serving.pressure_snapshot(),
+                "draining": self._draining,
             }
         with self._cache_lock:
             snapshot["cache_entries"] = len(self._cache)
+            serving["cache"] = {
+                "entries": len(self._cache),
+                "bytes": self._cache_bytes,
+                "max_bytes": serving["policy"]["cache_max_bytes"],
+                "effective_max_bytes": cache_limit,
+                "ttl_seconds": serving["policy"]["cache_ttl_seconds"],
+                "evictions": self._cache_evictions,
+                "expirations": self._cache_expirations,
+                "identity_invalidations": self._identity_invalidations,
+                "singleflight_active": len(self._singleflight),
+                "singleflight_hits": self._singleflight_hits,
+                "singleflight_waiters": self._singleflight_waiters,
+            }
+        snapshot["serving"] = serving
         return snapshot
 
-    def _reserve(self) -> None:
+    def configure_serving(self, policy: Mapping[str, Any]) -> dict[str, Any]:
+        """Change derived serving policy without changing activated identity."""
         with self._capacity_lock:
-            if self._active + self._queued >= self.max_concurrency + self.max_queue_size:
+            self._serving.configure(policy, time.monotonic())
+        self._trim_cache()
+        return self.snapshot()
+
+    def maintain(self, action: str = "trim_cache") -> dict[str, Any]:
+        """Apply bounded maintenance to disposable state, never model weights."""
+        if action not in {"trim_cache", "clear_cache", "drain", "resume"}:
+            raise ValueError("unknown local inference maintenance action")
+        if action == "clear_cache":
+            with self._cache_lock:
+                self._cache_evictions += len(self._cache)
+                self._cache.clear()
+                self._cache_bytes = 0
+                self._cache_epoch += 1
+        elif action == "trim_cache":
+            self._trim_cache()
+        else:
+            with self._capacity_lock:
+                self._draining = action == "drain"
+                if self._draining:
+                    for ticket in self._tickets.values():
+                        ticket.retired = "draining"
+                    self._queued -= len(self._tickets)
+                    self._tickets.clear()
+                    self._interactive_tickets.clear()
+                    self._background_tickets.clear()
+                    # Active workers keep their reservations and physical
+                    # ownership until their own finally block completes.
+        return self.snapshot()
+
+    def _reserve(
+        self,
+        work_class: str,
+        scope_id: str,
+        preemption_scope_id: str,
+        deadline: float | None,
+        cancel: threading.Event,
+    ) -> _ServingTicket:
+        now = time.monotonic()
+        with self._capacity_lock:
+            self._sample_pressure_locked(now)
+            if self._draining:
+                self._overloaded += 1
+                raise LocalInferenceOverloaded("local inference is draining")
+            queue_deadline = now + self._serving.policy.max_queue_wait_seconds
+            if deadline is not None:
+                queue_deadline = min(queue_deadline, deadline)
+            if queue_deadline <= now:
+                self._queue_expired += 1
+                raise LocalInferenceCancelled("local inference queue deadline exceeded")
+            if work_class == "background" and self._serving.policy.background_max_concurrency == 0:
+                self._overloaded += 1
+                raise LocalInferenceOverloaded("local background inference is paused")
+            background_queue_limit = max(1, self.max_queue_size * 3 // 4)
+            if work_class == "background" and len(self._background_tickets) >= background_queue_limit:
+                self._overloaded += 1
+                raise LocalInferenceOverloaded("local background waiting capacity is full")
+            full = self._active + self._queued >= self.max_concurrency + self.max_queue_size
+            if full and work_class == "interactive":
+                # Replace queued work only inside the same authority scope.
+                victim = next((item for item in reversed(self._background_tickets.values()) if (
+                    item.preemption_scope_id == preemption_scope_id
+                )), None)
+                if victim is not None:
+                    victim.retired = "preempted"
+                    del self._tickets[victim.sequence]
+                    del self._background_tickets[victim.sequence]
+                    self._queued -= 1
+                    self._preemptions += 1
+                    full = False
+            if full:
                 self._overloaded += 1
                 raise LocalInferenceOverloaded("local inference waiting capacity is full")
+            self._next_ticket += 1
+            ticket = _ServingTicket(
+                self._next_ticket, work_class, scope_id, preemption_scope_id,
+                now, queue_deadline, cancel,
+            )
+            self._tickets[ticket.sequence] = ticket
+            priority_queue = self._interactive_tickets if work_class == "interactive" else self._background_tickets
+            priority_queue[ticket.sequence] = ticket
             self._queued += 1
+            if work_class == "interactive" and self._active >= self._serving.effective_concurrency:
+                victim = next((item for item in self._running.values() if (
+                    item.work_class == "background"
+                    and item.preemption_scope_id == preemption_scope_id
+                    and not item.cancel.is_set()
+                )), None)
+                if victim is not None:
+                    victim.cancel.set()
+                    self._preemptions += 1
+            return ticket
 
     def _infer_admitted(
         self,
         request: LocalInferenceRequest,
         cancel: threading.Event,
         started: threading.Event,
+        ticket: _ServingTicket,
     ) -> LocalInferenceResult:
         started.set()
+        failed = False
         try:
             if cancel.is_set():
                 raise LocalInferenceCancelled("local inference cancelled before execution")
             result = self.model.infer(request, cancel)
             if not isinstance(result, LocalInferenceResult):
                 raise TypeError("local backend must return LocalInferenceResult")
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local inference cancelled during execution")
             with self._capacity_lock:
                 self._completed += 1
             return result
@@ -736,28 +997,71 @@ class LocalInferenceEngine:
                 self._cancelled += 1
             raise
         except BaseException:
+            failed = True
             with self._capacity_lock:
                 self._failed += 1
             raise
         finally:
             with self._capacity_lock:
                 self._active -= 1
+                self._running.pop(ticket.sequence, None)
+                now = time.monotonic()
+                admitted_at = ticket.started_at if ticket.started_at is not None else now
+                self._serving.observe(
+                    elapsed_ms=(now - admitted_at) * 1000.0,
+                    queue_wait_ms=(admitted_at - ticket.enqueued_at) * 1000.0,
+                    failed=failed,
+                )
             self._execution_slots.release()
 
-    async def _acquire_execution_slot(self) -> None:
+    async def _acquire_execution_slot(self, ticket: _ServingTicket) -> None:
         # Keep waiting requests off the process-wide default executor. The
         # same thread semaphore still fences capacity across event loops.
         try:
-            while not self._execution_slots.acquire(blocking=False):
+            while True:
+                with self._capacity_lock:
+                    now = time.monotonic()
+                    self._sample_pressure_locked(now)
+                    if ticket.retired is not None:
+                        raise LocalInferenceCancelled("local inference queue " + ticket.retired)
+                    if now >= ticket.deadline:
+                        self._tickets.pop(ticket.sequence, None)
+                        self._interactive_tickets.pop(ticket.sequence, None)
+                        self._background_tickets.pop(ticket.sequence, None)
+                        self._queued -= 1
+                        self._queue_expired += 1
+                        ticket.retired = "deadline exceeded"
+                        raise LocalInferenceCancelled("local inference queue deadline exceeded")
+                    interactive = next(iter(self._interactive_tickets.values()), None)
+                    head = interactive or next(iter(self._tickets.values()), None)
+                    background_active = sum(item.work_class == "background" for item in self._running.values())
+                    allowed = (
+                        head is ticket
+                        and self._active < self._serving.effective_concurrency
+                        and (ticket.work_class != "background" or background_active < self._serving.background_limit)
+                    )
+                    if allowed and self._execution_slots.acquire(blocking=False):
+                        del self._tickets[ticket.sequence]
+                        self._interactive_tickets.pop(ticket.sequence, None)
+                        self._background_tickets.pop(ticket.sequence, None)
+                        self._queued -= 1
+                        self._active += 1
+                        ticket.started_at = now
+                        self._running[ticket.sequence] = ticket
+                        return
                 await asyncio.sleep(0.01)
         except asyncio.CancelledError:
             with self._capacity_lock:
-                self._queued -= 1
+                if self._tickets.pop(ticket.sequence, None) is not None:
+                    self._queued -= 1
+                self._interactive_tickets.pop(ticket.sequence, None)
+                self._background_tickets.pop(ticket.sequence, None)
                 self._cancelled += 1
             raise
-        with self._capacity_lock:
-            self._queued -= 1
-            self._active += 1
+        except LocalInferenceCancelled:
+            with self._capacity_lock:
+                self._cancelled += 1
+            raise
 
     @staticmethod
     async def _await_worker(worker: asyncio.Task[Any], cancel: threading.Event) -> Any:
@@ -779,7 +1083,69 @@ class LocalInferenceEngine:
                 worker.exception()
             raise
 
-    def _key(self, request: LocalInferenceRequest) -> str:
+    def _assert_cached_admitted(
+        self,
+        check: Callable[[], Any],
+        ticket: _ServingTicket,
+        started: threading.Event,
+    ) -> None:
+        started.set()
+        try:
+            if ticket.cancel.is_set():
+                raise LocalInferenceCancelled("local cache identity admission cancelled")
+            check()
+            if ticket.cancel.is_set():
+                raise LocalInferenceCancelled("local cache identity admission cancelled")
+        except LocalInferenceCancelled:
+            with self._capacity_lock:
+                self._cancelled += 1
+            raise
+        except BaseException:
+            with self._capacity_lock:
+                self._failed += 1
+            raise
+        finally:
+            with self._capacity_lock:
+                self._active -= 1
+                self._running.pop(ticket.sequence, None)
+            self._execution_slots.release()
+
+    async def _admit_cached_identity(
+        self,
+        check: Callable[[], Any],
+        *,
+        work_class: str,
+        scope_id: str,
+        preemption_scope_id: str,
+        deadline: float | None,
+    ) -> None:
+        cancel = threading.Event()
+        ticket = self._reserve(work_class, scope_id, preemption_scope_id, deadline, cancel)
+        await self._acquire_execution_slot(ticket)
+        started = threading.Event()
+        timeout = None
+        try:
+            worker = asyncio.create_task(asyncio.to_thread(self._assert_cached_admitted, check, ticket, started))
+            if deadline is not None:
+                timeout = asyncio.get_running_loop().call_later(
+                    max(0.0, deadline - time.monotonic()), cancel.set,
+                )
+            await self._await_worker(worker, cancel)
+        except BaseException:
+            if not started.is_set():
+                with self._capacity_lock:
+                    self._active -= 1
+                    self._running.pop(ticket.sequence, None)
+                    self._failed += 1
+                self._execution_slots.release()
+            raise
+        finally:
+            if timeout is not None:
+                timeout.cancel()
+        if deadline is not None and time.monotonic() >= deadline:
+            raise LocalInferenceCancelled("local cache identity admission deadline exceeded")
+
+    def _model_identity(self) -> str:
         # Native runtime identities include tokenizer, architecture and policy.
         # Read before cache lookup so model drift invalidates old cached output.
         runtime_digest = getattr(self.model, "runtime_digest", None)
@@ -792,7 +1158,6 @@ class LocalInferenceEngine:
         identity = {
             "model": self.model.model_digest,
             "runtime": runtime_digest,
-            "request": request.digest,
         }
         profile = getattr(self.model, "execution_profile_digest", None)
         if profile is not None:
@@ -805,34 +1170,199 @@ class LocalInferenceEngine:
             identity["execution_profile"] = profile
         return _digest(identity)
 
-    async def generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
+    def _key(self, request: LocalInferenceRequest, scope_id: str = "local") -> str:
+        return _digest({"identity": self._model_identity(), "request": request.digest, "scope": scope_id})
+
+    def _trim_cache(self) -> None:
+        with self._capacity_lock:
+            self._sample_pressure_locked(time.monotonic())
+            policy = self._serving.policy
+            byte_limit = self._effective_cache_limit_locked()
+        now = time.monotonic()
+        with self._cache_lock:
+            for key, item in tuple(self._cache.items()):
+                if now >= min(item.expires_at, item.created_at + policy.cache_ttl_seconds):
+                    self._cache_bytes -= item.size_bytes
+                    del self._cache[key]
+                    self._cache_expirations += 1
+            while self._cache and (
+                len(self._cache) > self.cache_size or self._cache_bytes > byte_limit
+            ):
+                _, item = self._cache.popitem(last=False)
+                self._cache_bytes -= item.size_bytes
+                self._cache_evictions += 1
+
+    @staticmethod
+    def _cache_size_bytes(result: LocalInferenceResult, maximum: int) -> int:
+        # Avoid one potentially large serialization of a whole tool result.
+        size = 1024 + len((result.text or "").encode("utf-8"))
+        if result.structured_output is not None:
+            size += len(_stable_json(dict(result.structured_output)).encode("utf-8"))
+        for call in result.tool_calls:
+            size += 256 + len(call.call_id.encode("utf-8")) + len(call.tool_id.encode("utf-8"))
+            size += len(_stable_json(dict(call.arguments)).encode("utf-8"))
+            if size > maximum:
+                break
+        return size
+
+    async def generate(
+        self,
+        request: LocalInferenceRequest,
+        *,
+        work_class: str = "interactive",
+        scope_id: str | None = None,
+        preemption_scope_id: str | None = None,
+        deadline: float | None = None,
+    ) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
-        key = self._key(request)
+        if work_class not in {"interactive", "background"}:
+            raise ValueError("local work_class must be interactive or background")
+        for name, value in (("scope_id", scope_id), ("preemption_scope_id", preemption_scope_id)):
+            if value is not None and (not isinstance(value, str) or not value or len(value) > 512):
+                raise ValueError(f"{name} must be a non-empty bounded string")
+        if deadline is not None and (
+            isinstance(deadline, bool) or not isinstance(deadline, (int, float)) or not math.isfinite(deadline)
+        ):
+            raise ValueError("local inference deadline must be finite monotonic seconds")
+        if deadline is not None and deadline <= time.monotonic():
+            raise LocalInferenceCancelled("local inference deadline exceeded")
+        with self._capacity_lock:
+            if self._draining:
+                self._overloaded += 1
+                raise LocalInferenceOverloaded("local inference is draining")
+            follower_wait_limit = self._serving.policy.max_queue_wait_seconds
+        scope = scope_id or "local"
+        preemption_scope = preemption_scope_id or scope
+        identity = self._model_identity()
+        key = self._key(request, scope)
+        self._trim_cache()
+        with self._cache_lock:
+            if self._cache_identity != identity:
+                if self._cache_identity is not None:
+                    self._identity_invalidations += 1
+                self._cache.clear()
+                self._cache_bytes = 0
+                self._cache_identity = identity
+                self._cache_epoch += 1
+            epoch = self._cache_epoch
         if self.cache_size:
             with self._cache_lock:
                 cached = self._cache.get(key)
             if cached is not None:
                 admit_cached = getattr(self.model, "assert_identity", None)
                 if callable(admit_cached):
-                    admission = asyncio.create_task(asyncio.to_thread(admit_cached))
-                    await self._await_worker(admission, threading.Event())
-                if self._key(request) != key:
+                    await self._admit_cached_identity(
+                        admit_cached, work_class=work_class, scope_id=scope,
+                        preemption_scope_id=preemption_scope, deadline=deadline,
+                    )
+                if self._key(request, scope) != key:
                     raise ValueError("local runtime identity changed before cache hit")
-                with self._cache_lock:
-                    if key in self._cache:
-                        self._cache.move_to_end(key)
                 with self._capacity_lock:
-                    self._cache_hits += 1
-                return replace(cached, cached=True)
+                    ttl = self._serving.policy.cache_ttl_seconds
+                with self._cache_lock:
+                    valid = (
+                        self._cache.get(key) is cached
+                        and epoch == self._cache_epoch
+                        and time.monotonic() < min(cached.expires_at, cached.created_at + ttl)
+                    )
+                    if valid:
+                        self._cache.move_to_end(key)
+                if valid:
+                    with self._capacity_lock:
+                        self._cache_hits += 1
+                    return replace(cached.result, cached=True)
 
+        loop = asyncio.get_running_loop()
+        flight_key = (key, loop)
+        with self._cache_lock:
+            future = self._singleflight.get(flight_key)
+            leader = future is None
+            if not leader and self._singleflight_waiters >= self.max_concurrency + self.max_queue_size:
+                overloaded = True
+            else:
+                overloaded = False
+                if future is None:
+                    future = loop.create_future()
+                    # An owner with no followers still retrieves its failure.
+                    future.add_done_callback(lambda item: None if item.cancelled() else item.exception())
+                    self._singleflight[flight_key] = future
+                else:
+                    self._singleflight_waiters += 1
+                    self._singleflight_hits += 1
+        if overloaded:
+            with self._capacity_lock:
+                self._overloaded += 1
+            raise LocalInferenceOverloaded("local inference in-flight waiter capacity is full")
+        assert future is not None
+        try:
+            if not leader:
+                try:
+                    remaining = follower_wait_limit
+                    if deadline is not None:
+                        remaining = min(remaining, deadline - time.monotonic())
+                    if remaining <= 0:
+                        raise LocalInferenceCancelled("local inference deadline exceeded")
+                    result = await asyncio.wait_for(asyncio.shield(future), timeout=remaining)
+                except TimeoutError as exc:
+                    raise LocalInferenceCancelled("local inference deadline exceeded") from exc
+                return replace(result)
+            try:
+                result = await self._generate_uncached(
+                    request, key=key, scope_id=scope,
+                    preemption_scope_id=preemption_scope, work_class=work_class,
+                    deadline=deadline, cache_epoch=epoch,
+                )
+            except BaseException as exc:
+                if not future.done():
+                    if isinstance(exc, asyncio.CancelledError):
+                        future.cancel()
+                    else:
+                        future.set_exception(exc)
+                raise
+            if not future.done():
+                future.set_result(replace(result))
+            return result
+        finally:
+            with self._cache_lock:
+                if leader:
+                    self._singleflight.pop(flight_key, None)
+                else:
+                    self._singleflight_waiters -= 1
+
+    async def _generate_uncached(
+        self,
+        request: LocalInferenceRequest,
+        *,
+        key: str,
+        scope_id: str,
+        preemption_scope_id: str,
+        work_class: str,
+        deadline: float | None,
+        cache_epoch: int,
+    ) -> LocalInferenceResult:
         cancel = threading.Event()
-        self._reserve()
-        await self._acquire_execution_slot()
+        ticket = self._reserve(work_class, scope_id, preemption_scope_id, deadline, cancel)
+        await self._acquire_execution_slot(ticket)
         started = threading.Event()
         try:
-            worker = asyncio.create_task(asyncio.to_thread(self._infer_admitted, request, cancel, started))
-            result = await self._await_worker(worker, cancel)
+            worker = asyncio.create_task(asyncio.to_thread(self._infer_admitted, request, cancel, started, ticket))
+            if deadline is None:
+                result = await self._await_worker(worker, cancel)
+            else:
+                # Timer only requests cooperative cancellation. Await-worker
+                # retains ownership through the backend's physical drain.
+                timeout = None
+                try:
+                    timeout = asyncio.get_running_loop().call_later(
+                        max(0.0, deadline - time.monotonic()), cancel.set,
+                    )
+                    result = await self._await_worker(worker, cancel)
+                finally:
+                    if timeout is not None:
+                        timeout.cancel()
+                if time.monotonic() >= deadline:
+                    raise LocalInferenceCancelled("local inference deadline exceeded")
         except BaseException:
             # Executor rejection can occur before the worker owns its slot.
             # Once started, only the OS worker releases its own reservation.
@@ -840,12 +1370,13 @@ class LocalInferenceEngine:
                 with self._capacity_lock:
                     self._active -= 1
                     self._failed += 1
+                    self._running.pop(ticket.sequence, None)
                 self._execution_slots.release()
             raise
 
         if result.model_id != self.model.model_id or result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
-        if self._key(request) != key:
+        if self._key(request, scope_id) != key:
             raise ValueError("local runtime identity changed during inference")
         if result.usage_source == "local_model" and result.output_tokens > request.max_output_tokens:
             raise ValueError("local backend exceeded admitted output-token limit")
@@ -899,21 +1430,42 @@ class LocalInferenceEngine:
             except ToolContractError as exc:
                 raise ValueError(f"local structured output violates request schema: {exc}") from exc
 
-        if self.cache_size and result.finish_reason not in {"cancelled", "deadline"}:
+        with self._capacity_lock:
+            policy = self._serving.policy
+            byte_limit = self._effective_cache_limit_locked()
+        if (
+            self.cache_size and byte_limit and policy.cache_ttl_seconds
+            and result.finish_reason not in {"cancelled", "deadline"}
+        ):
+            size_bytes = self._cache_size_bytes(result, byte_limit)
             with self._cache_lock:
-                if self._key(request) != key:
+                if self._key(request, scope_id) != key:
                     raise ValueError("local runtime identity changed before caching")
                 # The cached copy owns all nested structured/tool output;
                 # application edits to the returned object cannot rewrite it.
-                self._cache[key] = replace(result)
-                self._cache.move_to_end(key)
-                while len(self._cache) > self.cache_size:
-                    self._cache.popitem(last=False)
+                if size_bytes <= byte_limit and cache_epoch == self._cache_epoch:
+                    previous = self._cache.pop(key, None)
+                    if previous is not None:
+                        self._cache_bytes -= previous.size_bytes
+                    now = time.monotonic()
+                    self._cache[key] = _CachedInference(
+                        replace(result), now, now + policy.cache_ttl_seconds, size_bytes,
+                    )
+                    self._cache_bytes += size_bytes
+                    while len(self._cache) > self.cache_size or self._cache_bytes > byte_limit:
+                        _, discarded = self._cache.popitem(last=False)
+                        self._cache_bytes -= discarded.size_bytes
+                        self._cache_evictions += 1
         return result
 
     async def generate_many(
         self,
         requests: Sequence[LocalInferenceRequest],
+        *,
+        work_class: str = "interactive",
+        scope_id: str | None = None,
+        preemption_scope_id: str | None = None,
+        deadline: float | None = None,
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
@@ -921,7 +1473,10 @@ class LocalInferenceEngine:
             raise ValueError("local inference batch exceeds configured max_batch_size")
         if any(not isinstance(item, LocalInferenceRequest) for item in requests):
             raise TypeError("batch requires LocalInferenceRequest values")
-        tasks = [asyncio.create_task(self.generate(item)) for item in requests]
+        tasks = [asyncio.create_task(self.generate(
+            item, work_class=work_class, scope_id=scope_id,
+            preemption_scope_id=preemption_scope_id, deadline=deadline,
+        )) for item in requests]
         try:
             # A failed member must not detach still-running native workers.
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -1140,6 +1695,40 @@ class LocalModelAdapter(ProviderAdapter):
     def generation_limits(self) -> dict[str, Any]:
         """Resolve limits from the activated backend, rather than a catalog guess."""
         model = self.engine.model
+        resolve = getattr(model, "generation_limits", None)
+        if callable(resolve):
+            supplied = resolve()
+            if not isinstance(supplied, Mapping):
+                raise ProviderPolicyError("activated local generation limits must be an object")
+            context = supplied.get("context_window")
+            output = supplied.get("max_output_tokens")
+            total = supplied.get("max_total_tokens")
+            if (
+                type(context) is not int or context < 1
+                or type(output) is not int or output < 1
+                or (total is not None and (type(total) is not int or total < 1))
+                or type(supplied.get("shared_context", False)) is not bool
+            ):
+                raise ProviderPolicyError("activated local generation limits are invalid")
+            tokenizer = supplied.get("tokenizer", "utf8_bytes_upper_bound")
+            source = supplied.get("limits_source", "activated_local_backend")
+            if any(not isinstance(item, str) or not item or len(item) > 256 for item in (tokenizer, source)):
+                raise ProviderPolicyError("activated local generation-limit metadata is invalid")
+            limits = {
+                "context_window": context,
+                "max_output_tokens": min(8_192, output, max(1, context // 2)),
+                "max_total_tokens": total,
+                "shared_context": supplied.get("shared_context", False),
+                "tokenizer": tokenizer,
+                "limits_source": source,
+            }
+            for name in ("tokenizer_max_chars", "tokenizer_max_tokens"):
+                value = supplied.get(name)
+                if value is not None:
+                    if type(value) is not int or value < 1:
+                        raise ProviderPolicyError("activated local tokenizer limit is invalid")
+                    limits[name] = value
+            return limits
         runtime = getattr(model, "runtime", None)
         native_limits = getattr(runtime, "limits", None)
         config = getattr(model, "config", None)
@@ -1279,6 +1868,10 @@ class LocalModelAdapter(ProviderAdapter):
             input_tokens = len(full_prompt.encode("utf-8")) + 1
         if type(input_tokens) is not int or input_tokens < 0:
             raise ProviderPolicyError("local tokenizer returned an invalid token count")
+        if "tokenizer_max_chars" in limits and len(local_request.rendered_input) > limits["tokenizer_max_chars"]:
+            raise ProviderPolicyError("local input exceeds activated tokenizer character limit")
+        if "tokenizer_max_tokens" in limits and input_tokens > limits["tokenizer_max_tokens"]:
+            raise ProviderPolicyError("local input exceeds activated tokenizer token limit")
         if input_tokens > budget.max_input_tokens:
             raise ProviderPolicyError("local input token budget exceeded")
         if input_tokens > limits["context_window"]:
@@ -1299,8 +1892,47 @@ class LocalModelAdapter(ProviderAdapter):
             )
         if not math.isfinite(remaining) or remaining <= 0:
             raise LocalInferenceCancelled("local inference deadline exceeded")
+        # Cache/coalescing authority is inherited from the validated provider
+        # envelope. Anonymous requests receive an opaque scope rather than
+        # sharing output merely because prompts or tenant labels coincide.
+        governance = request.governance_context
+        lineage = request.operation_id or request.execution_id
+        governance_scope = None if governance is None else governance.as_dict()
+        if governance_scope is not None:
+            # Purpose remains in the cache identity below. It cannot make
+            # foreground/background work from one operation unrelated.
+            governance_scope.pop("purpose", None)
+        authority = {
+            "tenant": request.tenant_id,
+            "data_class": request.data_class,
+            "operation": lineage or secrets.token_hex(24),
+            "governance": governance_scope,
+        }
+        preemption_scope = _digest(authority)
+        cache_scope = _digest({
+            "authority": authority,
+            "purpose": request.purpose,
+            "context_id": request.context_id,
+            "context_digest": request.context_digest,
+            "sources": request.context_source_snapshot,
+            "compiler": request.context_compiler_version,
+        })
+        work_class = "background" if request.purpose.strip().lower() in {
+            "idle-learning", "background-learning", "self-maintenance",
+            "self-augmentation", "training", "simulation_training",
+            "ratchet-learning", "idle-maintenance",
+        } else "interactive"
         try:
-            result = await asyncio.wait_for(self.engine.generate(local_request), timeout=remaining)
+            result = await asyncio.wait_for(
+                self.engine.generate(
+                    local_request,
+                    work_class=work_class,
+                    scope_id=cache_scope,
+                    preemption_scope_id=preemption_scope,
+                    deadline=time.monotonic() + remaining,
+                ),
+                timeout=remaining,
+            )
         except TimeoutError as exc:
             raise LocalInferenceCancelled("local inference deadline exceeded") from exc
         if time.monotonic() - started > budget.max_wall_seconds or (

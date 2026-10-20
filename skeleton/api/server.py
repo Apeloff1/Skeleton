@@ -728,6 +728,7 @@ class ServerState:
                             "engine:admission",
                             "engine:governance",
                             "engine:memory",
+                            "engine:runtime-control",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,

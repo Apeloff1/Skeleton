@@ -9,6 +9,7 @@ the same compare-and-set and transactional semantics.
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ from skeleton.contracts.ai_execution import (
     execution_payload_digest,
 )
 from skeleton.contracts.verification import VerificationReceipt
+from skeleton.intelligence import runtime_learning as learning
 
 
 class ExecutionRepositoryError(RuntimeError):
@@ -136,6 +138,7 @@ class SQLiteExecutionRepository:
         if not normalized:
             raise ValueError("namespace must not be empty")
         self.namespace = normalized
+        self.path = str(path)
         self._connection = sqlite3.connect(
             str(path),
             check_same_thread=False,
@@ -272,6 +275,97 @@ class SQLiteExecutionRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_ai_execution_outbox_pending
                 ON ai_execution_outbox(namespace, published_at, created_at);
+
+                CREATE TABLE IF NOT EXISTS ai_execution_learning_outcome (
+                    namespace TEXT NOT NULL,
+                    execution_id TEXT NOT NULL,
+                    outcome_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    scope_id TEXT NOT NULL,
+                    partition_id TEXT NOT NULL,
+                    task_class TEXT NOT NULL,
+                    model_selection_digest TEXT NOT NULL,
+                    source_snapshot_digest TEXT NOT NULL,
+                    request_digest TEXT NOT NULL,
+                    result_digest TEXT NOT NULL,
+                    observation_digest TEXT NOT NULL,
+                    observation_json TEXT NOT NULL,
+                    trained INTEGER NOT NULL,
+                    learning_status TEXT NOT NULL,
+                    observed_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, execution_id),
+                    UNIQUE(namespace, outcome_id),
+                    FOREIGN KEY(namespace, execution_id)
+                        REFERENCES ai_execution_state(namespace, execution_id)
+                        ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_recent
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, observed_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_replay
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, observed_at DESC);
+
+                CREATE TABLE IF NOT EXISTS ai_execution_learning_state (
+                    namespace TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    scope_id TEXT NOT NULL,
+                    partition_id TEXT NOT NULL,
+                    task_class TEXT NOT NULL,
+                    model_selection_digest TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    state_digest TEXT NOT NULL,
+                    state_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    maintenance_at TEXT,
+                    PRIMARY KEY(namespace, tenant_id, scope_id, partition_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_maintenance
+                ON ai_execution_learning_state(namespace, tenant_id, scope_id, maintenance_at, updated_at);
+
+                CREATE TABLE IF NOT EXISTS ai_execution_learning_policy (
+                    namespace TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    scope_id TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    policy_digest TEXT NOT NULL,
+                    policy_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, tenant_id, scope_id)
+                );
+                CREATE TABLE IF NOT EXISTS ai_execution_learning_totals (
+                    namespace TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    scope_id TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    totals_digest TEXT NOT NULL,
+                    totals_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, tenant_id, scope_id)
+                );
+                CREATE TABLE IF NOT EXISTS ai_execution_runtime_control_policy (
+                    namespace TEXT NOT NULL PRIMARY KEY,
+                    version INTEGER NOT NULL,
+                    policy_digest TEXT NOT NULL,
+                    policy_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS ai_execution_runtime_control_event (
+                    namespace TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    tenant_id TEXT,
+                    actor_digest TEXT,
+                    policy_digest TEXT NOT NULL,
+                    previous_policy_digest TEXT NOT NULL,
+                    learning_policy_digest TEXT,
+                    changed_sections_json TEXT NOT NULL,
+                    receipt_digest TEXT NOT NULL,
+                    receipt_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, version),
+                    FOREIGN KEY(namespace)
+                        REFERENCES ai_execution_runtime_control_policy(namespace)
+                );
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_runtime_control_history
+                ON ai_execution_runtime_control_event(namespace, tenant_id, version DESC);
                 """)
             state_columns = {
                 str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_state)")
@@ -1423,6 +1517,7 @@ class SQLiteExecutionRepository:
                 if existing is not None:
                     if existing.as_dict() != result.as_dict():
                         raise ExecutionRepositoryConflict("terminal execution result already differs")
+                    self._record_runtime_outcome_locked(current, existing, instant)
                     self._connection.execute(
                         """
                         DELETE FROM ai_execution_finalization_intent
@@ -1539,6 +1634,9 @@ class SQLiteExecutionRepository:
                 )
                 if cursor.rowcount != 1:
                     raise ExecutionRepositoryConflict("execution changed during atomic finalization")
+                # Feedback and the actual terminal result share one commit. A
+                # retry cannot lose an outcome or train it for a second time.
+                self._record_runtime_outcome_locked(updated, result, instant)
                 self._connection.execute(
                     """
                     DELETE FROM ai_execution_finalization_intent
@@ -1554,6 +1652,672 @@ class SQLiteExecutionRepository:
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
+
+    @staticmethod
+    def _learning_scope(tenant_id: str, scope_id: str) -> tuple[str, str]:
+        try:
+            return learning.identifier(tenant_id, "tenant_id", maximum=512), learning.identifier(scope_id, "scope_id")
+        except learning.RuntimeLearningError as exc:
+            raise ExecutionRepositoryError(str(exc)) from exc
+
+    def _learning_policy_locked(self, tenant_id: str, scope_id: str) -> dict[str, Any]:
+        row = self._connection.execute(
+            """SELECT * FROM ai_execution_learning_policy
+               WHERE namespace = ? AND tenant_id = ? AND scope_id = ?""",
+            (self.namespace, tenant_id, scope_id),
+        ).fetchone()
+        if row is None:
+            return {"version": 1, "policy": learning.normalize_policy()}
+        payload = _json_object(row["policy_json"], "learning policy")
+        if learning.digest(payload) != row["policy_digest"]:
+            raise ExecutionRepositoryCorruption("learning policy digest differs")
+        try:
+            policy = learning.normalize_policy(payload)
+        except learning.RuntimeLearningError as exc:
+            raise ExecutionRepositoryCorruption("learning policy is invalid") from exc
+        return {"version": int(row["version"]), "policy": policy}
+
+    def _write_learning_policy_locked(
+        self, tenant_id: str, scope_id: str, policy: dict[str, Any], version: int, instant: datetime
+    ) -> None:
+        self._connection.execute(
+            """INSERT INTO ai_execution_learning_policy(
+                   namespace, tenant_id, scope_id, version, policy_digest, policy_json, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(namespace, tenant_id, scope_id) DO UPDATE SET
+                   version = excluded.version, policy_digest = excluded.policy_digest,
+                   policy_json = excluded.policy_json, updated_at = excluded.updated_at""",
+            (self.namespace, tenant_id, scope_id, version, learning.digest(policy), _json_dump(policy), instant.isoformat()),
+        )
+
+    def set_runtime_learning_policy(
+        self,
+        *,
+        tenant_id: str,
+        scope_id: str = "tenant",
+        policy: dict[str, Any],
+        expected_version: int,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """CAS operator policy. Authentication remains the API owner's concern."""
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 1:
+            raise ExecutionRepositoryError("expected learning policy version must be positive")
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                current = self._learning_policy_locked(tenant_id, scope_id)
+                if current["version"] != expected_version:
+                    raise ExecutionRepositoryConflict("runtime learning policy version changed")
+                if not isinstance(policy, dict):
+                    raise ExecutionRepositoryError("learning policy must be an object")
+                try:
+                    merged = learning.normalize_policy({**current["policy"], **policy})
+                except learning.RuntimeLearningError as exc:
+                    raise ExecutionRepositoryError(str(exc)) from exc
+                version = expected_version + 1
+                self._write_learning_policy_locked(tenant_id, scope_id, merged, version, instant)
+                self._connection.execute("COMMIT")
+                return {"version": version, "policy": merged}
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def runtime_control_policy(self) -> dict[str, Any]:
+        """Read the namespace's one durable host-control policy/version."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM ai_execution_runtime_control_policy WHERE namespace = ?", (self.namespace,)
+            ).fetchone()
+            if row is None:
+                return {"version": 1, "policy": {}}
+            payload = _json_object(row["policy_json"], "runtime control policy")
+            if learning.digest(payload) != row["policy_digest"]:
+                raise ExecutionRepositoryCorruption("runtime control policy digest differs")
+            return {"version": int(row["version"]), "policy": payload}
+
+    def set_runtime_control_policy(
+        self,
+        policy: dict[str, Any],
+        expected_version: int,
+        *,
+        tenant_id: str | None = None,
+        actor_id: str | None = None,
+        scope_id: str = "tenant",
+        learning_policy: dict[str, Any] | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Atomically CAS host controls and optional tenant learning settings.
+
+        The host controller validates its own whitelist before this persistence
+        seam. No serving controls become active through this repository alone.
+        """
+        if isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 1:
+            raise ExecutionRepositoryError("expected runtime control version must be positive")
+        if not isinstance(policy, dict) or len(_json_dump(policy).encode()) > 32 * 1024:
+            raise ExecutionRepositoryError("runtime control policy must be a bounded object")
+        if tenant_id is not None:
+            tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if actor_id is not None:
+            try:
+                actor_id = learning.identifier(actor_id, "actor_id", maximum=512)
+            except learning.RuntimeLearningError as exc:
+                raise ExecutionRepositoryError(str(exc)) from exc
+        if learning_policy is not None:
+            if tenant_id is None:
+                raise ExecutionRepositoryError("tenant_id is required for learning policy")
+            if not isinstance(learning_policy, dict):
+                raise ExecutionRepositoryError("learning policy must be an object")
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                current = self.runtime_control_policy()
+                if current["version"] != expected_version:
+                    raise ExecutionRepositoryConflict("runtime control policy version changed")
+                learning_version = None
+                learning_policy_digest = None
+                changed_sections = []
+                if policy != current["policy"]:
+                    changed_sections.append("global_policy")
+                if learning_policy is not None:
+                    current_learning = self._learning_policy_locked(tenant_id, scope_id)
+                    try:
+                        merged = learning.normalize_policy({**current_learning["policy"], **learning_policy})
+                    except learning.RuntimeLearningError as exc:
+                        raise ExecutionRepositoryError(str(exc)) from exc
+                    learning_version = current_learning["version"] + 1
+                    learning_policy_digest = learning.digest(merged)
+                    if merged != current_learning["policy"]:
+                        changed_sections.append("tenant_learning")
+                    self._write_learning_policy_locked(tenant_id, scope_id, merged, learning_version, instant)
+                version = expected_version + 1
+                self._connection.execute(
+                    """INSERT INTO ai_execution_runtime_control_policy(
+                           namespace, version, policy_digest, policy_json, updated_at
+                       ) VALUES (?, ?, ?, ?, ?)
+                       ON CONFLICT(namespace) DO UPDATE SET version = excluded.version,
+                           policy_digest = excluded.policy_digest, policy_json = excluded.policy_json,
+                           updated_at = excluded.updated_at""",
+                    (self.namespace, version, learning.digest(policy), _json_dump(policy), instant.isoformat()),
+                )
+                receipt = {
+                    "schema_version": "skeleton.runtime.control.event.v1",
+                    "tenant_id": tenant_id, "version": version,
+                    "actor_digest": None if actor_id is None else learning.digest({
+                        "namespace": self.namespace, "tenant_id": tenant_id, "actor_id": actor_id,
+                    }),
+                    "policy_digest": learning.digest(policy),
+                    "previous_policy_digest": learning.digest(current["policy"]),
+                    "learning_policy_digest": learning_policy_digest,
+                    "changed_sections": changed_sections,
+                    "updated_at": instant.isoformat(),
+                }
+                receipt_digest = learning.digest(receipt)
+                self._connection.execute(
+                    """INSERT INTO ai_execution_runtime_control_event(
+                           namespace, version, tenant_id, actor_digest, policy_digest, previous_policy_digest,
+                           learning_policy_digest, changed_sections_json, receipt_digest, receipt_json, updated_at
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (self.namespace, version, tenant_id, receipt["actor_digest"], receipt["policy_digest"],
+                     receipt["previous_policy_digest"], learning_policy_digest, _json_dump(changed_sections),
+                     receipt_digest, _json_dump(receipt), instant.isoformat()),
+                )
+                self._connection.execute("COMMIT")
+                return {"version": version, "policy": dict(policy), "learning_policy_version": learning_version,
+                        "receipt": {**receipt, "receipt_digest": receipt_digest}}
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def runtime_control_history(self, *, tenant_id: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Bounded immutable control receipts for the authenticated tenant only."""
+        tenant_id, _ = self._learning_scope(tenant_id, "tenant")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ExecutionRepositoryError("runtime control history limit must be in [1, 100]")
+        with self._lock:
+            rows = self._connection.execute(
+                """SELECT * FROM ai_execution_runtime_control_event
+                   WHERE namespace = ? AND tenant_id = ? ORDER BY version DESC LIMIT ?""",
+                (self.namespace, tenant_id, limit),
+            ).fetchall()
+            history = []
+            for row in rows:
+                raw = row["receipt_json"]
+                if not isinstance(raw, str) or len(raw) > 4096:
+                    raise ExecutionRepositoryCorruption("runtime control receipt exceeds its storage bound")
+                receipt = _json_object(raw, "runtime control receipt")
+                expected_fields = {
+                    "schema_version", "tenant_id", "version", "actor_digest", "policy_digest",
+                    "previous_policy_digest", "learning_policy_digest", "changed_sections", "updated_at",
+                }
+                if set(receipt) != expected_fields or receipt.get("schema_version") != "skeleton.runtime.control.event.v1":
+                    raise ExecutionRepositoryCorruption("runtime control receipt schema differs")
+                if learning.digest(receipt) != row["receipt_digest"] or receipt.get("tenant_id") != tenant_id or receipt.get("version") != int(row["version"]):
+                    raise ExecutionRepositoryCorruption("runtime control receipt identity differs")
+                for name in ("actor_digest", "policy_digest", "previous_policy_digest", "learning_policy_digest"):
+                    value = receipt[name]
+                    if value != row[name] or (value is not None and (not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value))):
+                        raise ExecutionRepositoryCorruption("runtime control receipt digest fields differ")
+                sections = receipt["changed_sections"]
+                if not isinstance(sections, list) or len(sections) > 2 or any(not isinstance(section, str) or section not in {"global_policy", "tenant_learning"} for section in sections) or _json_dump(sections) != row["changed_sections_json"]:
+                    raise ExecutionRepositoryCorruption("runtime control receipt sections differ")
+                if receipt["updated_at"] != row["updated_at"]:
+                    raise ExecutionRepositoryCorruption("runtime control receipt timestamp differs")
+                _parse_time(receipt["updated_at"], "runtime control receipt updated_at")
+                history.append({**receipt, "receipt_digest": row["receipt_digest"]})
+            return history
+
+    @staticmethod
+    def _empty_learning_totals() -> dict[str, Any]:
+        return {
+            "outcomes": 0, "completed": 0, "degraded": 0, "failed": 0, "cancelled": 0,
+            "resource_failures": 0, "telemetry_errors": 0, "trained_outcomes": 0,
+            "total_elapsed_seconds": 0.0, "input_tokens": 0, "output_tokens": 0,
+            "provider_attempts": 0, "cost_usd": 0.0,
+        }
+
+    def _learning_totals_locked(self, tenant_id: str, scope_id: str) -> tuple[dict[str, Any], int]:
+        row = self._connection.execute(
+            """SELECT * FROM ai_execution_learning_totals
+               WHERE namespace = ? AND tenant_id = ? AND scope_id = ?""",
+            (self.namespace, tenant_id, scope_id),
+        ).fetchone()
+        if row is None:
+            return self._empty_learning_totals(), 0
+        totals = _json_object(row["totals_json"], "learning totals")
+        if learning.digest(totals) != row["totals_digest"]:
+            raise ExecutionRepositoryCorruption("runtime learning totals digest differs")
+        expected = self._empty_learning_totals()
+        if set(totals) != set(expected):
+            raise ExecutionRepositoryCorruption("runtime learning totals schema differs")
+        for key, value in totals.items():
+            try:
+                learning._finite(value, key, 0, learning.MAX_COUNTER)
+            except learning.RuntimeLearningError as exc:
+                raise ExecutionRepositoryCorruption("runtime learning totals are invalid") from exc
+        return totals, int(row["version"])
+
+    def _learning_state_locked(self, row: sqlite3.Row | None, *, seed: str) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        try:
+            raw = row["state_json"]
+            if not isinstance(raw, str) or len(raw) > learning.MAX_STATE_BYTES:
+                raise learning.RuntimeLearningError("optimizer storage bound differs")
+            state = _json_object(raw, "learning optimizer")
+            if learning.digest(state) != row["state_digest"]:
+                raise learning.RuntimeLearningError("optimizer digest differs")
+            return learning.validate_state(state)
+        except (ExecutionRepositoryCorruption, ValueError, TypeError, RecursionError, OverflowError) as exc:
+            prior = hashlib.sha256(str(row["state_json"]).encode()).hexdigest()
+            return learning.quarantine_state(seed, reason=str(exc), prior_digest=prior)
+
+    def _save_learning_state_locked(
+        self, identity: dict[str, Any], state: dict[str, Any], previous: sqlite3.Row | None,
+        instant: datetime, *, maintenance: bool = False,
+    ) -> int:
+        learning.validate_state(state)
+        version = 1 if previous is None else int(previous["version"]) + 1
+        self._connection.execute(
+            """INSERT INTO ai_execution_learning_state(
+                   namespace, tenant_id, scope_id, partition_id, task_class, model_selection_digest,
+                   version, state_digest, state_json, updated_at, maintenance_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(namespace, tenant_id, scope_id, partition_id) DO UPDATE SET
+                   version = excluded.version, state_digest = excluded.state_digest,
+                   state_json = excluded.state_json, updated_at = excluded.updated_at,
+                   maintenance_at = excluded.maintenance_at""",
+            (self.namespace, identity["tenant_id"], identity["scope_id"], identity["partition_id"],
+             identity["task_class"], identity["model_selection_digest"], version,
+             learning.digest(state), _json_dump(state), instant.isoformat(),
+             instant.isoformat() if maintenance else (None if previous is None else previous["maintenance_at"])),
+        )
+        return version
+
+    def _record_runtime_outcome_locked(
+        self, execution: AIExecution, result: AIExecutionResult, instant: datetime
+    ) -> dict[str, Any]:
+        """Called inside the terminal transaction; never trusts caller rewards."""
+        existing = self._connection.execute(
+            """SELECT * FROM ai_execution_learning_outcome
+               WHERE namespace = ? AND execution_id = ?""",
+            (self.namespace, execution.execution_id),
+        ).fetchone()
+        if existing is not None:
+            if existing["request_digest"] != execution.request.identity_digest or existing["result_digest"] != learning.digest(result.as_dict()):
+                raise ExecutionRepositoryConflict("runtime learning outcome identity differs")
+            return {"execution_id": execution.execution_id, "outcome_id": existing["outcome_id"],
+                    "recorded": True, "deduplicated": True, "trained": bool(existing["trained"]),
+                    "learning_status": existing["learning_status"]}
+
+        checkpoint = self.latest_checkpoint(execution.execution_id)
+        learning_status = "observed"
+        try:
+            observation = learning.terminal_observation(execution.request, result, None if checkpoint is None else checkpoint.payload)
+        except (learning.RuntimeLearningError, OverflowError, ValueError, TypeError) as exc:
+            # Malformed optimization metadata must not prevent durable failure
+            # or cancellation. Keep a minimal exact terminal identity instead.
+            request_digest = execution.request.identity_digest
+            result_digest = learning.digest(result.as_dict())
+            observation = {
+                "schema_version": learning.SCHEMA, "tenant_id": "unscoped", "scope_id": "quarantined",
+                "partition_id": learning.digest({"invalid_metadata": True}), "task_class": "unknown",
+                "model_selection_digest": learning.digest({}), "source_snapshot_digest": learning.digest([]),
+                "execution_id": execution.execution_id, "request_digest": request_digest,
+                "result_digest": result_digest, "outcome_id": learning.digest({"execution_id": execution.execution_id,
+                    "request_digest": request_digest, "result_digest": result_digest}),
+                "status": result.status, "error_code": "learning_metadata_invalid",
+                "features": [0.0] * 12, "metrics": {"elapsed_seconds": 0.0, "input_tokens": 0,
+                    "output_tokens": 0, "provider_attempts": 0, "cost_usd": 0.0,
+                    "resource_failure": 0, "telemetry_errors": 1},
+                "trainable": False, "observed_at": result.completed_at.isoformat(),
+                "learning_error": type(exc).__name__,
+            }
+            learning_status = "invalid_metadata"
+
+        tenant_id, scope_id = observation["tenant_id"], observation["scope_id"]
+        seed = f"{self.namespace}:{tenant_id}:{scope_id}:{observation['partition_id']}"
+        trained = False
+        try:
+            policy = self._learning_policy_locked(tenant_id, scope_id)["policy"]
+        except (ExecutionRepositoryCorruption, learning.RuntimeLearningError):
+            policy = learning.normalize_policy({"enabled": False})
+            learning_status = "policy_quarantined"
+        row = self._connection.execute(
+            """SELECT * FROM ai_execution_learning_state
+               WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ?""",
+            (self.namespace, tenant_id, scope_id, observation["partition_id"]),
+        ).fetchone()
+        capacity = True
+        if row is None:
+            count = self._connection.execute(
+                """SELECT COUNT(*) FROM ai_execution_learning_state
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ?""",
+                (self.namespace, tenant_id, scope_id),
+            ).fetchone()[0]
+            capacity = count < policy["partition_limit"]
+        if policy["enabled"] and observation["trainable"] and capacity:
+            state = self._learning_state_locked(row, seed=seed)
+            try:
+                state, trained = learning.learn_outcome(state, observation, policy, seed=seed)
+            except (learning.RuntimeLearningError, ArithmeticError, ValueError) as exc:
+                state = learning.quarantine_state(seed, reason=f"optimizer update: {type(exc).__name__}")
+            self._save_learning_state_locked(observation, state, row, instant)
+            learning_status = "trained" if trained else "optimizer_quarantined"
+        elif not capacity:
+            learning_status = "partition_capacity"
+        elif not policy["enabled"] and learning_status == "observed":
+            learning_status = "disabled"
+        elif not observation["trainable"] and learning_status == "observed":
+            learning_status = "audit_only"
+
+        self._connection.execute(
+            """INSERT INTO ai_execution_learning_outcome(
+                   namespace, execution_id, outcome_id, tenant_id, scope_id, partition_id, task_class,
+                   model_selection_digest, source_snapshot_digest, request_digest, result_digest,
+                   observation_digest, observation_json, trained, learning_status, observed_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (self.namespace, execution.execution_id, observation["outcome_id"], tenant_id, scope_id,
+             observation["partition_id"], observation["task_class"], observation["model_selection_digest"],
+             observation["source_snapshot_digest"], observation["request_digest"], observation["result_digest"],
+             learning.digest(observation), _json_dump(observation), int(trained), learning_status,
+             observation["observed_at"]),
+        )
+        try:
+            totals, totals_version = self._learning_totals_locked(tenant_id, scope_id)
+        except (ExecutionRepositoryCorruption, learning.RuntimeLearningError):
+            # An invalid optimization aggregate is not terminal execution
+            # authority. Preserve its quarantined bytes and the new outcome;
+            # the operator sees unavailable totals instead of invented counts.
+            return {"execution_id": execution.execution_id, "outcome_id": observation["outcome_id"],
+                    "recorded": True, "deduplicated": False, "trained": trained,
+                    "learning_status": learning_status, "totals_health": "quarantined"}
+        metrics = observation["metrics"]
+        increments = {
+            "outcomes": 1, observation["status"]: 1, "trained_outcomes": int(trained),
+            "resource_failures": metrics["resource_failure"], "telemetry_errors": metrics["telemetry_errors"],
+            "total_elapsed_seconds": metrics["elapsed_seconds"], "input_tokens": metrics["input_tokens"],
+            "output_tokens": metrics["output_tokens"], "provider_attempts": metrics["provider_attempts"],
+            "cost_usd": metrics["cost_usd"],
+        }
+        for key, value in increments.items():
+            totals[key] = min(learning.MAX_COUNTER, totals[key] + value)
+        self._connection.execute(
+            """INSERT INTO ai_execution_learning_totals(
+                   namespace, tenant_id, scope_id, version, totals_digest, totals_json, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(namespace, tenant_id, scope_id) DO UPDATE SET version = excluded.version,
+                   totals_digest = excluded.totals_digest, totals_json = excluded.totals_json,
+                   updated_at = excluded.updated_at""",
+            (self.namespace, tenant_id, scope_id, totals_version + 1, learning.digest(totals), _json_dump(totals), instant.isoformat()),
+        )
+        return {"execution_id": execution.execution_id, "outcome_id": observation["outcome_id"],
+                "recorded": True, "deduplicated": False, "trained": trained, "learning_status": learning_status}
+
+    def record_runtime_outcome(self, execution_id: str, *, now: datetime | None = None) -> dict[str, Any]:
+        """Idempotently learn an existing canonical terminal result, never a draft."""
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                execution = self.get(execution_id)
+                result = self.result(execution_id)
+                if result is None or execution.state not in {ExecutionState.COMPLETED, ExecutionState.FAILED, ExecutionState.CANCELLED}:
+                    raise ExecutionRepositoryError("runtime learning requires a durable terminal execution")
+                outcome = self._record_runtime_outcome_locked(execution, result, instant)
+                self._connection.execute("COMMIT")
+                return outcome
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def runtime_learning_snapshot(
+        self, *, tenant_id: str, scope_id: str = "tenant", limit: int = 20
+    ) -> dict[str, Any]:
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ExecutionRepositoryError("learning snapshot limit must be in [1, 100]")
+        with self._lock:
+            configuration = self._learning_policy_locked(tenant_id, scope_id)
+            policy = configuration["policy"]
+            totals_health = "healthy"
+            try:
+                totals, _ = self._learning_totals_locked(tenant_id, scope_id)
+            except (ExecutionRepositoryCorruption, learning.RuntimeLearningError):
+                totals = None
+                totals_health = "quarantined"
+            rows = self._connection.execute(
+                """SELECT * FROM ai_execution_learning_state
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
+                   ORDER BY updated_at DESC, partition_id LIMIT ?""",
+                (self.namespace, tenant_id, scope_id, limit),
+            ).fetchall()
+            partitions = []
+            for row in rows:
+                seed = f"{self.namespace}:{tenant_id}:{scope_id}:{row['partition_id']}"
+                state = self._learning_state_locked(row, seed=seed)
+                partitions.append({"partition_id": row["partition_id"], "task_class": row["task_class"],
+                    "model_selection_digest": row["model_selection_digest"], "state_version": int(row["version"]),
+                    "last_updated_at": row["updated_at"], **learning.state_readiness(state, policy)})
+            recent_rows = self._connection.execute(
+                """SELECT execution_id, model_selection_digest, source_snapshot_digest, observation_json,
+                          observation_digest, trained, learning_status, observed_at
+                   FROM ai_execution_learning_outcome
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
+                   ORDER BY observed_at DESC, execution_id LIMIT ?""",
+                (self.namespace, tenant_id, scope_id, limit),
+            ).fetchall()
+            recent = []
+            recent_outcome_errors = 0
+            for row in recent_rows:
+                try:
+                    observation = _json_object(row["observation_json"], "runtime learning outcome")
+                    if learning.digest(observation) != row["observation_digest"]:
+                        raise ExecutionRepositoryCorruption("runtime learning outcome digest differs")
+                    if not isinstance(observation.get("metrics"), dict):
+                        raise ExecutionRepositoryCorruption("runtime learning outcome metrics differ")
+                except (ExecutionRepositoryCorruption, learning.RuntimeLearningError, ValueError, TypeError):
+                    recent_outcome_errors += 1
+                    recent.append({"execution_id": row["execution_id"], "status": "unavailable",
+                        "error_code": "outcome_integrity_invalid", "elapsed_seconds": None,
+                        "source_snapshot_digest": row["source_snapshot_digest"],
+                        "model_selection_digest": row["model_selection_digest"], "observed_at": row["observed_at"],
+                        "trained": False, "learning_status": "outcome_quarantined"})
+                    continue
+                recent.append({"execution_id": row["execution_id"], "status": observation["status"],
+                    "error_code": observation["error_code"], "elapsed_seconds": observation["metrics"]["elapsed_seconds"],
+                    "source_snapshot_digest": row["source_snapshot_digest"],
+                    "model_selection_digest": row["model_selection_digest"], "observed_at": row["observed_at"],
+                    "trained": bool(row["trained"]), "learning_status": row["learning_status"]})
+            return {"schema_version": "skeleton.runtime.learning.snapshot.v1", "tenant_id": tenant_id,
+                "scope_id": scope_id, "policy": policy, "policy_version": configuration["version"],
+                "totals": totals, "totals_health": totals_health,
+                "observations": None if totals is None else totals["outcomes"], "partitions": partitions,
+                "recent_outcomes": recent, "recent_outcome_errors": recent_outcome_errors,
+                "model": {"kind": "bounded_online_mlp", "architecture": [12, 16, 8, 3], "optimizer": "adam",
+                    "parameter_count": learning.PARAMETER_COUNT, "outputs": list(learning.OUTPUT_NAMES),
+                    "latency_reference_seconds": learning.LATENCY_REFERENCE_SECONDS,
+                    "labels": "canonical operational telemetry; not creative quality or verified correctness"},
+                "limits": {"returned_partitions": len(partitions), "returned_outcomes": len(recent),
+                    "max_optimizer_updates_per_outcome": 1 + policy["replay_steps"],
+                    "partition_limit": policy["partition_limit"], "replay_capacity": policy["replay_capacity"]}}
+
+    def runtime_learning_recommendation(
+        self,
+        *,
+        tenant_id: str,
+        scope_id: str = "tenant",
+        request: AIExecutionRequest | None = None,
+        checkpoint_payload: dict[str, Any] | None = None,
+        task_class: str = "assistant.chat",
+        model_binding_digest: str = "",
+        source_snapshot_digest: str = "",
+        pressure: float = 0.0,
+        allowed_rounds: int = 1,
+        requested_rounds: int = 1,
+        resource_budget: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        try:
+            if request is not None:
+                identity = learning.runtime_learning_identity(request, checkpoint_payload)
+                if identity["tenant_id"] != tenant_id or identity["scope_id"] != scope_id:
+                    raise ExecutionRepositoryError("runtime learning request scope differs")
+            else:
+                task_class = learning.identifier(task_class, "task_class", maximum=256)
+                if model_binding_digest and (len(model_binding_digest) != 64 or any(char not in "0123456789abcdef" for char in model_binding_digest)):
+                    raise ExecutionRepositoryError("model selection digest is invalid")
+                if source_snapshot_digest and (len(source_snapshot_digest) != 64 or any(char not in "0123456789abcdef" for char in source_snapshot_digest)):
+                    raise ExecutionRepositoryError("source snapshot digest is invalid")
+                identity = {"tenant_id": tenant_id, "scope_id": scope_id, "task_class": task_class,
+                    "model_selection_digest": model_binding_digest, "source_snapshot_digest": source_snapshot_digest,
+                    "partition_id": learning.digest({"task_class": task_class, "model_selection_digest": model_binding_digest})}
+            features = learning.request_features(request, pressure=pressure, resource_budget=resource_budget, requested_rounds=requested_rounds)
+            with self._lock:
+                configuration = self._learning_policy_locked(tenant_id, scope_id)
+                row = self._connection.execute(
+                    """SELECT * FROM ai_execution_learning_state
+                       WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ?""",
+                    (self.namespace, tenant_id, scope_id, identity["partition_id"]),
+                ).fetchone()
+                seed = f"{self.namespace}:{tenant_id}:{scope_id}:{identity['partition_id']}"
+                state = self._learning_state_locked(row, seed=seed)
+                result = learning.recommend(state, configuration["policy"], features, allowed_rounds=allowed_rounds,
+                    requested_rounds=requested_rounds, pressure=pressure)
+                return {**result, **identity, "policy_version": configuration["version"],
+                    "state_version": 0 if row is None else int(row["version"])}
+        except learning.RuntimeLearningError as exc:
+            raise ExecutionRepositoryError(str(exc)) from exc
+
+    def runtime_learning_maintenance(
+        self, *, tenant_id: str, scope_id: str = "tenant", max_partitions: int = 4, now: datetime | None = None
+    ) -> dict[str, Any]:
+        """Bounded idle replay/integrity work on this repository's existing state.
+
+        Quarantined optimizer weights are discarded. Recovery uses at most four
+        digest-checked canonical outcomes and returns to cold-start confidence.
+        No provider model is trained, activated, selected, or promoted here.
+        """
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if isinstance(max_partitions, bool) or not isinstance(max_partitions, int) or not 1 <= max_partitions <= 8:
+            raise ExecutionRepositoryError("maintenance partition bound must be in [1, 8]")
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                policy = self._learning_policy_locked(tenant_id, scope_id)["policy"]
+                if not policy["enabled"]:
+                    self._connection.execute("COMMIT")
+                    return {"schema_version": "skeleton.runtime.learning.maintenance.v1", "tenant_id": tenant_id,
+                        "scope_id": scope_id, "processed_partitions": 0, "partitions": [],
+                        "deferred_reason": "learning_disabled", "external_model_work": False,
+                        "completed_at": instant.isoformat()}
+                rows = self._connection.execute(
+                    """SELECT * FROM ai_execution_learning_state
+                       WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
+                       ORDER BY COALESCE(maintenance_at, ''), updated_at, partition_id LIMIT ?""",
+                    (self.namespace, tenant_id, scope_id, max_partitions),
+                ).fetchall()
+                entries = []
+                for row in rows:
+                    seed = f"{self.namespace}:{tenant_id}:{scope_id}:{row['partition_id']}"
+                    state = self._learning_state_locked(row, seed=seed)
+                    recovering = state["quarantined"]
+                    updates_before = int(state["optimizer"]["step"])
+                    maintenance_error = None
+                    try:
+                        if recovering:
+                            old_quarantine = state["quarantine"]
+                            candidate = learning.new_state(seed)
+                            recent = self._connection.execute(
+                                """SELECT * FROM ai_execution_learning_outcome
+                                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ?
+                                   ORDER BY observed_at DESC LIMIT 4""",
+                                (self.namespace, tenant_id, scope_id, row["partition_id"]),
+                            ).fetchall()
+                            for outcome_row in reversed(recent):
+                                observation = _json_object(outcome_row["observation_json"], "learning recovery outcome")
+                                if learning.digest(observation) != outcome_row["observation_digest"]:
+                                    raise ExecutionRepositoryCorruption("learning recovery outcome digest differs")
+                                canonical_execution = self.get(outcome_row["execution_id"])
+                                canonical_result = self.result(outcome_row["execution_id"])
+                                if canonical_result is None or canonical_execution.request.identity_digest != outcome_row["request_digest"] or learning.digest(canonical_result.as_dict()) != outcome_row["result_digest"]:
+                                    raise ExecutionRepositoryCorruption("learning recovery terminal identity differs")
+                                candidate, _ = learning.learn_outcome(candidate, observation, {**policy, "replay_steps": 0}, seed=seed)
+                            candidate["recovery"] = {"prior_quarantine": old_quarantine, "recovered_at": instant.isoformat()}
+                            state = candidate
+                        else:
+                            state = learning.replay_maintenance(state, policy, max_updates=2)
+                    except (ExecutionRepositoryError, ValueError, TypeError, ArithmeticError, RecursionError) as exc:
+                        maintenance_error = type(exc).__name__
+                        state = learning.quarantine_state(seed, reason=f"maintenance: {type(exc).__name__}")
+                    self._save_learning_state_locked(dict(row), state, row, instant, maintenance=True)
+                    entries.append({"partition_id": row["partition_id"], "recovered": recovering and not state["quarantined"],
+                        "optimizer_updates": max(0, int(state["optimizer"]["step"]) - (0 if recovering else updates_before)),
+                        "maintenance_error": maintenance_error, **learning.state_readiness(state, policy)})
+                self._connection.execute("COMMIT")
+                return {"schema_version": "skeleton.runtime.learning.maintenance.v1", "tenant_id": tenant_id,
+                    "scope_id": scope_id, "processed_partitions": len(entries), "partitions": entries,
+                    "quarantined_partitions": sum(entry["quarantined"] for entry in entries),
+                    "external_model_work": False, "completed_at": instant.isoformat()}
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def runtime_storage_maintenance(self) -> dict[str, Any]:
+        """Attempt a passive WAL checkpoint without waiting on foreground work.
+
+        This is bounded storage housekeeping, not an integrity scan, terminal
+        ledger retention policy, journal-mode change, or database compaction.
+        Busy readers/writers keep their pages; a later idle task can retry.
+        """
+        result: dict[str, Any] = {
+            "mode": "passive_wal_checkpoint",
+            "wal_enabled": bool(getattr(self, "_storage_wal_enabled", False)),
+            "journal_mode_known": hasattr(self, "_storage_wal_enabled"),
+            "busy": 0, "log_pages": 0, "checkpointed_pages": 0,
+            "page_count": 0, "freelist_pages": 0, "metrics_available": False,
+            "noop": True,
+        }
+        if not self._lock.acquire(blocking=False):
+            return {**result, "busy": 1, "deferred_reason": "foreground_repository_busy"}
+        previous_busy_timeout: int | None = None
+        try:
+            if self._connection.in_transaction:
+                return {**result, "busy": 1, "deferred_reason": "foreground_transaction_active"}
+            timeout_row = self._connection.execute("PRAGMA busy_timeout").fetchone()
+            previous_busy_timeout = max(0, min(2147483647, int(timeout_row[0])))
+            self._connection.execute("PRAGMA busy_timeout = 0")
+            mode_row = self._connection.execute("PRAGMA journal_mode").fetchone()
+            wal_enabled = str(mode_row[0]).lower() == "wal"
+            self._storage_wal_enabled = wal_enabled
+            result.update({"wal_enabled": wal_enabled, "journal_mode_known": True})
+            if wal_enabled:
+                checkpoint = self._connection.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+                if checkpoint is not None:
+                    for name, value in zip(("busy", "log_pages", "checkpointed_pages"), checkpoint, strict=True):
+                        result[name] = max(0, min(learning.MAX_COUNTER, int(value)))
+                    result["noop"] = False
+            else:
+                result["noop_reason"] = "journal_mode_is_not_wal"
+            result["page_count"] = max(0, min(learning.MAX_COUNTER, int(self._connection.execute("PRAGMA page_count").fetchone()[0])))
+            result["freelist_pages"] = max(0, min(learning.MAX_COUNTER, int(self._connection.execute("PRAGMA freelist_count").fetchone()[0])))
+            result["metrics_available"] = True
+            return result
+        except sqlite3.OperationalError as exc:
+            # PASSIVE checkpoints may encounter another checkpoint or a schema
+            # writer. Do not turn that ordinary idle contention into an error.
+            if "locked" in str(exc).lower() or "busy" in str(exc).lower():
+                return {**result, "busy": 1, "deferred_reason": "sqlite_storage_busy"}
+            raise
+        finally:
+            try:
+                if previous_busy_timeout is not None:
+                    self._connection.execute(f"PRAGMA busy_timeout = {previous_busy_timeout:d}")
+            finally:
+                self._lock.release()
 
     def pending_outbox(
         self,

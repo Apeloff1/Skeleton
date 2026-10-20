@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import json
+import math
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -102,6 +104,7 @@ PLANNER_SYSTEM = (
     "The host supplies current expected_version and idempotency_key; use shown manifest/spec digests. "
     "Set done=true and operation=null when the bounded goal is satisfied or cannot be achieved with its grants."
 )
+NUMERIC_LEARNING_SCHEMA = "skeleton.game.studio_numeric_adaptation.v1"
 
 
 async def _indexes():
@@ -161,6 +164,16 @@ def _public(row):
     if row.get("quality_gate") is not None:
         result["quality_gate"] = row["quality_gate"]
         result["quality"] = (row.get("completion_receipt") or {}).get("quality")
+        if row["quality_gate"].get("adaptive_ranking"):
+            learning = row.get("quality_learning") or {}
+            result["adaptive_learning"] = {
+                "schema_version": NUMERIC_LEARNING_SCHEMA,
+                "status": learning.get("status", "waiting_for_baseline"),
+                **learning.get("learning_status", {}),
+                "advice": learning.get("advice", []),
+                "production_authority": False,
+                "scope": "Goal-local numeric ranking from opted-in matched original reviews; proposals require the existing editor, current-source review and acceptance gates.",
+            }
     result["workflow"] = {
         "remaining_actions": len(row.get("workflow", [])),
         "active": bool(row.get("workflow")),
@@ -1305,6 +1318,181 @@ async def _quality_progress(scope, row, project, *, allowed_editor_operation_id=
     return result
 
 
+def _numeric_review_spec(job):
+    from skeleton.jeeves.game_successor_runtime import validate_successor_spec
+
+    content = next((item["content"] for item in job["input"]["files"] if item["path"] == "game/successor/spec.json"), None)
+    if content is None:
+        raise GameLearningError("studio_numeric_source_absent", "Numeric advice requires an issued original world.", 409)
+    return validate_successor_spec(json.loads(content))
+
+
+def _numeric_dimensions(spec):
+    """Search a bounded neighborhood; the canonical editor validates proposals."""
+    from skeleton.learning.mirror_room import NumericDimension
+
+    # Reward definitions, goals, health, damage and source identities are not
+    # optimization knobs. These are ordinary inspected control/timing fields.
+    allowed = {
+        "movement": {"acceleration", "max_speed", "friction", "gravity", "max_fall_speed"},
+        "jump": {"velocity", "coyote_seconds", "buffer_seconds"},
+        "combat": {"projectile_speed", "cooldown", "invulnerability_seconds"},
+        "adventure": {"interact_radius", "melee_cooldown"},
+        "fishing": {"cast_range", "bite_min_seconds", "bite_max_seconds", "reel_speed", "tension_gain", "tension_release", "catch_window_seconds", "rod_strength"},
+        "farming": {"growth_days", "water_decay", "soil_quality", "season_days", "day_seconds", "weather_wet_probability"},
+    }
+    dimensions, parameters = [], {}
+    for section, names in sorted(allowed.items()):
+        for name in sorted(names):
+            value = spec.get("mechanics", {}).get(section, {}).get(name)
+            if type(value) not in (int, float) or not math.isfinite(value):
+                continue
+            key = "mechanics." + section + "." + name
+            radius = max(abs(float(value)) * 0.5, 0.1)
+            lower, upper = float(value) - radius, float(value) + radius
+            if value >= 0:
+                lower = max(0.0, lower)
+            span = upper - lower
+            dimensions.append(NumericDimension(key, lower, upper, span * 0.1, min_step=span * 0.0001))
+            parameters[key] = float(value)
+    return tuple(dimensions), parameters
+
+
+def _numeric_shape(spec, dimensions):
+    shape = copy.deepcopy(spec)
+    for dimension in dimensions:
+        _, section, name = dimension.name.split(".")
+        if name not in shape.get("mechanics", {}).get(section, {}):
+            return None
+        shape["mechanics"][section][name] = "numeric-ranking-dimension"
+    return _digest(shape)
+
+
+def _numeric_parameters(spec, dimensions):
+    result = {}
+    for dimension in dimensions:
+        _, section, name = dimension.name.split(".")
+        value = spec.get("mechanics", {}).get(section, {}).get(name)
+        if type(value) not in (int, float) or not math.isfinite(value) or not dimension.lower <= value <= dimension.upper:
+            return None
+        result[dimension.name] = float(value)
+    return result
+
+
+async def _advance_quality_learning(scope, row, token):
+    """Learn numeric ranking within the existing admitted, leased goal journal.
+
+    Ordinary historical reviews remain unauthorized for training. Only this
+    goal's explicit adaptive-ranking opt-in admits its original numeric review
+    facts. No ROM bytes, source text, teacher traces, quality labels or provider
+    weights enter the model. A ranking recommendation never executes an edit.
+    """
+    if not (row.get("quality_gate") or {}).get("adaptive_ranking") or row.get("stop_requested") or _time(row["expires_at"]) <= _now():
+        return row
+    from core import game_studio_review as reviews
+    from skeleton.jeeves.game_studio_review import compare_executed_reviews
+    from skeleton.jeeves.game_successor_runtime import validate_successor_spec, SuccessorRuntimeError
+    from skeleton.learning.mirror_room import AdaptiveLearningPolicy, DeterministicCoordinateLearner, MirrorRoomError, TrainingLearningArchive
+
+    project, _binding = await _current(scope, row)
+    quality = await _quality_progress(scope, row, project)
+    if not quality or not quality.get("baseline"):
+        return row
+    pin = quality["baseline"]
+    baseline = await reviews._load_review(scope, row["project_id"], pin["job_id"], historical=True)
+    if _quality_baseline_pin(baseline) != pin:
+        raise GameLearningError("studio_numeric_baseline_changed", "Numeric ranking baseline identity changed.", 503)
+    baseline_report = reviews._checked_result(baseline)
+    baseline_spec = _numeric_review_spec(baseline)
+    dimensions, baseline_parameters = _numeric_dimensions(baseline_spec)
+    if not dimensions:
+        return row
+    shape = _numeric_shape(baseline_spec, dimensions)
+    identity = baseline_report["source_identity"]
+    owner_context = _digest({
+        "schema_version": NUMERIC_LEARNING_SCHEMA, **scope,
+        "goal_id": row["goal_id"], "project_id": row["project_id"],
+        "baseline": pin, "quality_policy": row["quality_gate"],
+        "source_shape_digest": shape, "reviewer": identity["reviewer_implementation_digest"],
+        "review_protocol": identity["review_protocol"],
+        "reward": "mean-oriented-relative-task-return-goal-death/v1",
+        "cost": "observed-offline-operation-seconds/v1",
+    })
+    previous = row.get("quality_learning")
+    if previous and previous.get("owner_context_digest") != owner_context:
+        raise GameLearningError("studio_numeric_context_changed", "Stored numeric learning belongs to a different source or protocol.", 409)
+    try:
+        archive = TrainingLearningArchive.from_payload(previous["archive"], expected_digest=previous["archive_digest"]) if previous else TrainingLearningArchive()
+        learner = DeterministicCoordinateLearner(
+            generator_id="studio-numeric-ranker-v1", dimensions=dimensions, training_archive=archive,
+            learning_policy=AdaptiveLearningPolicy(minimum_rank_observations=1, replay_batch_size=8, max_candidate_pool=64),
+        )
+        learner.bind_numeric_observations(context_digest=owner_context, experiment_id="studio-" + row["goal_id"], workload_digest=pin["protocol_digest"])
+        status = "learning" if learner.learning_status["observations_seen"] else "bootstrap"
+        candidate_pin = quality.get("candidate")
+        if candidate_pin and candidate_pin.get("comparison_status") == "paired_observation":
+            candidate = await reviews._load_review(scope, row["project_id"], candidate_pin["job_id"], historical=True)
+            candidate_report = reviews._checked_result(candidate)
+            comparison = compare_executed_reviews(baseline_report, candidate_report, mode="source_revision")
+            candidate_spec = _numeric_review_spec(candidate)
+            parameters = _numeric_parameters(candidate_spec, dimensions)
+            if comparison["status"] != "paired_observation" or comparison["comparison_digest"] != candidate_pin["comparison_digest"]:
+                raise GameLearningError("studio_numeric_review_changed", "Numeric ranking needs the exact matched issued review.", 503)
+            if _numeric_shape(candidate_spec, dimensions) == shape and parameters is not None and parameters != baseline_parameters:
+                measurements = [item for item in comparison["measurements"] if not item["advisory"] and item["metric"] in {"task_return", "observed_goal", "observed_death"}]
+                if measurements:
+                    utility = sum((1.0 if item["preferred_direction"] == "higher" else -1.0) * item["delta"] / max(1.0, abs(item["baseline"])) for item in measurements) / len(measurements)
+                    cost = sum(float(value) for frame in candidate_report.get("frames", []) for name, value in frame.get("timings", {}).items() if name in {"step_wall_ms", "render_wall_ms"}) / 1000.0
+                    learner.observe_numeric_training(
+                        run_id=row["goal_id"], generation=max(1, candidate["input"]["project_version"]),
+                        candidate_id="review-" + candidate["job_id"], parent_parameters=baseline_parameters,
+                        candidate_parameters=parameters, parent_behavior_digest=pin["source_content_digest"],
+                        candidate_behavior_digest=_digest({item["path"]: item["content"] for item in candidate["input"]["files"]}),
+                        report_digest=comparison["comparison_digest"], utility_delta=utility, cost_units=cost,
+                        guardrails_passed=quality["status"] == "accepted",
+                    )
+                    status = "learning"
+            else:
+                status = "source_shape_changed"
+        current_spec = _numeric_review_spec({"input": {"files": project["files"]}})
+        current_parameters = _numeric_parameters(current_spec, dimensions)
+        advice = []
+        if _numeric_shape(current_spec, dimensions) == shape and current_parameters is not None:
+            for proposed in learner.rank_numeric_edits(parameters=current_parameters, generation=row["cursor"] + 1, limit=3):
+                revised, edits = copy.deepcopy(current_spec), []
+                for name, value in proposed.items():
+                    if value == current_parameters[name]:
+                        continue
+                    path = name.split(".")
+                    revised[path[0]][path[1]][path[2]] = value
+                    edits.append({"op": "set_field", "path": path, "value": value})
+                try:
+                    validate_successor_spec(revised)
+                except SuccessorRuntimeError:
+                    continue
+                if edits:
+                    advice.append({"expected_spec_digest": _digest(current_spec), "edits": edits})
+        else:
+            status = "source_shape_changed"
+        learning = {
+            "schema_version": NUMERIC_LEARNING_SCHEMA, "owner_context_digest": owner_context,
+            "baseline_review_digest": pin["review_digest"], "status": status,
+            "archive": learner.training_archive.payload(), "archive_digest": learner.training_archive.digest,
+            "learning_status": dict(learner.learning_status), "advice": advice,
+            "source_head_digest": _digest(project["files"]),
+            "training_authorized": True, "production_authority": False,
+        }
+        # The ordinary state digest, CAS lease and admitted byte count seal the
+        # whole optimizer/replay update together with its actual owner context.
+        if previous == learning:
+            return row
+        return await _set(scope, row["goal_id"], token, {"quality_learning": learning})
+    except MirrorRoomError as exc:
+        raise GameLearningError("studio_numeric_learning_invalid", "Stored numeric ranking state or measured outcome is invalid.", 409) from exc
+    except (SuccessorRuntimeError, json.JSONDecodeError) as exc:
+        raise GameLearningError("studio_numeric_source_invalid", "Numeric ranking needs a valid current original world.", 409) from exc
+
+
 async def _quality_restore_payload(scope, row, project, *, allowed_editor_operation_id=None):
     """Construct exact incumbent sections from the issued baseline, never prose."""
     from core import game_studio_review as reviews
@@ -2163,6 +2351,16 @@ async def _context(scope, row, project, binding):
     result["evidence_catalog"] = evidence[:128]
     if row.get("completion_requirements"):
         result["completion"] = await _completion_progress(scope, row, project)
+    learning = row.get("quality_learning")
+    if (row.get("quality_gate") or {}).get("adaptive_ranking") and learning:
+        result["numeric_adaptation"] = {
+            "status": learning["status"],
+            "learning_status": learning["learning_status"],
+            "advice": learning["advice"] if learning.get("source_head_digest") == _digest(project["files"]) else [],
+            "instruction": "These are optional numeric edit proposals learned from this goal's matched original review facts. Inspect the relevant mechanics, keep the exact source digest, and use only granted world.edit fields. Advice never replaces current-source simulation, review, restoration, or acceptance gates.",
+            "quality_certified": False,
+            "production_authority": False,
+        }
     while len(_json(result)) > 192 * 1024 and result.get("authoring_documents"):
         result["authoring_documents"].pop()
     _json(result, 192 * 1024)
@@ -2558,6 +2756,16 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
         }
         dump = lambda value: json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
         prompt = dump(data)
+        numeric = context.get("numeric_adaptation")
+        if numeric and "world.edit" in allowed:
+            proposed = {**data, "numeric_adaptation": {
+                "status": numeric["status"], "advice": numeric["advice"][:1],
+                "observations_seen": numeric["learning_status"]["observations_seen"],
+                "scope": "Optional numeric proposals; inspect and preserve current-source editor/review/restoration gates.",
+                "production_authority": False,
+            }}
+            if fits(dump(proposed)):
+                data, prompt = proposed, dump(proposed)
         # Admit complete actual observations atomically; never label a truncated result as complete.
         observations = []
         for lesson in context.get("review_lessons", []):
@@ -3202,6 +3410,7 @@ async def advance(scope, goal_id, body):
         model_waited = False
         row = await _recover_own_edit(scope, row, token)
         await _current(scope, row)
+        row = await _advance_quality_learning(scope, row, token)
         for _ in range(min(body["steps"], max(0, row["_active_advance"]["end_cursor"] - row["cursor"]))):
             if asyncio.get_running_loop().time() >= advance_deadline:
                 break
@@ -3268,6 +3477,7 @@ async def advance(scope, goal_id, body):
                     token,
                     {"pending_play_id": None, "status": "ready", "last_play_receipt": _feedback(play)},
                 )
+            row = await _advance_quality_learning(scope, row, token)
             if row["cursor"] >= row["max_steps"] or (
                 row["model_calls"] >= row["max_model_calls"]
                 and row.get("pending") is None
@@ -3498,6 +3708,7 @@ def _state_digest(row):
         "completion_mode",
         "quality_gate",
         "quality_baseline",
+        "quality_learning",
     ):
         if name in row:
             payload[name] = row[name]
@@ -3551,6 +3762,15 @@ def _validate_journal(row):
             raise GameLearningError(
                 "studio_goal_journal_corrupt", "Measured quality workflow grants differ.", 503
             )
+    if row.get("quality_learning") is not None:
+        learning = row["quality_learning"]
+        if (not (row.get("quality_gate") or {}).get("adaptive_ranking")
+            or not isinstance(learning, dict) or learning.get("schema_version") != NUMERIC_LEARNING_SCHEMA
+            or learning.get("training_authorized") is not True or learning.get("production_authority") is not False
+            or not isinstance(learning.get("archive"), dict) or _digest(learning["archive"]) != learning.get("archive_digest")
+            or not isinstance(learning.get("advice"), list) or len(learning["advice"]) > 3
+            or not isinstance(learning.get("learning_status"), dict)):
+            raise GameLearningError("studio_goal_journal_corrupt", "Numeric learning state differs from its explicit scoped grant or archive digest.", 503)
     if "max_output_tokens" in row or "max_output_tokens" in intent:
         if (
             type(row.get("max_output_tokens")) is not int

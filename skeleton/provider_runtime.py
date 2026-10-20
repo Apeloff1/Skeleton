@@ -3474,6 +3474,29 @@ class ProviderRegistry:
             "routing": routing,
         }
 
+    def runtime_serving_engines(self) -> tuple[Any, ...]:
+        """Return registered local serving owners, without activating a route.
+
+        Runtime pressure and maintenance never create a provider, resolve
+        credentials, change a selected model or alter activation identity.
+        Shared engines are returned once even when several adapters use them.
+        """
+        engines: list[Any] = []
+        seen: set[int] = set()
+        for adapter in self._adapters.values():
+            if adapter.provider_id != "local":
+                continue
+            engine = getattr(adapter, "engine", None)
+            if (
+                engine is not None
+                and id(engine) not in seen
+                and callable(getattr(engine, "configure_serving", None))
+                and callable(getattr(engine, "maintain", None))
+            ):
+                engines.append(engine)
+                seen.add(id(engine))
+        return tuple(engines)
+
     def verification_adapter_for(
         self,
         generator: ProviderAdapter,
@@ -3627,6 +3650,7 @@ def _execution_source_identity() -> dict[str, object]:
         "intelligence/verification_runtime.py",
         "intelligence/verification_policy.py",
         "ai/runtime/inference/local.py",
+        "ai/runtime/inference/adaptive_serving.py",
         "ai/runtime/inference/artifact.py",
         "ai/runtime/inference/neural.py",
         "ai/runtime/inference/native_runtime.py",

@@ -247,7 +247,8 @@
         "skeleton/testing/test_shared_pressure.py",
         "machine/state_backup_policy.json",
         "scripts/state_backup_bundle.py"
-      ]
+      ],
+      "runtime_optimization": "Same execution SQLite authority contains versioned runtime control policy, idempotent terminal numeric outcome ledger, tenant/scope/task/model learner checkpoints and bounded replay/optimizer state; existing idle effects ledger contains maintenance tasks/attempts/backoff/circuit state. No new database or store. Host control policy changes append same-transaction versioned audit receipts with actor digest and tenant-bound projections."
     },
     {
       "id": "verification-evidence-unbound",

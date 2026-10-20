@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import threading
 import time
 from collections.abc import Mapping
@@ -36,6 +37,8 @@ from .local import (
     LocalToolCall,
 )
 
+_MAX_OUTPUT_BYTES = 4 * 1024 * 1024
+
 
 class NativeRuntimeBackendError(RuntimeError):
     """Native runtime could not satisfy the local inference contract."""
@@ -55,8 +58,10 @@ class NativeRuntimeLocalModel:
         self.runtime = runtime
         identity = runtime.model_identity
         self.model_id = identity.model_id
+        self._admitted_model_id = self.model_id
         self._model_digest = runtime.model_digest
         self._runtime_digest = identity.identity_digest
+        self._tokenizer_digest = runtime.tokenizer.digest
 
     @property
     def model_digest(self) -> str:
@@ -71,7 +76,7 @@ class NativeRuntimeLocalModel:
 
     @property
     def tokenizer_digest(self) -> str:
-        return self.runtime.tokenizer.digest
+        return self._tokenizer_digest
 
     @property
     def execution_profile_digest(self) -> str:
@@ -83,6 +88,10 @@ class NativeRuntimeLocalModel:
                     "device": self.runtime.device.to_dict(),
                     "device_policy": self.runtime.device_policy.to_dict(),
                     "limits": self.runtime.limits.to_dict(),
+                    "tokenizer_limits": {
+                        name: getattr(self.runtime.tokenizer.limits, name)
+                        for name in ("max_chars", "max_tokens", "max_chunks", "max_chunk_chars")
+                    },
                 }
             ).encode("utf-8")
         ).hexdigest()
@@ -94,8 +103,12 @@ class NativeRuntimeLocalModel:
             self.runtime.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
             raise NativeRuntimeBackendError("native tokenizer identity drift") from exc
+        if self.model_id != self._admitted_model_id:
+            raise NativeRuntimeBackendError("native model identifier drift")
         if self.runtime.model_digest != self._model_digest:
             raise NativeRuntimeBackendError("native model digest drift")
+        if self.runtime.tokenizer.digest != self._tokenizer_digest:
+            raise NativeRuntimeBackendError("native tokenizer digest drift")
         if self.runtime.model_identity.identity_digest != self._runtime_digest:
             raise NativeRuntimeBackendError("native runtime identity drift")
 
@@ -108,8 +121,39 @@ class NativeRuntimeLocalModel:
         return dict(checkpoint)
 
     def count_input_tokens(self, request: LocalInferenceRequest) -> int:
+        if not isinstance(request, LocalInferenceRequest):
+            raise TypeError("request must be LocalInferenceRequest")
         self.assert_identity()
         return len(self.runtime.encode(self._render_prompt(request)).token_ids)
+
+    def generation_limits(self) -> dict[str, Any]:
+        """Expose activated sliding-context and tokenizer admission ceilings."""
+
+        self.assert_identity()
+        tokenizer_limits = self.runtime.tokenizer.limits
+        return {
+            "context_window": min(self.runtime.limits.max_context, tokenizer_limits.max_tokens),
+            "max_output_tokens": min(8192, self.runtime.limits.max_new_tokens, tokenizer_limits.max_tokens),
+            "max_total_tokens": self.runtime.limits.max_total_tokens,
+            "shared_context": False,
+            "tokenizer": self.tokenizer_kind,
+            "tokenizer_max_chars": tokenizer_limits.max_chars,
+            "tokenizer_max_tokens": tokenizer_limits.max_tokens,
+            "max_output_utf8_bytes": _MAX_OUTPUT_BYTES,
+            "limits_source": "activated_native_runtime",
+        }
+
+    @staticmethod
+    def _output_size(text: str, maximum: int = _MAX_OUTPUT_BYTES) -> int:
+        size = 0
+        try:
+            for offset in range(0, len(text), 8192):
+                size += len(text[offset : offset + 8192].encode("utf-8", errors="strict"))
+                if size > maximum:
+                    raise NativeRuntimeBackendError("native generation exceeds the local output byte budget")
+        except UnicodeEncodeError as exc:
+            raise NativeRuntimeBackendError("native generation contains invalid Unicode") from exc
+        return size
 
     @classmethod
     def from_checkpoint(
@@ -147,16 +191,24 @@ class NativeRuntimeLocalModel:
     def _reject_constant(value: str) -> None:
         raise NativeRuntimeBackendError("native local protocol contains non-finite JSON constant: " + value)
 
+    @staticmethod
+    def _finite_float(value: str) -> float:
+        number = float(value)
+        if not math.isfinite(number):
+            raise NativeRuntimeBackendError("native local protocol contains a non-finite JSON number")
+        return number
+
     def _load_protocol_json(self, text: str) -> Any:
         try:
             return json.loads(
                 text,
                 object_pairs_hook=self._strict_object,
                 parse_constant=self._reject_constant,
+                parse_float=self._finite_float,
             )
         except NativeRuntimeBackendError:
             raise
-        except (json.JSONDecodeError, RecursionError) as exc:
+        except (ValueError, RecursionError) as exc:
             raise NativeRuntimeBackendError("native local protocol output is not valid JSON") from exc
 
     def _normalized_structured_output_schema(
@@ -175,6 +227,7 @@ class NativeRuntimeLocalModel:
 
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
         prompt = request.rendered_input
+        structured_schema = self._normalized_structured_output_schema(request)
         if request.tools:
             allowed: list[dict[str, Any]] = []
             seen_tool_ids: set[str] = set()
@@ -192,8 +245,6 @@ class NativeRuntimeLocalModel:
                         "input_schema": item.get("input_schema", {}),
                     }
                 )
-            if request.structured_output_schema is not None:
-                self._normalized_structured_output_schema(request)
             prompt += (
                 "\n\n[Skeleton native local tool protocol]\n"
                 "When a tool is required, output exactly one JSON object and no prose: "
@@ -209,16 +260,17 @@ class NativeRuntimeLocalModel:
                 + "Allowed tools: "
                 + self._stable_json(allowed)
             )
+            if structured_schema is not None:
+                prompt += "\nFinal structured output schema: " + self._stable_json(structured_schema)
             if request.tool_choice in {"required", "specific"}:
                 prompt += "\nA tool call is required for this turn; do not return a prose-only answer."
             if request.tool_choice == "specific":
                 prompt += "\nRequired tool_id: " + str(request.specific_tool_id)
         elif request.structured_output_schema is not None:
-            schema = self._normalized_structured_output_schema(request)
             prompt += (
                 "\n\n[Skeleton native structured-output protocol]\n"
                 "Output exactly one JSON object matching this schema and no prose: "
-                + self._stable_json(schema)
+                + self._stable_json(structured_schema)
             )
         return prompt
 
@@ -242,13 +294,12 @@ class NativeRuntimeLocalModel:
         }
         payload: Any = None
         if text.startswith("{"):
-            if request.tools or request.structured_output_schema is not None:
+            try:
                 payload = self._load_protocol_json(text)
-            else:
-                try:
-                    payload = json.loads(text)
-                except json.JSONDecodeError:
-                    payload = None
+            except NativeRuntimeBackendError:
+                if request.tools or request.structured_output_schema is not None:
+                    raise
+                payload = None
             version = payload.get("skeleton_local_response") if isinstance(payload, dict) else None
             if (
                 isinstance(payload, dict)
@@ -268,9 +319,10 @@ class NativeRuntimeLocalModel:
                         "native local response envelope contains unsupported fields"
                     )
                 raw_calls = payload.get("tool_calls", [])
-                if not isinstance(raw_calls, list):
-                    raise NativeRuntimeBackendError("native tool_calls envelope must be a list")
+                if not isinstance(raw_calls, list) or len(raw_calls) > 256:
+                    raise NativeRuntimeBackendError("native tool_calls envelope must be a list of at most 256 calls")
                 calls: list[LocalToolCall] = []
+                call_ids: set[str] = set()
                 for raw_call in raw_calls:
                     if not isinstance(raw_call, dict):
                         raise NativeRuntimeBackendError("native local tool call must be an object")
@@ -283,6 +335,9 @@ class NativeRuntimeLocalModel:
                     arguments = raw_call.get("arguments", {})
                     if not call_id:
                         raise NativeRuntimeBackendError("native local tool call missing call_id")
+                    if call_id in call_ids:
+                        raise NativeRuntimeBackendError("native local tool call identifiers must be unique")
+                    call_ids.add(call_id)
                     if tool_id not in allowed_tool_ids:
                         raise NativeRuntimeBackendError(
                             f"native model requested undeclared tool_id {tool_id!r}"
@@ -369,7 +424,10 @@ class NativeRuntimeLocalModel:
         if cancel.is_set():
             raise LocalInferenceCancelled("native local inference cancelled")
 
-        self.assert_identity()
+        limits = self.generation_limits()
+        if request.max_output_tokens > limits["max_output_tokens"]:
+            raise NativeRuntimeBackendError("native request exceeds the admitted output-token budget")
+        execution_profile = self.execution_profile_digest
         started = time.perf_counter()
         eos_id = self.runtime.tokenizer.special_token_id("eos")
         config = GenerationConfig(
@@ -390,9 +448,29 @@ class NativeRuntimeLocalModel:
 
         try:
             rendered_input = self._render_prompt(request)
-            with self.runtime.stream(rendered_input, config, interrupt=interrupt) as stream:
-                for _event in stream:
+            if len(rendered_input) > limits["tokenizer_max_chars"]:
+                raise NativeRuntimeBackendError("native request exceeds the tokenizer character budget")
+            prompt_sequence = self.runtime.encode(rendered_input)
+            input_tokens = len(prompt_sequence.token_ids)
+            if input_tokens > limits["context_window"]:
+                raise NativeRuntimeBackendError("native request exceeds the admitted context budget")
+            if input_tokens + request.max_output_tokens > limits["max_total_tokens"]:
+                raise NativeRuntimeBackendError("native request exceeds the admitted total-token budget")
+            generated_bytes = 0
+            generated_count = 0
+            # stream_sequence admits the exact sequence used for accounting;
+            # native string stops finish normally with real usage and receipt.
+            with self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt) as stream:
+                for event in stream:
                     interrupt()
+                    if event.kind == "token":
+                        generated_count += 1
+                        if generated_count > request.max_output_tokens:
+                            raise NativeRuntimeBackendError("native decoder exceeded its output-token budget")
+                        piece = self.runtime.tokenizer.token_text(event.token_id)
+                        generated_bytes += self._output_size(piece) + int(generated_count > 1)
+                        if generated_bytes > _MAX_OUTPUT_BYTES:
+                            raise NativeRuntimeBackendError("native generation exceeds the local output byte budget")
             result = stream.result
             if result is None:
                 raise NativeRuntimeBackendError("native runtime terminated without a generation result")
@@ -402,6 +480,20 @@ class NativeRuntimeLocalModel:
             raise NativeRuntimeBackendError("native runtime rejected local inference") from exc
 
         self.assert_identity()
+        interrupt()
+        if self.execution_profile_digest != execution_profile:
+            raise NativeRuntimeBackendError("native execution profile changed during inference")
+        if (
+            result.prompt_sequence != prompt_sequence
+            or result.usage.prompt_tokens != input_tokens
+            or result.usage.generated_tokens != len(result.generated_ids)
+            or generated_count != len(result.generated_ids)
+            or len(result.generated_ids) > request.max_output_tokens
+        ):
+            raise NativeRuntimeBackendError("native terminal result does not match admitted token accounting")
+        if result.finish_reason not in {"completed", "length", "stop_token", "stop_string"}:
+            raise NativeRuntimeBackendError("native decoder returned an unsupported terminal reason")
+        self._output_size(result.text)
         raw_text, stop_hit = self._truncate_stop(result.text, request.stop)
         stop_hit = stop_hit or result.finish_reason in {"stop_token", "stop_string"}
         if not raw_text and not stop_hit:
@@ -413,6 +505,7 @@ class NativeRuntimeLocalModel:
                 if stop_hit
                 else "native runtime generated no output"
             )
+        self._output_size(raw_text)
 
         text, tool_calls, structured, parsed_finish = self._parse_output(
             raw_text,
@@ -428,7 +521,7 @@ class NativeRuntimeLocalModel:
             finish_reason = parsed_finish
 
         published_digest = hashlib.sha256(
-            (request.digest + ":" + result.output_digest + ":" + self.runtime_digest).encode("ascii")
+            (request.digest + ":" + result.output_digest + ":" + self._runtime_digest + ":" + execution_profile).encode("ascii")
         ).hexdigest()
         visible_digest = hashlib.sha256((text or "").encode("utf-8")).hexdigest()
         execution_receipt_digest = hashlib.sha256(
@@ -437,7 +530,7 @@ class NativeRuntimeLocalModel:
                 + ":"
                 + request.digest
                 + ":"
-                + self.runtime_digest
+                + self._runtime_digest
                 + ":"
                 + published_digest
                 + ":"
@@ -446,6 +539,7 @@ class NativeRuntimeLocalModel:
                 + finish_reason
             ).encode("ascii")
         ).hexdigest()
+        interrupt()
         return LocalInferenceResult(
             text=text,
             model_id=self.model_id,

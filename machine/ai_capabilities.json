@@ -599,5 +599,13 @@
     "capability version and instruction policy reference are recorded in execution/context evidence",
     "capability policy may be tightened by tenant/user/request constraints but never widened by model output",
     "provider capability names are vendor-neutral semantics"
-  ]
+  ],
+  "runtime_administration": {
+    "capability": "assistant.runtime.control",
+    "owner_plane": "engine-api",
+    "service_scope": "engine:runtime-control",
+    "application_policy": "authenticated administrator only; scoped viewer observations",
+    "implementation_state": "draft",
+    "grants": "existing attester grant and allowed tenant/capability configuration; no provider selection or model promotion authority"
+  }
 }

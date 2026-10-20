@@ -64,6 +64,10 @@ class EngineAuthorizationError(EngineClientError):
     """The engine rejected delegated authority."""
 
 
+class EngineRequestRejectedError(EngineProtocolError):
+    """A bounded control update failed canonical engine policy validation."""
+
+
 class EngineExecutionFailed(EngineClientError):
     """A submitted engine execution reached a non-success terminal state."""
 
@@ -1052,6 +1056,7 @@ class EngineClient:
         params: Mapping[str, str] | None = None,
         trace_id: str | None = None,
         max_response_bytes: int | None = None,
+        surface_validation_rejection: bool = False,
     ) -> dict[str, Any]:
         timeout = httpx.Timeout(self.config.request_timeout_s)
         try:
@@ -1100,6 +1105,8 @@ class EngineClient:
             raise EngineAuthorizationError("engine rejected delegated authority")
         if response.status_code >= 500:
             raise EngineUnavailableError("engine service is unavailable")
+        if surface_validation_rejection and response.status_code in {400, 422}:
+            raise EngineRequestRejectedError("engine rejected runtime control policy")
         if response.status_code >= 400:
             raise EngineProtocolError(f"engine rejected request with status {response.status_code}")
         try:
@@ -1580,6 +1587,120 @@ class EngineClient:
         _text(actor_id, "actor_id", maximum=512)
         tenant = _text(tenant_id, "tenant_id", maximum=512)
         return await self.provider_status(tenant_id=tenant, trace_id=trace_id)
+
+    @staticmethod
+    def _runtime_control_state(
+        payload: Mapping[str, Any], *, actor_id: str, tenant_id: str
+    ) -> dict[str, Any]:
+        """Accept only the versioned, identity-bound engine control snapshot."""
+
+        if payload.get("schema_version") != "skeleton.ai.runtime_control.v1":
+            raise EngineProtocolError("engine runtime control schema is incompatible")
+        if payload.get("actor_id") != actor_id or payload.get("tenant_id") != tenant_id:
+            raise EngineProtocolError("engine runtime control identity mismatch")
+        _positive_int(payload.get("policy_version"), "runtime_control.policy_version", maximum=2**63 - 1)
+        for section in ("serving", "learning", "maintenance", "ratchet"):
+            if not isinstance(payload.get(section), Mapping):
+                raise EngineProtocolError(f"runtime_control.{section} must be an object")
+        for section in ("serving", "learning", "maintenance"):
+            if not isinstance(payload[section].get("policy"), Mapping):
+                raise EngineProtocolError(f"runtime_control.{section}.policy must be an object")
+        for name in ("capacity", "pressure", "cache"):
+            if not isinstance(payload["serving"].get(name), Mapping):
+                raise EngineProtocolError(f"runtime_control.serving.{name} must be an object")
+        if not isinstance(payload["serving"].get("draining"), bool):
+            raise EngineProtocolError("runtime_control.serving.draining must be boolean")
+        for section, names in (
+            ("learning", ("totals", "partitions")),
+            ("maintenance", ("status", "recent_tasks")),
+        ):
+            if any(name not in payload[section] for name in names):
+                raise EngineProtocolError(f"runtime_control.{section} is incomplete")
+        if not isinstance(payload["ratchet"].get("available"), bool):
+            raise EngineProtocolError("runtime_control.ratchet.available must be boolean")
+        try:
+            json.dumps(payload, allow_nan=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise EngineProtocolError("engine runtime control state is not finite JSON") from exc
+        return dict(payload)
+
+    async def runtime_control(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Read engine-owned controls using the existing service-auth boundary."""
+
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        payload = await self._request(
+            "GET",
+            "/runtime-control",
+            params={"actor_id": actor, "tenant_id": tenant},
+            trace_id=trace_id,
+            max_response_bytes=256 * 1024,
+        )
+        return self._runtime_control_state(payload, actor_id=actor, tenant_id=tenant)
+
+    async def configure_runtime_control(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        expected_version: int,
+        serving: Mapping[str, Any] | None = None,
+        learning: Mapping[str, Any] | None = None,
+        maintenance: Mapping[str, Any] | None = None,
+        action: str | None = None,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Forward one optimistic operator update; never retry a stale version."""
+
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        body: dict[str, Any] = {
+            "actor_id": actor,
+            "tenant_id": tenant,
+            "expected_version": _positive_int(expected_version, "expected_version", maximum=2**63 - 1),
+        }
+        for section, changes in (("serving", serving), ("learning", learning), ("maintenance", maintenance)):
+            if changes is not None:
+                if not isinstance(changes, Mapping) or not changes:
+                    raise EngineProtocolError(f"runtime_control.{section} must be a non-empty object")
+                allowed = {
+                    "serving": {"enabled", "max_effective_concurrency"},
+                    "learning": {"enabled"},
+                    "maintenance": {"enabled", "augmentation_enabled"},
+                }[section]
+                if set(changes) - allowed:
+                    raise EngineProtocolError(f"runtime_control.{section} has unsupported policy fields")
+                for name, value in changes.items():
+                    if name in {"enabled", "augmentation_enabled"} and not isinstance(value, bool):
+                        raise EngineProtocolError(f"runtime_control.{section}.{name} must be boolean")
+                    if name == "max_effective_concurrency":
+                        _positive_int(value, "max_effective_concurrency", maximum=32)
+                body[section] = dict(changes)
+        if action is not None:
+            if action not in {"trim_cache", "clear_cache", "drain", "resume"}:
+                raise EngineProtocolError("runtime control action is invalid")
+            body["action"] = action
+        if len(body) == 3:
+            raise EngineProtocolError("runtime control update must contain a change")
+        try:
+            json.dumps(body, allow_nan=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise EngineProtocolError("runtime control update must be finite JSON") from exc
+        payload = await self._request(
+            "PATCH",
+            "/runtime-control",
+            json_body=body,
+            trace_id=trace_id,
+            max_response_bytes=256 * 1024,
+            surface_validation_rejection=True,
+        )
+        return self._runtime_control_state(payload, actor_id=actor, tenant_id=tenant)
 
     async def provider_status(
         self,
@@ -2169,6 +2290,7 @@ __all__ = [
     "EngineExecutionFailed",
     "EngineNotFoundError",
     "EngineProtocolError",
+    "EngineRequestRejectedError",
     "EngineTerminalResult",
     "EngineUnavailableError",
     "command_from_context",

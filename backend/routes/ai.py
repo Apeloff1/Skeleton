@@ -19,7 +19,7 @@ import time
 from typing import Any, Dict, List, Literal, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -52,10 +52,13 @@ from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
+    EngineAuthorizationError,
     EngineClient,
     EngineClientError,
+    EngineConflictError,
     EngineExecutionFailed,
     EngineNotFoundError,
+    EngineRequestRejectedError,
     EngineUnavailableError,
     command_from_context,
 )
@@ -367,6 +370,51 @@ class AIChatResumeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     idempotency_key: str = Field(min_length=1, max_length=1024)
     response_mode: Literal["deferred", "wait"] = "deferred"
+
+
+class AIRuntimePolicyPatch(BaseModel):
+    """Finite operator patch; omitted fields preserve canonical engine policy."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if not self.model_fields_set or any(
+            getattr(self, name) is None for name in self.model_fields_set
+        ):
+            raise ValueError("runtime policy patches require a non-null policy change")
+        return self
+
+
+class AIRuntimeServingPatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+
+
+class AIRuntimeLearningPatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+
+
+class AIRuntimeMaintenancePatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    augmentation_enabled: bool | None = None
+
+
+class AIRuntimeControlUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    expected_version: int = Field(ge=1, le=2**63 - 1)
+    serving: AIRuntimeServingPatch | None = None
+    learning: AIRuntimeLearningPatch | None = None
+    maintenance: AIRuntimeMaintenancePatch | None = None
+    action: Literal["trim_cache", "clear_cache", "drain", "resume"] | None = None
+
+    @model_validator(mode="after")
+    def require_change(self):
+        changes = self.model_fields_set - {"expected_version"}
+        if not changes or any(getattr(self, name) is None for name in changes):
+            raise ValueError("runtime control updates require a non-null policy change or action")
+        return self
 
 
 class AIChatCancelRequest(BaseModel):
@@ -834,6 +882,65 @@ def _engine_chat_error(exc: EngineClientError) -> HTTPException:
     if isinstance(exc, EngineExecutionFailed):
         return HTTPException(status_code=502, detail="AI execution failed")
     return HTTPException(status_code=502, detail="AI engine request failed")
+
+
+def _runtime_control_engine() -> EngineClient:
+    try:
+        engine = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise EngineUnavailableError("runtime control engine configuration is unavailable") from exc
+    if engine is None:
+        raise EngineUnavailableError("runtime control engine is not configured")
+    return engine
+
+
+def _runtime_control_error(exc: EngineClientError) -> HTTPException:
+    """Keep control failures actionable without exposing engine or provider data."""
+
+    if isinstance(exc, EngineConflictError):
+        return HTTPException(
+            status_code=409,
+            detail={
+                "code": "runtime_control_conflict",
+                "message": "Runtime policy changed before this update was applied.",
+                "action": "Refresh runtime controls and reapply the change using the current policy version.",
+            },
+        )
+    if isinstance(exc, EngineAuthorizationError):
+        return HTTPException(
+            status_code=403,
+            detail={
+                "code": "runtime_control_forbidden",
+                "message": "The engine denied runtime control for this identity and tenant.",
+                "action": "Ask an administrator to check the engine service grant for this tenant.",
+            },
+        )
+    if isinstance(exc, EngineRequestRejectedError):
+        return HTTPException(
+            status_code=422,
+            detail={
+                "code": "runtime_control_policy_rejected",
+                "message": "The engine rejected this change under its configured runtime policy.",
+                "action": "Refresh runtime controls and use values within the reported operator capacity.",
+            },
+        )
+    if isinstance(exc, (EngineUnavailableError, EngineNotFoundError)):
+        return HTTPException(
+            status_code=503,
+            detail={
+                "code": "runtime_control_unavailable",
+                "message": "The configured engine runtime control service is unavailable.",
+                "action": "Start or update the configured Skeleton engine, then refresh runtime controls.",
+            },
+        )
+    return HTTPException(
+        status_code=502,
+        detail={
+            "code": "runtime_control_protocol_error",
+            "message": "The engine returned an incompatible runtime control response.",
+            "action": "Update the application and engine together, then refresh runtime controls.",
+        },
+    )
 
 
 def _engine_configured() -> bool:
@@ -3555,6 +3662,44 @@ async def get_ai_models(user=Depends(require_role("viewer"))):
     except EngineClientError:
         client = None
     return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+
+
+@router.get("/runtime-control")
+async def get_ai_runtime_control(response: Response, user=Depends(require_role("viewer"))):
+    """Observe the canonical runtime in the authenticated caller's tenant scope."""
+
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        state = await _runtime_control_engine().runtime_control(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return state
+
+
+@router.patch("/runtime-control")
+async def configure_ai_runtime_control(
+    update: AIRuntimeControlUpdate,
+    response: Response,
+    user=Depends(require_role("admin")),
+):
+    """Apply one administrator-controlled CAS update through the engine owner."""
+
+    tenant_id, actor_id = _chat_identity(user)
+    changes = update.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    try:
+        state = await _runtime_control_engine().configure_runtime_control(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            **changes,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return state
 
 
 @router.get("/chat/readiness")

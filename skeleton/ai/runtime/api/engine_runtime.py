@@ -20,6 +20,7 @@ from skeleton.intelligence.execution_runtime import (
     FinalizationBindingHook,
     VerificationHook,
 )
+from skeleton.intelligence.runtime_control import RuntimeOptimizationControl
 from skeleton.kernel.runtime_supervision import (
     RuntimeServiceLifecycle,
     RuntimeSupervisionError,
@@ -92,6 +93,12 @@ class EngineExecutionCoordinator:
         self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
         self._supervision_faults: list[str] = []
         self._closed = False
+        self.runtime_control = RuntimeOptimizationControl(
+            self.service.repository,
+            self.provider_registry,
+        )
+        self._maintenance_stop = asyncio.Event()
+        self._maintenance_task: asyncio.Task[None] | None = None
 
     async def ensure_started(
         self,
@@ -102,13 +109,9 @@ class EngineExecutionCoordinator:
         if not isinstance(command, EngineExecutionCommand):
             raise TypeError("command must be EngineExecutionCommand")
         if self._closed:
-            raise EngineExecutionCoordinatorError(
-                "engine execution coordinator is closed"
-            )
+            raise EngineExecutionCoordinatorError("engine execution coordinator is closed")
         if self._supervision_faults:
-            raise EngineExecutionCoordinatorError(
-                "engine execution coordinator supervision is faulted"
-            )
+            raise EngineExecutionCoordinatorError("engine execution coordinator supervision is faulted")
         execution_id = command.execution_request.execution_id
         if self.service.repository.result(execution_id) is not None:
             return
@@ -133,11 +136,13 @@ class EngineExecutionCoordinator:
                     ) from exc
 
             try:
+                self.runtime_control.foreground_started()
                 task = asyncio.create_task(
                     self._drive(command),
                     name="engine-execution:" + execution_id,
                 )
             except BaseException:
+                self.runtime_control.foreground_finished(command.execution_request)
                 if lease is not None:
                     self.lifecycle.release_work(lease)
                 raise
@@ -168,16 +173,12 @@ class EngineExecutionCoordinator:
             released = self.lifecycle.release_work(lease)
         except RuntimeSupervisionError as exc:
             self._record_supervision_fault(
-                "lifecycle lease release failed for "
-                + lease.work_id
-                + ": "
-                + str(exc)
+                "lifecycle lease release failed for " + lease.work_id + ": " + str(exc)
             )
             return
         if not released:
             self._record_supervision_fault(
-                "lifecycle lease disappeared before task retirement: "
-                + lease.work_id
+                "lifecycle lease disappeared before task retirement: " + lease.work_id
             )
 
     def _task_done(
@@ -201,16 +202,8 @@ class EngineExecutionCoordinator:
     def supervision_snapshot(self) -> dict[str, object]:
         """Return identity-safe local supervision state for health/evidence."""
 
-        tasks = tuple(
-            sorted(
-                execution_id
-                for execution_id, task in self._tasks.items()
-                if not task.done()
-            )
-        )
-        lease_ids = tuple(
-            sorted(lease.work_id for lease in self._lifecycle_leases.values())
-        )
+        tasks = tuple(sorted(execution_id for execution_id, task in self._tasks.items() if not task.done()))
+        lease_ids = tuple(sorted(lease.work_id for lease in self._lifecycle_leases.values()))
         return {
             "closed": self._closed,
             "active_execution_ids": tasks,
@@ -219,6 +212,11 @@ class EngineExecutionCoordinator:
             "active_lease_count": len(lease_ids),
             "supervision_faults": tuple(self._supervision_faults),
             "faulted": bool(self._supervision_faults),
+            "runtime_maintenance": {
+                "owned": self._maintenance_task is not None,
+                "running": self._maintenance_task is not None and not self._maintenance_task.done(),
+                "stopping": self._maintenance_stop.is_set(),
+            },
         }
 
     async def ensure_execution(self, execution_id: str) -> None:
@@ -226,9 +224,7 @@ class EngineExecutionCoordinator:
             str(execution_id),
         )
         if stored is None:
-            raise EngineExecutionCoordinatorError(
-                "engine submission is unavailable for execution"
-            )
+            raise EngineExecutionCoordinatorError("engine submission is unavailable for execution")
         await self.ensure_started(stored.command)
 
     async def interrupt_cancelled_execution(self, execution_id: str) -> None:
@@ -244,13 +240,9 @@ class EngineExecutionCoordinator:
         try:
             execution = self.service.repository.get(execution_id)
         except Exception as exc:
-            raise EngineExecutionCoordinatorError(
-                "engine execution is unavailable for cancellation"
-            ) from exc
+            raise EngineExecutionCoordinatorError("engine execution is unavailable for cancellation") from exc
         if not execution.cancellation_requested:
-            raise EngineExecutionCoordinatorError(
-                "execution cancellation has not been requested"
-            )
+            raise EngineExecutionCoordinatorError("execution cancellation has not been requested")
         if execution.terminal or self.service.repository.result(execution_id) is not None:
             return
 
@@ -280,11 +272,14 @@ class EngineExecutionCoordinator:
                     pass
 
     async def recover(self) -> tuple[str, ...]:
+        if self._maintenance_task is None and not self._closed:
+            self._maintenance_task = asyncio.create_task(
+                self._maintain_runtime(),
+                name="engine-runtime-maintenance",
+            )
         recovered: list[str] = []
         for execution in self.service.repository.recoverable():
-            stored = self.service.submissions.get_by_execution_id(
-                execution.execution_id
-            )
+            stored = self.service.submissions.get_by_execution_id(execution.execution_id)
             if stored is None:
                 await self._finalize_failure(
                     execution.execution_id,
@@ -300,6 +295,7 @@ class EngineExecutionCoordinator:
 
     async def shutdown(self) -> None:
         self._closed = True
+        self._maintenance_stop.set()
         async with self._lock:
             task_items = tuple(self._tasks.items())
 
@@ -317,32 +313,26 @@ class EngineExecutionCoordinator:
         for execution_id, task in task_items:
             self._task_done(execution_id, task)
 
+        # A maintenance callback is bounded and cooperative. Keep custody of
+        # the worker until it physically drains before closing its database.
+        if self._maintenance_task is not None:
+            await self._maintenance_task
+            self._maintenance_task = None
+        self.runtime_control.close()
+
         async with self._lock:
             stranded_tasks = tuple(
-                execution_id
-                for execution_id, task in self._tasks.items()
-                if not task.done()
+                execution_id for execution_id, task in self._tasks.items() if not task.done()
             )
             self._tasks = {
-                execution_id: task
-                for execution_id, task in self._tasks.items()
-                if not task.done()
+                execution_id: task for execution_id, task in self._tasks.items() if not task.done()
             }
 
         if stranded_tasks:
-            self._record_supervision_fault(
-                "shutdown left active tasks: " + ",".join(sorted(stranded_tasks))
-            )
+            self._record_supervision_fault("shutdown left active tasks: " + ",".join(sorted(stranded_tasks)))
         if self._lifecycle_leases:
-            leaked = tuple(
-                sorted(
-                    lease.work_id
-                    for lease in self._lifecycle_leases.values()
-                )
-            )
-            self._record_supervision_fault(
-                "shutdown left lifecycle leases: " + ",".join(leaked)
-            )
+            leaked = tuple(sorted(lease.work_id for lease in self._lifecycle_leases.values()))
+            self._record_supervision_fault("shutdown left lifecycle leases: " + ",".join(leaked))
 
         if self._supervision_faults:
             raise EngineExecutionCoordinatorError(
@@ -350,7 +340,57 @@ class EngineExecutionCoordinator:
                 + "; ".join(self._supervision_faults)
             )
 
-    async def _drive(
+    async def _maintain_runtime(self) -> None:
+        while not self._maintenance_stop.is_set():
+            lease = None
+            try:
+                if self.lifecycle is not None:
+                    lease = self.lifecycle.acquire_work("engine-maintenance:runtime")
+                worker = asyncio.create_task(asyncio.to_thread(self.runtime_control.tick))
+                try:
+                    await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    while not worker.done():
+                        try:
+                            await asyncio.shield(worker)
+                        except asyncio.CancelledError:
+                            continue
+                    worker.result()
+                    raise
+            except RuntimeSupervisionError:
+                # STARTING/DRAINING never grants background work.
+                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Runtime maintenance deferred (%s)",
+                    type(exc).__name__,
+                )
+            finally:
+                if lease is not None and self.lifecycle is not None:
+                    try:
+                        self.lifecycle.release_work(lease)
+                    except RuntimeSupervisionError:
+                        self._record_supervision_fault("runtime maintenance lease release failed")
+            try:
+                await asyncio.wait_for(self._maintenance_stop.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                pass
+
+    async def _drive(self, command: EngineExecutionCommand) -> None:
+        try:
+            self.runtime_control.reconcile()
+            await self._execute(command)
+        finally:
+            try:
+                self.runtime_control.foreground_finished(command.execution_request)
+            except Exception as exc:
+                # Optimization is subordinate to committed execution results.
+                logging.getLogger(__name__).warning(
+                    "Runtime outcome upkeep deferred (%s)",
+                    type(exc).__name__,
+                )
+
+    async def _execute(
         self,
         command: EngineExecutionCommand,
     ) -> None:
@@ -400,16 +440,14 @@ class EngineExecutionCoordinator:
             "verification_adapter_for",
             None,
         )
-        semantic_verification_adapter = (
-            verifier_selector(provider)
-            if callable(verifier_selector)
-            else None
-        )
+        semantic_verification_adapter = verifier_selector(provider) if callable(verifier_selector) else None
 
         from skeleton.intelligence.cooperation import normalize_cooperation_policy
 
         cooperative_adapters = {}
-        cooperation = normalize_cooperation_policy(command.execution_request.context_policy.get("cooperation"))
+        cooperation = normalize_cooperation_policy(
+            command.execution_request.context_policy.get("cooperation")
+        )
         if cooperation is not None:
             try:
                 for role, selection in cooperation["roles"].items():
@@ -428,6 +466,7 @@ class EngineExecutionCoordinator:
             verification_hook=self.verification_hook,
             semantic_verification_adapter=semantic_verification_adapter,
             cooperative_adapters=cooperative_adapters,
+            runtime_pressure_probe=self.runtime_control.pressure,
             finalization_binding_hook=self.finalization_binding_hook,
             storage_meter=(
                 lambda resource_id, write_id, payload, meter_now=None: (
@@ -441,15 +480,10 @@ class EngineExecutionCoordinator:
                 )
             ),
         )
-        history = tuple(
-            AIMessage(role=role, content=content)
-            for role, content in handoff.history
-        )
+        history = tuple(AIMessage(role=role, content=content) for role, content in handoff.history)
 
         try:
-            checkpoint = self.service.repository.latest_checkpoint(
-                execution_id
-            )
+            checkpoint = self.service.repository.latest_checkpoint(execution_id)
             approval_refs = self.service.active_approval_refs(
                 execution_id,
             )
@@ -468,9 +502,7 @@ class EngineExecutionCoordinator:
                     approval_refs=approval_refs,
                 )
             if self.service.repository.result(execution_id) is not None:
-                self.service.complete_execution_admission(
-                    execution_id
-                )
+                self.service.complete_execution_admission(execution_id)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -510,12 +542,7 @@ class EngineExecutionCoordinator:
                 "model_turns": 0,
                 "tool_calls": 0,
             },
-            stream_terminal_event=(
-                "stream-terminal:"
-                + current.execution_id
-                + ":failed:"
-                + str(error_code)
-            ),
+            stream_terminal_event=("stream-terminal:" + current.execution_id + ":failed:" + str(error_code)),
             completed_at=now,
         )
         try:

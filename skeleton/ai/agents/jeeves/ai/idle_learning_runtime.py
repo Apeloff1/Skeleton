@@ -18,7 +18,8 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import sqlite3
-from threading import RLock
+from threading import Condition, RLock
+from time import monotonic_ns, thread_time_ns
 from typing import Any
 
 from .idle_learning_scheduler import (
@@ -35,6 +36,31 @@ class IdleWorkPreempted(IdleRuntimeError):
     """Trusted host telemetry no longer permits background work."""
 
 
+@dataclass(frozen=True, slots=True)
+class IdleWorkBudget:
+    """Cooperative bounds for one local work chunk, never execution authority.
+
+    Handlers must split expensive operations into bounded items and poll the
+    checkpoint between them. The host still owns any native worker timeout.
+    """
+
+    maximum_wall_ns: int = 1_000_000_000
+    maximum_cpu_ns: int = 500_000_000
+    maximum_polls: int = 512
+    maximum_memory_drop_ppm: int = 100_000
+
+    def __post_init__(self) -> None:
+        for key in ("maximum_wall_ns", "maximum_cpu_ns"):
+            value = getattr(self, key)
+            if type(value) is not int or not 1 <= value <= 5_000_000_000:
+                raise IdleRuntimeError("idle chunk time budget must be 1ns..5s")
+        if type(self.maximum_polls) is not int or not 3 <= self.maximum_polls <= 65_536:
+            raise IdleRuntimeError("idle chunk checkpoint budget must be 3..65536")
+        if (type(self.maximum_memory_drop_ppm) is not int
+                or not 0 <= self.maximum_memory_drop_ppm <= 1_000_000):
+            raise IdleRuntimeError("idle chunk memory headroom budget is invalid")
+
+
 class IdleWorkCheckpoint:
     """Cooperative worker preemption: call before each bounded source operation.
 
@@ -47,46 +73,86 @@ class IdleWorkCheckpoint:
     def __init__(
         self, *, policy: IdleLearningPolicy, candidate: IdleWorkCandidate,
         telemetry_probe: Callable[[], tuple[HostIdleTelemetry, int]],
+        budget: IdleWorkBudget | None = None,
+        stop_requested: Callable[[], bool] | None = None,
     ) -> None:
         if not callable(telemetry_probe):
             raise IdleRuntimeError("host idle telemetry probe required")
         self._policy = policy
         self._candidate = candidate
         self._probe = telemetry_probe
+        if budget is not None and not isinstance(budget, IdleWorkBudget):
+            raise IdleRuntimeError("idle work budget must be typed")
+        if stop_requested is not None and not callable(stop_requested):
+            raise IdleRuntimeError("idle preemption predicate must be callable")
+        self._budget = budget
+        self._stop_requested = stop_requested
+        self._started_wall_ns = monotonic_ns()
+        self._started_cpu_ns = thread_time_ns()
+        self._initial_memory_free_ppm: int | None = None
+        self.last_reason = "not_polled"
         self.poll_count = 0
 
     def permitted(self) -> bool:
+        self.poll_count += 1
+        if self._stop_requested is not None and self._stop_requested() is not False:
+            self.last_reason = "foreground_preemption"
+            return False
+        if self._budget is not None:
+            if monotonic_ns() - self._started_wall_ns > self._budget.maximum_wall_ns:
+                self.last_reason = "chunk_wall_budget"
+                return False
+            if thread_time_ns() - self._started_cpu_ns > self._budget.maximum_cpu_ns:
+                self.last_reason = "chunk_cpu_budget"
+                return False
+            if self.poll_count > self._budget.maximum_polls:
+                self.last_reason = "chunk_checkpoint_budget"
+                return False
         observed = self._probe()
         if (not isinstance(observed, tuple) or len(observed) != 2
                 or not isinstance(observed[0], HostIdleTelemetry)
                 or type(observed[1]) is not int):
             raise IdleWorkPreempted("host telemetry probe returned invalid observation")
         telemetry, now_ns = observed
-        self.poll_count += 1
         if (now_ns < telemetry.observed_at_ns
                 or now_ns - telemetry.observed_at_ns > self._policy.maximum_telemetry_age_ns):
+            self.last_reason = "telemetry_stale"
             return False
         if telemetry.pending_interactive_requests or telemetry.power_saving:
+            self.last_reason = "interactive_or_power_policy"
             return False
         if telemetry.quiet_ns < self._policy.minimum_idle_ns:
+            self.last_reason = "machine_not_idle"
             return False
         if telemetry.serving_pressure_ppm >= self._policy.maximum_serving_pressure_ppm:
+            self.last_reason = "serving_pressure"
             return False
         if (telemetry.cpu_free_ppm < self._policy.minimum_cpu_free_ppm
                 or telemetry.memory_free_ppm < self._policy.minimum_memory_free_ppm):
+            self.last_reason = "host_resource_pressure"
+            return False
+        if self._initial_memory_free_ppm is None:
+            self._initial_memory_free_ppm = telemetry.memory_free_ppm
+        if (self._budget is not None
+                and self._initial_memory_free_ppm - telemetry.memory_free_ppm
+                > self._budget.maximum_memory_drop_ppm):
+            self.last_reason = "chunk_memory_headroom"
             return False
         if self._candidate.requires_network and not telemetry.online:
+            self.last_reason = "network_offline"
             return False
         if (self._candidate.requires_accelerator
                 and telemetry.gpu_free_ppm < self._policy.minimum_gpu_free_ppm):
+            self.last_reason = "accelerator_pressure"
             return False
         # Current job counts as active during cooperative work, so do not
         # reject it solely because total worker concurrency is saturated.
+        self.last_reason = "admitted_idle"
         return True
 
     def __call__(self) -> None:
         if not self.permitted():
-            raise IdleWorkPreempted("interactive demand or resource pressure preempted idle work")
+            raise IdleWorkPreempted(self.last_reason)
 
 
 class IdleExecutionState(str, Enum):
@@ -173,6 +239,7 @@ CREATE TABLE IF NOT EXISTS jeeves_idle_effect (
     receipt_digest TEXT,
     host_event_digest TEXT
 );
+CREATE INDEX IF NOT EXISTS jeeves_idle_effect_state ON jeeves_idle_effect(state);
 """
 
 
@@ -186,12 +253,17 @@ class JeevesIdleWorkExecutor:
         handlers: Mapping[IdleWorkKind, Callable[..., HostIdleWorkReceipt]],
         verify_result: Callable[[IdleWorkAssignment, HostIdleWorkReceipt, Any], bool],
         telemetry_probe: Callable[[], tuple[HostIdleTelemetry, int]],
+        maximum_history_events: int = 200_000,
     ) -> None:
         self.path = Path(store_path)
         if not self.path.is_absolute():
             raise IdleRuntimeError("idle-effect database requires host absolute path")
         if not isinstance(policy, IdleLearningPolicy):
             raise IdleRuntimeError("typed idle admission policy required")
+        if (type(maximum_history_events) is not int
+                or not 3 <= maximum_history_events <= 20_000_000):
+            raise IdleRuntimeError("idle history capacity must be 3..20000000 events")
+        self.maximum_history_events = maximum_history_events
         if not callable(host_authorize) or not callable(verify_result):
             raise IdleRuntimeError("independent idle work authorization and verifier required")
         if (not isinstance(handlers, Mapping) or not handlers
@@ -207,6 +279,10 @@ class JeevesIdleWorkExecutor:
             raise IdleRuntimeError("host polling probe required for cooperative preemption")
         self._telemetry_probe = telemetry_probe
         self._lock = RLock()
+        self._worker_condition = Condition(self._lock)
+        self._active_workers = 0
+        self._closing = False
+        self._closed = False
         self._db = sqlite3.connect(
             str(self.path), timeout=10, isolation_level=None, check_same_thread=False,
         )
@@ -244,7 +320,7 @@ class JeevesIdleWorkExecutor:
             "SELECT sequence,prior_digest,event_digest,event_json "
             "FROM jeeves_idle_event ORDER BY sequence"
         ):
-            if count >= 200_000 or sequence != count or stored_prior != prior:
+            if count >= self.maximum_history_events or sequence != count or stored_prior != prior:
                 raise IdleRuntimeError("idle event history is not sequential")
             if not isinstance(event_json, str) or len(event_json) > 65536:
                 raise IdleRuntimeError("idle evidence entry exceeds byte budget")
@@ -330,7 +406,7 @@ class JeevesIdleWorkExecutor:
         current = self._db.execute(
             "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
         ).fetchone()
-        if current is None or current[1] >= 200_000:
+        if current is None or current[1] >= self.maximum_history_events:
             raise IdleRuntimeError("idle journal metadata missing or capacity exhausted")
         head, number = current
         row = self._db.execute(
@@ -377,6 +453,8 @@ class JeevesIdleWorkExecutor:
             return {
                 "schema": "jeeves.idle_effect_history.v1",
                 "head_digest": head, "event_count": count,
+                "maximum_history_events": self.maximum_history_events,
+                "remaining_events": max(0, self.maximum_history_events - count),
                 "authority": "host-worker-only",
             }
 
@@ -433,8 +511,14 @@ class JeevesIdleWorkExecutor:
         assignment: IdleWorkAssignment, candidate: IdleWorkCandidate,
         telemetry: HostIdleTelemetry, host_now_ns: int,
         context: Any,
+        budget: IdleWorkBudget | None = None,
+        stop_requested: Callable[[], bool] | None = None,
     ) -> tuple[IdleExecutionState, str]:
+        if stop_requested is not None and not callable(stop_requested):
+            raise IdleRuntimeError("idle preemption predicate must be callable")
         with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
             self._admit(plan, assignment, candidate, telemetry, host_now_ns)
             handler = self._handlers.get(assignment.kind)
             if handler is None:
@@ -442,6 +526,10 @@ class JeevesIdleWorkExecutor:
             checkpoint = IdleWorkCheckpoint(
                 policy=self.policy, candidate=candidate,
                 telemetry_probe=self._telemetry_probe,
+                budget=budget,
+                stop_requested=lambda: self._closing or (
+                    stop_requested is not None and stop_requested() is not False
+                ),
             )
             checkpoint()
             intent = self._intent(plan, assignment)
@@ -455,6 +543,20 @@ class JeevesIdleWorkExecutor:
                     (intent, assignment.work_id),
                 ).fetchone():
                     raise IdleRuntimeError("idle work was already claimed or attempted")
+                head = self._db.execute(
+                    "SELECT event_count FROM jeeves_idle_meta WHERE singleton=1",
+                ).fetchone()
+                reserved = self._db.execute(
+                    "SELECT COALESCE(SUM(CASE WHEN state=? THEN 2 "
+                    "WHEN state=? THEN 1 ELSE 0 END),0) FROM jeeves_idle_effect "
+                    "WHERE state IN (?,?)",
+                    (IdleExecutionState.IN_FLIGHT.value, IdleExecutionState.IN_DOUBT.value,
+                     IdleExecutionState.IN_FLIGHT.value, IdleExecutionState.IN_DOUBT.value),
+                ).fetchone()[0]
+                # Keep capacity for this claim, an ambiguous outcome and its
+                # host reconciliation, including concurrent existing workers.
+                if head is None or head[0] + reserved + 3 > self.maximum_history_events:
+                    raise IdleRuntimeError("idle journal capacity reserved for effect recovery")
                 self._db.execute(
                     "INSERT INTO jeeves_idle_effect VALUES (?,?,?,?,?,?,?,?)",
                     (intent, assignment.work_id, assignment.scope_id,
@@ -467,62 +569,77 @@ class JeevesIdleWorkExecutor:
                 if self._db.in_transaction:
                     self._db.execute("ROLLBACK")
                 raise
-            # Never replay external effects. The handler checks resource
-            # pressure cooperatively, and interrupted/failed effects remain
-            # in doubt until an independent host observes their outcome.
+            self._active_workers += 1
+        # A worker never holds the persistence lock while computing. Foreground
+        # preemption and status readers must remain responsive during chunks.
+        try:
             try:
                 result = handler(assignment, context, checkpoint)
             except BaseException:
+                self._interrupt_claim(intent, at_ns=host_now_ns)
+                raise
+            # The handler has completed; renewed interactive demand prevents
+            # confirmation of idle compliance, not custody of its receipt.
+            if not isinstance(result, HostIdleWorkReceipt):
+                self._interrupt_claim(intent, at_ns=host_now_ns)
+                raise IdleRuntimeError("host idle handler returned untyped receipt")
+            try:
+                completed_while_idle = checkpoint.permitted()
+                verified = (
+                    result.work_id == assignment.work_id
+                    and result.scope_id == assignment.scope_id
+                    and result.kind is assignment.kind
+                    and result.source_digest == assignment.source_digest
+                    and result.completed and completed_while_idle
+                    and checkpoint.poll_count >= 3
+                    and self._verify(assignment, result, context) is True
+                )
+            except BaseException:
+                self._interrupt_claim(intent, at_ns=host_now_ns)
+                raise
+            state = (IdleExecutionState.VERIFIED if verified
+                     else IdleExecutionState.IN_DOUBT)
+            with self._lock:
                 try:
                     self._db.execute("BEGIN IMMEDIATE")
                     updated = self._db.execute(
-                        "UPDATE jeeves_idle_effect SET state=? "
-                        "WHERE intent_digest=? AND state=?",
-                        (IdleExecutionState.IN_DOUBT.value, intent,
-                         IdleExecutionState.IN_FLIGHT.value),
+                        "UPDATE jeeves_idle_effect SET state=?,receipt_digest=?,"
+                        "host_event_digest=? WHERE intent_digest=? AND state=?",
+                        (state.value, result.digest, result.external_event_digest,
+                         intent, IdleExecutionState.IN_FLIGHT.value),
                     )
-                    if updated.rowcount == 1:
-                        self._append_event(
-                            intent, "worker_interrupted", at_ns=host_now_ns,
-                        )
+                    if updated.rowcount != 1:
+                        raise IdleRuntimeError("idle effect outcome was settled by another owner")
+                    self._append_event(intent, "worker_result", at_ns=host_now_ns)
                     self._db.execute("COMMIT")
                 except BaseException:
                     if self._db.in_transaction:
                         self._db.execute("ROLLBACK")
-                    # The earlier durable IN_FLIGHT claim already blocks replay.
-                raise
-            # The handler has completed; renewed interactive demand prevents
-            # confirmation of idle compliance, not custody of its receipt.
-            completed_while_idle = checkpoint.permitted()
-            if not isinstance(result, HostIdleWorkReceipt):
-                raise IdleRuntimeError("host idle handler returned untyped receipt")
-            if (result.work_id != assignment.work_id
-                    or result.scope_id != assignment.scope_id
-                    or result.kind is not assignment.kind
-                    or result.source_digest != assignment.source_digest
-                    or not result.completed or not completed_while_idle
-                    or checkpoint.poll_count < 3  # host handler must cooperate at least once
-                    or self._verify(assignment, result, context) is not True):
-                state = IdleExecutionState.IN_DOUBT
-            else:
-                state = IdleExecutionState.VERIFIED
+                    raise
+            return state, intent
+        finally:
+            with self._worker_condition:
+                self._active_workers -= 1
+                self._worker_condition.notify_all()
+
+    def _interrupt_claim(self, intent: str, *, at_ns: int) -> None:
+        """Retain ambiguous custody; this method never invokes a worker again."""
+        with self._lock:
             try:
                 self._db.execute("BEGIN IMMEDIATE")
                 updated = self._db.execute(
-                    "UPDATE jeeves_idle_effect SET state=?,receipt_digest=?,"
-                    "host_event_digest=? WHERE intent_digest=? AND state=?",
-                    (state.value, result.digest, result.external_event_digest,
-                     intent, IdleExecutionState.IN_FLIGHT.value),
+                    "UPDATE jeeves_idle_effect SET state=? "
+                    "WHERE intent_digest=? AND state=?",
+                    (IdleExecutionState.IN_DOUBT.value, intent,
+                     IdleExecutionState.IN_FLIGHT.value),
                 )
-                if updated.rowcount != 1:
-                    raise IdleRuntimeError("idle effect outcome was settled by another owner")
-                self._append_event(intent, "worker_result", at_ns=host_now_ns)
+                if updated.rowcount == 1:
+                    self._append_event(intent, "worker_interrupted", at_ns=at_ns)
                 self._db.execute("COMMIT")
             except BaseException:
                 if self._db.in_transaction:
                     self._db.execute("ROLLBACK")
-                raise
-            return state, intent
+                # The durable IN_FLIGHT claim already prevents unsafe replay.
 
     def pending(self, *, limit: int = 100) -> tuple[dict[str, str], ...]:
         if type(limit) is not int or not 1 <= limit <= 1000:
@@ -590,8 +707,14 @@ class JeevesIdleWorkExecutor:
                 raise
 
     def close(self) -> None:
-        with self._lock:
+        with self._worker_condition:
+            if self._closed:
+                return
+            self._closing = True
+            while self._active_workers:
+                self._worker_condition.wait(timeout=0.1)
             self._db.close()
+            self._closed = True
 
     def __enter__(self) -> "JeevesIdleWorkExecutor":
         return self
@@ -601,6 +724,6 @@ class JeevesIdleWorkExecutor:
 
 
 __all__ = [
-    "IdleRuntimeError", "IdleWorkPreempted", "IdleWorkCheckpoint", "IdleExecutionState",
+    "IdleRuntimeError", "IdleWorkPreempted", "IdleWorkBudget", "IdleWorkCheckpoint", "IdleExecutionState",
     "HostIdleWorkReceipt", "JeevesIdleWorkExecutor",
 ]
