@@ -203,6 +203,13 @@ jobs:
             skeleton/jeeves/game_frontier_expedition_dragon.py \
             skeleton/jeeves/game_frontier_expedition_endurance.py \
             skeleton/jeeves/game_frontier_expedition_campaign.py \
+            skeleton/jeeves/game_frontier_expedition_input.py \
+            skeleton/jeeves/game_frontier_expedition_quests.py \
+            skeleton/jeeves/game_frontier_expedition_audio.py \
+            skeleton/jeeves/game_frontier_expedition_cinematics.py \
+            skeleton/jeeves/game_frontier_expedition_render.py \
+            skeleton/jeeves/game_frontier_expedition_dragon_review.py \
+            skeleton/jeeves/game_frontier_expedition_crash.py \
             skeleton/jeeves/game_frontier_expedition_release.py \
             skeleton/jeeves/game_frontier_expedition_studio_tools.py \
             skeleton/jeeves/game_studio_tools.py \
@@ -226,7 +233,14 @@ jobs:
             tests/test_game_frontier_expedition_dragon.py \
             tests/test_game_frontier_expedition_endurance.py \
             tests/test_game_frontier_expedition_campaign.py \
-            tests/test_original_campaign_cli.py
+            tests/test_original_campaign_cli.py \
+            tests/test_game_frontier_expedition_input.py \
+            tests/test_game_frontier_expedition_quests.py \
+            tests/test_game_frontier_expedition_audio.py \
+            tests/test_game_frontier_expedition_cinematics.py \
+            tests/test_game_frontier_expedition_render.py \
+            tests/test_game_frontier_expedition_dragon_review.py \
+            tests/test_game_frontier_expedition_crash.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
