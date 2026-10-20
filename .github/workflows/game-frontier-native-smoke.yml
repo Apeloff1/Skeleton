@@ -103,6 +103,9 @@ jobs:
           from skeleton.jeeves.game_frontier_expedition_native_verify import (
               inspect_native_expedition_trace,
           )
+          from skeleton.jeeves.game_frontier_expedition_native_cinema_verify import (
+              verify_native_cinema_frames,
+          )
           candidate=compile_original_campaign(
               "fully-original-frontier-native-ci",
               gdd_digest="c"*64,seed=31,islands=5,
@@ -138,6 +141,8 @@ jobs:
               assert verified["executed_actions"]>=1
               assert "EXPEDITION_AUDIO_READY " in out, "Native WAV audio unavailable: "+repr(out[-3000:])
               assert "EXPEDITION_ENDING " in out, "Native quest ending missing: "+repr(out[-3000:])
+              assert "EXPEDITION_NPC_READY " in out, "Native original NPC scene absent: "+repr(out[-3000:])
+              assert "EXPEDITION_ECOLOGY_READY " in out, "Native original foliage not instantiated: "+repr(out[-3000:])
               assert "EXPEDITION_CINEMATIC_COMPLETE " in out or "EXPEDITION_OBSERVATION " in out
               assert "game/frontier/quests.json" in candidate["files"]
               assert "game/frontier/cinematic.gd" in candidate["files"]
@@ -161,6 +166,14 @@ jobs:
                   raise AssertionError(
                       "Native original Camera3D playback failed: "+repr(cinema_out[-5000:]))
               assert "EXPEDITION_CINEMATIC_AUDIT_STARTED " in cinema_out
+              cinema_review=verify_native_cinema_frames(
+                  cinema_out,candidate["storyboard"],
+                  clip_id="scene_001",
+              )
+              assert cinema_review["observations"]==5
+              assert cinema_review["source_frame_replay_verified"]
+              assert "game/frontier/npcs.json" in candidate["files"]
+              assert "game/frontier/ecology.json" in candidate["files"]
               assert "game/frontier/lod_runtime.json" in candidate["files"]
               assert candidate["dragon_attacks"]["all_attacks_rejected"]
               print(json.dumps({

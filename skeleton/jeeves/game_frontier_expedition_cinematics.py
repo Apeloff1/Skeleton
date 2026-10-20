@@ -254,8 +254,26 @@ func _play_original_clip() -> void:
         quit(45)
         return
     print("EXPEDITION_CINEMATIC_AUDIT_STARTED " + str(parsed["world"]))
-    for frame_index in range(0, int(clips[0]["frames"]) + 4):
-        await process_frame
+    # Exercise the real GDScript camera interpolator at fixed authored frames.
+    # The actual Camera3D is read back after each native runtime invocation.
+    cinema.set_process(false)
+    for frame_index in [0,17,35,54,71]:
+        cinema.set("frame", frame_index)
+        cinema.call("_process", 0.04166667)
+        var actual: Camera3D = cinema.get("camera")
+        if actual == null:
+            push_error("Native cinematic never built Camera3D")
+            quit(46)
+            return
+        print("EXPEDITION_CINEMATIC_FRAME " + JSON.stringify({
+            "world_digest":str(parsed["world"]),
+            "clip_id":str(clips[0]["clip_id"]),
+            "frame":frame_index,
+            "x":actual.position.x,
+            "y":actual.position.y,
+            "z":actual.position.z,
+            "fov":actual.fov,
+        }))
     print("EXPEDITION_CINEMATIC_AUDIT_VERIFIED " + str(clips[0]["clip_id"]))
     quit(0)
 """

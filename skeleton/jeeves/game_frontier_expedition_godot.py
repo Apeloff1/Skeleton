@@ -51,6 +51,9 @@ const CANON_FILE = "res://game/frontier/canon.json"
 const VISUALS_FILE = "res://game/frontier/visuals_manifest.json"
 const QUESTS_FILE = "res://game/frontier/quests.json"
 const AUDIO_FILE = "res://game/frontier/audio_pcm.json"
+const AUDIO_MIX_FILE = "res://game/frontier/audio_mix.json"
+const ECOLOGY_SCRIPT = "res://game/frontier/ecology.gd"
+const NPC_FILE = "res://game/frontier/npcs.json"
 const LOD_FILE = "res://game/frontier/lod_runtime.json"
 const CINEMATIC_SCENE = "res://game/frontier/cinematic.tscn"
 const STORYBOARD_FILE = "res://game/frontier/storyboard.json"
@@ -78,6 +81,8 @@ var controller_hud: Label
 var canon: Dictionary = {}
 var visuals: Dictionary = {}
 var quests: Dictionary = {}
+var npc_cast: Dictionary = {}
+var npc_markers: Dictionary = {}
 var storyboard: Dictionary = {}
 var quest_flags: Dictionary = {}
 var quest_progress: Dictionary = {}
@@ -238,6 +243,13 @@ func _load_optional_authored_game() -> void:
             visuals = style
         else:
             push_error("Optional visual asset manifest differs from original world")
+    if FileAccess.file_exists(NPC_FILE):
+        var actors: Dictionary = _load_json(NPC_FILE)
+        if (actors.get("schema", "") == "skeleton.game.original_npc_cast.v1"
+                and str(actors.get("world_digest", "")) == str(world.get("world_digest", ""))):
+            npc_cast = actors
+        else:
+            push_error("Optional NPC source is not the original world")
     if FileAccess.file_exists(QUESTS_FILE):
         var quest_source: Dictionary = _load_json(QUESTS_FILE)
         if (quest_source.get("schema", "") == "skeleton.game.canon_quest_endings.v1"
@@ -263,8 +275,11 @@ func _load_optional_authored_game() -> void:
 func _install_soundscape() -> void:
     if not FileAccess.file_exists(AUDIO_FILE):
         return
-    var data: Dictionary = _load_json(AUDIO_FILE)
-    if (data.get("schema", "") != "skeleton.game.original_audio_pcm.v1"
+    var path: String = AUDIO_MIX_FILE if FileAccess.file_exists(AUDIO_MIX_FILE) else AUDIO_FILE
+    var data: Dictionary = _load_json(path)
+    if (str(data.get("schema", "")) not in [
+            "skeleton.game.original_audio_pcm.v1",
+            "skeleton.game.adaptive_original_audio_resource.v1"]
             or str(data.get("world_digest", "")) != str(world.get("world_digest", ""))):
         push_error("Original soundscape was built for another game")
         return
@@ -444,6 +459,31 @@ func _setup_scene() -> void:
         marker.set_meta("waypoint_id", str(node["waypoint_id"]))
         add_child(marker)
         marker_by_id[str(node["waypoint_id"])] = marker
+    if not npc_cast.is_empty():
+        var count: int = 0
+        for row in npc_cast.get("cast", []):
+            var profile: Dictionary = row.get("design", {})
+            var home_id := str(profile.get("home", ""))
+            if not waypoint_by_id.has(home_id) or count >= 64:
+                continue
+            var npc := MeshInstance3D.new()
+            var npc_body := CapsuleMesh.new()
+            npc_body.radius = 0.42
+            npc_body.height = 2.1
+            npc.mesh = npc_body
+            var clothing := StandardMaterial3D.new()
+            clothing.albedo_color = Color(0.45, 0.7, 1.0)
+            npc.material_override = clothing
+            npc.position = _where(waypoint_by_id[home_id])+Vector3(0, 2, 0)
+            add_child(npc)
+            npc_markers[str(profile.get("npc_id", ""))] = npc
+            count += 1
+        print("EXPEDITION_NPC_READY " + str(world.get("world_digest", "")) + " " + str(count))
+    if ResourceLoader.exists(ECOLOGY_SCRIPT):
+        var flora := Node3D.new()
+        flora.set_meta("expected_world", str(world.get("world_digest", "")))
+        flora.set_script(load(ECOLOGY_SCRIPT))
+        add_child(flora)
     var segments := ImmediateMesh.new()
     segments.surface_begin(Mesh.PRIMITIVE_LINES)
     for edge in world["edges"]:
@@ -684,6 +724,25 @@ func _unhandled_input(event: InputEvent) -> void:
         _rest()
         get_viewport().set_input_as_handled()
 
+func _animate_original_npcs() -> void:
+    if npc_cast.is_empty():
+        return
+    for row in npc_cast.get("cast", []):
+        var profile: Dictionary = row.get("design", {})
+        var npc_id := str(profile.get("npc_id", ""))
+        if not npc_markers.has(npc_id):
+            continue
+        var history: Dictionary = row.get("proof", {})
+        var steps: Array = history.get("steps", [])
+        if steps.is_empty():
+            continue
+        var move: Dictionary = steps[int(lod_frame / 120) % steps.size()]
+        var target_id := str(move.get("new", ""))
+        if waypoint_by_id.has(target_id):
+            var marker: MeshInstance3D = npc_markers[npc_id]
+            marker.position = marker.position.lerp(
+                _where(waypoint_by_id[target_id])+Vector3(0, 2, 0), .18)
+
 func _refresh_lod() -> void:
     if lod_policy.is_empty() or camera == null:
         return
@@ -710,6 +769,7 @@ func _process(delta: float) -> void:
     lod_frame += 1
     if lod_frame % 30 == 0:
         _refresh_lod()
+        _animate_original_npcs()
     if camera != null and actor != null:
         var goal := actor.position + Vector3(0, 28, 45)
         camera.position = camera.position.lerp(goal, minf(1.0,delta*3.0))

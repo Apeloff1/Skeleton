@@ -43,6 +43,16 @@ from .game_frontier_expedition_dragon_review import (
     adversarial_dragon_review,adversarial_attack_matrix,
 )
 from .game_frontier_expedition_crash import CrashPolicy
+from .game_frontier_expedition_plot_audit import prove_original_story_branches
+from .game_frontier_expedition_session import ProductionSession
+from .game_frontier_expedition_audio_mix import (
+    make_original_ambient_layers,mix_original_stems,
+)
+from .game_frontier_expedition_npcs import original_world_npcs,NPCEpisode
+from .game_frontier_expedition_ecology import (
+    EcologyPolicy,generate_original_ecology,export_ecology_godot,
+    simulate_ecology_frame,
+)
 from .game_frontier_expedition_input import (
     AxisBinding,AxisCalibration,
 )
@@ -98,6 +108,21 @@ def compile_original_campaign(
     storyboard=original_game_storyboard(world,gdd_digest)
     storyboard_frames=storyboard_frame_receipts(storyboard,sample_stride=6)
     sound=export_original_soundscape(world,seconds=1)
+    mix=mix_original_stems(make_original_ambient_layers(sound["score"]))
+    branch_proof=prove_original_story_branches(world,player,story,questbook)
+    ecology_policy=EcologyPolicy(seed=seed,per_waypoint=12)
+    ecology=generate_original_ecology(world,ecology_policy)
+    ecology_sample=simulate_ecology_frame(ecology,frame=120,wind_mps=10)
+    npc_designs=original_world_npcs(world)
+    npc_records=[]
+    for design in npc_designs:
+        actual=NPCEpisode(world,player,design)
+        for tick in range(1,4):
+            actual.choose(player_at=world.arrival,player_reputation=0,tick=tick)
+        observed=NPCEpisode.restore(world,player,design,actual.snapshot())
+        if observed.snapshot()!=actual.snapshot():
+            raise ExpeditionError("NPC independent build replay differed")
+        npc_records.append({"design":asdict(design),"proof":actual.snapshot()})
     render_frames=render_lod_timeline(
         world,assets["manifest"],(
             View(1,0,0,0,500),
@@ -117,6 +142,37 @@ def compile_original_campaign(
     files["game/frontier/canon.json"]=_json(story.as_dict()).decode("utf-8")
     files["game/frontier/quests.json"]=_json(questbook.as_dict()).decode("utf-8")
     files.update(export_storyboard_godot(storyboard,world))
+    files.update(export_ecology_godot(world,ecology_policy))
+    files["game/frontier/npcs.json"]=_json({
+        "schema":"skeleton.game.original_npc_cast.v1",
+        "world_digest":world.digest,
+        "cast":npc_records,
+        "native_npc_behaviors_verified":False,
+    }).decode("utf-8")
+    files["game/frontier/branch_playthroughs.json"]=_json(
+        branch_proof
+    ).decode("utf-8")
+    files["game/frontier/learning_candidacy.json"]=_json({
+        "schema":"skeleton.dragon.source_learning_candidacy.v1",
+        "world_digest":world.digest,
+        "dragon_report_receipt":dragon["receipt_digest"],
+        "adversarial_receipt":dragon_review["receipt_digest"],
+        "attack_receipt":dragon_attacks["receipt_digest"],
+        "source_lessons":dragon["lessons"],
+        "external_reviewer_signoff":False,
+        "model_weights_changed":False,
+    }).decode("utf-8")
+    files["game/frontier/ecology_frame.json"]=_json(
+        ecology_sample
+    ).decode("utf-8")
+    files["game/frontier/audio_mix.json"]=_json({
+        "schema":"skeleton.game.adaptive_original_audio_resource.v1",
+        "world_digest":world.digest,
+        "score_digest":sound["score"].digest,
+        "mix_receipt":mix["manifest"]["receipt_digest"],
+        "rate":mix["manifest"]["sample_rate"],
+        "pcm_base64":b64encode(mix["wav"][44:]).decode("ascii"),
+    }).decode("utf-8")
     files["game/frontier/audio_pcm.json"]=_json({
         "schema":"skeleton.game.original_audio_pcm.v1",
         "world_digest":world.digest,
@@ -163,6 +219,14 @@ def compile_original_campaign(
         "story_digest":story.digest,
         "questbook_digest":questbook.digest,
         "storyboard_digest":storyboard.digest,
+        "branch_plot_receipt":branch_proof["receipt_digest"],
+        "full_branch_playthroughs":branch_proof["opening_branches_executed"],
+        "different_endings_earned":branch_proof["distinct_endings_reached"],
+        "npc_cast_count":len(npc_records),
+        "npc_replay_receipts":[x["proof"]["snapshot_digest"] for x in npc_records],
+        "ecology_receipt":ecology["receipt_digest"],
+        "ecology_frame_receipt":ecology_sample["receipt_digest"],
+        "adaptive_music_receipt":mix["manifest"]["receipt_digest"],
         "cinematic_frame_receipt":storyboard_frames["receipt_digest"],
         "original_audio_receipt":sound["manifest"]["receipt_digest"],
         "render_lod_receipt":render_frames["receipt_digest"],
@@ -193,6 +257,10 @@ def compile_original_campaign(
         "files":files,"manifest":proofs,
         "story":story,"questbook":questbook,
         "storyboard":storyboard,"audio":sound,
+        "adaptive_music":mix,
+        "plot_proof":branch_proof,
+        "npcs":npc_records,"ecology":ecology,
+        "ecology_frame":ecology_sample,
         "render":render_frames,"dragon":dragon,
         "dragon_adversary":dragon_review,
         "dragon_attacks":dragon_attacks,
@@ -217,6 +285,11 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
             or compiled.get("questbook")!=expected["questbook"]
             or compiled.get("storyboard")!=expected["storyboard"]
             or compiled.get("audio")!=expected["audio"]
+            or compiled.get("adaptive_music")!=expected["adaptive_music"]
+            or compiled.get("plot_proof")!=expected["plot_proof"]
+            or compiled.get("npcs")!=expected["npcs"]
+            or compiled.get("ecology")!=expected["ecology"]
+            or compiled.get("ecology_frame")!=expected["ecology_frame"]
             or compiled.get("render")!=expected["render"]
             or compiled.get("dragon")!=expected["dragon"]
             or compiled.get("dragon_adversary")!=expected["dragon_adversary"]
