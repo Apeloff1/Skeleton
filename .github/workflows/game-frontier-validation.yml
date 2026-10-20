@@ -49,4 +49,5 @@ jobs:
           python -m pytest -q tests/test_game_frontier*.py
           PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -q --noconftest \
             skeleton/testing/test_game_production_quality.py \
-            skeleton/testing/test_game_production_deep_quality.py
+            skeleton/testing/test_game_production_deep_quality.py \
+            skeleton/testing/test_game_production_frontier_quality.py
