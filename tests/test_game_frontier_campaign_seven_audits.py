@@ -1,10 +1,9 @@
 """Real source-bound seven-milestone game QA and tamper rejection."""
 from copy import deepcopy
-from dataclasses import replace
 import pytest
 
 from skeleton.jeeves.game_frontier_expedition import (
-    ExpeditionError, ExpeditionWorld, TravelEdge, Waypoint, _digest,
+    ExpeditionError, ExpeditionWorld, TravelEdge, Waypoint,
 )
 from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile, author_archipelago
 from skeleton.jeeves.game_frontier_expedition_campaign import original_campaign_player
