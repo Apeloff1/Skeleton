@@ -3,13 +3,14 @@
 Records an ordered chain of archive snapshots and verifies the chain.
 Candidate-only. In-memory.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from hashlib import sha256
 import json
 
-from .game_frontier_milestone_11 import ArchiveSnapshot, snapshot
+from .game_frontier_milestone_11 import ArchiveSnapshot, SnapshotError, _verified_snapshot, snapshot
 from .game_frontier_milestone_9 import CampaignArchive
 
 
@@ -38,10 +39,14 @@ class SnapshotHistory:
 
     def verify(self) -> bool:
         """Recompute the chain and confirm the head."""
-        if not self.entries:
+        if type(self.entries) is not list or not self.entries or type(self.head) is not str:
             return False
         head = ""
         for index, snap in enumerate(self.entries):
+            try:
+                _verified_snapshot(snap)
+            except SnapshotError:
+                return False
             payload = json.dumps(
                 {"prev": head, "digest": snap.digest, "index": index},
                 sort_keys=True,
