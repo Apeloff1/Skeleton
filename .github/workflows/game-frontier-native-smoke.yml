@@ -141,6 +141,26 @@ jobs:
               assert "EXPEDITION_CINEMATIC_COMPLETE " in out or "EXPEDITION_OBSERVATION " in out
               assert "game/frontier/quests.json" in candidate["files"]
               assert "game/frontier/cinematic.gd" in candidate["files"]
+              assert "game/frontier/cinematic_audit.gd" in candidate["files"]
+              cinema=subprocess.run(
+                  [os.environ["FRONTIER_GODOT"],"--headless",
+                   "--path",str(root),"--script",
+                   "res://game/frontier/cinematic_audit.gd",
+                   "--quit-after","160"],
+                  cwd=root,capture_output=True,text=True,
+                  timeout=90,check=False,
+              )
+              cinema_out=cinema.stdout+"\n"+cinema.stderr
+              if cinema.returncode!=0 or (
+                  "EXPEDITION_CINEMATIC_AUDIT_VERIFIED scene_001"
+                  not in cinema_out
+              ) or (
+                  "EXPEDITION_CINEMATIC_COMPLETE scene_001"
+                  not in cinema_out
+              ):
+                  raise AssertionError(
+                      "Native original Camera3D playback failed: "+repr(cinema_out[-5000:]))
+              assert "EXPEDITION_CINEMATIC_AUDIT_STARTED " in cinema_out
               assert "game/frontier/lod_runtime.json" in candidate["files"]
               assert candidate["dragon_attacks"]["all_attacks_rejected"]
               print(json.dumps({

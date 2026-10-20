@@ -50,7 +50,9 @@ def test_godot_cinematic_source_has_camera_execution_and_scene_data():
     w=world()
     board=original_game_storyboard(w,GDD)
     files=export_storyboard_godot(board,w)
-    assert len(files)==3
+    assert len(files)==4
+    assert "game/frontier/cinematic_audit.gd" in files
+    assert "EXPEDITION_CINEMATIC_AUDIT_VERIFIED" in files["game/frontier/cinematic_audit.gd"]
     assert "game/frontier/cinematic.tscn" in files
     script=files["game/frontier/cinematic.gd"]
     for key in ("extends Node3D","Camera3D.new()",

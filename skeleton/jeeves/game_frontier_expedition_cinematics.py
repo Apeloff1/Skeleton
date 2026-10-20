@@ -217,10 +217,55 @@ script = ExtResource("1")
 """
 
 
+_GODOT_AUDIT = """extends SceneTree
+# Independently exercise an authored original Camera3D timeline on real Godot.
+const CLIP = preload("res://game/frontier/cinematic.tscn")
+const DATA_PATH = "res://game/frontier/storyboard.json"
+
+func _initialize() -> void:
+    call_deferred("_play_original_clip")
+
+func _play_original_clip() -> void:
+    if not FileAccess.file_exists(DATA_PATH):
+        push_error("Cinema audit source is absent")
+        quit(41)
+        return
+    var parsed = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH))
+    if typeof(parsed) != TYPE_DICTIONARY:
+        push_error("Cinema audit source JSON invalid")
+        quit(42)
+        return
+    if str(parsed.get("schema", "")) != "skeleton.game.original_storyboard.v1":
+        push_error("Cinema audit schema mismatch")
+        quit(43)
+        return
+    var clips: Array = parsed.get("clips", [])
+    if clips.is_empty() or str(parsed.get("world", "")).length() != 64:
+        push_error("Cinema audit needs source-bound timeline")
+        quit(44)
+        return
+    var cinema: Node3D = CLIP.instantiate()
+    root.add_child(cinema)
+    await process_frame
+    var launched: bool = bool(cinema.call(
+        "play_clip", str(clips[0]["clip_id"]), str(parsed["world"])))
+    if not launched:
+        push_error("Cinema clip failed source binding")
+        quit(45)
+        return
+    print("EXPEDITION_CINEMATIC_AUDIT_STARTED " + str(parsed["world"]))
+    for frame_index in range(0, int(clips[0]["frames"]) + 4):
+        await process_frame
+    print("EXPEDITION_CINEMATIC_AUDIT_VERIFIED " + str(clips[0]["clip_id"]))
+    quit(0)
+"""
+
+
 def export_storyboard_godot(board:Storyboard,world:ExpeditionWorld)->dict[str,str]:
     board.validate(world)
     return {
         "game/frontier/storyboard.json":_json(board.as_dict()).decode("utf-8"),
         "game/frontier/cinematic.gd":_GODOT_SCRIPT,
         "game/frontier/cinematic.tscn":_GODOT_SCENE,
+        "game/frontier/cinematic_audit.gd":_GODOT_AUDIT,
     }
