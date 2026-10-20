@@ -289,6 +289,45 @@ class GameProductionDeepTests(unittest.TestCase):
         with self.assertRaises(QualityGateError):
             _verify_sample_log("\n".join(reversed(lines)), 30)
 
+    def test_campaign_replays_three_real_original_endings_without_claiming_native(self):
+        from tests.test_game_frontier_production_seven import sources
+        from skeleton.jeeves.game_frontier_expedition import find_route
+        from skeleton.jeeves.game_frontier_expedition_session import (
+            ProductionSession, ProductionInput,
+        )
+        w, p, story, quests = sources()
+        sessions = []
+        for branch in ("chart", "rescue", "wanderer"):
+            session = ProductionSession(w, p, story, quests)
+            if branch != "wanderer":
+                session.submit(ProductionInput("dialogue", scene_id="departure",
+                                               choice_id=branch))
+                session.submit(ProductionInput("gameplay", "travel", "launch_updraft"))
+                session.submit(ProductionInput("dialogue", scene_id="threshold",
+                                               choice_id="remember"))
+            route = find_route(w, p, w.destinations[0], start=session.game.position)
+            for edge_id in route.edge_ids:
+                session.submit(ProductionInput("gameplay", "travel", edge_id))
+            if branch != "wanderer":
+                session.submit(ProductionInput("dialogue", scene_id="arrival",
+                                               choice_id="archive"))
+            self.assertTrue(session.game.won)
+            sessions.append(session.snapshot())
+        device_evidence = [
+            {"kind": mode, "world_digest": w.digest, "verified": True,
+             "receipt_sha256": _B} for mode in ("keyboard", "gamepad")
+        ]
+        report = accept_original_campaign(
+            w, p, story, quests, sessions,
+            controller_evidence=device_evidence, require_all_endings=True,
+        )
+        self.assertEqual({"cartographer", "rescuer", "wanderer"},
+                         set(report["earned_endings"]))
+        self.assertEqual(3, len(report["verified_sessions"]))
+        self.assertFalse(report["candidate_passed"])
+        self.assertFalse(report["real_native_run_observed"])
+        self.assertEqual([{"code": "real_native_run_missing"}], report["failures"])
+
     def test_campaign_rejects_unowned_or_noncanonical_source(self):
         with self.assertRaises(QualityGateError):
             accept_original_campaign({}, {}, {}, {}, [])
