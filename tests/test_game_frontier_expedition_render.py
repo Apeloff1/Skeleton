@@ -77,6 +77,12 @@ def test_foreign_or_modified_asset_manifest_is_never_rendered():
         plan_game_lod(w,View(1,0,0,0),forged)
     forged=deepcopy(assets)
     forged["assets"].append(forged["assets"][0])
+    # Recompute the unkeyed manifest checksum to reach the *independent*
+    # duplicate LOD guard, rather than failing on the earlier hash check.
+    from skeleton.jeeves.game_frontier_expedition import _digest
+    forged["receipt_digest"]=_digest({
+        key:value for key,value in forged.items() if key!="receipt_digest"
+    })
     with pytest.raises(ExpeditionError,match="ambiguous"):
         plan_game_lod(w,View(1,0,0,0),forged)
 
