@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from types import SimpleNamespace
 from uuid import NAMESPACE_URL, uuid5
 
@@ -413,7 +414,17 @@ def test_engine_text_evidence_contract_is_bounded_and_unique() -> None:
 
 
 @pytest.mark.asyncio
-async def test_engine_text_recovers_existing_execution_before_recompiling_changed_evidence() -> None:
+async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence() -> None:
+    original_request = EngineTextRequest(
+        instructions="Rules",
+        prompt="Same canonical question",
+        idempotency_key="stable-recovery",
+        tenant_id="default",
+        actor_id="backend-ai",
+        data_class="public",
+        capability="assistant.compat",
+    )
+
     class RecoveringClient:
         config = EngineClientConfig(
             base_url="http://skeleton:8001",
@@ -491,6 +502,14 @@ async def test_engine_text_recovers_existing_execution_before_recompiling_change
                 context_digest="a" * 64,
                 compiler_version="compiler-original",
                 source_snapshot=(
+                    (
+                        str(uuid5(
+                            NAMESPACE_URL,
+                            "backend-engine-prompt:" + self.operation_id
+                            + ":prompt:" + original_request.request_identity_digest,
+                        )),
+                        sha256(original_request.prompt.encode("utf-8")).hexdigest(),
+                    ),
                     ("segment-original", "b" * 64),
                 ),
                 data_class="internal",
@@ -508,29 +527,43 @@ async def test_engine_text_recovers_existing_execution_before_recompiling_change
             )
 
     client = RecoveringClient()
-    result = await execute_engine_text(
-        EngineTextRequest(
-            instructions="Rules",
-            prompt="Same canonical question",
-            idempotency_key="stable-recovery",
-            tenant_id="default",
-            actor_id="backend-ai",
-            data_class="public",
-            capability="assistant.compat",
-            evidence=(
-                {
-                    "source_id": "retrieval:new",
-                    "content": "new retrieval that did not exist initially",
-                },
+    # An idempotency key cannot silently authorize changed evidence, even
+    # when the old execution has already reached a durable terminal state.
+    with pytest.raises(EngineTextError, match="different request semantics"):
+        await execute_engine_text(
+            EngineTextRequest(
+                instructions="Rules",
+                prompt="Same canonical question",
+                idempotency_key="stable-recovery",
+                tenant_id="default",
+                actor_id="backend-ai",
+                data_class="public",
+                capability="assistant.compat",
+                evidence=(
+                    {
+                        "source_id": "retrieval:new",
+                        "content": "new retrieval that did not exist initially",
+                    },
+                ),
             ),
-        ),
-        client=client,
-    )
+            client=client,
+        )
+
+    # Exact replay recovers the verified result and never reruns the engine.
+    result = await execute_engine_text(original_request, client=client)
 
     assert result.text == "original durable answer"
     assert result.context_id == "context-original"
     assert result.context_digest == "a" * 64
     assert result.context_source_snapshot == (
+        (
+            str(uuid5(
+                NAMESPACE_URL,
+                "backend-engine-prompt:" + client.operation_id
+                + ":prompt:" + original_request.request_identity_digest,
+            )),
+            sha256(original_request.prompt.encode("utf-8")).hexdigest(),
+        ),
         ("segment-original", "b" * 64),
     )
     assert result.provider_receipts == (
