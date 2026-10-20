@@ -733,6 +733,8 @@ def author_studio_expedition(project: StudioProject, profile, *, weather=None):
         raise StudioError("expedition placement compilation budget exceeded")
     anchor=compile_studio_project(project)["content_sha256"]
     world=author_archipelago(project.project_id,anchor,profile,weather=weather)
+    from skeleton.forge.game_frontier_studio_tile_navigation import add_studio_walkable_paths
+    world=add_studio_walkable_paths(project,world)
     waypoints=list(world.waypoints)
     edges=list(world.edges)
     originals=tuple(world.waypoints)
