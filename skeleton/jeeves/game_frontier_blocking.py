@@ -38,8 +38,8 @@ class ActorTrack:
             raise ExpeditionError("cinematic track identity invalid")
         if type(self.keys) is not tuple or len(self.keys)<2 or len(self.keys)>64:
             raise ExpeditionError("cinematic actor path missing keyframes")
-        if any(key.actor!=self.actor or b.frame<=a.frame
-               for a,b in zip(self.keys,self.keys[1:])):
+        if (any(key.actor!=self.actor for key in self.keys)
+                or any(b.frame<=a.frame for a,b in zip(self.keys,self.keys[1:]))):
             raise ExpeditionError("cinematic actor frames missing source chronology")
 
 def track_at(track:ActorTrack,frame:int)->dict:
