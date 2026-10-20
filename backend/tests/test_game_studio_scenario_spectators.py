@@ -35,7 +35,9 @@ class TestStudioScenarioSpectators(unittest.IsolatedAsyncioTestCase):
             report=await game_studio_learning.scenario_mirror_views(
                 self.scope,"campaign-fixture",lanes=2,steps=3,sample=1,
             )
-            reader.assert_awaited_once_with(self.scope,"campaign-fixture")
+            # The second read is a post-computation authorization recheck.
+            self.assertEqual(reader.await_count, 2)
+            reader.assert_awaited_with(self.scope,"campaign-fixture")
         self.assertEqual(report["campaign_id"],"campaign-fixture")
         self.assertEqual(report["campaign_cursor"],7)
         self.assertTrue(report["spectator_only"])
@@ -52,7 +54,9 @@ class TestStudioScenarioSpectators(unittest.IsolatedAsyncioTestCase):
                 self.scope,"campaign-fixture",angle="temporal",
                 steps=1,max_cycles=10,replay_budget=300,
             )
-            reader.assert_awaited_once_with(self.scope,"campaign-fixture")
+            # The second read is a post-computation authorization recheck.
+            self.assertEqual(reader.await_count, 2)
+            reader.assert_awaited_with(self.scope,"campaign-fixture")
         self.assertEqual(outcome["campaign_id"],"campaign-fixture")
         self.assertEqual(outcome["parent_sim_count"],1)
         self.assertTrue(outcome["spectator_only"])
@@ -79,7 +83,8 @@ class TestStudioScenarioSpectators(unittest.IsolatedAsyncioTestCase):
             experiment=await game_studio_learning.multifactor_verified_experiments(
                 self.scope,"campaign-fixture",axis_offset=0,count=2,steps=1,
             )
-            self.assertEqual(reader.await_count,3)
+            # Catalog reads once; both compute probes recheck campaign access.
+            self.assertEqual(reader.await_count,5)
         self.assertEqual(catalog["editor"],"economy")
         self.assertGreater(catalog["total_executable_axes"],1)
         self.assertTrue(design["scenarios"])
@@ -107,6 +112,29 @@ class TestStudioScenarioSpectators(unittest.IsolatedAsyncioTestCase):
                 await game_studio_learning.scenario_mirror_views(
                     self.scope,"campaign-fixture",lanes=2,
                 )
+
+
+    async def test_canonical_authority_cannot_be_laundered_by_a_valid_snapshot(self):
+        # A malicious or stale campaign row must not inherit permission from
+        # an independently well-formed champion snapshot with matching target.
+        denied={**self.row,"environment_request":{
+            **self.request.as_dict(),"kind":"builtin",
+        }}
+        with patch.object(game_studio_learning,"_read",new_callable=AsyncMock) as read:
+            read.return_value=denied
+            with self.assertRaises((GameLearningError,ValueError)):
+                await game_studio_learning.scenario_mirror_views(
+                    self.scope,"campaign-fixture",lanes=1,steps=1,
+                )
+            with self.assertRaises((GameLearningError,ValueError)):
+                await game_studio_learning.scenario_shadow_audit(
+                    self.scope,"campaign-fixture",steps=1,
+                )
+            with self.assertRaises((GameLearningError,ValueError)):
+                await game_studio_learning.multifactor_control_catalog(
+                    self.scope,"campaign-fixture",
+                )
+            self.assertEqual(read.await_count,3)
 
 
 if __name__ == "__main__":
