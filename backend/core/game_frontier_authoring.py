@@ -134,3 +134,58 @@ def catalog() -> dict:
             "actions": AUTHORING_ACTIONS, "action_count": 50,
             "persistence_owner": "canonical_game_learning_workspace",
             "source_file": SOURCE_PATH}
+
+
+
+async def export_native_project(scope: Mapping[str, str], project_id: str,
+                                body: Mapping[str, Any]) -> dict:
+    """Write an actually emitted Godot project into canonical owned project files.
+
+    The game comes from Forge's existing original expedition compiler, and the
+    versioned workspace save transaction is authoritative. No mock binaries,
+    arbitrary filesystem locations or second project DB are created.
+    """
+    owner, authored = await _source(scope, project_id)
+    if (owner["version"] != body.get("expected_version")
+            or project_digest(authored) != body.get("expected_sha256")):
+        raise GameLearningError("studio_source_conflict",
+                                "Studio project changed before native build.", 409)
+    seed, islands = body.get("seed"), body.get("islands")
+    if (type(seed) is not int or not 0 <= seed <= 2**63 - 1
+            or type(islands) is not int or not 3 <= islands <= 64):
+        raise StudioError("bounded original world generation profile required")
+    original = compile_studio_expedition(
+        authored, ArchipelagoProfile(seed=seed, islands=islands, caverns=0),
+        playtest_routes=4, include_godot=True,
+    )
+    generated = original["godot_project_files"]
+    folder = "game/generated/frontier_native/" + original["world_digest"][:16] + "/"
+    paths = [folder + leaf for leaf in generated]
+    if len(set(paths)) != len(paths):
+        raise StudioError("duplicate native Godot source file")
+    existing = {f["path"] for f in owner["files"]}
+    if any(path in existing for path in paths):
+        raise GameLearningError("studio_build_collision",
+                                "Native output for this exact content already exists.", 409)
+    files = [{"path": f["path"], "content": f["content"]} for f in owner["files"]]
+    files.extend({"path": folder + name, "content": content}
+                 for name, content in sorted(generated.items()))
+    saved = await workspace.save_editor(scope, project_id, {
+        "expected_version": owner["version"],
+        "idempotency_key": body["idempotency_key"],
+        "files": files, "entrypoint": owner["entrypoint"],
+    })
+    saved_paths = {f["path"] for f in saved["files"]}
+    if not set(paths) <= saved_paths:
+        raise GameLearningError("studio_native_save_mismatch",
+                                "Native build was not committed to project source.", 409)
+    return {
+        "schema": "skeleton.game.frontier_studio_native_export.v1",
+        "project_id": project_id, "source_sha256": project_digest(authored),
+        "game_world_sha256": original["world_digest"],
+        "expected_version": saved["version"],
+        "file_count": len(paths), "file_paths": paths,
+        "playtest": original["playtest"],
+        "receipt_sha256": original["receipt_digest"],
+        "saved": True, "native_executed": False, "release_certified": False,
+    }
