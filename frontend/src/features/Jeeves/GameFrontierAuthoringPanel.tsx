@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   buildForge, copyForgeTiles, editForge, exportForge, inspectForge,
+  previewForgeGameplay, type ForgeGameplayProbe,
   type ForgeDocument, type ForgeStep, type ForgeBuild,
 } from '../../product/gameFrontierAuthoringClient';
 import { getLearningProject, type LearningProject } from '../../product/gameLearningClient';
@@ -168,6 +169,9 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ForgeBuild | null>(null);
+  const [gameplayProbe, setGameplayProbe] = useState<ForgeGameplayProbe | null>(null);
+  const [probePosition, setProbePosition] = useState('[1,1,0]');
+  const [probeSignals, setProbeSignals] = useState('{"altitude_m":0}');
   const pending = disabled || busy;
   useEffect(() => { onDirtyChange?.(steps.length > 0); }, [steps.length, onDirtyChange]);
   const load = useCallback(async () => {
@@ -254,6 +258,24 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     } catch (reason: any) { setError(String(reason?.message || reason)); }
     finally { setBusy(false); }
   };
+  const probe = async () => {
+    setBusy(true); setError('');
+    try {
+      const coords: unknown = JSON.parse(probePosition);
+      const signals: unknown = JSON.parse(probeSignals);
+      if (!Array.isArray(coords) || coords.length !== 3 ||
+          coords.some(value => typeof value !== 'number' || !Number.isFinite(value)) ||
+          !signals || typeof signals !== 'object' || Array.isArray(signals) ||
+          Object.values(signals).some(value => typeof value !== 'number' || !Number.isFinite(value))) {
+        throw new Error('Provide three finite source XYZ numbers and a typed sensor signal object.');
+      }
+      const result = await previewForgeGameplay(project.project_id, coords as number[],
+        signals as Record<string, number>);
+      setGameplayProbe(result);
+      setNotice('Real RPG/physics reference simulation evaluated from saved source.');
+    } catch (reason: any) { setError(String(reason?.message || reason)); }
+    finally { setBusy(false); }
+  };
   return <View style={{ gap: 12, paddingVertical: 10 }}>
     <Text style={{ color: '#eef3fa', fontSize: 20, fontWeight: '700' }}>Forge Studio · Real Game Authoring</Text>
     <Text style={{ color: '#a7bacf' }}>100 editable tools for maps, characters, quests, environmental events, native physics and soundtracks.
@@ -314,6 +336,35 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     <Text style={{ color: '#bed1e4' }}>{steps.length} queued changes</Text>
     {steps.slice(-8).map((step, index) => <Text key={index} style={{ color: '#a5bdcc' }}>
       {steps.length - Math.min(steps.length, 8) + index + 1}. {label(step.action)}</Text>)}
+
+    <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Simulate authored 3D gameplay</Text>
+    <Text style={{ color: '#a7bacf' }}>Probe a local game coordinate and available
+      environment sensors. Results use real source-based equations; no native hardware
+      execution is implied.</Text>
+    <TextInput accessibilityLabel="Reference game position source XYZ JSON"
+      value={probePosition} onChangeText={setProbePosition} editable={!pending}
+      autoCapitalize="none" style={{ color: '#eef6ff', backgroundColor: '#202936', padding: 10,
+        borderRadius: 7 }} />
+    <TextInput accessibilityLabel="Game environment sensor observations JSON"
+      value={probeSignals} onChangeText={setProbeSignals} editable={!pending}
+      autoCapitalize="none" style={{ color: '#eef6ff', backgroundColor: '#202936', padding: 10,
+        borderRadius: 7 }} />
+    <Button title="Simulate physics, zones and RPG events" disabled={pending || !doc}
+      press={() => { void probe(); }} />
+    {gameplayProbe && <View style={{ gap: 4 }}>
+      <Text style={{ color: '#bce4d2' }}>
+        Active zones: {gameplayProbe.occupied_zones.length} · Force fields: {gameplayProbe.field_forces.length}
+        · Triggered RPG pages: {gameplayProbe.environment_accepted.length}
+      </Text>
+      <Text style={{ color: '#a7bbd0' }}>Net force XYZ (newtons): {gameplayProbe.net_force_xyz_n.map(
+        n => n.toFixed(2)).join(', ')}</Text>
+      {gameplayProbe.occupied_zones.map(row => <Text key={row.zone_id}
+        style={{ color: '#b9d8ea' }}>Zone {row.zone_id}: {row.action_kind}</Text>)}
+      {gameplayProbe.missing_sensor_signals.length > 0 &&
+        <Text style={{ color: '#efc58c' }}>Unobserved signals:
+          {gameplayProbe.missing_sensor_signals.join(', ')}</Text>}
+      <Text selectable style={{ color: '#829db0', fontSize: 11 }}>{gameplayProbe.receipt_sha256}</Text>
+    </View>}
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Compile & export real game</Text>
     <View style={{ flexDirection: 'row', gap: 10 }}>
       <TextInput value={seed} onChangeText={setSeed} keyboardType="numeric" accessibilityLabel="Procedural world seed"
