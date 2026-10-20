@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "41a880cb5da3c23b3a5fd67aa72cf946c398ef52",
+      "source_git_object_sha": "7e773e063d900533d7a293bbf51b8a49b1ebce5e",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1499,7 +1499,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "477f1f576cab1ec2912617242c9563189f981680",
+      "source_git_object_sha": "ddceb43f10ddd98c6c1f90a053c0535b5dc1e563",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -10361,7 +10361,8 @@
       "AIFT-INTELLIGENCE",
       "AIFT-JEEVES",
       "AIFT-ENGINE-API",
-      "AIFT-LEARNING"
+      "AIFT-LEARNING",
+      "AIFT-FORGE"
     ],
     "operator_and_learning_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation"
   }
