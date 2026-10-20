@@ -32,13 +32,14 @@ id = "generic-api-key"
 description = "Inherited generic API key rule with Skeleton documentation false-positive allowlist"
 
   [[rules.allowlists]]
-  description = "Three reviewed public tokenizer-profile enum lines, never credential values"
+  description = "Four reviewed public tokenizer-profile enum lines, never credential values"
   condition = "AND"
   regexTarget = "line"
   regexes = [
     '''^\s*tokenizer_kind = "utf8_bytes_upper_bound"$''',
     '''^\s*"tokenizer": getattr\(model, "tokenizer_kind", "utf8_bytes_upper_bound"\),$''',
-    '''^\s*tokenizer = "utf8_bytes_upper_bound"$'''
+    '''^\s*tokenizer = "utf8_bytes_upper_bound"$''',
+    '''^\s*tokenizer = supplied\.get\("tokenizer", "utf8_bytes_upper_bound"\)$'''
   ]
   paths = [
     '''^skeleton/ai/runtime/inference/llama_cpp\.py$''',
