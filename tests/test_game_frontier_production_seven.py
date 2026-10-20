@@ -102,7 +102,7 @@ def test_production_session_rejects_modified_actions_even_with_recomputed_root_h
     saved["events"][0]["input"]["choice_id"]="rescue"
     from skeleton.jeeves.game_frontier_expedition import _digest
     saved["snapshot_digest"]=_digest({
-        key:value for key,value in saved.items() if key!="snapshot_digest",
+        key:value for key,value in saved.items() if key!="snapshot_digest"
     })
     with pytest.raises(ExpeditionError,match="edited after execution"):
         ProductionSession.restore(w,p,s,q,saved)
