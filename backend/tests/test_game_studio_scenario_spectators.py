@@ -43,7 +43,8 @@ class TestStudioScenarioSpectators(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(report["spectator_only"])
         self.assertFalse(report["frames_show_training_episodes"])
         self.assertEqual(len(report["lanes"]),2)
-        self.assertEqual(report["workers_used"],2)
+        # Two independent angles share one resource-bounded local worker.
+        self.assertEqual(report["workers_used"],1)
         self.assertTrue(all(lane["steps"]>0 for lane in report["lanes"]))
         self.assertEqual(self.row["cursor"],7)
 
