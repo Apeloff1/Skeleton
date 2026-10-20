@@ -91,20 +91,24 @@ def audit_quest_ending_graph(campaign: Mapping[str, Any]) -> GateResult:
     for key, deps in graph.items():
         if key in deps or any(d not in graph for d in deps):
             findings.append(Finding("quests", "invalid_dependency", key))
-    visit: dict[str, int] = {}
-    def dfs(key: str) -> None:
-        if visit.get(key) == 1:
-            findings.append(Finding("quests", "dependency_cycle", key))
-            return
-        if visit.get(key) == 2:
-            return
-        visit[key] = 1
-        for dep in graph[key]:
-            if dep in graph:
-                dfs(dep)
-        visit[key] = 2
-    for key in sorted(graph):
-        dfs(key)
+    # Kahn's algorithm bounds deeply nested quest chains without recursion.
+    remaining = {key: len(set(d for d in deps if d in graph))
+                 for key, deps in graph.items()}
+    dependents: dict[str, set[str]] = {key: set() for key in graph}
+    for key, deps in graph.items():
+        for dependency in deps:
+            if dependency in graph:
+                dependents[dependency].add(key)
+    ready = deque(sorted(key for key, count in remaining.items() if count == 0))
+    while ready:
+        node = ready.popleft()
+        for dependent in sorted(dependents[node]):
+            remaining[dependent] -= 1
+            if remaining[dependent] == 0:
+                ready.append(dependent)
+    for node, count in sorted(remaining.items()):
+        if count:
+            findings.append(Finding("quests", "dependency_cycle", node))
     covered: set[str] = set()
     ids: set[str] = set()
     for ending in endings:
@@ -285,6 +289,23 @@ def audit_package_closure(package: Mapping[str, Any]) -> GateResult:
                 pending.append(dependency)
     for unused in sorted(set(graph) - reached):
         findings.append(Finding("package", "orphan_file", unused))
+    remaining = {key: len(set(d for d in deps if d in graph))
+                 for key, deps in graph.items()}
+    dependents: dict[str, set[str]] = {key: set() for key in graph}
+    for key, deps in graph.items():
+        for dep in deps:
+            if dep in graph:
+                dependents[dep].add(key)
+    ready = deque(sorted(key for key, count in remaining.items() if count == 0))
+    while ready:
+        node = ready.popleft()
+        for dependent in sorted(dependents[node]):
+            remaining[dependent] -= 1
+            if remaining[dependent] == 0:
+                ready.append(dependent)
+    for node, count in sorted(remaining.items()):
+        if count:
+            findings.append(Finding("package", "dependency_cycle", node))
     return _result("package", findings, package)
 
 
@@ -311,4 +332,30 @@ def audit_deep_candidate(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "gates": gates,
         "findings": findings,
         "evidence_digest": _digest(gates),
+    }
+
+
+def verify_deep_quality_report(bundle: Mapping[str, Any], report: Mapping[str, Any]) -> dict:
+    """Independently re-execute all thirteen gates against exact original inputs.
+
+    Neither hash correctness nor a second self-authored summary alone suffices:
+    every finding, gate outcome and source identity must match recomputation.
+    """
+    if not isinstance(report, Mapping) or set(report) != {
+        "schema", "source_digest", "candidate_passed", "release_certified",
+        "gates", "findings", "evidence_digest",
+    }:
+        raise QualityGateError("quality verifier received a malformed report")
+    actual = audit_deep_candidate(bundle)
+    if dict(report) != actual:
+        raise QualityGateError("independent reviewer rejected contradictory quality evidence")
+    return {
+        "schema": "game.candidate.independent_verify.v1",
+        "source_digest": actual["source_digest"],
+        "gate_count": len(actual["gates"]),
+        "findings_count": len(actual["findings"]),
+        "independent_replay_passed": True,
+        "candidate_passed": actual["candidate_passed"],
+        "release_certified": False,
+        "receipt_digest": _digest(actual),
     }
