@@ -12,7 +12,7 @@ import unittest
 from skeleton.forge.game_frontier_studio import (
     StudioError, StudioEvent, StudioForceField, StudioPlacement,
     StudioQuest, StudioQuestStage, StudioTriggerVolume,
-    StudioProject, compile_studio_gameplay_force_fields,
+    StudioProject, compile_studio_expedition, compile_studio_gameplay_force_fields,
     compile_studio_gameplay_zones, compile_studio_native_quest_graph,
 )
 from skeleton.forge.game_frontier_rpg_events import (
@@ -27,6 +27,7 @@ from skeleton.forge.game_frontier_studio_physics_edit import PHYSICAL_ACTIONS
 from skeleton.forge.game_frontier_studio_quest_terrain_edit import QUEST_ACTIONS, TERRAIN_ACTIONS
 from skeleton.forge.game_frontier_studio_document import authored_document, load_authored_document
 from skeleton.testing.test_game_frontier_studio_authoring import project as original_project
+from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile
 
 NEW_ACTIONS = ENV_ACTIONS + PHYSICAL_ACTIONS + QUEST_ACTIONS + TERRAIN_ACTIONS
 
@@ -223,6 +224,58 @@ class SecondFiftyFunctionalAcceptance(unittest.TestCase):
         self.assertEqual(edited.native_trigger_volumes, reloaded.native_trigger_volumes)
         self.assertEqual(edited.native_gameplay_force_fields,
                          reloaded.native_gameplay_force_fields)
+
+    def test_generated_godot_game_actually_executes_new_zone_and_force_mechanics(self):
+        before = project()
+        built = compile_studio_expedition(
+            before, ArchipelagoProfile(
+                seed=77, islands=5, caverns=0,
+                include_underwater=False, include_portals=False),
+            include_godot=True,
+        )
+        files = built["godot_project_files"]
+        self.assertTrue(built["studio_native_runtime_installed"])
+        self.assertIn("game/frontier/studio_gameplay.gd", files)
+        self.assertIn("game/frontier/studio_gameplay_zones.json", files)
+        self.assertIn("game/frontier/studio_gameplay_fields.json", files)
+        self.assertIn("game/frontier/studio_gameplay_environment.json", files)
+        self.assertIn("game/frontier/studio_gameplay_quests.json", files)
+        self.assertIn("StudioGameplay", files["game/frontier/expedition.tscn"])
+        self.assertIn("func _force_tick", files["game/frontier/studio_gameplay.gd"])
+        self.assertIn("func _zone_tick", files["game/frontier/studio_gameplay.gd"])
+        self.assertIn("func _environment_tick", files["game/frontier/studio_gameplay.gd"])
+        self.assertIn('"zone0"', files["game/frontier/studio_gameplay_zones.json"])
+        self.assertIn('"wind0"', files["game/frontier/studio_gameplay_fields.json"])
+        self.assertIn('"journey"', files["game/frontier/studio_gameplay_quests.json"])
+
+    def test_native_file_content_changes_when_force_editor_changes(self):
+        profile = ArchipelagoProfile(
+            seed=77, islands=5, caverns=0,
+            include_underwater=False, include_portals=False)
+        before = project()
+        after = execute_authoring(before, "field_strength", FIELD["field_strength"])
+        a = compile_studio_expedition(before, profile, include_godot=True)
+        b = compile_studio_expedition(after, profile, include_godot=True)
+        self.assertNotEqual(
+            a["godot_project_files"]["game/frontier/studio_gameplay_fields.json"],
+            b["godot_project_files"]["game/frontier/studio_gameplay_fields.json"],
+        )
+        self.assertNotEqual(a["studio_native_runtime_sha256"],
+                            b["studio_native_runtime_sha256"])
+        self.assertEqual(
+            a["godot_project_files"]["game/frontier/studio_gameplay.gd"],
+            b["godot_project_files"]["game/frontier/studio_gameplay.gd"],
+        )
+
+    def test_native_script_does_not_use_unreviewed_generated_payload_as_code(self):
+        files = compile_studio_expedition(
+            project(), ArchipelagoProfile(seed=15, islands=3, caverns=0,
+                                          include_underwater=False, include_portals=False),
+            include_godot=True)["godot_project_files"]
+        script = files["game/frontier/studio_gameplay.gd"]
+        self.assertNotIn("Expression.new()", script)
+        self.assertNotIn("OS.execute(", script)
+        self.assertIn("studio_gameplay_environment.json", script)
 
     def test_invalid_native_operation_rolls_back_entire_batch(self):
         original = project()
