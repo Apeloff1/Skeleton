@@ -26,6 +26,8 @@ def complete_studio_quality_handlers(
     store: QualityHistoryStore,
     operator_id: str,
     native_owners: Mapping[str, Callable[[], tuple]] | None = None,
+    approve_patch: Callable[[StudioCommand, Mapping[str, Any]], bool] | None = None,
+    verify_candidate: Callable[[StudioCommand, Mapping[str, Any]], bool] | None = None,
 ) -> dict[str, Callable[[StudioCommand, Any], dict]]:
     """Create eight concrete, host-backed operations for the existing registry."""
     if (not isinstance(projects, Mapping) or not projects or
@@ -47,6 +49,11 @@ def complete_studio_quality_handlers(
                 for key, provider in native_owners.items())):
         raise QualityGateError("host-controlled native evidence mapping invalid")
     native = dict(native_owners or {})
+    if (approve_patch is None) != (verify_candidate is None):
+        raise QualityGateError("repair preview requires both trusted host-review callbacks")
+    if approve_patch is not None and (
+            not callable(approve_patch) or not callable(verify_candidate)):
+        raise QualityGateError("repair approval and source verification must be callable")
 
     def source(command: StudioCommand) -> Mapping:
         if not isinstance(command, StudioCommand) or command.project_id not in bound:
@@ -128,6 +135,35 @@ def complete_studio_quality_handlers(
             raise QualityGateError("host native witness must bind world/player/files/report")
         return inspect_native_game_witness(candidate, *value)
 
+    def repair_preview(command: StudioCommand, context: Any) -> dict:
+        from skeleton.game.production_studio_repair import preview_reviewed_studio_repairs
+        if approve_patch is None or verify_candidate is None:
+            raise QualityGateError("host has not installed an independently reviewed editor")
+        if set(command.payload) != {"patches"}:
+            raise QualityGateError("preview requires an exact candidate patch list")
+        patches = command.payload["patches"]
+        if type(patches) is not list or len(patches) > 16:
+            raise QualityGateError("bounded source edit requests only")
+        result = preview_reviewed_studio_repairs(
+            source(command), patches,
+            authorize=lambda patch: approve_patch(command, patch),
+            independently_verify=lambda new: verify_candidate(command, new),
+        )
+        return {
+            "schema": result["schema"],
+            "source_sha256": result["source_sha256"],
+            "attempt_count": result["attempt_count"],
+            "accepted_count": result["accepted_count"],
+            "attempts": result["attempts"],
+            "proposed_source_sha256": _sha(result["post_quality"]["source_digest"],
+                                           "reviewed original source"),
+            "quality_evidence_sha256": result["post_quality"]["evidence_digest"],
+            "remaining_findings": len(result["post_quality"]["findings"]),
+            "persisted": False,
+            "release_approved": False,
+            "receipt_digest": result["receipt_digest"],
+        }
+
     return {
         "game.studio.quality.audit": audit,
         "game.studio.quality.dragon": dragon,
@@ -137,4 +173,6 @@ def complete_studio_quality_handlers(
         "game.studio.quality.record": record,
         "game.studio.quality.review": review,
         "game.studio.quality.native.inspect": native_inspect,
+        **({"game.studio.quality.repair.preview": repair_preview}
+           if approve_patch is not None else {}),
     }
