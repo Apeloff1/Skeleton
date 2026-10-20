@@ -108,6 +108,7 @@ class QualityHistoryStore:
                     "game.candidate.frontier_quality.v1",
                     "game.candidate.complete_studio.v1",
                     "game.candidate.advanced_studio.v1",
+                    "game.candidate.production_84.v1",
             ):
                 raise QualityGateError("wrong report authority schema")
             if obj.get("release_certified") is not False:
@@ -121,13 +122,15 @@ class QualityHistoryStore:
                     "game.candidate.frontier_quality.v1",
                     "game.candidate.complete_studio.v1",
                     "game.candidate.advanced_studio.v1",
+                    "game.candidate.production_84.v1",
             ):
                 expected_gates += (
                     "lineage", "continuity", "routes", "physics", "lod",
                     "localization", "comparison",
                 )
             if obj["schema"] in ("game.candidate.complete_studio.v1",
-                                 "game.candidate.advanced_studio.v1"):
+                                 "game.candidate.advanced_studio.v1",
+                                 "game.candidate.production_84.v1"):
                 expected_gates += (
                     "cinematics", "dialogue_sync", "npc_behaviors", "streaming",
                     "save_migrations", "dynamic_world", "input_latency",
@@ -137,6 +140,25 @@ class QualityHistoryStore:
                     "audio_mix", "procedural_replay", "economy_integrity",
                     "multiplayer_sync", "transport_paths", "privacy_consent",
                     "endurance_recovery",
+                )
+            if obj["schema"] == "game.candidate.production_84.v1":
+                expected_gates += (
+                    "frame_interpolation", "animation_blends", "lip_transitions",
+                    "subtitle_layout", "quest_causality", "npc_reactions",
+                    "weather_dwell", "camera_path", "audio_beat_grid", "controller_buffer",
+                    "elastic_skin", "skeletal_joint", "center_mass", "fluid_buoyancy",
+                    "freefall_terminal", "wind_drafting", "turbulence", "surface_grip",
+                    "inertial_gyro", "sextant_fix",
+                    "plot_threads", "character_arcs", "dialogue_choices", "quest_dependency",
+                    "reputational_effects", "faction_branching", "ending_resolutions",
+                    "lore_citations", "world_portals", "multi_world_state",
+                    "sprite_atlases", "color_palette", "material_shaders", "foliage_detail",
+                    "parallax_depth", "lod_transition", "shadow_contact", "volumetric_light",
+                    "texture_streaming", "particle_fidelity",
+                    "checkpoint_atomic", "save_rollback", "chunk_receipts",
+                    "deterministic_compilation", "controller_binding", "console_portability",
+                    "multiplayer_reconcile", "crawler_knowledge", "adversarial_promotion",
+                    "background_workers",
                 )
             gates = obj.get("gates")
             if (type(gates) is not list or len(gates) != len(expected_gates) or
