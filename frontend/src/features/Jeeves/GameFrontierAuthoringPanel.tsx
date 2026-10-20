@@ -158,7 +158,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         await load();
         onSaved(await getLearningProject(project.project_id));
         setNotice('Real game source committed to the project revision history.');
-      } else setNotice('Preview compiled: ' + result.candidate_sha256.slice(0, 16) +
+      } else if ('candidate_sha256' in result) setNotice('Preview compiled: ' + result.candidate_sha256.slice(0, 16) +
         ' · no source changes persisted.');
     } catch (reason: any) { setError(String(reason?.message || reason)); }
     finally { setBusy(false); }
