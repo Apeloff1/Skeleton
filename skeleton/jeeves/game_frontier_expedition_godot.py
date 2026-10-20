@@ -85,7 +85,9 @@ func _ready() -> void:
     world = _load_json(WORLD_FILE)
     player = _load_json(PLAYER_FILE)
     if (world.get("schema", "") != "skeleton.game.frontier_expedition.v1"
-            or player.get("schema", "") != "skeleton.game.frontier_expedition_player.v1"):
+            or player.get("schema", "") != "skeleton.game.frontier_expedition_player.v1"
+            or str(world.get("world_digest", "")).length() != 64
+            or str(player.get("traveler_digest", "")).length() != 64):
         push_error("Authored expedition schema mismatch")
         return
     var nodes = world.get("waypoints", [])
@@ -234,7 +236,7 @@ func _can_travel(edge: Dictionary) -> bool:
             return false
     var weather: Dictionary = world.get("weather", {})
     if (float(weather.get("visibility", 1.0)) < 0.12
-            and str(edge.get("mode", "")) in ["glide", "airship", "portal"]
+            and str(edge.get("mode", "")) in ["glide", "updraft", "airship", "portal"]
             and not flags.has("instrument_navigation")):
         return false
     return true
@@ -297,6 +299,8 @@ func _emit_observation(action: String, evidence: String) -> void:
     print("EXPEDITION_OBSERVATION " + JSON.stringify({
         "schema":"skeleton.game.expedition_native_observation.v1",
         "source_digest":str(world.get("source", "")),
+        "world_digest":str(world.get("world_digest", "")),
+        "traveler_digest":str(player.get("traveler_digest", "")),
         "project_id":str(world.get("project", "")),
         "action":action,"evidence":evidence,
         "state":_state(),"receipt_head":receipt_head,
@@ -407,8 +411,20 @@ or proof of full long-term production qualification.
 
 
 def _traveler_json(traveler: Traveler) -> str:
+    from .game_frontier_expedition import _digest
+    profile = {
+        "permitted_modes": sorted(traveler.permitted_modes),
+        "flags": sorted(traveler.flags),
+        "equipment": sorted(traveler.equipment),
+        "max_stamina": traveler.max_stamina,
+        "carried_kg": traveler.carried_kg,
+        "capacity_kg": traveler.capacity_kg,
+        "skill": traveler.skill,
+        "shelter": traveler.shelter,
+    }
     return _json({
         "schema": "skeleton.game.frontier_expedition_player.v1",
+        "traveler_digest": _digest(profile),
         "permitted_modes": sorted(traveler.permitted_modes),
         "flags": sorted(traveler.flags),
         "equipment": sorted(traveler.equipment),
@@ -428,7 +444,7 @@ def emit_expedition_godot_project(
     if not isinstance(world, ExpeditionWorld) or not isinstance(traveler, Traveler):
         raise ExpeditionError("typed source world and traveler required for native game")
     if type(include_project_config) is not bool:
-        raise ExpeditionError("Godot project configuration policy must be boolean")
+        raise ExpeditionError("Godot project configuration policy must be explicit boolean")
     export = world_export(world)
     files = {
         "game/frontier/expedition.tscn": _GODOT_SCENE,

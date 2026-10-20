@@ -170,3 +170,9 @@ def test_godot_headless_loads_real_scene_when_binary_available(tmp_path):
     assert run.returncode==0,run.stdout[-2000:]+run.stderr[-2000:]
     assert "EXPEDITION_READY" in run.stdout,run.stdout[-2000:]
     assert "EXPEDITION_OBSERVATION" in run.stdout
+    from skeleton.jeeves.game_frontier_expedition_native_verify import (
+        inspect_native_expedition_trace,
+    )
+    replay=inspect_native_expedition_trace(run.stdout,world(),traveler())
+    assert replay["verified_source_gameplay"]
+    assert replay["observations"]>=1

@@ -85,3 +85,26 @@ Forge integration and (when the executable exists) real Godot headless scene
 startup. A test skipped because Godot is unavailable is not a passing
 native playthrough claim. The compiler's native_playtest_completed flag remains
 false until an independently observed native playthrough is provided.
+
+
+## Candidate-native playthrough replay and independent route verification
+
+The Godot 4 runtime now emits the exact authored world digest and traveler
+profile digest alongside source identity on every emitted game action.
+inspect_native_expedition_trace() checks bounded native stdout records against
+an independently instantiated ExpeditionEpisode replay, including:
+
+- Exact world, original source, project and player identities.
+- Real directed graph movement, blocked route rejection and equipment gates.
+- Stamina/health accounting, game-clock drift, scene landmarks and visited nodes.
+- Quest flags, authored collectibles, victory state and action ordering.
+- Per-action candidate receipts, duplicate record rejection and original start
+  identity, including explicit incomplete-playthrough checks.
+- Strict JSON parsing without duplicate fields, nonfinite data, unbounded
+  vectors, absent initial spawn or forged native-authority assertions.
+
+This adapter does not grant native process authenticity: a synthetic JSON
+trace could describe a legitimate simulated session. Its report explicitly
+states that the source gameplay was replay-verified while engine origin
+attestation remains false. A real native run still requires its test job,
+binary identity and captured process provenance to be independently checked.

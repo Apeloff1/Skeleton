@@ -334,7 +334,7 @@ def assess_travel(
     )
     damage = max(0, math.floor(exposure*10))
     duration = round(edge.duration_s * pressure * (1+mass_load*0.4), 4)
-    if w.visibility < 0.12 and edge.mode in {"glide", "airship", "portal"} and "instrument_navigation" not in traveler.equipment:
+    if w.visibility < 0.12 and edge.mode in {"glide", "updraft", "airship", "portal"} and "instrument_navigation" not in traveler.equipment:
         return TravelAssessment(False, "visibility_requires_instruments", 0, 0, 0, 0, 0)
     return TravelAssessment(True, "passable", stamina, duration, damage, round(wind_along, 4), round(traction, 4))
 
@@ -711,6 +711,7 @@ def world_export(world:ExpeditionWorld, *,
     """Portable, fully source-bound original project data for an engine loader."""
     _int(max_bytes,256,4_000_000,"engine data budget")
     data=world.as_dict()
+    data["world_digest"]=world.digest
     raw=_json(data,max_bytes)
     return {
         "schema":"skeleton.game.frontier_expedition_export.v1",
