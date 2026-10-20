@@ -27,6 +27,9 @@ def test_llm_router_delegates_provider_and_model_ownership_to_engine() -> None:
 
 
 def test_llm_router_failure_is_engine_bounded_without_provider_fallback() -> None:
-    assert "except (EngineTextError, TimeoutError, asyncio.TimeoutError)" in SOURCE
+    # Python 3.11's asyncio.TimeoutError aliases builtins.TimeoutError:
+    # the runtime catches it once instead of carrying duplicate branches.
+    assert "except (EngineTextError, TimeoutError):" in SOURCE
+    assert "except (EngineClientError, EngineTextError, ValueError, TypeError):" in SOURCE
     assert '"error_code": "engine_unavailable"' in SOURCE
     assert "adapter.generate(" not in SOURCE
