@@ -64,6 +64,12 @@ READ_OPERATIONS = (
     "game.studio.quality.history",
     "game.studio.quality.native.inspect",
     "game.studio.quality.repair.preview",
+    "game.studio.advanced.audit",
+    "game.studio.advanced.dragon",
+    "game.studio.advanced.work",
+    "game.studio.advanced.impact",
+    "game.studio.advanced.diff",
+    "game.studio.advanced.history",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -107,6 +113,8 @@ WRITE_OPERATIONS = (
     "game.quality.frontier.attest",
     "game.studio.quality.record",
     "game.studio.quality.review",
+    "game.studio.advanced.record",
+    "game.studio.advanced.review",
 )
 OPERATIONS = frozenset((*READ_OPERATIONS, *WRITE_OPERATIONS))
 
