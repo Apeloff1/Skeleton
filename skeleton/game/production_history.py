@@ -311,3 +311,14 @@ class QualityHistoryStore:
         except Exception:
             self.db.execute("ROLLBACK")
             raise
+
+    def report_at(self, project_id: str, *, generation: int) -> dict:
+        """Read a historically committed report only after full chain replay."""
+        project = self._project(project_id)
+        if type(generation) is not int or not 1 <= generation <= 100000:
+            raise QualityGateError("historical audit requires exact bounded generation")
+        rows = self._rows(project)
+        self._verify(project, rows)
+        if generation > len(rows):
+            raise QualityGateError("historical audit generation does not exist")
+        return json.loads(rows[generation - 1][4])
