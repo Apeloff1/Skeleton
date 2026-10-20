@@ -182,6 +182,20 @@ jobs:
             skeleton/testing/test_operation_runtime.py
           python scripts/check_jeeves_agent_mirror.py
 
+      - name: Frontier expedition playable multi-route world and Forge Studio
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python -m py_compile \
+            skeleton/jeeves/game_frontier_expedition.py \
+            skeleton/jeeves/game_frontier_expedition_generation.py \
+            skeleton/forge/game_frontier_studio.py
+          python -m pytest -q --noconftest \
+            tests/test_game_frontier_expedition.py \
+            tests/test_game_frontier_expedition_studio.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
