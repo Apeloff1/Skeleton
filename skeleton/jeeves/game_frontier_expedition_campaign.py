@@ -76,6 +76,7 @@ from .game_frontier_ragdoll import simulate_ragdoll
 from .game_frontier_supply import original_supply_network
 from .game_frontier_blocking import author_original_blocking,export_blocking_godot
 from .game_frontier_visual_capture import export_native_capture_godot
+from .game_frontier_postproduction import compile_frame_postproduction
 from .game_frontier_controller_parity import verify_all_controller_eras
 from .game_frontier_soak import simulated_process_recovery
 
@@ -158,6 +159,7 @@ def compile_original_campaign(
     performance=author_performance(story,storyboard)
     preview_rgb=(original_procedural_preview_frames(world.digest),)
     vision=compare_original_visuals(preview_rgb)
+    postproduction=compile_frame_postproduction(preview_rgb[0],expected_world=world.digest)
     measured_controller=qualify_game_controller(
         controller,simulated_controller_trace(controller),
         world_digest=world.digest,
@@ -211,6 +213,8 @@ def compile_original_campaign(
     files["game/frontier/elasticbodyskin3d.json"]=_json(soft_skin).decode("utf-8")
     files["game/frontier/society.json"]=_json(society).decode("utf-8")
     files["game/frontier/visual_comparison.json"]=_json(vision).decode("utf-8")
+    files["game/frontier/postproduction.json"]=_json(postproduction["report"]).decode("utf-8")
+    files["game/frontier/contact_sheet.ppm"]=postproduction["contact_sheet_ppm"]
     files["game/frontier/controller_latency.json"]=_json(measured_controller).decode("utf-8")
     files["game/frontier/production_telemetry.json"]=_json(watchdog).decode("utf-8")
     files["game/frontier/seven_plane_assurance.json"]=_json(seven_axes).decode("utf-8")
@@ -303,6 +307,8 @@ def compile_original_campaign(
         "npc_society_receipt":society["snapshot_digest"],
         "performance_receipt":performance["receipt_digest"],
         "dragon_visual_receipt":vision["receipt_digest"],
+        "postproduction_receipt":postproduction["report"]["receipt_digest"],
+        "native_postproduction_attested":False,
         "controller_latency_receipt":measured_controller["receipt_digest"],
         "production_watchdog_receipt":watchdog["snapshot_digest"],
         "seven_plane_assurance_receipt":seven_axes["receipt_digest"],
@@ -353,7 +359,8 @@ def compile_original_campaign(
         "ik":ik,"ragdoll":ragdoll,"supply":supply,"blocking":blocking,
         "controller_parity":parity,"soak":soak,
         "society":society,"performance":performance,
-        "dragon_vision":vision,"controller_qa":measured_controller,
+        "dragon_vision":vision,"postproduction":postproduction,
+        "controller_qa":measured_controller,
         "production_watchdog":watchdog,"seven_plane_assurance":seven_axes,
         "ecology_frame":ecology_sample,
         "render":render_frames,"dragon":dragon,
@@ -394,6 +401,7 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
             or compiled.get("society")!=expected["society"]
             or compiled.get("performance")!=expected["performance"]
             or compiled.get("dragon_vision")!=expected["dragon_vision"]
+            or compiled.get("postproduction")!=expected["postproduction"]
             or compiled.get("controller_qa")!=expected["controller_qa"]
             or compiled.get("production_watchdog")!=expected["production_watchdog"]
             or compiled.get("seven_plane_assurance")!=expected["seven_plane_assurance"]

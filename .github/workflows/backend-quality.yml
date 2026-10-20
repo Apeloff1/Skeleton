@@ -230,6 +230,7 @@ jobs:
             skeleton/jeeves/game_frontier_supply.py \
             skeleton/jeeves/game_frontier_blocking.py \
             skeleton/jeeves/game_frontier_visual_capture.py \
+            skeleton/jeeves/game_frontier_postproduction.py \
             skeleton/jeeves/game_frontier_controller_parity.py \
             skeleton/jeeves/game_frontier_soak.py \
             skeleton/jeeves/game_frontier_expedition_production_tools.py \
@@ -268,7 +269,8 @@ jobs:
             tests/test_game_frontier_expedition_production_store.py \
             tests/test_game_frontier_expedition_production_tools.py \
             tests/test_game_frontier_advanced_seven.py \
-            tests/test_game_frontier_next_seven.py
+            tests/test_game_frontier_next_seven.py \
+            tests/test_game_frontier_postproduction.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .

@@ -13,6 +13,7 @@ from typing import Mapping
 import json
 from .game_frontier_expedition import ExpeditionError,_digest
 from .game_frontier_expedition_visual_lab import VisualFrame,compare_original_visuals
+from .game_frontier_postproduction import compile_frame_postproduction
 PREFIX="EXPEDITION_VIEWPORT_RGB "
 MAX_FRAMES=120
 
@@ -50,14 +51,17 @@ def ingest_godot_viewport_log(log:str,*,expected_world:str,
     if len(frames)<2:
         raise ExpeditionError("native viewport needs two real comparable frames")
     scored=compare_original_visuals((tuple(frames),))
+    post=compile_frame_postproduction(tuple(frames),expected_world=expected_world)
     report={"schema":"skeleton.dragon.native_viewport_ingest.v1",
             "world":expected_world,"frames":len(frames),
             "pixel_sources":[x.source_digest for x in frames],
             "comparison":scored["receipt_digest"],
+            "postproduction_receipt":post["report"]["receipt_digest"],
             "native_runner_attestation_verified":False,
             "video_file_generated":False}
     report["receipt_digest"]=_digest(report)
-    return {"frames":tuple(frames),"report":report,"comparison":scored}
+    return {"frames":tuple(frames),"report":report,"comparison":scored,
+            "postproduction":post}
 
 _GODOT_CAPTURE="""extends SceneTree
 # Emits two bounded original viewport RGB frames, no fabricated pixel metadata.
