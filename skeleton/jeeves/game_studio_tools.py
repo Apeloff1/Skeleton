@@ -76,6 +76,11 @@ READ_OPERATIONS = (
     "game.studio.expanded.impact",
     "game.studio.expanded.diff",
     "game.studio.expanded.history",
+    "game.studio.author.inspect",
+    "game.studio.author.copy",
+    "game.studio.author.preview",
+    "game.studio.author.compile",
+    "game.studio.author.game",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -123,6 +128,8 @@ WRITE_OPERATIONS = (
     "game.studio.advanced.review",
     "game.studio.expanded.record",
     "game.studio.expanded.review",
+    "game.studio.author.edit",
+    "game.studio.author.export",
 )
 OPERATIONS = frozenset((*READ_OPERATIONS, *WRITE_OPERATIONS))
 
