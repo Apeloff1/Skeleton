@@ -34,6 +34,7 @@ _C = "c" * 64
 def candidate():
     value = base_candidate()
     value["frontier"] = {
+        "source_sha256": _A,
         "lineage": {
             "source_sha256": _A,
             "assets": [
@@ -44,6 +45,7 @@ def candidate():
             ],
         },
         "timeline": {
+            "source_sha256": _A,
             "cast": [{"id": "guide", "appearance_sha256": _A}],
             "scenes": [
                 {"id": "departure", "act": 1, "tick": 0,
@@ -79,6 +81,7 @@ def candidate():
             ],
         },
         "lod": {
+            "source_sha256": _A,
             "meshes": [
                 {"mesh": "original_mesh", "level": 0, "triangles": 1000, "sha256": _A},
                 {"mesh": "original_mesh", "level": 1, "triangles": 300, "sha256": _B},
@@ -89,6 +92,7 @@ def candidate():
             ],
         },
         "localization": {
+            "source_sha256": _A,
             "base": {"greeting": "Welcome {name}", "farewell": "Goodbye"},
             "languages": [
                 {"id": "norwegian", "strings": {
@@ -135,6 +139,17 @@ class FrontierGateTests(unittest.TestCase):
         c = candidate()["frontier"]["lineage"]
         c["assets"][0]["inputs"] = ["low_poly"]
         self.assertIn("source_cycle", {f.code for f in audit_asset_lineage(c).findings})
+
+    def test_all_frontier_contracts_pin_single_source_snapshot(self):
+        for plane in ("lineage", "timeline", "routes", "motion", "lod", "localization"):
+            c = candidate()
+            c["frontier"][plane]["source_sha256"] = _B
+            with self.subTest(plane=plane), self.assertRaises(QualityGateError):
+                audit_frontier_candidate(c)
+        c = candidate()
+        c["frontier"]["comparison"]["candidate"]["source_sha256"] = _B
+        with self.assertRaises(QualityGateError):
+            audit_frontier_candidate(c)
 
     def test_lineage_rejects_foreign_source(self):
         c = candidate()["frontier"]["lineage"]
