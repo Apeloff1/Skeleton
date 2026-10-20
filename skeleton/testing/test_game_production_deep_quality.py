@@ -72,7 +72,7 @@ def candidate():
                      "controls": [{"id": "start", "label": "Start",
                                    "focusable": True, "contrast_ratio": 7.0}]}],
         "profiles": [{"device": mode, "bindings": {
-            a: mode + "_" + a for a in controls,
+            a: mode + "_" + a for a in controls
         }} for mode in ("keyboard", "gamepad")],
         "envelopes": [{"target": "portable", "ram_mb": 512,
                        "max_ram_mb": 1024, "texture_mb": 64,
