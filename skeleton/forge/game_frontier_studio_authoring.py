@@ -17,10 +17,16 @@ from .game_frontier_studio import (
 )
 from .game_frontier_studio_map_edit import MAP_ACTIONS, edit_map
 from .game_frontier_studio_object_edit import OBJECT_ACTIONS, edit_objects
+from .game_frontier_studio_environment_edit import ENV_ACTIONS, edit_environment
+from .game_frontier_studio_physics_edit import PHYSICAL_ACTIONS, edit_physical
+from .game_frontier_studio_quest_terrain_edit import (
+    QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
+)
 
-AUTHORING_ACTIONS = MAP_ACTIONS + OBJECT_ACTIONS
-if len(AUTHORING_ACTIONS) != 50 or len(set(AUTHORING_ACTIONS)) != 50:
-    raise RuntimeError("Forge Studio action registry must expose 50 unique actions")
+AUTHORING_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIONS +
+                     QUEST_ACTIONS + TERRAIN_ACTIONS)
+if len(AUTHORING_ACTIONS) != 100 or len(set(AUTHORING_ACTIONS)) != 100:
+    raise RuntimeError("Forge Studio must expose 100 implemented, distinct operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -60,6 +66,14 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_map(project, operation, payload)
     if operation in OBJECT_ACTIONS:
         return edit_objects(project, operation, payload)
+    if operation in ENV_ACTIONS:
+        return edit_environment(project, operation, payload)
+    if operation in PHYSICAL_ACTIONS:
+        return edit_physical(project, operation, payload)
+    if operation in QUEST_ACTIONS:
+        return edit_quest_structure(project, operation, payload)
+    if operation in TERRAIN_ACTIONS:
+        return edit_terrain(project, operation, payload)
     raise StudioError("unknown executable Studio editor action")
 
 
@@ -127,6 +141,10 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "authored_event_count": len(project.events),
         "quest_count": len(project.native_quests),
         "music_cue_count": len(project.soundtrack_ids),
+        "environment_page_count": len(project.environmental_pages),
+        "native_zone_count": len(project.native_trigger_volumes),
+        "native_force_field_count": len(project.native_gameplay_force_fields),
+        "quest_stage_count": sum(len(q.stages) for q in project.native_quests),
         "action_catalog": AUTHORING_ACTIONS,
         "candidate_only": True,
     }
