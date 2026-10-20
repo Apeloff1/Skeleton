@@ -37,7 +37,7 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     # The active drainer has a trusted schedule, manual dispatch and
     # default-branch change trigger. No untrusted workflow_run event may grant
     # the actions:write cancellation scope.
-    assert "\\n  workflow_run:\\n" not in workflow
+    assert "\n  workflow_run:\n" not in workflow
     assert "  schedule:" in workflow
     assert "  workflow_dispatch:" in workflow
     assert "branches: [main]" in workflow
