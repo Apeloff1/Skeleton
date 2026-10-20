@@ -102,7 +102,21 @@ def run_headless_expedition(
     native_lines=[line[len(COMPLETE_PREFIX):] for line in output.splitlines()
                   if line.startswith(COMPLETE_PREFIX)]
     if len(native_lines)!=1:
-        raise ExpeditionError("native engine never emitted unique full-run result")
+        # Capture *bounded diagnostics only*, never full project stdout.
+        # Godot may exit zero even when a GDScript attached to a scene fails
+        # parsing and the scene never executes gameplay.
+        diagnostics=[
+            line.strip()[:240] for line in output.splitlines()
+            if any(token in line.lower() for token in (
+                "error:", "parse error", "parser error", "invalid call",
+                "failed to load", "script error", "at: ",
+                "expedition_ready",
+            ))
+        ][:12]
+        raise ExpeditionError(
+            "native engine never emitted unique full-run result; "
+            "godot_diagnostics="+repr(diagnostics)
+        )
     try:
         actual=json.loads(native_lines[0])
     except (ValueError,TypeError) as exc:
