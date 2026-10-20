@@ -189,3 +189,80 @@ async def export_native_project(scope: Mapping[str, str], project_id: str,
         "receipt_sha256": original["receipt_digest"],
         "saved": True, "native_executed": False, "release_certified": False,
     }
+
+
+
+async def simulate_gameplay(scope: Mapping[str, str], project_id: str,
+                            body: Mapping[str, Any]) -> dict:
+    """Actually evaluate authored RPG signals, 3D zone occupancy and field force.
+
+    Uses canonical deterministic Forge RPG evaluator and native body force
+    equation; the position and sensor snapshot are declared simulation inputs.
+    Results are playable *reference* mechanics, not a fabricated native capture.
+    """
+    from dataclasses import asdict
+    from hashlib import sha256
+    import json
+    import math
+    from skeleton.forge.game_frontier_rpg_events import evaluate_environment_events
+    from skeleton.forge.game_frontier_studio import (
+        compile_studio_gameplay_zones, compile_studio_gameplay_force_fields,
+    )
+    from skeleton.jeeves.game_frontier_native_fields import calculated_native_field_force
+
+    version, authored = await _source(scope, project_id)
+    xyz = body.get("position_xyz_m")
+    mass = body.get("mass_kg")
+    if (type(xyz) is not list or len(xyz) != 3 or
+            any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1e7
+                for v in xyz) or type(mass) not in (int, float)
+            or not math.isfinite(mass) or not 0 < mass <= 100000):
+        raise StudioError("gameplay simulation needs bounded position and body mass")
+    zones = compile_studio_gameplay_zones(authored)["zones"]
+    fields = compile_studio_gameplay_force_fields(authored)["fields"]
+    entered = []
+    for zone in zones:
+        center = zone["center_xyz_m"]
+        delta_squared = sum((a-b)**2 for a, b in zip(xyz, center))
+        if delta_squared <= zone["radius_m"] ** 2:
+            entered.append({
+                "zone_id": zone["id"],
+                "actor_id": zone["actor_id"],
+                "event_page_id": zone["event_page_id"],
+                "action_kind": zone["action_kind"],
+            })
+    forces = []
+    total = [0.0, 0.0, 0.0]
+    for field in fields:
+        force = calculated_native_field_force(field, xyz, mass)
+        total = [a+b for a,b in zip(total,force)]
+        forces.append({
+            "field_id": field["id"], "force_xyz_n": list(force),
+        })
+    evaluation = evaluate_environment_events(
+        authored.environmental_pages,
+        current=body.get("current_signals", {}),
+        previous=body.get("previous_signals", {}),
+        flags=body.get("flags", {}),
+        now_ms=body.get("now_ms", 0),
+    )
+    result = {
+        "schema": "skeleton.game.frontier_studio_gameplay_reference.v1",
+        "project_id": project_id,
+        "source_version": version["version"],
+        "source_sha256": project_digest(authored),
+        "position_xyz_m": xyz, "mass_kg": mass,
+        "occupied_zones": entered,
+        "zone_count": len(zones),
+        "force_field_count": len(fields),
+        "field_forces": forces,
+        "net_force_xyz_n": total,
+        "environment_accepted": [asdict(item) for item in evaluation.accepted],
+        "environment_suppressed": list(evaluation.suppressed),
+        "missing_sensor_signals": list(evaluation.missing_signals),
+        "source_observed": False, "native_engine_executed": False,
+    }
+    result["receipt_sha256"] = sha256(json.dumps(
+        result, sort_keys=True, separators=(",", ":"),
+        allow_nan=False).encode("utf-8")).hexdigest()
+    return result
