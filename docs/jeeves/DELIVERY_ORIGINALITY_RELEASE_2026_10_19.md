@@ -225,3 +225,42 @@ actual execution requires the explicit execute flag.
 A successful run proves only the selected tests on the pinned commit.
 It does not implement missing features, grant signoff, or clear the mandatory
 independent review, security, rollback and exact-head requirements.
+
+
+## Durable milestone work queue checkpointing
+
+The optional SQLiteMilestoneQueueStore binds each Jeeves run to a durable
+source commit and artifact digest. Queue snapshots are stored with exact
+canonical JSON hashes, sequential generations, optimistic compare-and-swap
+updates, SQLite transactions and independent typed hash-chain replay.
+A resumed agent can restore the previous claim/lease history, explicitly
+expire abandoned leases, and continue without fabricating milestone progress.
+A changed source snapshot, duplicate serialization keys, nonfinite values,
+malformed records, broken receipt chain, duplicate writers or a closed storage
+adapter are rejected. Existing memory is only updated after the durable
+checkpoint write succeeds.
+
+The API uses bind_assurance_checkpoint_store(run_id, store,
+source_commit=..., artifact_digest=...) to attach explicit host storage.
+The ordinary no-store path is *ephemeral*, not crash-safe. SQLite durability
+is conditional on the host's actual filesystem lifecycle and storage policy.
+Hashes detect corruption, not tampering by an attacker with write access to
+the database. These are system-level implementation milestones, not
+production-certified completion of any of the original 421 volumes.
+
+
+### Tamper-evident generation history
+
+SQLite milestone checkpoint writes now also append a transactionally linked
+history entry for each new generation. Replay verifies sequence continuity,
+the previous receipt, content and queue digests, and the latest committed
+snapshot before loading or overwriting it. Exports contain only digest records
+and generation numbers, not project or game source. Idempotent replays do not
+create redundant generations. Truncation, rollback to an earlier current
+snapshot, missing history, modified receipt, and cross-process stale writers
+all block checkpoint trust.
+
+This history is a same-database integrity mechanism, not an external
+anchoring/signature service. An attacker who can rewrite the complete SQLite
+database could recompute both history and state; higher-assurance deployment
+requires a trusted off-database audit sink and independently verified anchors.

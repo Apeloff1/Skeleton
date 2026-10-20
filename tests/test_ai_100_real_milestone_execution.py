@@ -8,7 +8,8 @@ import pytest
 from scripts.execute_ai_100_large_milestones import (
     ExecutionPlan, ExecutionReport, CheckOutcome, MilestoneExecutionError,
     PlannedCheck, _hash, _safe_selection, _safe_test,
-    create_execution_plan, execute_plan, verify_execution_report, ROOT,
+    create_execution_plan, execute_plan, audit_milestone_coverage,
+    verify_execution_report, ROOT,
 )
 
 
@@ -155,3 +156,51 @@ def test_report_never_labels_candidate_checks_as_feature_complete():
     assert summary["status"] == "candidate_checks_passed"
     assert summary["qualifying_milestones"] == []
     assert summary["independent_milestone_signoff"] is False
+
+
+
+def test_audit_all_original_hundred_milestones_without_claiming_completion():
+    requested = tuple(f"MDM-{i:03d}" for i in range(1, 101))
+    result = audit_milestone_coverage(requested)
+    assert result["kind"] == "source_coverage_audit"
+    assert result["milestones_examined"] == 100
+    assert result["volumes_examined"] == 421
+    assert result["production_completed_milestones"] == 0
+    assert result["completion_signoff"] is False
+    assert result["unique_planned_tests"] > 0
+    assert result["test_path_ready_milestones"] + result["blocked_milestones"] == 100
+    assert len(result["audit_receipt"]) == 64
+    assert {row["milestone_id"] for row in result["milestones"]} == set(requested)
+
+
+def test_source_coverage_reports_planned_wildcard_and_missing_tests_separately(monkeypatch):
+    from scripts import execute_ai_100_large_milestones as executor
+
+    canonical = "tests/test_ai_100_real_milestone_execution.py"
+    fake = {
+        "milestones": [{
+            "id": "MDM-001",
+            "title": "Actual source coverage",
+            "volumes": [{
+                "id": "VOL-000",
+                "acceptance_tests": [
+                    canonical,
+                    "planned:tests/does_not_exist.py",
+                    "skeleton/testing/test_shell_*.py",
+                    "tests/this_test_is_missing.py",
+                ],
+                "contract_targets": ["scripts", "scripts/does_not_exist.py"],
+            }],
+        }],
+    }
+    monkeypatch.setattr(executor, "_load_roadmap", lambda root: (fake, "f" * 64))
+    report = executor.audit_milestone_coverage(("MDM-001",))
+    row = report["milestones"][0]
+    assert row["status"] == "blocked_missing_test_implementation"
+    assert canonical in row["existing_tests"]
+    assert row["missing_tests"] == ["tests/this_test_is_missing.py"]
+    assert row["planned_tests"] == ["planned:tests/does_not_exist.py"]
+    assert row["unsupported_test_bindings"] == ["skeleton/testing/test_shell_*.py"]
+    assert row["existing_implementation_paths"]["scripts"] == "directory-present"
+    assert row["missing_implementation_paths"] == ["scripts/does_not_exist.py"]
+    assert report["completion_signoff"] is False
