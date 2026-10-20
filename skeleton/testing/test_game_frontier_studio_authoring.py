@@ -20,6 +20,9 @@ from skeleton.forge.game_frontier_studio_authoring import (
     AUTHORING_ACTIONS, apply_authoring_batch, authored_tile_region,
     execute_authoring, project_digest, authored_summary,
 )
+from skeleton.forge.game_frontier_studio_document import (
+    authored_document, load_authored_document, create_authoring_project,
+)
 from skeleton.jeeves.game_frontier_worlds import ProjectionMode, WorldFamily
 from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile
 from skeleton.jeeves.game_frontier_studio_authoring_tools import studio_authoring_handlers
@@ -192,6 +195,41 @@ class RealForgeStudioAuthoringTests(unittest.TestCase):
         with self.assertRaises(StudioError):
             execute_authoring(project(), "placement_grid", {
                 **OBJECTS["placement_grid"], "columns": 128, "rows": 128})
+
+    def test_typed_json_project_survives_real_save_reload(self):
+        original = project()
+        record = authored_document(original)
+        loaded = load_authored_document(record, project_id="testgame")
+        self.assertIsInstance(loaded, StudioProject)
+        self.assertEqual(project_digest(original), project_digest(loaded))
+        self.assertEqual(original.layers, loaded.layers)
+        self.assertEqual(original.native_quests, loaded.native_quests)
+        self.assertEqual(original.events, loaded.events)
+        changed = execute_authoring(loaded, "quest_stage_append",
+                                   OBJECTS["quest_stage_append"])
+        reloaded = load_authored_document(
+            authored_document(changed), project_id="testgame")
+        self.assertEqual(2, len(reloaded.native_quests[0].stages))
+
+    def test_json_rejects_foreign_or_modified_project_source(self):
+        original = project()
+        source = authored_document(original)
+        with self.assertRaises(StudioError):
+            load_authored_document(source, project_id="foreign")
+        tampered = source.replace('"candidate_not_executed"', '"production_approved"')
+        with self.assertRaises(StudioError):
+            load_authored_document(tampered, project_id="testgame")
+
+    def test_default_workspace_game_can_really_be_painted(self):
+        blank = create_authoring_project("newgame", width=6, height=4)
+        self.assertEqual((6, 4), (blank.layers[0].width, blank.layers[0].height))
+        filled = execute_authoring(blank, "rect_fill", {
+            "layer": "ground", "x": 1, "y": 1,
+            "width": 3, "height": 2, "tile": 2})
+        self.assertEqual(2, filled.layers[0].data[1 * 6 + 1])
+        self.assertNotEqual(project_digest(blank), project_digest(filled))
+        self.assertEqual(project_digest(filled), project_digest(
+            load_authored_document(authored_document(filled), project_id="newgame")))
 
     def test_host_authorized_edit_persists_and_rechecks_generation(self):
         state = {"revision": 4, "value": project()}
