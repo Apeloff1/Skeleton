@@ -775,7 +775,8 @@ def author_studio_expedition(project: StudioProject, profile, *, weather=None):
 
 
 def compile_studio_expedition(project: StudioProject, profile, *, weather=None,
-                              playtest_routes: int = 4) -> dict:
+                              playtest_routes: int = 4,
+                              include_godot: bool = True) -> dict:
     """Compile, route-playtest and export a real Studio-derived game realm."""
     from skeleton.jeeves.game_frontier_expedition import world_export
     from skeleton.jeeves.game_frontier_expedition_generation import (
@@ -783,6 +784,8 @@ def compile_studio_expedition(project: StudioProject, profile, *, weather=None,
     )
     if type(playtest_routes) is not int or not 1<=playtest_routes<=16:
         raise StudioError("playtest route budget must be bounded")
+    if type(include_godot) is not bool:
+        raise StudioError("Godot game export policy must be explicit")
     world=author_studio_expedition(project,profile,weather=weather)
     report=playtest_archipelago(world,max_routes=playtest_routes)
     compiled=world_export(world)
@@ -809,6 +812,27 @@ def compile_studio_expedition(project: StudioProject, profile, *, weather=None,
         "native_playtest_completed":False,
         "authority":"playable_deterministic_preview_not_native_engine_authority",
     }
+    if include_godot:
+        from skeleton.jeeves.game_frontier_expedition import Traveler
+        from skeleton.jeeves.game_frontier_expedition_godot import (
+            emit_expedition_godot_project, verify_expedition_godot_project,
+        )
+        native_player=Traveler(
+            permitted_modes=frozenset((
+                "walk","rope_bridge","updraft","glide","airship",
+                "portal","climb","dive","swim",
+            )),
+            flags=frozenset((
+                "glider","airship_license","diving_gear","portal_key",
+            )),
+            equipment=frozenset(("instrument_navigation",)),
+            max_stamina=1000,skill=0.8,
+        )
+        files=emit_expedition_godot_project(world,native_player)
+        out["godot_project_files"]=files
+        out["godot_candidate_proof"]=verify_expedition_godot_project(
+            files,world,native_player,
+        )
     out["receipt_digest"]=sha256(json.dumps(
         out,sort_keys=True,separators=(",",":"),allow_nan=False,
     ).encode("utf-8")).hexdigest()

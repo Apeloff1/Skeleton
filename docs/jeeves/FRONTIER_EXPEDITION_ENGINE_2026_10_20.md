@@ -58,3 +58,30 @@ completed MDM-001..MDM-100 volumes. A real Godot loader, asset rendering,
 controller capture, physics authority and full first-install playthrough remain
 separate integration and verification work. Explicitly simulated evidence must
 not be presented as hardware or commercial production proof.
+
+
+## Standalone real Godot 4 game export
+
+The engine now emits a runnable Godot 4 project, not only JSON candidate
+navigation data. emit_expedition_godot_project() creates project.godot,
+a main scene, engine-executed expedition.gd, original world JSON and player
+capability source, plus player instructions. The scene builds visible 3D
+landmarks, route lines and a controllable camera around the authored world.
+UI Up/Down chooses edges, Enter takes a valid connected route, and Escape
+rests only at actual rest points. In-engine state updates health, stamina,
+travel time, first-time discoveries, collectibles, unlocked quest flags and
+victory or defeat. The scene uses Godot's native input and emits clearly
+labeled untrusted native observation lines for independent replay.
+
+The Forge Studio compiler includes these playable project files by default,
+and a source-bound, per-file SHA-256 manifest. attach_expedition_godot_project()
+permits addition to an existing game but refuses replacement of nonidentical
+native files. An explicit include_godot=False choice permits simulation-only
+builds without generating a native project.
+
+Regression tests verify resource closure, seeded byte-for-byte reproducibility,
+invalid or replaced source refusal, added-asset overwrite refusal, compiled
+Forge integration and (when the executable exists) real Godot headless scene
+startup. A test skipped because Godot is unavailable is not a passing
+native playthrough claim. The compiler's native_playtest_completed flag remains
+false until an independently observed native playthrough is provided.
