@@ -221,11 +221,33 @@ class ProductionStudioGateTests(unittest.TestCase):
         c["migrations"][0]["transform_sha256"] = "bad"
         self.assertFalse(audit_save_evolution(c).passed)
 
+    def test_save_rejects_nonconsecutive_actual_save_bytes(self):
+        c = candidate()["studio"]["saves"]
+        c["migrations"][1]["input_sha256"] = SHA
+        self.assertIn("unlinked_migration_bytes",
+                      {x.code for x in audit_save_evolution(c).findings})
+
+    def test_save_rejects_duplicate_claimed_compatibility(self):
+        c = candidate()["studio"]["saves"]
+        c["supported_versions"].append(1)
+        self.assertIn("duplicate_supported_version",
+                      {x.code for x in audit_save_evolution(c).findings})
+
     def test_weather_rejects_unmitigated_hazards(self):
         c = candidate()["studio"]["environment"]
         c["states"][1]["mitigation"] = []
         self.assertIn("unmitigated_hazard",
                       {x.code for x in audit_dynamic_world(c).findings})
+
+    def test_hazard_requires_explicit_boolean_and_real_actions(self):
+        c = candidate()["studio"]["environment"]
+        del c["states"][0]["hazardous"]
+        with self.assertRaises(QualityGateError):
+            audit_dynamic_world(c)
+        c = candidate()["studio"]["environment"]
+        c["states"][1]["mitigation"] = "string-is-not-an-action-list"
+        with self.assertRaises(QualityGateError):
+            audit_dynamic_world(c)
 
     def test_weather_rejects_probabilities_not_summing_to_one(self):
         c = candidate()["studio"]["environment"]
@@ -238,6 +260,13 @@ class ProductionStudioGateTests(unittest.TestCase):
         c["observations"][1]["independently_replayed"] = False
         self.assertIn("unverified_world_effect",
                       {x.code for x in audit_dynamic_world(c).findings})
+
+    def test_input_tail_requires_consistent_p95_p99_limits(self):
+        c = candidate()["studio"]["latency"]
+        c["max_p95_ms"] = 100
+        c["max_p99_ms"] = 50
+        with self.assertRaises(QualityGateError):
+            audit_controller_latency(c)
 
     def test_input_tail_rejects_latency_regressions(self):
         c = candidate()["studio"]["latency"]
