@@ -34,8 +34,13 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     assert "'.github/workflows/queue-drain.yml'" in workflow
     assert "'.github/workflows/pr-obsolete-run-drain.yml'" in workflow
     assert "github.event.workflow_run.conclusion == 'success'" not in workflow
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
-    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in workflow
+    # There is no workflow_run subscription in the current recovery controller:
+    # only trusted schedule, manual dispatch and main-branch path-limited push.
+    assert "\n  workflow_run:\n" not in workflow
+    assert "  workflow_dispatch:" in workflow
+    assert "  schedule:" in workflow
+    assert "  push:" in workflow
+    assert "branches: [main]" in workflow
 
 
 def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
