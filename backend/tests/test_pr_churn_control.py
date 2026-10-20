@@ -344,7 +344,7 @@ def test_churn_recovery_is_archived_without_duplicate_active_controller() -> Non
     queue = (root / ".github/workflows/queue-drain.yml").read_text(
         encoding="utf-8"
     )
-    assert "  drain:\\n".replace("\\n", "\n") in queue
+    assert "  drain:\n" in queue
     assert "runs-on: ubuntu-24.04-arm" in queue
-    assert "  wake-housekeeping:\\n".replace("\\n", "\n") not in queue
+    assert "  wake-housekeeping:\n" not in queue
     assert "cancel-in-progress: false" in queue
