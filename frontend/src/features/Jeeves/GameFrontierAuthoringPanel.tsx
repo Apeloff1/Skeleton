@@ -1,4 +1,4 @@
-"""Interactive 50-operation Forge Studio editor over live authenticated project revisions."""
+/** Interactive 50-operation Forge Studio editor over live authenticated project revisions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
@@ -11,6 +11,7 @@ type Props = {
   project: LearningProject;
   disabled?: boolean;
   onSaved: (project: LearningProject) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 const GROUPS: { title: string; actions: string[] }[] = [
@@ -79,7 +80,7 @@ function Button({ title, press, disabled }: { title: string; press: () => void; 
     <Text style={{ color: disabled ? '#8792a0' : '#e8eff6', fontWeight: '600' }}>{title}</Text>
   </TouchableOpacity>;
 }
-export default function GameFrontierAuthoringPanel({ project, disabled = false, onSaved }: Props) {
+export default function GameFrontierAuthoringPanel({ project, disabled = false, onSaved, onDirtyChange }: Props) {
   const [doc, setDoc] = useState<ForgeDocument | null>(null);
   const [action, setAction] = useState('tile_set');
   const [search, setSearch] = useState('');
@@ -95,6 +96,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ForgeBuild | null>(null);
   const pending = disabled || busy;
+  useEffect(() => { onDirtyChange?.(steps.length > 0); }, [steps.length, onDirtyChange]);
   const load = useCallback(async () => {
     const current = await inspectForge(project.project_id);
     setDoc(current);
