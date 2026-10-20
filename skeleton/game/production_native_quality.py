@@ -97,6 +97,8 @@ def run_native_quality_probe(
                 any(x in ("", ".", "..") for x in path.split("/")) or
                 type(body) is not str or len(body.encode()) > 4_000_000):
             raise QualityGateError("invalid authored candidate file")
+    if sum(len(body.encode("utf-8")) for body in files.values()) > 64_000_000:
+        raise QualityGateError("compiled project exceeds native probe disk budget")
     if "quality/observe.gd" in files:
         raise QualityGateError("quality instrumentation would overwrite game file")
     binary = Path(executable).resolve()
@@ -120,24 +122,33 @@ def run_native_quality_probe(
         target = project / "quality" / "observe.gd"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_SCRIPT, encoding="utf-8")
-        try:
-            run = subprocess.run(
-                [str(binary), "--headless", "--path", str(project),
-                 "--script", "res://quality/observe.gd"],
-                cwd=project, stdin=subprocess.DEVNULL,
-                capture_output=True, text=True, timeout=timeout_seconds,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise QualityGateError("native game frame probe did not finish") from exc
+        with tempfile.TemporaryFile() as capture:
+            try:
+                run = subprocess.run(
+                    [str(binary), "--headless", "--path", str(project),
+                     "--script", "res://quality/observe.gd"],
+                    cwd=project, stdin=subprocess.DEVNULL,
+                    stdout=capture, stderr=subprocess.STDOUT,
+                    timeout=timeout_seconds, check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                raise QualityGateError("native game frame probe did not finish") from exc
+            if capture.tell() > 4_000_000:
+                raise QualityGateError("native process exceeded bounded log budget")
+            capture.seek(0)
+            log = capture.read().decode("utf-8", errors="replace")
     if run.returncode:
         raise QualityGateError("native frame sampler exited nonzero")
-    frames = _verify_sample_log(run.stdout, 30)
+    frames = _verify_sample_log(log, 30)
     result = audit_frame_budget(frames, max_ms=max_ms, max_draw_calls=max_draw_calls)
+    binary_digest = sha256()
+    with binary.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            binary_digest.update(chunk)
     return {
         "schema": "game.native.headless_quality.v1",
         "source_sha256": source_sha256,
-        "engine_sha256": sha256(binary.read_bytes()).hexdigest(),
+        "engine_sha256": binary_digest.hexdigest(),
         "engine_version": version.stdout.strip()[:128],
         "candidate_file_digest": _digest(dict(files)),
         "native_engine_executed": True,
@@ -146,5 +157,5 @@ def run_native_quality_probe(
         "profile": "godot4_headless_unattested",
         "frames": len(frames),
         "frame_gate": result.as_dict(),
-        "native_log_sha256": sha256(run.stdout.encode()).hexdigest(),
+        "native_log_sha256": sha256(log.encode()).hexdigest(),
     }
