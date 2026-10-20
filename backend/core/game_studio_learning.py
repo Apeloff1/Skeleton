@@ -2489,8 +2489,10 @@ async def scenario_mirror_views(scope, identifier, *, lanes=10, steps=12, sample
         raise GameLearningError("spectator_bounds", "Bounded spectator controls required.", 422)
     row = await _read(scope, identifier)
     latest = (row.get("snapshot") or {}).get("champion_request")
+    canonical = GameEnvironmentRequest.from_dict(row["environment_request"])
     executable = GameEnvironmentRequest.from_dict(latest or row["environment_request"])
-    if executable.kind != "studio" or executable.target_id != row["environment_request"]["target_id"]:
+    if (canonical.kind != "studio" or executable.kind != "studio"
+            or executable.target_id != canonical.target_id):
         raise GameLearningError(
             "spectator_engine",
             "Only original-engine studio campaigns have mirrored reference telemetry.",
@@ -2689,8 +2691,10 @@ async def scenario_shadow_audit(
         raise GameLearningError("shadow_limits", "Source-bound shadow audit budget exceeded.", 422)
     row = await _read(scope, identifier)
     candidate = (row.get("snapshot") or {}).get("champion_request")
+    canonical = GameEnvironmentRequest.from_dict(row["environment_request"])
     request = GameEnvironmentRequest.from_dict(candidate or row["environment_request"])
-    if request.kind != "studio" or request.target_id != row["environment_request"]["target_id"]:
+    if (canonical.kind != "studio" or request.kind != "studio"
+            or request.target_id != canonical.target_id):
         raise GameLearningError(
             "shadow_source", "Only owner-registered original studios admit shadow reviews.", 409
         )
@@ -2734,8 +2738,10 @@ async def _multifactor_original_source(scope, identifier):
 
     row = await _read(scope, identifier)
     pinned = (row.get("snapshot") or {}).get("champion_request")
+    canonical = GameEnvironmentRequest.from_dict(row["environment_request"])
     req = GameEnvironmentRequest.from_dict(pinned or row["environment_request"])
-    if req.kind != "studio" or req.target_id != row["environment_request"]["target_id"]:
+    if (canonical.kind != "studio" or req.kind != "studio"
+            or req.target_id != canonical.target_id):
         raise GameLearningError(
             "multifactor_source",
             "Multi-factor training requires an authorized original-game studio source.",
