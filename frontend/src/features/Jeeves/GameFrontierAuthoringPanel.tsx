@@ -51,23 +51,23 @@ const GROUPS: { title: string; actions: string[] }[] = [
     'terrain_noise','terrain_smooth','terrain_terrace','terrain_outline','terrain_erode',
   ] },
   { title: 'World generators', actions: [
-    'terrain_height_noise', 'terrain_fractal', 'terrain_ridge', 'terrain_islands', 'terrain_crater', 
-    'terrain_meander_river', 'terrain_lake', 'terrain_coastline', 'terrain_talus', 'terrain_dunes', 
-    'terrain_voronoi', 'terrain_contours', 'terrain_floodplain', 'terrain_cave_automata', 
-    'terrain_room_dungeon', 'terrain_depth_maze', 'terrain_road_links', 'terrain_avoidance_path', 
+    'terrain_height_noise', 'terrain_fractal', 'terrain_ridge', 'terrain_islands', 'terrain_crater',
+    'terrain_meander_river', 'terrain_lake', 'terrain_coastline', 'terrain_talus', 'terrain_dunes',
+    'terrain_voronoi', 'terrain_contours', 'terrain_floodplain', 'terrain_cave_automata',
+    'terrain_room_dungeon', 'terrain_depth_maze', 'terrain_road_links', 'terrain_avoidance_path',
     'terrain_cliff_band', 'terrain_biome_mosaic'
   ] },
   { title: 'World population', actions: [
-    'formation_line', 'formation_arc', 'formation_ring', 'formation_spiral', 'formation_wedge', 
-    'formation_stagger', 'formation_jitter_grid', 'formation_scatter', 'formation_poisson', 
-    'formation_waypoint_path', 'formation_perimeter', 'actors_translate', 'actors_rotate', 
+    'formation_line', 'formation_arc', 'formation_ring', 'formation_spiral', 'formation_wedge',
+    'formation_stagger', 'formation_jitter_grid', 'formation_scatter', 'formation_poisson',
+    'formation_waypoint_path', 'formation_perimeter', 'actors_translate', 'actors_rotate',
     'actors_mirror', 'actors_reassign_prefab'
   ] },
   { title: 'Narrative director', actions: [
-    'narrative_branch_pair', 'narrative_branch_multi', 'narrative_extend_chain', 
-    'narrative_insert_stage', 'narrative_bypass_stage', 'narrative_relabel_quest', 
-    'narrative_fork_quest', 'narrative_merge_endings', 'event_clone', 'event_batch_retarget', 
-    'event_batch_retrigger', 'event_bind_quest', 'event_actor_dialogue_batch', 
+    'narrative_branch_pair', 'narrative_branch_multi', 'narrative_extend_chain',
+    'narrative_insert_stage', 'narrative_bypass_stage', 'narrative_relabel_quest',
+    'narrative_fork_quest', 'narrative_merge_endings', 'event_clone', 'event_batch_retarget',
+    'event_batch_retrigger', 'event_bind_quest', 'event_actor_dialogue_batch',
     'event_actor_audio_batch', 'event_actor_loot_batch'
   ] },
 ];
