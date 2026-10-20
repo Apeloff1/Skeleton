@@ -15,6 +15,7 @@ from skeleton.game.production_deep_gates import (
     audit_deep_candidate, audit_design_traceability,
     audit_quest_ending_graph, audit_accessibility_ui, audit_input_parity,
     audit_resource_envelopes, audit_session_receipts, audit_package_closure,
+    verify_deep_quality_report,
 )
 from skeleton.game.production_dragon_redteam import challenge_quality_verifiers
 from skeleton.game.production_repair import suggest_quality_repairs, execute_reviewed_repairs
@@ -248,6 +249,33 @@ class GameProductionDeepTests(unittest.TestCase):
                 with self.assertRaises(QualityGateError):
                     other = StudioCommand("game.quality.audit", "alien", {})
                     handlers[other.operation](other, None)
+
+    def test_independent_verifier_catches_forged_summary(self):
+        c = candidate()
+        report = audit_deep_candidate(c)
+        self.assertTrue(verify_deep_quality_report(c, report)["independent_replay_passed"])
+        bad = dict(report)
+        bad["candidate_passed"] = False
+        with self.assertRaises(QualityGateError):
+            verify_deep_quality_report(c, bad)
+
+    def test_package_cycles_are_rejected(self):
+        c = candidate()["package"]
+        c["files"][1]["imports"] = ["main"]
+        self.assertIn("dependency_cycle",
+                      {f.code for f in audit_package_closure(c).findings})
+
+    def test_long_quest_chains_are_bounded_without_recursive_stack(self):
+        c = candidate()["campaign"]
+        c["stages"] = [{"id": "step" + str(i),
+                        "requires": ["step" + str(i - 1)] if i else []}
+                       for i in range(2000)]
+        c["endings"] = [{"id": "earned", "requires": ["step1999"]}]
+        c["playthroughs"] = [{
+            "ending": "earned", "completed": ["step" + str(i) for i in range(2000)],
+            "won": True,
+        }]
+        self.assertTrue(audit_quest_ending_graph(c).passed)
 
     def test_native_sampler_rejects_fake_missing_or_reordered_samples(self):
         lines = []
