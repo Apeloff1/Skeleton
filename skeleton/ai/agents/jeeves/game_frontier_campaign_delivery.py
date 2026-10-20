@@ -115,6 +115,12 @@ def _admit(files: Mapping[str, str], policy: DeliveryPolicy) -> tuple[tuple[str,
         if total > policy.max_total_bytes:
             raise ExpeditionError("delivery total byte budget exceeded")
         result.append((name, data))
+    # A file cannot also be a parent directory, even with case changes.
+    for folded in casefolded:
+        parts = folded.split("/")
+        if any("/".join(parts[:i]) in casefolded
+               for i in range(1, len(parts))):
+            raise ExpeditionError("delivery file/directory path collision")
     return tuple(sorted(result, key=lambda item: item[0]))
 
 
@@ -179,7 +185,9 @@ def _check_report(report: dict) -> None:
     _scope(report["project"], report["gdd_digest"], report["world_digest"])
     if (report.get("production_release_approved") is not False
             or report.get("copyright_cleared") is not False
-            or report.get("native_gameplay_attested") is not False):
+            or report.get("native_gameplay_attested") is not False
+            or report.get("source_authenticated") is not False
+            or report.get("zip_algorithm") != "ZIP_STORED_portable"):
         raise ExpeditionError("delivery cannot forge release attestations")
 
 
@@ -267,10 +275,20 @@ def verify_campaign_bundle(
     if _sha(archive) != report["bundle_sha256"]:
         raise ExpeditionError("delivery archive fingerprint differs")
     rows = report["files"]
-    if type(rows) is not list or len(rows) != report["file_count"]:
+    if (type(rows) is not list or len(rows) != report["file_count"]
+            or len(rows) > policy.max_files):
         raise ExpeditionError("delivery inventory count differs")
     if _seal(rows) != report["inventory_sha256"]:
         raise ExpeditionError("delivery inventory receipt differs")
+    if any(type(row) is not dict or set(row) != {"path", "bytes", "sha256"}
+           or type(row["bytes"]) is not int or row["bytes"] < 0
+           or row["bytes"] > policy.max_file_bytes
+           or type(row["path"]) is not str or type(row["sha256"]) is not str
+           for row in rows):
+        raise ExpeditionError("delivery inventory row invalid")
+    for row in rows:
+        _path(row["path"], policy)
+        _digest(row["sha256"], "file")
     decoded = _decode(archive, rows, policy)
     if (sum(len(data) for _, data in decoded) != report["source_bytes"]
             or _inventory(decoded) != rows):

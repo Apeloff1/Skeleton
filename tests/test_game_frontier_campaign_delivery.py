@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import replace
-from pathlib import Path
 from zipfile import ZipFile
 from io import BytesIO
 
@@ -50,6 +48,8 @@ def test_m1_no_case_insensitive_collision_or_non_utf8():
         build({"A/B.txt": "a", "a/b.TXT": "b"})
     with pytest.raises(ExpeditionError, match="encoding"):
         build({"bad.txt": "\ud800"})
+    with pytest.raises(ExpeditionError, match="path collision"):
+        build({"game": "flat file", "GAME/main.gd": "nested file"})
     with pytest.raises(ExpeditionError, match="budget"):
         build({"big": "x"*128}, policy=DeliveryPolicy(max_file_bytes=64))
 
