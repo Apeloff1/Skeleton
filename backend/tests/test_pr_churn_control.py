@@ -313,9 +313,11 @@ def test_mutation_limit_is_always_bounded() -> None:
 
 def test_workflow_runs_only_from_trusted_default_branch_context() -> None:
     root = Path(__file__).resolve().parents[2]
-    workflow = (root / ".github/workflows/pr-churn-control.yml").read_text(
-        encoding="utf-8"
-    )
+    active = root / ".github/workflows/pr-churn-control.yml"
+    archived = root / ".github/workflows-archive/pr-churn-control.yml"
+    selected = active if active.is_file() else archived
+    assert selected.is_file()
+    workflow = selected.read_text(encoding="utf-8")
 
     assert "pull_request_target:" not in workflow
     assert "pull_request:" not in workflow
@@ -331,19 +333,18 @@ def test_workflow_runs_only_from_trusted_default_branch_context() -> None:
     assert "cancel-in-progress: false" in workflow
 
 
-def test_churn_recovery_control_plane_uses_broad_runner_pool() -> None:
+def test_churn_recovery_is_archived_without_duplicate_active_controller() -> None:
     root = Path(__file__).resolve().parents[2]
+    archived = root / ".github/workflows-archive/pr-churn-control.yml"
+    active = root / ".github/workflows/pr-churn-control.yml"
+    assert archived.is_file()
+    assert not active.exists()
+    assert "runs-on: ubuntu-latest" in archived.read_text(encoding="utf-8")
 
-    churn_workflow = (
-        root / ".github/workflows/pr-churn-control.yml"
-    ).read_text(encoding="utf-8")
-    assert "runs-on: ubuntu-latest" in churn_workflow
-    assert "runs-on: ubuntu-24.04-arm" not in churn_workflow
-
-    queue_workflow = (
-        root / ".github/workflows/queue-drain.yml"
-    ).read_text(encoding="utf-8")
-    primary, helper = queue_workflow.split("  wake-housekeeping:", 1)
-    assert "runs-on: ubuntu-latest" in primary
-    assert "runs-on: ubuntu-24.04-arm" not in primary
-    assert "runs-on: ubuntu-24.04-arm" in helper
+    queue = (root / ".github/workflows/queue-drain.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "  drain:\\n".replace("\\n", "\n") in queue
+    assert "runs-on: ubuntu-24.04-arm" in queue
+    assert "  wake-housekeeping:\\n".replace("\\n", "\n") not in queue
+    assert "cancel-in-progress: false" in queue
