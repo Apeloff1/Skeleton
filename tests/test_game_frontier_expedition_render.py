@@ -96,3 +96,23 @@ def test_frame_order_is_independent_of_unsorted_malformed_observations():
         render_lod_timeline(w,assets,[
             View(3,0,0,0),View(2,0,0,0),
         ])
+
+
+
+def test_lod_manifest_cannot_spoof_a_different_mesh_path_or_checksum():
+    w,assets=sources()
+    tampered=deepcopy(assets)
+    tampered["assets"][0]["mesh_path"]="../foreign.obj"
+    from skeleton.jeeves.game_frontier_expedition import _digest
+    tampered["receipt_digest"]=_digest({
+        key:value for key,value in tampered.items() if key!="receipt_digest",
+    })
+    with pytest.raises(ExpeditionError,match="provenance path"):
+        plan_game_lod(w,View(1,0,0,0),tampered)
+    tampered=deepcopy(assets)
+    tampered["assets"][0]["sha256"]="not-a-sha"
+    tampered["receipt_digest"]=_digest({
+        key:value for key,value in tampered.items() if key!="receipt_digest",
+    })
+    with pytest.raises(ExpeditionError,match="provenance path"):
+        plan_game_lod(w,View(1,0,0,0),tampered)

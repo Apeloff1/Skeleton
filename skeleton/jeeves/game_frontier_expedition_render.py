@@ -67,6 +67,13 @@ def plan_game_lod(world:ExpeditionWorld,view:View,asset_manifest:Mapping, *,
             asset_manifest.get("schema")!="skeleton.game.original_3d_assets.v1" or
             asset_manifest.get("world_digest")!=world.digest):
         raise ExpeditionError("LOD mesh inventory belongs to another source")
+    if asset_manifest.get("source_digest")!=world.source_digest:
+        raise ExpeditionError("LOD assets have foreign original source provenance")
+    if asset_manifest.get("receipt_digest")!=_digest({
+        key:value for key,value in asset_manifest.items()
+        if key!="receipt_digest"
+    }):
+        raise ExpeditionError("LOD inventory root checksum was altered")
     records=asset_manifest.get("assets")
     if not isinstance(records,list) or len(records)>32768:
         raise ExpeditionError("LOD geometry inventory invalid")
@@ -76,6 +83,12 @@ def plan_game_lod(world:ExpeditionWorld,view:View,asset_manifest:Mapping, *,
             raise ExpeditionError("LOD record has foreign waypoint")
         lod=item.get("lod")
         triangles=item.get("triangles")
+        path=item.get("mesh_path")
+        digest=item.get("sha256")
+        expected=f"game/frontier/assets/{item['waypoint']}_lod{lod}.obj"
+        if (path!=expected or type(digest) is not str or len(digest)!=64
+                or any(ch not in "0123456789abcdef" for ch in digest)):
+            raise ExpeditionError("LOD geometry provenance path or hash invalid")
         if type(lod) is not int or not 0<=lod<=8 or type(triangles) is not int or not 1<=triangles<=1_000_000:
             raise ExpeditionError("LOD geometry topology invalid")
         if lod in by_waypoint.setdefault(item["waypoint"],{}):

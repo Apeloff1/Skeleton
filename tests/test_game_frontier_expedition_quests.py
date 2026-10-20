@@ -119,5 +119,5 @@ def test_story_and_game_snapshots_appear_in_each_quest_step_receipt():
     assert step["game_receipt"]==session.snapshot()["receipt_head"]
     assert step["story_receipt"]==story.head
     assert step["receipt"]==quests.head
-    assert step["prior"]!=step["receipt"]
+    assert step["previous"]!=step["receipt"]
     assert initial["head"]!=quests.snapshot()["head"]
