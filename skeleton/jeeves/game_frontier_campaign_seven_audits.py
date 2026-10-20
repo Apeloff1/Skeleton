@@ -34,14 +34,17 @@ def audit_topology(world:ExpeditionWorld)->dict:
     """M1: directed graph, dead ends, destination cuts, no invented reverse edges."""
     if not isinstance(world,ExpeditionWorld):
         raise ExpeditionError("topology needs canonical expedition")
+    # The canonical game owner synthesizes reverse traversal for one_way=False.
+    # Read its same by_edge projection rather than inventing different physics.
+    canonical_edges=tuple(world.by_edge.values())
     labeled={key:[] for key in world.by_id}
-    for edge in world.edges:
+    for edge in canonical_edges:
         labeled[edge.source].append((edge.edge_id,edge.target))
     graph={key:tuple(sorted(dst for _,dst in values)) for key,values in labeled.items()}
     seen=_reachable(graph,world.arrival)
     cuts=[]
-    if len(world.edges)<=512:
-        for edge in world.edges:
+    if len(canonical_edges)<=512:
+        for edge in canonical_edges:
             reduced={start:tuple(dst for edge_id,dst in pairs
                      if edge_id!=edge.edge_id)
                      for start,pairs in labeled.items()}
@@ -52,12 +55,13 @@ def audit_topology(world:ExpeditionWorld)->dict:
     return _seal({
         "schema":"skeleton.game.campaign_topology_audit.v1",
         "world":world.digest,"node_count":len(world.waypoints),
-        "directed_edges":len(world.edges),
+        "directed_edges":len(canonical_edges),
+        "authored_links":len(world.edges),
         "unreachable_waypoints":sorted(set(graph)-seen),
         "unreachable_destinations":sorted(set(world.destinations)-seen),
         "non_goal_sinks":sorted(v for v in seen if not graph[v] and v not in world.destinations),
         "destination_cut_edges":sorted(cuts),
-        "cut_analysis_complete":len(world.edges)<=512,
+        "cut_analysis_complete":len(canonical_edges)<=512,
         "not_an_ability_gated_playthrough":True,
     })
 

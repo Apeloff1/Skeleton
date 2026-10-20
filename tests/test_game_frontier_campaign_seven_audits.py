@@ -25,7 +25,8 @@ def source():
 def test_m1_original_directed_graph(source):
     w,_,_=source
     proof=audit_topology(w)
-    assert proof["directed_edges"]==len(w.edges)
+    assert proof["directed_edges"]==len(w.by_edge)
+    assert proof["authored_links"]==len(w.edges)
     assert proof["world"]==w.digest
     assert not proof["unreachable_destinations"]
 
