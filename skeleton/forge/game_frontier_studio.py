@@ -52,6 +52,9 @@ STUDIO_TOOLS = (
     "native_3d_airflow_field_editor", "native_rigid_body_field_receipt_inspector",
     "native_quest_graph_compiler", "native_quest_stage_branch_editor",
     "native_approved_session_replay_inspector",
+    "authored_tile_operations", "authored_prefab_and_actor_operations",
+    "authored_quest_event_music_operations", "authored_transactional_editor",
+    "authored_playable_godot_export",
 )
 
 
