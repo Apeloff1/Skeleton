@@ -82,6 +82,7 @@ from .game_frontier_soak import simulated_process_recovery
 from .game_frontier_campaign_seven_audits import (
     compile_seven_campaign_audits, verify_seven_campaign_audits,
 )
+from .game_frontier_expedition_world_assurance import compile_world_assurance,verify_world_assurance
 from .game_frontier_expedition_navigation_advanced import (
     compile_navigation_seven, verify_navigation_seven,
 )
@@ -134,6 +135,8 @@ def compile_original_campaign(
     )
     dragon_attacks=adversarial_attack_matrix(dragon,(world,),player)
     questbook=original_quest_book(ExpeditionEpisode(world,player),story)
+    world_assurance=compile_world_assurance(world,player,story,questbook)
+    verify_world_assurance(world,player,story,questbook,world_assurance)
     storyboard=original_game_storyboard(world,gdd_digest)
     storyboard_frames=storyboard_frame_receipts(storyboard,sample_stride=6)
     sound=export_original_soundscape(world,seconds=1)
@@ -207,6 +210,7 @@ def compile_original_campaign(
     if release["status"]!="blocked" or release["production_release_approved"]:
         raise ExpeditionError("candidate without legal/native evidence must not be approved")
     files={**native_files,**assets["files"]}
+    files["game/frontier/world_assurance.json"]=_json(world_assurance).decode("utf-8")
     files["game/frontier/canon.json"]=_json(story.as_dict()).decode("utf-8")
     files["game/frontier/quests.json"]=_json(questbook.as_dict()).decode("utf-8")
     files.update(export_storyboard_godot(storyboard,world))
@@ -304,6 +308,8 @@ def compile_original_campaign(
         "world_digest":world.digest,"source_digest":world.source_digest,
         "gdd_digest":gdd_digest,
         "controller_digest":controller.digest,
+        "world_assurance_receipt":world_assurance["receipt_digest"],
+        "world_assurance_axes":world_assurance["axes_executed"],
         "story_digest":story.digest,
         "questbook_digest":questbook.digest,
         "storyboard_digest":storyboard.digest,
@@ -379,6 +385,7 @@ def compile_original_campaign(
         "controller_qa":measured_controller,
         "production_watchdog":watchdog,"seven_plane_assurance":seven_axes,
         "seven_campaign_audits":seven_campaign_audits,
+        "world_assurance":world_assurance,
         "advanced_navigation":advanced_navigation,
         "ecology_frame":ecology_sample,
         "render":render_frames,"dragon":dragon,
@@ -424,6 +431,7 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
             or compiled.get("production_watchdog")!=expected["production_watchdog"]
             or compiled.get("seven_plane_assurance")!=expected["seven_plane_assurance"]
             or compiled.get("seven_campaign_audits")!=expected["seven_campaign_audits"]
+            or compiled.get("world_assurance")!=expected["world_assurance"]
             or compiled.get("advanced_navigation")!=expected["advanced_navigation"]
             or compiled.get("npcs")!=expected["npcs"]
             or compiled.get("ecology")!=expected["ecology"]

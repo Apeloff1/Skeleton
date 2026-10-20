@@ -14,6 +14,8 @@ def test_full_campaign_cli_builds_runnable_authored_artifacts_and_all_receipts(t
         destination=tmp_path/"game",
     )
     assert report["schema"]=="skeleton.game.original_campaign_cli_report.v1"
+    assert report["world_assurance_axes"] == 7
+    assert len(report["world_assurance_receipt"]) == 64
     assert report["independent_recompile_verified"]
     assert report["original_generated_meshes"]>10
     assert report["original_npc_cast"]==3
