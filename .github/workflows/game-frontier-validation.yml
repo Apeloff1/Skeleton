@@ -15,6 +15,10 @@ on:
       - "scripts/qualify_game_frontier_godot.py"
       - "scripts/build_game_frontier_smoke.py"
       - "scripts/validate_game_frontier_native_smoke.py"
+      - "skeleton/game/production_*.py"
+      - "skeleton/jeeves/game_production_quality_tools.py"
+      - "skeleton/jeeves/game_studio_tools.py"
+      - "skeleton/testing/test_game_production_*.py"
       - ".github/workflows/game-frontier-validation.yml"
   workflow_dispatch:
 
@@ -39,6 +43,10 @@ jobs:
       - name: Install focused runtime and test dependencies
         run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<9"
       - name: Compile all frontier source and tests
-        run: python -m compileall -q skeleton/jeeves/game_frontier*.py skeleton/forge/game_frontier_godot.py skeleton/forge/game_frontier_studio.py skeleton/forge/game_frontier_rpg_events.py scripts/run_game_frontier_capture.py scripts/qualify_game_frontier_godot.py scripts/build_game_frontier_smoke.py scripts/validate_game_frontier_native_smoke.py tests/test_game_frontier*.py
+        run: python -m compileall -q skeleton/jeeves/game_frontier*.py skeleton/jeeves/game_production_quality_tools.py skeleton/jeeves/game_studio_tools.py skeleton/game/production_*.py skeleton/testing/test_game_production_*.py skeleton/forge/game_frontier_godot.py skeleton/forge/game_frontier_studio.py skeleton/forge/game_frontier_rpg_events.py scripts/run_game_frontier_capture.py scripts/qualify_game_frontier_godot.py scripts/build_game_frontier_smoke.py scripts/validate_game_frontier_native_smoke.py tests/test_game_frontier*.py
       - name: Focused regression proof
-        run: python -m pytest -q tests/test_game_frontier*.py
+        run: |
+          python -m pytest -q tests/test_game_frontier*.py
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -q --noconftest \
+            skeleton/testing/test_game_production_quality.py \
+            skeleton/testing/test_game_production_deep_quality.py
