@@ -57,6 +57,12 @@ READ_OPERATIONS = (
     "game.quality.frontier.challenge",
     "game.quality.frontier.diff",
     "game.quality.frontier.reviews.inspect",
+    "game.studio.quality.audit",
+    "game.studio.quality.dragon",
+    "game.studio.quality.work",
+    "game.studio.quality.diff",
+    "game.studio.quality.history",
+    "game.studio.quality.native.inspect",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -98,6 +104,8 @@ WRITE_OPERATIONS = (
     "game.quality.frontier.record",
     "game.quality.frontier.review",
     "game.quality.frontier.attest",
+    "game.studio.quality.record",
+    "game.studio.quality.review",
 )
 OPERATIONS = frozenset((*READ_OPERATIONS, *WRITE_OPERATIONS))
 
