@@ -212,6 +212,54 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
     if operation not in {"job.cancel", "play.stop", "campaign.pause", "campaign.cancel"}:
         binding = await workspace._input(scope, project, require_execution=False)
         await workspace._authority(scope, binding)
+    if operation.startswith("game.studio.author."):
+        # Real Forge editor operations use the canonical authenticated project
+        # workspace. No model-injected database, project owner or file path.
+        from core import game_frontier_authoring as forge_author
+        if operation == "game.studio.author.inspect":
+            _only(payload, ())
+            return await forge_author.document(scope, command.project_id)
+        if operation == "game.studio.author.copy":
+            _only(payload, ("layer", "x", "y", "width", "height"),
+                  required=("layer", "x", "y", "width", "height"))
+            return await forge_author.copy_tiles(
+                scope, command.project_id, **payload)
+        if operation in {"game.studio.author.preview", "game.studio.author.edit"}:
+            writer = operation.endswith(".edit")
+            allowed = ("expected_revision", "expected_sha256", "steps", "idempotency_key")
+            _only(payload, allowed, required=allowed if writer else allowed[:-1])
+            command_body = {
+                "expected_version": payload["expected_revision"],
+                "expected_sha256": payload["expected_sha256"],
+                "steps": payload["steps"],
+                "idempotency_key": payload.get("idempotency_key", "preview-only"),
+            }
+            return await forge_author.edit(
+                scope, command.project_id, command_body, preview=not writer)
+        if operation == "game.studio.author.compile":
+            _only(payload, ())
+            return await forge_author.document(scope, command.project_id)
+        if operation == "game.studio.author.game":
+            _only(payload, ("seed", "islands"))
+            return await forge_author.compile_game(
+                scope, command.project_id,
+                seed=payload.get("seed", 42),
+                islands=payload.get("islands", 12),
+                include_godot=False,
+            )
+        if operation == "game.studio.author.export":
+            required = ("expected_revision", "expected_sha256", "idempotency_key")
+            _only(payload, (*required, "seed", "islands"), required=required)
+            return await forge_author.export_native_project(
+                scope, command.project_id, {
+                    "expected_version": payload["expected_revision"],
+                    "expected_sha256": payload["expected_sha256"],
+                    "idempotency_key": payload["idempotency_key"],
+                    "seed": payload.get("seed", 42),
+                    "islands": payload.get("islands", 12),
+                })
+        raise GameLearningError("studio_operation_unknown",
+                                "Unknown original Forge Studio authoring action.", 422)
     if operation in {"job.resume", "job.cancel"}:
         identifier = _id(payload, "job_id")
         _only(payload, ("job_id",), required=("job_id",))
