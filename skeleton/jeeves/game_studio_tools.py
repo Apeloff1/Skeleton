@@ -63,6 +63,7 @@ READ_OPERATIONS = (
     "game.studio.quality.diff",
     "game.studio.quality.history",
     "game.studio.quality.native.inspect",
+    "game.studio.quality.repair.preview",
 )
 WRITE_OPERATIONS = (
     "console.edit",
