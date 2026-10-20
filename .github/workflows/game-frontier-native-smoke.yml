@@ -21,6 +21,7 @@ on:
       - "skeleton/forge/game_frontier_godot.py"
       - "skeleton/jeeves/game_frontier*.py"
       - "scripts/build_original_expedition.py"
+      - "scripts/build_original_campaign.py"
       - "tests/test_original_expedition_cli.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
 
@@ -86,6 +87,64 @@ jobs:
               "route_count": proof["actual_simulated_routes"],
               "engine_replay_receipt": proof["native_playthrough_receipt"],
           }, sort_keys=True))
+          PY
+      - name: Qualify complete original campaign controller, story, LOD meshes and Dragon source on real Godot
+        shell: bash
+        env:
+          PYTHONPATH: "."
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,subprocess,tempfile
+          from pathlib import Path
+          from skeleton.jeeves.game_frontier_expedition_campaign import (
+              compile_original_campaign,verify_original_campaign,
+          )
+          from skeleton.jeeves.game_frontier_expedition_native_verify import (
+              inspect_native_expedition_trace,
+          )
+          candidate=compile_original_campaign(
+              "fully-original-frontier-native-ci",
+              gdd_digest="c"*64,seed=31,islands=5,
+              controller_id="dual_stick",
+          )
+          verify_original_campaign(
+              candidate,project_id="fully-original-frontier-native-ci",
+              gdd_digest="c"*64,seed=31,islands=5,
+              controller_id="dual_stick",
+          )
+          with tempfile.TemporaryDirectory(prefix="campaign-native-") as location:
+              root=Path(location)
+              for relative,contents in candidate["files"].items():
+                  path=root/relative
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_text(contents,encoding="utf-8")
+              result=subprocess.run(
+                  [os.environ["FRONTIER_GODOT"],"--headless",
+                   "--path",str(root),"--quit-after","20","--",
+                   "--expedition-autoplay"],
+                  cwd=root,capture_output=True,text=True,timeout=180,
+                  check=False,
+              )
+              out=result.stdout+"\n"+result.stderr
+              if result.returncode != 0 or "EXPEDITION_COMPLETE " not in out:
+                  raise AssertionError(
+                      "Native original game failed: "+repr(out[-4000:]))
+              verified=inspect_native_expedition_trace(
+                  out,candidate["world"],candidate["player"],
+                  expected_complete=True,
+              )
+              assert verified["won"]
+              assert verified["executed_actions"]>=1
+              print(json.dumps({
+                  "original_3d_assets":candidate["manifest"]["unique_game_assets"],
+                  "actual_gameplay_qa_cases":candidate["manifest"]["actual_qa_cases"],
+                  "replayed_dragon_routes":candidate["manifest"]["dragon_verified_route_checks"],
+                  "gameplay_receipt":verified["receipt_digest"],
+                  "source_world":candidate["world"].digest,
+                  "native_executed":True,
+                  "production_release_approved":False,
+              },sort_keys=True))
           PY
       # One pinned binary download, four independently sandboxed native
       # simulations and journals. This avoids a 4x runner/install/download fanout.
