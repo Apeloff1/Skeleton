@@ -151,6 +151,11 @@ class SQLiteExecutionRepository:
             self._connection.executescript("""
                 PRAGMA foreign_keys = ON;
 
+                CREATE TABLE IF NOT EXISTS ai_execution_coordinator_identity (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                    namespace TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS ai_execution_stream_event (
                     namespace TEXT NOT NULL,
                     execution_id TEXT NOT NULL,
@@ -180,6 +185,15 @@ class SQLiteExecutionRepository:
                     PRIMARY KEY(namespace, execution_id),
                     UNIQUE(namespace, operation_id, execution_id)
                 );
+
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_recoverable_keyset
+                ON ai_execution_state(namespace, updated_at, execution_id)
+                WHERE state NOT IN ('completed', 'failed', 'cancelled');
+                DROP INDEX IF EXISTS idx_ai_execution_active_keyset;
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_actionable_keyset
+                ON ai_execution_state(namespace, updated_at, execution_id)
+                WHERE state NOT IN ('completed', 'failed', 'cancelled')
+                  AND (state NOT IN ('waiting_for_user', 'waiting_for_tool_authority') OR cancellation_requested = 1);
 
                 CREATE TABLE IF NOT EXISTS ai_execution_turn (
                     namespace TEXT NOT NULL,
@@ -215,6 +229,17 @@ class SQLiteExecutionRepository:
                     result_digest TEXT NOT NULL,
                     result_json TEXT NOT NULL,
                     completed_at TEXT NOT NULL,
+                    learning_outcome_id TEXT,
+                    learning_observation_digest TEXT,
+                    learning_observed_at TEXT,
+                    learning_trained INTEGER,
+                    learning_status TEXT,
+                    learning_checkpoint_version INTEGER,
+                    learning_tenant_id TEXT,
+                    learning_scope_id TEXT,
+                    learning_partition_id TEXT,
+                    learning_model_selection_digest TEXT,
+                    learning_source_snapshot_digest TEXT,
                     PRIMARY KEY(namespace, execution_id),
                     FOREIGN KEY(namespace, execution_id)
                         REFERENCES ai_execution_state(namespace, execution_id)
@@ -305,6 +330,9 @@ class SQLiteExecutionRepository:
                 ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, observed_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_source
                 ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, source_snapshot_digest);
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_accepted_replay
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, observed_at DESC)
+                WHERE trained = 1;
 
                 CREATE TABLE IF NOT EXISTS ai_execution_learning_state (
                     namespace TEXT NOT NULL,
@@ -378,7 +406,24 @@ class SQLiteExecutionRepository:
                     result_digest TEXT NOT NULL,
                     result_json TEXT NOT NULL,
                     completed_at TEXT NOT NULL,
+                    acknowledged_at TEXT,
+                    acknowledgement_digest TEXT,
+                    compacted_at TEXT,
                     PRIMARY KEY(namespace, tenant_id, scope_id, idempotency_key)
+                );
+                CREATE TABLE IF NOT EXISTS ai_execution_learning_retention_state (
+                    namespace TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    scope_id TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    policy_limit INTEGER NOT NULL,
+                    live_rows INTEGER NOT NULL,
+                    overflow INTEGER NOT NULL,
+                    pruned_rows INTEGER NOT NULL,
+                    skipped_rows INTEGER NOT NULL,
+                    last_deferred_reason TEXT,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, tenant_id, scope_id)
                 );
                 """)
             learning_columns = {
@@ -386,6 +431,47 @@ class SQLiteExecutionRepository:
             }
             if "last_observed_at" not in learning_columns:
                 self._connection.execute("ALTER TABLE ai_execution_learning_state ADD COLUMN last_observed_at TEXT")
+            marker_columns = {
+                str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_result)")
+            }
+            for name, kind in (
+                ("learning_outcome_id", "TEXT"), ("learning_observation_digest", "TEXT"),
+                ("learning_observed_at", "TEXT"), ("learning_trained", "INTEGER"), ("learning_status", "TEXT"),
+                ("learning_checkpoint_version", "INTEGER"), ("learning_tenant_id", "TEXT"),
+                ("learning_scope_id", "TEXT"), ("learning_partition_id", "TEXT"),
+                ("learning_model_selection_digest", "TEXT"), ("learning_source_snapshot_digest", "TEXT"),
+            ):
+                if name not in marker_columns:
+                    self._connection.execute(f"ALTER TABLE ai_execution_result ADD COLUMN {name} {kind}")
+            receipt_columns = {
+                str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_learning_maintenance_receipt)")
+            }
+            for name in ("acknowledged_at", "acknowledgement_digest", "compacted_at"):
+                if name not in receipt_columns:
+                    self._connection.execute(f"ALTER TABLE ai_execution_learning_maintenance_receipt ADD COLUMN {name} TEXT")
+            self._connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_execution_learning_marker "
+                "ON ai_execution_result(namespace, learning_outcome_id) WHERE learning_outcome_id IS NOT NULL"
+            )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_marker_source "
+                "ON ai_execution_result(namespace, learning_tenant_id, learning_scope_id, learning_partition_id, learning_source_snapshot_digest) "
+                "WHERE learning_outcome_id IS NOT NULL"
+            )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_marker_recent "
+                "ON ai_execution_result(namespace, learning_tenant_id, learning_scope_id, learning_partition_id, learning_observed_at DESC) "
+                "WHERE learning_outcome_id IS NOT NULL"
+            )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_marker_replay "
+                "ON ai_execution_result(namespace, learning_tenant_id, learning_scope_id, learning_partition_id, learning_observed_at DESC) "
+                "WHERE learning_outcome_id IS NOT NULL AND learning_trained = 1"
+            )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_receipt_retention "
+                "ON ai_execution_learning_maintenance_receipt(namespace, tenant_id, scope_id, compacted_at, acknowledged_at, idempotency_key)"
+            )
             self._connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_observed "
                 "ON ai_execution_learning_state(namespace, tenant_id, scope_id, last_observed_at)"
@@ -1747,6 +1833,44 @@ class SQLiteExecutionRepository:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def claim_coordinator_namespace(self) -> dict[str, Any]:
+        """Pin a coordinated execution file to one namespace across restarts.
+
+        Standalone repositories remain namespace-capable. The engine calls
+        this explicit claim after obtaining its file lock, before activation.
+        """
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                existing = self._connection.execute(
+                    "SELECT namespace FROM ai_execution_coordinator_identity WHERE singleton = 1"
+                ).fetchone()
+                if existing is not None:
+                    if existing["namespace"] != self.namespace:
+                        raise ExecutionRepositoryConflict("execution database is pinned to another coordinator namespace")
+                    self._connection.execute("COMMIT")
+                    return {"namespace": self.namespace, "claimed": True, "already_claimed": True}
+                # Two index range probes avoid walking a large history that
+                # already belongs entirely to the requested namespace.
+                other = self._connection.execute(
+                    "SELECT 1 FROM ai_execution_state WHERE namespace < ? LIMIT 1", (self.namespace,)
+                ).fetchone()
+                if other is None:
+                    other = self._connection.execute(
+                        "SELECT 1 FROM ai_execution_state WHERE namespace > ? LIMIT 1", (self.namespace,)
+                    ).fetchone()
+                if other is not None:
+                    raise ExecutionRepositoryConflict("execution database contains another coordinator namespace")
+                self._connection.execute(
+                    "INSERT INTO ai_execution_coordinator_identity(singleton, namespace) VALUES (1, ?)",
+                    (self.namespace,),
+                )
+                self._connection.execute("COMMIT")
+                return {"namespace": self.namespace, "claimed": True, "already_claimed": False}
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def runtime_control_policy(self) -> dict[str, Any]:
         """Read the namespace's one durable host-control policy/version."""
         with self._lock:
@@ -2026,10 +2150,190 @@ class SQLiteExecutionRepository:
         )
         return version
 
+    @staticmethod
+    def _learning_observation_base(observation: dict[str, Any]) -> dict[str, Any]:
+        return {name: value for name, value in observation.items() if name != "retired_inactive_partition"}
+
+    def _write_learning_marker_locked(
+        self, execution_id: str, observation: dict[str, Any], *, trained: bool,
+        learning_status: str, checkpoint_version: int,
+    ) -> None:
+        digest = learning.digest(self._learning_observation_base(observation))
+        row = self._connection.execute(
+            """SELECT result_digest, learning_outcome_id, learning_observation_digest
+               FROM ai_execution_result WHERE namespace = ? AND execution_id = ?""",
+            (self.namespace, execution_id),
+        ).fetchone()
+        if row is None or row["result_digest"] != observation["result_digest"]:
+            raise ExecutionRepositoryCorruption("learning marker requires its canonical terminal result")
+        if row["learning_outcome_id"] is not None:
+            if row["learning_outcome_id"] != observation["outcome_id"] or row["learning_observation_digest"] != digest:
+                raise ExecutionRepositoryConflict("durable learning feedback marker differs")
+            return
+        self._connection.execute(
+            """UPDATE ai_execution_result SET learning_outcome_id = ?, learning_observation_digest = ?,
+                   learning_observed_at = ?, learning_trained = ?, learning_status = ?, learning_checkpoint_version = ?,
+                   learning_tenant_id = ?, learning_scope_id = ?, learning_partition_id = ?,
+                   learning_model_selection_digest = ?, learning_source_snapshot_digest = ?
+               WHERE namespace = ? AND execution_id = ? AND learning_outcome_id IS NULL""",
+            (observation["outcome_id"], digest, observation["observed_at"], int(trained), learning_status, checkpoint_version,
+             observation["tenant_id"], observation["scope_id"], observation["partition_id"],
+             observation["model_selection_digest"], observation["source_snapshot_digest"], self.namespace, execution_id),
+        )
+
+    def _observation_from_learning_marker_locked(self, marker: sqlite3.Row) -> dict[str, Any]:
+        execution = self.get(marker["execution_id"])
+        result = self._result_from_row(marker)
+        version = int(marker["learning_checkpoint_version"] or 0)
+        checkpoint_payload = None
+        if version:
+            checkpoint_row = self._connection.execute(
+                """SELECT * FROM ai_execution_checkpoint
+                   WHERE namespace = ? AND execution_id = ? AND checkpoint_version = ?""",
+                (self.namespace, marker["execution_id"], version),
+            ).fetchone()
+            if checkpoint_row is None:
+                raise ExecutionRepositoryCorruption("learning feedback checkpoint no longer exists")
+            checkpoint_payload = self._checkpoint_from_row(checkpoint_row).payload
+        observation = learning.terminal_observation(execution.request, result, checkpoint_payload)
+        if observation["outcome_id"] != marker["learning_outcome_id"] or learning.digest(observation) != marker["learning_observation_digest"]:
+            raise ExecutionRepositoryCorruption("reconstructed learning feedback digest differs")
+        for name in ("tenant_id", "scope_id", "partition_id", "model_selection_digest", "source_snapshot_digest"):
+            if observation[name] != marker["learning_" + name]:
+                raise ExecutionRepositoryCorruption("reconstructed learning feedback scope/provenance differs")
+        return observation
+
+    def _backfill_learning_marker_locked(self, outcome: sqlite3.Row) -> bool:
+        """Bounded lazy upgrade before a derived diagnostic row is removed."""
+        marker = self._connection.execute(
+            "SELECT * FROM ai_execution_result WHERE namespace = ? AND execution_id = ?",
+            (self.namespace, outcome["execution_id"]),
+        ).fetchone()
+        if marker is None:
+            return False
+        try:
+            observation = _json_object(outcome["observation_json"], "legacy learning outcome")
+            if learning.digest(observation) != outcome["observation_digest"]:
+                return False
+            if marker["learning_outcome_id"] is not None:
+                return marker["learning_outcome_id"] == outcome["outcome_id"] and marker["learning_observation_digest"] == learning.digest(self._learning_observation_base(observation))
+            execution = self.get(outcome["execution_id"])
+            result = self._result_from_row(marker)
+            checkpoint = self.latest_checkpoint(outcome["execution_id"])
+            version = 0 if checkpoint is None else checkpoint.checkpoint_version
+            if observation.get("trainable") is True:
+                rebuilt = learning.terminal_observation(execution.request, result, None if checkpoint is None else checkpoint.payload)
+                if rebuilt != self._learning_observation_base(observation):
+                    return False
+            self._write_learning_marker_locked(outcome["execution_id"], observation, trained=bool(outcome["trained"]),
+                learning_status=outcome["learning_status"], checkpoint_version=version)
+            return True
+        except (ExecutionRepositoryError, learning.RuntimeLearningError, TypeError, ValueError):
+            return False
+
+    def _learning_retention_state_locked(
+        self, tenant_id: str, scope_id: str, policy_limit: int, instant: datetime
+    ) -> dict[str, Any]:
+        row = self._connection.execute(
+            """SELECT * FROM ai_execution_learning_retention_state
+               WHERE namespace = ? AND tenant_id = ? AND scope_id = ?""",
+            (self.namespace, tenant_id, scope_id),
+        ).fetchone()
+        rebuilt = False
+        if row is not None:
+            try:
+                for name in ("version", "pruned_rows", "skipped_rows", "live_rows"):
+                    learning._integer(row[name], name, 0, learning.MAX_COUNTER)
+                learning._integer(row["policy_limit"], "retention policy limit", 128, 100000)
+                learning._integer(row["overflow"], "retention overflow flag", 0, 1)
+            except learning.RuntimeLearningError:
+                row = None
+                rebuilt = True
+        if row is None or int(row["policy_limit"]) != policy_limit:
+            # A legacy database may contain millions of rows. Inspect only the
+            # configured bound plus one and leave excess cleanup to idle work.
+            count = int(self._connection.execute(
+                """SELECT COUNT(*) FROM (
+                       SELECT 1 FROM ai_execution_learning_outcome
+                       WHERE namespace = ? AND tenant_id = ? AND scope_id = ? LIMIT ?
+                   )""", (self.namespace, tenant_id, scope_id, policy_limit + 1),
+            ).fetchone()[0])
+            state = {"version": 0 if row is None else int(row["version"]), "policy_limit": policy_limit,
+                "live_rows": count, "overflow": count > policy_limit,
+                "pruned_rows": 0 if row is None else int(row["pruned_rows"]),
+                "skipped_rows": 0 if row is None else int(row["skipped_rows"]),
+                "last_deferred_reason": "legacy_retention_backlog" if count > policy_limit else "retention_metadata_rebuilt" if rebuilt else None}
+            self._save_learning_retention_state_locked(tenant_id, scope_id, state, instant)
+            return state
+        return dict(row)
+
+    def _save_learning_retention_state_locked(
+        self, tenant_id: str, scope_id: str, state: dict[str, Any], instant: datetime
+    ) -> None:
+        state["version"] = min(learning.MAX_COUNTER, int(state["version"]) + 1)
+        self._connection.execute(
+            """INSERT INTO ai_execution_learning_retention_state(
+                   namespace, tenant_id, scope_id, version, policy_limit, live_rows, overflow,
+                   pruned_rows, skipped_rows, last_deferred_reason, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(namespace, tenant_id, scope_id) DO UPDATE SET version = excluded.version,
+                   policy_limit = excluded.policy_limit, live_rows = excluded.live_rows, overflow = excluded.overflow,
+                   pruned_rows = excluded.pruned_rows, skipped_rows = excluded.skipped_rows,
+                   last_deferred_reason = excluded.last_deferred_reason, updated_at = excluded.updated_at""",
+            (self.namespace, tenant_id, scope_id, state["version"], state["policy_limit"], state["live_rows"],
+             int(bool(state["overflow"])), state["pruned_rows"], state["skipped_rows"],
+             state["last_deferred_reason"], instant.isoformat()),
+        )
+
+    def _reserve_learning_diagnostic_locked(
+        self, tenant_id: str, scope_id: str, policy: dict[str, Any], instant: datetime
+    ) -> bool:
+        state = self._learning_retention_state_locked(tenant_id, scope_id, policy["retained_outcomes"], instant)
+        retained = not bool(state["overflow"])
+        if retained and int(state["live_rows"]) >= policy["retained_outcomes"]:
+            oldest = self._connection.execute(
+                """SELECT * FROM ai_execution_learning_outcome
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ? ORDER BY observed_at, execution_id LIMIT 1""",
+                (self.namespace, tenant_id, scope_id),
+            ).fetchone()
+            if oldest is not None and self._backfill_learning_marker_locked(oldest):
+                self._connection.execute(
+                    "DELETE FROM ai_execution_learning_outcome WHERE namespace = ? AND execution_id = ?",
+                    (self.namespace, oldest["execution_id"]),
+                )
+                state["live_rows"] = max(0, int(state["live_rows"]) - 1)
+                state["pruned_rows"] = min(learning.MAX_COUNTER, int(state["pruned_rows"]) + 1)
+            else:
+                retained = False
+                state["last_deferred_reason"] = "oldest_feedback_marker_requires_repair"
+        if retained:
+            state["live_rows"] += 1
+            state["last_deferred_reason"] = None
+        else:
+            state["skipped_rows"] = min(learning.MAX_COUNTER, int(state["skipped_rows"]) + 1)
+        self._save_learning_retention_state_locked(tenant_id, scope_id, state, instant)
+        return retained
+
     def _record_runtime_outcome_locked(
         self, execution: AIExecution, result: AIExecutionResult, instant: datetime
     ) -> dict[str, Any]:
         """Called inside the terminal transaction; never trusts caller rewards."""
+        marker = self._connection.execute(
+            """SELECT result_digest, learning_outcome_id, learning_trained, learning_status
+               FROM ai_execution_result WHERE namespace = ? AND execution_id = ?""",
+            (self.namespace, execution.execution_id),
+        ).fetchone()
+        if marker is not None and marker["learning_outcome_id"] is not None:
+            if marker["result_digest"] != learning.digest(result.as_dict()):
+                raise ExecutionRepositoryConflict("durable feedback terminal result differs")
+            learning._sha(marker["learning_outcome_id"], "durable learning outcome identity")
+            retained = self._connection.execute(
+                "SELECT 1 FROM ai_execution_learning_outcome WHERE namespace = ? AND execution_id = ?",
+                (self.namespace, execution.execution_id),
+            ).fetchone() is not None
+            return {"execution_id": execution.execution_id, "outcome_id": marker["learning_outcome_id"],
+                "recorded": True, "deduplicated": True, "trained": bool(marker["learning_trained"]),
+                "learning_status": marker["learning_status"], "outcome_retained": retained}
         existing = self._connection.execute(
             """SELECT * FROM ai_execution_learning_outcome
                WHERE namespace = ? AND execution_id = ?""",
@@ -2038,6 +2342,7 @@ class SQLiteExecutionRepository:
         if existing is not None:
             if existing["request_digest"] != execution.request.identity_digest or existing["result_digest"] != learning.digest(result.as_dict()):
                 raise ExecutionRepositoryConflict("runtime learning outcome identity differs")
+            self._backfill_learning_marker_locked(existing)
             return {"execution_id": execution.execution_id, "outcome_id": existing["outcome_id"],
                     "recorded": True, "deduplicated": True, "trained": bool(existing["trained"]),
                     "learning_status": existing["learning_status"]}
@@ -2124,18 +2429,27 @@ class SQLiteExecutionRepository:
         elif not observation["trainable"] and learning_status == "observed":
             learning_status = "audit_only"
 
-        self._connection.execute(
-            """INSERT INTO ai_execution_learning_outcome(
-                   namespace, execution_id, outcome_id, tenant_id, scope_id, partition_id, task_class,
-                   model_selection_digest, source_snapshot_digest, request_digest, result_digest,
-                   observation_digest, observation_json, trained, learning_status, observed_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (self.namespace, execution.execution_id, observation["outcome_id"], tenant_id, scope_id,
-             observation["partition_id"], observation["task_class"], observation["model_selection_digest"],
-             observation["source_snapshot_digest"], observation["request_digest"], observation["result_digest"],
-             learning.digest(observation), _json_dump(observation), int(trained), learning_status,
-             observation["observed_at"]),
-        )
+        self._write_learning_marker_locked(execution.execution_id, observation, trained=trained,
+            learning_status=learning_status, checkpoint_version=0 if checkpoint is None else checkpoint.checkpoint_version)
+        try:
+            outcome_retained = self._reserve_learning_diagnostic_locked(tenant_id, scope_id, policy, instant)
+        except (ExecutionRepositoryError, learning.RuntimeLearningError, ValueError, TypeError, OverflowError):
+            # Canonical terminal feedback is already marked. Diagnostic cache
+            # corruption cannot undo that result or cause a second optimizer update.
+            outcome_retained = False
+        if outcome_retained:
+            self._connection.execute(
+                """INSERT INTO ai_execution_learning_outcome(
+                       namespace, execution_id, outcome_id, tenant_id, scope_id, partition_id, task_class,
+                       model_selection_digest, source_snapshot_digest, request_digest, result_digest,
+                       observation_digest, observation_json, trained, learning_status, observed_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (self.namespace, execution.execution_id, observation["outcome_id"], tenant_id, scope_id,
+                 observation["partition_id"], observation["task_class"], observation["model_selection_digest"],
+                 observation["source_snapshot_digest"], observation["request_digest"], observation["result_digest"],
+                 learning.digest(observation), _json_dump(observation), int(trained), learning_status,
+                 observation["observed_at"]),
+            )
         try:
             totals, totals_version = self._learning_totals_locked(tenant_id, scope_id)
         except (ExecutionRepositoryCorruption, learning.RuntimeLearningError):
@@ -2144,7 +2458,7 @@ class SQLiteExecutionRepository:
             # the operator sees unavailable totals instead of invented counts.
             return {"execution_id": execution.execution_id, "outcome_id": observation["outcome_id"],
                     "recorded": True, "deduplicated": False, "trained": trained,
-                    "learning_status": learning_status, "totals_health": "quarantined"}
+                    "learning_status": learning_status, "totals_health": "quarantined", "outcome_retained": outcome_retained}
         metrics = observation["metrics"]
         increments = {
             "outcomes": 1, observation["status"]: 1, "trained_outcomes": int(trained),
@@ -2165,7 +2479,8 @@ class SQLiteExecutionRepository:
             (self.namespace, tenant_id, scope_id, totals_version + 1, learning.digest(totals), _json_dump(totals), instant.isoformat()),
         )
         return {"execution_id": execution.execution_id, "outcome_id": observation["outcome_id"],
-                "recorded": True, "deduplicated": False, "trained": trained, "learning_status": learning_status}
+                "recorded": True, "deduplicated": False, "trained": trained, "learning_status": learning_status,
+                "outcome_retained": outcome_retained}
 
     def record_runtime_outcome(self, execution_id: str, *, now: datetime | None = None) -> dict[str, Any]:
         """Idempotently learn an existing canonical terminal result, never a draft."""
@@ -2234,11 +2549,19 @@ class SQLiteExecutionRepository:
                 if any(row[name] != identity[name] for name in ("tenant_id", "scope_id", "partition_id", "model_selection_digest")):
                     raise ExecutionRepositoryError("imported replay scope/activation differs")
                 observation = _json_object(row["observation_json"], "learning import outcome")
-                if learning.digest(observation) != row["observation_digest"] or observation.get("trainable") is not True:
+                if learning.digest(observation) != row["observation_digest"] or observation.get("trainable") is not True or not bool(row["trained"]):
                     raise ExecutionRepositoryCorruption("imported replay canonical provenance differs")
                 outcomes[row["outcome_id"]] = observation
-            if set(outcomes) != set(sample_ids):
-                raise ExecutionRepositoryError("imported replay requires existing canonical outcomes")
+            for missing in set(sample_ids) - set(outcomes):
+                marker = self._connection.execute(
+                    "SELECT * FROM ai_execution_result WHERE namespace = ? AND learning_outcome_id = ?",
+                    (self.namespace, missing),
+                ).fetchone()
+                if marker is None or any(marker["learning_" + name] != identity[name] for name in ("tenant_id", "scope_id", "partition_id", "model_selection_digest")):
+                    raise ExecutionRepositoryError("imported replay requires existing canonical feedback provenance")
+                if not bool(marker["learning_trained"]):
+                    raise ExecutionRepositoryError("imported replay was not accepted by its original learning policy")
+                outcomes[missing] = self._observation_from_learning_marker_locked(marker)
             for sample in samples:
                 observation = outcomes[sample["outcome_id"]]
                 if sample["features"] != observation["features"] or sample["targets"] != learning.observation_targets(observation, policy):
@@ -2255,7 +2578,15 @@ class SQLiteExecutionRepository:
                 (self.namespace, identity["tenant_id"], identity["scope_id"], identity["partition_id"], source),
             ).fetchone()
             if found is None:
-                raise ExecutionRepositoryError("imported source fingerprint has no canonical provenance")
+                found = self._connection.execute(
+                    """SELECT 1 FROM ai_execution_result
+                       WHERE namespace = ? AND learning_tenant_id = ? AND learning_scope_id = ?
+                             AND learning_partition_id = ? AND learning_source_snapshot_digest = ?
+                             AND learning_outcome_id IS NOT NULL LIMIT 1""",
+                    (self.namespace, identity["tenant_id"], identity["scope_id"], identity["partition_id"], source),
+                ).fetchone()
+                if found is None:
+                    raise ExecutionRepositoryError("imported source fingerprint has no canonical provenance")
 
     def _mutate_learning_checkpoint(
         self, *, tenant_id: str, scope_id: str, partition_id: str, expected_version: int,
@@ -2427,11 +2758,32 @@ class SQLiteExecutionRepository:
                     "source_snapshot_digest": row["source_snapshot_digest"],
                     "model_selection_digest": row["model_selection_digest"], "observed_at": row["observed_at"],
                     "trained": bool(row["trained"]), "learning_status": row["learning_status"]})
+            retention_row = self._connection.execute(
+                """SELECT * FROM ai_execution_learning_retention_state
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ?""",
+                (self.namespace, tenant_id, scope_id),
+            ).fetchone()
+            retention: dict[str, Any] = {"initialized": retention_row is not None,
+                "policy_limit": policy["retained_outcomes"], "outcome_max_age_days": policy["outcome_max_age_days"],
+                "maintenance_receipt_retention": policy["maintenance_receipt_retention"],
+                "canonical_results_retained": True, "dedupe_markers_retained": True}
+            if retention_row is not None:
+                try:
+                    for name in ("live_rows", "pruned_rows", "skipped_rows", "version"):
+                        learning._integer(retention_row[name], name, 0, learning.MAX_COUNTER)
+                    learning._integer(retention_row["overflow"], "retention overflow", 0, 1)
+                    retention.update({"health": "healthy", "live_rows": int(retention_row["live_rows"]),
+                        "live_rows_exact": not bool(retention_row["overflow"]), "overflow": bool(retention_row["overflow"]),
+                        "pruned_rows": int(retention_row["pruned_rows"]), "skipped_rows": int(retention_row["skipped_rows"]),
+                        "last_deferred_reason": retention_row["last_deferred_reason"]})
+                except learning.RuntimeLearningError:
+                    retention.update({"health": "quarantined", "live_rows": None, "live_rows_exact": False})
             return {"schema_version": "skeleton.runtime.learning.snapshot.v1", "tenant_id": tenant_id,
                 "scope_id": scope_id, "policy": policy, "policy_version": configuration["version"],
                 "totals": totals, "totals_health": totals_health,
                 "observations": None if totals is None else totals["outcomes"], "partitions": partitions,
                 "recent_outcomes": recent, "recent_outcome_errors": recent_outcome_errors,
+                "retention": retention,
                 "model": {"kind": "bounded_online_mlp", "architecture": [12, 16, 8, 3], "optimizer": "adam",
                     "controller_version": learning.CONTROLLER_VERSION,
                     "parameter_count": learning.PARAMETER_COUNT, "outputs": list(learning.OUTPUT_NAMES),
@@ -2441,6 +2793,7 @@ class SQLiteExecutionRepository:
                     "partition_offset": offset, "total_partitions": total_partitions,
                     "has_more_partitions": offset + len(partitions) < total_partitions,
                     "max_optimizer_updates_per_outcome": 1 + policy["replay_steps"],
+                    "retained_outcomes": policy["retained_outcomes"], "max_retention_rows_per_chunk": 512,
                     "partition_limit": policy["partition_limit"], "replay_capacity": policy["replay_capacity"]}}
 
     def runtime_learning_recommendation(
@@ -2491,6 +2844,124 @@ class SQLiteExecutionRepository:
         except learning.RuntimeLearningError as exc:
             raise ExecutionRepositoryError(str(exc)) from exc
 
+    def runtime_learning_retention(
+        self, *, tenant_id: str, scope_id: str = "tenant", max_rows: int = 128, now: datetime | None = None
+    ) -> dict[str, Any]:
+        """Bound derived diagnostics and compact only verified consumed receipts.
+
+        Canonical terminal payloads, feedback dedupe markers, cumulative
+        operational totals, optimizer state and operator audit are retained.
+        """
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if isinstance(max_rows, bool) or not isinstance(max_rows, int) or not 1 <= max_rows <= 512:
+            raise ExecutionRepositoryError("learning retention row bound must be in [1, 512]")
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                policy = self._learning_policy_locked(tenant_id, scope_id)["policy"]
+                state = self._learning_retention_state_locked(tenant_id, scope_id, policy["retained_outcomes"], instant)
+                outcome_budget = max(1, max_rows // 2)
+                cutoff = (instant - timedelta(days=policy["outcome_max_age_days"])).isoformat()
+                candidates = self._connection.execute(
+                    """SELECT * FROM ai_execution_learning_outcome
+                       WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND observed_at < ?
+                       ORDER BY observed_at, execution_id LIMIT ?""",
+                    (self.namespace, tenant_id, scope_id, cutoff, outcome_budget),
+                ).fetchall()
+                selected = {row["execution_id"]: row for row in candidates}
+                if len(selected) < outcome_budget:
+                    excess = self._connection.execute(
+                        """SELECT * FROM ai_execution_learning_outcome
+                           WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
+                           ORDER BY observed_at DESC, execution_id DESC LIMIT ? OFFSET ?""",
+                        (self.namespace, tenant_id, scope_id, outcome_budget - len(selected), policy["retained_outcomes"]),
+                    ).fetchall()
+                    for row in excess:
+                        selected.setdefault(row["execution_id"], row)
+                pruned = failures = 0
+                for row in selected.values():
+                    if not self._backfill_learning_marker_locked(row):
+                        failures += 1
+                        continue
+                    cursor = self._connection.execute(
+                        "DELETE FROM ai_execution_learning_outcome WHERE namespace = ? AND execution_id = ?",
+                        (self.namespace, row["execution_id"]),
+                    )
+                    pruned += cursor.rowcount
+                count = int(self._connection.execute(
+                    """SELECT COUNT(*) FROM (
+                           SELECT 1 FROM ai_execution_learning_outcome
+                           WHERE namespace = ? AND tenant_id = ? AND scope_id = ? LIMIT ?
+                       )""", (self.namespace, tenant_id, scope_id, policy["retained_outcomes"] + 1),
+                ).fetchone()[0])
+                state.update({"live_rows": count, "overflow": count > policy["retained_outcomes"],
+                    "pruned_rows": min(learning.MAX_COUNTER, int(state["pruned_rows"]) + pruned),
+                    "last_deferred_reason": "feedback_marker_requires_repair" if failures else "legacy_retention_backlog" if count > policy["retained_outcomes"] else None})
+                self._save_learning_retention_state_locked(tenant_id, scope_id, state, instant)
+                receipt_budget = max_rows - len(selected)
+                compacted = 0
+                if receipt_budget:
+                    receipts = self._connection.execute(
+                        """SELECT idempotency_key FROM ai_execution_learning_maintenance_receipt
+                           WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
+                                 AND acknowledged_at IS NOT NULL AND compacted_at IS NULL
+                           ORDER BY acknowledged_at DESC, idempotency_key DESC LIMIT ? OFFSET ?""",
+                        (self.namespace, tenant_id, scope_id, receipt_budget, policy["maintenance_receipt_retention"]),
+                    ).fetchall()
+                    for receipt in receipts:
+                        cursor = self._connection.execute(
+                            """UPDATE ai_execution_learning_maintenance_receipt
+                               SET result_json = '', compacted_at = ?
+                               WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND idempotency_key = ?
+                                     AND acknowledged_at IS NOT NULL AND compacted_at IS NULL""",
+                            (instant.isoformat(), self.namespace, tenant_id, scope_id, receipt["idempotency_key"]),
+                        )
+                        compacted += cursor.rowcount
+                self._connection.execute("COMMIT")
+                return {"schema_version": "skeleton.runtime.learning.retention.v1", "tenant_id": tenant_id,
+                    "scope_id": scope_id, "pruned_outcomes": pruned, "compacted_maintenance_receipts": compacted,
+                    "marker_backfill_failures": failures, "retained_outcomes": count,
+                    "retained_outcomes_exact": not bool(state["overflow"]), "overflow": bool(state["overflow"]),
+                    "terminal_results_removed": 0, "idempotency_tombstones_removed": 0,
+                    "cumulative_totals_unchanged": True, "completed_at": instant.isoformat()}
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def _learning_recovery_observations_locked(
+        self, tenant_id: str, scope_id: str, partition_id: str
+    ) -> list[dict[str, Any]]:
+        observations: dict[str, dict[str, Any]] = {}
+        markers = self._connection.execute(
+            """SELECT * FROM ai_execution_result
+               WHERE namespace = ? AND learning_tenant_id = ? AND learning_scope_id = ?
+                     AND learning_partition_id = ? AND learning_outcome_id IS NOT NULL AND learning_trained = 1
+               ORDER BY learning_observed_at DESC LIMIT 4""",
+            (self.namespace, tenant_id, scope_id, partition_id),
+        ).fetchall()
+        for marker in markers:
+            observation = self._observation_from_learning_marker_locked(marker)
+            observations[observation["outcome_id"]] = observation
+        if len(observations) < 4:
+            legacy = self._connection.execute(
+                """SELECT * FROM ai_execution_learning_outcome
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ? AND trained = 1
+                   ORDER BY observed_at DESC LIMIT 4""",
+                (self.namespace, tenant_id, scope_id, partition_id),
+            ).fetchall()
+            for row in legacy:
+                if row["outcome_id"] in observations or not self._backfill_learning_marker_locked(row):
+                    continue
+                marker = self._connection.execute(
+                    "SELECT * FROM ai_execution_result WHERE namespace = ? AND execution_id = ?",
+                    (self.namespace, row["execution_id"]),
+                ).fetchone()
+                observation = self._observation_from_learning_marker_locked(marker)
+                observations[observation["outcome_id"]] = observation
+        newest = sorted(observations.values(), key=lambda item: (item["observed_at"], item["execution_id"]), reverse=True)[:4]
+        return list(reversed(newest))
+
     def _learning_maintenance_result_locked(
         self, result: dict[str, Any], *, tenant_id: str, scope_id: str,
         idempotency_key: str | None, binding_digest: str | None, instant: datetime,
@@ -2510,6 +2981,51 @@ class SQLiteExecutionRepository:
              result_digest, _json_dump(payload), instant.isoformat()),
         )
         return {**payload, "maintenance_receipt_digest": result_digest}
+
+    def acknowledge_runtime_learning_maintenance(
+        self, *, tenant_id: str, scope_id: str = "tenant", idempotency_key: str,
+        maintenance_receipt_digest: str, completion_receipt_digest: str, now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Acknowledge only after the host verified and committed its chunk cursor.
+
+        The host supplies its verified completion receipt digest. This method
+        never infers success from a pending callback or from an optimizer result.
+        """
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        try:
+            idempotency_key = learning.identifier(idempotency_key, "idempotency_key", maximum=256)
+            learning._sha(maintenance_receipt_digest, "maintenance_receipt_digest")
+            learning._sha(completion_receipt_digest, "completion_receipt_digest")
+        except learning.RuntimeLearningError as exc:
+            raise ExecutionRepositoryError(str(exc)) from exc
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """SELECT * FROM ai_execution_learning_maintenance_receipt
+                       WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND idempotency_key = ?""",
+                    (self.namespace, tenant_id, scope_id, idempotency_key),
+                ).fetchone()
+                if row is None or row["result_digest"] != maintenance_receipt_digest:
+                    raise ExecutionRepositoryConflict("maintenance acknowledgement receipt identity differs")
+                existing = row["acknowledgement_digest"]
+                if existing is not None and existing != completion_receipt_digest:
+                    raise ExecutionRepositoryConflict("maintenance completion acknowledgement already differs")
+                self._connection.execute(
+                    """UPDATE ai_execution_learning_maintenance_receipt
+                       SET acknowledged_at = ?, acknowledgement_digest = ?
+                       WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND idempotency_key = ?
+                             AND acknowledged_at IS NULL""",
+                    (instant.isoformat(), completion_receipt_digest, self.namespace, tenant_id, scope_id, idempotency_key),
+                )
+                self._connection.execute("COMMIT")
+                return {"acknowledged": True, "already_acknowledged": existing is not None,
+                    "idempotency_key": idempotency_key, "maintenance_receipt_digest": maintenance_receipt_digest,
+                    "completion_receipt_digest": completion_receipt_digest}
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
 
     def runtime_learning_maintenance(
         self, *, tenant_id: str, scope_id: str = "tenant", max_partitions: int = 4,
@@ -2546,6 +3062,16 @@ class SQLiteExecutionRepository:
                     if prior is not None:
                         if prior["binding_digest"] != binding_digest:
                             raise ExecutionRepositoryConflict("learning maintenance idempotency binding differs")
+                        if prior["compacted_at"] is not None:
+                            if prior["acknowledged_at"] is None or prior["acknowledgement_digest"] is None:
+                                raise ExecutionRepositoryCorruption("compacted maintenance receipt lacks verified acknowledgement")
+                            self._connection.execute("COMMIT")
+                            return {"schema_version": "skeleton.runtime.learning.maintenance.tombstone.v1",
+                                "tenant_id": tenant_id, "scope_id": scope_id, "idempotency_key": idempotency_key,
+                                "binding_digest": binding_digest, "maintenance_receipt_digest": prior["result_digest"],
+                                "completion_receipt_digest": prior["acknowledgement_digest"],
+                                "already_acknowledged": True, "compacted": True, "processed_partitions": 0,
+                                "external_model_work": False, "completed_at": prior["completed_at"]}
                         if not isinstance(prior["result_json"], str) or len(prior["result_json"]) > 128 * 1024:
                             raise ExecutionRepositoryCorruption("learning maintenance receipt exceeds its storage bound")
                         previous_result = _json_object(prior["result_json"], "learning maintenance receipt")
@@ -2580,20 +3106,8 @@ class SQLiteExecutionRepository:
                         if recovering:
                             old_quarantine = state["quarantine"]
                             candidate = learning.new_state(seed)
-                            recent = self._connection.execute(
-                                """SELECT * FROM ai_execution_learning_outcome
-                                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ?
-                                   ORDER BY observed_at DESC LIMIT 4""",
-                                (self.namespace, tenant_id, scope_id, row["partition_id"]),
-                            ).fetchall()
-                            for outcome_row in reversed(recent):
-                                observation = _json_object(outcome_row["observation_json"], "learning recovery outcome")
-                                if learning.digest(observation) != outcome_row["observation_digest"]:
-                                    raise ExecutionRepositoryCorruption("learning recovery outcome digest differs")
-                                canonical_execution = self.get(outcome_row["execution_id"])
-                                canonical_result = self.result(outcome_row["execution_id"])
-                                if canonical_result is None or canonical_execution.request.identity_digest != outcome_row["request_digest"] or learning.digest(canonical_result.as_dict()) != outcome_row["result_digest"]:
-                                    raise ExecutionRepositoryCorruption("learning recovery terminal identity differs")
+                            recent = self._learning_recovery_observations_locked(tenant_id, scope_id, row["partition_id"])
+                            for observation in recent:
                                 candidate, _ = learning.learn_outcome(candidate, observation, {**policy, "replay_steps": 0}, seed=seed)
                             candidate["recovery"] = {"prior_quarantine": old_quarantine, "recovered_at": instant.isoformat()}
                             costs = candidate["optimizer_cost"]
@@ -2753,6 +3267,40 @@ class SQLiteExecutionRepository:
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
+
+    def recoverable_page(
+        self, *, limit: int = 32, after_updated_at: datetime | None = None,
+        after_execution_id: str | None = None, include_waiting: bool = True,
+    ) -> tuple[AIExecution, ...]:
+        """Keyset page of unfinished executions; never loads the entire backlog.
+
+        ``include_waiting=False`` excludes passive user/authority waiters.
+        A waiter with cancellation requested remains actionable and is included
+        so recovery can durably finish its cancellation after a worker crash.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 128:
+            raise ExecutionRepositoryError("recoverable page limit must be in [1, 128]")
+        if type(include_waiting) is not bool:
+            raise ExecutionRepositoryError("include_waiting must be boolean")
+        if (after_updated_at is None) != (after_execution_id is None):
+            raise ExecutionRepositoryError("recovery cursor requires timestamp and execution identity together")
+        condition = "state NOT IN ('completed', 'failed', 'cancelled')" if include_waiting else (
+            "state NOT IN ('completed', 'failed', 'cancelled') "
+            "AND (state NOT IN ('waiting_for_user', 'waiting_for_tool_authority') OR cancellation_requested = 1)"
+        )
+        parameters: list[Any] = [self.namespace]
+        if after_updated_at is not None:
+            if not isinstance(after_execution_id, str) or not 1 <= len(after_execution_id) <= 192:
+                raise ExecutionRepositoryError("recovery execution cursor is invalid")
+            condition += " AND (updated_at, execution_id) > (?, ?)"
+            parameters.extend((_utc(after_updated_at).isoformat(), after_execution_id))
+        parameters.append(limit)
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM ai_execution_state WHERE namespace = ? AND " + condition
+                + " ORDER BY updated_at, execution_id LIMIT ?", parameters,
+            ).fetchall()
+            return tuple(self._execution_from_row(row) for row in rows)
 
     def recoverable(self) -> tuple[AIExecution, ...]:
         with self._lock:

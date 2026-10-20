@@ -12,7 +12,7 @@ import json
 import sqlite3
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from collections import OrderedDict
 from dataclasses import replace
 from pathlib import Path
@@ -68,9 +68,16 @@ def _checkpoint_from_json(value: str) -> dict[str, Any]:
 class RuntimeOptimizationControl:
     """Bounded host optimization with tenant-isolated learning projections."""
 
-    def __init__(self, repository: Any, providers: Any) -> None:
+    def __init__(
+        self,
+        repository: Any,
+        providers: Any,
+        *,
+        supervision_probe: Callable[[], Mapping[str, Any]] | None = None,
+    ) -> None:
         self.repository = repository
         self.providers = providers
+        self._supervision_probe = supervision_probe
         self._lock = threading.RLock()
         self._activity_lock = threading.Lock()
         self._foreground = 0
@@ -167,7 +174,7 @@ class RuntimeOptimizationControl:
             IdleWorkKind.CACHE_CLEANUP: MaintenanceHandler(self._trim_idle_cache, retry_safe=True),
             IdleWorkKind.CHECKPOINT_COMPACTION: MaintenanceHandler(self._checkpoint_storage, retry_safe=True),
             IdleWorkKind.LEARNER_SNAPSHOT: MaintenanceHandler(self._maintain_learning, retry_safe=True),
-            IdleWorkKind.REPLAY_DEDUP: MaintenanceHandler(self._maintain_learning, retry_safe=True),
+            IdleWorkKind.REPLAY_DEDUP: MaintenanceHandler(self._retain_learning, retry_safe=True),
             IdleWorkKind.ELIGIBLE_AUGMENTATION: MaintenanceHandler(self._maintain_learning, retry_safe=True),
         }
         # Separate connections share the declared execution database. No
@@ -177,6 +184,7 @@ class RuntimeOptimizationControl:
             telemetry_probe=self._telemetry,
             host_authorize=self._authorize_maintenance,
             callbacks=callbacks,
+            after_verified_chunk=self._acknowledge_learning_chunk,
             maximum_history_events=2_000_000,
         )
         self._maintenance_unavailable = ""
@@ -234,11 +242,35 @@ class RuntimeOptimizationControl:
         checkpoint()
         result = self.repository.runtime_learning_maintenance(
             tenant_id=task.payload["tenant_id"],
+            scope_id=task.payload.get("learning_scope_id", "tenant"),
             max_partitions=1,
             idempotency_key=task.continuation_id,
         )
         checkpoint()
         return result
+
+    def _retain_learning(self, task: Any, checkpoint: Any) -> dict[str, Any]:
+        checkpoint()
+        result = self.repository.runtime_learning_retention(
+            tenant_id=task.payload["tenant_id"],
+            scope_id=task.payload.get("learning_scope_id", "tenant"),
+            max_rows=128,
+        )
+        checkpoint()
+        return result
+
+    def _acknowledge_learning_chunk(self, task: Any, result: Any, receipt: Any) -> None:
+        """Acknowledge optimizer output only after the idle owner verifies it."""
+        output = result.output
+        if not isinstance(output, Mapping) or "maintenance_receipt_digest" not in output:
+            return
+        self.repository.acknowledge_runtime_learning_maintenance(
+            tenant_id=task.payload["tenant_id"],
+            scope_id=task.payload.get("learning_scope_id", "tenant"),
+            idempotency_key=task.continuation_id,
+            maintenance_receipt_digest=output["maintenance_receipt_digest"],
+            completion_receipt_digest=receipt.digest,
+        )
 
     def _checkpoint_storage(self, task: Any, checkpoint: Any) -> dict[str, Any]:
         del task
@@ -333,18 +365,36 @@ class RuntimeOptimizationControl:
         # identity coalesces per tenant/minute instead of growing per token.
         if self.repository.result(request.execution_id) is None:
             return
-        checkpoint = self.repository.latest_checkpoint(request.execution_id)
-        advice = {} if checkpoint is None else checkpoint.payload.get("runtime_learning", {})
-        priority = 10 if isinstance(advice, Mapping) and advice.get("defer_background") is True else 50
         tenant = request.context_policy.get("tenant_id") or request.tool_policy.get("tenant_id")
         if not isinstance(tenant, str) or not tenant:
             return
+        learning_scope = _identity(
+            request.context_policy.get("runtime_learning_scope_id", "tenant"), "learning scope"
+        )
         from skeleton.jeeves.ai.idle_learning_scheduler import IdleWorkKind
 
         bucket = int(time.time()) // 60
+        bucket_key = _digest({"tenant": tenant, "learning_scope": learning_scope})
         with self._activity_lock:
-            if self._enqueued_buckets.get(tenant) == bucket:
+            if self._enqueued_buckets.get(bucket_key) == bucket:
                 return
+        checkpoint = self.repository.latest_checkpoint(request.execution_id)
+        try:
+            # The terminal outcome has already updated the canonical learner.
+            # Recompute upkeep advice from current drift/source confidence and
+            # actual serving pressure, rather than replaying request-start advice.
+            advice = self.repository.runtime_learning_recommendation(
+                tenant_id=tenant,
+                scope_id=learning_scope,
+                request=request,
+                checkpoint_payload=None if checkpoint is None else dict(checkpoint.payload),
+                pressure=self.pressure(),
+                allowed_rounds=1,
+                requested_rounds=1,
+            )
+        except Exception:
+            advice = {"defer_background": True}
+        priority = 10 if advice.get("defer_background") is True else 50
         kinds = [
             IdleWorkKind.CACHE_CLEANUP,
             IdleWorkKind.LEARNER_SNAPSHOT,
@@ -354,18 +404,23 @@ class RuntimeOptimizationControl:
         if self._maintenance.policy.augmentation_enabled:
             kinds.append(IdleWorkKind.ELIGIBLE_AUGMENTATION)
         for kind in kinds:
-            material = {"tenant": tenant, "kind": kind.value, "bucket": bucket}
+            material = {
+                "tenant": tenant,
+                "learning_scope": learning_scope,
+                "kind": kind.value,
+                "bucket": bucket,
+            }
             self._maintenance.enqueue(
                 kind=kind,
                 scope_id=self._maintenance_scope(tenant),
                 source_digest=_digest(material),
                 idempotency_key=_digest(material),
-                payload={"tenant_id": tenant},
+                payload={"tenant_id": tenant, "learning_scope_id": learning_scope},
                 priority=priority,
             )
         with self._activity_lock:
-            self._enqueued_buckets[tenant] = bucket
-            self._enqueued_buckets.move_to_end(tenant)
+            self._enqueued_buckets[bucket_key] = bucket
+            self._enqueued_buckets.move_to_end(bucket_key)
             while len(self._enqueued_buckets) > 256:
                 self._enqueued_buckets.popitem(last=False)
 
@@ -477,6 +532,19 @@ class RuntimeOptimizationControl:
             "state": "degraded" if self._maintenance_coordination_error else "observed",
             "error_code": self._maintenance_coordination_error,
         }
+        execution: dict[str, Any] = {"available": False}
+        if self._supervision_probe is not None:
+            try:
+                observed = self._supervision_probe()
+                execution = {
+                    "available": True,
+                    "active_executions": observed["active_task_count"],
+                    "active_lifecycle_leases": observed["active_lease_count"],
+                    "faulted": observed["faulted"],
+                    "recovery": dict(observed["recovery"]),
+                }
+            except Exception as exc:
+                execution = {"available": False, "error_code": type(exc).__name__}
         return {
             "schema_version": SCHEMA_VERSION,
             "actor_id": actor_id,
@@ -492,6 +560,7 @@ class RuntimeOptimizationControl:
             "serving": serving,
             "learning": learning,
             "maintenance": maintenance,
+            "execution": execution,
             "ratchet": {
                 "available": False,
                 "reason": "campaign_owned_observatory",
@@ -614,6 +683,38 @@ class RuntimeOptimizationControl:
             except Exception as exc:
                 self._maintenance_coordination_error = type(exc).__name__
                 raise
+
+    def retry_maintenance(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        task_id: str,
+        source_digest: str,
+        expected_attempts: int,
+    ) -> dict[str, Any]:
+        _identity(actor_id, "actor_id")
+        _identity(tenant_id, "tenant_id")
+        self._learning_partition(task_id)
+        self._learning_partition(source_digest)
+        if type(expected_attempts) is not int or not 0 <= expected_attempts <= 1_000_000:
+            raise ValueError("maintenance retry requires the observed attempt count")
+        if self._maintenance is None or self._closed or self._maintenance_coordination_error:
+            raise ValueError("maintenance coordination must be available before retry")
+        result = self._maintenance.retry_failed(
+            task_id=task_id,
+            scope_id=self._maintenance_scope(tenant_id),
+            source_digest=source_digest,
+            expected_attempts=expected_attempts,
+        )
+        return {
+            "schema_version": "skeleton.ai.runtime_maintenance_retry.v1",
+            "actor_id": actor_id,
+            "tenant_id": tenant_id,
+            "task_id": task_id,
+            "result": result,
+            "runtime": self.snapshot(actor_id=actor_id, tenant_id=tenant_id),
+        }
 
     @staticmethod
     def _learning_partition(partition_id: str) -> str:

@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "f73b278a1736a538ec09ee7b65889b2b2231695c",
+      "source_git_object_sha": "715acad6429a17aae4c3d0befe9b7b4a81df2e73",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "f73b278a1736a538ec09ee7b65889b2b2231695c",
+      "source_git_object_sha": "715acad6429a17aae4c3d0befe9b7b4a81df2e73",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -130,7 +130,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "311384edd079433ad8eb1917367288c46ca6b7cc",
+      "source_git_object_sha": "3f037543f8421c7328975c586dae107f43ef7af9",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "73f7c8a0308d59465bc3e4333077334d25f99166",
+      "source_git_object_sha": "1f669acfb66d2bf24f2085110f038ada5715b9cc",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -398,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "8f825d931a97903cccdce7e765f4028f812ceaff",
+      "source_git_object_sha": "a4e0f56747aea6b69a0c820569f07f10bc67135f",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "2b03ae357bb6739156b22f26f995ab52cb4e5eed",
+      "source_git_object_sha": "26f32765baebd79e63ee8bc4c9697a255c7a4c1f",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "701dcaa9b1a7b79b5ec3ad8c4df2c32668db90aa",
+      "source_git_object_sha": "e97ecd56a951cc270919dacd27bd9a832c41cf50",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1269,7 +1269,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "e41db4d8117306e8ccd952e730da50847f9a3bb4",
+      "source_git_object_sha": "97e5331920e7fad1ee5ea5a889f8cc3ec9b6d5e2",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1499,7 +1499,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "b919869f2a1b22c90c2e2c85b01c2325dacf819a",
+      "source_git_object_sha": "477f1f576cab1ec2912617242c9563189f981680",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1578,7 +1578,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "76a3e625fb642fc9107b1dab73c360ac50248a57",
+      "source_git_object_sha": "8be3b1a2d58d143f2e22f5e2e9a80ebbae1fb06d",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -2091,7 +2091,7 @@
       "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "73d773eca32320c058c5e1853c9799872538ef62",
+      "source_git_object_sha": "723a68a7e23728a8ceb3fb91494020ffaf9b50de",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -5449,7 +5449,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "a838c6ebb3df89af889f467fbcc5d6b1789e43a3",
+      "source_git_object_sha": "012df9616bf368f5aabfc5b82a50f20596ea0538",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"
@@ -10333,5 +10333,34 @@
         "VOL-006"
       ]
     }
-  ]
+  ],
+  "runtime_assembly_continuation": {
+    "status": "implementation_candidate",
+    "owner_policy": "Existing canonical owners, migration facades and parity rules remain authoritative; no import cutover or enterprise qualification follows from this continuation.",
+    "construction": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.working_order_continuation",
+    "active_paths": [
+      "skeleton/ai/runtime/inference",
+      "skeleton/intelligence/runtime_control.py",
+      "skeleton/persistence/execution_repository.py",
+      "skeleton/jeeves/ai/studio_maintenance.py",
+      "backend/core/game_studio_agent.py",
+      "frontend/src/features/Jeeves",
+      "scripts/configure_ai_chat.py"
+    ],
+    "source_metadata": "Affected current-branch canonical source-object identities reference the staged implementation tree. Historical signatures and qualification state are preserved; no import cutover or verification signature is created.",
+    "refreshed_source_mappings": [
+      "AIFT-PROVIDER-RUNTIME",
+      "AIFT-PROVIDER-RUNTIME-LEGACY-ALIAS",
+      "AIFT-CONTRACTS",
+      "AIFT-PERSISTENCE",
+      "AIFT-INTELLIGENCE",
+      "AIFT-JEEVES",
+      "AIFT-ENGINE-API",
+      "AIFT-LEARNING",
+      "AIFT-FORGE",
+      "AIFT-CORTEX",
+      "AIFT-MESH",
+      "AIFT-DISTRIBUTED"
+    ]
+  }
 }

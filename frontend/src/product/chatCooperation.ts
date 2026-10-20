@@ -11,6 +11,7 @@ export type ChatCooperationModel = {
   id: string; provider_id: string; model_id: string; label: string; available: boolean; selectable: boolean;
   credential_free: boolean; capabilities: readonly string[]; context_window?: number | null;
   max_output_tokens?: number | null; readiness?: { message?: string } | null;
+  activation?: Record<string, unknown> | null;
 };
 export const COOPERATION_ROLES: readonly { role: ChatCooperationRole; label: string }[] = [
   { role: 'plan', label: 'Planning' }, { role: 'draft', label: 'Drafting' },

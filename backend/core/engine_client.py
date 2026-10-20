@@ -1711,6 +1711,48 @@ class EngineClient:
         )
         return self._runtime_control_state(payload, actor_id=actor, tenant_id=tenant)
 
+    async def retry_runtime_maintenance(
+        self, *, actor_id: str, tenant_id: str, task_id: str,
+        source_digest: str, expected_attempts: int, trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Queue one exact failed task through its existing scoped owner.
+
+        A request is forwarded once. Queue admission preserves the source and
+        attempt counter; the ordinary maintenance grants still own execution.
+        """
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        task = _text(task_id, "task_id", maximum=64)
+        source = _text(source_digest, "source_digest", maximum=64)
+        if re.fullmatch(r"[0-9a-f]{64}", task) is None or re.fullmatch(r"[0-9a-f]{64}", source) is None:
+            raise EngineProtocolError("runtime maintenance task or source identity is invalid")
+        if type(expected_attempts) is not int or not 0 <= expected_attempts <= 1_000_000:
+            raise EngineProtocolError("runtime maintenance attempts must be in [0, 1000000]")
+        payload = await self._request(
+            "POST", "/runtime-control/maintenance/tasks/" + task + "/retry",
+            json_body={"actor_id": actor, "tenant_id": tenant,
+                "source_digest": source, "expected_attempts": expected_attempts},
+            trace_id=trace_id, max_response_bytes=384 * 1024,
+            surface_validation_rejection=True,
+        )
+        if (payload.get("schema_version") != "skeleton.ai.runtime_maintenance_retry.v1"
+            or payload.get("actor_id") != actor or payload.get("tenant_id") != tenant
+            or payload.get("task_id") != task or not isinstance(payload.get("result"), Mapping)
+            or not isinstance(payload.get("runtime"), Mapping)):
+            raise EngineProtocolError("runtime maintenance retry identity or receipt is incomplete")
+        result = payload["result"]
+        if (result.get("task_id") != task or result.get("source_digest") != source
+            or not isinstance(result.get("state"), str) or result["state"] not in {"ready", "retry_wait"}
+            or type(result.get("attempts")) is not int or result["attempts"] != expected_attempts
+            or type(result.get("deduplicated")) is not bool):
+            raise EngineProtocolError("runtime maintenance retry differs from the exact queued task")
+        self._runtime_control_state(payload["runtime"], actor_id=actor, tenant_id=tenant)
+        try:
+            json.dumps(payload, allow_nan=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise EngineProtocolError("runtime maintenance retry must be finite JSON") from exc
+        return dict(payload)
+
     @staticmethod
     def _learning_checkpoint_identity(
         payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,

@@ -43,6 +43,9 @@ DEFAULT_POLICY: dict[str, Any] = {
     "pressure_threshold": 0.8,
     "uncertainty_ceiling": 0.45,
     "partition_limit": 32,
+    "retained_outcomes": 10000,
+    "outcome_max_age_days": 90,
+    "maintenance_receipt_retention": 2048,
 }
 
 
@@ -102,6 +105,8 @@ def normalize_policy(value: Mapping[str, Any] | None = None) -> dict[str, Any]:
     for name, low, high in (
         ("min_samples", 4, 10000), ("replay_capacity", 8, 256),
         ("replay_steps", 0, 3), ("max_effort_rounds", 1, 3), ("partition_limit", 1, 128),
+        ("retained_outcomes", 128, 100000), ("outcome_max_age_days", 1, 3650),
+        ("maintenance_receipt_retention", 16, 100000),
     ):
         policy[name] = _integer(policy[name], name, low, high)
     for name, low, high in (
@@ -324,6 +329,14 @@ def _optimizer_checkpoint(state: Mapping[str, Any]) -> dict[str, Any]:
 def upgrade_state(state: dict[str, Any]) -> dict[str, Any]:
     """Lazily upgrade finite legacy weights without inventing past confidence."""
     if state.get("controller_version") == CONTROLLER_VERSION:
+        if "idle_replay_budget" not in state:
+            state["idle_replay_budget"] = 0
+            if _mapping(state.get("optimizer_cost")).get("maintenance_updates", 0):
+                # Older controllers could replay indefinitely between real
+                # outcomes. Their last residual does not certify those weights.
+                state["fresh_observations"] = 0
+                state["prequential"]["drift_active"] = True
+                state["prequential"]["cooldown_remaining"] = max(16, state["prequential"]["cooldown_remaining"])
         return state
     if "controller_version" in state:
         raise RuntimeLearningError("controller state version differs")
@@ -337,6 +350,7 @@ def upgrade_state(state: dict[str, Any]) -> dict[str, Any]:
             "total_updates": int(_mapping(state.get("optimizer")).get("step", 0)),
             "deferred_replay_updates": 0, "rollbacks": 0},
         "last_rollback": None,
+        "idle_replay_budget": 0,
     })
     state["last_healthy"] = _optimizer_checkpoint(state)
     return state
@@ -388,6 +402,7 @@ def validate_state(value: object, *, replay_capacity: int = 256) -> dict[str, An
         "residual_ema", "replay", "quarantined", "quarantine", "controller_version", "generation",
         "fresh_observations", "lifetime_observations", "prequential", "recent_replay", "provenance",
         "optimizer_cost", "last_rollback", "last_healthy", "recovery", "last_operator_action",
+        "idle_replay_budget",
     }
     if set(value) - allowed_fields:
         raise RuntimeLearningError("optimizer state fields differ")
@@ -424,6 +439,8 @@ def validate_state(value: object, *, replay_capacity: int = 256) -> dict[str, An
         raise RuntimeLearningError("controller state version differs")
     for name in ("generation", "fresh_observations", "lifetime_observations"):
         _integer(value.get(name), name, 0, MAX_COUNTER)
+    if "idle_replay_budget" in value:
+        _integer(value["idle_replay_budget"], "idle_replay_budget", 0, 3)
     prequential = _mapping(value.get("prequential"))
     if set(prequential) != set(_new_prequential()):
         raise RuntimeLearningError("prequential fields differ")
@@ -632,6 +649,7 @@ def restore_last_healthy(state: dict[str, Any], *, reason: str, policy: Mapping[
     state["optimizer"] = copy.deepcopy(checkpoint["optimizer"])
     state["quarantined"], state["quarantine"] = False, None
     state["fresh_observations"] = 0
+    state["idle_replay_budget"] = 0
     state["prequential"] = _new_prequential()
     state["prequential"].update({"drift_active": True, "cooldown_remaining": max(16, policy["min_samples"])})
     _increment(state, "generation")
@@ -665,6 +683,7 @@ def reset_confidence(state: dict[str, Any], *, reason: str, policy: Mapping[str,
     validate_state(state)
     upgrade_state(state)
     state["fresh_observations"] = 0
+    state["idle_replay_budget"] = 0
     state["prequential"] = _new_prequential()
     state["prequential"].update({"drift_active": True, "cooldown_remaining": max(16, policy["min_samples"])})
     state["residual_ema"] = [0.25, 0.25, 0.25]
@@ -768,6 +787,7 @@ def learn_outcome(state: dict[str, Any] | None, observation: Mapping[str, Any], 
     requested_replays = min(int(policy["replay_steps"]), len(replay) + len(state["recent_replay"]))
     replay_steps = 0 if sample["features"][8] >= policy["pressure_threshold"] else min(1 if state["prequential"]["drift_active"] else 3, requested_replays)
     _increment(costs, "deferred_replay_updates", requested_replays - replay_steps)
+    state["idle_replay_budget"] = min(3, int(state["idle_replay_budget"]) + requested_replays - replay_steps)
     for index in range(replay_steps):
         replay_sample = _replay_sample(state, index, recent_only=state["prequential"]["drift_active"])
         if replay_sample is not None:
@@ -802,12 +822,13 @@ def replay_maintenance(state: dict[str, Any], policy: Mapping[str, Any], *, max_
     upgrade_state(state)
     max_updates = _integer(max_updates, "max_updates", 0, 4)
     if policy["enabled"] and not state["quarantined"]:
-        for index in range(min(max_updates, len(state["replay"]) + len(state["recent_replay"]))):
+        for index in range(min(max_updates, state["idle_replay_budget"], len(state["replay"]) + len(state["recent_replay"]))):
             sample = _replay_sample(state, index, recent_only=state["prequential"]["drift_active"])
             if sample is not None:
                 _optimize(state, sample, policy)
                 _increment(state["optimizer_cost"], "maintenance_updates")
                 _increment(state["optimizer_cost"], "total_updates")
+                state["idle_replay_budget"] -= 1
     validate_state(state)
     return state
 
@@ -861,6 +882,7 @@ def state_readiness(state: Mapping[str, Any], policy: Mapping[str, Any], *, sour
                 "latest_source_samples": 0 if known_source is None else known_source["observations"],
                 "recent_source_count": len(provenance["recent_sources"]), "source_switches": provenance["source_switches"]},
             "optimizer_cost": dict(state["optimizer_cost"]),
+            "deferred_replay_budget": state["idle_replay_budget"],
             "replay_samples": len(state["replay"]) + len(state["recent_replay"])}
 
 

@@ -23,6 +23,10 @@ export type RuntimeServingState = {
   fairness?: { active_tenants?: number; queued_tenants?: number; largest_tenant_active?: number; largest_tenant_queued?: number; rotations?: number; aged_background_admissions?: number; tenant_limit_rejections?: number; memory_shed_rejections?: number; load_shed_rejections?: number; oldest_interactive_wait_ms?: number; oldest_background_wait_ms?: number; max_observed_queue_wait_ms?: number };
   draining?: boolean;
 };
+export type RuntimeMaintenanceTask = {
+  task_id?: string; kind?: string; state?: string; attempts?: number; failures?: number; updated_at_ns?: number;
+  source_digest?: string; retryable?: boolean; retry_reason?: string | null;
+};
 export type RuntimeControlState = {
   schema_version: 'skeleton.ai.runtime_control.v1';
   policy_version: number;
@@ -44,12 +48,18 @@ export type RuntimeControlState = {
     policy?: { enabled?: boolean; augmentation_enabled?: boolean };
     status?: { state?: string; active_tasks?: number; foreground_requests?: number; last_run_ns?: number | null; next_run_ns?: number | null; last_reason?: string; coordination_state?: 'synchronized' | 'unavailable'; coordination_error?: string | null };
     queued_tasks?: number;
-    recent_tasks?: { task_id?: string; kind?: string; state?: string; attempts?: number; failures?: number; updated_at_ns?: number }[];
+    recent_tasks?: RuntimeMaintenanceTask[];
     ownership?: { owner_id?: string; host_id?: string; state?: string; heartbeat_ns?: number; foreground_requests?: number; physical_tasks?: number };
     leases?: { resource_id?: string; scope_id?: string; owner_id?: string; fencing_token?: number; state?: string; heartbeat_ns?: number; lease_until_ns?: number; drained_at_ns?: number | null }[];
     recovery?: { blocked_tasks?: number; clock_jump_count?: number; last_clock_jump_reason?: string | null };
     coordination?: { state?: 'observed' | 'degraded'; error_code?: string | null };
     quiescence?: { host_foreground_requests?: number; registered_host_owners?: number; observation?: string };
+    chunk_results?: { retained?: number; reserved?: number; reusable_unverified?: number; shared_retained?: number; maximum?: number; backpressure?: boolean };
+    acknowledgements?: { pending?: number; failed_attempts?: number; next_retry_ns?: number | null; last_error?: string | null; callback_available?: boolean };
+  };
+  execution?: {
+    available?: boolean; active_executions?: number; active_lifecycle_leases?: number; faulted?: boolean;
+    recovery?: { maximum_recovery_drivers?: number; page_limit?: number; scan_in_progress?: boolean; scanned?: number; started?: number; last_error?: string | null; driver_failures?: number; driver_finalization_failures?: number; last_driver_error?: string | null };
   };
   ratchet: { available: boolean; baseline?: Fields | null };
 };
@@ -134,12 +144,22 @@ function state(value: unknown, scope: AccountScope): RuntimeControlState {
   if (value.learning.totals !== undefined && value.learning.totals !== null && !object(value.learning.totals) || value.learning.partitions !== undefined && !Array.isArray(value.learning.partitions)
     || value.maintenance.status !== undefined && !object(value.maintenance.status) || value.maintenance.recent_tasks !== undefined && !Array.isArray(value.maintenance.recent_tasks)) invalid('The learning or maintenance observation is invalid.');
   if (Array.isArray(value.learning.partitions) && value.learning.partitions.some(row => !object(row)) || Array.isArray(value.maintenance.recent_tasks) && value.maintenance.recent_tasks.some(row => !object(row))) invalid('The runtime observation contains an invalid record.');
+  if (Array.isArray(value.maintenance.recent_tasks)) for (const row of value.maintenance.recent_tasks as Fields[]) {
+    if (row.retryable !== undefined && typeof row.retryable !== 'boolean' || row.retry_reason != null && (typeof row.retry_reason !== 'string' || row.retry_reason.length > 512)) invalid('Maintenance retry eligibility is invalid.');
+    if (row.retryable === true && (!HASH.test(String(row.task_id)) || !HASH.test(String(row.source_digest)) || !Number.isSafeInteger(row.attempts) || Number(row.attempts) < 0 || Number(row.attempts) > 1000000)) invalid('The eligible maintenance retry lacks an exact task, source or attempt binding.');
+  }
+  if (value.execution !== undefined) {
+    if (!object(value.execution)) invalid('The execution recovery observation is invalid.');
+    for (const key of ['available', 'faulted']) if (value.execution[key] !== undefined && typeof value.execution[key] !== 'boolean') invalid('The execution supervisor flags are invalid.');
+    for (const key of ['active_executions', 'active_lifecycle_leases']) if (value.execution[key] !== undefined && (!Number.isSafeInteger(value.execution[key]) || Number(value.execution[key]) < 0)) invalid('The execution supervisor counters are invalid.');
+    if (value.execution.recovery !== undefined && !object(value.execution.recovery)) invalid('The execution recovery counters are invalid.');
+  }
   if (Array.isArray(value.learning.partitions)) for (const row of value.learning.partitions as Fields[]) {
     if (row.confidence_reasons !== undefined && (!Array.isArray(row.confidence_reasons) || row.confidence_reasons.length > 32 || row.confidence_reasons.some(reason => typeof reason !== 'string' || reason.length > 160))) invalid('Learner confidence constraints are invalid.');
     for (const key of ['drift', 'last_healthy', 'source_provenance', 'optimizer_cost']) if (row[key] !== undefined && !object(row[key])) invalid('A learner observation contains invalid diagnostic state.');
   }
   if (value.maintenance.leases !== undefined && (!Array.isArray(value.maintenance.leases) || value.maintenance.leases.some(row => !object(row)))) invalid('The maintenance lease observation is invalid.');
-  for (const key of ['ownership', 'recovery', 'coordination', 'quiescence']) if (value.maintenance[key] !== undefined && !object(value.maintenance[key])) invalid('The maintenance ownership observation is invalid.');
+  for (const key of ['ownership', 'recovery', 'coordination', 'quiescence', 'chunk_results', 'acknowledgements']) if (value.maintenance[key] !== undefined && !object(value.maintenance[key])) invalid('The maintenance ownership observation is invalid.');
   if (value.serving.models !== undefined) {
     if (!Array.isArray(value.serving.models) || value.serving.models.length > 8) invalid('The local serving catalog exceeds its supported bounds.');
     const routes = new Set<string>();
@@ -187,11 +207,11 @@ function partitionBinding(observed: RuntimeControlObservation, partition: Runtim
 export function canManageRuntimePartition(observed: RuntimeControlObservation, partition: RuntimeLearningPartition): boolean {
   try { partitionBinding(observed, partition); return true; } catch { return false; }
 }
-async function adminAccount(observed: RuntimeControlObservation, signal?: AbortSignal): Promise<AccountScope> {
+async function adminAccount(observed: RuntimeControlObservation, signal?: AbortSignal, purpose = 'manage learner checkpoints'): Promise<AccountScope> {
   current(observed.scope.token, signal);
   const scope = await account(signal, observed.scope);
-  if (scope.role !== 'admin') throw new ChatClientError('An administrator account is required to manage learner checkpoints.', { kind: 'authorization', retryable: false });
-  if (Date.now() - observed.observedAt > 60000) throw new ChatClientError('The learner observation is stale. Refresh before managing its checkpoint.', { kind: 'conflict', code: 'runtime_observation_stale', retryable: false });
+  if (scope.role !== 'admin') throw new ChatClientError(`An administrator account is required to ${purpose}.`, { kind: 'authorization', retryable: false });
+  if (Date.now() - observed.observedAt > 60000) throw new ChatClientError('The runtime observation is stale. Refresh before continuing.', { kind: 'conflict', code: 'runtime_observation_stale', retryable: false });
   return scope;
 }
 
@@ -246,4 +266,20 @@ export async function changeRuntimePartition(observed: RuntimeControlObservation
   if (runtime.policy_version < Number(receipt.version)) invalid('The runtime observation precedes the learner action receipt. Refresh current state.');
   if (result.partition !== undefined && (!object(result.partition) || result.partition.partition_id !== binding.partitionId || result.partition.model_selection_digest !== binding.modelDigest || result.partition.state_version !== mutation.state_version)) invalid('The learner action result disagrees with its immutable audit receipt.');
   return { observation: { state: runtime, scope, observedAt: Date.now() }, receipt };
+}
+
+export async function retryRuntimeMaintenanceTask(observed: RuntimeControlObservation, task: RuntimeMaintenanceTask, signal?: AbortSignal): Promise<{ observation: RuntimeControlObservation; result: { task_id: string; source_digest: string; state: 'ready' | 'retry_wait'; attempts: number; deduplicated: boolean } }> {
+  const maintenance = observed.state.maintenance;
+  const found = maintenance.recent_tasks?.find(row => row.task_id === task.task_id);
+  if (maintenance.available !== true || maintenance.coordination?.state !== 'observed' || maintenance.status?.coordination_state !== 'synchronized') throw new ChatClientError('Healthy maintenance coordination must be observed before retrying a task. Refresh current state.', { kind: 'unavailable', retryable: false });
+  if (!found || task.retryable !== true || found.retryable !== true || !HASH.test(String(task.task_id)) || !HASH.test(String(task.source_digest))
+    || found.source_digest !== task.source_digest || found.attempts !== task.attempts || !Number.isSafeInteger(task.attempts) || Number(task.attempts) < 0 || Number(task.attempts) > 1000000) throw new ChatClientError('The failed maintenance task or its attempt binding is stale. Refresh current state before retrying.', { kind: 'conflict', code: 'runtime_maintenance_task_changed', retryable: false });
+  const scope = await adminAccount(observed, signal, 'retry failed maintenance tasks');
+  const result = await read(api.post<unknown>(`${ROOT}/maintenance/tasks/${encodeURIComponent(task.task_id!)}/retry`, {
+    source_digest: task.source_digest, expected_attempts: task.attempts,
+  }, { ...OPTIONS, maxResponseChars: 384 * 1024, signal, headers: authHeaders() }), scope.token, signal);
+  if (!object(result) || result.schema_version !== 'skeleton.ai.runtime_maintenance_retry.v1' || result.actor_id !== scope.principalId || result.tenant_id !== scope.tenantId || result.task_id !== task.task_id || !object(result.result)) invalid('The maintenance retry does not match the authorized account and task.');
+  const retry = result.result;
+  if (retry.task_id !== task.task_id || retry.source_digest !== task.source_digest || retry.attempts !== task.attempts || !['ready', 'retry_wait'].includes(String(retry.state)) || typeof retry.deduplicated !== 'boolean') invalid('The maintenance retry result does not bind the requested source and attempt count. Refresh current state before continuing.');
+  return { observation: { state: state(result.runtime, scope), scope, observedAt: Date.now() }, result: retry as { task_id: string; source_digest: string; state: 'ready' | 'retry_wait'; attempts: number; deduplicated: boolean } };
 }

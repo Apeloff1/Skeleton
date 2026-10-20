@@ -115,6 +115,14 @@ class EngineLearningCheckpointUpdate(BaseModel):
         return self
 
 
+class EngineMaintenanceRetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    expected_attempts: int = Field(ge=0, le=1_000_000)
+
+
 class EngineImageGenerateBody(BaseModel):
     actor_id: str = Field(min_length=1, max_length=512)
     tenant_id: str = Field(min_length=1, max_length=512)
@@ -337,6 +345,7 @@ def providers(
         "limits_source", "tokenizer", "supports_temperature", "artifact",
         "model_family", "protocol_capabilities", "generation_limits",
         "model_digest", "runtime_digest", "execution_profile_digest", "capacity", "runtime",
+        "semantic_verifier_configured", "semantic_verifier_route",
     )
     rows = [{key: value[key] for key in fields if key in value} for value in registry.statuses()]
     artifact_fields = (
@@ -351,11 +360,21 @@ def providers(
             row["artifact"] = {
                 key: artifact[key] for key in artifact_fields if key in artifact
             }
+        runtime = row.get("runtime")
+        serving = runtime.get("serving") if isinstance(runtime, dict) else None
+        if isinstance(serving, dict) and isinstance(serving.get("capacity"), dict):
+            row["serving_state"] = {
+                "draining": serving["draining"],
+                "active": runtime["active"],
+                "queued": runtime["queued"],
+                "effective_concurrency": serving["capacity"]["effective_concurrency"],
+            }
         for field, allowed in {
             "generation_limits": (
                 "context_window", "max_output_tokens", "max_total_tokens", "shared_context",
                 "tokenizer", "limits_source",
                 "tokenizer_max_chars", "tokenizer_max_tokens",
+                "max_output_utf8_bytes",
             ),
             "capacity": ("max_concurrency", "max_batch_size", "max_queue_size", "cache_entries"),
             "runtime": ("active", "queued", "completed", "failed", "cancelled", "overloaded", "cache_hits", "cache_entries"),
@@ -460,6 +479,24 @@ def export_runtime_learning_checkpoint(
         return coordinator.runtime_control.export_learning_checkpoint(
             actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
             expected_state_version=expected_state_version,
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
+def retry_runtime_maintenance(
+    request: Request, task_id: str, body: EngineMaintenanceRetry,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.retry_maintenance(
+            task_id=task_id, **body.model_dump(),
         )
     except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
         _raise_engine_error(exc)

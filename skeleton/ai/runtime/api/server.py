@@ -815,22 +815,35 @@ class ServerState:
                 self.governance_lifecycle_executor
             ),
         )
-        provider_registry = ProviderRegistry.from_env(
-            admission_runtime=provider_admission_runtime,
-            retain_unavailable=True,
-        )
-        coordinator = EngineExecutionCoordinator(
-            service,
-            provider_registry=provider_registry,
-            finalization_binding_hook=(
-                self.bind_verified_memory_finalization
-            ),
-            lifecycle=runtime_lifecycle,
-            tool_runtime=build_engine_tool_runtime(
-                admission_runtime=execution_admission_runtime,
-                receipt_store=receipt_store,
-            ),
-        )
+        try:
+            coordinator = EngineExecutionCoordinator(
+                service,
+                # Acquire exclusive execution custody before activating model
+                # graphs, so a duplicate worker cannot allocate another catalog.
+                provider_registry_factory=lambda: ProviderRegistry.from_env(
+                    admission_runtime=provider_admission_runtime,
+                    retain_unavailable=True,
+                ),
+                finalization_binding_hook=(
+                    self.bind_verified_memory_finalization
+                ),
+                lifecycle=runtime_lifecycle,
+                tool_runtime=build_engine_tool_runtime(
+                    admission_runtime=execution_admission_runtime,
+                    receipt_store=receipt_store,
+                ),
+            )
+        except BaseException:
+            # These handles have not yet transferred into AppState ownership.
+            # Preserve the original startup error while closing local resources.
+            for owner in (receipt_store, pressure_ledger, quota_ledger, submissions, repository):
+                closer = getattr(owner, "close", None)
+                if callable(closer):
+                    try:
+                        closer()
+                    except Exception:
+                        pass
+            raise
         self.engine_execution_service = service
         self.engine_execution_coordinator = coordinator
         self.engine_tool_receipt_store = receipt_store

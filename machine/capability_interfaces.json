@@ -433,7 +433,8 @@
         "child budget/authority/depth tests",
         "interactive interrupt/replace tests"
       ],
-      "status": "present"
+      "status": "present",
+      "working_order_continuation": "Existing admin runtime control adds scoped failed-maintenance retry under exact source/attempt custody guards, aggregate execution recovery status and bounded retention diagnostics. Same engine/provider/store owners; no implicit replay, model promotion or authority transfer."
     },
     {
       "id": "runtime_dependency:application-api->retrieval",

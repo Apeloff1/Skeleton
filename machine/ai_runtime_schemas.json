@@ -2485,6 +2485,39 @@
         "state CAS, policy CAS, optimizer mutation and immutable audit receipt commit atomically",
         "import/reset/restore cannot transfer production model or verification authority; fresh canonical outcomes required for confidence"
       ]
+    },
+    "RuntimeMaintenanceRetry": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "actor_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "task_id": {
+          "type": "Digest256"
+        },
+        "source_digest": {
+          "type": "Digest256"
+        },
+        "expected_attempts": {
+          "type": "NonNegativeInt",
+          "maximum": 1000000
+        }
+      },
+      "invariants": [
+        "administrator plus sealed engine runtime-control grant required",
+        "task scope derives from authenticated tenant; task/source/attempt binding must match current queue record",
+        "only failed tasks with unchanged handler and released/proven-drained physical custody may be requeued",
+        "continuation id and monotonic attempts remain unchanged; ordinary idle admission still controls execution",
+        "retry is an explicit queue-only operation with existing durable owner audit, no global policy CAS or automatic effect replay claim"
+      ]
     }
   },
   "cross_record_invariants": [

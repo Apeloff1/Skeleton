@@ -29,7 +29,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from skeleton.compat.datetime_utc import UTC
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict
 
 from skeleton.provider_runtime import (
     ProviderAdapter,
@@ -672,6 +672,11 @@ class _ServingTicket:
     memory_wait_observed: bool = False
 
 
+class _BatchLimits(TypedDict):
+    max_batch_size: int
+    max_batch_tokens: int | None
+
+
 @dataclass(frozen=True, slots=True)
 class _CachedInference:
     result: LocalInferenceResult
@@ -1123,8 +1128,27 @@ class LocalInferenceEngine:
             return 0
         return maximum // 2 if self._serving.level == "elevated" else maximum
 
+    def batch_limits(self) -> _BatchLimits:
+        """Intersect operator batch policy with the activated native runtime."""
+        native = getattr(getattr(self.model, "runtime", None), "limits", None)
+        maximum = getattr(native, "max_batch_size", None)
+        tokens = getattr(native, "max_batch_tokens", None)
+        for name, value in (("max_batch_size", maximum), ("max_batch_tokens", tokens)):
+            if value is not None and (type(value) is not int or value < 1):
+                raise ProviderPolicyError("activated local " + name + " is invalid")
+        return {
+            "max_batch_size": self.max_batch_size if maximum is None else min(self.max_batch_size, maximum),
+            "max_batch_tokens": tokens,
+        }
+
     def snapshot(self) -> dict[str, Any]:
         """Return bounded operational counts without prompts or model output."""
+        memory_source = getattr(self.model, "memory_estimate_source", None)
+        if not isinstance(memory_source, str) or memory_source not in {
+            "gguf_process_weights_scratch_and_kv", "gguf_process_weights_scratch_kv_unknown",
+        }:
+            memory_source = "native_kv_upper_bound_when_available"
+        batch_limits = self.batch_limits()
         with self._capacity_lock:
             now = time.monotonic()
             self._sample_pressure_locked(now)
@@ -1161,6 +1185,8 @@ class LocalInferenceEngine:
                     "effective_queue_limit": self._effective_queue_limit_locked(),
                     "reserved_memory_bytes": self._reserved_memory_bytes,
                     "memory_estimated_active": sum(bool(item.estimated_memory_bytes) for item in self._running.values()),
+                    "effective_max_batch_size": batch_limits["max_batch_size"],
+                    "effective_max_batch_tokens": batch_limits["max_batch_tokens"],
                 },
                 "pressure": self._serving.pressure_snapshot(),
                 "fairness": {
@@ -1189,7 +1215,7 @@ class LocalInferenceEngine:
                     "max_observed_queue_wait_ms": self._max_queue_wait_ms,
                     "memory_shedding": self._memory_shedding_locked(),
                     "memory_headroom_waits": self._memory_headroom_waits,
-                    "memory_estimate_source": "native_kv_upper_bound_when_available",
+                    "memory_estimate_source": memory_source,
                     "background_starvation_seconds": self._background_starvation_seconds_locked(),
                     "foreground_grants_between_background": 3,
                 },
@@ -1213,6 +1239,29 @@ class LocalInferenceEngine:
                 "largest_tenant_singleflight_waiters": max(self._singleflight_tenants.values(), default=0),
             }
         snapshot["serving"] = serving
+        describe_backend = getattr(self.model, "execution_snapshot", None)
+        if callable(describe_backend):
+            backend = describe_backend()
+            if not isinstance(backend, Mapping):
+                raise ValueError("local backend execution snapshot must be an object")
+            admitted: dict[str, Any] = {}
+            kind = backend.get("kind")
+            if isinstance(kind, str) and kind in {"llama_cpp_cli", "native_runtime", "native_transformer"}:
+                admitted["kind"] = kind
+            for name in (
+                "active_processes", "draining_processes", "spawning_processes", "processes_started",
+                "processes_exited", "termination_requests", "trained_context_tokens",
+            ):
+                value = backend.get(name)
+                if value is None or (type(value) is int and 0 <= value < 2**63):
+                    admitted[name] = value
+            for name in ("trained_context_known", "kv_estimate_available"):
+                if type(backend.get(name)) is bool:
+                    admitted[name] = backend[name]
+            source = backend.get("memory_estimate_source")
+            if isinstance(source, str) and source in {"gguf_process_weights_scratch_and_kv", "gguf_process_weights_scratch_kv_unknown"}:
+                admitted["memory_estimate_source"] = source
+            snapshot["backend"] = admitted
         return snapshot
 
     def configure_serving(self, policy: Mapping[str, Any]) -> dict[str, Any]:
@@ -1580,6 +1629,12 @@ class LocalInferenceEngine:
         return size
 
     def _request_memory_estimate(self, request: LocalInferenceRequest) -> int:
+        declared = getattr(self.model, "estimate_memory_bytes", None)
+        if callable(declared):
+            size = declared(request)
+            if type(size) is not int or not 0 <= size < 2**63:
+                raise ProviderPolicyError("local backend memory estimate is invalid")
+            return size
         runtime = getattr(self.model, "runtime", None)
         estimate = getattr(runtime, "estimate_kv_bytes", None)
         limits = getattr(runtime, "limits", None)
@@ -1933,10 +1988,28 @@ class LocalInferenceEngine:
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
-        if len(requests) > self.max_batch_size:
+        batch_limits = self.batch_limits()
+        if len(requests) > batch_limits["max_batch_size"]:
             raise ValueError("local inference batch exceeds configured max_batch_size")
         if any(not isinstance(item, LocalInferenceRequest) for item in requests):
             raise TypeError("batch requires LocalInferenceRequest values")
+        maximum_tokens = batch_limits["max_batch_tokens"]
+        if maximum_tokens is not None:
+            count = getattr(self.model, "count_input_tokens", None)
+            if not callable(count):
+                raise ProviderPolicyError("native batch admission requires its activated tokenizer")
+            reserved_tokens = 0
+            for request in requests:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise LocalInferenceCancelled("local batch deadline exceeded before execution")
+                tokens = count(request)
+                if type(tokens) is not int or tokens < 0:
+                    raise ProviderPolicyError("native batch tokenizer returned an invalid count")
+                reserved_tokens += tokens + request.max_output_tokens
+                if reserved_tokens > maximum_tokens:
+                    raise ProviderPolicyError("native batch exceeds its admitted aggregate token limit")
+                # Tokenization is local preflight, before any OS model worker.
+                await asyncio.sleep(0)
         with self._capacity_lock:
             self._sample_pressure_locked(time.monotonic())
             workers = min(
@@ -1993,15 +2066,14 @@ async def _drain_inference_tasks(tasks: Sequence[asyncio.Task]) -> None:
     drained.result()
 
 
-@dataclass(slots=True)
-class _BatchItem:
-    request: LocalInferenceRequest
-    future: asyncio.Future[LocalInferenceResult]
-    task: asyncio.Task[None] | None = None
-
-
 class LocalInferenceScheduler:
-    """Bounded micro-batching queue for local inference requests."""
+    """Loop-bound submission facade using the engine's single fair queue.
+
+    Native work is never staged in a second FIFO ahead of tenant admission.
+    ``batch_window_ms`` remains an accepted legacy configuration value; new
+    work is admitted immediately and explicit batches use bounded engine
+    workers. Closing owns each accepted submission through physical drain.
+    """
 
     def __init__(
         self,
@@ -2010,12 +2082,10 @@ class LocalInferenceScheduler:
         max_batch_size: int = 8,
         batch_window_ms: float = 2.0,
     ) -> None:
-        if (
-            isinstance(max_batch_size, bool)
-            or not isinstance(max_batch_size, int)
-            or not 1 <= max_batch_size <= 256
-        ):
-            raise ValueError("max_batch_size must be in [1, 256]")
+        if not isinstance(engine, LocalInferenceEngine):
+            raise TypeError("engine must be LocalInferenceEngine")
+        if type(max_batch_size) is not int or not 1 <= max_batch_size <= min(256, engine.max_batch_size):
+            raise ValueError("scheduler max_batch_size exceeds engine batch bounds")
         if (
             isinstance(batch_window_ms, bool)
             or not isinstance(batch_window_ms, (int, float))
@@ -2025,103 +2095,109 @@ class LocalInferenceScheduler:
             raise ValueError("batch_window_ms must be in [0, 1000]")
         self.engine = engine
         self.max_batch_size = max_batch_size
-        self.batch_window = batch_window_ms / 1000.0
-        self._queue: asyncio.Queue[_BatchItem | None] = asyncio.Queue(maxsize=max_batch_size * 32)
-        self._worker: asyncio.Task[None] | None = None
-        self._admission_lock = asyncio.Lock()
+        self.batch_window = float(batch_window_ms) / 1000.0
+        self._inflight: set[asyncio.Future[None]] = set()
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._close_task: asyncio.Task[None] | None = None
         self._closed = False
 
-    def _ensure_worker(self) -> None:
-        if self._worker is None or self._worker.done():
-            self._worker = asyncio.create_task(self._run())
+    def _ensure_loop(self) -> asyncio.AbstractEventLoop:
+        loop = asyncio.get_running_loop()
+        if self._loop is None:
+            self._loop = loop
+        elif self._loop is not loop:
+            raise RuntimeError("local inference scheduler cannot cross event loops")
+        return loop
 
-    async def submit(self, request: LocalInferenceRequest) -> LocalInferenceResult:
-        if not isinstance(request, LocalInferenceRequest):
-            raise TypeError("request must be LocalInferenceRequest")
+    def _begin(self) -> asyncio.Future[None]:
+        loop = self._ensure_loop()
         if self._closed:
             raise RuntimeError("local inference scheduler is closed")
-        loop = asyncio.get_running_loop()
-        future: asyncio.Future[LocalInferenceResult] = loop.create_future()
-        item = _BatchItem(request=request, future=future)
+        completed = loop.create_future()
+        self._inflight.add(completed)
+        return completed
+
+    def _finish(self, completed: asyncio.Future[None]) -> None:
+        self._inflight.discard(completed)
+        if not completed.done():
+            completed.set_result(None)
+
+    async def submit(
+        self,
+        request: LocalInferenceRequest,
+        *,
+        work_class: str = "interactive",
+        scope_id: str | None = None,
+        preemption_scope_id: str | None = None,
+        tenant_scope_id: str | None = None,
+        deadline: float | None = None,
+    ) -> LocalInferenceResult:
+        if not isinstance(request, LocalInferenceRequest):
+            raise TypeError("request must be LocalInferenceRequest")
+        completed = self._begin()
         try:
-            # A producer waiting for queue space cannot enqueue after the
-            # shutdown sentinel. Close waits for accepted admission to finish.
-            async with self._admission_lock:
-                if self._closed:
-                    raise RuntimeError("local inference scheduler is closed")
-                self._ensure_worker()
-                await self._queue.put(item)
-            return await future
-        except asyncio.CancelledError:
-            future.cancel()
-            if item.task is not None:
-                item.task.cancel()
-                await _drain_inference_tasks([item.task])
-            raise
+            # Await directly: cancellation remains attached to the engine's
+            # real worker and no scheduler task can hide extra pending work.
+            return await self.engine.generate(
+                request, work_class=work_class, scope_id=scope_id,
+                preemption_scope_id=preemption_scope_id,
+                tenant_scope_id=tenant_scope_id, deadline=deadline,
+            )
+        finally:
+            self._finish(completed)
 
-    async def _execute_item(self, item: _BatchItem) -> None:
+    async def submit_many(
+        self,
+        requests: Sequence[LocalInferenceRequest],
+        *,
+        work_class: str = "interactive",
+        scope_id: str | None = None,
+        preemption_scope_id: str | None = None,
+        tenant_scope_id: str | None = None,
+        deadline: float | None = None,
+    ) -> tuple[LocalInferenceResult, ...]:
+        if len(requests) > self.max_batch_size:
+            raise ValueError("scheduler batch exceeds configured max_batch_size")
+        completed = self._begin()
         try:
-            result = await self.engine.generate(item.request)
-        except asyncio.CancelledError:
-            item.future.cancel()
-            raise
-        except Exception as exc:  # noqa: BLE001 -- forward arbitrary model failures to their owning future
-            if not item.future.done():
-                item.future.set_exception(exc)
-        else:
-            if not item.future.done():
-                item.future.set_result(result)
+            return await self.engine.generate_many(
+                requests, work_class=work_class, scope_id=scope_id,
+                preemption_scope_id=preemption_scope_id,
+                tenant_scope_id=tenant_scope_id, deadline=deadline,
+            )
+        finally:
+            self._finish(completed)
 
-    async def _run(self) -> None:
-        while True:
-            first = await self._queue.get()
-            if first is None:
-                return
-            batch = [first]
-            close_after_batch = False
-            deadline = asyncio.get_running_loop().time() + self.batch_window
-            while len(batch) < self.max_batch_size:
-                remaining = deadline - asyncio.get_running_loop().time()
-                if remaining <= 0:
-                    break
-                try:
-                    item = await asyncio.wait_for(self._queue.get(), remaining)
-                except TimeoutError:
-                    break
-                if item is None:
-                    close_after_batch = True
-                    break
-                batch.append(item)
-
-            active = [item for item in batch if not item.future.cancelled()]
-            if active:
-                for item in active:
-                    item.task = asyncio.create_task(self._execute_item(item))
-                # Each caller owns its result and cancellation. A malformed
-                # request must not fail unrelated requests sharing a batch.
-                await asyncio.gather(*(item.task for item in active), return_exceptions=True)
-            if close_after_batch:
-                return
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "closed": self._closed,
+            "inflight_submissions": len(self._inflight),
+            "max_batch_size": self.max_batch_size,
+            "admission_owner": "local_inference_engine",
+            "batch_mode": "bounded_engine_workers",
+        }
 
     async def close(self) -> None:
+        self._ensure_loop()
         if self._close_task is None:
             self._closed = True
             self._close_task = asyncio.create_task(self._finish_close())
         try:
             await asyncio.shield(self._close_task)
         except asyncio.CancelledError:
-            # Do not interrupt a saturated queue's sentinel insertion, or
-            # expose completed shutdown while native inference is still live.
             await _drain_inference_tasks([self._close_task])
             raise
 
     async def _finish_close(self) -> None:
-        async with self._admission_lock:
-            if self._worker is not None and not self._worker.done():
-                await self._queue.put(None)
-        if self._worker is not None:
-            await self._worker
+        pending = tuple(self._inflight)
+        if pending:
+            drained = asyncio.gather(*pending, return_exceptions=True)
+            while not drained.done():
+                try:
+                    await asyncio.shield(drained)
+                except asyncio.CancelledError:
+                    continue
+            drained.result()
 
 
 _FINISH_MAP = {
@@ -2219,6 +2295,11 @@ class LocalModelAdapter(ProviderAdapter):
                     if type(value) is not int or value < 1:
                         raise ProviderPolicyError("activated local tokenizer limit is invalid")
                     limits[name] = value
+            maximum_bytes = supplied.get("max_output_utf8_bytes")
+            if maximum_bytes is not None:
+                if type(maximum_bytes) is not int or maximum_bytes < 1:
+                    raise ProviderPolicyError("activated local output byte limit is invalid")
+                limits["max_output_utf8_bytes"] = min(maximum_bytes, 4 * 1024 * 1024)
             return limits
         runtime = getattr(model, "runtime", None)
         native_limits = getattr(runtime, "limits", None)
@@ -2442,6 +2523,18 @@ class LocalModelAdapter(ProviderAdapter):
             raise ProviderProtocolViolationError("local result exceeded admitted output-token budget")
         if len(result.tool_calls) > budget.max_tool_calls:
             raise ProviderPolicyError("local result exceeded admitted tool-call budget")
+        maximum_bytes = limits.get("max_output_utf8_bytes")
+        if maximum_bytes is not None:
+            output_bytes = len((result.text or "").encode("utf-8"))
+            if result.structured_output is not None:
+                output_bytes += len(_stable_json(dict(result.structured_output)).encode("utf-8"))
+            for call in result.tool_calls:
+                output_bytes += len(call.call_id.encode("utf-8")) + len(call.tool_id.encode("utf-8"))
+                output_bytes += len(_stable_json(dict(call.arguments)).encode("utf-8"))
+                if output_bytes > maximum_bytes:
+                    break
+            if output_bytes > maximum_bytes:
+                raise ProviderProtocolViolationError("local result exceeded activated output-byte limit")
         tool_calls = tuple(
             ProviderToolCall(
                 call_id=item.call_id,

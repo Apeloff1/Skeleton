@@ -250,10 +250,16 @@ def build_native_transformer_adapter(
     model_id: str = "skeleton-native-transformer",
     cache_size: int = 128,
     default_seed: int = 0,
+    max_concurrency: int = 1,
+    max_queue_size: int = 256,
+    max_batch_size: int = 256,
 ) -> LocalModelAdapter:
     """Build the canonical provider-neutral adapter for the owned transformer."""
     backend = NativeTransformerModel(runtime, model_id=model_id)
-    engine = LocalInferenceEngine(backend, cache_size=cache_size)
+    engine = LocalInferenceEngine(
+        backend, cache_size=cache_size, max_concurrency=max_concurrency,
+        max_queue_size=max_queue_size, max_batch_size=max_batch_size,
+    )
     return LocalModelAdapter(
         engine,
         default_seed=default_seed,

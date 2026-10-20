@@ -253,12 +253,12 @@ export class ChatController {
       ]);
       if (pageResult.status === 'rejected') throw pageResult.reason;
       const models = catalogResult.status === 'fulfilled' ? catalogResult.value.models : [];
-      const selected = models.find(model => model.id === saved?.selectedModelId && model.selectable && model.available)
-        ?? models.find(model => model.active && model.selectable && model.available);
+      const selected = saved?.selectedModelId ? models.find(model => model.id === saved.selectedModelId)
+        : models.find(model => model.active && model.selectable && model.available);
       this.listCursor = pageResult.value.nextCursor;
       this.emit({ ready: true, threads: sortedThreads(pageResult.value.threads), models,
-        selectedModelId: selected?.id ?? null, status: 'idle', hasMoreThreads: !!this.listCursor,
-        notice: catalogResult.status === 'rejected' ? 'Model availability could not be loaded. Refresh before selecting a model.' : null });
+        selectedModelId: saved?.selectedModelId ?? selected?.id ?? null, status: 'idle', hasMoreThreads: !!this.listCursor,
+        notice: catalogResult.status === 'rejected' ? 'Model availability could not be loaded. Refresh before selecting a model.' : saved?.selectedModelId && (!selected?.available || !selected.selectable) ? 'Your selected model is unavailable. Refresh models or explicitly choose another model for a new turn.' : null });
       const threadId = this.options.initialThreadId ?? saved?.activeThreadId ?? pageResult.value.threads[0]?.thread_id;
       if (threadId) await this.openConversation(threadId);
       else this.saveSelection();
@@ -440,7 +440,7 @@ export class ChatController {
       throw new ChatClientError('Context, attachment references or generation settings are invalid.', { kind: 'validation' });
     }
     const originThreadId = this.snapshot.activeThread?.thread_id ?? null;
-    const model = this.snapshot.models.find(item => item.id === this.snapshot.selectedModelId) ?? null;
+    const model = this.modelForNewTurn();
     let epoch = this.selectionEpoch;
     this.sending = true;
     this.emit({ status: 'submitting', error: null, notice: null });
@@ -680,14 +680,23 @@ export class ChatController {
     try {
       await this.identity();
       const catalog = await getChatModels(this.request());
-      const selected = catalog.models.find(model => model.id === this.snapshot.selectedModelId && model.selectable && model.available);
-      this.emit({ models: catalog.models, selectedModelId: selected?.id ?? null }); this.saveSelection();
+      const selected = this.snapshot.selectedModelId ? catalog.models.find(model => model.id === this.snapshot.selectedModelId)
+        : catalog.models.find(model => model.active && model.selectable && model.available);
+      this.emit({ models: catalog.models, selectedModelId: this.snapshot.selectedModelId ?? selected?.id ?? null,
+        notice: this.snapshot.selectedModelId && (!selected?.available || !selected.selectable) ? 'Your selected model is unavailable. Choose another observed model to start new work.' : null }); this.saveSelection();
     } catch (error) { this.emit({ error: asChatError(error) }); }
   };
+
+  private modelForNewTurn(): ChatModel {
+    const model = this.snapshot.models.find(item => item.id === this.snapshot.selectedModelId);
+    if (!model?.available || !model.selectable) throw new ChatClientError('Choose an available configured model before starting a new reply. Saved pending work keeps its original model.', { kind: 'unavailable', code: 'model_selection_unavailable' });
+    return model;
+  }
 
   edit = async (messageId: string, content: string): Promise<void> => {
     const thread = this.snapshot.activeThread;
     if (!thread || this.snapshot.pending || ['submitting', 'cancelling', 'loading'].includes(this.snapshot.status)) throw new ChatClientError('Wait for the current conversation update before editing.', { kind: 'conflict' });
+    const model = this.modelForNewTurn();
     const key = newKey('edit'); const epoch = this.selectionEpoch;
     const execute = async () => {
       if (this.editing) return;
@@ -709,7 +718,7 @@ export class ChatController {
           startedAt: edited.message.created_at, accepted: false,
         };
         this.submission = { thread: snapshot.thread, pending,
-          model: this.snapshot.models.find(item => item.id === this.snapshot.selectedModelId) ?? null,
+          model,
           options: { attachmentRefs } };
         this.emit({ pending, status: 'submitting' }); this.rememberPending(pending);
         await this.submit(this.submission, epoch);
@@ -728,14 +737,14 @@ export class ChatController {
     if (!message || message.author_type !== 'assistant') {
       throw new ChatClientError('Choose an assistant reply to regenerate.', { kind: 'validation' });
     }
+    const model = this.modelForNewTurn();
     const key = newKey('regenerate'); const epoch = this.selectionEpoch;
     const pending: PendingChatTurn = {
       kind: 'regeneration', messageId, threadId: thread.thread_id, idempotencyKey: key,
       message: '', attachmentRefs: [], streamText: '', lastEventId: 0,
       state: 'submitting', startedAt: new Date().toISOString(), accepted: false,
     };
-    this.regenerationSubmission = { thread, messageId, key,
-      model: this.snapshot.models.find(item => item.id === this.snapshot.selectedModelId) ?? null };
+    this.regenerationSubmission = { thread, messageId, key, model };
     this.mutationRetry = null; this.submission = null;
     this.emit({ pending, status: 'submitting', error: null }); this.rememberPending(pending);
     await this.admitRegeneration(this.regenerationSubmission, pending, epoch);

@@ -418,6 +418,13 @@ class AIRuntimeControlUpdate(BaseModel):
         return self
 
 
+class AIRuntimeMaintenanceRetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    expected_attempts: int = Field(ge=0, le=1_000_000)
+
+
 class AIRuntimeLearningCheckpointUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
     action: Literal["import", "reset", "restore_last_healthy"]
@@ -3732,6 +3739,34 @@ async def configure_ai_runtime_control(
         raise _runtime_control_error(exc) from exc
     response.headers["Cache-Control"] = "no-store"
     return state
+
+
+@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
+async def retry_ai_runtime_maintenance(
+    task_id: str, update: AIRuntimeMaintenanceRetry, response: Response,
+    user=Depends(require_role("admin")),
+):
+    """Queue an exact failed maintenance task without changing runtime grants."""
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", task_id) is None:
+        raise HTTPException(status_code=422, detail="Maintenance task identity is invalid", headers={"Cache-Control": "no-store"})
+    try:
+        result = await _runtime_control_engine().retry_runtime_maintenance(
+            actor_id=actor_id, tenant_id=tenant_id, task_id=task_id,
+            source_digest=update.source_digest, expected_attempts=update.expected_attempts,
+        )
+    except EngineClientError as exc:
+        error = _runtime_control_error(exc)
+        if isinstance(exc, EngineConflictError):
+            error.detail = {
+                "code": "runtime_control_conflict",
+                "message": "Maintenance task source, attempt count, or state changed before retry admission.",
+                "action": "Refresh runtime maintenance tasks and retry the exact retained failed task.",
+            }
+        error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
+        raise error from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
 
 
 @router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")

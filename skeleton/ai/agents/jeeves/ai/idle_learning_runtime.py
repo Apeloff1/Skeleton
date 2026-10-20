@@ -553,10 +553,16 @@ class JeevesIdleWorkExecutor:
                     stop_requested is not None and stop_requested() is not False
                 ),
             )
-            checkpoint()
-            intent = self._intent(plan, assignment)
-            if self._authorize(assignment, intent, context) is not True:
-                raise IdleRuntimeError("host did not authorize exact idle work")
+        # Host callbacks can take controller/telemetry locks and may renew
+        # durable leases. Never invoke them while holding the persistence lock:
+        # foreground accounting takes its state lock before committing presence.
+        checkpoint()
+        intent = self._intent(plan, assignment)
+        if self._authorize(assignment, intent, context) is not True:
+            raise IdleRuntimeError("host did not authorize exact idle work")
+        with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
             try:
                 self._db.execute("BEGIN IMMEDIATE")
                 if self._db.execute(
@@ -695,6 +701,22 @@ class JeevesIdleWorkExecutor:
         if type(observed_at_ns) is not int or observed_at_ns < 0:
             raise IdleRuntimeError("host recovery observation timestamp required")
         with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
+            pending = self._db.execute(
+                "SELECT state FROM jeeves_idle_effect WHERE intent_digest=?", (intent_digest,),
+            ).fetchone()
+            if pending is None or pending[0] not in (
+                IdleExecutionState.IN_FLIGHT.value, IdleExecutionState.IN_DOUBT.value,
+            ):
+                raise IdleRuntimeError("no unresolved host idle effect")
+        # The host proof may read other owned state. Keep it outside our
+        # persistence lock and recheck unresolved custody in the transaction.
+        if verify_external(intent_digest, external_event_digest) is not True:
+            raise IdleRuntimeError("external idle effect was not verified")
+        with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
             try:
                 self._db.execute("BEGIN IMMEDIATE")
                 row = self._db.execute(
@@ -706,8 +728,6 @@ class JeevesIdleWorkExecutor:
                     IdleExecutionState.IN_DOUBT.value,
                 ):
                     raise IdleRuntimeError("no unresolved host idle effect")
-                if verify_external(intent_digest, external_event_digest) is not True:
-                    raise IdleRuntimeError("external idle effect was not verified")
                 state = (IdleExecutionState.VERIFIED if confirmed_completed
                          else IdleExecutionState.REJECTED)
                 updated = self._db.execute(

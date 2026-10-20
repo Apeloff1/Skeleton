@@ -63,6 +63,52 @@ Use `python -m skeleton app status --live` to check the current service topology
 and `python -m skeleton app logs` for service logs. The optional Chroma profile
 is not required for bounded lexical retrieval from captured sources.
 
+## Configure existing weights for Compose
+
+The stdlib configuration helper accepts an existing artifact, deployment or
+catalog. For a catalog and an explicit administrator:
+
+```bash
+python scripts/configure_ai_chat.py --env-file .env.local-catalog \
+  --provider local --local-catalog /absolute/models/catalog.json \
+  --admin-email operator@example.com \
+  --admin-password-file /absolute/private/operator-password.txt
+```
+
+For a single GGUF deployment, use `--local-deployment /absolute/local-ai/deployment.json`
+instead of `--local-catalog`. The existing `--local-artifact /absolute/local-model.json`
+alternative remains supported. Exactly one local input is accepted. The
+administrator flags are optional and must be supplied together; public
+registration still creates a viewer.
+
+The helper writes a private environment file, a `.compose.json` override and a
+`.README.md` with the exact startup command. New configurations include required
+persistent master/seal keys and an authenticated backend service grant for
+administrator runtime controls. Generated deployment/catalog manifests use
+container paths and retain exact weight/executable pins. Original model files
+and manifests remain unchanged and are mounted read-only. No inference,
+downloads or service startup occurs in this command.
+
+Use the generated README's Compose command with both the repository Compose
+file and its generated override. On Linux the engine runs as UID `10001` and
+needs read access to model files and execute access to its runtime; the helper
+provides targeted access commands and preserves operator file permissions.
+Generated nonsecret model manifests use mode `0644`; credentials and the Compose
+override use `0600`. Keep all generated private files outside version control.
+Intentional `--force` reconfiguration preserves valid existing Mongo credentials
+and URLs, signing keys, engine token, persistent master/seal material and
+administrator bootstrap. Partial or conflicting credential groups are rejected.
+Changing a model does not implicitly rotate those credentials or migrate a
+database. A preserved hosted key is reused unless a new key source is supplied.
+
+Portable GGUF executables must be Linux ELF64 for amd64 or arm64. The override
+selects the matching container platform, which Docker must support. Adjacent
+`lib*.so*` runtime dependencies are bounded to 128 files and 128 MiB per runtime;
+the helper does not discover arbitrary system dependencies or establish an
+independent shared-library execution pin. Mixed executable architectures in one
+catalog are rejected. The engine still performs model activation and resource
+admission at startup.
+
 ## Activate the reproducible local CPU model
 
 The optional acquisition recipe uses Qwen3-0.6B-Q8_0, an Apache-2.0 model, and
@@ -251,6 +297,18 @@ numeric outcomes, learner state and maintenance receipts across restarts.
 self-maintenance enabled, it permits bounded extra local predictor updates from
 recorded numeric outcomes. It performs no provider work or transformer-weight
 training and does not establish game quality.
+New canonical outcomes grant only bounded deferred replay credits when their
+ordinary replay work was skipped. Idle updates consume those credits; an
+unchanged replay buffer does not receive unlimited optimizer updates.
+
+Derived numeric outcome JSON is bounded to 10,000 retained rows per tenant/scope
+by default. Idle cleanup also applies a 90-day age limit in chunks of 128 rows.
+Small terminal feedback markers preserve exactly-once learning, while immutable
+execution results, audit history and cumulative totals remain authoritative.
+Legacy overflow catches up in bounded chunks and suppresses extra diagnostic
+JSON until capacity is available. Predictor maintenance keeps the newest 2,048
+full acknowledged receipts by default; older verified receipts retain small
+replay tombstones. Unacknowledged receipts are not discarded to meet that target.
 
 Measured studio goals have a separate **Learn numeric control suggestions during
 this goal** opt-in. It journals bounded numeric edit observations and predictor
@@ -268,6 +326,8 @@ silently replayed. If a request is unconfirmed, inspect refreshed state before
 trying again.
 Cache actions retain separate host and model markers so each engine worker can
 reconcile intervening commands even when another model receives a later action.
+A drained model remains installed and keeps its activation identity. The model
+list reports that new work is paused and points to **Resume admission**.
 
 Select a learner partition to inspect prequential error, drift, confidence
 constraints, source fingerprints, optimizer work and its last healthy checkpoint.
@@ -296,6 +356,19 @@ Maintenance reports ownership, physical work, fencing and blocked recovery. Leas
 expiry alone does not prove that old work stopped; takeover requires positive
 physical-drain evidence. Degraded coordination suspends maintenance and makes its
 controls read-only until healthy coordination is observed again.
+When a failed task is eligible, **Retry failed task** explicitly requeues its
+original continuation under the observed source and attempt count. It grants no
+extra model/action allowance and does not immediately execute or repeat verified
+optimizer work. Failed acknowledgements retry separately after verified cursor
+commit. Result-cache backpressure and unresolved physical custody remain visible.
+
+Execution recovery reports aggregate active work and bounded scan progress.
+Use one engine coordinator and one engine namespace per execution database;
+parallel model workers remain inside that owner. A live OS database lock rejects
+a competing coordinator or inherited fork. A persistent namespace pin rejects
+incompatible reuse of the same file. Restart recovery reads keyset pages of at
+most 128 rows and starts at most 32 recovery drivers concurrently; unchanged
+approval/input waiters remain passive, while requested cancellations can recover.
 
 Studio adaptive numeric advice uses **Only this goal** by default. **Remember
 compatible goals** permits reuse only when both source and recipient explicitly
@@ -306,6 +379,13 @@ history** starts a fresh numeric epoch once that goal has a verified original
 baseline; it preserves historical journals and running goals. Retained memory is
 bounded to eight provenance goals and 32 observations. It grants no source-text
 reuse, quality certification or model-weight promotion.
+Issued editor/play/review work can still reconcile after dispatch budgets are
+exhausted. A measured regression can expose **Restore incumbent** when the
+original restoration/edit/run grants, current source and remaining action
+allowance permit it. That explicit action stages an exact host decision through
+the ordinary editor gate, without requiring a planner call or inventing a model
+receipt. A committed interrupted edit is acknowledged from its exact saved
+revision instead of being applied again.
 
 This runtime implementation is a construction draft, not enterprise certification.
 No automated tests were authored or run for this build, following the user's

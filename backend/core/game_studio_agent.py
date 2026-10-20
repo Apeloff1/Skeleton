@@ -112,6 +112,8 @@ NUMERIC_MEMORY_DONOR_ATTEMPTS = 8
 NUMERIC_MEMORY_GOALS = 8
 NUMERIC_MEMORY_OBSERVATIONS = 32
 NUMERIC_SHARED_POLICIES = frozenset({"reuse_compatible", "reset"})
+RESTORATION_SCHEMA = "skeleton.game.studio_quality_recovery.v1"
+RESTORATION_AUTHORITY = "host_quality_restoration"
 
 
 async def _indexes():
@@ -142,6 +144,7 @@ def _public(row):
         "expires_at",
         "created_at",
         "updated_at",
+        "history_digest",
         "steps",
         "error",
         "pending_job_id",
@@ -200,6 +203,8 @@ def _public(row):
                 "max_output_tokens",
                 "canonical_probe",
                 "poll",
+                "decision_authority",
+                "host_decision_receipt",
             )
             if key in pending
         }
@@ -391,6 +396,28 @@ async def _recover_own_edit(scope, row, token, *, metadata_only=False):
     await _authorize_history(scope, row)
     binding = await workspace._input(scope, project, require_execution=False)
     await workspace._authority(scope, binding)
+    recovered = {**pending, "recovered_edit": True}
+    if raw["operation"] == "world.edit" and not metadata_only:
+        from core.game_successor import world
+
+        # The exact editor revision above already committed the mutation. Read
+        # the real owner's current result instead of asking the pre-edit quality
+        # fence to authorize that mutation again against its post-edit head.
+        issued = await world(scope, row["project_id"])
+        if issued.get("project", {}).get("version") != project["version"]:
+            raise GameLearningError("studio_goal_head_changed", "The recovered world projection differs from its exact committed revision.", 409)
+        result = _compact({key: value for key, value in issued.items() if key != "project"}
+            | {"project": _project_summary(issued["project"])})
+        outcome = {"result": result, "job_id": None, "play_id": None,
+            "output_version": project["version"], "output_digest": _digest(project["files"])}
+        editor_receipt = {"schema_version": "skeleton.game.studio_editor_recovery.v1",
+            "operation_id": operation["_id"], "operation_request_digest": operation["request_digest"],
+            "revision_id": revision_id, "revision_request_digest": revision["request_digest"],
+            "output_version": project["version"], "output_digest": _digest(project["files"]),
+            "result_authority": "current_world_projection_after_exact_committed_revision"}
+        editor_receipt["receipt_digest"] = _digest(editor_receipt)
+        recovered.update(phase="outcome", action_outcome=outcome,
+            outcome_digest=_digest(outcome), recovered_editor_receipt=editor_receipt)
     return await _set(
         scope,
         row["goal_id"],
@@ -398,7 +425,7 @@ async def _recover_own_edit(scope, row, token, *, metadata_only=False):
         {
             "head_version": project["version"],
             "head_digest": _digest(project["files"]),
-            "pending": {**pending, "recovered_edit": True},
+            "pending": recovered,
         },
     )
 
@@ -636,6 +663,10 @@ async def inspect(scope, goal_id):
             result["outcome"]["workflow_requirements_verified"] = result["completion"]["verified"]
             if row.get("quality_gate") is not None:
                 result["quality"] = result["completion"].get("quality")
+                available, reason = _restoration_capability(row, result["quality"])
+                result["recovery"].update(
+                    can_restore_incumbent=available, restore_incumbent_reason=reason,
+                )
         except GameLearningError as exc:
             result["completion"] = {"verified": False, "error": {"code": exc.code, "message": exc.message}}
             result["outcome"]["workflow_requirements_verified"] = False
@@ -1881,6 +1912,127 @@ async def _quality_restore_payload(scope, row, project, *, allowed_editor_operat
         "expected_spec_digest": _digest(current_spec),
         "restore_review_job_id": baseline["job_id"],
     }, quality
+
+
+def _restoration_capability(row, quality=None):
+    """Only a fresh inspect/recovery may offer the exact host rollback."""
+    if row.get("schema_version") != SCHEMA:
+        return False, "legacy_read_only"
+    if (row.get("execution_mode") != "run" or not row.get("allow_edits")
+        or not (row.get("quality_gate") or {}).get("restore_on_regression")):
+        return False, "restoration_not_granted"
+    if row.get("status") in {"completed", "cancelled", "expired", "paused", "planned"} or row.get("stop_requested"):
+        return False, "goal_not_active"
+    if _time(row["expires_at"]) <= _now():
+        return False, "authorization_expired"
+    if row.get("pending") or row.get("pending_job_id") or row.get("pending_play_id"):
+        return False, "issued_work_requires_reconciliation"
+    if row["cursor"] >= row["max_steps"]:
+        return False, "action_budget_exhausted"
+    if quality is None:
+        return False, "inspect_current_quality"
+    if quality.get("status") != "rejected" or not quality.get("candidate") or not quality.get("baseline"):
+        return False, "no_measured_rejected_candidate"
+    if quality.get("head_digest") != row.get("head_digest"):
+        return False, "quality_source_changed"
+    return True, None
+
+
+def _validate_host_restoration(row, record, *, committed=False):
+    """A host rollback has its own receipt and never borrows model lineage."""
+    authority = record.get("decision_authority")
+    receipt = record.get("host_decision_receipt")
+    if authority is None and receipt is None:
+        return False
+    command = record.get("command") if isinstance(record.get("command"), dict) else {}
+    payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}
+    policy = row.get("quality_gate") or {}
+    decision = record.get("decision") or {}
+    input_version = record.get("input_version" if committed else "head_version")
+    input_digest = record.get("input_digest" if committed else "head_digest")
+    if (authority != RESTORATION_AUTHORITY or not isinstance(receipt, dict)
+        or receipt.get("schema_version") != RESTORATION_SCHEMA
+        or receipt.get("receipt_digest") != _digest({key: value for key, value in receipt.items() if key != "receipt_digest"})
+        or receipt.get("goal_id") != row["goal_id"] or receipt.get("goal_request_digest") != row["request_digest"]
+        or receipt.get("index") != record.get("index") or receipt.get("input_version") != input_version
+        or receipt.get("input_digest") != input_digest or receipt.get("policy_digest") != _digest(policy)
+        or receipt.get("command_digest") != record.get("command_digest")
+        or row.get("execution_mode") != "run" or not row.get("allow_edits") or not policy.get("restore_on_regression")
+        or record.get("quality_role") != "restore_incumbent"
+        or command.get("operation") != "world.edit" or command.get("project_id") != row["project_id"]
+        or set(payload) != {"expected_spec_digest", "restore_review_job_id", "expected_version", "idempotency_key"}
+        or payload.get("expected_version") != input_version
+        or payload.get("idempotency_key") != row["goal_id"] + ":action:" + str(record.get("index"))
+        or not isinstance(receipt.get("baseline"), dict) or not isinstance(receipt.get("candidate"), dict)
+        or payload.get("restore_review_job_id") != receipt["baseline"].get("job_id")
+        or receipt["candidate"].get("head_digest") != input_digest
+        or not receipt["candidate"].get("review_digest") or not receipt.get("quality_receipt_digest")
+        or decision.get("schema_version") != DECISION_SCHEMA or decision.get("operation") != "world.edit"
+        or decision.get("done") is not False or decision.get("payload") != payload
+        or decision.get("evidence_refs") or decision.get("follow_up")
+        or any(record.get(name) is not None for name in ("model_key", "model_receipt", "prompt_digest", "response_digest", "raw_decision", "prompt"))):
+        raise GameLearningError("studio_goal_recovery_receipt_corrupt", "Host restoration differs from its exact original grant, source, or independent decision receipt.", 503)
+    if not committed and record.get("phase") not in {"action", "outcome"}:
+        raise GameLearningError("studio_goal_recovery_receipt_corrupt", "Host restoration cannot issue a canonical model operation.", 503)
+    return True
+
+
+def _validate_editor_recovery(row, record, *, committed=False):
+    receipt = record.get("recovered_editor_receipt")
+    if receipt is None:
+        return
+    command = record.get("command") if isinstance(record.get("command"), dict) else {}
+    payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}
+    output = record if committed else record.get("action_outcome") or {}
+    input_version = record.get("input_version" if committed else "head_version")
+    if (not isinstance(receipt, dict) or not isinstance(output, dict) or type(input_version) is not int
+        or not isinstance(payload.get("idempotency_key"), str)):
+        raise GameLearningError("studio_goal_editor_recovery_corrupt", "Recovered editor receipt has no exact typed source outcome.", 503)
+    operation_id = _key(row["project_id"], "successor-world", payload.get("idempotency_key", ""))
+    if (receipt.get("schema_version") != "skeleton.game.studio_editor_recovery.v1"
+        or receipt.get("receipt_digest") != _digest({key: value for key, value in receipt.items() if key != "receipt_digest"})
+        or command.get("operation") != "world.edit" or command.get("project_id") != row["project_id"]
+        or receipt.get("operation_id") != operation_id or receipt.get("operation_request_digest") != _digest(payload)
+        or receipt.get("revision_id") != _key(row["project_id"], "editor", "successor-world:" + operation_id)
+        or not receipt.get("revision_request_digest")
+        or receipt.get("output_version") != input_version + 1
+        or receipt.get("output_version") != output.get("output_version")
+        or receipt.get("output_digest") != output.get("output_digest")
+        or receipt.get("result_authority") != "current_world_projection_after_exact_committed_revision"
+        or (not committed and record.get("phase") != "outcome")):
+        raise GameLearningError("studio_goal_editor_recovery_corrupt", "Recovered edit differs from its exact operation, committed revision, or source outcome.", 503)
+
+
+async def _prepare_incumbent_restoration(scope, row):
+    project, binding = await _current(scope, row)
+    payload, quality = await _quality_restore_payload(scope, row, project)
+    available, reason = _restoration_capability(row, quality)
+    if not available:
+        raise GameLearningError("studio_quality_restore_unavailable", "Exact incumbent recovery is unavailable: " + reason + ".", 409)
+    payload.update(expected_version=project["version"], idempotency_key=row["goal_id"] + ":action:" + str(row["cursor"]))
+    _action_scope(row, "world.edit", payload)
+    command = StudioCommand("world.edit", row["project_id"], payload).as_dict()
+    decision = {"schema_version": DECISION_SCHEMA, "operation": "world.edit", "payload": payload,
+        "explanation": "Restore the exact issued incumbent after the measured candidate was rejected under the original restoration grant.", "done": False}
+    receipt = {"schema_version": RESTORATION_SCHEMA, "goal_id": row["goal_id"],
+        "goal_request_digest": row["request_digest"], "index": row["cursor"],
+        "policy_digest": _digest(row["quality_gate"]), "input_version": project["version"],
+        "input_digest": _digest(project["files"]), "baseline": quality["baseline"],
+        "candidate": quality["candidate"], "quality_receipt_digest": quality["receipt_digest"],
+        "command_digest": _digest(command)}
+    receipt["receipt_digest"] = _digest(receipt)
+    from core import game_studio_review as reviews
+
+    dependencies = [_dependencies(binding)]
+    for pin in (quality["baseline"], quality["candidate"]):
+        issued = await reviews._load_review(scope, row["project_id"], pin["job_id"], historical=True)
+        dependencies.append(_dependencies(issued["input"]))
+    return {"index": row["cursor"], "phase": "action", "head_version": project["version"],
+        "head_digest": _digest(project["files"]), "dependencies": dependencies,
+        "max_output_tokens": row.get("max_output_tokens", 4096),
+        "decision_authority": RESTORATION_AUTHORITY, "host_decision_receipt": receipt,
+        "quality_role": "restore_incumbent", "decision": decision, "decision_digest": _digest(decision),
+        "command": command, "command_digest": _digest(command)}
 
 
 async def _quality_action_payload(
@@ -3606,15 +3758,15 @@ async def _finish_step(scope, row, token):
         "play_id": play_id,
         "job_id": job_id,
         "command": pending["command"],
-        "prompt_digest": pending["prompt_digest"],
-        "model_key": pending["model_key"],
-        "response_digest": pending["response_digest"],
+        "prompt_digest": pending.get("prompt_digest"),
+        "model_key": pending.get("model_key"),
+        "response_digest": pending.get("response_digest"),
         "decision_digest": _digest(decision),
         "result_digest": _digest(result),
         "previous_step_digest": row["history_digest"],
         "index": pending["index"],
         "decision": decision,
-        "model_receipt": pending["model_receipt"],
+        "model_receipt": pending.get("model_receipt"),
         "workflow_position": pending.get("workflow_position", 0),
         "receipt_bindings": pending.get("receipt_bindings", []),
         "command_digest": _digest(pending["command"]) if pending["command"] else None,
@@ -3628,6 +3780,11 @@ async def _finish_step(scope, row, token):
     }
     if pending.get("quality_role"):
         step["quality_role"] = pending["quality_role"]
+    if pending.get("decision_authority"):
+        step["decision_authority"] = pending["decision_authority"]
+        step["host_decision_receipt"] = pending["host_decision_receipt"]
+    if pending.get("recovered_editor_receipt"):
+        step["recovered_editor_receipt"] = pending["recovered_editor_receipt"]
     step["step_digest"] = _digest(step)
     for refs in pending["dependencies"]:
         await _authorize_history(scope, {"evidence_dependencies": [refs]})
@@ -3674,6 +3831,70 @@ async def _finish_step(scope, row, token):
         if decision["done"]:
             changes["completion_reason"] = "verified_workflow_complete"
     return await _set(scope, row["goal_id"], token, changes)
+
+
+async def _reconcile_boundary(scope, row, token):
+    """Settle issued work independently of the remaining dispatch budget.
+
+    Child observations and completion are facts about already admitted work.
+    Requiring another action slot to acknowledge them strands the final job at
+    the budget boundary. This path never admits work or calls the planner.
+    """
+    if _time(row["expires_at"]) <= _now():
+        return await _set(scope, row["goal_id"], token, {"status": "expired"}), False
+    if row.get("stop_requested"):
+        status = "paused" if row["stop_requested"] == "pause" else "cancelled"
+        return await _set(scope, row["goal_id"], token, {"status": status}), False
+    if row.get("pending_job_id"):
+        job = await workspace.get_job(scope, row["pending_job_id"])
+        if job["status"] == "interrupted":
+            row = await _set(scope, row["goal_id"], token, {
+                "status": "blocked", "last_job_receipt": _feedback(job),
+                "error": {"code": "studio_goal_job_interrupted", "message": "The actual worker was interrupted; use the job controls to resume or cancel it."},
+            })
+            return row, False
+        if job["status"] not in {"completed", "failed", "cancelled", "blocked"}:
+            return row, False
+        row = await _set(scope, row["goal_id"], token, {
+            "pending_job_id": None, "status": "ready", "last_job_receipt": _compact(job),
+        })
+    if row.get("pending_play_id"):
+        from routes.game_learning import _plays
+
+        play = await _plays().get(scope, row["pending_play_id"])
+        if play["status"] == "interrupted":
+            row = await _set(scope, row["goal_id"], token, {
+                "status": "blocked", "last_play_receipt": _feedback(play),
+                "error": {"code": "studio_goal_play_interrupted", "message": "AI playback was interrupted; use its live playback controls to resume or stop it."},
+            })
+            return row, False
+        if play["status"] not in {"completed", "stopped", "failed", "cancelled", "blocked"}:
+            return row, False
+        row = await _set(scope, row["goal_id"], token, {
+            "pending_play_id": None, "status": "ready", "last_play_receipt": _feedback(play),
+        })
+    row = await _advance_quality_learning(scope, row, token)
+    completion = None
+    if not row.get("pending") and row.get("completion_requirements"):
+        completion = await _completion_progress(scope, row)
+        if completion["verified"]:
+            row = await _set(scope, row["goal_id"], token, {
+                "status": "completed", "completion_reason": "verified_workflow_complete",
+                "completion_receipt": completion, "error": None, "workflow": [],
+            })
+            return row, False
+    if row["cursor"] >= row["max_steps"] or (
+        row["model_calls"] >= row["max_model_calls"]
+        and row.get("pending") is None and not row.get("workflow")
+    ):
+        row = await _set(scope, row["goal_id"], token, {
+            "status": "blocked" if completion else "completed",
+            "completion_reason": "bounded_budget_exhausted",
+            "error": {"code": "studio_goal_budget_reached", "message": "Bounded execution budget reached; inspect actual receipts."} if completion else None,
+            **({"completion_receipt": completion} if completion else {}),
+        })
+        return row, False
+    return row, True
 
 
 async def advance(scope, goal_id, body):
@@ -3764,96 +3985,11 @@ async def advance(scope, goal_id, body):
         model_waited = False
         row = await _recover_own_edit(scope, row, token)
         await _current(scope, row)
-        row = await _advance_quality_learning(scope, row, token)
-        for _ in range(min(body["steps"], max(0, row["_active_advance"]["end_cursor"] - row["cursor"]))):
+        while True:
             if asyncio.get_running_loop().time() >= advance_deadline:
                 break
-            if _time(row["expires_at"]) <= _now():
-                row = await _set(scope, goal_id, token, {"status": "expired"})
-                break
-            if row.get("stop_requested"):
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {"status": "paused" if row["stop_requested"] == "pause" else "cancelled"},
-                )
-                break
-            if row.get("pending_job_id"):
-                job = await workspace.get_job(scope, row["pending_job_id"])
-                if job["status"] == "interrupted":
-                    row = await _set(
-                        scope,
-                        goal_id,
-                        token,
-                        {
-                            "status": "blocked",
-                            "last_job_receipt": _feedback(job),
-                            "error": {
-                                "code": "studio_goal_job_interrupted",
-                                "message": "The actual worker was interrupted; use the job controls to resume or cancel it.",
-                            },
-                        },
-                    )
-                    break
-                if job["status"] not in {"completed", "failed", "cancelled", "blocked"}:
-                    break
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {"pending_job_id": None, "status": "ready", "last_job_receipt": _compact(job)},
-                )
-            if row.get("pending_play_id"):
-                from routes.game_learning import _plays
-
-                play = await _plays().get(scope, row["pending_play_id"])
-                if play["status"] == "interrupted":
-                    row = await _set(
-                        scope,
-                        goal_id,
-                        token,
-                        {
-                            "status": "blocked",
-                            "last_play_receipt": _feedback(play),
-                            "error": {
-                                "code": "studio_goal_play_interrupted",
-                                "message": "AI playback was interrupted; use its live playback controls to resume or stop it.",
-                            },
-                        },
-                    )
-                    break
-                if play["status"] not in {"completed", "stopped", "failed", "cancelled", "blocked"}:
-                    break
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {"pending_play_id": None, "status": "ready", "last_play_receipt": _feedback(play)},
-                )
-            row = await _advance_quality_learning(scope, row, token)
-            if row["cursor"] >= row["max_steps"] or (
-                row["model_calls"] >= row["max_model_calls"]
-                and row.get("pending") is None
-                and not row.get("workflow")
-            ):
-                completion = (
-                    await _completion_progress(scope, row) if row.get("completion_requirements") else None
-                )
-                row = await _set(
-                    scope,
-                    goal_id,
-                    token,
-                    {
-                        "status": "blocked" if completion and not completion["verified"] else "completed",
-                        "completion_reason": "bounded_budget_exhausted",
-                        "error": {
-                            "code": "studio_goal_budget_reached",
-                            "message": "Bounded execution budget reached; inspect actual receipts.",
-                        },
-                        **({"completion_receipt": completion} if completion else {}),
-                    },
-                )
+            row, dispatch_available = await _reconcile_boundary(scope, row, token)
+            if not dispatch_available or row["cursor"] >= row["_active_advance"]["end_cursor"]:
                 break
             if row.get("pending") is None:
                 if model_waited and not row.get("workflow"):
@@ -4170,11 +4306,15 @@ def _validate_journal(row):
             raise GameLearningError(
                 "studio_goal_history_corrupt", "Goal step/result receipt chain differs.", 503
             )
+        _validate_host_restoration(row, step, committed=True)
+        _validate_editor_recovery(row, step, committed=True)
         chain = step["step_digest"]
     if row.get("history_digest") != chain:
         raise GameLearningError("studio_goal_history_corrupt", "Goal history head differs.", 503)
     pending = row.get("pending")
     if pending:
+        host_restoration = _validate_host_restoration(row, pending)
+        _validate_editor_recovery(row, pending)
         if "max_output_tokens" in pending and pending["max_output_tokens"] != row.get(
             "max_output_tokens", 4096
         ):
@@ -4188,7 +4328,7 @@ def _validate_journal(row):
         if (
             pending.get("index") != row["cursor"]
             or pending.get("phase") not in {"model", "response", "action", "outcome"}
-            or pending.get("prompt_digest") != _digest({"prompt": pending.get("prompt")})
+            or (not host_restoration and pending.get("prompt_digest") != _digest({"prompt": pending.get("prompt")}))
         ):
             raise GameLearningError("studio_goal_pending_corrupt", "Pending action identity differs.", 503)
         if pending.get("structured_output_schema") and pending.get(
@@ -4197,7 +4337,7 @@ def _validate_journal(row):
             raise GameLearningError(
                 "studio_goal_schema_corrupt", "Frozen planner output schema differs.", 503
             )
-        if pending["phase"] != "model" and (
+        if not host_restoration and pending["phase"] != "model" and (
             pending.get("response_digest") != _digest({"text": pending.get("raw_decision")})
             or not pending.get("model_receipt", {}).get("execution_id")
         ):
@@ -4264,6 +4404,7 @@ def _recovery_projection(row):
             )
         )
     )
+    restore_available, restore_reason = _restoration_capability(row)
     return {
         "next_action": next_action,
         "automatic_continuation_available": next_action == "advance" and not row.get("stop_requested"),
@@ -4274,6 +4415,15 @@ def _recovery_projection(row):
         "reason": (row.get("error") or {}).get("code"),
         "pending_kind": target,
         "pending_id": row.get("pending_job_id") or row.get("pending_play_id"),
+        "remaining_steps": max(0, row.get("max_steps", 0) - row.get("cursor", 0)),
+        "remaining_model_calls": max(0, row.get("max_model_calls", 0) - row.get("model_calls", 0)),
+        "remaining_jobs": max(0, row.get("max_jobs", 0) - row.get("jobs_started", 0)),
+        "reconciliation_only": bool(current and (
+            row.get("cursor", 0) >= row.get("max_steps", 0)
+            or (row.get("model_calls", 0) >= row.get("max_model_calls", 0) and not pending and not row.get("workflow"))
+        )),
+        "can_restore_incumbent": restore_available,
+        "restore_incumbent_reason": restore_reason,
         "legacy_read_only": not current,
         "can_new_planner_attempt": current
         and pending.get("phase") in {"model", "response"}
@@ -4462,7 +4612,15 @@ async def retry(scope, goal_id, body):
             "completed_at": _now().isoformat(),
         }
         changes = {"error": None, "status": "ready"}
-        if target == "planner":
+        if target == "restore_incumbent":
+            # Reconcile only issued work before deriving the exact rollback.
+            # This may acknowledge a final review but cannot admit a new one.
+            row, _dispatch_available = await _reconcile_boundary(scope, row, token)
+            pending = await _prepare_incumbent_restoration(scope, row)
+            changes.update(pending=pending, completion_reason=None)
+            receipt["host_decision_receipt_digest"] = pending["host_decision_receipt"]["receipt_digest"]
+            receipt["command_digest"] = pending["command_digest"]
+        elif target == "planner":
             pending = row.get("pending")
             if not pending or pending["phase"] not in {"model", "response"}:
                 raise GameLearningError(
@@ -5167,6 +5325,14 @@ async def _dispatch_fence(scope, row, token, pending, *, phase="action", allowed
         )
     if phase == "action" and pending.get("command") and current.get("quality_gate") is not None:
         command = pending["command"]
+        if pending.get("decision_authority") == RESTORATION_AUTHORITY:
+            project = await workspace._project(current["project_id"], scope, current["head_version"])
+            _payload, quality = await _quality_restore_payload(
+                scope, current, project, allowed_editor_operation_id=allowed_editor_operation_id,
+            )
+            receipt = pending["host_decision_receipt"]
+            if any(receipt[key] != quality[key] for key in ("baseline", "candidate")) or receipt["quality_receipt_digest"] != quality["receipt_digest"]:
+                raise GameLearningError("studio_quality_restore_changed", "Exact rejected candidate or incumbent evidence changed before restoration.", 409)
         frozen = dict(pending)
         checked = await _quality_action_payload(
             scope,

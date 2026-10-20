@@ -190,6 +190,11 @@ Administrators can export/import a bounded numeric checkpoint or reset/restore a
 partition using exact tenant/model identity and policy plus learner-version checks.
 Checkpoint download and import preserve the original JSON text, including numeric
 spellings, so the server can verify the original integrity digests.
+The [local configuration helper](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md#configure-existing-weights-for-compose)
+now accepts artifacts, GGUF deployments and catalogs, prepares read-only container
+bindings, supplies required startup secrets and supports explicit administrator
+bootstrap. Runtime status reports model draining, bounded restart recovery,
+learner retention and failed-maintenance retry eligibility.
 
 Studio goals can opt into [measured quality refinement](docs/ai/STUDIO_MEASURED_QUALITY.md):
 pin a baseline review, edit the original source, compare a candidate under the
@@ -204,6 +209,9 @@ or promote model weights.
 The optional **Learn numeric control suggestions during this goal** setting adds
 a bounded predictor for compatible numeric edits from matched review outcomes.
 Its suggestions remain subject to the same source, review and restoration gates.
+Outstanding play/review/editor receipts reconcile even after dispatch budgets are
+used. Eligible measured regressions expose an explicit **Restore incumbent** action
+through the existing source/editor gates, without needing another model response.
 
 See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
 and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).

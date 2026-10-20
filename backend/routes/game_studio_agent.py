@@ -94,7 +94,7 @@ class GoalControl(Request):
 class GoalRetry(Request):
     expected_goal_version: int = Field(ge=1, strict=True)
     idempotency_key: str = Field(min_length=1, max_length=512)
-    target: Literal["planner", "action", "job", "play", "reconcile"]
+    target: Literal["planner", "action", "job", "play", "reconcile", "restore_incumbent"]
     new_planner_attempt: bool = Field(default=False, strict=True)
 
     @model_validator(mode="after")

@@ -131,6 +131,8 @@ class LocalModelDeployment:
     extra_args: tuple[str, ...]
     manifest_digest: str
     output_framing: str = "raw"
+    runtime_scratch_bytes: int = 512 * 1024 * 1024
+    kv_bytes_per_token: int | None = None
 
     @classmethod
     def load(
@@ -218,6 +220,8 @@ class LocalModelDeployment:
             "temperature",
             "extra_args",
             "output_framing",
+            "runtime_scratch_bytes",
+            "kv_bytes_per_token",
         }
         unknown = set(config) - allowed_config
         if unknown:
@@ -242,6 +246,8 @@ class LocalModelDeployment:
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
                 output_framing=config.get("output_framing", "raw"),
+                runtime_scratch_bytes=config.get("runtime_scratch_bytes", 512 * 1024 * 1024),
+                kv_bytes_per_token=config.get("kv_bytes_per_token"),
                 reject_model_symlink=True,
                 rehash_artifacts_each_run=False,
             )
@@ -276,6 +282,8 @@ class LocalModelDeployment:
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
             output_framing=validated.output_framing,
+            runtime_scratch_bytes=validated.runtime_scratch_bytes,
+            kv_bytes_per_token=validated.kv_bytes_per_token,
             manifest_digest=_stable_digest(payload),
         )
         deployment.verify_artifacts()
@@ -315,6 +323,8 @@ class LocalModelDeployment:
             temperature=self.temperature,
             extra_args=self.extra_args,
             output_framing=self.output_framing,
+            runtime_scratch_bytes=self.runtime_scratch_bytes,
+            kv_bytes_per_token=self.kv_bytes_per_token,
             reject_model_symlink=True,
             rehash_artifacts_each_run=rehash_artifacts_each_run,
         )
@@ -374,6 +384,8 @@ def create_local_model_deployment(
     timeout_seconds: float = 120.0,
     output_framing: str = "raw",
     runtime_profile: str = "raw",
+    runtime_scratch_bytes: int = 512 * 1024 * 1024,
+    kv_bytes_per_token: int | None = None,
 ) -> LocalModelDeployment:
     """Prepare a pinned configuration from existing files, without execution.
 
@@ -431,6 +443,8 @@ def create_local_model_deployment(
         reject_model_symlink=True,
         extra_args=extra_args,
         batch_size=512 if completion_profile else None,
+        runtime_scratch_bytes=runtime_scratch_bytes,
+        kv_bytes_per_token=kv_bytes_per_token,
     )
     payload = {
         "schema_version": SCHEMA,
@@ -448,6 +462,8 @@ def create_local_model_deployment(
             "temperature": 0.0,
             "extra_args": list(validated.extra_args),
             "output_framing": validated.output_framing,
+            "runtime_scratch_bytes": validated.runtime_scratch_bytes,
+            "kv_bytes_per_token": validated.kv_bytes_per_token,
         },
     }
     if completion_profile:

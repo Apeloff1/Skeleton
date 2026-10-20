@@ -42,6 +42,7 @@ LOCAL_MAINTENANCE_KINDS = frozenset({
 _MAX_PAYLOAD_BYTES = 16_384
 _MAX_OUTPUT_BYTES = 32_768
 _MAX_RETAINED_EVENTS = 4096
+_MAX_CHUNK_BYTES = 65_536
 _TASK_COLUMNS = (
     "task_id,scope_id,kind,source_digest,payload_digest,payload_json,priority,"
     "state,attempts,failures,next_run_ns,created_at_ns,updated_at_ns,"
@@ -116,6 +117,8 @@ CREATE TABLE IF NOT EXISTS jeeves_idle_maintenance_lease (
 );
 CREATE INDEX IF NOT EXISTS jeeves_idle_maintenance_scope_lease
     ON jeeves_idle_maintenance_lease(scope_id,state);
+CREATE INDEX IF NOT EXISTS jeeves_idle_maintenance_task_lease
+    ON jeeves_idle_maintenance_lease(task_id,state);
 CREATE TABLE IF NOT EXISTS jeeves_idle_maintenance_clock (
     host_id TEXT PRIMARY KEY,
     boot_id TEXT NOT NULL,
@@ -125,6 +128,33 @@ CREATE TABLE IF NOT EXISTS jeeves_idle_maintenance_clock (
     jump_count INTEGER NOT NULL,
     last_jump_reason TEXT
 );
+CREATE TABLE IF NOT EXISTS jeeves_idle_maintenance_chunk (
+    continuation_id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    scope_id TEXT NOT NULL,
+    source_digest TEXT NOT NULL,
+    handler_version TEXT NOT NULL,
+    payload_digest TEXT NOT NULL,
+    task_json TEXT NOT NULL,
+    result_json TEXT,
+    result_digest TEXT,
+    recorded_at_ns INTEGER NOT NULL,
+    producer_owner_id TEXT NOT NULL,
+    producer_attempt INTEGER NOT NULL,
+    producer_fence INTEGER NOT NULL,
+    verified_intent_digest TEXT,
+    verified_receipt_json TEXT,
+    verified_receipt_digest TEXT,
+    verified_at_ns INTEGER,
+    ack_state TEXT NOT NULL,
+    ack_failures INTEGER NOT NULL,
+    next_ack_ns INTEGER NOT NULL,
+    last_ack_error TEXT
+);
+CREATE INDEX IF NOT EXISTS jeeves_idle_maintenance_chunk_ack
+    ON jeeves_idle_maintenance_chunk(ack_state,next_ack_ns);
+CREATE INDEX IF NOT EXISTS jeeves_idle_maintenance_chunk_scope
+    ON jeeves_idle_maintenance_chunk(scope_id,ack_state);
 """
 
 
@@ -215,6 +245,8 @@ class StudioMaintenancePolicy:
     priority_aging_ms: int = 30_000
     clock_jump_tolerance_ms: int = 5000
     maximum_owner_heartbeat_ms: int = 15_000
+    maximum_chunk_results: int = 1024
+    maximum_ack_retries_per_tick: int = 4
 
     def __post_init__(self) -> None:
         if type(self.enabled) is not bool or type(self.augmentation_enabled) is not bool:
@@ -238,6 +270,8 @@ class StudioMaintenancePolicy:
             "priority_aging_ms": (1000, 86_400_000),
             "clock_jump_tolerance_ms": (100, 60_000),
             "maximum_owner_heartbeat_ms": (1000, 300_000),
+            "maximum_chunk_results": (1, 16_384),
+            "maximum_ack_retries_per_tick": (1, 16),
         }
         for key, (minimum, maximum) in bounds.items():
             value = getattr(self, key)
@@ -303,6 +337,8 @@ class MaintenanceHandler:
 
     Use the stable task_id for local candidate/snapshot idempotency. A handler
     may compact derived replay buffers, never authoritative terminal receipts.
+    Handlers execute synchronously in the owner process and drain all physical
+    work before returning; detached threads or subprocess work are not allowed.
     """
 
     callback: Callable[[MaintenanceTask, IdleWorkCheckpoint], Mapping[str, Any] | MaintenanceResult]
@@ -321,6 +357,7 @@ class _AttemptContext:
     handler: MaintenanceHandler
     output: MaintenanceResult | None = None
     receipt: HostIdleWorkReceipt | None = None
+    controller: StudioMaintenanceController | None = None
 
 
 class StudioMaintenanceController:
@@ -340,6 +377,7 @@ class StudioMaintenanceController:
         owner_id: str | None = None,
         host_id: str | None = None,
         host_confirm_drained: Callable[[Mapping[str, Any]], bool | None] | None = None,
+        after_verified_chunk: Callable[[MaintenanceTask, MaintenanceResult, HostIdleWorkReceipt], Any] | None = None,
     ) -> None:
         if not isinstance(executor, JeevesIdleWorkExecutor):
             raise IdleRuntimeError("maintenance requires the existing idle executor")
@@ -353,6 +391,9 @@ class StudioMaintenanceController:
             raise IdleRuntimeError("maintenance drain verifier must be host-owned")
         self._identity = _local_identity(owner_id=owner_id, host_id=host_id)
         self._host_confirm_drained = host_confirm_drained
+        if after_verified_chunk is not None and not callable(after_verified_chunk):
+            raise IdleRuntimeError("verified maintenance acknowledgement must be host-owned")
+        self._after_verified_chunk = after_verified_chunk
         self._state_lock = RLock()
         self._tick_lock = Lock()
         self._foreground_requests = 0
@@ -380,6 +421,7 @@ class StudioMaintenanceController:
                     "continuation_index": "INTEGER NOT NULL DEFAULT 0",
                     "continuation_id": "TEXT",
                     "handler_version": "TEXT NOT NULL DEFAULT ''",
+                    "recovery_checked_ns": "INTEGER NOT NULL DEFAULT 0",
                 }
                 for name, declaration in additions.items():
                     if name not in columns:
@@ -627,7 +669,7 @@ class StudioMaintenanceController:
                                  task_id: str, now_ns: int, lease_ns: int) -> int | None:
         db = self._executor._db
         row = db.execute(
-            "SELECT owner_id,fencing_token,state,lease_until_ns FROM "
+            "SELECT owner_id,fencing_token,state,lease_until_ns,task_id FROM "
             "jeeves_idle_maintenance_lease WHERE resource_id=?", (resource_id,),
         ).fetchone()
         if row is None:
@@ -636,8 +678,15 @@ class StudioMaintenanceController:
                 (resource_id, scope_id, self._identity["owner_id"], now_ns, now_ns + lease_ns, task_id),
             )
             return 1
-        owner, token, state, expires = row
+        owner, token, state, expires, prior_task = row
         if state != "released" and (expires > now_ns or not self._owner_drained(owner)):
+            return None
+        if state != "released" and prior_task is not None and db.execute(
+            "SELECT 1 FROM jeeves_idle_maintenance_task WHERE task_id=? AND state='running'",
+            (prior_task,),
+        ).fetchone() is not None:
+            # Recover both old fences and its task in one transaction first.
+            # Stealing just the host fence can otherwise orphan the old scope.
             return None
         changed = db.execute(
             "UPDATE jeeves_idle_maintenance_lease SET owner_id=?,fencing_token=?,state='held',"
@@ -659,6 +708,21 @@ class StudioMaintenanceController:
             )
             if updated.rowcount != 1:
                 raise IdleRuntimeError("maintenance release lost its ownership fence")
+
+    def _release_drained_resources_locked(self, task: MaintenanceTask, now_ns: int) -> None:
+        """Recovery only, after positive physical drain of the prior owner.
+
+        A newer fence may already exist after an older-version takeover. Never
+        mutate that worker's lease; retire only the exact old custody still held.
+        """
+        for resource, token in (("host:" + task.host_id, task.host_fencing_token),
+                                ("scope:" + task.scope_id, task.fencing_token)):
+            self._executor._db.execute(
+                "UPDATE jeeves_idle_maintenance_lease SET state='released',lease_until_ns=0,"
+                "drained_at_ns=?,heartbeat_ns=? WHERE resource_id=? AND owner_id=? "
+                "AND fencing_token=? AND state='held' AND task_id=?",
+                (now_ns, now_ns, resource, task.owner_id, token, task.task_id),
+            )
 
     def _heartbeat_task(self, task: MaintenanceTask, policy: StudioMaintenancePolicy) -> bool:
         """Renew only the exact physical worker's scope and host fences."""
@@ -718,6 +782,223 @@ class StudioMaintenanceController:
             "(SELECT MAX(sequence)-? FROM jeeves_idle_maintenance_event)",
             (_MAX_RETAINED_EVENTS,),
         )
+
+    @staticmethod
+    def _task_json(task: MaintenanceTask) -> str:
+        return _canonical({
+            "task_id": task.task_id, "scope_id": task.scope_id, "kind": task.kind.value,
+            "source_digest": task.source_digest, "payload_json": _canonical(dict(task.payload)),
+            "attempts": task.attempt, "priority": task.priority, "created_at_ns": task.created_at_ns,
+            "owner_id": task.owner_id, "host_id": task.host_id, "scope_fence": task.fencing_token,
+            "host_fence": task.host_fencing_token, "continuation_index": task.continuation_index,
+            "continuation_id": task.continuation_id, "handler_version": task.handler_version,
+        }, maximum_bytes=_MAX_OUTPUT_BYTES)
+
+    @staticmethod
+    def _result_json(result: MaintenanceResult) -> str:
+        return _canonical({"output": dict(result.output), "complete": result.complete,
+                           "continuation": None if result.continuation is None else dict(result.continuation)},
+                          maximum_bytes=_MAX_CHUNK_BYTES)
+
+    @staticmethod
+    def _completion_digest(task: MaintenanceTask, result: MaintenanceResult) -> str:
+        return _digest({
+            "schema": "jeeves.local_maintenance_result.v1", "task_id": task.task_id,
+            "attempt": task.attempt, "owner_id": task.owner_id,
+            "fencing_token": task.fencing_token, "host_fencing_token": task.host_fencing_token,
+            "continuation_id": task.continuation_id, "kind": task.kind.value,
+            "source_digest": task.source_digest, "handler_version": task.handler_version,
+            "output_digest": _digest(dict(result.output)), "complete": result.complete,
+            "continuation_digest": None if result.continuation is None else _digest(dict(result.continuation)),
+        })
+
+    @staticmethod
+    def _decode_result(raw: str, expected_digest: str) -> MaintenanceResult:
+        if (not isinstance(raw, str) or len(raw.encode("utf-8")) > _MAX_CHUNK_BYTES
+                or sha256(raw.encode("utf-8")).hexdigest() != expected_digest):
+            raise IdleRuntimeError("maintenance chunk result proof diverged")
+        try:
+            value = json.loads(raw)
+            if not isinstance(value, dict) or set(value) != {"output", "complete", "continuation"}:
+                raise ValueError("invalid result envelope")
+            return MaintenanceResult(**value)
+        except (ValueError, TypeError, RecursionError) as exc:
+            raise IdleRuntimeError("maintenance chunk result is malformed") from exc
+
+    def _compact_chunks_locked(self) -> None:
+        # Unacknowledged verified proofs and unverified completed work stay
+        # durable. Only acknowledged/no-hook projections may be discarded.
+        self._executor._db.execute(
+            "DELETE FROM jeeves_idle_maintenance_chunk WHERE continuation_id IN "
+            "(SELECT c.continuation_id FROM jeeves_idle_maintenance_chunk c "
+            "WHERE c.ack_state IN ('acknowledged','not_required') AND NOT EXISTS "
+            "(SELECT 1 FROM jeeves_idle_maintenance_task t WHERE t.task_id=c.task_id "
+            "AND t.state IN ('ready','retry_wait','running') AND t.continuation_id=c.continuation_id) "
+            "ORDER BY c.verified_at_ns,c.continuation_id LIMIT 32)",
+        )
+        self._executor._db.execute(
+            "DELETE FROM jeeves_idle_maintenance_chunk WHERE continuation_id IN "
+            "(SELECT c.continuation_id FROM jeeves_idle_maintenance_chunk c WHERE c.result_json IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM jeeves_idle_maintenance_task t WHERE t.task_id=c.task_id "
+            "AND t.state IN ('ready','retry_wait','running')) ORDER BY c.recorded_at_ns LIMIT 32)",
+        )
+
+    def _prepare_chunk_locked(self, task: MaintenanceTask, now_ns: int,
+                              policy: StudioMaintenancePolicy) -> MaintenanceResult | None:
+        db = self._executor._db
+        payload_digest = _digest(dict(task.payload))
+        row = db.execute(
+            "SELECT task_id,scope_id,source_digest,handler_version,payload_digest,result_json,result_digest "
+            "FROM jeeves_idle_maintenance_chunk WHERE continuation_id=?", (task.continuation_id,),
+        ).fetchone()
+        identity = (task.task_id, task.scope_id, task.source_digest, task.handler_version, payload_digest)
+        if row is not None:
+            if row[:5] != identity:
+                raise IdleRuntimeError("maintenance continuation changed its source or cursor")
+            if row[5] is not None:
+                return self._decode_result(row[5], row[6])
+            db.execute(
+                "UPDATE jeeves_idle_maintenance_chunk SET task_json=?,producer_owner_id=?,"
+                "producer_attempt=?,producer_fence=? WHERE continuation_id=? AND result_json IS NULL",
+                (self._task_json(task), task.owner_id, task.attempt, task.fencing_token, task.continuation_id),
+            )
+            return None
+        self._compact_chunks_locked()
+        count = db.execute("SELECT COUNT(*) FROM jeeves_idle_maintenance_chunk").fetchone()[0]
+        if count >= policy.maximum_chunk_results:
+            raise IdleWorkPreempted("chunk_result_backpressure")
+        db.execute(
+            "INSERT INTO jeeves_idle_maintenance_chunk "
+            "(continuation_id,task_id,scope_id,source_digest,handler_version,payload_digest,task_json,"
+            "recorded_at_ns,producer_owner_id,producer_attempt,producer_fence,ack_state,ack_failures,next_ack_ns) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,'unverified',0,0)",
+            (task.continuation_id, *identity, self._task_json(task), now_ns,
+             task.owner_id, task.attempt, task.fencing_token),
+        )
+        return None
+
+    def _prepare_chunk(self, task: MaintenanceTask) -> MaintenanceResult | None:
+        with self._executor._lock:
+            db = self._executor._db
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                now = self._logical_now_locked(time_ns(), self._policy)
+                if db.execute(
+                    "SELECT 1 FROM jeeves_idle_maintenance_task WHERE task_id=? AND state='running' "
+                    "AND owner_id=? AND attempts=? AND scope_fence=? AND host_fence=?",
+                    (task.task_id, task.owner_id, task.attempt, task.fencing_token, task.host_fencing_token),
+                ).fetchone() is None:
+                    raise IdleRuntimeError("maintenance result admission lost its physical fence")
+                result = self._prepare_chunk_locked(task, now, self._policy)
+                db.execute("COMMIT")
+                return result
+            except BaseException:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
+
+    def _record_chunk(self, task: MaintenanceTask, result: MaintenanceResult) -> None:
+        raw = self._result_json(result)
+        digest = sha256(raw.encode("utf-8")).hexdigest()
+        with self._executor._lock:
+            db = self._executor._db
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                now = self._logical_now_locked(time_ns(), self._policy)
+                owned = db.execute(
+                    "SELECT 1 FROM jeeves_idle_maintenance_task WHERE task_id=? AND state='running' "
+                    "AND owner_id=? AND attempts=? AND scope_fence=? AND host_fence=?",
+                    (task.task_id, task.owner_id, task.attempt, task.fencing_token, task.host_fencing_token),
+                ).fetchone()
+                if owned is None:
+                    raise IdleRuntimeError("completed maintenance lost its physical custody")
+                changed = db.execute(
+                    "UPDATE jeeves_idle_maintenance_chunk SET result_json=?,result_digest=?,recorded_at_ns=? "
+                    "WHERE continuation_id=? AND producer_owner_id=? AND producer_attempt=? "
+                    "AND producer_fence=? AND result_json IS NULL",
+                    (raw, digest, now, task.continuation_id, task.owner_id, task.attempt, task.fencing_token),
+                ).rowcount
+                if changed != 1:
+                    raise IdleRuntimeError("maintenance chunk completion lost its reservation")
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
+
+    def _retry_acknowledgements(self, limit: int) -> int:
+        """Retire already-verified local proofs; never re-enter a work handler."""
+        if limit <= 0 or self._after_verified_chunk is None:
+            return 0
+        now = self._logical_now()
+        with self._executor._lock:
+            rows = self._executor._db.execute(
+                "SELECT task_id,continuation_id,task_json,result_json,result_digest,verified_receipt_json,"
+                "verified_receipt_digest,verified_intent_digest,ack_failures "
+                "FROM jeeves_idle_maintenance_chunk WHERE ack_state='pending' AND next_ack_ns<=? "
+                "ORDER BY next_ack_ns,verified_at_ns,continuation_id LIMIT ?", (now, limit),
+            ).fetchall()
+        for task_id, continuation, task_json, raw, digest, receipt_json, receipt_digest, intent, failures in rows:
+            error: str | None = None
+            try:
+                item = json.loads(task_json)
+                task = self._task_from_row(item, attempt=item["attempts"])
+                result = self._decode_result(raw, digest)
+                receipt_values = json.loads(receipt_json)
+                receipt_values["kind"] = IdleWorkKind(receipt_values["kind"])
+                receipt = HostIdleWorkReceipt(**receipt_values)
+                if (task.task_id != task_id or receipt.digest != receipt_digest or task.continuation_id != continuation
+                        or receipt.work_id != self._work_id(task.task_id, task.attempt)
+                        or receipt.scope_id != task.scope_id or receipt.source_digest != task.source_digest
+                        or receipt.kind is not task.kind or receipt.completed is not True
+                        or receipt.host_worker_id != task.owner_id
+                        or receipt.output_digest != _digest(dict(result.output))
+                        or receipt.external_event_digest != self._completion_digest(task, result)):
+                    raise IdleRuntimeError("verified maintenance acknowledgement proof diverged")
+                with self._executor._lock:
+                    verified = self._executor._db.execute(
+                        "SELECT state,receipt_digest FROM jeeves_idle_effect WHERE intent_digest=?", (intent,),
+                    ).fetchone()
+                if verified != (IdleExecutionState.VERIFIED.value, receipt_digest):
+                    raise IdleRuntimeError("maintenance acknowledgement lacks verified effect custody")
+                # Host callback is bounded, local and idempotent. It runs after
+                # commit with no persistence lock, foreground lock or worker.
+                acknowledgement = self._after_verified_chunk(task, result, receipt)
+                if isinstance(acknowledgement, Mapping) and acknowledgement.get("acknowledged") is False:
+                    raise IdleRuntimeError("host did not acknowledge verified maintenance")
+            except Exception as exc:
+                error = type(exc).__name__[:96]
+            with self._executor._lock:
+                db = self._executor._db
+                try:
+                    db.execute("BEGIN IMMEDIATE")
+                    if error is None:
+                        changed = db.execute(
+                            "UPDATE jeeves_idle_maintenance_chunk SET ack_state='acknowledged',"
+                            "last_ack_error=NULL WHERE continuation_id=? AND ack_state='pending' "
+                            "AND verified_receipt_digest=?", (continuation, receipt_digest),
+                        ).rowcount
+                        if changed == 1:
+                            self._event(task_id, "chunk_acknowledged", now,
+                                        {"continuation_id": continuation, "verified_receipt_digest": receipt_digest})
+                    else:
+                        failures = min(1_000_000, failures + 1)
+                        backoff = min(self._policy.maximum_backoff_ms,
+                                      self._policy.initial_backoff_ms * 2 ** min(failures - 1, 20))
+                        db.execute(
+                            "UPDATE jeeves_idle_maintenance_chunk SET ack_failures=?,next_ack_ns=?,"
+                            "last_ack_error=? WHERE continuation_id=? AND ack_state='pending' "
+                            "AND verified_receipt_digest=?",
+                            (failures, now + backoff * 1_000_000, error, continuation, receipt_digest),
+                        )
+                        self._event(task_id, "chunk_acknowledgement_deferred", now,
+                                    {"continuation_id": continuation, "error": error, "failures": failures})
+                    db.execute("COMMIT")
+                except BaseException:
+                    if db.in_transaction:
+                        db.execute("ROLLBACK")
+                    raise
+        return len(rows)
 
     def enqueue(
         self, *, kind: IdleWorkKind, scope_id: str, source_digest: str,
@@ -811,6 +1092,91 @@ class StudioMaintenanceController:
                 raise
         return {"task_id": task_id, "state": "ready", "deduplicated": False}
 
+    def retry_failed(self, *, task_id: str, scope_id: str,
+                     source_digest: str, expected_attempts: int) -> dict[str, Any]:
+        """Host-only recovery proposal; normal idle admission still owns effects.
+
+        The caller must authorize the exact scoped source. This never invokes a
+        handler or acknowledges an ambiguous outcome, and it preserves the
+        repeat-safe continuation identity and any completed chunk result.
+        """
+        _sha(task_id)
+        _sha(source_digest)
+        _identifier(scope_id, "retry scope")
+        if type(expected_attempts) is not int or not 0 <= expected_attempts <= 1_000_000:
+            raise IdleRuntimeError("host retry requires the observed attempt count")
+        with self._state_lock:
+            if self._closed or self._closing:
+                raise IdleRuntimeError("maintenance controller is closing")
+            policy = self._policy
+        with self._executor._lock:
+            db = self._executor._db
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                now = self._logical_now_locked(time_ns(), policy)
+                row = db.execute(
+                    f"SELECT {_TASK_COLUMNS} FROM jeeves_idle_maintenance_task "
+                    "WHERE task_id=? AND scope_id=? AND source_digest=?",
+                    (task_id, scope_id, source_digest),
+                ).fetchone()
+                if row is None:
+                    raise IdleRuntimeError("no retained maintenance task matches the host retry source")
+                item = dict(zip(_TASK_COLUMNS.split(","), row))
+                if item["attempts"] != expected_attempts:
+                    raise IdleRuntimeError("maintenance attempt count changed before host retry")
+                if item["state"] in ("ready", "retry_wait"):
+                    db.execute("COMMIT")
+                    return {"task_id": task_id, "source_digest": source_digest,
+                            "state": item["state"], "attempts": item["attempts"], "deduplicated": True}
+                if item["state"] != "failed":
+                    raise IdleRuntimeError("host retry requires a failed, physically drained task")
+                if expected_attempts >= 1_000_000:
+                    raise IdleRuntimeError("maintenance attempt budget exhausted; a new task is required")
+                kind = IdleWorkKind(item["kind"])
+                handler = self._handlers.get(kind)
+                if handler is None or item["handler_version"] != handler.version:
+                    raise IdleRuntimeError("maintenance handler changed; a new source-bound task is required")
+                held = db.execute(
+                    "SELECT 1 FROM jeeves_idle_maintenance_lease WHERE task_id=? AND state='held'", (task_id,),
+                ).fetchone()
+                if held is not None:
+                    raise IdleRuntimeError("failed maintenance still holds physical custody")
+                if (item["attempts"] > 0 and item["drained_at_ns"] is None
+                        and not self._owner_drained(item["owner_id"])):
+                    raise IdleRuntimeError("failed maintenance lacks physical drain proof")
+                queued = db.execute(
+                    "SELECT COUNT(*) FROM jeeves_idle_maintenance_task "
+                    "WHERE state IN ('ready','retry_wait','running')",
+                ).fetchone()[0]
+                scoped = db.execute(
+                    "SELECT COUNT(*) FROM jeeves_idle_maintenance_task WHERE scope_id=? "
+                    "AND state IN ('ready','retry_wait','running')", (scope_id,),
+                ).fetchone()[0]
+                if (queued >= policy.maximum_queue
+                        or scoped >= min(policy.maximum_queue, policy.maximum_scope_queue)):
+                    raise IdleRuntimeError("maintenance retry exceeds the host or scope queue budget")
+                db.execute(
+                    "UPDATE jeeves_idle_maintenance_task SET state='ready',failures=0,"
+                    "next_run_ns=?,updated_at_ns=?,last_error=NULL,drained_at_ns=COALESCE(drained_at_ns,?) "
+                    "WHERE task_id=? AND state='failed' AND attempts=?",
+                    (now, now, now, task_id, expected_attempts),
+                )
+                retained = db.execute(
+                    "SELECT 1 FROM jeeves_idle_maintenance_chunk WHERE continuation_id=? "
+                    "AND result_json IS NOT NULL", (item["continuation_id"],),
+                ).fetchone() is not None
+                self._event(task_id, "host_retry_queued", now,
+                            {"scope_id": scope_id, "source_digest": source_digest,
+                             "continuation_id": item["continuation_id"], "retained_result": retained})
+                db.execute("COMMIT")
+                return {"task_id": task_id, "source_digest": source_digest, "state": "ready",
+                        "attempts": item["attempts"], "deduplicated": False,
+                        "retained_result": retained}
+            except BaseException:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
+
     def _compact_terminal(self, retained: int) -> None:
         # These are bounded local queue projections. Any attempt that entered
         # a handler keeps its first authoritative effect claim as a permanent
@@ -821,6 +1187,20 @@ class StudioMaintenanceController:
             "(SELECT task_id FROM jeeves_idle_maintenance_task "
             "WHERE state IN ('completed','failed') "
             "ORDER BY updated_at_ns DESC,task_id LIMIT -1 OFFSET ?)", (retained,),
+        )
+        self._compact_chunks_locked()
+        # Drained process presence is operational state. Keep every live or
+        # unresolved reference and all immutable effect receipts separately.
+        self._executor._db.execute(
+            "DELETE FROM jeeves_idle_maintenance_owner WHERE owner_id IN "
+            "(SELECT o.owner_id FROM jeeves_idle_maintenance_owner o WHERE o.state='drained' "
+            "AND o.owner_id!=? AND NOT EXISTS (SELECT 1 FROM jeeves_idle_maintenance_lease l "
+            "WHERE l.owner_id=o.owner_id AND l.state='held') AND NOT EXISTS "
+            "(SELECT 1 FROM jeeves_idle_maintenance_task t WHERE t.owner_id=o.owner_id "
+            "AND t.state IN ('ready','retry_wait','running')) AND NOT EXISTS "
+            "(SELECT 1 FROM jeeves_idle_maintenance_chunk c WHERE c.producer_owner_id=o.owner_id "
+            "AND c.ack_state IN ('pending','unverified')) ORDER BY o.heartbeat_ns LIMIT 32)",
+            (self._identity["owner_id"],),
         )
 
     def _claim(self, now_ns: int, policy: StudioMaintenancePolicy) -> MaintenanceTask | None:
@@ -842,13 +1222,19 @@ class StudioMaintenanceController:
                 # its process/boot/start identity no longer exists.
                 expired = db.execute(
                     f"SELECT {_TASK_COLUMNS} FROM jeeves_idle_maintenance_task "
-                    "WHERE state='running' AND lease_until_ns<=? LIMIT ?",
-                    (now_ns, min(32, policy.maximum_queue)),
+                    "WHERE state='running' AND lease_until_ns<=? "
+                    "ORDER BY CASE WHEN host_id=? THEN 0 ELSE 1 END,"
+                    "recovery_checked_ns,updated_at_ns,task_id LIMIT ?",
+                    (now_ns, self._identity["host_id"], min(32, policy.maximum_queue)),
                 ).fetchall()
                 blocked = False
                 for expired_row in expired:
                     stale = dict(zip(_TASK_COLUMNS.split(","), expired_row))
                     task_id = stale["task_id"]
+                    db.execute(
+                        "UPDATE jeeves_idle_maintenance_task SET recovery_checked_ns=? WHERE task_id=?",
+                        (now_ns, task_id),
+                    )
                     if not self._owner_drained(stale["owner_id"]):
                         blocked = True
                         if stale["last_error"] != "recovery_blocked_owner_alive_or_unknown":
@@ -863,7 +1249,7 @@ class StudioMaintenanceController:
                         continue
                     if stale["owner_id"] is not None and stale["scope_fence"]:
                         stale_task = self._task_from_row(stale, attempt=stale["attempts"])
-                        self._release_resources_locked(stale_task, now_ns)
+                        self._release_drained_resources_locked(stale_task, now_ns)
                     db.execute(
                         "UPDATE jeeves_idle_maintenance_task SET state='retry_wait',"
                         "next_run_ns=?,updated_at_ns=?,lease_until_ns=0,"
@@ -928,6 +1314,18 @@ class StudioMaintenanceController:
                             "cursor_digest": _digest(json.loads(item["payload_json"])),
                         })
                     task = self._task_from_row(item, attempt=item["attempts"] + 1)
+                    self._compact_chunks_locked()
+                    has_chunk = db.execute(
+                        "SELECT 1 FROM jeeves_idle_maintenance_chunk WHERE continuation_id=?",
+                        (task.continuation_id,),
+                    ).fetchone() is not None
+                    if (not has_chunk and db.execute(
+                        "SELECT COUNT(*) FROM jeeves_idle_maintenance_chunk",
+                    ).fetchone()[0] >= policy.maximum_chunk_results):
+                        db.execute("ROLLBACK TO maintenance_candidate")
+                        db.execute("RELEASE maintenance_candidate")
+                        self._last_reason = "result_backpressure"
+                        continue
                     changed = db.execute(
                         "UPDATE jeeves_idle_maintenance_task SET state='running',attempts=?,"
                         "updated_at_ns=?,lease_until_ns=?,heartbeat_ns=?,owner_id=?,host_id=?,"
@@ -938,6 +1336,7 @@ class StudioMaintenanceController:
                     ).rowcount
                     if changed != 1:
                         raise IdleRuntimeError("maintenance claim lost its compare-and-swap")
+                    self._prepare_chunk_locked(task, now_ns, policy)
                     db.execute(
                         "UPDATE jeeves_idle_maintenance_owner SET physical_tasks=1,heartbeat_ns=? "
                         "WHERE owner_id=? AND state='live'", (now_ns, task.owner_id),
@@ -985,6 +1384,12 @@ class StudioMaintenanceController:
             if (type(item["continuation_index"]) is not int
                     or not 0 <= item["continuation_index"] <= 1_000_000):
                 raise ValueError("invalid continuation index")
+            if item["continuation_id"] != _digest({
+                "task_id": item["task_id"], "source_digest": item["source_digest"],
+                "handler_version": item["handler_version"], "index": item["continuation_index"],
+                "cursor_digest": _digest(payload),
+            }):
+                raise ValueError("continuation identity diverged from its exact cursor")
         except (ValueError, TypeError, KeyError, RecursionError) as exc:
             raise IdleRuntimeError("invalid persisted maintenance task") from exc
         return MaintenanceTask(
@@ -1001,6 +1406,7 @@ class StudioMaintenanceController:
         self, task: MaintenanceTask, *, now_ns: int, policy: StudioMaintenancePolicy,
         state: str, reason: str | None, intent: str | None = None,
         result: MaintenanceResult | None = None,
+        receipt: HostIdleWorkReceipt | None = None,
     ) -> None:
         with self._executor._lock:
             db = self._executor._db
@@ -1053,6 +1459,26 @@ class StudioMaintenanceController:
                 elif state == "retry_wait":
                     next_run_ns += policy.preemption_backoff_ms * 1_000_000
                 elif state == "completed":
+                    if result is None or receipt is None or intent is None:
+                        raise IdleRuntimeError("completed chunk requires its verified result and receipt")
+                    custody = db.execute(
+                        "SELECT state,receipt_digest,work_id,source_digest FROM jeeves_idle_effect "
+                        "WHERE intent_digest=?", (intent,),
+                    ).fetchone()
+                    if custody != (IdleExecutionState.VERIFIED.value, receipt.digest,
+                                    self._work_id(task.task_id, task.attempt), task.source_digest):
+                        raise IdleRuntimeError("maintenance cursor cannot advance without verified effect custody")
+                    result_digest = sha256(self._result_json(result).encode("utf-8")).hexdigest()
+                    admitted = db.execute(
+                        "UPDATE jeeves_idle_maintenance_chunk SET verified_intent_digest=?,"
+                        "verified_receipt_json=?,verified_receipt_digest=?,verified_at_ns=?,ack_state=?,"
+                        "next_ack_ns=?,task_json=? WHERE continuation_id=? AND result_digest=?",
+                        (intent, _canonical(asdict(receipt), maximum_bytes=_MAX_OUTPUT_BYTES),
+                         receipt.digest, now_ns, "pending" if self._after_verified_chunk is not None else "not_required",
+                         now_ns, self._task_json(task), task.continuation_id, result_digest),
+                    ).rowcount
+                    if admitted != 1:
+                        raise IdleRuntimeError("maintenance cursor lost its durable chunk result")
                     failures = 0
                     db.execute(
                         "DELETE FROM jeeves_idle_maintenance_circuit WHERE scope_id=? AND kind=?",
@@ -1111,6 +1537,7 @@ class StudioMaintenanceController:
         try:
             if not self.heartbeat():
                 return {"state": "closed", "processed": 0}
+            acknowledgements = self._retry_acknowledgements(self._policy.maximum_ack_retries_per_tick)
             with self._state_lock:
                 policy = self._policy
                 generation = self._foreground_generation
@@ -1146,14 +1573,14 @@ class StudioMaintenanceController:
                 task = self._claim(now_ns, policy)
                 if task is None:
                     with self._state_lock:
-                        if self._last_reason not in ("lease_contended", "recovery_blocked", "host_foreground_preemption"):
+                        if self._last_reason not in ("lease_contended", "recovery_blocked", "host_foreground_preemption", "result_backpressure"):
                             self._last_reason = "idle"
                     break
                 with self._state_lock:
                     self._active_tasks = 1
                     self._last_run_ns = now_ns
                     self._last_reason = "running"
-                context = _AttemptContext(task, self._handlers[task.kind])
+                context = _AttemptContext(task, self._handlers[task.kind], controller=self)
                 candidate = IdleWorkCandidate(
                     work_id=self._work_id(task.task_id, task.attempt),
                     scope_id=task.scope_id, source_digest=task.source_digest,
@@ -1184,7 +1611,7 @@ class StudioMaintenanceController:
                         raise IdleWorkPreempted("chunk_idle_compliance_unconfirmed")
                     self._finish(task, now_ns=self._completion_time(now_ns), policy=policy,
                                  state="completed", reason=None, intent=intent,
-                                 result=context.output)
+                                 result=context.output, receipt=context.receipt)
                     processed += 1
                 except IdleWorkPreempted as exc:
                     self._finish(task, now_ns=self._completion_time(now_ns), policy=policy,
@@ -1204,6 +1631,9 @@ class StudioMaintenanceController:
                 finally:
                     with self._state_lock:
                         self._active_tasks = 0
+            # Acknowledgement failures cannot enter the chunk failure handler:
+            # the verified effect and advanced cursor have already committed.
+            self._retry_acknowledgements(max(0, policy.maximum_ack_retries_per_tick - acknowledgements))
             with self._state_lock:
                 if self._last_reason == "running":
                     self._last_reason = "idle"
@@ -1253,18 +1683,18 @@ class StudioMaintenanceController:
             scope_clause = "" if scope_id is None else " WHERE scope_id=?"
             scope_params: tuple[Any, ...] = () if scope_id is None else (scope_id,)
             rows = db.execute(
-                "SELECT task_id,scope_id,kind,state,priority,attempts,failures,"
+                "SELECT task_id,scope_id,source_digest,kind,state,priority,attempts,failures,"
                 "next_run_ns,updated_at_ns,last_error,output_digest,owner_id,host_id,"
                 "scope_fence,host_fence,continuation_index,continuation_id,heartbeat_ns,"
-                "lease_until_ns,drained_at_ns "
+                "lease_until_ns,drained_at_ns,handler_version "
                 "FROM jeeves_idle_maintenance_task" + scope_clause
                 + " ORDER BY updated_at_ns DESC,task_id LIMIT ?",
                 (*scope_params, limit),
             ).fetchall()
-            keys = ("task_id", "scope_id", "kind", "state", "priority", "attempts", "failures",
+            keys = ("task_id", "scope_id", "source_digest", "kind", "state", "priority", "attempts", "failures",
                     "next_run_ns", "updated_at_ns", "last_error", "output_digest", "owner_id", "host_id",
                     "fencing_token", "host_fencing_token", "continuation_index", "continuation_id",
-                    "heartbeat_ns", "lease_until_ns", "drained_at_ns")
+                    "heartbeat_ns", "lease_until_ns", "drained_at_ns", "handler_version")
             queued, next_run = db.execute(
                 "SELECT COUNT(*),MIN(next_run_ns) FROM jeeves_idle_maintenance_task "
                 "WHERE state IN ('ready','running','retry_wait')"
@@ -1300,9 +1730,58 @@ class StudioMaintenanceController:
                 "FROM jeeves_idle_maintenance_owner WHERE host_id=? AND state!='drained'",
                 (self._identity["host_id"],),
             ).fetchone()
+            chunks = db.execute(
+                "SELECT COUNT(*),COALESCE(SUM(result_json IS NULL),0),"
+                "COALESCE(SUM(ack_state='unverified' AND result_json IS NOT NULL),0),"
+                "COALESCE(SUM(ack_state='pending'),0),COALESCE(SUM(ack_failures),0),"
+                "MIN(CASE WHEN ack_state='pending' THEN next_ack_ns END) "
+                "FROM jeeves_idle_maintenance_chunk" + scope_clause, scope_params,
+            ).fetchone()
+            shared_chunks = db.execute("SELECT COUNT(*) FROM jeeves_idle_maintenance_chunk").fetchone()[0]
+            ack_error = db.execute(
+                "SELECT last_ack_error FROM jeeves_idle_maintenance_chunk WHERE last_ack_error IS NOT NULL"
+                + ("" if scope_id is None else " AND scope_id=?")
+                + " ORDER BY next_ack_ns DESC LIMIT 1", scope_params,
+            ).fetchone()
+            recovery_checked = db.execute(
+                "SELECT MAX(recovery_checked_ns) FROM jeeves_idle_maintenance_task" + scope_clause,
+                scope_params,
+            ).fetchone()[0]
+            tasks = [dict(zip(keys, row)) for row in rows]
+            if scope_id is not None:
+                shared_queue = db.execute(
+                    "SELECT COUNT(*) FROM jeeves_idle_maintenance_task "
+                    "WHERE state IN ('ready','retry_wait','running')",
+                ).fetchone()[0]
+                for task in tasks:
+                    try:
+                        handler = self._handlers.get(IdleWorkKind(task["kind"]))
+                    except ValueError:
+                        handler = None
+                    reason = None
+                    if task["state"] != "failed":
+                        reason = "not_failed"
+                    elif task["attempts"] >= 1_000_000:
+                        reason = "attempt_limit"
+                    elif handler is None:
+                        reason = "handler_unavailable"
+                    elif handler.version != task["handler_version"]:
+                        reason = "handler_changed"
+                    elif db.execute(
+                        "SELECT 1 FROM jeeves_idle_maintenance_lease WHERE task_id=? AND state='held'",
+                        (task["task_id"],),
+                    ).fetchone() is not None:
+                        reason = "custody_held"
+                    elif task["attempts"] > 0 and task["drained_at_ns"] is None:
+                        reason = "drain_unproven"
+                    elif (shared_queue >= policy["maximum_queue"]
+                          or queued >= min(policy["maximum_scope_queue"], policy["maximum_queue"])):
+                        reason = "queue_full"
+                    task["retryable"] = reason is None
+                    task["retry_reason"] = reason
         result = {"schema": "jeeves.studio_maintenance.v1", "policy": policy,
                   "status": status, "queued_tasks": queued,
-                  "recent_tasks": [dict(zip(keys, row)) for row in rows],
+                  "recent_tasks": tasks,
                   "circuits": [dict(zip(("scope_id", "kind", "failures", "open_until_ns", "last_error"), row))
                                for row in circuits],
                   "execution_authority": "host-local-derived-only"}
@@ -1320,6 +1799,17 @@ class StudioMaintenanceController:
             "blocked_tasks": blocked,
             "clock_jump_count": None if clock is None else clock[0],
             "last_clock_jump_reason": None if clock is None else clock[1],
+            "last_checked_ns": recovery_checked,
+        }
+        result["chunk_results"] = {
+            "retained": chunks[0], "reserved": chunks[1], "reusable_unverified": chunks[2],
+            "shared_retained": shared_chunks, "maximum": policy["maximum_chunk_results"],
+            "backpressure": shared_chunks >= policy["maximum_chunk_results"],
+        }
+        result["acknowledgements"] = {
+            "pending": chunks[3], "failed_attempts": chunks[4], "next_retry_ns": chunks[5],
+            "last_error": None if ack_error is None else ack_error[0],
+            "callback_available": self._after_verified_chunk is not None,
         }
         result["quiescence"] = {
             "host_foreground_requests": host_foreground,
@@ -1407,6 +1897,7 @@ def create_studio_maintenance(
     owner_id: str | None = None,
     host_id: str | None = None,
     host_confirm_drained: Callable[[Mapping[str, Any]], bool | None] | None = None,
+    after_verified_chunk: Callable[[MaintenanceTask, MaintenanceResult, HostIdleWorkReceipt], Any] | None = None,
 ) -> StudioMaintenanceController:
     """Build an engine-owned controller using the existing execution DB file.
 
@@ -1430,25 +1921,18 @@ def create_studio_maintenance(
         if not isinstance(context, _AttemptContext):
             raise IdleRuntimeError("maintenance worker lacks its exact host task")
         checkpoint()
-        value = context.handler.callback(context.task, checkpoint)
-        result = value if isinstance(value, MaintenanceResult) else MaintenanceResult(output=value)
+        if context.controller is None:
+            raise IdleRuntimeError("maintenance worker lacks its durable chunk owner")
+        result = context.controller._prepare_chunk(context.task)
+        if result is None:
+            checkpoint()
+            value = context.handler.callback(context.task, checkpoint)
+            result = value if isinstance(value, MaintenanceResult) else MaintenanceResult(output=value)
+            # Preserve actual callback completion before post-work pressure can
+            # interrupt receipt admission. A retry reuses this exact chunk.
+            context.controller._record_chunk(context.task, result)
         output_digest = _digest(dict(result.output))
-        external_digest = _digest({
-            "schema": "jeeves.local_maintenance_result.v1",
-            "task_id": context.task.task_id,
-            "attempt": context.task.attempt,
-            "owner_id": context.task.owner_id,
-            "fencing_token": context.task.fencing_token,
-            "host_fencing_token": context.task.host_fencing_token,
-            "continuation_id": context.task.continuation_id,
-            "kind": assignment.kind.value,
-            "source_digest": assignment.source_digest,
-            "handler_version": context.handler.version,
-            "output_digest": output_digest,
-            "complete": result.complete,
-            "continuation_digest": (None if result.continuation is None
-                                    else _digest(dict(result.continuation))),
-        })
+        external_digest = context.controller._completion_digest(context.task, result)
         context.output = result
         # Poll after preserving the completed local result. If foreground
         # demand arrived, the executor records in-doubt custody and the queue
@@ -1482,6 +1966,7 @@ def create_studio_maintenance(
         return StudioMaintenanceController(
             executor=executor, callbacks=handlers, policy=policy, owns_executor=True,
             owner_id=owner_id, host_id=host_id, host_confirm_drained=host_confirm_drained,
+            after_verified_chunk=after_verified_chunk,
         )
     except BaseException:
         executor.close()

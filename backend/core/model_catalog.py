@@ -96,6 +96,10 @@ _READINESS = {
         "The activated local model is no longer ready.",
         "Ask an administrator to verify its artifact and restart the engine.",
     ),
+    "local_serving_draining": (
+        "New work is paused for this local model.",
+        "Ask an administrator to resume admission for this model in Runtime optimization.",
+    ),
     "no_ready_model": (
         "No configured model is ready for chat.",
         "Choose a ready model or ask an administrator to configure one.",
@@ -158,8 +162,8 @@ def _text(value: object, *, maximum: int, optional: bool = False) -> str | None:
     return value
 
 
-def _integer(value: object, *, maximum: int) -> int:
-    if type(value) is not int or not 1 <= value <= maximum:
+def _integer(value: object, *, maximum: int, minimum: int = 1) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
         raise EngineProtocolError("model catalog contains an invalid capacity")
     return value
 
@@ -298,6 +302,18 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         code = "ready" if available else raw.get("readiness_code", "provider_configuration_unavailable")
         if not isinstance(code, str):
             raise EngineProtocolError("model inventory readiness code is invalid")
+        serving_state = raw.get("serving_state")
+        if serving_state is not None:
+            if not local or not isinstance(serving_state, Mapping) or type(serving_state.get("draining")) is not bool:
+                raise EngineProtocolError("model inventory serving state is invalid")
+            serving_state = {
+                "draining": serving_state["draining"],
+                "active": _integer(serving_state.get("active"), minimum=0, maximum=1_000_000),
+                "queued": _integer(serving_state.get("queued"), minimum=0, maximum=1_000_000),
+                "effective_concurrency": _integer(serving_state.get("effective_concurrency"), maximum=32),
+            }
+            if available and serving_state["draining"]:
+                available, code = False, "local_serving_draining"
         activation = _activation(raw.get("artifact"), model_id)
         if local and available and activation is None:
             raise EngineProtocolError("ready local model lacks activation identity")
@@ -385,6 +401,23 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             "readiness": readiness(code),
             "activation": activation,
         }
+        if serving_state is not None:
+            row["serving_state"] = serving_state
+        for name in ("semantic_verifier_configured", "semantic_verifier_route"):
+            if name in raw:
+                if type(raw[name]) is not bool:
+                    raise EngineProtocolError("model inventory verifier metadata is invalid")
+                row[name] = raw[name]
+        limits = raw.get("generation_limits")
+        if limits is not None:
+            if not isinstance(limits, Mapping):
+                raise EngineProtocolError("model inventory generation limits are invalid")
+            bounded_limits = {}
+            for name in ("tokenizer_max_chars", "tokenizer_max_tokens", "max_output_utf8_bytes"):
+                if name in limits:
+                    bounded_limits[name] = _integer(limits[name], maximum=1024**3)
+            if bounded_limits:
+                row["generation_limits"] = bounded_limits
         family = raw.get("model_family")
         if family is not None:
             if family not in {
@@ -427,7 +460,7 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         "available": available,
         "automatic_available": inventory["available"]
         and not any(
-            row["readiness"]["code"] == "model_context_too_small"
+            row["readiness"]["code"] in {"model_context_too_small", "local_serving_draining"}
             and (
                 row["active"]
                 or row["fallback"]

@@ -6,7 +6,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import { ChatClientError } from '../../product/chatErrors';
-import { canManageRuntimePartition, changeRuntimeOptimization, changeRuntimePartition, exportRuntimeCheckpoint, getRuntimeOptimization, MAX_RUNTIME_CHECKPOINT_BYTES, parseRuntimeCheckpoint, type RuntimeControlChange, type RuntimeControlObservation, type RuntimeLearningAction, type RuntimeLearningCheckpoint, type RuntimeLearningCheckpointFile, type RuntimeLearningPartition } from '../../product/runtimeOptimizationClient';
+import { canManageRuntimePartition, changeRuntimeOptimization, changeRuntimePartition, exportRuntimeCheckpoint, getRuntimeOptimization, MAX_RUNTIME_CHECKPOINT_BYTES, parseRuntimeCheckpoint, retryRuntimeMaintenanceTask, type RuntimeControlChange, type RuntimeControlObservation, type RuntimeLearningAction, type RuntimeLearningCheckpoint, type RuntimeLearningCheckpointFile, type RuntimeLearningPartition, type RuntimeMaintenanceTask } from '../../product/runtimeOptimizationClient';
 import { useStudioForeground } from './useStudioForeground';
 
 function number(value: unknown): number | null { return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null; }
@@ -88,6 +88,7 @@ export default function RuntimeOptimizationPanel() {
   const [pendingLearnerChange, setPendingLearnerChange] = useState<PendingLearnerChange | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingLearnerImport | null>(null);
   const [pickingFile, setPickingFile] = useState(false);
+  const [tasksExpanded, setTasksExpanded] = useState(false);
   const epoch = useRef(0);
   const requests = useRef(new Set<AbortController>());
   const refreshRequest = useRef<AbortController | null>(null);
@@ -138,6 +139,7 @@ export default function RuntimeOptimizationPanel() {
       setObserved(null); setFresh(false); setLoading(false); setCommand(''); setNotice('');
       learningOffsetRef.current = 0;
       setServingRouteId(null); setPartitionId(null); setLearningOffset(0); setPendingLearnerChange(null); setPendingImport(null); setPickingFile(false);
+      setTasksExpanded(false);
       setError('Your account changed. Refresh to observe the current account.');
       commandLock.current = false;
     }, 1000);
@@ -234,6 +236,8 @@ export default function RuntimeOptimizationPanel() {
   const replayEnabled = maintenance?.available === true ? maintenance.policy?.augmentation_enabled : undefined;
   const coordinationUnavailable = maintenance?.coordination?.state === 'degraded' || maintenance?.status?.coordination_state === 'unavailable';
   const maintenanceDisabled = disabled || coordinationUnavailable;
+  const maintenanceRetryObserved = maintenance?.available === true && maintenance.coordination?.state === 'observed' && maintenance.status?.coordination_state === 'synchronized';
+  const execution = state?.execution;
   const draining = serving?.draining;
   const currentToken = observed?.scope.token === getAuthToken();
   const selectedPartition = partitions.find(row => row.partition_id === partitionId);
@@ -293,6 +297,31 @@ export default function RuntimeOptimizationPanel() {
   const prepareLearnerChange = (action: 'reset' | 'restore_last_healthy') => {
     if (!observed || !selectedPartition || disabled || !partitionManageable) return;
     setPendingImport(null); setPendingLearnerChange({ partitionId: selectedPartition.partition_id!, stateVersion: selectedPartition.state_version!, policyVersion: observed.state.policy_version, action });
+  };
+  const retryMaintenance = async (task: RuntimeMaintenanceTask) => {
+    if (!observed || disabled || !maintenanceRetryObserved || task.retryable !== true || commandLock.current) return;
+    commandLock.current = true; refreshRequest.current?.abort();
+    const request = new AbortController(); requests.current.add(request);
+    const generation = epoch.current;
+    const valid = () => mounted.current && !request.signal.aborted && generation === epoch.current && observed.scope.token === getAuthToken();
+    setCommand('Recording failed-task retry'); setLoading(false); setError(''); setNotice('');
+    try {
+      const result = await retryRuntimeMaintenanceTask(observed, task, request.signal);
+      if (!valid()) return;
+      setNotice(`${result.result.deduplicated ? 'The same task retry was already recorded' : 'Maintenance task retry recorded'} · ${label(result.result.state)} · attempt ${count(result.result.attempts)}. Work starts only when existing maintenance policy admits it.`);
+      await reconcileConfirmed(result.observation, request, generation, observed.scope.token);
+    } catch (cause) {
+      if (!valid()) return;
+      setFresh(false);
+      const unauthorized = cause instanceof ChatClientError && cause.kind === 'authorization';
+      const message = cause instanceof ChatClientError ? cause.message : 'The maintenance retry was not confirmed.';
+      if (unauthorized) setObserved(null);
+      setError(message);
+      if (!unauthorized) {
+        try { const current = await getRuntimeOptimization(request.signal, learningOffsetRef.current); if (valid()) { setObserved(current); setFresh(true); setError(`${message} Current state has been refreshed; the retry was not replayed.`); } }
+        catch { /* A read failure cannot authorize another retry or repeat physical work. */ }
+      }
+    } finally { requests.current.delete(request); if (generation === epoch.current) { commandLock.current = false; if (mounted.current) setCommand(''); } }
   };
 
   // An account can change between the timer callback and this render.
@@ -355,10 +384,15 @@ export default function RuntimeOptimizationPanel() {
         <Text style={s.caption}>Replay adaptation starts off and runs only with idle self-maintenance enabled. It adds bounded local predictor updates; it does not train transformer weights or verify game quality.</Text>
         <Text style={s.caption}>{label(maintenance?.status?.state, 'Maintenance state unknown')} · active tasks {count(maintenance?.status?.active_tasks)} · queued {count(maintenance?.queued_tasks)}</Text>
         <View style={s.metrics}><Metric title="Maintenance owner" value={label(maintenance?.ownership?.state)} /><Metric title="Owner physical tasks" value={count(maintenance?.ownership?.physical_tasks)} /><Metric title="Host foreground work" value={count(maintenance?.quiescence?.host_foreground_requests)} /><Metric title="Registered host owners" value={count(maintenance?.quiescence?.registered_host_owners)} /><Metric title="Blocked recovery tasks" value={count(maintenance?.recovery?.blocked_tasks)} /><Metric title="Clock discontinuities" value={count(maintenance?.recovery?.clock_jump_count)} /></View>
+        <View style={s.metrics}><Metric title="Retained chunk receipts" value={count(maintenance?.chunk_results?.retained)} /><Metric title="Pending acknowledgements" value={count(maintenance?.acknowledgements?.pending)} /><Metric title="Acknowledgement failures" value={count(maintenance?.acknowledgements?.failed_attempts)} /><Metric title="Host receipt capacity" value={count(maintenance?.chunk_results?.maximum)} /></View>
+        {maintenance?.chunk_results?.backpressure === true && <Text style={s.warning}>Durable chunk results have reached their admission limit. Maintenance waits for receipt capacity before starting more physical work.</Text>}
+        {number(maintenance?.acknowledgements?.failed_attempts) !== null && Number(maintenance?.acknowledgements?.failed_attempts) > 0 && <Text style={s.warning}>A receipt acknowledgement is waiting for metadata recovery. Its retry does not repeat the optimizer update.</Text>}
         {number(maintenance?.recovery?.blocked_tasks) !== null && Number(maintenance?.recovery?.blocked_tasks) > 0 && <Text style={s.warning}>Recovery is blocked until the prior physical work is proven drained. Expired leases alone do not authorize takeover.</Text>}
         {!!maintenance?.leases?.length && <View style={s.partitionList}>{maintenance.leases.slice(0, 3).map((lease, index) => <Text key={`${lease.resource_id ?? index}:${index}`} style={s.caption}>Lease fence {count(lease.fencing_token)} · {label(lease.state)}{lease.drained_at_ns != null ? ' · drain recorded' : ''}</Text>)}</View>}
-        {!!maintenance?.recent_tasks?.length && <View style={s.partitionList}>{maintenance.recent_tasks.slice(0, 3).map((task, index) => <View key={`${task.task_id ?? index}:${index}`} style={s.partition}><Text style={s.partitionName}>{label(task.kind, 'Maintenance task')}</Text><Text style={s.caption}>{label(task.state)} · {count(task.attempts)} attempts</Text></View>)}</View>}
+        {!!maintenance?.recent_tasks?.length && <View style={s.partitionList}>{maintenance.recent_tasks.slice(0, tasksExpanded ? maintenance.recent_tasks.length : 3).map((task, index) => <View key={`${task.task_id ?? index}:${index}`} style={s.partitionChoice}><View style={s.partition}><Text style={s.partitionName}>{label(task.kind, 'Maintenance task')}</Text><Text style={s.caption}>{label(task.state)} · {count(task.attempts)} attempts</Text></View>{task.state === 'failed' && task.retryable !== true && task.retry_reason && <Text style={s.caption}>Retry unavailable: {label(task.retry_reason)}</Text>}{task.retryable === true && admin && fresh && foreground && observed && Date.now() - observed.observedAt <= 60000 && maintenanceRetryObserved && <Button title="Retry failed task" icon="refresh-outline" disabled={disabled} onPress={() => { void retryMaintenance(task); }} />}</View>)}{maintenance.recent_tasks.length > 3 && <Button title={tasksExpanded ? 'Show recent three tasks' : `Show ${maintenance.recent_tasks.length} returned tasks`} onPress={() => setTasksExpanded(expanded => !expanded)} />}<Text style={s.caption}>Retry queues the exact observed task and source at its recorded attempt count. It does not enable maintenance, resume other work or force immediate execution.</Text></View>}
       </View>
+
+      {execution && <View style={s.section}><Text style={s.rowTitle}>Execution supervision and recovery</Text>{execution.available !== true ? <Text style={s.caption}>The engine could not observe its execution supervisor. No recovery counters are inferred.</Text> : <><View style={s.metrics}><Metric title="Active executions" value={count(execution.active_executions)} /><Metric title="Lifecycle leases" value={count(execution.active_lifecycle_leases)} /><Metric title="Recovery records scanned" value={count(execution.recovery?.scanned)} /><Metric title="Recovery drivers started" value={count(execution.recovery?.started)} /><Metric title="Driver failures" value={count(execution.recovery?.driver_failures)} /><Metric title="Finalization failures" value={count(execution.recovery?.driver_finalization_failures)} /></View><Text style={s.caption}>{execution.recovery?.scan_in_progress === true ? 'Recovery scan in progress' : execution.recovery?.scan_in_progress === false ? 'Recovery scan idle' : 'Recovery scan state unknown'} · driver ceiling {count(execution.recovery?.maximum_recovery_drivers)} · page limit {count(execution.recovery?.page_limit)}</Text>{execution.faulted === true && <Text style={s.warning}>Execution supervision reports a fault. Inspect the engine before submitting replacement work.</Text>}{typeof execution.recovery?.last_error === 'string' && execution.recovery.last_error && <Text style={s.warning}>Last recovery scan error: {label(execution.recovery.last_error)}</Text>}{typeof execution.recovery?.last_driver_error === 'string' && execution.recovery.last_driver_error && <Text style={s.warning}>Last recovery driver error: {label(execution.recovery.last_driver_error)}</Text>}<Text style={s.caption}>These are aggregate engine observations. A recovery scan or issued lease does not confirm an execution result.</Text></>}</View>}
 
       <View style={s.ratchet}><Ionicons name={state.ratchet.available ? 'shield-checkmark-outline' : 'shield-outline'} size={17} color="#a78bfa" /><View style={s.policyCopy}><Text style={s.rowTitle}>Quality ratchet</Text><Text style={s.caption}>{state.ratchet.available ? 'Configured ratchet reported. Learned candidate guidance remains separate from measured promotion evidence.' : 'No configured ratchet reported by this engine. Quality improvement has not been verified here.'}</Text></View></View>
       <View style={s.actions}><Button title="Trim cache" icon="sparkles-outline" disabled={disabled || serving?.available === false} onPress={() => { void apply('Cache trim', { action: 'trim_cache' }); }} /><Button title="Clear cache" icon="trash-outline" disabled={disabled || serving?.available === false} onPress={() => { void apply('Cache cleared', { action: 'clear_cache' }); }} /><Button title={draining === true ? 'Resume admission' : 'Drain new work'} icon={draining === true ? 'play-outline' : 'pause-outline'} disabled={disabled || typeof draining !== 'boolean' || serving?.available === false} onPress={() => { void apply(draining ? 'Admission resumed' : 'New work drained', { action: draining ? 'resume' : 'drain' }); }} /></View>

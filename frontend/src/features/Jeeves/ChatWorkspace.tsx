@@ -161,19 +161,24 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     accountChatStorage(scope), sendCanonicalChat, canonicalChatHistory,
     { cancel: cancelCanonicalChat, library: canonicalChatLibrary, archive: archiveCanonicalChat, remove: deleteCanonicalChat, rename: renameCanonicalChat },
   ));
-  const { readiness, refresh: refreshModels } = useChatReadiness();
+  const { readiness, refresh: refreshModels, error: readinessError, observedAt: readinessObservedAt } = useChatReadiness();
   const [reviewResponse, setReviewResponse] = useState(false);
   const [reviewPolicy, setReviewPolicy] = useState(reviewedResponsePolicy);
   const [reviewFieldError, setReviewFieldError] = useState<string | null>(null);
   const [model, setModel] = useState<string>('automatic');
   const [modelPicker, setModelPicker] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [outputTokens, setOutputTokens] = useState(1024);
+  const [outputTokens, setOutputTokens] = useState<number | null>(null);
   const [knowledge, setKnowledge] = useState(false);
   const [knowledgeQuery, setKnowledgeQuery] = useState('');
   const selectedModel = readiness?.models.models.find(row => row.id === model);
   const modelReady = readiness?.available === true && (model === 'automatic' ? readiness.models.automatic_available : selectedModel?.selectable === true && selectedModel.available);
-  const answerTokenLimit = selectedModel ? Math.min(outputTokens, selectedModel.max_output_tokens, 16384) : undefined;
+  const automaticRoutes = readiness?.models.models.filter(row => row.active || row.fallback === true) ?? [];
+  const automaticOutputLimit = readiness?.models.automatic_available && automaticRoutes.length ? Math.min(...automaticRoutes.map(row => row.max_output_tokens)) : undefined;
+  const automaticDefaultOutput = readiness?.models.automatic_available && automaticRoutes.length ? Math.min(...automaticRoutes.map(row => row.default_output_tokens)) : undefined;
+  const observedOutputLimit = selectedModel?.max_output_tokens ?? (model === 'automatic' ? automaticOutputLimit : undefined);
+  const observedDefaultOutput = selectedModel?.default_output_tokens ?? (model === 'automatic' ? automaticDefaultOutput : undefined);
+  const answerTokenLimit = observedOutputLimit !== undefined && observedDefaultOutput !== undefined ? Math.min(outputTokens ?? observedDefaultOutput, observedOutputLimit, 16384) : undefined;
   const reviewAvailable = readiness?.capabilities.cooperative_review === true;
   const reviewIssues = cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], answerTokenLimit);
   const reviewBudgetReady = !reviewResponse || reviewAvailable && !reviewFieldError && reviewIssues.length === 0;
@@ -224,7 +229,8 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     const pending = controller.send(undefined, {
       context: requestContext,
       ...(reviewResponse ? { cooperation: reviewPolicy } : {}),
-      ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id, max_output_tokens: answerTokenLimit } : {}),
+      ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id } : {}),
+      ...(answerTokenLimit !== undefined ? { max_output_tokens: answerTokenLimit } : {}),
       ...(knowledge ? { crawler_context: { query: knowledgeQuery.trim(), max_documents: 4, max_characters: 16000 } } : {}),
     });
     void pending;
@@ -248,7 +254,7 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         <Button icon="refresh-outline" label="Refresh" disabled={busy} onPress={() => { void controller.refreshCanonical(); }} />
         <Button icon="options-outline" label="Details" onPress={() => { setTitle(conversation.title); setContext(conversation.context); setSettings(true); }} />
       </View>
-      <JeevesRuntimeStatus readiness={readiness} refresh={refreshModels} />
+      <JeevesRuntimeStatus readiness={readiness} refresh={refreshModels} readinessError={readinessError?.message} observedAt={readinessObservedAt} />
       <View style={s.chatToolbar}>
         <Button icon="hardware-chip-outline" label={selectedModel?.label || 'Automatic model'} disabled={busy} onPress={() => setModelPicker(true)} />
         <Text style={[s.small, s.flex]}>{modelReady ? 'Ready for a new turn' : 'A ready model and conversation storage are required'}</Text>
@@ -301,10 +307,10 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
       <View style={s.sectionHeader}><Text style={s.sectionTitle}>Choose a model</Text><Button icon="close" label="Close" onPress={() => setModelPicker(false)} /></View>
       <Text style={s.small}>The engine owns model availability and credentials. A selection applies to the next new turn; Resume keeps the original saved selection.</Text>
       <Button icon="refresh-outline" label="Refresh models" onPress={() => void refreshModels()} />
-      <Button icon="git-branch-outline" label="Automatic engine route" selected={model === 'automatic'} disabled={!readiness?.models.automatic_available} onPress={() => { setModel('automatic'); setModelPicker(false); }} />
+      <Button icon="git-branch-outline" label="Automatic engine route" selected={model === 'automatic'} disabled={!readiness?.models.automatic_available} onPress={() => { setModel('automatic'); setOutputTokens(null); setModelPicker(false); }} />
       {!readiness && <Text style={s.error}>The configured model catalog could not be observed. Open Setup and refresh.</Text>}
-      {readiness?.models.models.map(row => <View key={row.id} style={s.artifact}><Text style={s.label}>{row.label}</Text><Text style={s.small}>{row.readiness.message}{row.credential_free ? ' · Local, no hosted credential required' : ''}</Text>{row.readiness.action && <Text style={s.small}>{row.readiness.action}</Text>}<ChatModelCapabilities modelFamily={row.model_family} capabilities={row.capabilities} contextWindow={row.context_window} outputLimit={row.max_output_tokens} /><Button icon="checkmark-outline" label={row.selectable ? model === row.id ? 'Selected' : 'Use model' : 'Unavailable'} disabled={!row.selectable} selected={model === row.id} onPress={() => { setModel(row.id); setOutputTokens(Math.min(row.default_output_tokens, row.max_output_tokens, 16384)); setModelPicker(false); }} /></View>)}
-      {selectedModel && <><Text style={s.label}>Maximum answer tokens</Text><View style={s.row}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= selectedModel.max_output_tokens).map(value => <Button key={value} icon="text-outline" label={String(value)} selected={outputTokens === value} onPress={() => setOutputTokens(value)} />)}</View></>}
+      {readiness?.models.models.map(row => <View key={row.id} style={s.artifact}><Text style={s.label}>{row.label}</Text><Text style={s.small}>{row.readiness.message}{row.credential_free ? ' · Local, no hosted credential required' : ''}</Text>{row.readiness.action && <Text style={s.small}>{row.readiness.action}</Text>}<ChatModelCapabilities modelFamily={row.model_family} capabilities={row.capabilities} contextWindow={row.context_window} outputLimit={row.max_output_tokens} activation={row.activation} tokenizer={row.tokenizer} limitsSource={row.limits_source} runtimeFacts={row} /><Button icon="checkmark-outline" label={row.selectable ? model === row.id ? 'Selected' : 'Use model' : 'Unavailable'} disabled={!row.selectable} selected={model === row.id} onPress={() => { setModel(row.id); setOutputTokens(Math.min(row.default_output_tokens, row.max_output_tokens, 16384)); setModelPicker(false); }} /></View>)}
+      {observedOutputLimit !== undefined && <><Text style={s.label}>Shared answer budget · {answerTokenLimit?.toLocaleString()} tokens</Text>{model === 'automatic' && <Text style={s.small}>The observed limit is the smallest capacity across the declared primary and fallback routes. Automatic routing remains engine-owned.</Text>}<View style={s.row}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= observedOutputLimit).map(value => <Button key={value} icon="text-outline" label={String(value)} selected={answerTokenLimit === value} onPress={() => setOutputTokens(value)} />)}</View></>}
       <Text style={s.small}>Attachments and all-forms generation are unavailable in canonical chat. No file is uploaded from this screen.</Text>
       <Button icon="settings-outline" label="Setup & readiness" onPress={() => { setModelPicker(false); router.push('/setup' as never); }} />
     </ScrollView></SafeAreaView></Modal>

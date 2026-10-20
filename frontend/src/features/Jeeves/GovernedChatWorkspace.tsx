@@ -173,7 +173,7 @@ export type ChatWorkspaceProps = { initialThreadId?: string };
 export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = {}) {
   const router = useRouter();
   const { controller, state } = useChatController({ initialThreadId });
-  const { readiness, refresh: refreshReadiness } = useChatReadiness();
+  const { readiness, refresh: refreshReadiness, error: readinessError, observedAt: readinessObservedAt } = useChatReadiness();
   const dragonAcademy = useDragonAcademy();
   const { width } = useWindowDimensions();
   const compact = width < 900;
@@ -505,7 +505,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           {state.activeThread && !narrow && <IconButton icon="ellipsis-horizontal" label="Conversation options" disabled={busy}
             onPress={() => { setManage({ thread: state.activeThread!, action: 'menu' }); setDialogError(null); }} />}
         </View>
-        <JeevesRuntimeStatus readiness={readiness} refresh={refreshReadiness} />
+        <JeevesRuntimeStatus readiness={readiness} refresh={refreshReadiness} readinessError={readinessError?.message} observedAt={readinessObservedAt} />
         <View style={s.companionToggle}><MiniButton icon="sparkles-outline" label={companionOpen ? 'Hide companion' : 'Show companion'} onPress={() => setCompanionOpen(open => !open)} /></View>
         </View>
         {companionOpen && <ScrollView style={[s.companionDock, { top: headerHeight + 8, bottom: composerHeight + 12 }, compact && s.companionDockCompact]} keyboardShouldPersistTaps="handled">
@@ -627,7 +627,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
             <Text style={[s.badge, (!model.selectable || !model.available) && s.unavailableBadge]}>{model.selectable && model.available ? 'Ready' : 'Unavailable'}</Text>
             {model.id === state.selectedModelId && <Ionicons name="checkmark-circle" size={19} color={C.primaryHover} />}</View>
           <Text style={s.modelDetails}>{model.selectable && model.available ? model.credential_free ? 'Runs locally' : 'Connected model' : model.readiness?.message || 'This model is not ready to use.'}</Text>
-          <ChatModelCapabilities modelFamily={model.model_family} capabilities={model.capabilities} contextWindow={model.context_window} outputLimit={model.max_output_tokens} />
+          <ChatModelCapabilities modelFamily={model.model_family} capabilities={model.capabilities} contextWindow={model.context_window} outputLimit={model.max_output_tokens} activation={model.activation} tokenizer={model.tokenizer} limitsSource={model.limits_source} runtimeFacts={model} />
         </TouchableOpacity>)}
       </ScrollView>
       {selectedModel && <View style={{ gap: 8 }}><Text style={s.dialogBody}>Shared answer token budget · {answerTokenLimit.toLocaleString()}</Text><View style={[s.row, { flexWrap: 'wrap' }]}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= (selectedModel.max_output_tokens ?? 0)).map(value => <MiniButton key={value} icon={answerTokenLimit === value ? 'checkmark-circle-outline' : 'ellipse-outline'} label={value.toLocaleString()} disabled={busy} onPress={() => setOutputTokens(value)} />)}</View></View>}
