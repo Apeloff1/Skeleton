@@ -136,9 +136,10 @@ assert len(MAP) == 25 and len(OBJECTS) == 25
 
 
 class RealForgeStudioAuthoringTests(unittest.TestCase):
-    def test_fifty_distinct_supported_game_edits(self):
-        self.assertEqual(50, len(AUTHORING_ACTIONS))
-        self.assertEqual(set(PARAMETERS), set(AUTHORING_ACTIONS))
+    def test_first_fifty_distinct_supported_game_edits(self):
+        self.assertEqual(100, len(AUTHORING_ACTIONS))
+        self.assertEqual(50, len(PARAMETERS))
+        self.assertTrue(set(PARAMETERS) <= set(AUTHORING_ACTIONS))
 
     def test_batch_edits_real_tile_geometry_quest_and_actor(self):
         original = project()
