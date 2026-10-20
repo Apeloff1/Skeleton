@@ -106,6 +106,7 @@ class QualityHistoryStore:
             if obj.get("schema") not in (
                     "game.candidate.deep_quality.v1",
                     "game.candidate.frontier_quality.v1",
+                    "game.candidate.complete_studio.v1",
             ):
                 raise QualityGateError("wrong report authority schema")
             if obj.get("release_certified") is not False:
@@ -115,10 +116,18 @@ class QualityHistoryStore:
                 "traceability", "quests", "accessibility", "controls",
                 "resources", "session", "package",
             )
-            if obj["schema"] == "game.candidate.frontier_quality.v1":
+            if obj["schema"] in (
+                    "game.candidate.frontier_quality.v1",
+                    "game.candidate.complete_studio.v1",
+            ):
                 expected_gates += (
                     "lineage", "continuity", "routes", "physics", "lod",
                     "localization", "comparison",
+                )
+            if obj["schema"] == "game.candidate.complete_studio.v1":
+                expected_gates += (
+                    "cinematics", "dialogue_sync", "npc_behaviors", "streaming",
+                    "save_migrations", "dynamic_world", "input_latency",
                 )
             gates = obj.get("gates")
             if (type(gates) is not list or len(gates) != len(expected_gates) or
