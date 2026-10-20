@@ -18,6 +18,13 @@ def test_full_campaign_cli_builds_runnable_authored_artifacts_and_all_receipts(t
     assert report["original_generated_meshes"]>10
     assert report["original_npc_cast"]==3
     assert len(report["original_skeletal_rig_digest"])==64
+    assert len(report["foot_ik_receipt"])==64
+    assert len(report["ragdoll_receipt"])==64
+    assert len(report["npc_supply_receipt"])==64
+    assert len(report["actor_blocking_receipt"])==64
+    assert len(report["controller_parity_receipt"])==64
+    assert len(report["soak_recovery_receipt"])==64
+    assert report["real_controller_devices_qualified"]==0
     assert len(report["elastic_skin_receipt"])==64
     assert len(report["faction_economy_receipt"])==64
     assert len(report["facial_performance_receipt"])==64

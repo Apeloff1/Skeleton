@@ -208,3 +208,46 @@ def test_advanced_game_artifacts_cannot_be_replaced_after_source_recompile():
                 tampered,project_id="campaign",gdd_digest=GDD,
                 seed=13,islands=5,
             )
+
+
+
+def test_additional_seven_original_systems_compile_with_source_receipts_and_replay():
+    original=compile_game()
+    manifest=original["manifest"]
+    for name in (
+        "game/frontier/foot_ik.json",
+        "game/frontier/ragdoll.json",
+        "game/frontier/supply_chain.json",
+        "game/frontier/actor_blocking.json",
+        "game/frontier/actor_blocking.gd",
+        "game/frontier/viewport_capture.gd",
+        "game/frontier/controller_era_parity.json",
+        "game/frontier/process_soak.json",
+    ):
+        assert name in original["files"]
+    for field in (
+        "foot_ik_receipt","ragdoll_receipt","npc_supply_receipt",
+        "cinematic_blocking_receipt","controller_parity_receipt",
+        "soak_recovery_receipt",
+    ):
+        assert len(manifest[field])==64
+    assert original["controller_parity"]["profile_count"]==7
+    assert not original["soak"]["measured_uptime_qualified"]
+    assert manifest["actual_hid_devices_qualified"]==0
+    assert manifest["native_rgb_frames_captured_by_compiler"]==0
+
+
+def test_new_physics_and_cinematic_files_fail_independent_source_recompile_on_tampering():
+    original=compile_game()
+    for name in ("game/frontier/foot_ik.json",
+                 "game/frontier/ragdoll.json",
+                 "game/frontier/supply_chain.json",
+                 "game/frontier/actor_blocking.gd",
+                 "game/frontier/controller_era_parity.json"):
+        forged=deepcopy(original)
+        forged["files"][name]+=" tampered"
+        with pytest.raises(ExpeditionError,match="differs"):
+            verify_original_campaign(
+                forged,project_id="campaign",gdd_digest=GDD,
+                seed=13,islands=5,
+            )

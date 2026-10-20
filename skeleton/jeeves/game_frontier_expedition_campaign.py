@@ -71,6 +71,13 @@ from .game_frontier_expedition_controller_latency import (
 )
 from .game_frontier_expedition_watchdog import simulate_production_health
 from .game_frontier_expedition_seven_review import objectively_review_seven_planes
+from .game_frontier_ik import solve_foot_plant
+from .game_frontier_ragdoll import simulate_ragdoll
+from .game_frontier_supply import original_supply_network
+from .game_frontier_blocking import author_original_blocking,export_blocking_godot
+from .game_frontier_visual_capture import export_native_capture_godot
+from .game_frontier_controller_parity import verify_all_controller_eras
+from .game_frontier_soak import simulated_process_recovery
 
 
 def original_campaign_player()->Traveler:
@@ -141,6 +148,12 @@ def compile_original_campaign(
     # Seven additional independently replayable original game-production systems.
     rig,walk_cycle=original_actor_rig(world.digest)
     soft_skin=simulate_elastic_skin(rig,walk_cycle,frames=48)
+    ik=solve_foot_plant(rig,frame=18)
+    ragdoll=simulate_ragdoll(rig,frames=36)
+    supply=original_supply_network(world,tuple(npc_designs))
+    blocking=author_original_blocking(world,storyboard,tuple(npc_designs))
+    parity=verify_all_controller_eras(world.digest)
+    soak=simulated_process_recovery(world.digest,cycles=6)
     society=simulate_original_society(world,tuple(npc_designs))
     performance=author_performance(story,storyboard)
     preview_rgb=(original_procedural_preview_frames(world.digest),)
@@ -188,6 +201,13 @@ def compile_original_campaign(
     files.update(export_ecology_godot(world,ecology_policy))
     files.update(export_actor_rig_godot(rig,walk_cycle))
     files.update(export_performance_godot(story,storyboard))
+    files.update(export_blocking_godot(world,storyboard,tuple(npc_designs)))
+    files.update(export_native_capture_godot())
+    files["game/frontier/foot_ik.json"]=_json(ik).decode("utf-8")
+    files["game/frontier/ragdoll.json"]=_json(ragdoll).decode("utf-8")
+    files["game/frontier/supply_chain.json"]=_json(supply).decode("utf-8")
+    files["game/frontier/controller_era_parity.json"]=_json(parity).decode("utf-8")
+    files["game/frontier/process_soak.json"]=_json(soak).decode("utf-8")
     files["game/frontier/elasticbodyskin3d.json"]=_json(soft_skin).decode("utf-8")
     files["game/frontier/society.json"]=_json(society).decode("utf-8")
     files["game/frontier/visual_comparison.json"]=_json(vision).decode("utf-8")
@@ -271,6 +291,14 @@ def compile_original_campaign(
         "questbook_digest":questbook.digest,
         "storyboard_digest":storyboard.digest,
         "rig_digest":rig.digest,
+        "foot_ik_receipt":ik["receipt_digest"],
+        "ragdoll_receipt":ragdoll["receipt_digest"],
+        "npc_supply_receipt":supply["snapshot_digest"],
+        "cinematic_blocking_receipt":blocking["receipt_digest"],
+        "controller_parity_receipt":parity["receipt_digest"],
+        "soak_recovery_receipt":soak["receipt_digest"],
+        "actual_hid_devices_qualified":0,
+        "native_rgb_frames_captured_by_compiler":0,
         "elastic_skin_receipt":soft_skin["receipt_digest"],
         "npc_society_receipt":society["snapshot_digest"],
         "performance_receipt":performance["receipt_digest"],
@@ -322,6 +350,8 @@ def compile_original_campaign(
         "plot_proof":branch_proof,
         "npcs":npc_records,"ecology":ecology,
         "rig":rig,"walk_cycle":walk_cycle,"elastic_skin":soft_skin,
+        "ik":ik,"ragdoll":ragdoll,"supply":supply,"blocking":blocking,
+        "controller_parity":parity,"soak":soak,
         "society":society,"performance":performance,
         "dragon_vision":vision,"controller_qa":measured_controller,
         "production_watchdog":watchdog,"seven_plane_assurance":seven_axes,
@@ -352,6 +382,12 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
             or compiled.get("audio")!=expected["audio"]
             or compiled.get("adaptive_music")!=expected["adaptive_music"]
             or compiled.get("plot_proof")!=expected["plot_proof"]
+            or compiled.get("ik")!=expected["ik"]
+            or compiled.get("ragdoll")!=expected["ragdoll"]
+            or compiled.get("supply")!=expected["supply"]
+            or compiled.get("blocking")!=expected["blocking"]
+            or compiled.get("controller_parity")!=expected["controller_parity"]
+            or compiled.get("soak")!=expected["soak"]
             or compiled.get("rig")!=expected["rig"]
             or compiled.get("walk_cycle")!=expected["walk_cycle"]
             or compiled.get("elastic_skin")!=expected["elastic_skin"]

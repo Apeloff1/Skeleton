@@ -56,6 +56,7 @@ const ECOLOGY_SCRIPT = "res://game/frontier/ecology.gd"
 const NPC_FILE = "res://game/frontier/npcs.json"
 const ACTOR_RIG_SCRIPT = "res://game/frontier/actor_rig.gd"
 const PERFORMANCE_SCRIPT = "res://game/frontier/performance.gd"
+const ACTOR_BLOCKING_SCRIPT = "res://game/frontier/actor_blocking.gd"
 const SOCIETY_FILE = "res://game/frontier/society.json"
 const SEVEN_PLANE_FILE = "res://game/frontier/seven_plane_assurance.json"
 const LOD_FILE = "res://game/frontier/lod_runtime.json"
@@ -99,6 +100,7 @@ var story_flags: Dictionary = {}
 var completed_scenes: Dictionary = {}
 var actor: MeshInstance3D
 var performance_player: Node3D
+var blocking_player: Node3D
 var society_source: Dictionary = {}
 
 func _load_json(path: String) -> Dictionary:
@@ -532,6 +534,11 @@ func _setup_scene() -> void:
         performance_player.set_meta("expected_world", str(world.get("world_digest", "")))
         performance_player.set_script(load(PERFORMANCE_SCRIPT))
         actor.add_child(performance_player)
+    if ResourceLoader.exists(ACTOR_BLOCKING_SCRIPT):
+        blocking_player = Node3D.new()
+        blocking_player.set_meta("expected_world",str(world.get("world_digest","")))
+        blocking_player.set_script(load(ACTOR_BLOCKING_SCRIPT))
+        add_child(blocking_player)
     camera = Camera3D.new()
     camera.current = true
     camera.far = 100000.0
@@ -679,6 +686,8 @@ func _travel(edge: Dictionary) -> void:
                                str(world.get("world_digest", "")))
                 if performance_player != null and performance_player.has_method("play_performance"):
                     performance_player.call("play_performance", str(clip.get("clip_id", "")))
+                if blocking_player != null and blocking_player.has_method("play_blocking"):
+                    blocking_player.call("play_blocking", str(clip.get("clip_id", "")))
                 break
     _resolve_ending()
     _refresh_ui()

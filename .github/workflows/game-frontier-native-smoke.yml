@@ -106,6 +106,9 @@ jobs:
           from skeleton.jeeves.game_frontier_expedition_native_cinema_verify import (
               verify_native_cinema_frames,
           )
+          from skeleton.jeeves.game_frontier_visual_capture import (
+              ingest_godot_viewport_log,
+          )
           candidate=compile_original_campaign(
               "fully-original-frontier-native-ci",
               gdd_digest="c"*64,seed=31,islands=5,
@@ -145,6 +148,14 @@ jobs:
               assert "EXPEDITION_ECOLOGY_READY " in out, "Native original foliage not instantiated: "+repr(out[-3000:])
               assert "EXPEDITION_RIG_READY " in out, "Native authored skeleton did not load: "+repr(out[-3000:])
               assert "EXPEDITION_PERFORMANCE_READY " in out, "Native authored facial performance not loaded: "+repr(out[-3000:])
+              assert "EXPEDITION_BLOCKING_READY " in out, "Native cinematic actor blocking not loaded: "+repr(out[-3000:])
+              assert "game/frontier/supply_chain.json" in candidate["files"]
+              assert "game/frontier/ragdoll.json" in candidate["files"]
+              assert "game/frontier/foot_ik.json" in candidate["files"]
+              assert "game/frontier/controller_era_parity.json" in candidate["files"]
+              assert "game/frontier/process_soak.json" in candidate["files"]
+              assert candidate["controller_parity"]["profile_count"]==7
+              assert not candidate["soak"]["measured_uptime_qualified"]
               assert "game/frontier/society.json" in candidate["files"]
               assert "game/frontier/actor_rig.gd" in candidate["files"]
               assert "game/frontier/performance.gd" in candidate["files"]
@@ -179,6 +190,23 @@ jobs:
               )
               assert cinema_review["observations"]==5
               assert cinema_review["source_frame_replay_verified"]
+              pixels=subprocess.run(
+                  [os.environ["FRONTIER_GODOT"],"--headless",
+                   "--path",str(root),"--script",
+                   "res://game/frontier/viewport_capture.gd",
+                   "--quit-after","200"],
+                  cwd=root,capture_output=True,text=True,
+                  timeout=90,check=False,
+              )
+              pixel_out=pixels.stdout+"\n"+pixels.stderr
+              if pixels.returncode!=0:
+                  raise AssertionError("Native original RGB viewport failed: "+repr(pixel_out[-4000:]))
+              visual=ingest_godot_viewport_log(
+                  pixel_out,expected_world=candidate["world"].digest,
+              )
+              assert visual["report"]["frames"]==2
+              assert visual["comparison"]["frame_count"]==2
+              assert visual["report"]["native_runner_attestation_verified"] is False
               assert "game/frontier/npcs.json" in candidate["files"]
               assert "game/frontier/ecology.json" in candidate["files"]
               assert "game/frontier/lod_runtime.json" in candidate["files"]
