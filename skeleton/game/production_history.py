@@ -53,6 +53,19 @@ class QualityHistoryStore:
             )
         """)
         self.db.execute("CREATE INDEX IF NOT EXISTS quality_source_idx ON quality_evidence(project_id,source_sha256)")
+        self.db.execute("""
+            CREATE TABLE IF NOT EXISTS quality_operator_review(
+              project_id TEXT NOT NULL,
+              generation INTEGER NOT NULL CHECK(generation > 0),
+              report_head_sha256 TEXT NOT NULL,
+              reviewer_id TEXT NOT NULL,
+              decision TEXT NOT NULL,
+              reason_sha256 TEXT NOT NULL,
+              previous_sha256 TEXT NOT NULL,
+              receipt_sha256 TEXT NOT NULL,
+              PRIMARY KEY(project_id, generation)
+            )
+        """)
 
     def __enter__(self):
         return self
@@ -90,7 +103,10 @@ class QualityHistoryStore:
             obj = json.loads(raw)
             if not isinstance(obj, dict) or obj.get("source_digest") != sha:
                 raise QualityGateError("quality journal report source changed")
-            if obj.get("schema") != "game.candidate.deep_quality.v1":
+            if obj.get("schema") not in (
+                    "game.candidate.deep_quality.v1",
+                    "game.candidate.frontier_quality.v1",
+            ):
                 raise QualityGateError("wrong report authority schema")
             if obj.get("release_certified") is not False:
                 raise QualityGateError("quality review cannot manufacture production approval")
@@ -99,10 +115,15 @@ class QualityHistoryStore:
                 "traceability", "quests", "accessibility", "controls",
                 "resources", "session", "package",
             )
+            if obj["schema"] == "game.candidate.frontier_quality.v1":
+                expected_gates += (
+                    "lineage", "continuity", "routes", "physics", "lod",
+                    "localization", "comparison",
+                )
             gates = obj.get("gates")
             if (type(gates) is not list or len(gates) != len(expected_gates) or
                     tuple(g.get("name") for g in gates if type(g) is dict) != expected_gates):
-                raise QualityGateError("journal requires all thirteen canonical quality gates")
+                raise QualityGateError("journal requires its canonical complete gate ledger")
             merged_findings = []
             for gate in gates:
                 if (type(gate.get("passed")) is not bool or
@@ -186,3 +207,107 @@ class QualityHistoryStore:
              "report_sha256": sha256(row[4].encode()).hexdigest()}
             for row in rows[-limit:]
         ]}
+
+
+    def _review_rows(self, project: str) -> list[tuple]:
+        return self.db.execute(
+            "SELECT generation,report_head_sha256,reviewer_id,decision,"
+            "reason_sha256,previous_sha256,receipt_sha256 "
+            "FROM quality_operator_review WHERE project_id=? ORDER BY generation",
+            (project,),
+        ).fetchall()
+
+    @staticmethod
+    def _verify_reviews(project: str, rows: list[tuple]) -> dict:
+        parent = _GENESIS
+        for index, row in enumerate(rows, 1):
+            gen, report_head, actor, decision, reason, prev, receipt = row
+            if gen != index or prev != parent:
+                raise QualityGateError("operator review has rollback or missing generation")
+            for label, digest in (("review head", report_head), ("review reason", reason), ("review receipt", receipt)):
+                _sha(digest, label)
+            if (type(actor) is not str or not 3 <= len(actor) <= 128 or
+                    decision not in ("request_changes", "accept_candidate", "reject_candidate")):
+                raise QualityGateError("operator decision actor or state corrupted")
+            payload = {"schema": "game.quality_operator_review.v1",
+                       "project_id": project, "generation": gen,
+                       "report_head_sha256": report_head, "reviewer_id": actor,
+                       "decision": decision, "reason_sha256": reason,
+                       "previous_sha256": prev, "production_approved": False}
+            if receipt != _digest(payload):
+                raise QualityGateError("operator review hash receipt forged")
+            parent = receipt
+        return {"schema": "game.quality_operator_review.v1",
+                "project_id": project, "generation": len(rows),
+                "head": parent, "production_approved": False}
+
+    def inspect_reviews(self, project_id: str, *, limit: int = 64) -> dict:
+        if type(limit) is not int or not 1 <= limit <= 256:
+            raise QualityGateError("bounded operator review query required")
+        project = self._project(project_id)
+        rows = self._review_rows(project)
+        proof = self._verify_reviews(project, rows)
+        # Also verify the source audit ledger, never silently trust an orphan review.
+        evidence = self._verify(project, self._rows(project))
+        known_heads = {row[3] for row in self._rows(project)}
+        if any(row[1] not in known_heads for row in rows):
+            raise QualityGateError("operator review points at absent evidence")
+        return {**proof, "evidence_generation": evidence["generation"],
+                "entries": [
+                    {"generation": row[0], "report_head_sha256": row[1],
+                     "reviewer_id": row[2], "decision": row[3],
+                     "reason_sha256": row[4], "previous_sha256": row[5],
+                     "receipt_sha256": row[6]}
+                    for row in rows[-limit:]
+                ]}
+
+    def review(self, project_id: str, *, reviewer_id: str, decision: str,
+               reason_sha256: str, report_head_sha256: str,
+               expected_generation: int, expected_head: str) -> dict:
+        """Host-authorized evidence review with durable optimistic concurrency.
+
+        This records candidate-level reviewer decisions ONLY. It is not an
+        approval of copyright, trained weights or a production release.
+        """
+        project = self._project(project_id)
+        if (type(reviewer_id) is not str or not 3 <= len(reviewer_id) <= 128 or
+                not reviewer_id.isascii() or
+                any(not (ch.isalnum() or ch in "._-") for ch in reviewer_id) or
+                decision not in ("request_changes", "accept_candidate", "reject_candidate") or
+                type(expected_generation) is not int or not 0 <= expected_generation < 100000):
+            raise QualityGateError("authorized reviewer identity and decision required")
+        for name, value in (("review reason", reason_sha256), ("report head", report_head_sha256),
+                            ("expected review head", expected_head)):
+            _sha(value, name)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            evidence_rows = self._rows(project)
+            evidence = self._verify(project, evidence_rows)
+            if (not evidence_rows or evidence["head"] != report_head_sha256):
+                raise QualityGateError("review must reference exact latest committed audit")
+            current = self._verify_reviews(project, self._review_rows(project))
+            if current["generation"] != expected_generation or current["head"] != expected_head:
+                raise QualityGateError("operator review stale generation")
+            if decision == "accept_candidate":
+                report = json.loads(evidence_rows[-1][4])
+                if report.get("candidate_passed") is not True:
+                    raise QualityGateError("operator cannot accept failing candidate")
+            generation = expected_generation + 1
+            payload = {
+                "schema": "game.quality_operator_review.v1", "project_id": project,
+                "generation": generation, "report_head_sha256": report_head_sha256,
+                "reviewer_id": reviewer_id, "decision": decision,
+                "reason_sha256": reason_sha256, "previous_sha256": expected_head,
+                "production_approved": False,
+            }
+            receipt = _digest(payload)
+            self.db.execute(
+                "INSERT INTO quality_operator_review VALUES(?,?,?,?,?,?,?,?)",
+                (project, generation, report_head_sha256, reviewer_id,
+                 decision, reason_sha256, expected_head, receipt),
+            )
+            self.db.execute("COMMIT")
+            return {**payload, "receipt_sha256": receipt}
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
