@@ -6,12 +6,11 @@ rights clearance from these self-authored values.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from skeleton.game.production_quality import QualityGateError, _digest
+from skeleton.game.production_quality import QualityGateError
 from skeleton.game.production_studio_gates import (
     audit_cinematic_direction, audit_dialogue_sync, audit_npc_behavior,
     audit_world_streaming, audit_save_evolution, audit_dynamic_world,
@@ -22,6 +21,7 @@ from skeleton.game.production_studio_assurance import (
     compare_studio_reports, studio_repair_queue, inspect_native_game_witness,
 )
 from skeleton.game.production_history import QualityHistoryStore
+from skeleton.game.production_studio_repair import preview_reviewed_studio_repairs
 from skeleton.jeeves.game_complete_studio_quality_tools import complete_studio_quality_handlers
 from skeleton.jeeves.game_studio_tools import StudioCommand, studio_command_catalog
 from skeleton.testing.test_game_production_frontier_quality import candidate as frontier_candidate
@@ -394,6 +394,78 @@ class StudioUpgradesTests(unittest.TestCase):
                 command = StudioCommand("game.studio.quality.native.inspect", "game-1", {})
                 with self.assertRaises(QualityGateError):
                     handlers[command.operation](command, None)
+
+    def test_reviewed_repair_only_accepts_measurably_improved_original(self):
+        c = candidate()
+        c["studio"]["cinematics"]["scenes"][0]["shots"][1]["intent"] = ""
+        patch = {
+            "path": ["studio", "cinematics", "scenes", 0, "shots", 1, "intent"],
+            "old": "", "new": "arrival with long-term canon payoff",
+        }
+        result = preview_reviewed_studio_repairs(
+            c, [patch], authorize=lambda p: True,
+            independently_verify=lambda p: p["source_sha256"] == SHA,
+        )
+        self.assertEqual(1, result["accepted_count"])
+        self.assertTrue(result["post_quality"]["candidate_passed"])
+        self.assertFalse(result["persisted"])
+        self.assertEqual("", c["studio"]["cinematics"]["scenes"][0]["shots"][1]["intent"])
+
+    def test_reviewed_repair_cannot_forge_native_or_source_proofs(self):
+        c = candidate()
+        c["studio"]["environment"]["observations"][0]["independently_replayed"] = False
+        patch = {
+            "path": ["studio", "environment", "observations", 0, "independently_replayed"],
+            "old": False, "new": True,
+        }
+        result = preview_reviewed_studio_repairs(
+            c, [patch], authorize=lambda p: True,
+            independently_verify=lambda p: True,
+        )
+        self.assertEqual(0, result["accepted_count"])
+        self.assertFalse(result["post_quality"]["candidate_passed"])
+
+    def test_preview_requires_host_approval_and_independent_compiler(self):
+        c = candidate()
+        c["studio"]["cinematics"]["scenes"][0]["shots"][1]["intent"] = ""
+        patch = {
+            "path": ["studio", "cinematics", "scenes", 0, "shots", 1, "intent"],
+            "old": "", "new": "proofread cinematic closure",
+        }
+        denied = preview_reviewed_studio_repairs(
+            c, [patch], authorize=lambda p: False,
+            independently_verify=lambda p: True,
+        )
+        self.assertEqual("host_denied", denied["attempts"][0]["outcome"])
+        refused = preview_reviewed_studio_repairs(
+            c, [patch], authorize=lambda p: True,
+            independently_verify=lambda p: False,
+        )
+        self.assertEqual(0, refused["accepted_count"])
+
+    def test_jeeves_preview_is_an_isolated_nonpersistent_tool(self):
+        c = candidate()
+        c["studio"]["cinematics"]["scenes"][0]["shots"][1]["intent"] = ""
+        with TemporaryDirectory() as root:
+            with QualityHistoryStore(Path(root) / "studio.db") as store:
+                handlers = complete_studio_quality_handlers(
+                    {"game-1": (SHA, lambda: c)}, store=store,
+                    operator_id="operator-01",
+                    approve_patch=lambda command, patch: command.project_id == "game-1",
+                    verify_candidate=lambda command, new: new["source_sha256"] == SHA,
+                )
+                self.assertEqual(9, len(handlers))
+                command = StudioCommand("game.studio.quality.repair.preview", "game-1", {
+                    "patches": [{
+                        "path": ["studio", "cinematics", "scenes", 0, "shots", 1, "intent"],
+                        "old": "", "new": "frame-coherent original direction",
+                    }],
+                })
+                result = handlers[command.operation](command, None)
+                self.assertEqual(1, result["accepted_count"])
+                self.assertFalse(result["persisted"])
+                self.assertFalse(store.inspect("game-1")["generation"])
+                self.assertEqual("", c["studio"]["cinematics"]["scenes"][0]["shots"][1]["intent"])
 
     def test_27_gate_summary_tamper_is_rejected(self):
         report = audit_complete_studio(candidate())
