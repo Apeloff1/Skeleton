@@ -19,14 +19,18 @@ from .game_frontier_studio_map_edit import MAP_ACTIONS, edit_map
 from .game_frontier_studio_object_edit import OBJECT_ACTIONS, edit_objects
 from .game_frontier_studio_environment_edit import ENV_ACTIONS, edit_environment
 from .game_frontier_studio_physics_edit import PHYSICAL_ACTIONS, edit_physical
+from .game_frontier_studio_procedural_edit import PROCEDURAL_ACTIONS, edit_procedural
+from .game_frontier_studio_population_edit import POPULATION_ACTIONS, edit_population
+from .game_frontier_studio_narrative_edit import STORY_ACTIONS, edit_story
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
 
 AUTHORING_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIONS +
-                     QUEST_ACTIONS + TERRAIN_ACTIONS)
-if len(AUTHORING_ACTIONS) != 100 or len(set(AUTHORING_ACTIONS)) != 100:
-    raise RuntimeError("Forge Studio must expose 100 implemented, distinct operations")
+                     QUEST_ACTIONS + TERRAIN_ACTIONS + PROCEDURAL_ACTIONS +
+                     POPULATION_ACTIONS + STORY_ACTIONS)
+if len(AUTHORING_ACTIONS) != 150 or len(set(AUTHORING_ACTIONS)) != 150:
+    raise RuntimeError("Forge Studio must expose 150 implemented, distinct operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -74,6 +78,12 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_quest_structure(project, operation, payload)
     if operation in TERRAIN_ACTIONS:
         return edit_terrain(project, operation, payload)
+    if operation in PROCEDURAL_ACTIONS:
+        return edit_procedural(project, operation, payload)
+    if operation in POPULATION_ACTIONS:
+        return edit_population(project, operation, payload)
+    if operation in STORY_ACTIONS:
+        return edit_story(project, operation, payload)
     raise StudioError("unknown executable Studio editor action")
 
 
