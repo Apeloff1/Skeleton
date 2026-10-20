@@ -46,6 +46,9 @@ _GODOT_SCRIPT = r'''extends Node3D
 
 const WORLD_FILE = "res://game/frontier/expedition.json"
 const PLAYER_FILE = "res://game/frontier/player.json"
+const CONTROLLER_FILE = "res://game/frontier/controller.json"
+const CANON_FILE = "res://game/frontier/canon.json"
+const VISUALS_FILE = "res://game/frontier/visuals_manifest.json"
 const AUTOPLAY_FILE = "res://game/frontier/autoplay.json"
 const MAX_GAME_EDGES = 65536
 var world: Dictionary = {}
@@ -66,6 +69,11 @@ var won: bool = false
 var failed: bool = false
 var camera: Camera3D
 var hud: Label
+var controller_hud: Label
+var canon: Dictionary = {}
+var visuals: Dictionary = {}
+var story_flags: Dictionary = {}
+var completed_scenes: Dictionary = {}
 var actor: MeshInstance3D
 
 func _load_json(path: String) -> Dictionary:
@@ -145,7 +153,9 @@ func _ready() -> void:
     visited[current_id] = true
     receipt_head = (str(world.get("source", "")) + ":" +
         str(world.get("project", "")) + ":" + current_id).sha256_text()
+    _load_optional_authored_game()
     _setup_scene()
+    _install_controller()
     _refresh_ui()
     print("EXPEDITION_READY " + str(world.get("project", "")) +
           " " + str(waypoint_by_id.size()) + " " + str(edge_by_id.size()))
@@ -197,6 +207,89 @@ func _run_autoplay() -> void:
     else:
         get_tree().quit(0)
 
+func _load_optional_authored_game() -> void:
+    if FileAccess.file_exists(CANON_FILE):
+        var source: Dictionary = _load_json(CANON_FILE)
+        if (source.get("schema", "") == "skeleton.game.canon_dialogue.v1"
+                and str(source.get("world_digest", "")) == str(world.get("world_digest", ""))):
+            canon = source
+        else:
+            push_error("Optional story canon differs from original world")
+    if FileAccess.file_exists(VISUALS_FILE):
+        var style: Dictionary = _load_json(VISUALS_FILE)
+        if (style.get("schema", "") == "skeleton.game.original_3d_assets.v1"
+                and str(style.get("world_digest", "")) == str(world.get("world_digest", ""))):
+            visuals = style
+        else:
+            push_error("Optional visual asset manifest differs from original world")
+
+func _story_scene() -> Dictionary:
+    for scene in canon.get("scenes", []):
+        if str(scene.get("waypoint", "")) != current_id:
+            continue
+        if completed_scenes.has(str(scene.get("scene_id", ""))) and not bool(scene.get("repeatable", false)):
+            continue
+        var allowed: bool = true
+        for flag in scene.get("requires_game_flags", []):
+            if not flags.has(str(flag)) and not inventory.has(str(flag)):
+                allowed = false
+        for flag in scene.get("requires_story_flags", []):
+            if not story_flags.has(str(flag)):
+                allowed = false
+        if allowed:
+            return scene
+    return {}
+
+func _choose_story(index: int) -> void:
+    if won or failed:
+        return
+    var scene := _story_scene()
+    if scene.is_empty():
+        return
+    var choices: Array = scene.get("choices", [])
+    if index < 0 or index >= choices.size():
+        return
+    var choice: Dictionary = choices[index]
+    for grant in choice.get("advances", []):
+        story_flags[str(grant)] = true
+    completed_scenes[str(scene["scene_id"])] = true
+    print("EXPEDITION_STORY " + JSON.stringify({
+        "world_digest":str(world.get("world_digest", "")),
+        "scene":str(scene["scene_id"]), "choice":str(choice["choice_id"]),
+        "at":current_id, "game_receipt_head":receipt_head,
+        "story_flags":story_flags.keys(),
+    }))
+    _refresh_ui()
+
+func _install_controller() -> void:
+    if not FileAccess.file_exists(CONTROLLER_FILE):
+        return
+    var profile: Dictionary = _load_json(CONTROLLER_FILE)
+    if (profile.get("schema", "") != "skeleton.game.controller_profile.v1"
+            or str(profile.get("world_digest", "")) != str(world.get("world_digest", ""))):
+        push_error("Controller belongs to another authored game")
+        return
+    var mappings: Dictionary = profile.get("input_map", {})
+    for action_name in ["ui_up", "ui_down", "ui_accept", "ui_cancel"]:
+        if not mappings.has(action_name):
+            push_error("Missing controller game action")
+            return
+        var button_index: int = int(mappings[action_name])
+        if button_index < 0 or button_index > 31:
+            push_error("Unsupported controller physical index")
+            return
+        var gamepad := InputEventJoypadButton.new()
+        gamepad.device = -1
+        gamepad.button_index = button_index
+        gamepad.pressed = true
+        if not InputMap.action_has_event(action_name, gamepad):
+            InputMap.action_add_event(action_name, gamepad)
+    if controller_hud != null:
+        var labels: Array = []
+        for button in profile.get("buttons", []):
+            labels.append(str(button.get("legend", "")) + ": " + str(button.get("action", "")))
+        controller_hud.text = "GAMEPAD  " + str(profile.get("era", "")) + "\n" + "  |  ".join(labels)
+
 func _where(node: Dictionary) -> Vector3:
     return Vector3(float(node["x_m"]), float(node["altitude_m"]), float(node["y_m"]))
 
@@ -211,6 +304,11 @@ func _setup_scene() -> void:
         ball.radius = 1.8 if str(node["kind"]) == "sky_island" else 1.1
         ball.height = ball.radius * 2.0
         marker.mesh = ball
+        var model_path := "res://game/frontier/assets/" + str(node["waypoint_id"]) + "_lod0.obj"
+        if ResourceLoader.exists(model_path):
+            var loaded: Resource = load(model_path)
+            if loaded is Mesh:
+                marker.mesh = loaded
         var mat := StandardMaterial3D.new()
         var kind := str(node["kind"])
         if kind == "sky_island":
@@ -263,6 +361,10 @@ func _setup_scene() -> void:
     hud.position = Vector2(16, 16)
     hud.add_theme_color_override("font_color", Color.WHITE)
     layer.add_child(hud)
+    controller_hud = Label.new()
+    controller_hud.position = Vector2(16, 580)
+    controller_hud.add_theme_color_override("font_color", Color(0.8, 0.9, 1))
+    layer.add_child(controller_hud)
 
 func _place_actor() -> void:
     actor.position = _where(waypoint_by_id[current_id]) + Vector3(0, 3, 0)
@@ -414,12 +516,25 @@ func _refresh_ui() -> void:
             str(edge["target"]) + " (" + str(edge["mode"]) + ")" +
             " stamina " + str(cost["stamina"]) +
             (" [LOCKED]" if not _can_travel(edge) else ""))
+    var story_scene := _story_scene()
+    if not story_scene.is_empty():
+        lines.append("STORY - " + str(story_scene.get("speaker", "")) + ": " +
+            str(story_scene.get("opening", "")))
+        var options: Array = story_scene.get("choices", [])
+        for n in range(mini(options.size(), 4)):
+            lines.append("[" + str(n+1) + "] " + str(options[n].get("spoken_line", "")))
     hud.text = "\n".join(lines)
 
 func _unhandled_input(event: InputEvent) -> void:
     if not event.is_pressed() or event.is_echo() or won or failed:
         return
     var choices := _outgoing()
+    if event is InputEventKey:
+        var keycode: int = (event as InputEventKey).keycode
+        if keycode >= KEY_1 and keycode <= KEY_4:
+            _choose_story(keycode - KEY_1)
+            get_viewport().set_input_as_handled()
+            return
     if event.is_action_pressed("ui_down") and choices.size() > 0:
         selected = (selected+1)%choices.size()
         _refresh_ui()
@@ -533,6 +648,7 @@ def emit_expedition_godot_project(
     world: ExpeditionWorld, traveler: Traveler, *,
     include_project_config: bool = True,
     include_autoplay: bool = False,
+    controller_profile=None,
 ) -> dict[str, str]:
     """Compile executable, resource-safe Godot 4 files for an original game."""
     if not isinstance(world, ExpeditionWorld) or not isinstance(traveler, Traveler):
@@ -553,6 +669,15 @@ def emit_expedition_godot_project(
         files["game/frontier/autoplay.json"] = _json(
             make_expedition_autoplay(world, traveler)
         ).decode("utf-8")
+    if controller_profile is not None:
+        from .game_frontier_expedition_controllers import (
+            ControllerProfile, export_controller_profile,
+        )
+        if not isinstance(controller_profile, ControllerProfile):
+            raise ExpeditionError("controller requires a validated source profile")
+        files["game/frontier/controller.json"] = _json(
+            export_controller_profile(controller_profile, world.digest)
+        ).decode("utf-8")
     return files
 
 
@@ -560,11 +685,12 @@ def verify_expedition_godot_project(
     files: Mapping[str, str], world: ExpeditionWorld,
     traveler: Traveler, *, include_project_config: bool = True,
     include_autoplay: bool = False,
+    controller_profile=None,
 ) -> dict:
     """Compare every generated game byte with independent deterministic export."""
     expected = emit_expedition_godot_project(
         world, traveler, include_project_config=include_project_config,
-        include_autoplay=include_autoplay,
+        include_autoplay=include_autoplay, controller_profile=controller_profile,
     )
     if (not isinstance(files, Mapping) or set(files) != set(expected)
             or any(type(files.get(path)) is not str or files[path] != content

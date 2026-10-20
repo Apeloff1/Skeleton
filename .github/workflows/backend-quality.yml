@@ -197,6 +197,12 @@ jobs:
             skeleton/jeeves/game_frontier_expedition_native_runner.py \
             skeleton/jeeves/game_frontier_expedition_qa.py \
             skeleton/jeeves/game_frontier_expedition_save_store.py \
+            skeleton/jeeves/game_frontier_expedition_controllers.py \
+            skeleton/jeeves/game_frontier_expedition_narrative.py \
+            skeleton/jeeves/game_frontier_expedition_assets.py \
+            skeleton/jeeves/game_frontier_expedition_dragon.py \
+            skeleton/jeeves/game_frontier_expedition_endurance.py \
+            skeleton/jeeves/game_frontier_expedition_campaign.py \
             skeleton/jeeves/game_frontier_expedition_release.py \
             skeleton/jeeves/game_frontier_expedition_studio_tools.py \
             skeleton/jeeves/game_studio_tools.py \
@@ -212,7 +218,13 @@ jobs:
             tests/test_game_frontier_expedition_qa.py \
             tests/test_game_frontier_expedition_save_store.py \
             tests/test_game_frontier_expedition_release.py \
-            tests/test_game_frontier_expedition_studio_tools.py
+            tests/test_game_frontier_expedition_studio_tools.py \
+            tests/test_game_frontier_expedition_controllers.py \
+            tests/test_game_frontier_expedition_narrative.py \
+            tests/test_game_frontier_expedition_assets.py \
+            tests/test_game_frontier_expedition_dragon.py \
+            tests/test_game_frontier_expedition_endurance.py \
+            tests/test_game_frontier_expedition_campaign.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
