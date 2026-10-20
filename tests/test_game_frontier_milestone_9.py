@@ -109,19 +109,29 @@ def test_bounded_archive_and_defensive_copy():
 
 
 def test_staged_ai_mirror_has_identical_archive_contract():
+    from skeleton.ai.agents.jeeves.game_frontier_milestone_8 import (
+        CampaignExport as StagedExport,
+    )
     from skeleton.ai.agents.jeeves.game_frontier_milestone_9 import (
         ArchiveError as StagedArchiveError,
         CampaignArchive as StagedArchive,
     )
 
     original = _export("staged")
-    key = StagedArchive().store(original)
+    staged = StagedExport(
+        campaign_id=original.campaign_id,
+        session_count=original.session_count,
+        head=original.head,
+        audit=original.audit,
+        manifest=original.manifest,
+    )
+    key = StagedArchive().store(staged)
     assert key == original.manifest
     with pytest.raises(StagedArchiveError):
-        StagedArchive().store(original.__class__(
-            campaign_id=original.campaign_id,
-            session_count=original.session_count,
-            head=original.head,
-            audit=original.audit,
+        StagedArchive().store(StagedExport(
+            campaign_id=staged.campaign_id,
+            session_count=staged.session_count,
+            head=staged.head,
+            audit=staged.audit,
             manifest="0" * 64,
         ))
