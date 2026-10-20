@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Mapping
-import math
 from typing import Any
 
 from .production_quality import Finding, GateResult, QualityGateError, _digest, _items, _record, _result
@@ -25,18 +24,6 @@ MODES = frozenset((
     "foot", "road", "rail", "water", "air", "space", "magic",
     "teleport", "underground",
 ))
-
-
-def _unique(records: list, label: str) -> tuple[dict[str, Mapping], list[Finding]]:
-    seen: dict[str, Mapping] = {}
-    findings: list[Finding] = []
-    for item in records:
-        item = _record(item, label)
-        key = _id(item.get("id"), label + " id")
-        if key in seen:
-            findings.append(Finding(label, "duplicate_id", key))
-        seen[key] = item
-    return seen, findings
 
 
 def audit_audio_mix(data: Mapping[str, Any]) -> GateResult:
@@ -199,18 +186,6 @@ def audit_economy_integrity(data: Mapping[str, Any]) -> GateResult:
             findings.append(Finding("economy_integrity", "unknown_recipe_dependency", rid))
     visiting: set[str] = set()
     visited: set[str] = set()
-    def inspect(node: str) -> bool:
-        if node in visiting:
-            return True
-        if node in visited:
-            return False
-        visiting.add(node)
-        cyclic = False
-        for target in sorted(recipe_graph[node] & recipe_ids):
-            cyclic |= inspect(target)
-        visiting.remove(node)
-        visited.add(node)
-        return cyclic
     # Iterative check prevents Python recursion failure on adversarially deep graphs.
     for rid in sorted(recipe_ids):
         stack = [(rid, False)]
@@ -392,7 +367,6 @@ def audit_endurance_recovery(data: Mapping[str, Any]) -> GateResult:
     restores = _items(data.get("restores"), "restart observations", 10000)
     findings: list[Finding] = []
     previous = -1.0
-    durations: list[float] = []
     first = None
     for reading in readings:
         r = _record(reading, "endurance observation")
@@ -404,7 +378,6 @@ def audit_endurance_recovery(data: Mapping[str, Any]) -> GateResult:
         previous = at
         if first is None:
             first = at
-        durations.append(at)
         if mem > max_mem or frame > max_frame:
             findings.append(Finding("endurance_recovery", "resource_budget_exceeded", str(at)))
         if r.get("source_sha256") != source or r.get("observed") is not True:
