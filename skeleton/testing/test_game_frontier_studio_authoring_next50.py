@@ -7,7 +7,7 @@ unsafe state changes. No quality-gate-only tests count as game features.
 from __future__ import annotations
 
 from dataclasses import replace
-from hashlib import sha256
+import json
 import unittest
 
 from skeleton.forge.game_frontier_studio import (
@@ -159,6 +159,44 @@ class ForgeNewFiftyFunctionalAcceptance(unittest.TestCase):
         self.assertEqual(reopened.layers,original.layers)
         self.assertEqual(reopened.placements,original.placements)
         self.assertEqual(reopened.native_quests,original.native_quests)
+
+    def test_native_godot_emits_actual_rendered_terrain_tiles(self):
+        from skeleton.forge.game_frontier_studio import compile_studio_expedition
+        from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile
+        original=source()
+        edited=execute_authoring(original,"terrain_depth_maze",
+                                 TERRAIN_DATA["terrain_depth_maze"])
+        built=compile_studio_expedition(
+            edited,ArchipelagoProfile(seed=25,islands=4,caverns=0,
+                                       include_portals=False,include_underwater=False),
+            playtest_routes=2,include_godot=True)
+        files=built["godot_project_files"]
+        self.assertIn("game/frontier/studio_terrain.gd",files)
+        self.assertIn("game/frontier/studio_terrain.json",files)
+        self.assertIn("MultiMeshInstance3D",files["game/frontier/studio_terrain.gd"])
+        self.assertIn("StudioTerrain",files["game/frontier/expedition.tscn"])
+        record=json.loads(files["game/frontier/studio_terrain.json"])
+        self.assertEqual(project_digest(edited),record["studio_sha256"])
+        self.assertGreater(record["rendered_cells"],0)
+        terrain=next(item for item in record["layers"] if item["id"]=="terrain")
+        self.assertEqual(list(edited.layers[0].data),terrain["tiles"])
+        self.assertEqual(record["source_cells"],record["rendered_cells"])
+
+    def test_godot_terrain_lod_respects_resource_budget(self):
+        from skeleton.forge.game_frontier_studio_terrain_runtime import add_studio_native_terrain
+        from skeleton.jeeves.game_frontier_expedition_godot import (
+            _GODOT_SCENE,
+        )
+        original=source()
+        huge=MapLayer("huge",256,256,("grass","rock"),(1,)*(256*256))
+        project=replace(original,layers=(huge,))
+        files=add_studio_native_terrain(project,{
+            "game/frontier/expedition.tscn":_GODOT_SCENE,
+        })
+        record=json.loads(files["game/frontier/studio_terrain.json"])
+        self.assertLessEqual(record["rendered_cells"],8192)
+        self.assertEqual(record["source_cells"],65536)
+        self.assertTrue(record["visual_lod_only"])
 
     def test_failed_multi_step_stops_without_mutating_source(self):
         original=source()
