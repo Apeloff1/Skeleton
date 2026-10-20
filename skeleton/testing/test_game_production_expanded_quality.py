@@ -5,7 +5,6 @@ contract behavior, never native hardware, GPU, rights or year-long runs.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -153,6 +152,16 @@ class ExpandedStudioAcceptance(unittest.TestCase):
         self.assertEqual("verification_owner", queue["items"][0]["owner"])
         self.assertFalse(queue["items"][0]["mutation_authorized"])
         self.assertFalse(impact_84(bad)["mutation_authorized"])
+
+    def test_equal_finding_counts_cannot_mask_regression(self):
+        a = candidate()
+        b = candidate()
+        a["studio"]["expanded"]["elastic_skin"]["samples"][0]["unit"] = "unknown"
+        b["studio"]["expanded"]["elastic_skin"]["samples"][0]["source_sha256"] = ALT
+        diff = compare_84(audit_expanded_studio(a), audit_expanded_studio(b))
+        self.assertTrue(any(x["gate"] == "elastic_skin" for x in diff["improved"]))
+        self.assertTrue(any(x["gate"] == "elastic_skin" for x in diff["regressed"]))
+        self.assertFalse(diff["strict_pareto_improvement"])
 
     def test_84_gates_persist_with_earlier_schemas(self):
         with TemporaryDirectory() as root:
