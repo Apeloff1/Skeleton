@@ -225,3 +225,25 @@ actual execution requires the explicit execute flag.
 A successful run proves only the selected tests on the pinned commit.
 It does not implement missing features, grant signoff, or clear the mandatory
 independent review, security, rollback and exact-head requirements.
+
+
+## Durable milestone work queue checkpointing
+
+The optional SQLiteMilestoneQueueStore binds each Jeeves run to a durable
+source commit and artifact digest. Queue snapshots are stored with exact
+canonical JSON hashes, sequential generations, optimistic compare-and-swap
+updates, SQLite transactions and independent typed hash-chain replay.
+A resumed agent can restore the previous claim/lease history, explicitly
+expire abandoned leases, and continue without fabricating milestone progress.
+A changed source snapshot, duplicate serialization keys, nonfinite values,
+malformed records, broken receipt chain, duplicate writers or a closed storage
+adapter are rejected. Existing memory is only updated after the durable
+checkpoint write succeeds.
+
+The API uses bind_assurance_checkpoint_store(run_id, store,
+source_commit=..., artifact_digest=...) to attach explicit host storage.
+The ordinary no-store path is *ephemeral*, not crash-safe. SQLite durability
+is conditional on the host's actual filesystem lifecycle and storage policy.
+Hashes detect corruption, not tampering by an attacker with write access to
+the database. These are system-level implementation milestones, not
+production-certified completion of any of the original 421 volumes.
