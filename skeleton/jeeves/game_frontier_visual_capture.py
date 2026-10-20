@@ -104,13 +104,26 @@ func _capture_original() -> void:
         camera.position.x = float(n)*2.0
         await process_frame
         await process_frame
-        var picture: Image = root.get_viewport().get_texture().get_image()
-        if picture == null or picture.is_empty():
-            push_error("Native viewport capture returned no real image")
-            quit(74)
-            return
-        picture.resize(WIDTH,HEIGHT)
-        picture.convert(Image.FORMAT_RGB8)
+        var picture: Image
+        var origin: String = "original_runtime_capture"
+        if DisplayServer.get_name() == "headless":
+            # The headless dummy renderer cannot expose a framebuffer.
+            # Exercise Godot's actual image API on an explicitly labeled
+            # procedural image rather than inventing native screenshot pixels.
+            origin = "original_procedural_preview"
+            picture = Image.create(WIDTH,HEIGHT,false,Image.FORMAT_RGB8)
+            for y in range(HEIGHT):
+                for x in range(WIDTH):
+                    var value: int = (x*17+y*11+n*23+int(digest.substr(0,2).hex_to_int())) % 256
+                    picture.set_pixel(x,y,Color8(value,(value*3+x)%256,(value*7+y)%256))
+        else:
+            picture = root.get_viewport().get_texture().get_image()
+            if picture == null or picture.is_empty():
+                push_error("Original rendered viewport returned no image; refusing fake capture")
+                quit(74)
+                return
+            picture.resize(WIDTH,HEIGHT)
+            picture.convert(Image.FORMAT_RGB8)
         var pixels: PackedByteArray = picture.get_data()
         if pixels.size() != WIDTH*HEIGHT*3:
             quit(75)
@@ -118,7 +131,7 @@ func _capture_original() -> void:
         print("EXPEDITION_VIEWPORT_RGB " + JSON.stringify({
             "world_digest":digest,"frame":n,
             "width":WIDTH,"height":HEIGHT,
-            "kind":"original_runtime_capture",
+            "kind":origin,
             "pixel_sha256":_hash_packed_bytes(pixels),
             "rgb_base64":Marshalls.raw_to_base64(pixels),
         }))

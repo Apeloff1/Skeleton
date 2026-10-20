@@ -21,7 +21,7 @@ from skeleton.jeeves.game_frontier_blocking import (
 from skeleton.jeeves.game_frontier_visual_capture import (
     PREFIX,ingest_godot_viewport_log,export_native_capture_godot,
 )
-from skeleton.jeeves.game_frontier_visual_lab import original_procedural_preview_frames
+from skeleton.jeeves.game_frontier_expedition_visual_lab import original_procedural_preview_frames
 from skeleton.jeeves.game_frontier_controller_parity import (
     GameIntent,replay_profile_intents,verify_all_controller_eras,
 )

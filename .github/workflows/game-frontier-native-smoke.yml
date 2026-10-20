@@ -203,8 +203,12 @@ jobs:
                   raise AssertionError("Native original RGB viewport failed: "+repr(pixel_out[-4000:]))
               visual=ingest_godot_viewport_log(
                   pixel_out,expected_world=candidate["world"].digest,
+                  expected_kind="original_procedural_preview",
               )
               assert visual["report"]["frames"]==2
+              assert visual["comparison"]["games"][0]["source_kind"]==[
+                  "original_procedural_preview",
+              ]
               assert visual["comparison"]["frame_count"]==2
               assert visual["report"]["native_runner_attestation_verified"] is False
               assert "game/frontier/npcs.json" in candidate["files"]
