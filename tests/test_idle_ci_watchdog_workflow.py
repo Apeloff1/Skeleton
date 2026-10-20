@@ -15,6 +15,7 @@ def test_watchdog_preserves_in_progress_run_identity_without_tsv_collapsing() ->
     assert "@tsv" not in workflow
     assert "while IFS= read -r run; do" in workflow
     assert "done < <(jq -c '.[]'" in workflow
-    assert "conclusion=$(jq -r '.conclusion // \\"none\\"'" in workflow
+    assert "conclusion=$(jq -r " in workflow
+    assert '.conclusion // "none"' in workflow
     assert "created=$(jq -r '.createdAt // empty'" in workflow
     assert "url=$(jq -r '.url // empty'" in workflow
