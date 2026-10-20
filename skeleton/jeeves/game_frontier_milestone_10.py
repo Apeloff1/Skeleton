@@ -3,6 +3,7 @@
 Applies a retention bound to a campaign archive and answers
 simple queries over stored exports. Candidate-only. In-memory.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,14 +30,16 @@ class RetentionPolicy:
 def apply_retention(archive: CampaignArchive, policy: RetentionPolicy) -> int:
     """Drop oldest manifests until the archive fits the policy.
 
-    Returns the number of manifests removed. Order is the sorted
-    manifest order from the archive, which is stable.
+    Returns the number of manifests removed. The archive's insertion
+    order preserves admission age; digest ordering does not.
     """
     overflow = len(archive) - policy.max_entries
     if overflow <= 0:
         return 0
+    # Validate the complete public index before changing any retained content.
+    archive.list_manifests()
     removed = 0
-    for manifest in archive.list_manifests()[:overflow]:
+    for manifest in tuple(archive.entries)[:overflow]:
         del archive.entries[manifest]
         removed += 1
     return removed
