@@ -839,6 +839,10 @@ def compile_studio_expedition(project: StudioProject, profile, *, weather=None,
             add_studio_native_gameplay,
         )
         compiled_files=add_studio_native_gameplay(project, files)
+        from skeleton.forge.game_frontier_studio_terrain_runtime import (
+            add_studio_native_terrain,
+        )
+        compiled_files=add_studio_native_terrain(project, compiled_files)
         out["godot_project_files"]=compiled_files
         out["studio_native_runtime_installed"]=len(compiled_files)>len(files)
         out["studio_native_runtime_sha256"]=sha256(json.dumps(
