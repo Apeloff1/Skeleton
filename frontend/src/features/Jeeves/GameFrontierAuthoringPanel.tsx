@@ -278,7 +278,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   };
   return <View style={{ gap: 12, paddingVertical: 10 }}>
     <Text style={{ color: '#eef3fa', fontSize: 20, fontWeight: '700' }}>Forge Studio · Real Game Authoring</Text>
-    <Text style={{ color: '#a7bacf' }}>100 editable tools for maps, characters, quests, environmental events, native physics and soundtracks.
+    <Text style={{ color: '#a7bacf' }}>150 executable tools for maps, characters, quests, environmental events, native physics and soundtracks.
       Every saved edit changes the project source and is consumed by the real game compiler.</Text>
     {!doc ? <ActivityIndicator color="#8bd5e8" /> : <View>
       <Text style={{ color: '#bdcddd' }}>Revision {doc.expected_version} · {doc.layers.length} layers
@@ -310,7 +310,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
           disabled={pending} press={() => setSelectedLayer(layer.id)} />)}</View>
     </ScrollView>
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Choose an executable editor tool</Text>
-    <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 100 game editor tools"
+    <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 150 game editor tools"
       placeholder="Search tiles, NPCs, quests, events…" placeholderTextColor="#75869a"
       style={{ color: '#f0f5fb', borderWidth: 1, borderColor: '#526478', borderRadius: 7, padding: 10 }} />
     {listed.map(group => <View key={group.title} style={{ gap: 4 }}>
