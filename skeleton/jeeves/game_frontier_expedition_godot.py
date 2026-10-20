@@ -121,7 +121,7 @@ func _ready() -> void:
             return
         edge_by_id[eid] = edge
         if not bool(edge.get("one_way", true)):
-            var backward := edge.duplicate(true)
+            var backward: Dictionary = (edge as Dictionary).duplicate(true)
             backward["edge_id"] = eid + ".reverse"
             backward["source"] = edge["target"]
             backward["target"] = edge["source"]
