@@ -113,6 +113,34 @@ def test_long_lived_world_sessions_never_allow_untrusted_viewers(endpoint):
     assert denied.value.status_code==403
 
 
+
+def test_checkpoint_rejects_distinct_signature_strings_with_identical_decoded_mac():
+    """Unused base64 pad bits cannot create alternate accepted signed tokens."""
+    import base64
+
+    owner = editor()
+    token = route.native_living_world_checkpoint_advance(
+        request(moves=("forage",)), owner=owner
+    )["new_checkpoint"]
+    prefix, signature = token.split(".", 1)
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    alternate_last = alphabet[alphabet.index(signature[-1]) ^ 1]
+    forged_signature = signature[:-1] + alternate_last
+
+    def decode(value: str) -> bytes:
+        return base64.urlsafe_b64decode(value + "=" * ((-len(value)) % 4))
+
+    # This is a real malleability probe, not an invalid-MAC corruption.
+    assert signature != forged_signature
+    assert decode(signature) == decode(forged_signature)
+    with pytest.raises(HTTPException) as denied:
+        route.native_living_world_checkpoint_advance(
+            request(token=prefix + "." + forged_signature, moves=("observe",)),
+            owner=owner,
+        )
+    assert denied.value.status_code in (403, 422)
+
+
 def test_invalid_tampered_token_and_illegal_new_world_action_are_refused():
     first=route.native_living_world_checkpoint_advance(request(),owner=editor())
     token=first["new_checkpoint"]

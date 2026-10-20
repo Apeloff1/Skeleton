@@ -62,9 +62,20 @@ def _b64(raw:bytes)->str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def _unb64(raw:str)->bytes:
-    return base64.b64decode(raw+"="*((-len(raw))%4),altchars=b"-_",
-                            validate=True)
+def _unb64(raw: str) -> bytes:
+    """Decode only the unique canonical unpadded base64url representation.
+
+    A valid signature has one string representation. Python's permissive
+    decoder otherwise accepts distinct final sextets with unused nonzero
+    padding bits, allowing a signed token to be changed without changing
+    its HMAC bytes.
+    """
+    decoded = base64.b64decode(
+        raw + "=" * ((-len(raw)) % 4), altchars=b"-_", validate=True
+    )
+    if _b64(decoded) != raw:
+        raise ValueError("checkpoint base64url representation is not canonical")
+    return decoded
 
 
 def _state(document:dict)->LivingState:
