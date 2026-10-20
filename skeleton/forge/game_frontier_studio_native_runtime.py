@@ -81,7 +81,7 @@ func _center(row: Dictionary) -> Vector3:
     var xyz: Array = row.get("center_xyz_m", [0.0, 0.0, 0.0])
     if xyz.size() != 3:
         return Vector3.ZERO
-    return Vector3(float(xyz[0]), float(xyz[1]), float(xyz[2]))
+    return Vector3(float(xyz[0]), float(xyz[2]), float(xyz[1]))
 
 func _event(kind: String, name: String, target: String) -> void:
     var record := {"kind": kind, "name": name, "target": target}
@@ -89,7 +89,7 @@ func _event(kind: String, name: String, target: String) -> void:
     if game_events.size() > MAX_EVENTS:
         game_events.pop_front()
     print("STUDIO_GAMEPLAY_EVENT " + JSON.stringify(record))
-    var game = get_parent()
+    var game: Variant = get_parent()
     if kind == "start_quest":
         active_quests[target] = true
         game.flags[target] = true
@@ -132,17 +132,17 @@ func _force_tick(position: Vector3, delta: float) -> Vector3:
         var size: float = minf(25.0, float(field.get("acceleration_mps2", 0.0))) * taper
         match str(field.get("kind", "")):
             "updraft":
-                acceleration.z += size
+                acceleration.y += size
             "downdraft":
-                acceleration.z -= size
+                acceleration.y -= size
             "eastward_current":
                 acceleration.x += size
             "vortex":
-                var horizontal: Vector2 = Vector2(relative.x, relative.y)
+                var horizontal: Vector2 = Vector2(relative.x, relative.z)
                 if horizontal.length_squared() > 0.000001:
                     var swirl: Vector2 = Vector2(-horizontal.y, horizontal.x).normalized() * size
                     acceleration.x += swirl.x
-                    acceleration.y += swirl.y
+                    acceleration.z += swirl.y
     linear_velocity = (linear_velocity + acceleration.limit_length(50.0) * delta) * maxf(0.0, 1.0 - delta * 2.5)
     linear_velocity = linear_velocity.limit_length(12.0)
     return linear_velocity * delta
@@ -150,7 +150,7 @@ func _force_tick(position: Vector3, delta: float) -> Vector3:
 func _environment_tick(position: Vector3) -> void:
     # Only physically measured in-game altitude is available in this
     # standalone source runtime. Unknown sensors are never fabricated.
-    var measured_altitude: float = position.z
+    var measured_altitude: float = position.y
     for page in pages:
         if typeof(page) != TYPE_DICTIONARY or not bool(page.get("enabled", false)):
             continue
