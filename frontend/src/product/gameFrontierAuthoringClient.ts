@@ -50,7 +50,7 @@ function route(projectId: string) {
 function verifyDoc(doc: ForgeDocument): ForgeDocument {
   if (!doc || doc.schema !== 'skeleton.game.frontier_studio_document.v1'
       || !SHA.test(doc.source_sha256) || !Number.isSafeInteger(doc.expected_version)
-      || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 50
+      || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 100
       || !Array.isArray(doc.layers) || doc.layers.length > 128) {
     throw new ChatClientError('Forge Studio returned invalid original game authoring source.',
       { kind: 'protocol', retryable: false });
@@ -65,7 +65,7 @@ export async function inspectForge(projectId: string, signal?: AbortSignal): Pro
 export async function getForgeActions(signal?: AbortSignal): Promise<string[]> {
   const result = await data(api.get<{ actions: string[]; action_count: number }>(
     ROOT + '/actions', options(undefined, signal)), 'Forge tool catalogue unavailable.');
-  if (!Array.isArray(result.actions) || result.actions.length !== 50 || result.action_count !== 50)
+  if (!Array.isArray(result.actions) || result.actions.length !== 100 || result.action_count !== 100)
     throw new Error('Forge Studio action catalogue is incomplete.');
   return result.actions;
 }
