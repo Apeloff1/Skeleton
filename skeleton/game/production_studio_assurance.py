@@ -104,7 +104,7 @@ def challenge_studio_verifiers(bundle: Mapping[str, Any]) -> dict:
             "modified_evidence_sha256": actual["evidence_digest"],
         })
     forged = deepcopy(report)
-    forged["gates"][20]["findings"] = []
+    forged["gates"][20]["passed"] = False
     try:
         verify_complete_studio(bundle, forged)
     except QualityGateError:
