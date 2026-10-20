@@ -27,6 +27,12 @@ class EditorMutation(WriteRequest):
     steps: list[EditorStep] = Field(min_length=1, max_length=64)
 
 
+class NativeExport(WriteRequest):
+    expected_sha256: str = Field(pattern="^[a-f0-9]{64}$")
+    seed: int = Field(default=42, ge=0, le=2**63 - 1, strict=True)
+    islands: int = Field(default=12, ge=3, le=64, strict=True)
+
+
 class TileSelection(Request):
     layer: str = Field(min_length=1, max_length=128)
     x: int = Field(ge=0, le=255, strict=True)
@@ -88,3 +94,11 @@ async def build_playable_game(project_id: str, body: NativeBuild,
                               user=Depends(get_current_user)):
     return await _call(studio.compile_game(
         _scope(user), project_id, **body.model_dump()))
+
+
+
+@router.post("/projects/{project_id}/build/export")
+async def export_game_to_project(project_id: str, body: NativeExport,
+                                 user=Depends(get_current_user)):
+    return await _call(studio.export_native_project(
+        _write_scope(user), project_id, body.model_dump()))
