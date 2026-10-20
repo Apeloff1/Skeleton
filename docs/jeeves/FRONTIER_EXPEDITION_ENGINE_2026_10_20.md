@@ -108,3 +108,42 @@ trace could describe a legitimate simulated session. Its report explicitly
 states that the source gameplay was replay-verified while engine origin
 attestation remains false. A real native run still requires its test job,
 binary identity and captured process provenance to be independently checked.
+
+
+## Seven implemented development milestones (2026-10-20)
+
+The new expedition delivery is implemented in distinct source owners, all
+attached to the existing Forge/Jeeves app rather than a sample-only plan.
+
+1. Native Godot autoplay accepts a deterministic source-constrained route
+   from the actual route solver. The engine navigates every connected edge,
+   updates game state, prints candidate observations, and terminates with
+   an explicit winning-state receipt (or exits nonzero).
+2. An actual Godot 4 runner checks the binary version, runs the standalone
+   project headlessly, captures the complete process log, verifies the
+   terminal game result, and independently replays all emitted observations.
+   Missing Godot, engine failures and incomplete gameplay are hard failures.
+3. The CLI exports complete original seeded projects with SHA-256 file
+   evidence and atomic no-overwrite publication, and optionally runs native
+   verification. Its simulated reports never impersonate engine results.
+4. Real multi-seed campaign QA executes full routes across original worlds,
+   headwinds, storms, rain, turbulence, fog, and equipment variations,
+   including explicitly blocked cases and objective comparison receipts.
+5. SQLite save games retain every actual action with source-bound replay,
+   restart-safe typed restore, optimistic concurrency, idempotent writes,
+   tamper checks, and hash-linked generations.
+6. Independent release assurance checks file source closure, playable goals
+   via two independently reconstructed routes, QA case receipts, objective
+   quality axes, source-linked content reviewers, and actual native evidence
+   if provided. No model may manufacture legal clearance, reviewer authority
+   or production completion merely by filling a JSON field.
+7. Seven real Jeeves Studio operations bind projects from host-owned
+   authority: inspect, preview, QA, release inspection, session start, state
+   action and original Godot export. The preexisting registry's exact-command
+   host authorization and tool grants remain mandatory. No direct unapproved
+   files, providers or hardware access is granted to Jeeves.
+
+Each host's finite batch or engine job supports project continuation through
+durable game/queue receipts. Remaining work includes real multihour native
+playthroughs, expanded cutscene/asset pipelines and signed legal approval;
+nothing here constitutes completion of 100 roadmap bundles.

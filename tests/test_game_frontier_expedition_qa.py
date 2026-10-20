@@ -16,7 +16,10 @@ def test_qa_exercises_multiple_original_games_and_actual_scenario_routes():
     assert report["executed_game_routes"]>=8
     assert report["physical_engine_playthroughs"]==0
     assert not report["release_approved"]
-    assert len({row["world_digest"] for row in report["cases"]})==14
+    # Fog cases intentionally share the *same* weather world: only player
+    # equipment differs. Both independent identities are still unique.
+    assert len({(row["world_digest"],row["traveler_digest"])
+                for row in report["cases"]})==14
     assert all(len(row["receipt_digest"])==64 for row in report["cases"])
 
 

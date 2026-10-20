@@ -40,6 +40,11 @@ READ_OPERATIONS = (
     "artifact.export",
     "campaign.champion.handoff",
     "campaign.attempts",
+    # Real original expedition tool plane, always host-authorized.
+    "expedition.inspect",
+    "expedition.preview",
+    "expedition.qa",
+    "expedition.release.inspect",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -71,6 +76,9 @@ WRITE_OPERATIONS = (
     "campaign.pause",
     "campaign.resume",
     "campaign.cancel",
+    "expedition.start",
+    "expedition.action",
+    "expedition.export",
 )
 OPERATIONS = frozenset((*READ_OPERATIONS, *WRITE_OPERATIONS))
 
