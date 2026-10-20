@@ -20,6 +20,8 @@ on:
       - "scripts/validate_game_frontier_native_smoke.py"
       - "skeleton/forge/game_frontier_godot.py"
       - "skeleton/jeeves/game_frontier*.py"
+      - "scripts/build_original_expedition.py"
+      - "tests/test_original_expedition_cli.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
 
 permissions:
@@ -57,6 +59,34 @@ jobs:
           chmod 700 "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64"
           echo "FRONTIER_GODOT=$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
           echo "FRONTIER_GODOT_SHA=$(sha256sum "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - name: Play and independently replay the original sky-island expedition on real Godot
+        shell: bash
+        env:
+          PYTHONPATH: "."
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from scripts.build_original_expedition import build_original_expedition
+          files, proof = build_original_expedition(
+              "frontier-original-native-ci",
+              seed=742193, islands=9, native=True,
+              godot_executable=os.environ["FRONTIER_GODOT"],
+          )
+          assert proof["native_executed"], proof
+          assert proof["actual_simulated_routes"] >= 2, proof
+          assert len(proof["native_playthrough_receipt"]) == 64, proof
+          assert "game/frontier/expedition.gd" in files, proof
+          assert not proof["independent_native_engine_signoff"], proof
+          print(json.dumps({
+              "executed_real_godot_expedition": True,
+              "original_project": proof["project_id"],
+              "source_world_digest": proof["world_digest"],
+              "route_count": proof["actual_simulated_routes"],
+              "engine_replay_receipt": proof["native_playthrough_receipt"],
+          }, sort_keys=True))
+          PY
       # One pinned binary download, four independently sandboxed native
       # simulations and journals. This avoids a 4x runner/install/download fanout.
       - name: Qualify 30/50/60/120 Hz native physics and frame journals
