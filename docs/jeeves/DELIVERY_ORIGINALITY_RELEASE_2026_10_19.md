@@ -225,3 +225,88 @@ actual execution requires the explicit execute flag.
 A successful run proves only the selected tests on the pinned commit.
 It does not implement missing features, grant signoff, or clear the mandatory
 independent review, security, rollback and exact-head requirements.
+
+
+## Durable milestone work queue checkpointing
+
+The optional SQLiteMilestoneQueueStore binds each Jeeves run to a durable
+source commit and artifact digest. Queue snapshots are stored with exact
+canonical JSON hashes, sequential generations, optimistic compare-and-swap
+updates, SQLite transactions and independent typed hash-chain replay.
+A resumed agent can restore the previous claim/lease history, explicitly
+expire abandoned leases, and continue without fabricating milestone progress.
+A changed source snapshot, duplicate serialization keys, nonfinite values,
+malformed records, broken receipt chain, duplicate writers or a closed storage
+adapter are rejected. Existing memory is only updated after the durable
+checkpoint write succeeds.
+
+The API uses bind_assurance_checkpoint_store(run_id, store,
+source_commit=..., artifact_digest=...) to attach explicit host storage.
+The ordinary no-store path is *ephemeral*, not crash-safe. SQLite durability
+is conditional on the host's actual filesystem lifecycle and storage policy.
+Hashes detect corruption, not tampering by an attacker with write access to
+the database. These are system-level implementation milestones, not
+production-certified completion of any of the original 421 volumes.
+
+
+### Tamper-evident generation history
+
+SQLite milestone checkpoint writes now also append a transactionally linked
+history entry for each new generation. Replay verifies sequence continuity,
+the previous receipt, content and queue digests, and the latest committed
+snapshot before loading or overwriting it. Exports contain only digest records
+and generation numbers, not project or game source. Idempotent replays do not
+create redundant generations. Truncation, rollback to an earlier current
+snapshot, missing history, modified receipt, and cross-process stale writers
+all block checkpoint trust.
+
+This history is a same-database integrity mechanism, not an external
+anchoring/signature service. An attacker who can rewrite the complete SQLite
+database could recompute both history and state; higher-assurance deployment
+requires a trusted off-database audit sink and independently verified anchors.
+
+
+## Bounded durable host execution cycles
+
+The source-bound scheduler executes actual host-provided reviewer callbacks
+in bounded cycles through the delivery_milestone_driver module. It loads an
+already-initialized SQLite queue, expires abandoned leases, requires separately
+registered independent host checkers, persists each lease before invoking
+reviewers, and commits every verified settlement before reporting completion.
+
+Each cycle sets a claim budget, duration limit and operator stop hook. Host
+exceptions, lease expiry and time-budget overrun leave the in-flight lease
+recorded until explicit recovery, rather than silently replaying an
+unknown outcome. Cross-process optimistic checkpoint conflicts fail closed.
+The journal binds run identity, pinned source, prior/final queue digests,
+generation history and accepted verdicts. The scheduler never invents
+measurement values, checker independence or production signoff.
+
+Finite resource budgets keep each cycle controllable, while long-running game
+production may continue through a succession of durable cycles. Regression
+tests drive all 100 criteria through several checkpointed cycles, but do not
+certify any original MDM-001..MDM-100 masterplan milestone as complete.
+
+
+## Durable operator intervention and cancellation races
+
+The same source-bound SQLite authority now stores operator control states:
+running, paused or terminally cancelled. A host must explicitly authorize the
+operator identity and reason reference before calling the runtime's
+set_assurance_operator_control() or the underlying store. Controls are
+versioned with compare-and-swap generations, scoped to the exact queue source,
+checked against their canonical receipts, and survive process restarts.
+
+Pause prevents *new* work claims, but permits an already claimed reviewer to
+settle. Cancellation blocks any further queue-state changes. The store checks
+operator control in the same SQLite write transaction as queue settlement,
+preventing a race where the driver reads "running", an operator cancels, and
+a later worker publishes a result. A cancelled queue cannot be silently
+resumed. An interrupted host execution remains durably leased and must not be
+reported as successfully verified. Operator controls are independent from
+the ordinary user's authored game data and are never inferred from AI output.
+
+The durable work driver checks controls before recovery, before each claim
+and after external reviewers. Test fixtures exercise pause/resume/cancel,
+interleaved processes, stale generations, failed direct queue bypass attempts,
+tampered control receipts, and runtime integration.

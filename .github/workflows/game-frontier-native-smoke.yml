@@ -20,6 +20,9 @@ on:
       - "scripts/validate_game_frontier_native_smoke.py"
       - "skeleton/forge/game_frontier_godot.py"
       - "skeleton/jeeves/game_frontier*.py"
+      - "scripts/build_original_expedition.py"
+      - "scripts/build_original_campaign.py"
+      - "tests/test_original_expedition_cli.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
 
 permissions:
@@ -57,6 +60,171 @@ jobs:
           chmod 700 "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64"
           echo "FRONTIER_GODOT=$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
           echo "FRONTIER_GODOT_SHA=$(sha256sum "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - name: Play and independently replay the original sky-island expedition on real Godot
+        shell: bash
+        env:
+          PYTHONPATH: "."
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from scripts.build_original_expedition import build_original_expedition
+          files, proof = build_original_expedition(
+              "frontier-original-native-ci",
+              seed=742193, islands=9, native=True,
+              godot_executable=os.environ["FRONTIER_GODOT"],
+          )
+          assert proof["native_executed"], proof
+          assert proof["actual_simulated_routes"] >= 2, proof
+          assert len(proof["native_playthrough_receipt"]) == 64, proof
+          assert "game/frontier/expedition.gd" in files, proof
+          assert not proof["independent_native_engine_signoff"], proof
+          print(json.dumps({
+              "executed_real_godot_expedition": True,
+              "original_project": proof["project_id"],
+              "source_world_digest": proof["world_digest"],
+              "route_count": proof["actual_simulated_routes"],
+              "engine_replay_receipt": proof["native_playthrough_receipt"],
+          }, sort_keys=True))
+          PY
+      - name: Qualify complete original campaign controller, story, LOD meshes and Dragon source on real Godot
+        shell: bash
+        env:
+          PYTHONPATH: "."
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,subprocess,tempfile
+          from pathlib import Path
+          from skeleton.jeeves.game_frontier_expedition_campaign import (
+              compile_original_campaign,verify_original_campaign,
+          )
+          from skeleton.jeeves.game_frontier_expedition_native_verify import (
+              inspect_native_expedition_trace,
+          )
+          from skeleton.jeeves.game_frontier_expedition_native_cinema_verify import (
+              verify_native_cinema_frames,
+          )
+          from skeleton.jeeves.game_frontier_visual_capture import (
+              ingest_godot_viewport_log,
+          )
+          candidate=compile_original_campaign(
+              "fully-original-frontier-native-ci",
+              gdd_digest="c"*64,seed=31,islands=5,
+              controller_id="dual_stick",
+          )
+          verify_original_campaign(
+              candidate,project_id="fully-original-frontier-native-ci",
+              gdd_digest="c"*64,seed=31,islands=5,
+              controller_id="dual_stick",
+          )
+          with tempfile.TemporaryDirectory(prefix="campaign-native-") as location:
+              root=Path(location)
+              for relative,contents in candidate["files"].items():
+                  path=root/relative
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_text(contents,encoding="utf-8")
+              result=subprocess.run(
+                  [os.environ["FRONTIER_GODOT"],"--headless",
+                   "--path",str(root),"--quit-after","20","--",
+                   "--expedition-autoplay"],
+                  cwd=root,capture_output=True,text=True,timeout=180,
+                  check=False,
+              )
+              out=result.stdout+"\n"+result.stderr
+              if result.returncode != 0 or "EXPEDITION_COMPLETE " not in out:
+                  raise AssertionError(
+                      "Native original game failed: "+repr(out[-4000:]))
+              verified=inspect_native_expedition_trace(
+                  out,candidate["world"],candidate["player"],
+                  expected_complete=True,
+              )
+              assert verified["won"]
+              assert verified["executed_actions"]>=1
+              assert "EXPEDITION_AUDIO_READY " in out, "Native WAV audio unavailable: "+repr(out[-3000:])
+              assert "EXPEDITION_ENDING " in out, "Native quest ending missing: "+repr(out[-3000:])
+              assert "EXPEDITION_NPC_READY " in out, "Native original NPC scene absent: "+repr(out[-3000:])
+              assert "EXPEDITION_ECOLOGY_READY " in out, "Native original foliage not instantiated: "+repr(out[-3000:])
+              assert "EXPEDITION_RIG_READY " in out, "Native authored skeleton did not load: "+repr(out[-3000:])
+              assert "EXPEDITION_PERFORMANCE_READY " in out, "Native authored facial performance not loaded: "+repr(out[-3000:])
+              assert "EXPEDITION_BLOCKING_READY " in out, "Native cinematic actor blocking not loaded: "+repr(out[-3000:])
+              assert "game/frontier/supply_chain.json" in candidate["files"]
+              assert "game/frontier/ragdoll.json" in candidate["files"]
+              assert "game/frontier/foot_ik.json" in candidate["files"]
+              assert "game/frontier/controller_era_parity.json" in candidate["files"]
+              assert "game/frontier/process_soak.json" in candidate["files"]
+              assert candidate["controller_parity"]["profile_count"]==7
+              assert not candidate["soak"]["measured_uptime_qualified"]
+              assert "game/frontier/society.json" in candidate["files"]
+              assert "game/frontier/actor_rig.gd" in candidate["files"]
+              assert "game/frontier/performance.gd" in candidate["files"]
+              assert candidate["manifest"]["seven_plane_source_checks"]==6
+              assert not candidate["seven_plane_assurance"]["production_release_approved"]
+              assert "EXPEDITION_CINEMATIC_COMPLETE " in out or "EXPEDITION_OBSERVATION " in out
+              assert "game/frontier/quests.json" in candidate["files"]
+              assert "game/frontier/cinematic.gd" in candidate["files"]
+              assert "game/frontier/cinematic_audit.gd" in candidate["files"]
+              cinema=subprocess.run(
+                  [os.environ["FRONTIER_GODOT"],"--headless",
+                   "--path",str(root),"--script",
+                   "res://game/frontier/cinematic_audit.gd",
+                   "--quit-after","160"],
+                  cwd=root,capture_output=True,text=True,
+                  timeout=90,check=False,
+              )
+              cinema_out=cinema.stdout+"\n"+cinema.stderr
+              if cinema.returncode!=0 or (
+                  "EXPEDITION_CINEMATIC_AUDIT_VERIFIED scene_001"
+                  not in cinema_out
+              ) or (
+                  "EXPEDITION_CINEMATIC_COMPLETE scene_001"
+                  not in cinema_out
+              ):
+                  raise AssertionError(
+                      "Native original Camera3D playback failed: "+repr(cinema_out[-5000:]))
+              assert "EXPEDITION_CINEMATIC_AUDIT_STARTED " in cinema_out
+              cinema_review=verify_native_cinema_frames(
+                  cinema_out,candidate["storyboard"],
+                  clip_id="scene_001",
+              )
+              assert cinema_review["observations"]==5
+              assert cinema_review["source_frame_replay_verified"]
+              pixels=subprocess.run(
+                  [os.environ["FRONTIER_GODOT"],"--headless",
+                   "--path",str(root),"--script",
+                   "res://game/frontier/viewport_capture.gd",
+                   "--quit-after","200"],
+                  cwd=root,capture_output=True,text=True,
+                  timeout=90,check=False,
+              )
+              pixel_out=pixels.stdout+"\n"+pixels.stderr
+              if pixels.returncode!=0:
+                  raise AssertionError("Native original RGB viewport failed: "+repr(pixel_out[-4000:]))
+              visual=ingest_godot_viewport_log(
+                  pixel_out,expected_world=candidate["world"].digest,
+                  expected_kind="original_procedural_preview",
+              )
+              assert visual["report"]["frames"]==2
+              assert visual["comparison"]["games"][0]["source_kind"]==[
+                  "original_procedural_preview",
+              ]
+              assert visual["comparison"]["frame_count"]==2
+              assert visual["report"]["native_runner_attestation_verified"] is False
+              assert "game/frontier/npcs.json" in candidate["files"]
+              assert "game/frontier/ecology.json" in candidate["files"]
+              assert "game/frontier/lod_runtime.json" in candidate["files"]
+              assert candidate["dragon_attacks"]["all_attacks_rejected"]
+              print(json.dumps({
+                  "original_3d_assets":candidate["manifest"]["unique_game_assets"],
+                  "actual_gameplay_qa_cases":candidate["manifest"]["actual_qa_cases"],
+                  "replayed_dragon_routes":candidate["manifest"]["dragon_verified_route_checks"],
+                  "gameplay_receipt":verified["receipt_digest"],
+                  "source_world":candidate["world"].digest,
+                  "native_executed":True,
+                  "production_release_approved":False,
+              },sort_keys=True))
+          PY
       # One pinned binary download, four independently sandboxed native
       # simulations and journals. This avoids a 4x runner/install/download fanout.
       - name: Qualify 30/50/60/120 Hz native physics and frame journals

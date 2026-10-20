@@ -384,6 +384,123 @@ def execute_plan(
     return report
 
 
+
+
+def audit_milestone_coverage(
+    requested: Sequence[str], *, root: Path = ROOT,
+) -> dict[str, object]:
+    """Inspect *all* canonical implementation/test references without executing them.
+
+    This deliberately distinguishes authored implementation from merely
+    referenced/missing test files. A path exists and is fingerprinted or it
+    remains unresolved; there is no synthetic test and no completion signoff.
+    """
+    root = root.resolve()
+    selection = _safe_selection(requested)
+    roadmap, source_pin = _load_roadmap(root)
+    selected = set(selection)
+    rows: list[dict[str, object]] = []
+    all_present_tests: set[str] = set()
+    all_missing_tests: set[str] = set()
+    all_planned_tests: set[str] = set()
+    for milestone in roadmap["milestones"]:
+        if milestone["id"] not in selected:
+            continue
+        existing_tests: dict[str, str] = {}
+        missing_tests: set[str] = set()
+        planned_tests: set[str] = set()
+        unsupported_tests: set[str] = set()
+        implementation_paths: dict[str, str] = {}
+        missing_implementations: set[str] = set()
+        for volume in milestone["volumes"]:
+            for test_path in volume["acceptance_tests"]:
+                if test_path.startswith("planned:"):
+                    planned_tests.add(test_path)
+                    all_planned_tests.add(test_path)
+                    continue
+                if (not isinstance(test_path, str) or not _PATH.fullmatch(test_path)
+                        or test_path.startswith("/")
+                        or ".." in PurePosixPath(test_path).parts
+                        or str(PurePosixPath(test_path)) != test_path
+                        or not (
+                            test_path.startswith(_ALLOWED_TEST_ROOTS)
+                            or test_path.startswith(_ALLOWED_SCRIPT_ROOTS)
+                        )):
+                    # Source-authored wildcard paths and test command labels
+                    # are requirements, not executable files.
+                    unsupported_tests.add(str(test_path))
+                    continue
+                try:
+                    _, resolved = _safe_test(test_path, root)
+                except MilestoneExecutionError:
+                    missing_tests.add(test_path)
+                    all_missing_tests.add(test_path)
+                    continue
+                existing_tests[test_path] = _hash(resolved.read_bytes())
+                all_present_tests.add(test_path)
+            for path in volume["contract_targets"]:
+                if isinstance(path, str) and path.startswith("planned:"):
+                    missing_implementations.add(path)
+                    continue
+                if (not isinstance(path, str) or not _PATH.fullmatch(path)
+                        or path.startswith("/") or ".." in PurePosixPath(path).parts
+                        or str(PurePosixPath(path)) != path):
+                    raise MilestoneExecutionError("unsafe declared implementation path")
+                resolved = (root / path).resolve()
+                if not resolved.is_relative_to(root):
+                    raise MilestoneExecutionError("implementation path escapes checkout")
+                if resolved.exists():
+                    if resolved.is_file():
+                        implementation_paths[path] = _hash(resolved.read_bytes())
+                    elif resolved.is_dir():
+                        implementation_paths[path] = "directory-present"
+                    else:
+                        missing_implementations.add(path)
+                else:
+                    missing_implementations.add(path)
+        status = (
+            "paths_ready_for_test_execution"
+            if existing_tests and not missing_tests and not planned_tests
+            and not unsupported_tests
+            else "blocked_missing_test_implementation"
+        )
+        rows.append({
+            "milestone_id": milestone["id"],
+            "title": milestone["title"],
+            "volume_count": len(milestone["volumes"]),
+            "status": status,
+            "existing_tests": dict(sorted(existing_tests.items())),
+            "missing_tests": sorted(missing_tests),
+            "planned_tests": sorted(planned_tests),
+            "unsupported_test_bindings": sorted(unsupported_tests),
+            "existing_implementation_paths": dict(sorted(implementation_paths.items())),
+            "missing_implementation_paths": sorted(missing_implementations),
+            "independent_signoff": False,
+        })
+    if len(rows) != len(selection):
+        raise MilestoneExecutionError("coverage audit lost requested milestones")
+    payload = {
+        "schema": SCHEMA,
+        "kind": "source_coverage_audit",
+        "roadmap_sha256": source_pin,
+        "milestones_examined": len(rows),
+        "volumes_examined": sum(item["volume_count"] for item in rows),
+        "test_path_ready_milestones": sum(
+            item["status"] == "paths_ready_for_test_execution" for item in rows
+        ),
+        "blocked_milestones": sum(
+            item["status"] != "paths_ready_for_test_execution" for item in rows
+        ),
+        "unique_existing_tests": len(all_present_tests),
+        "unique_missing_tests": len(all_missing_tests),
+        "unique_planned_tests": len(all_planned_tests),
+        "production_completed_milestones": 0,
+        "completion_signoff": False,
+        "milestones": rows,
+    }
+    payload["audit_receipt"] = _hash(_canonical_json(payload))
+    return payload
+
 def _atomic_json(destination: Path, payload: Mapping[str, object]) -> None:
     if destination.exists() and destination.is_symlink():
         raise MilestoneExecutionError("refusing symlink output")
@@ -410,6 +527,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--milestone", action="append", dest="milestones")
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--audit", action="store_true")
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--report", type=Path)
     args = parser.parse_args(argv)
@@ -419,11 +537,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         [f"MDM-{i:03d}" for i in range(1, 101)]
         if args.all else args.milestones
     )
-    plan = create_execution_plan(requested)
-    result = (
-        execute_plan(plan, timeout=args.timeout).summary()
-        if args.execute else plan.preview()
-    )
+    if args.audit and args.execute:
+        parser.error("--audit and --execute are mutually exclusive")
+    if args.audit:
+        result = audit_milestone_coverage(requested)
+    else:
+        plan = create_execution_plan(requested)
+        result = (
+            execute_plan(plan, timeout=args.timeout).summary()
+            if args.execute else plan.preview()
+        )
     if args.report is not None:
         _atomic_json(args.report, result)
     print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
