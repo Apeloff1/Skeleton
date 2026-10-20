@@ -34,7 +34,7 @@ class QualityHistoryStore:
     """Append-only source-bound evidence; caller supplies authorized local path."""
 
     def __init__(self, path: Path):
-        if type(path) is not Path or not path.parent.is_dir():
+        if not isinstance(path, Path) or not path.parent.is_dir():
             raise QualityGateError("quality journal requires host-owned existing directory")
         self.path = path
         self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
