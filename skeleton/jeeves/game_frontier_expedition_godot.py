@@ -46,6 +46,7 @@ _GODOT_SCRIPT = r'''extends Node3D
 
 const WORLD_FILE = "res://game/frontier/expedition.json"
 const PLAYER_FILE = "res://game/frontier/player.json"
+const AUTOPLAY_FILE = "res://game/frontier/autoplay.json"
 const MAX_GAME_EDGES = 65536
 var world: Dictionary = {}
 var player: Dictionary = {}
@@ -149,6 +150,52 @@ func _ready() -> void:
     print("EXPEDITION_READY " + str(world.get("project", "")) +
           " " + str(waypoint_by_id.size()) + " " + str(edge_by_id.size()))
     _emit_observation("spawn", "start")
+    if OS.get_cmdline_user_args().has("--expedition-autoplay"):
+        _run_autoplay()
+
+func _run_autoplay() -> void:
+    var recipe := _load_json(AUTOPLAY_FILE)
+    if (recipe.get("schema", "") != "skeleton.game.expedition_autoplay.v1"
+            or str(recipe.get("world_digest", "")) != str(world.get("world_digest", ""))
+            or str(recipe.get("traveler_digest", "")) != str(player.get("traveler_digest", ""))):
+        push_error("Autoplay source or player differs from exact game files")
+        get_tree().quit(21)
+        return
+    var steps = recipe.get("steps", [])
+    if typeof(steps) != TYPE_ARRAY or steps.size() < 1 or steps.size() > 4096:
+        push_error("Autoplay sequence exceeds game execution budget")
+        get_tree().quit(22)
+        return
+    for step in steps:
+        if typeof(step) != TYPE_DICTIONARY:
+            push_error("Autoplay action schema invalid")
+            get_tree().quit(23)
+            return
+        var edge_id := str(step.get("edge_id", ""))
+        var edge: Dictionary = edge_by_id.get(edge_id, {})
+        if edge.is_empty() or str(edge["source"]) != current_id:
+            push_error("Autoplay edge is not connected to actual gameplay")
+            get_tree().quit(24)
+            return
+        _travel(edge)
+        if current_id != str(step.get("target", "")):
+            push_error("Autoplay action failed authored travel constraints")
+            get_tree().quit(25)
+            return
+    var completed: bool = won and not failed and bool(
+        world.get("destinations", []).has(current_id))
+    print("EXPEDITION_COMPLETE " + JSON.stringify({
+        "world_digest": str(world.get("world_digest", "")),
+        "route_digest": str(recipe.get("route_digest", "")),
+        "completed":completed,
+        "steps": receipts.size(),
+        "candidate_receipt_head":receipt_head,
+    }))
+    if not completed:
+        push_error("Native expedition did not reach its actual authored goal")
+        get_tree().quit(26)
+    else:
+        get_tree().quit(0)
 
 func _where(node: Dictionary) -> Vector3:
     return Vector3(float(node["x_m"]), float(node["altitude_m"]), float(node["y_m"]))
@@ -436,15 +483,62 @@ def _traveler_json(traveler: Traveler) -> str:
     }).decode("utf-8")
 
 
+def make_expedition_autoplay(
+    world: ExpeditionWorld, traveler: Traveler,
+    *, destination: str | None = None,
+) -> dict:
+    """Use the actual source-bound simulator to author an executable native route."""
+    from .game_frontier_expedition import find_route, verify_route
+    if not isinstance(world, ExpeditionWorld) or not isinstance(traveler, Traveler):
+        raise ExpeditionError("native autoplay needs a typed original game source")
+    target = world.destinations[0] if destination is None else destination
+    route = find_route(world, traveler, target)
+    if len(route.edge_ids) > 4096:
+        raise ExpeditionError("native autoplay requires bounded finite gameplay")
+    proof = verify_route(world, traveler, route)
+    if not proof["final_state"]["won"]:
+        raise ExpeditionError("native candidate autoplay must terminate in victory")
+    recipe = {
+        "schema": "skeleton.game.expedition_autoplay.v1",
+        "source_digest":world.source_digest,
+        "world_digest":world.digest,
+        "traveler_digest":_digest_traveler(traveler),
+        "route_digest":route.digest,
+        "steps":[
+            {"edge_id":eid,"target":world.by_edge[eid].target}
+            for eid in route.edge_ids
+        ],
+        "simulated_playthrough_receipt":proof["receipt_head"],
+        "engine_execution_pending":True,
+    }
+    recipe["receipt_digest"]=sha256(_json(recipe)).hexdigest()
+    return recipe
+
+
+def _digest_traveler(traveler: Traveler) -> str:
+    from .game_frontier_expedition import _digest
+    return _digest({
+        "permitted_modes": sorted(traveler.permitted_modes),
+        "flags": sorted(traveler.flags),
+        "equipment": sorted(traveler.equipment),
+        "max_stamina": traveler.max_stamina,
+        "carried_kg": traveler.carried_kg,
+        "capacity_kg": traveler.capacity_kg,
+        "skill": traveler.skill,
+        "shelter": traveler.shelter,
+    })
+
+
 def emit_expedition_godot_project(
     world: ExpeditionWorld, traveler: Traveler, *,
     include_project_config: bool = True,
+    include_autoplay: bool = False,
 ) -> dict[str, str]:
     """Compile executable, resource-safe Godot 4 files for an original game."""
     if not isinstance(world, ExpeditionWorld) or not isinstance(traveler, Traveler):
         raise ExpeditionError("typed source world and traveler required for native game")
-    if type(include_project_config) is not bool:
-        raise ExpeditionError("Godot project configuration policy must be explicit boolean")
+    if type(include_project_config) is not bool or type(include_autoplay) is not bool:
+        raise ExpeditionError("Godot project and autoplay policy must be explicit boolean")
     export = world_export(world)
     files = {
         "game/frontier/expedition.tscn": _GODOT_SCENE,
@@ -455,16 +549,22 @@ def emit_expedition_godot_project(
     }
     if include_project_config:
         files["project.godot"] = _GODOT_PROJECT
+    if include_autoplay:
+        files["game/frontier/autoplay.json"] = _json(
+            make_expedition_autoplay(world, traveler)
+        ).decode("utf-8")
     return files
 
 
 def verify_expedition_godot_project(
     files: Mapping[str, str], world: ExpeditionWorld,
     traveler: Traveler, *, include_project_config: bool = True,
+    include_autoplay: bool = False,
 ) -> dict:
     """Compare every generated game byte with independent deterministic export."""
     expected = emit_expedition_godot_project(
         world, traveler, include_project_config=include_project_config,
+        include_autoplay=include_autoplay,
     )
     if (not isinstance(files, Mapping) or set(files) != set(expected)
             or any(type(files.get(path)) is not str or files[path] != content
