@@ -101,3 +101,20 @@ export async function exportForge(projectId: string, doc: ForgeDocument,
     seed, islands, idempotency_key: key,
   }, options(key)), 'Could not publish native Godot files to the project.');
 }
+
+
+export type ForgeGameplayProbe = {
+  source_sha256: string; occupied_zones: { zone_id: string; action_kind: string }[];
+  field_forces: { field_id: string; force_xyz_n: number[] }[];
+  net_force_xyz_n: number[];
+  environment_accepted: { page_id: string; actions: unknown[] }[];
+  missing_sensor_signals: string[]; native_engine_executed: false;
+  receipt_sha256: string;
+};
+export async function previewForgeGameplay(projectId: string, position_xyz_m: number[],
+                                          current_signals: Record<string, number>,
+                                          flags: Record<string, boolean> = {}): Promise<ForgeGameplayProbe> {
+  return data(api.post<ForgeGameplayProbe>(route(projectId) + '/gameplay/simulate', {
+    position_xyz_m, mass_kg: 75, now_ms: 50000, current_signals, flags,
+  }, options()), 'Could not evaluate authored gameplay at this position.');
+}
