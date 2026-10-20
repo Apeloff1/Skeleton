@@ -82,6 +82,9 @@ from .game_frontier_soak import simulated_process_recovery
 from .game_frontier_campaign_seven_audits import (
     compile_seven_campaign_audits, verify_seven_campaign_audits,
 )
+from .game_frontier_expedition_navigation_advanced import (
+    compile_navigation_seven, verify_navigation_seven,
+)
 
 
 def original_campaign_player()->Traveler:
@@ -186,6 +189,8 @@ def compile_original_campaign(
         raise ExpeditionError("original studio cannot bypass unsigned release assurance")
     seven_campaign_audits=compile_seven_campaign_audits(world,player,assets)
     verify_seven_campaign_audits(world,player,assets,seven_campaign_audits)
+    advanced_navigation=compile_navigation_seven(world,player)
+    verify_navigation_seven(world,player,advanced_navigation)
     render_frames=render_lod_timeline(
         world,assets["manifest"],(
             View(1,0,0,0,500),
@@ -221,6 +226,7 @@ def compile_original_campaign(
     files["game/frontier/postproduction.json"]=_json(postproduction["report"]).decode("utf-8")
     files["game/frontier/contact_sheet.ppm"]=postproduction["contact_sheet_ppm"]
     files["game/frontier/controller_latency.json"]=_json(measured_controller).decode("utf-8")
+    files["game/frontier/advanced_navigation.json"]=_json(advanced_navigation).decode("utf-8")
     files["game/frontier/production_telemetry.json"]=_json(watchdog).decode("utf-8")
     files["game/frontier/seven_plane_assurance.json"]=_json(seven_axes).decode("utf-8")
     for audit_id,audit in sorted(seven_campaign_audits.items()):
@@ -320,6 +326,7 @@ def compile_original_campaign(
         "production_watchdog_receipt":watchdog["snapshot_digest"],
         "seven_plane_assurance_receipt":seven_axes["receipt_digest"],
         "seven_campaign_audits_receipt":seven_campaign_audits["delivery"]["receipt_digest"],
+        "advanced_navigation_receipt":advanced_navigation["assurance"]["receipt_digest"],
         "seven_campaign_source_checked":seven_campaign_audits["delivery"]["source_checks_passed"],
         "seven_plane_source_checks":seven_axes["passed"],
         "real_hardware_test_completed":False,
@@ -372,6 +379,7 @@ def compile_original_campaign(
         "controller_qa":measured_controller,
         "production_watchdog":watchdog,"seven_plane_assurance":seven_axes,
         "seven_campaign_audits":seven_campaign_audits,
+        "advanced_navigation":advanced_navigation,
         "ecology_frame":ecology_sample,
         "render":render_frames,"dragon":dragon,
         "dragon_adversary":dragon_review,
@@ -416,6 +424,7 @@ def verify_original_campaign(compiled:Mapping, *, project_id:str,
             or compiled.get("production_watchdog")!=expected["production_watchdog"]
             or compiled.get("seven_plane_assurance")!=expected["seven_plane_assurance"]
             or compiled.get("seven_campaign_audits")!=expected["seven_campaign_audits"]
+            or compiled.get("advanced_navigation")!=expected["advanced_navigation"]
             or compiled.get("npcs")!=expected["npcs"]
             or compiled.get("ecology")!=expected["ecology"]
             or compiled.get("ecology_frame")!=expected["ecology_frame"]
