@@ -10,7 +10,7 @@ from skeleton.jeeves.game_frontier_expedition_save_store import ExpeditionSaveSt
 from skeleton.jeeves.game_frontier_expedition_studio_tools import (
     OPERATIONS, expedition_studio_handlers,
 )
-from tests.test_game_frontier_expedition_native_runner import world,traveler
+from tests.test_game_frontier_expedition_godot import world,traveler
 
 
 def host(tmp_path):
@@ -49,14 +49,14 @@ def test_governed_player_interaction_updates_actual_persisted_state(tmp_path):
     assert started["generation"]==1
     moved=handlers["expedition.action"](
         request("expedition.action",run_id="run1",
-                expected_generation=1,kind="travel",edge_id="launch"),None)
+                expected_generation=1,kind="travel",edge_id="launch_updraft"),None)
     assert moved["generation"]==2
-    assert moved["state"]["position"]=="cliff"
-    assert "discovered:cliff" in moved["events"]
+    assert moved["state"]["position"]=="island_001"
+    assert "discovered:island_001" in moved["events"]
     loaded=handlers["expedition.inspect"](
         request("expedition.inspect",run_id="run1"),None)
     assert loaded["session"]["generation"]==2
-    assert loaded["session"]["state"]["position"]=="cliff"
+    assert loaded["session"]["state"]["position"]=="island_001"
     with pytest.raises(ExpeditionError,match="current checkpoint"):
         handlers["expedition.action"](
             request("expedition.action",run_id="run1",

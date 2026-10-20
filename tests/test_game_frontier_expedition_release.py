@@ -8,7 +8,7 @@ from skeleton.jeeves.game_frontier_expedition_godot import emit_expedition_godot
 from skeleton.jeeves.game_frontier_expedition_release import (
     ExternalContentReview,evaluate_expedition_release,
 )
-from tests.test_game_frontier_expedition_native_runner import world,traveler
+from tests.test_game_frontier_expedition_godot import world,traveler
 
 
 def inputs():
