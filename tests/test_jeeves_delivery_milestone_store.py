@@ -187,3 +187,76 @@ def test_closed_store_refuses_all_new_work(tmp_path):
         store.save("run:closed", queue())
     with pytest.raises(MilestoneCheckpointError, match="closed"):
         store.load("run:closed", source_commit=COMMIT, artifact_digest=SOURCE)
+
+
+
+def test_generation_history_is_hash_linked_and_content_free(tmp_path):
+    with SQLiteMilestoneQueueStore(tmp_path / "history.sqlite") as store:
+        first = store.save("run:history", queue())
+        claimed, lease = first.queue.claim("worker:a", 10)
+        second = store.save(
+            "run:history", claimed, expected_fingerprint=first.fingerprint,
+        )
+        approved, verdict = claimed.settle(
+            lease, 11, check("review-one"), check("review-two"),
+        )
+        assert verdict.passed
+        third = store.save(
+            "run:history", approved, expected_fingerprint=second.fingerprint,
+        )
+        history = store.checkpoint_history("run:history")
+        assert len(history) == 3
+        assert [row["generation"] for row in history] == [1, 2, 3]
+        assert history[0]["previous_digest"] == "0" * 64
+        assert history[1]["previous_digest"] == history[0]["receipt_digest"]
+        assert history[2]["previous_digest"] == history[1]["receipt_digest"]
+        assert history[2]["queue_fingerprint"] == third.queue.fingerprint
+        assert "src/" not in str(history)
+        assert store.save("run:history", approved).generation == 3
+        assert store.checkpoint_history("run:history") == history
+
+
+def test_missing_history_generation_detected_even_when_current_state_unchanged(tmp_path):
+    with SQLiteMilestoneQueueStore(tmp_path / "missing-generation.sqlite") as store:
+        first = store.save("run:history", queue())
+        claimed, _ = first.queue.claim("worker:a", 10)
+        store.save("run:history", claimed, expected_fingerprint=first.fingerprint)
+        store._connection.execute(
+            "DELETE FROM milestone_queue_history WHERE generation=1",
+        )
+        with pytest.raises(MilestoneCheckpointError, match="reordered"):
+            store.load(
+                "run:history", source_commit=COMMIT, artifact_digest=SOURCE,
+            )
+        with pytest.raises(MilestoneCheckpointError, match="reordered"):
+            store.save("run:history", claimed)
+
+
+def test_generation_history_detects_modified_receipt_or_current_state(tmp_path):
+    with SQLiteMilestoneQueueStore(tmp_path / "history-tamper.sqlite") as store:
+        store.save("run:history", queue())
+        store._connection.execute(
+            "UPDATE milestone_queue_history SET receipt_digest = ?",
+            ("f" * 64,),
+        )
+        with pytest.raises(MilestoneCheckpointError, match="receipt was altered"):
+            store.checkpoint_history("run:history")
+
+
+def test_history_integrity_rejects_rolled_back_current_generation(tmp_path):
+    with SQLiteMilestoneQueueStore(tmp_path / "rollback.sqlite") as store:
+        first = store.save("run:history", queue())
+        claimed, _ = first.queue.claim("worker", 10)
+        store.save("run:history", claimed, expected_fingerprint=first.fingerprint)
+        store._connection.execute(
+            "UPDATE milestone_queue_checkpoint SET generation=1",
+        )
+        with pytest.raises(MilestoneCheckpointError, match="latest state"):
+            store.load("run:history", source_commit=COMMIT, artifact_digest=SOURCE)
+
+
+def test_new_database_has_no_history_until_first_checkpoint(tmp_path):
+    with SQLiteMilestoneQueueStore(tmp_path / "new.sqlite") as store:
+        assert store.checkpoint_history("run:missing") == ()
+        assert store.load("run:missing", source_commit=COMMIT,
+                          artifact_digest=SOURCE) is None

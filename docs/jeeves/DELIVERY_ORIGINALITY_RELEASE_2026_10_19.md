@@ -247,3 +247,20 @@ is conditional on the host's actual filesystem lifecycle and storage policy.
 Hashes detect corruption, not tampering by an attacker with write access to
 the database. These are system-level implementation milestones, not
 production-certified completion of any of the original 421 volumes.
+
+
+### Tamper-evident generation history
+
+SQLite milestone checkpoint writes now also append a transactionally linked
+history entry for each new generation. Replay verifies sequence continuity,
+the previous receipt, content and queue digests, and the latest committed
+snapshot before loading or overwriting it. Exports contain only digest records
+and generation numbers, not project or game source. Idempotent replays do not
+create redundant generations. Truncation, rollback to an earlier current
+snapshot, missing history, modified receipt, and cross-process stale writers
+all block checkpoint trust.
+
+This history is a same-database integrity mechanism, not an external
+anchoring/signature service. An attacker who can rewrite the complete SQLite
+database could recompute both history and state; higher-assurance deployment
+requires a trusted off-database audit sink and independently verified anchors.

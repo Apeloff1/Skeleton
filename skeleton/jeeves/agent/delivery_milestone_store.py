@@ -174,6 +174,18 @@ class SQLiteMilestoneQueueStore:
                 payload BLOB NOT NULL,
                 PRIMARY KEY(namespace, run_id)
             );
+            CREATE TABLE IF NOT EXISTS milestone_queue_history (
+                namespace TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                generation INTEGER NOT NULL,
+                source_commit TEXT NOT NULL,
+                artifact_digest TEXT NOT NULL,
+                payload_sha256 TEXT NOT NULL,
+                queue_fingerprint TEXT NOT NULL,
+                previous_digest TEXT NOT NULL,
+                receipt_digest TEXT NOT NULL,
+                PRIMARY KEY(namespace, run_id, generation)
+            );
         """)
 
     def _open(self) -> None:
@@ -185,6 +197,80 @@ class SQLiteMilestoneQueueStore:
         if not isinstance(run_id, str) or not _KEY.fullmatch(run_id):
             raise MilestoneCheckpointError("invalid checkpoint run identity")
         return run_id
+
+    @staticmethod
+    def _history_digest(
+        namespace: str, run_id: str, generation: int,
+        source_commit: str, artifact_digest: str,
+        payload_sha256: str, queue_fingerprint: str,
+        previous_digest: str,
+    ) -> str:
+        return hashlib.sha256(json.dumps({
+            "namespace": namespace, "run": run_id, "generation": generation,
+            "source": source_commit, "artifact": artifact_digest,
+            "payload": payload_sha256, "queue": queue_fingerprint,
+            "previous": previous_digest,
+        }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+    def _verify_history(self, key: str, latest: sqlite3.Row | None) -> str:
+        """Replay every generation and ensure the head matches current state.
+
+        Must be called under an active SQLite transaction to prevent
+        cross-process torn reads between history and checkpoint snapshots.
+        """
+        rows = self._connection.execute(
+            """
+            SELECT * FROM milestone_queue_history
+            WHERE namespace=? AND run_id=?
+            ORDER BY generation ASC
+            """, (self.namespace, key),
+        ).fetchall()
+        if (latest is None) != (not rows):
+            raise MilestoneCheckpointError("checkpoint generation history is incomplete")
+        previous = "0" * 64
+        for sequence, item in enumerate(rows, 1):
+            if (type(item["generation"]) is not int
+                    or item["generation"] != sequence
+                    or item["previous_digest"] != previous):
+                raise MilestoneCheckpointError("checkpoint generation history is reordered")
+            receipt = self._history_digest(
+                self.namespace, key, sequence,
+                item["source_commit"], item["artifact_digest"],
+                item["payload_sha256"], item["queue_fingerprint"], previous,
+            )
+            if item["receipt_digest"] != receipt:
+                raise MilestoneCheckpointError("checkpoint generation receipt was altered")
+            previous = receipt
+        if latest is not None:
+            last = rows[-1]
+            if any(last[column] != latest[column] for column in (
+                "generation", "source_commit", "artifact_digest",
+                "payload_sha256", "queue_fingerprint",
+            )):
+                raise MilestoneCheckpointError("checkpoint latest state does not match history")
+        return previous
+
+    def _append_history(
+        self, key: str, generation: int, queue: MilestoneQueue,
+        payload_sha: str, previous: str,
+    ) -> None:
+        receipt = self._history_digest(
+            self.namespace, key, generation,
+            queue.source_commit, queue.artifact_digest,
+            payload_sha, queue.fingerprint, previous,
+        )
+        self._connection.execute(
+            """
+            INSERT INTO milestone_queue_history (
+                namespace, run_id, generation, source_commit, artifact_digest,
+                payload_sha256, queue_fingerprint, previous_digest, receipt_digest
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            """, (
+                self.namespace, key, generation, queue.source_commit,
+                queue.artifact_digest, payload_sha, queue.fingerprint,
+                previous, receipt,
+            ),
+        )
 
     def save(
         self, run_id: str, queue: MilestoneQueue,
@@ -212,6 +298,7 @@ class SQLiteMilestoneQueueStore:
                     WHERE namespace=? AND run_id=?
                     """, (self.namespace, key),
                 ).fetchone()
+                previous_receipt = self._verify_history(key, old)
                 if old is not None:
                     # Do not trust a stored fingerprint without authenticating
                     # the actual saved bytes and re-validating the chain.
@@ -236,6 +323,7 @@ class SQLiteMilestoneQueueStore:
                         (self.namespace, key, generation, queue.source_commit,
                          queue.artifact_digest, digest, payload_sha, payload),
                     )
+                    self._append_history(key, generation, queue, payload_sha, previous_receipt)
                 else:
                     if (old["source_commit"] != queue.source_commit
                             or old["artifact_digest"] != queue.artifact_digest):
@@ -257,6 +345,9 @@ class SQLiteMilestoneQueueStore:
                             (generation, digest, payload_sha, payload,
                              self.namespace, key, old["generation"]),
                         )
+                        self._append_history(
+                            key, generation, queue, payload_sha, previous_receipt,
+                        )
                 self._connection.execute("COMMIT")
             except Exception:
                 self._connection.execute("ROLLBACK")
@@ -270,13 +361,20 @@ class SQLiteMilestoneQueueStore:
         key = self._key(run_id)
         with self._lock:
             self._open()
-            row = self._connection.execute(
-                """
-                SELECT *
-                FROM milestone_queue_checkpoint
-                WHERE namespace=? AND run_id=?
-                """, (self.namespace, key),
-            ).fetchone()
+            self._connection.execute("BEGIN")
+            try:
+                row = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM milestone_queue_checkpoint
+                    WHERE namespace=? AND run_id=?
+                    """, (self.namespace, key),
+                ).fetchone()
+                self._verify_history(key, row)
+                self._connection.execute("COMMIT")
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
         if row is None:
             return None
         if (row["source_commit"] != source_commit
@@ -296,6 +394,41 @@ class SQLiteMilestoneQueueStore:
         if type(generation) is not int or generation < 1:
             raise MilestoneCheckpointError("invalid persisted checkpoint generation")
         return StoredMilestoneQueue(key, generation, queue, digest)
+
+    def checkpoint_history(self, run_id: str) -> tuple[dict[str, object], ...]:
+        """Export content-free, validated generation receipts for audit."""
+        key = self._key(run_id)
+        with self._lock:
+            self._open()
+            self._connection.execute("BEGIN")
+            try:
+                current = self._connection.execute(
+                    """
+                    SELECT * FROM milestone_queue_checkpoint
+                    WHERE namespace=? AND run_id=?
+                    """, (self.namespace, key),
+                ).fetchone()
+                self._verify_history(key, current)
+                rows = self._connection.execute(
+                    """
+                    SELECT generation, payload_sha256, queue_fingerprint,
+                           previous_digest, receipt_digest
+                    FROM milestone_queue_history
+                    WHERE namespace=? AND run_id=? ORDER BY generation
+                    """, (self.namespace, key),
+                ).fetchall()
+                result = tuple({
+                    "generation": item["generation"],
+                    "payload_sha256": item["payload_sha256"],
+                    "queue_fingerprint": item["queue_fingerprint"],
+                    "previous_digest": item["previous_digest"],
+                    "receipt_digest": item["receipt_digest"],
+                } for item in rows)
+                self._connection.execute("COMMIT")
+                return result
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
 
     def close(self) -> None:
         with self._lock:
