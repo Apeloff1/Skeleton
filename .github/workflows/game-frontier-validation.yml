@@ -52,4 +52,5 @@ jobs:
             skeleton/testing/test_game_production_quality.py \
             skeleton/testing/test_game_production_deep_quality.py \
             skeleton/testing/test_game_production_frontier_quality.py \
-            skeleton/testing/test_game_production_studio_quality.py
+            skeleton/testing/test_game_production_studio_quality.py \
+            skeleton/testing/test_game_production_advanced_quality.py
