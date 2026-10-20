@@ -50,3 +50,78 @@ def test_list_sorted():
     manifests = archive.list_manifests()
     assert list(manifests) == sorted(manifests)
     assert len(manifests) == 2
+
+
+def test_rejects_forged_or_incomplete_export_evidence():
+    from dataclasses import replace
+
+    good = _export("tamper")
+    samples = (
+        replace(good, manifest="0" * 64),
+        replace(good, head="0" * 64),
+        replace(good, audit="bad"),
+        replace(good, session_count=0),
+        replace(good, session_count=True),
+        replace(good, campaign_id=""),
+        replace(good, campaign_id="too-long-" * 11),
+    )
+    for forged in samples:
+        with pytest.raises(ArchiveError):
+            CampaignArchive().store(forged)
+    with pytest.raises(ArchiveError):
+        CampaignArchive().store(object())
+
+
+def test_rejects_invalid_keys_and_mutated_index_state():
+    from dataclasses import replace
+
+    archive = CampaignArchive()
+    original = _export("tampered-index")
+    manifest = archive.store(original)
+    for key in ("bad", manifest.upper(), 42):
+        with pytest.raises(ArchiveError):
+            archive.get(key)
+    archive.entries[manifest] = replace(original, head="f" * 64)
+    with pytest.raises(ArchiveError):
+        archive.get(manifest)
+    with pytest.raises(ArchiveError):
+        archive.list_manifests()
+
+
+def test_bounded_archive_and_defensive_copy():
+    from dataclasses import replace
+
+    with pytest.raises(ArchiveError):
+        CampaignArchive(max_entries=0)
+    with pytest.raises(ArchiveError):
+        CampaignArchive(max_entries=True)
+    with pytest.raises(ArchiveError):
+        CampaignArchive(max_entries=4097)
+    archive = CampaignArchive(max_entries=1)
+    export = _export("one")
+    key = archive.store(export)
+    assert archive.get(key) == export
+    with pytest.raises(ArchiveError):
+        archive.store(_export("two"))
+    # The returned frozen export is not a live reference to the stored entry.
+    forged = replace(archive.get(key), audit="a" * 64)
+    assert forged != archive.get(key)
+
+
+def test_staged_ai_mirror_has_identical_archive_contract():
+    from skeleton.ai.agents.jeeves.game_frontier_milestone_9 import (
+        ArchiveError as StagedArchiveError,
+        CampaignArchive as StagedArchive,
+    )
+
+    original = _export("staged")
+    key = StagedArchive().store(original)
+    assert key == original.manifest
+    with pytest.raises(StagedArchiveError):
+        StagedArchive().store(original.__class__(
+            campaign_id=original.campaign_id,
+            session_count=original.session_count,
+            head=original.head,
+            audit=original.audit,
+            manifest="0" * 64,
+        ))
