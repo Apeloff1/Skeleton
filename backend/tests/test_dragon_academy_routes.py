@@ -35,13 +35,28 @@ def test_registered_with_existing_auth_and_no_authority_mint_endpoints():
     assert "/api/dragon-academy/status" in paths
     assert "/api/dragon-academy/practice/run" in paths
     assert "/api/dragon-academy/practice/subscribe" in paths
-    # Inspect complete path segments, not substrings: legitimate read-only
-    # /preview routes include "review" inside that word.
-    forbidden_authority_segments = {"offer", "approve", "xp", "review"}
+    # Native Academy endpoints must not mint crawler-authoritative lessons
+    # or progress. Dedicated /knowledge/.../review operations are legitimate,
+    # but they must remain separately editor-gated and POST-only.
+    forbidden_mint_segments = {"offer", "approve", "xp"}
     assert not any(
-        forbidden_authority_segments.intersection(path.strip("/").split("/"))
+        forbidden_mint_segments.intersection(path.strip("/").split("/"))
         for path in paths
     )
+    review_routes = {
+        r.path: r for r in route.router.routes
+        if "review" in r.path.strip("/").split("/")
+    }
+    assert set(review_routes) == {
+        "/api/dragon-academy/knowledge/candidates/{candidate_id}/review",
+        "/api/dragon-academy/knowledge/candidates/{candidate_id}/review/resume",
+    }
+    for candidate in review_routes.values():
+        assert candidate.methods == {"POST"}
+        assert any(
+            dependency.call.__name__ == "get_current_user"
+            for dependency in candidate.dependant.dependencies
+        )
     assert '/api/dragon-academy/native/generate' in paths
     assert '/api/dragon-academy/native/targets' in paths
 

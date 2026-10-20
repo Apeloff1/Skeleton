@@ -18,7 +18,9 @@ SHA_A = "1111111111111111111111111111111111111111"
 SHA_B = "2222222222222222222222222222222222222222"
 STUCK_SHA = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 PAGED_SHA = "ffffffffffffffffffffffffffffffffffffffff"
-WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "pr-obsolete-run-drain.yml"
+ROOT = Path(__file__).resolve().parents[2]
+ARCHIVED_WORKFLOW = ROOT / ".github/workflows-archive/pr-obsolete-run-drain.yml"
+ACTIVE_DRAIN = ROOT / ".github/workflows/queue-drain.yml"
 
 
 class FakeApi:
@@ -333,14 +335,20 @@ def test_main_keeps_deferred_sweep_green_but_terminal_failure_red(monkeypatch) -
     assert sweep_module.main() == 1
 
 
-def test_workflow_has_periodic_and_rollout_backlog_reconciliation() -> None:
-    text = WORKFLOW.read_text(encoding="utf-8")
+def test_archived_sweep_and_active_hourly_recovery_both_keep_provenance() -> None:
+    assert ARCHIVED_WORKFLOW.is_file()
+    assert not (ROOT / ".github/workflows/pr-obsolete-run-drain.yml").exists()
+    legacy = ARCHIVED_WORKFLOW.read_text(encoding="utf-8")
+    assert "python backend/scripts/pr_obsolete_run_sweep.py" in legacy
+    assert "workflows: [\"PR Lifecycle Signal\"]" in legacy
 
-    assert "schedule:" in text
-    assert "*/10 * * * *" in text
-    assert "push:" in text
-    assert "backend/scripts/pr_obsolete_run_sweep.py" in text
-    assert "python backend/scripts/pr_obsolete_run_sweep.py" in text
+    current = ACTIVE_DRAIN.read_text(encoding="utf-8")
+    assert "  schedule:" in current
+    assert 'cron: "7 * * * *"' in current
+    assert "def stale_pr_run(run, open_pr_heads):" in current
+    assert "obsolete_pr_queued" in current
+    assert "obsolete_pr_active" in current
+    assert "if security_lane:" in current
 
 
 def test_commit_pr_numbers_keep_later_pages() -> None:
