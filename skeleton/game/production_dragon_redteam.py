@@ -22,7 +22,7 @@ def challenge_quality_verifiers(bundle: Mapping) -> dict:
     attacks = (
         ("world_reachability", lambda d: d["world"].update(victory="absent")),
         ("canon_foreign_actor", lambda d: d["story"]["scenes"][0].update(speakers=["forged"])),
-        ("asset_digest", lambda d: d["assets"][0].update(sha256="0" * 64) if d["assets"][0]["sha256"] != "0" * 64 else d["assets"][0].update(sha256="1" * 64)),
+        ("asset_digest", lambda d: d["assets"][0].update(sha256="invalid_hash")),
         ("build_divergence", lambda d: d["builds"][1].update(source_sha256="f" * 64) if d["builds"][1]["source_sha256"] != "f" * 64 else d["builds"][1].update(source_sha256="e" * 64)),
         ("frame_pressure", lambda d: d["frames"][0].update(draw_calls=10_000_000)),
         ("copyright_laundering", lambda d: d["sources"][0].update(reviewed=False)),
