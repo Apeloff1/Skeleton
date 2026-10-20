@@ -130,7 +130,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "3f037543f8421c7328975c586dae107f43ef7af9",
+      "source_git_object_sha": "d8e92abad2f7c495bcd0706dd369f1b2b08e297d",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "1f669acfb66d2bf24f2085110f038ada5715b9cc",
+      "source_git_object_sha": "c51f3a33539ca2680e8381312e10b1052c79ea3f",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -398,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "a4e0f56747aea6b69a0c820569f07f10bc67135f",
+      "source_git_object_sha": "42bd498f2d860e86c182ead2fa2e62e7d0815d98",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "26f32765baebd79e63ee8bc4c9697a255c7a4c1f",
+      "source_git_object_sha": "41a880cb5da3c23b3a5fd67aa72cf946c398ef52",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "e97ecd56a951cc270919dacd27bd9a832c41cf50",
+      "source_git_object_sha": "7eaedb3fc89660983a9c3fd1cac4d30af8a70fd0",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -10345,7 +10345,12 @@
       "skeleton/jeeves/ai/studio_maintenance.py",
       "backend/core/game_studio_agent.py",
       "frontend/src/features/Jeeves",
-      "scripts/configure_ai_chat.py"
+      "scripts/configure_ai_chat.py",
+      "skeleton/contracts/runtime_optimization.py",
+      "skeleton/api/engine_routes.py",
+      "backend/core/dragon_crawler.py",
+      "backend/core/dragon_runtime.py",
+      "backend/routes/ai.py"
     ],
     "source_metadata": "Affected current-branch canonical source-object identities reference the staged implementation tree. Historical signatures and qualification state are preserved; no import cutover or verification signature is created.",
     "refreshed_source_mappings": [
@@ -10356,11 +10361,8 @@
       "AIFT-INTELLIGENCE",
       "AIFT-JEEVES",
       "AIFT-ENGINE-API",
-      "AIFT-LEARNING",
-      "AIFT-FORGE",
-      "AIFT-CORTEX",
-      "AIFT-MESH",
-      "AIFT-DISTRIBUTED"
-    ]
+      "AIFT-LEARNING"
+    ],
+    "operator_and_learning_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation"
   }
 }

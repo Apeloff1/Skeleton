@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass
 from hashlib import sha256
 import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
 from socket import gethostname
@@ -167,7 +168,55 @@ def _host_text(path: str) -> str | None:
         return None
 
 
+def _windows_process_observation(process_id: int) -> tuple[str | None, bool | None]:
+    """Query process identity/drain without sending a signal on Windows."""
+    if type(process_id) is not int or process_id <= 0:
+        return None, None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        query = kernel.OpenProcess
+        query.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        query.restype = wintypes.HANDLE
+        close = kernel.CloseHandle
+        close.argtypes = (wintypes.HANDLE,)
+        close.restype = wintypes.BOOL
+        handle = query(0x1000, False, process_id)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            # Invalid positive PID means no such process. Access denied and
+            # unsupported calls provide no drain proof.
+            return None, True if ctypes.get_last_error() == 87 else None
+        try:
+            times = kernel.GetProcessTimes
+            times.argtypes = (wintypes.HANDLE, *(ctypes.POINTER(wintypes.FILETIME),) * 4)
+            times.restype = wintypes.BOOL
+            creation, exit_time, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
+            start = None
+            if times(
+                handle,
+                ctypes.byref(creation),
+                ctypes.byref(exit_time),
+                ctypes.byref(kernel_time),
+                ctypes.byref(user_time),
+            ):
+                start = str((creation.dwHighDateTime << 32) | creation.dwLowDateTime)
+            exit_code = kernel.GetExitCodeProcess
+            exit_code.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+            exit_code.restype = wintypes.BOOL
+            code = wintypes.DWORD()
+            drained = code.value != 259 if exit_code(handle, ctypes.byref(code)) else None
+            return start, drained
+        finally:
+            close(handle)
+    except (OSError, AttributeError, ValueError, TypeError, ImportError):
+        return None, None
+
+
 def _process_start(process_id: int) -> str | None:
+    if os.name == "nt":
+        return _windows_process_observation(process_id)[0]
     raw = _host_text(f"/proc/{process_id}/stat")
     if raw is None or ")" not in raw:
         return None
@@ -247,6 +296,7 @@ class StudioMaintenancePolicy:
     maximum_owner_heartbeat_ms: int = 15_000
     maximum_chunk_results: int = 1024
     maximum_ack_retries_per_tick: int = 4
+    maximum_admission_wait_ms: int = 60_000
 
     def __post_init__(self) -> None:
         if type(self.enabled) is not bool or type(self.augmentation_enabled) is not bool:
@@ -269,9 +319,10 @@ class StudioMaintenancePolicy:
             "maximum_scope_queue": (1, 8192),
             "priority_aging_ms": (1000, 86_400_000),
             "clock_jump_tolerance_ms": (100, 60_000),
-            "maximum_owner_heartbeat_ms": (1000, 300_000),
+            "maximum_owner_heartbeat_ms": (10_000, 300_000),
             "maximum_chunk_results": (1, 16_384),
             "maximum_ack_retries_per_tick": (1, 16),
+            "maximum_admission_wait_ms": (1000, 3_600_000),
         }
         for key, (minimum, maximum) in bounds.items():
             value = getattr(self, key)
@@ -406,6 +457,9 @@ class StudioMaintenanceController:
         self._last_reason = "disabled" if not self._policy.enabled else "idle"
         self._coordination_fault: str | None = None
         self._last_logical_ns = 0
+        self._last_quiescence: dict[str, Any] | None = None
+        self._last_telemetry: dict[str, Any] | None = None
+        self._last_presence_repair: dict[str, Any] | None = None
         with self._executor._lock:
             self._executor._db.executescript(_QUEUE_SCHEMA)
             db = self._executor._db
@@ -413,7 +467,8 @@ class StudioMaintenanceController:
                 db.execute("BEGIN IMMEDIATE")
                 columns = {row[1] for row in db.execute("PRAGMA table_info(jeeves_idle_maintenance_task)")}
                 additions = {
-                    "owner_id": "TEXT", "host_id": "TEXT",
+                    "owner_id": "TEXT",
+                    "host_id": "TEXT",
                     "host_fence": "INTEGER NOT NULL DEFAULT 0",
                     "scope_fence": "INTEGER NOT NULL DEFAULT 0",
                     "heartbeat_ns": "INTEGER NOT NULL DEFAULT 0",
@@ -422,6 +477,7 @@ class StudioMaintenanceController:
                     "continuation_id": "TEXT",
                     "handler_version": "TEXT NOT NULL DEFAULT ''",
                     "recovery_checked_ns": "INTEGER NOT NULL DEFAULT 0",
+                    "last_admission_ns": "INTEGER NOT NULL DEFAULT 0",
                 }
                 for name, declaration in additions.items():
                     if name not in columns:
@@ -430,6 +486,29 @@ class StudioMaintenanceController:
                 if "process_namespace" not in owner_columns:
                     db.execute("ALTER TABLE jeeves_idle_maintenance_owner ADD COLUMN "
                                "process_namespace TEXT NOT NULL DEFAULT 'unavailable'")
+                if "last_probe_ns" not in owner_columns:
+                    db.execute(
+                        "ALTER TABLE jeeves_idle_maintenance_owner ADD COLUMN "
+                        "last_probe_ns INTEGER NOT NULL DEFAULT 0"
+                    )
+                circuit_columns = {
+                    row[1] for row in db.execute("PRAGMA table_info(jeeves_idle_maintenance_circuit)")
+                }
+                for name, declaration in {
+                    "generation": "INTEGER NOT NULL DEFAULT 0",
+                    "last_failure_digest": "TEXT",
+                    "last_source_digest": "TEXT",
+                    "last_task_id": "TEXT",
+                    "last_failure_at_ns": "INTEGER",
+                    "last_failure_attempt": "INTEGER",
+                    "reset_from_generation": "INTEGER",
+                    "reset_failure_digest": "TEXT",
+                    "reset_at_ns": "INTEGER",
+                }.items():
+                    if name not in circuit_columns:
+                        db.execute(
+                            f"ALTER TABLE jeeves_idle_maintenance_circuit ADD COLUMN {name} {declaration}"
+                        )
                 now = self._logical_now_locked(time_ns(), self._policy)
                 if db.execute("SELECT 1 FROM jeeves_idle_maintenance_owner WHERE owner_id=?",
                               (self._identity["owner_id"],)).fetchone() is not None:
@@ -508,7 +587,12 @@ class StudioMaintenanceController:
         ).fetchone()
         keys = ("owner_id", "host_id", "boot_id", "process_id", "process_start", "process_namespace", "state", "physical_tasks")
         info = {"owner_id": owner_id, "state": "unproven"} if row is None else dict(zip(keys, row))
-        if row is not None:
+        return self._drain_proven(info)
+
+    def _drain_proven(self, info: Mapping[str, Any]) -> bool:
+        """Evaluate host proof without any persistence or controller lock."""
+        owner_id = info.get("owner_id")
+        if "host_id" in info:
             if owner_id == self._identity["owner_id"] and self._active_tasks == 0:
                 # The controller's tick lock is held by recovery. This exact
                 # lifespan knows a prior failed finalization physically drained.
@@ -534,18 +618,120 @@ class StudioMaintenanceController:
                     if start != info["process_start"]:
                         return True
                 else:
-                    try:
-                        os.kill(info["process_id"], 0)
-                    except ProcessLookupError:
-                        return True
-                    except (OSError, OverflowError, ValueError):
-                        pass  # permission/namespace uncertainty is not proof
+                    if os.name == "nt":
+                        if _windows_process_observation(info["process_id"])[1] is True:
+                            return True
+                    else:
+                        try:
+                            os.kill(info["process_id"], 0)
+                        except ProcessLookupError:
+                            return True
+                        except (OSError, OverflowError, ValueError):
+                            pass  # permission/namespace uncertainty is not proof
         if self._host_confirm_drained is None:
             return False
         try:
             return self._host_confirm_drained(MappingProxyType(info)) is True
         except Exception:
             return False
+
+    def _compact_owners_locked(self) -> None:
+        db = self._executor._db
+        db.execute(
+            "DELETE FROM jeeves_idle_maintenance_owner WHERE owner_id IN "
+            "(SELECT o.owner_id FROM jeeves_idle_maintenance_owner o WHERE o.state='drained' "
+            "AND o.owner_id!=? AND NOT EXISTS (SELECT 1 FROM jeeves_idle_maintenance_lease l "
+            "WHERE l.owner_id=o.owner_id AND l.state='held') AND NOT EXISTS "
+            "(SELECT 1 FROM jeeves_idle_maintenance_task t WHERE t.owner_id=o.owner_id "
+            "AND t.state IN ('ready','retry_wait','running')) AND NOT EXISTS "
+            "(SELECT 1 FROM jeeves_idle_maintenance_chunk c WHERE c.producer_owner_id=o.owner_id "
+            "AND c.ack_state IN ('pending','unverified')) ORDER BY o.heartbeat_ns LIMIT 32)",
+            (self._identity["owner_id"],),
+        )
+        db.execute(
+            "DELETE FROM jeeves_idle_maintenance_clock WHERE host_id IN "
+            "(SELECT c.host_id FROM jeeves_idle_maintenance_clock c WHERE c.host_id!=? "
+            "AND NOT EXISTS (SELECT 1 FROM jeeves_idle_maintenance_owner o WHERE o.host_id=c.host_id) "
+            "AND NOT EXISTS (SELECT 1 FROM jeeves_idle_maintenance_task t WHERE t.host_id=c.host_id "
+            "AND t.state IN ('ready','retry_wait','running')) AND NOT EXISTS "
+            "(SELECT 1 FROM jeeves_idle_maintenance_lease l WHERE l.resource_id='host:'||c.host_id "
+            "AND l.state='held') ORDER BY c.logical_ns LIMIT 32)",
+            (self._identity["host_id"],),
+        )
+
+    def _retire_stale_presence(self, policy: StudioMaintenancePolicy) -> None:
+        """Bounded process-presence repair, never an idle handler invocation."""
+        keys = (
+            "owner_id",
+            "host_id",
+            "boot_id",
+            "process_id",
+            "process_start",
+            "process_namespace",
+            "state",
+            "physical_tasks",
+            "heartbeat_ns",
+        )
+        with self._executor._lock:
+            rows = self._executor._db.execute(
+                "SELECT owner_id,host_id,boot_id,process_id,process_start,process_namespace,state,"
+                "physical_tasks,heartbeat_ns FROM jeeves_idle_maintenance_owner "
+                "WHERE host_id=? AND owner_id!=? AND state!='drained' AND heartbeat_ns<? "
+                "ORDER BY last_probe_ns,heartbeat_ns,owner_id LIMIT 32",
+                (
+                    self._identity["host_id"],
+                    self._identity["owner_id"],
+                    self._last_logical_ns - policy.maximum_owner_heartbeat_ms * 1_000_000,
+                ),
+            ).fetchall()
+        # Host probes may read the process table or a trusted supervisor. Keep
+        # them out of state/persistence locks; fresh identity is CAS-checked.
+        proofs = [(dict(zip(keys, row)), self._drain_proven(dict(zip(keys, row)))) for row in rows]
+        if not proofs:
+            self._last_presence_repair = {
+                "observed_at_ns": self._last_logical_ns,
+                "examined": 0,
+                "retired": 0,
+                "unproven": 0,
+            }
+            return
+        with self._executor._lock:
+            db = self._executor._db
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                now = self._logical_now_locked(time_ns(), policy)
+                retired = 0
+                for info, proven in proofs:
+                    changed = "state='drained',foreground_requests=0,physical_tasks=0," if proven else ""
+                    updated = db.execute(
+                        "UPDATE jeeves_idle_maintenance_owner SET " + changed + "last_probe_ns=? "
+                        "WHERE owner_id=? AND host_id=? AND boot_id=? AND process_id=? "
+                        "AND process_start=? AND process_namespace=? AND heartbeat_ns=? AND state=?",
+                        (
+                            now,
+                            info["owner_id"],
+                            info["host_id"],
+                            info["boot_id"],
+                            info["process_id"],
+                            info["process_start"],
+                            info["process_namespace"],
+                            info["heartbeat_ns"],
+                            info["state"],
+                        ),
+                    ).rowcount
+                    retired += int(proven and updated == 1)
+                self._compact_owners_locked()
+                db.execute("COMMIT")
+                self._last_presence_repair = {
+                    "observed_at_ns": now,
+                    "examined": len(proofs),
+                    "retired": retired,
+                    "unproven": sum(not proof for _, proof in proofs),
+                }
+            except BaseException:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
 
     def heartbeat(self) -> bool:
         """Lifespan hook; checkpoints additionally heartbeat the active fences."""
@@ -571,6 +757,7 @@ class StudioMaintenanceController:
                     ).rowcount
                     if changed != 1:
                         raise IdleRuntimeError("maintenance owner presence is unavailable")
+                    self._compact_owners_locked()
                     db.execute("COMMIT")
                     self._coordination_fault = None
                     return True
@@ -650,20 +837,63 @@ class StudioMaintenanceController:
             "jeeves_idle_maintenance_owner WHERE host_id=? AND state!='drained' LIMIT 1025",
             (self._identity["host_id"],),
         ).fetchall()
-        if len(owners) > 1024:
-            return False
+        counts = {
+            "foreground_requests": 0,
+            "stale_owners": 0,
+            "draining_owners": 0,
+            "recent_activity_owners": 0,
+            "future_presence_owners": 0,
+        }
+        maximum_age = 0
+        quiet_ns: int | None = None
+        own_present = False
         for owner, foreground, last_foreground, heartbeat, state in owners:
-            if owner != self._identity["owner_id"] and self._owner_drained(owner):
-                db.execute(
-                    "UPDATE jeeves_idle_maintenance_owner SET state='drained',"
-                    "foreground_requests=0,physical_tasks=0 WHERE owner_id=?", (owner,),
+            own_present = own_present or owner == self._identity["owner_id"]
+            age = now_ns - heartbeat
+            stale = age < 0 or age > self._policy.maximum_owner_heartbeat_ms * 1_000_000
+            # Presence repair probes happen outside locks before admission.
+            # This checkpoint only consumes that durable observation.
+            counts["foreground_requests"] += foreground
+            counts["stale_owners"] += int(stale)
+            counts["future_presence_owners"] += int(age < 0)
+            counts["draining_owners"] += int(state != "live")
+            quiet = max(0, now_ns - last_foreground)
+            counts["recent_activity_owners"] += int(quiet < self._executor.policy.minimum_idle_ns)
+            quiet_ns = quiet if quiet_ns is None else min(quiet_ns, quiet)
+            maximum_age = max(maximum_age, max(0, age))
+        reason = (
+            "owner_registry_pressure"
+            if len(owners) > 1024
+            else (
+                "owner_presence_missing"
+                if not own_present
+                else (
+                    "host_foreground_pending"
+                    if counts["foreground_requests"]
+                    else (
+                        "host_presence_stale"
+                        if counts["stale_owners"]
+                        else (
+                            "host_owner_draining"
+                            if counts["draining_owners"]
+                            else "host_quiet_window" if counts["recent_activity_owners"] else "admitted_idle"
+                        )
+                    )
                 )
-                continue
-            if (state != "live" or foreground
-                    or now_ns - heartbeat > self._policy.maximum_owner_heartbeat_ms * 1_000_000
-                    or now_ns - last_foreground < self._executor.policy.minimum_idle_ns):
-                return False
-        return True
+            )
+        )
+        self._last_quiescence = {
+            "observed_at_ns": now_ns,
+            "permitted": reason == "admitted_idle",
+            "reason": reason,
+            "owners_examined": len(owners),
+            **counts,
+            "minimum_quiet_ns": quiet_ns,
+            "maximum_heartbeat_age_ns": maximum_age,
+            "required_quiet_ns": self._executor.policy.minimum_idle_ns,
+            "maximum_owner_heartbeat_ms": self._policy.maximum_owner_heartbeat_ms,
+        }
+        return reason == "admitted_idle"
 
     def _acquire_resource_locked(self, resource_id: str, scope_id: str | None,
                                  task_id: str, now_ns: int, lease_ns: int) -> int | None:
@@ -767,6 +997,21 @@ class StudioMaintenanceController:
                 if db.in_transaction:
                     db.execute("ROLLBACK")
                 raise
+
+    def _checkpoint_permitted(
+        self, task: MaintenanceTask, policy: StudioMaintenancePolicy, generation: int
+    ) -> bool:
+        if self._preempted(generation):
+            return False
+        try:
+            return self._heartbeat_task(task, policy)
+        except (sqlite3.OperationalError, OSError) as exc:
+            # Serving contention or unavailable coordination is a deferral,
+            # never negative evidence about the learner/cache handler itself.
+            with self._state_lock:
+                self._coordination_fault = type(exc).__name__
+                self._last_reason = "coordination_unavailable"
+            raise IdleWorkPreempted("maintenance_coordination_unavailable") from exc
 
     def _event(self, task_id: str, operation: str, now_ns: int,
                detail: Mapping[str, Any]) -> None:
@@ -1177,6 +1422,127 @@ class StudioMaintenanceController:
                     db.execute("ROLLBACK")
                 raise
 
+    def reset_circuit(
+        self,
+        *,
+        scope_id: str,
+        kind: IdleWorkKind,
+        expected_generation: int,
+        expected_failure_digest: str,
+        source_digest: str,
+    ) -> dict[str, Any]:
+        """Clear one observed breaker; this does not admit or resume work."""
+        _identifier(scope_id, "circuit scope")
+        _sha(expected_failure_digest)
+        _sha(source_digest)
+        if not isinstance(kind, IdleWorkKind) or kind not in LOCAL_MAINTENANCE_KINDS:
+            raise IdleRuntimeError("unknown local maintenance circuit kind")
+        if type(expected_generation) is not int or not 1 <= expected_generation < 9_000_000_000_000_000:
+            raise IdleRuntimeError("circuit reset requires its observed generation")
+        with self._state_lock:
+            if self._closed or self._closing:
+                raise IdleRuntimeError("maintenance controller is closing")
+            policy = self._policy
+        with self._executor._lock:
+            db = self._executor._db
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                now = self._logical_now_locked(time_ns(), policy)
+                row = db.execute(
+                    "SELECT generation,last_failure_digest,last_source_digest,last_task_id,failures,"
+                    "open_until_ns,reset_from_generation,reset_failure_digest "
+                    "FROM jeeves_idle_maintenance_circuit WHERE scope_id=? AND kind=?",
+                    (scope_id, kind.value),
+                ).fetchone()
+                if row is None or row[1] is None or row[2] is None or row[3] is None:
+                    raise IdleRuntimeError("circuit has no source-bound failure to reset")
+                if row[1:3] != (expected_failure_digest, source_digest):
+                    raise IdleRuntimeError("maintenance circuit failure changed before host reset")
+                if (
+                    row[0] == expected_generation + 1
+                    and row[6:] == (expected_generation, expected_failure_digest)
+                    and row[4:6] == (0, 0)
+                ):
+                    db.execute("COMMIT")
+                    return {
+                        "scope_id": scope_id,
+                        "kind": kind.value,
+                        "generation": row[0],
+                        "source_digest": source_digest,
+                        "failure_digest": expected_failure_digest,
+                        "failures": 0,
+                        "open_until_ns": 0,
+                        "state": "closed",
+                        "deduplicated": True,
+                    }
+                if row[0] != expected_generation:
+                    raise IdleRuntimeError("maintenance circuit generation changed before host reset")
+                if row[4:6] == (0, 0):
+                    raise IdleRuntimeError("maintenance circuit is already closed")
+                if (
+                    db.execute(
+                        "SELECT 1 FROM jeeves_idle_maintenance_task WHERE scope_id=? AND kind=? AND state='running'",
+                        (scope_id, kind.value),
+                    ).fetchone()
+                    is not None
+                ):
+                    raise IdleRuntimeError("maintenance circuit still has a running physical task")
+                if (
+                    db.execute(
+                        "SELECT 1 FROM jeeves_idle_maintenance_lease WHERE state='held' AND "
+                        "(scope_id=? OR task_id IN (SELECT task_id FROM jeeves_idle_maintenance_task WHERE scope_id=?))",
+                        (scope_id, scope_id),
+                    ).fetchone()
+                    is not None
+                ):
+                    raise IdleRuntimeError("maintenance circuit scope still holds physical custody")
+                changed = db.execute(
+                    "UPDATE jeeves_idle_maintenance_circuit SET failures=0,open_until_ns=0,last_error=NULL,"
+                    "generation=generation+1,reset_from_generation=?,reset_failure_digest=?,reset_at_ns=? "
+                    "WHERE scope_id=? AND kind=? AND generation=? AND last_failure_digest=? AND last_source_digest=?",
+                    (
+                        expected_generation,
+                        expected_failure_digest,
+                        now,
+                        scope_id,
+                        kind.value,
+                        expected_generation,
+                        expected_failure_digest,
+                        source_digest,
+                    ),
+                ).rowcount
+                if changed != 1:
+                    raise IdleRuntimeError("maintenance circuit reset lost its compare-and-swap")
+                self._event(
+                    row[3],
+                    "host_circuit_reset",
+                    now,
+                    {
+                        "scope_id": scope_id,
+                        "kind": kind.value,
+                        "source_digest": source_digest,
+                        "failure_digest": expected_failure_digest,
+                        "prior_generation": expected_generation,
+                        "generation": expected_generation + 1,
+                    },
+                )
+                db.execute("COMMIT")
+                return {
+                    "scope_id": scope_id,
+                    "kind": kind.value,
+                    "generation": expected_generation + 1,
+                    "source_digest": source_digest,
+                    "failure_digest": expected_failure_digest,
+                    "failures": 0,
+                    "open_until_ns": 0,
+                    "state": "closed",
+                    "deduplicated": False,
+                }
+            except BaseException:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
+
     def _compact_terminal(self, retained: int) -> None:
         # These are bounded local queue projections. Any attempt that entered
         # a handler keeps its first authoritative effect claim as a permanent
@@ -1184,30 +1550,23 @@ class StudioMaintenanceController:
         # jeeves_idle_effect/event row is ever compacted here.
         self._executor._db.execute(
             "DELETE FROM jeeves_idle_maintenance_task WHERE task_id IN "
-            "(SELECT task_id FROM jeeves_idle_maintenance_task "
-            "WHERE state IN ('completed','failed') "
-            "ORDER BY updated_at_ns DESC,task_id LIMIT -1 OFFSET ?)", (retained,),
+            "(SELECT t.task_id FROM jeeves_idle_maintenance_task t "
+            "WHERE t.state IN ('completed','failed') AND NOT EXISTS "
+            "(SELECT 1 FROM jeeves_idle_maintenance_lease l WHERE l.task_id=t.task_id AND l.state='held') "
+            "ORDER BY t.updated_at_ns DESC,t.task_id LIMIT -1 OFFSET ?)",
+            (retained,),
         )
         self._compact_chunks_locked()
         # Drained process presence is operational state. Keep every live or
         # unresolved reference and all immutable effect receipts separately.
-        self._executor._db.execute(
-            "DELETE FROM jeeves_idle_maintenance_owner WHERE owner_id IN "
-            "(SELECT o.owner_id FROM jeeves_idle_maintenance_owner o WHERE o.state='drained' "
-            "AND o.owner_id!=? AND NOT EXISTS (SELECT 1 FROM jeeves_idle_maintenance_lease l "
-            "WHERE l.owner_id=o.owner_id AND l.state='held') AND NOT EXISTS "
-            "(SELECT 1 FROM jeeves_idle_maintenance_task t WHERE t.owner_id=o.owner_id "
-            "AND t.state IN ('ready','retry_wait','running')) AND NOT EXISTS "
-            "(SELECT 1 FROM jeeves_idle_maintenance_chunk c WHERE c.producer_owner_id=o.owner_id "
-            "AND c.ack_state IN ('pending','unverified')) ORDER BY o.heartbeat_ns LIMIT 32)",
-            (self._identity["owner_id"],),
-        )
+        self._compact_owners_locked()
 
     def _claim(self, now_ns: int, policy: StudioMaintenancePolicy) -> MaintenanceTask | None:
         allowed = tuple(kind.value for kind in self._handlers
                         if policy.augmentation_enabled
                         or kind is not IdleWorkKind.ELIGIBLE_AUGMENTATION)
         if not allowed:
+            self._last_reason = "augmentation_disabled"
             return None
         placeholders = ",".join("?" for _ in allowed)
         with self._executor._lock:
@@ -1262,7 +1621,7 @@ class StudioMaintenanceController:
                     self._event(task_id, "local_chunk_recovered", now_ns,
                                 {"authority": "host-confirmed-physical-drain", "prior_owner_id": stale["owner_id"]})
                 if not self._host_idle_locked(now_ns):
-                    self._last_reason = "host_foreground_preemption"
+                    self._last_reason = self._last_quiescence["reason"]
                     db.execute("COMMIT")
                     return None
                 rows = db.execute(
@@ -1271,15 +1630,31 @@ class StudioMaintenanceController:
                     f"AND kind IN ({placeholders}) AND NOT EXISTS "
                     "(SELECT 1 FROM jeeves_idle_maintenance_circuit c "
                     "WHERE c.scope_id=t.scope_id AND c.kind=t.kind AND c.open_until_ns>?) "
-                    "ORDER BY MIN(100,priority+MAX(0,(?-updated_at_ns)/?)) DESC,"
-                    "updated_at_ns,created_at_ns,task_id LIMIT 32",
-                    (now_ns, *allowed, now_ns, now_ns, policy.priority_aging_ms * 1_000_000),
+                    "ORDER BY CASE WHEN ?-updated_at_ns>=? THEN 100 "
+                    "ELSE MIN(100,priority+MAX(0,(?-updated_at_ns)/?)) END DESC,"
+                    "last_admission_ns,updated_at_ns,created_at_ns,task_id LIMIT 32",
+                    (
+                        now_ns,
+                        *allowed,
+                        now_ns,
+                        now_ns,
+                        policy.maximum_admission_wait_ms * 1_000_000,
+                        now_ns,
+                        policy.priority_aging_ms * 1_000_000,
+                    ),
                 ).fetchall()
                 lease_ns = (policy.maximum_chunk_wall_ms
                             + policy.interrupted_lease_grace_ms) * 1_000_000
                 self._last_reason = "recovery_blocked" if blocked else "idle"
                 for row in rows:
                     item = dict(zip(_TASK_COLUMNS.split(","), row))
+                    # Admission deferrals must rotate independently of progress
+                    # timestamps. A blocked first page cannot starve cached
+                    # completions or another eligible scope forever.
+                    db.execute(
+                        "UPDATE jeeves_idle_maintenance_task SET last_admission_ns=? WHERE task_id=?",
+                        (now_ns, item["task_id"]),
+                    )
                     version = self._handlers[IdleWorkKind(item["kind"])].version
                     if item["handler_version"] not in ("", version):
                         db.execute(
@@ -1444,17 +1819,56 @@ class StudioMaintenanceController:
                     jitter = int(task.task_id[:8], 16) % max(1, backoff_ms // 5)
                     next_run_ns += (backoff_ms + jitter) * 1_000_000
                     previous = db.execute(
-                        "SELECT failures FROM jeeves_idle_maintenance_circuit "
-                        "WHERE scope_id=? AND kind=?", (task.scope_id, task.kind.value),
+                        "SELECT failures,generation FROM jeeves_idle_maintenance_circuit "
+                        "WHERE scope_id=? AND kind=?",
+                        (task.scope_id, task.kind.value),
                     ).fetchone()
                     circuit_failures = 1 if previous is None else previous[0] + 1
+                    circuit_generation = 1 if previous is None else previous[1] + 1
+                    if circuit_generation > 9_000_000_000_000_000:
+                        raise IdleRuntimeError("maintenance circuit generation exhausted")
+                    failure_digest = _digest(
+                        {
+                            "schema": "jeeves.maintenance_failure_binding.v1",
+                            "scope_id": task.scope_id,
+                            "kind": task.kind.value,
+                            "task_id": task.task_id,
+                            "source_digest": task.source_digest,
+                            "continuation_id": task.continuation_id,
+                            "attempt": task.attempt,
+                            "intent_digest": intent,
+                            "reason": reason,
+                            "at_ns": now_ns,
+                            "generation": circuit_generation,
+                            "circuit_failures": circuit_failures,
+                        }
+                    )
                     open_until = (now_ns + policy.circuit_cooldown_ms * 1_000_000
                                   if circuit_failures >= policy.circuit_failure_threshold else 0)
                     db.execute(
-                        "INSERT INTO jeeves_idle_maintenance_circuit VALUES (?,?,?,?,?) "
+                        "INSERT INTO jeeves_idle_maintenance_circuit "
+                        "(scope_id,kind,failures,open_until_ns,last_error,generation,last_failure_digest,"
+                        "last_source_digest,last_task_id,last_failure_at_ns,last_failure_attempt) "
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?) "
                         "ON CONFLICT(scope_id,kind) DO UPDATE SET failures=excluded.failures,"
-                        "open_until_ns=excluded.open_until_ns,last_error=excluded.last_error",
-                        (task.scope_id, task.kind.value, circuit_failures, open_until, reason),
+                        "open_until_ns=excluded.open_until_ns,last_error=excluded.last_error,"
+                        "generation=excluded.generation,last_failure_digest=excluded.last_failure_digest,"
+                        "last_source_digest=excluded.last_source_digest,last_task_id=excluded.last_task_id,"
+                        "last_failure_at_ns=excluded.last_failure_at_ns,last_failure_attempt=excluded.last_failure_attempt,"
+                        "reset_from_generation=NULL,reset_failure_digest=NULL,reset_at_ns=NULL",
+                        (
+                            task.scope_id,
+                            task.kind.value,
+                            circuit_failures,
+                            open_until,
+                            reason,
+                            circuit_generation,
+                            failure_digest,
+                            task.source_digest,
+                            task.task_id,
+                            now_ns,
+                            task.attempt,
+                        ),
                     )
                 elif state == "retry_wait":
                     next_run_ns += policy.preemption_backoff_ms * 1_000_000
@@ -1481,7 +1895,9 @@ class StudioMaintenanceController:
                         raise IdleRuntimeError("maintenance cursor lost its durable chunk result")
                     failures = 0
                     db.execute(
-                        "DELETE FROM jeeves_idle_maintenance_circuit WHERE scope_id=? AND kind=?",
+                        "UPDATE jeeves_idle_maintenance_circuit SET failures=0,open_until_ns=0,last_error=NULL,"
+                        "generation=generation+1,reset_from_generation=NULL,reset_failure_digest=NULL,reset_at_ns=NULL "
+                        "WHERE scope_id=? AND kind=?",
                         (task.scope_id, task.kind.value),
                     )
                     if result is not None and not result.complete:
@@ -1537,6 +1953,7 @@ class StudioMaintenanceController:
         try:
             if not self.heartbeat():
                 return {"state": "closed", "processed": 0}
+            self._retire_stale_presence(self._policy)
             acknowledgements = self._retry_acknowledgements(self._policy.maximum_ack_retries_per_tick)
             with self._state_lock:
                 policy = self._policy
@@ -1566,15 +1983,28 @@ class StudioMaintenanceController:
                 admission = JeevesIdleLearningScheduler(policy=self._executor.policy).propose(
                     (gate,), telemetry, host_now_ns=now_ns,
                 )
+                self._last_telemetry = {
+                    "observed_at_ns": telemetry.observed_at_ns,
+                    "host_now_ns": now_ns,
+                    "age_ns": now_ns - telemetry.observed_at_ns,
+                    "quiet_ns": telemetry.quiet_ns,
+                    "serving_pressure_ppm": telemetry.serving_pressure_ppm,
+                    "cpu_free_ppm": telemetry.cpu_free_ppm,
+                    "memory_free_ppm": telemetry.memory_free_ppm,
+                    "gpu_free_ppm": telemetry.gpu_free_ppm,
+                    "pending_interactive_requests": telemetry.pending_interactive_requests,
+                    "active_background_workers": telemetry.active_background_workers,
+                    "power_saving": telemetry.power_saving,
+                    "online": telemetry.online,
+                    "telemetry_digest": telemetry.host_observation_digest,
+                    "admission_reason": admission.plan_reason,
+                }
                 if not admission.assignments:
                     with self._state_lock:
                         self._last_reason = admission.plan_reason
                     break
                 task = self._claim(now_ns, policy)
                 if task is None:
-                    with self._state_lock:
-                        if self._last_reason not in ("lease_contended", "recovery_blocked", "host_foreground_preemption", "result_backpressure"):
-                            self._last_reason = "idle"
                     break
                 with self._state_lock:
                     self._active_tasks = 1
@@ -1596,16 +2026,19 @@ class StudioMaintenanceController:
                     if not plan.assignments:
                         raise IdleWorkPreempted(plan.plan_reason)
                     state, intent = self._executor.invoke_one(
-                        plan=plan, assignment=plan.assignments[0], candidate=candidate,
-                        telemetry=telemetry, host_now_ns=now_ns, context=context,
+                        plan=plan,
+                        assignment=plan.assignments[0],
+                        candidate=candidate,
+                        telemetry=telemetry,
+                        host_now_ns=now_ns,
+                        context=context,
                         budget=IdleWorkBudget(
                             maximum_wall_ns=policy.maximum_chunk_wall_ms * 1_000_000,
                             maximum_cpu_ns=policy.maximum_chunk_cpu_ms * 1_000_000,
                             maximum_polls=policy.maximum_chunk_polls,
                             maximum_memory_drop_ppm=policy.maximum_memory_drop_ppm,
                         ),
-                        stop_requested=lambda: self._preempted(generation)
-                        or not self._heartbeat_task(task, policy),
+                        stop_requested=lambda: not self._checkpoint_permitted(task, policy, generation),
                     )
                     if state is not IdleExecutionState.VERIFIED:
                         raise IdleWorkPreempted("chunk_idle_compliance_unconfirmed")
@@ -1619,6 +2052,20 @@ class StudioMaintenanceController:
                                  result=context.output)
                     with self._state_lock:
                         self._last_reason = "preempted"
+                    break
+                except (sqlite3.OperationalError, OSError) as exc:
+                    self._finish(
+                        task,
+                        now_ns=self._completion_time(now_ns),
+                        policy=policy,
+                        state="retry_wait",
+                        reason="maintenance_storage_unavailable",
+                        intent=intent,
+                        result=context.output,
+                    )
+                    with self._state_lock:
+                        self._coordination_fault = type(exc).__name__
+                        self._last_reason = "coordination_unavailable"
                     break
                 except Exception as exc:
                     # Exception text may contain tenant data or filesystem
@@ -1701,9 +2148,12 @@ class StudioMaintenanceController:
                 + ("" if scope_id is None else " AND scope_id=?"), scope_params,
             ).fetchone()
             circuits = db.execute(
-                "SELECT scope_id,kind,failures,open_until_ns,last_error "
-                "FROM jeeves_idle_maintenance_circuit" + scope_clause
-                + " ORDER BY open_until_ns DESC LIMIT ?", (*scope_params, limit),
+                "SELECT scope_id,kind,failures,open_until_ns,last_error,generation,last_failure_digest,"
+                "last_source_digest,last_task_id,last_failure_at_ns,last_failure_attempt "
+                "FROM jeeves_idle_maintenance_circuit"
+                + scope_clause
+                + " ORDER BY open_until_ns DESC LIMIT ?",
+                (*scope_params, limit),
             ).fetchall()
             status["next_run_ns"] = next_run
             head = self._executor.history_head()
@@ -1722,7 +2172,7 @@ class StudioMaintenanceController:
                 + ("" if scope_id is None else " AND scope_id=?"), scope_params,
             ).fetchone()[0]
             clock = db.execute(
-                "SELECT jump_count,last_jump_reason FROM jeeves_idle_maintenance_clock WHERE host_id=?",
+                "SELECT jump_count,last_jump_reason,logical_ns FROM jeeves_idle_maintenance_clock WHERE host_id=?",
                 (self._identity["host_id"],),
             ).fetchone()
             host_foreground, host_owners = db.execute(
@@ -1748,11 +2198,70 @@ class StudioMaintenanceController:
                 scope_params,
             ).fetchone()[0]
             tasks = [dict(zip(keys, row)) for row in rows]
+            circuit_entries = [
+                dict(
+                    zip(
+                        (
+                            "scope_id",
+                            "kind",
+                            "failures",
+                            "open_until_ns",
+                            "last_error",
+                            "generation",
+                            "last_failure_digest",
+                            "last_source_digest",
+                            "last_task_id",
+                            "last_failure_at_ns",
+                            "last_failure_attempt",
+                        ),
+                        row,
+                    )
+                )
+                for row in circuits
+            ]
+            for circuit in circuit_entries:
+                circuit["state"] = (
+                    "closed"
+                    if circuit["failures"] == 0 and circuit["open_until_ns"] == 0
+                    else "open" if clock is not None and circuit["open_until_ns"] > clock[2] else "half_open"
+                )
             if scope_id is not None:
                 shared_queue = db.execute(
                     "SELECT COUNT(*) FROM jeeves_idle_maintenance_task "
                     "WHERE state IN ('ready','retry_wait','running')",
                 ).fetchone()[0]
+                circuit_custody = (
+                    db.execute(
+                        "SELECT 1 FROM jeeves_idle_maintenance_lease WHERE state='held' AND "
+                        "(scope_id=? OR task_id IN (SELECT task_id FROM jeeves_idle_maintenance_task WHERE scope_id=?))",
+                        (scope_id, scope_id),
+                    ).fetchone()
+                    is not None
+                )
+                running_kinds = {
+                    row[0]
+                    for row in db.execute(
+                        "SELECT DISTINCT kind FROM jeeves_idle_maintenance_task WHERE scope_id=? AND state='running'",
+                        (scope_id,),
+                    )
+                }
+                for circuit in circuit_entries:
+                    reason = None
+                    if (
+                        circuit["generation"] < 1
+                        or circuit["last_failure_digest"] is None
+                        or circuit["last_source_digest"] is None
+                        or circuit["last_task_id"] is None
+                    ):
+                        reason = "unknown_failure_binding"
+                    elif circuit["kind"] in running_kinds:
+                        reason = "task_running"
+                    elif circuit_custody:
+                        reason = "custody_held"
+                    elif circuit["state"] == "closed":
+                        reason = "already_closed"
+                    circuit["resettable"] = reason is None
+                    circuit["reset_reason"] = reason
                 for task in tasks:
                     try:
                         handler = self._handlers.get(IdleWorkKind(task["kind"]))
@@ -1779,12 +2288,15 @@ class StudioMaintenanceController:
                         reason = "queue_full"
                     task["retryable"] = reason is None
                     task["retry_reason"] = reason
-        result = {"schema": "jeeves.studio_maintenance.v1", "policy": policy,
-                  "status": status, "queued_tasks": queued,
-                  "recent_tasks": tasks,
-                  "circuits": [dict(zip(("scope_id", "kind", "failures", "open_until_ns", "last_error"), row))
-                               for row in circuits],
-                  "execution_authority": "host-local-derived-only"}
+        result = {
+            "schema": "jeeves.studio_maintenance.v1",
+            "policy": policy,
+            "status": status,
+            "queued_tasks": queued,
+            "recent_tasks": tasks,
+            "circuits": circuit_entries,
+            "execution_authority": "host-local-derived-only",
+        }
         for task in result["recent_tasks"]:
             task["recovery_reason"] = (task["last_error"] if task["last_error"] is not None
                                        and task["last_error"].startswith("recovery_blocked") else None)
@@ -1815,7 +2327,12 @@ class StudioMaintenanceController:
             "host_foreground_requests": host_foreground,
             "registered_host_owners": host_owners,
             "observation": "persisted_host_owner_heartbeats",
+            "last_admission": None if self._last_quiescence is None else dict(self._last_quiescence),
+            "last_presence_repair": (
+                None if self._last_presence_repair is None else dict(self._last_presence_repair)
+            ),
         }
+        result["telemetry"] = None if self._last_telemetry is None else dict(self._last_telemetry)
         result["journal_capacity"] = {
             key: head[key] for key in ("event_count", "maximum_history_events", "remaining_events")
         }

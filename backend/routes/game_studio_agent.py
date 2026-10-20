@@ -83,6 +83,15 @@ class GoalAdvance(Request):
     expected_goal_version: int = Field(ge=1, strict=True)
     idempotency_key: str = Field(min_length=1, max_length=512)
     steps: int = Field(default=1, ge=1, le=4, strict=True)
+    max_planner_decisions: int = Field(default=1, ge=1, le=4, strict=True)
+    wait_for_work_seconds: int = Field(default=0, ge=0, le=10, strict=True)
+
+
+class GoalSourceRefresh(Request):
+    expected_goal_version: int = Field(ge=1, strict=True)
+    idempotency_key: str = Field(min_length=1, max_length=512)
+    expected_project_version: int = Field(ge=1, strict=True)
+    expected_tree_digest: str = Field(pattern="^[a-f0-9]{64}$")
 
 
 class GoalControl(Request):
@@ -189,7 +198,18 @@ async def dragon_observation(
 
 @router.post("/goals/{goal_id}/advance")
 async def advance_goal(goal_id: str, body: GoalAdvance, user=Depends(get_current_user)):
-    return {"goal": await _call(agent.advance(_scope(user), goal_id, body.model_dump()))}
+    payload = body.model_dump()
+    # Preserve exact historical request keys when the additive controls were
+    # omitted; a retry may never silently become a larger batch.
+    for field in ("max_planner_decisions", "wait_for_work_seconds"):
+        if field not in body.model_fields_set:
+            payload.pop(field)
+    return {"goal": await _call(agent.advance(_scope(user), goal_id, payload))}
+
+
+@router.post("/goals/{goal_id}/source-refresh")
+async def refresh_goal_source(goal_id: str, body: GoalSourceRefresh, user=Depends(get_current_user)):
+    return {"goal": await _call(agent.refresh_source(_scope(user), goal_id, body.model_dump()))}
 
 
 @router.post("/goals/{goal_id}/control")

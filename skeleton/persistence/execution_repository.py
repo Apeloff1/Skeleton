@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import base64
+import binascii
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -240,6 +242,8 @@ class SQLiteExecutionRepository:
                     learning_partition_id TEXT,
                     learning_model_selection_digest TEXT,
                     learning_source_snapshot_digest TEXT,
+                    learning_policy_version INTEGER,
+                    learning_policy_digest TEXT,
                     PRIMARY KEY(namespace, execution_id),
                     FOREIGN KEY(namespace, execution_id)
                         REFERENCES ai_execution_state(namespace, execution_id)
@@ -333,6 +337,14 @@ class SQLiteExecutionRepository:
                 CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_accepted_replay
                 ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, observed_at DESC)
                 WHERE trained = 1;
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_dataset
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, observed_at, execution_id);
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_partition_dataset
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, observed_at, execution_id);
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_accepted_dataset
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, observed_at, execution_id) WHERE trained = 1;
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_accepted_partition_dataset
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, observed_at, execution_id) WHERE trained = 1;
 
                 CREATE TABLE IF NOT EXISTS ai_execution_learning_state (
                     namespace TEXT NOT NULL,
@@ -435,11 +447,19 @@ class SQLiteExecutionRepository:
                 str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_result)")
             }
             for name, kind in (
-                ("learning_outcome_id", "TEXT"), ("learning_observation_digest", "TEXT"),
-                ("learning_observed_at", "TEXT"), ("learning_trained", "INTEGER"), ("learning_status", "TEXT"),
-                ("learning_checkpoint_version", "INTEGER"), ("learning_tenant_id", "TEXT"),
-                ("learning_scope_id", "TEXT"), ("learning_partition_id", "TEXT"),
-                ("learning_model_selection_digest", "TEXT"), ("learning_source_snapshot_digest", "TEXT"),
+                ("learning_outcome_id", "TEXT"),
+                ("learning_observation_digest", "TEXT"),
+                ("learning_observed_at", "TEXT"),
+                ("learning_trained", "INTEGER"),
+                ("learning_status", "TEXT"),
+                ("learning_checkpoint_version", "INTEGER"),
+                ("learning_tenant_id", "TEXT"),
+                ("learning_scope_id", "TEXT"),
+                ("learning_partition_id", "TEXT"),
+                ("learning_model_selection_digest", "TEXT"),
+                ("learning_source_snapshot_digest", "TEXT"),
+                ("learning_policy_version", "INTEGER"),
+                ("learning_policy_digest", "TEXT"),
             ):
                 if name not in marker_columns:
                     self._connection.execute(f"ALTER TABLE ai_execution_result ADD COLUMN {name} {kind}")
@@ -2151,12 +2171,39 @@ class SQLiteExecutionRepository:
         return version
 
     @staticmethod
+    def _learning_observation_age(
+        state: dict[str, Any] | None, *, now: datetime | None = None
+    ) -> float | None:
+        """Read evidence age without treating replay/maintenance writes as outcomes."""
+        if state is None:
+            return None
+        provenance = state.get("provenance")
+        raw = provenance.get("last_observation_at") if isinstance(provenance, dict) else None
+        if raw is None:
+            return None
+        try:
+            instant = _utc(now)
+            observed = _parse_time(raw, "learning observation time")
+            if observed > instant + timedelta(minutes=5):
+                return None
+            return min(float(learning.MAX_COUNTER), max(0.0, (instant - observed).total_seconds()))
+        except (ExecutionRepositoryError, ValueError, TypeError, ArithmeticError):
+            return None
+
+    @staticmethod
     def _learning_observation_base(observation: dict[str, Any]) -> dict[str, Any]:
         return {name: value for name, value in observation.items() if name != "retired_inactive_partition"}
 
     def _write_learning_marker_locked(
-        self, execution_id: str, observation: dict[str, Any], *, trained: bool,
-        learning_status: str, checkpoint_version: int,
+        self,
+        execution_id: str,
+        observation: dict[str, Any],
+        *,
+        trained: bool,
+        learning_status: str,
+        checkpoint_version: int,
+        policy_version: int | None = None,
+        policy_digest: str | None = None,
     ) -> None:
         digest = learning.digest(self._learning_observation_base(observation))
         row = self._connection.execute(
@@ -2174,11 +2221,26 @@ class SQLiteExecutionRepository:
             """UPDATE ai_execution_result SET learning_outcome_id = ?, learning_observation_digest = ?,
                    learning_observed_at = ?, learning_trained = ?, learning_status = ?, learning_checkpoint_version = ?,
                    learning_tenant_id = ?, learning_scope_id = ?, learning_partition_id = ?,
-                   learning_model_selection_digest = ?, learning_source_snapshot_digest = ?
+                   learning_model_selection_digest = ?, learning_source_snapshot_digest = ?,
+                   learning_policy_version = ?, learning_policy_digest = ?
                WHERE namespace = ? AND execution_id = ? AND learning_outcome_id IS NULL""",
-            (observation["outcome_id"], digest, observation["observed_at"], int(trained), learning_status, checkpoint_version,
-             observation["tenant_id"], observation["scope_id"], observation["partition_id"],
-             observation["model_selection_digest"], observation["source_snapshot_digest"], self.namespace, execution_id),
+            (
+                observation["outcome_id"],
+                digest,
+                observation["observed_at"],
+                int(trained),
+                learning_status,
+                checkpoint_version,
+                observation["tenant_id"],
+                observation["scope_id"],
+                observation["partition_id"],
+                observation["model_selection_digest"],
+                observation["source_snapshot_digest"],
+                policy_version,
+                policy_digest,
+                self.namespace,
+                execution_id,
+            ),
         )
 
     def _observation_from_learning_marker_locked(self, marker: sqlite3.Row) -> dict[str, Any]:
@@ -2375,8 +2437,13 @@ class SQLiteExecutionRepository:
         tenant_id, scope_id = observation["tenant_id"], observation["scope_id"]
         seed = f"{self.namespace}:{tenant_id}:{scope_id}:{observation['partition_id']}"
         trained = False
+        learning_policy_version = None
+        learning_policy_digest = None
         try:
-            policy = self._learning_policy_locked(tenant_id, scope_id)["policy"]
+            configuration = self._learning_policy_locked(tenant_id, scope_id)
+            policy = configuration["policy"]
+            learning_policy_version = configuration["version"]
+            learning_policy_digest = learning.digest(policy)
         except (ExecutionRepositoryCorruption, learning.RuntimeLearningError):
             policy = learning.normalize_policy({"enabled": False})
             learning_status = "policy_quarantined"
@@ -2417,6 +2484,10 @@ class SQLiteExecutionRepository:
         if policy["enabled"] and observation["trainable"] and capacity:
             state = self._learning_state_locked(row, seed=seed)
             try:
+                if state is not None and state.get("fresh_observations", 0):
+                    age = self._learning_observation_age(state, now=instant)
+                    if age is None or age > policy["outcome_max_age_days"] * 86400:
+                        state = learning.reset_confidence(state, reason="stale_evidence", policy=policy)
                 state, trained = learning.learn_outcome(state, observation, policy, seed=seed)
             except (learning.RuntimeLearningError, ArithmeticError, ValueError) as exc:
                 state = learning.quarantine_state(seed, reason=f"optimizer update: {type(exc).__name__}")
@@ -2429,8 +2500,15 @@ class SQLiteExecutionRepository:
         elif not observation["trainable"] and learning_status == "observed":
             learning_status = "audit_only"
 
-        self._write_learning_marker_locked(execution.execution_id, observation, trained=trained,
-            learning_status=learning_status, checkpoint_version=0 if checkpoint is None else checkpoint.checkpoint_version)
+        self._write_learning_marker_locked(
+            execution.execution_id,
+            observation,
+            trained=trained,
+            learning_status=learning_status,
+            checkpoint_version=0 if checkpoint is None else checkpoint.checkpoint_version,
+            policy_version=learning_policy_version,
+            policy_digest=learning_policy_digest,
+        )
         try:
             outcome_retained = self._reserve_learning_diagnostic_locked(tenant_id, scope_id, policy, instant)
         except (ExecutionRepositoryError, learning.RuntimeLearningError, ValueError, TypeError, OverflowError):
@@ -2661,9 +2739,16 @@ class SQLiteExecutionRepository:
                     changed_sections=["learning_checkpoint"], learning_policy_digest=learning.digest(policy),
                     instant=instant, learning_checkpoint=mutation)
                 self._connection.execute("COMMIT")
-                return {"version": version, "state_version": state_version, "partition_id": partition_id,
-                    "model_selection_digest": model_selection_digest, "receipt": receipt,
-                    **learning.state_readiness(state, policy)}
+                return {
+                    "version": version,
+                    "state_version": state_version,
+                    "partition_id": partition_id,
+                    "model_selection_digest": model_selection_digest,
+                    "receipt": receipt,
+                    **learning.state_readiness(
+                        state, policy, observed_age_seconds=self._learning_observation_age(state, now=instant)
+                    ),
+                }
             except learning.RuntimeLearningError as exc:
                 self._connection.execute("ROLLBACK")
                 raise ExecutionRepositoryError(str(exc)) from exc
@@ -2700,6 +2785,7 @@ class SQLiteExecutionRepository:
             raise ExecutionRepositoryError("learning snapshot limit must be in [1, 100]")
         if isinstance(offset, bool) or not isinstance(offset, int) or not 0 <= offset <= 127:
             raise ExecutionRepositoryError("learning snapshot offset must be in [0, 127]")
+        instant = _utc()
         with self._lock:
             configuration = self._learning_policy_locked(tenant_id, scope_id)
             policy = configuration["policy"]
@@ -2724,10 +2810,21 @@ class SQLiteExecutionRepository:
             for row in rows:
                 seed = f"{self.namespace}:{tenant_id}:{scope_id}:{row['partition_id']}"
                 state = self._learning_state_locked(row, seed=seed)
-                partitions.append({"partition_id": row["partition_id"], "task_class": row["task_class"],
-                    "model_selection_digest": row["model_selection_digest"], "state_version": int(row["version"]),
-                    "last_observed_at": row["last_observed_at"] or row["updated_at"],
-                    "last_updated_at": row["updated_at"], **learning.state_readiness(state, policy)})
+                partitions.append(
+                    {
+                        "partition_id": row["partition_id"],
+                        "task_class": row["task_class"],
+                        "model_selection_digest": row["model_selection_digest"],
+                        "state_version": int(row["version"]),
+                        "last_observed_at": row["last_observed_at"] or row["updated_at"],
+                        "last_updated_at": row["updated_at"],
+                        **learning.state_readiness(
+                            state,
+                            policy,
+                            observed_age_seconds=self._learning_observation_age(state, now=instant),
+                        ),
+                    }
+                )
             recent_rows = self._connection.execute(
                 """SELECT execution_id, model_selection_digest, source_snapshot_digest, observation_json,
                           observation_digest, trained, learning_status, observed_at
@@ -2796,6 +2893,404 @@ class SQLiteExecutionRepository:
                     "retained_outcomes": policy["retained_outcomes"], "max_retention_rows_per_chunk": 512,
                     "partition_limit": policy["partition_limit"], "replay_capacity": policy["replay_capacity"]}}
 
+    @staticmethod
+    def _learning_dataset_cursor(binding: str, after: dict[str, str], watermark: dict[str, str]) -> str:
+        payload = {
+            "schema_version": "skeleton.runtime.learning.dataset.cursor.v1",
+            "binding_digest": binding,
+            "after": after,
+            "watermark": watermark,
+        }
+        payload["cursor_digest"] = learning.digest(payload)
+        return base64.urlsafe_b64encode(_json_dump(payload).encode()).decode("ascii").rstrip("=")
+
+    @staticmethod
+    def _parse_learning_dataset_cursor(cursor: str, binding: str) -> dict[str, Any]:
+        if not isinstance(cursor, str) or not 1 <= len(cursor) <= 4096 or cursor.strip() != cursor:
+            raise ExecutionRepositoryError("learning dataset cursor exceeds its bound")
+        try:
+            raw = base64.b64decode(
+                cursor.encode("ascii") + b"=" * (-len(cursor) % 4), altchars=b"-_", validate=True
+            )
+            if len(raw) > 3072:
+                raise ValueError("cursor is too large")
+            payload = _json_object(raw.decode("utf-8"), "learning dataset cursor")
+            fields = {"schema_version", "binding_digest", "after", "watermark", "cursor_digest"}
+            if (
+                set(payload) != fields
+                or payload["schema_version"] != "skeleton.runtime.learning.dataset.cursor.v1"
+                or payload["binding_digest"] != binding
+            ):
+                raise ValueError("cursor scope/filter binding differs")
+            if (
+                learning.digest({key: value for key, value in payload.items() if key != "cursor_digest"})
+                != payload["cursor_digest"]
+            ):
+                raise ValueError("cursor digest differs")
+            for name in ("after", "watermark"):
+                pair = payload[name]
+                if not isinstance(pair, dict) or set(pair) != {"observed_at", "execution_id"}:
+                    raise ValueError("cursor keyset differs")
+                if not isinstance(pair["execution_id"], str) or not 1 <= len(pair["execution_id"]) <= 192:
+                    raise ValueError("cursor execution identity differs")
+                if _parse_time(pair["observed_at"], "dataset cursor time").isoformat() != pair["observed_at"]:
+                    raise ValueError("cursor timestamp must be canonical UTC")
+            if (payload["after"]["observed_at"], payload["after"]["execution_id"]) > (
+                payload["watermark"]["observed_at"],
+                payload["watermark"]["execution_id"],
+            ):
+                raise ValueError("cursor exceeds its watermark")
+            return payload
+        except (
+            ValueError,
+            TypeError,
+            UnicodeError,
+            binascii.Error,
+            ExecutionRepositoryError,
+            RecursionError,
+        ) as exc:
+            raise ExecutionRepositoryError(
+                "learning dataset cursor is invalid or belongs to another scope/filter"
+            ) from exc
+
+    @staticmethod
+    def _learning_dataset_row(row: sqlite3.Row) -> tuple[dict[str, Any] | None, str | None]:
+        if row["canonical_request_digest"] is None or row["canonical_result_digest"] is None:
+            return None, "canonical_execution_missing"
+        if row["marker_outcome_id"] is None:
+            return None, "feedback_marker_missing"
+        try:
+            raw = row["observation_json"]
+            if not isinstance(raw, str) or len(raw.encode()) > 16 * 1024:
+                return None, "retained_observation_bound_exceeded"
+            observation = _json_object(raw, "dataset retained observation")
+            if (
+                observation.get("schema_version") != learning.SCHEMA
+                or learning.digest(observation) != row["observation_digest"]
+            ):
+                return None, "retained_observation_digest_invalid"
+            if (
+                learning.digest(SQLiteExecutionRepository._learning_observation_base(observation))
+                != row["marker_observation_digest"]
+            ):
+                return None, "feedback_marker_digest_invalid"
+            if (
+                observation["request_digest"] != row["canonical_request_digest"]
+                or observation["result_digest"] != row["canonical_result_digest"]
+            ):
+                return None, "canonical_identity_digest_invalid"
+            for name in (
+                "tenant_id",
+                "scope_id",
+                "partition_id",
+                "model_selection_digest",
+                "source_snapshot_digest",
+            ):
+                if observation[name] != row[name] or observation[name] != row["marker_" + name]:
+                    return None, "canonical_scope_provenance_invalid"
+            for name in ("execution_id", "outcome_id", "request_digest", "result_digest", "observed_at"):
+                if observation[name] != row[name]:
+                    return None, "retained_identity_invalid"
+            learning.identifier(observation["execution_id"], "execution_id")
+            learning.identifier(observation["task_class"], "task_class", maximum=256)
+            if (
+                observation["task_class"] != row["task_class"]
+                or learning.digest(
+                    {
+                        "task_class": observation["task_class"],
+                        "model_selection_digest": observation["model_selection_digest"],
+                    }
+                )
+                != observation["partition_id"]
+            ):
+                return None, "canonical_partition_binding_invalid"
+            if (
+                _parse_time(observation["observed_at"], "dataset observation time").isoformat()
+                != observation["observed_at"]
+            ):
+                return None, "retained_timestamp_invalid"
+            if observation["observed_at"] != row["marker_observed_at"]:
+                return None, "canonical_timestamp_invalid"
+            learning._integer(row["trained"], "retained training acceptance", 0, 1)
+            learning._integer(row["marker_trained"], "canonical training acceptance", 0, 1)
+            if (
+                observation["outcome_id"] != row["marker_outcome_id"]
+                or bool(row["trained"]) != bool(row["marker_trained"])
+                or row["learning_status"] != row["marker_learning_status"]
+            ):
+                return None, "feedback_acceptance_invalid"
+            if (
+                observation["status"] not in {"completed", "degraded", "failed", "cancelled"}
+                or type(observation["trainable"]) is not bool
+            ):
+                return None, "terminal_label_invalid"
+            for name in (
+                "outcome_id",
+                "request_digest",
+                "result_digest",
+                "partition_id",
+                "model_selection_digest",
+                "source_snapshot_digest",
+            ):
+                learning._sha(observation[name], name)
+            features = learning._vector(observation["features"], 12, "dataset features", 0.0, 1.0)
+            metrics = observation["metrics"]
+            if not isinstance(metrics, dict):
+                return None, "retained_metrics_invalid"
+            metric_limits = {
+                "elapsed_seconds": 315576000.0,
+                "input_tokens": learning.MAX_COUNTER,
+                "output_tokens": learning.MAX_COUNTER,
+                "provider_attempts": learning.MAX_COUNTER,
+                "cost_usd": 1000000000.0,
+                "model_turns": learning.MAX_COUNTER,
+                "tool_calls": learning.MAX_COUNTER,
+                "resource_failure": 1,
+                "telemetry_errors": learning.MAX_COUNTER,
+            }
+            usage = {
+                name: learning._finite(metrics.get(name, 0), name, 0, maximum)
+                for name, maximum in metric_limits.items()
+            }
+            version = learning._integer(
+                row["marker_checkpoint_version"], "canonical checkpoint version", 0, learning.MAX_COUNTER
+            )
+            checkpoint_digest = row["canonical_checkpoint_digest"]
+            if version:
+                learning._sha(checkpoint_digest, "canonical checkpoint digest")
+            elif checkpoint_digest is not None:
+                return None, "canonical_checkpoint_invalid"
+            policy_version, policy_digest = row["marker_policy_version"], row["marker_policy_digest"]
+            if policy_version is not None or policy_digest is not None:
+                learning._integer(policy_version, "learning policy version", 1, learning.MAX_COUNTER)
+                learning._sha(policy_digest, "learning policy digest")
+            sample = {
+                "execution_id": row["execution_id"],
+                "outcome_id": observation["outcome_id"],
+                "observed_at": observation["observed_at"],
+                "task_class": observation["task_class"],
+                "partition_id": observation["partition_id"],
+                "model_selection_digest": observation["model_selection_digest"],
+                "source_snapshot_digest": observation["source_snapshot_digest"],
+                "request_digest": observation["request_digest"],
+                "result_digest": observation["result_digest"],
+                "observation_digest": row["observation_digest"],
+                "feedback_digest": row["marker_observation_digest"],
+                "canonical_checkpoint_version": version,
+                "canonical_checkpoint_digest": checkpoint_digest,
+                "learning_policy_version": policy_version,
+                "learning_policy_digest": policy_digest,
+                "policy_provenance": "legacy_unknown" if policy_version is None else "atomic_feedback_marker",
+                "features": features,
+                "targets": learning.observation_targets(observation, learning.DEFAULT_POLICY),
+                "usage": usage,
+                "status": observation["status"],
+                "training_eligibility": observation["trainable"],
+                "trained_online": bool(row["trained"]),
+                "provenance_verified": True,
+                "provenance_basis": "canonical_feedback_marker",
+            }
+            sample["sample_digest"] = learning.digest(sample)
+            return sample, None
+        except (
+            ExecutionRepositoryError,
+            learning.RuntimeLearningError,
+            KeyError,
+            ValueError,
+            TypeError,
+            OverflowError,
+            RecursionError,
+        ):
+            return None, "retained_numeric_provenance_invalid"
+
+    def runtime_learning_dataset_export(
+        self,
+        *,
+        tenant_id: str,
+        scope_id: str = "tenant",
+        limit: int = 128,
+        cursor: str | None = None,
+        partition_id: str | None = None,
+        include_untrained: bool = False,
+    ) -> dict[str, Any]:
+        """Read one bounded numeric telemetry page without exposing task content.
+
+        A fixed chronological watermark limits continuation pages. Retention
+        and late arrivals can change membership between page reads; this is not
+        an immutable historical snapshot or a provider-weight training grant.
+        """
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 256:
+            raise ExecutionRepositoryError("learning dataset page limit must be in [1, 256]")
+        if type(include_untrained) is not bool:
+            raise ExecutionRepositoryError("include_untrained must be boolean")
+        if partition_id is not None:
+            try:
+                learning._sha(partition_id, "partition_id")
+            except learning.RuntimeLearningError as exc:
+                raise ExecutionRepositoryError(str(exc)) from exc
+        filters = {"partition_id": partition_id, "include_untrained": include_untrained}
+        binding = learning.digest(
+            {
+                "tenant_id": tenant_id,
+                "scope_id": scope_id,
+                "filters": filters,
+                "feature_schema": learning.FEATURE_SCHEMA,
+            }
+        )
+        decoded = None if cursor is None else self._parse_learning_dataset_cursor(cursor, binding)
+        after = None if decoded is None else decoded["after"]
+        watermark = None if decoded is None else decoded["watermark"]
+        parameters: list[Any] = [self.namespace, tenant_id, scope_id]
+        where = "o.namespace = ? AND o.tenant_id = ? AND o.scope_id = ?"
+        if partition_id is not None:
+            where += " AND o.partition_id = ?"
+            parameters.append(partition_id)
+        if not include_untrained:
+            where += " AND o.trained = 1"
+        with self._lock:
+            if self._connection.in_transaction:
+                raise ExecutionRepositoryError("dataset export requires an independent read transaction")
+            self._connection.execute("BEGIN")
+            try:
+                if watermark is None:
+                    last = self._connection.execute(
+                        "SELECT o.observed_at, o.execution_id FROM ai_execution_learning_outcome o WHERE "
+                        + where
+                        + " ORDER BY o.observed_at DESC, o.execution_id DESC LIMIT 1",
+                        parameters,
+                    ).fetchone()
+                    watermark = (
+                        None
+                        if last is None
+                        else {"observed_at": last["observed_at"], "execution_id": last["execution_id"]}
+                    )
+                candidates = []
+                if watermark is not None:
+                    page_where = where + " AND (o.observed_at, o.execution_id) <= (?, ?)"
+                    page_parameters = [*parameters, watermark["observed_at"], watermark["execution_id"]]
+                    if after is not None:
+                        page_where += " AND (o.observed_at, o.execution_id) > (?, ?)"
+                        page_parameters.extend((after["observed_at"], after["execution_id"]))
+                    candidates = self._connection.execute(
+                        """SELECT o.execution_id, o.outcome_id, o.tenant_id, o.scope_id, o.partition_id, o.task_class,
+                           o.model_selection_digest, o.source_snapshot_digest, o.request_digest, o.result_digest,
+                           o.observation_digest, o.trained, o.learning_status, o.observed_at,
+                           CASE WHEN length(CAST(o.observation_json AS BLOB)) <= 16384
+                                THEN o.observation_json ELSE NULL END AS observation_json,
+                           s.identity_digest AS canonical_request_digest, r.result_digest AS canonical_result_digest,
+                           r.learning_outcome_id AS marker_outcome_id, r.learning_observation_digest AS marker_observation_digest,
+                           r.learning_tenant_id AS marker_tenant_id, r.learning_scope_id AS marker_scope_id,
+                           r.learning_partition_id AS marker_partition_id, r.learning_model_selection_digest AS marker_model_selection_digest,
+                           r.learning_source_snapshot_digest AS marker_source_snapshot_digest,
+                           r.learning_checkpoint_version AS marker_checkpoint_version, r.learning_trained AS marker_trained,
+                           r.learning_observed_at AS marker_observed_at,
+                           r.learning_status AS marker_learning_status, r.learning_policy_version AS marker_policy_version,
+                           r.learning_policy_digest AS marker_policy_digest, c.checkpoint_digest AS canonical_checkpoint_digest
+                           FROM ai_execution_learning_outcome o
+                           LEFT JOIN ai_execution_state s ON s.namespace = o.namespace AND s.execution_id = o.execution_id
+                           LEFT JOIN ai_execution_result r ON r.namespace = o.namespace AND r.execution_id = o.execution_id
+                           LEFT JOIN ai_execution_checkpoint c ON c.namespace = o.namespace AND c.execution_id = o.execution_id
+                                AND c.checkpoint_version = r.learning_checkpoint_version
+                           WHERE """
+                        + page_where
+                        + " ORDER BY o.observed_at, o.execution_id LIMIT ?",
+                        (*page_parameters, limit + 1),
+                    ).fetchall()
+                rows, omitted = [], []
+                last_scanned = after
+                encoded_rows = 0
+                scanned = 0
+                for candidate in candidates[:limit]:
+                    sample, reason = self._learning_dataset_row(candidate)
+                    entry = (
+                        sample
+                        if sample is not None
+                        else {
+                            "execution_id": candidate["execution_id"],
+                            "outcome_id": candidate["outcome_id"],
+                            "reason": reason,
+                        }
+                    )
+                    entry_size = len(_json_dump(entry).encode())
+                    if scanned and encoded_rows + entry_size > 1024 * 1024 - 64 * 1024:
+                        break
+                    (rows if sample is not None else omitted).append(entry)
+                    encoded_rows += entry_size
+                    scanned += 1
+                    last_scanned = {
+                        "observed_at": candidate["observed_at"],
+                        "execution_id": candidate["execution_id"],
+                    }
+                has_more = len(candidates) > scanned
+                next_cursor = None
+                if has_more and last_scanned is not None and watermark is not None:
+                    next_cursor = self._learning_dataset_cursor(binding, last_scanned, watermark)
+                try:
+                    policy = self._learning_policy_locked(tenant_id, scope_id)["policy"]
+                    retention = {
+                        "retained_outcomes": policy["retained_outcomes"],
+                        "outcome_max_age_days": policy["outcome_max_age_days"],
+                        "policy_state": "known",
+                    }
+                except (ExecutionRepositoryCorruption, learning.RuntimeLearningError):
+                    retention = {
+                        "retained_outcomes": None,
+                        "outcome_max_age_days": None,
+                        "policy_state": "quarantined",
+                    }
+                page = {
+                    "schema_version": "skeleton.runtime.learning.dataset.v1",
+                    "tenant_id": tenant_id,
+                    "scope_id": scope_id,
+                    "feature_schema": learning.FEATURE_SCHEMA,
+                    "feature_names": list(learning.FEATURE_NAMES),
+                    "feature_normalizers": list(learning.FEATURE_NORMALIZERS),
+                    "target_names": list(learning.OUTPUT_NAMES),
+                    "target_semantics": {
+                        "operational_completion": {
+                            "completed": 1.0,
+                            "degraded": 0.35,
+                            "failed": 0.0,
+                            "cancelled": 0.0,
+                        },
+                        "resource_failure": "canonical terminal resource-failure flag",
+                        "normalized_latency": {
+                            "formula": "elapsed_seconds/(elapsed_seconds+reference_seconds)",
+                            "reference_seconds": learning.LATENCY_REFERENCE_SECONDS,
+                        },
+                    },
+                    "filters": filters,
+                    "rows": rows,
+                    "row_count": len(rows),
+                    "scanned_rows": scanned,
+                    "omitted_rows": omitted,
+                    "next_cursor": next_cursor,
+                    "has_more": has_more,
+                    "watermark": watermark,
+                    "window": {
+                        "after": after,
+                        "last_scanned": last_scanned,
+                        "order": "observed_at,execution_id",
+                    },
+                    "retention": retention,
+                    "limits": {"max_rows": 256, "max_json_bytes": 1024 * 1024, "max_cursor_bytes": 4096},
+                    "limitations": [
+                        "Only retained numeric diagnostics are exported; canonical historical results are not reconstructed.",
+                        "Retention and late arrivals can change membership between pages; this is not an immutable historical snapshot.",
+                        "Targets describe operational completion, resource failures and latency; they do not certify creative quality or factual correctness.",
+                        "Export does not train, select, activate or promote provider weights, or grant tools or resources.",
+                    ],
+                }
+                page["dataset_digest"] = learning.digest(page)
+                if len(_json_dump(page).encode()) > 1024 * 1024:
+                    raise ExecutionRepositoryError("learning dataset page exceeds its JSON byte bound")
+                self._connection.execute("COMMIT")
+                return page
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def runtime_learning_recommendation(
         self,
         *,
@@ -2836,9 +3331,16 @@ class SQLiteExecutionRepository:
                 ).fetchone()
                 seed = f"{self.namespace}:{tenant_id}:{scope_id}:{identity['partition_id']}"
                 state = self._learning_state_locked(row, seed=seed)
-                result = learning.recommend(state, configuration["policy"], features, allowed_rounds=allowed_rounds,
-                    requested_rounds=requested_rounds, pressure=pressure,
-                    source_snapshot_digest=identity["source_snapshot_digest"] or None)
+                result = learning.recommend(
+                    state,
+                    configuration["policy"],
+                    features,
+                    allowed_rounds=allowed_rounds,
+                    requested_rounds=requested_rounds,
+                    pressure=pressure,
+                    source_snapshot_digest=identity["source_snapshot_digest"] or None,
+                    observed_age_seconds=self._learning_observation_age(state),
+                )
                 return {**result, **identity, "policy_version": configuration["version"],
                     "state_version": 0 if row is None else int(row["version"])}
         except learning.RuntimeLearningError as exc:
@@ -3102,6 +3604,7 @@ class SQLiteExecutionRepository:
                     recovering = state["quarantined"]
                     updates_before = int(state["optimizer"]["step"])
                     maintenance_error = None
+                    deferred_reason = None
                     try:
                         if recovering:
                             old_quarantine = state["quarantine"]
@@ -3117,15 +3620,32 @@ class SQLiteExecutionRepository:
                             # it cannot certify fresh prequential performance.
                             candidate = learning.reset_confidence(candidate, reason="maintenance_recovery", policy=policy)
                             state = candidate
+                        elif (
+                            age := self._learning_observation_age(state, now=instant)
+                        ) is None or age > policy["outcome_max_age_days"] * 86400:
+                            deferred_reason = "observation_time_unknown" if age is None else "outcomes_stale"
                         else:
                             state = learning.replay_maintenance(state, policy, max_updates=2)
                     except (ExecutionRepositoryError, ValueError, TypeError, ArithmeticError, RecursionError) as exc:
                         maintenance_error = type(exc).__name__
                         state = learning.quarantine_state(seed, reason=f"maintenance: {type(exc).__name__}")
                     self._save_learning_state_locked(dict(row), state, row, instant, maintenance=True)
-                    entries.append({"partition_id": row["partition_id"], "recovered": recovering and not state["quarantined"],
-                        "optimizer_updates": max(0, int(state["optimizer"]["step"]) - (0 if recovering else updates_before)),
-                        "maintenance_error": maintenance_error, **learning.state_readiness(state, policy)})
+                    entries.append(
+                        {
+                            "partition_id": row["partition_id"],
+                            "recovered": recovering and not state["quarantined"],
+                            "optimizer_updates": max(
+                                0, int(state["optimizer"]["step"]) - (0 if recovering else updates_before)
+                            ),
+                            "maintenance_error": maintenance_error,
+                            "deferred_reason": deferred_reason,
+                            **learning.state_readiness(
+                                state,
+                                policy,
+                                observed_age_seconds=self._learning_observation_age(state, now=instant),
+                            ),
+                        }
+                    )
                 result = self._learning_maintenance_result_locked({
                     "schema_version": "skeleton.runtime.learning.maintenance.v1", "tenant_id": tenant_id,
                     "scope_id": scope_id, "processed_partitions": len(entries), "partitions": entries,

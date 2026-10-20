@@ -364,6 +364,50 @@ async def _assert_candidate(scope: dict, candidate: dict, *, approved: bool = Fa
         )
 
 
+def _same_review_source_reference(current: dict, retained: dict) -> bool:
+    """Compare already-authorized pins without replacing their stored identity.
+
+    An untouched legacy v1 pin may match a newly issued v2 pin at policy
+    version zero. Callers must first assert the retained pin against live
+    crawler authority; a changed source-use policy is never equivalent.
+    """
+    identity_fields = {"session_id", "source_id", "source_digest", "request_digest", "consent_id"}
+    schemas = {"skeleton.dragon.crawler_reference.v1", "skeleton.dragon.crawler_reference.v2"}
+    for reference in (current, retained):
+        if not isinstance(reference, dict):
+            return False
+        schema = reference.get("schema_version")
+        v2 = schema == "skeleton.dragon.crawler_reference.v2"
+        if (
+            not isinstance(schema, str)
+            or schema not in schemas
+            or set(reference)
+            != identity_fields | {"schema_version"} | ({"source_use_version"} if v2 else set())
+            or any(
+                not isinstance(reference[key], str) or not 1 <= len(reference[key]) <= 256
+                for key in identity_fields
+            )
+            or any(
+                _ID.fullmatch(reference[key]) is None
+                for key in ("source_id", "source_digest", "request_digest")
+            )
+            or v2
+            and (
+                type(reference["source_use_version"]) is not int
+                or not 0 <= reference["source_use_version"] <= 2**31 - 1
+            )
+        ):
+            return False
+    if current == retained:
+        return True
+    return (
+        retained["schema_version"] == "skeleton.dragon.crawler_reference.v1"
+        and current["schema_version"] == "skeleton.dragon.crawler_reference.v2"
+        and current["source_use_version"] == 0
+        and all(current[key] == retained[key] for key in identity_fields)
+    )
+
+
 async def _annotated_candidate(scope: dict, candidate: dict) -> dict:
     try:
         await _assert_candidate(scope, candidate, approved=candidate["state"] == "approved")
@@ -397,7 +441,7 @@ async def review_candidate(scope: dict, identifier: str, request: dict) -> dict:
         evidence = await crawler_application.source_evidence(
             scope, candidate["session_id"], candidate["source_id"]
         )
-        if evidence["reference"] != candidate["source_ref"]:
+        if not _same_review_source_reference(evidence["reference"], candidate["source_ref"]):
             raise KnowledgeError("source identity changed")
         with _library() as (_, reviews):
             reviews.validate_approval(owner, identifier, request, evidence["source"]["text"])
@@ -423,7 +467,7 @@ async def resume_review(scope: dict, identifier: str, review_id: str) -> dict:
         evidence = await crawler_application.source_evidence(
             scope, candidate["session_id"], candidate["source_id"]
         )
-        if evidence["reference"] != candidate["source_ref"]:
+        if not _same_review_source_reference(evidence["reference"], candidate["source_ref"]):
             raise KnowledgeError("source identity changed")
         with _library() as (_, reviews):
             value = reviews.finish_review(owner, identifier, intent, evidence["source"]["text"])

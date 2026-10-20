@@ -23,7 +23,7 @@ from skeleton.ai.model_runtime import (
     RuntimeContractError,
 )
 from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA
-from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+from skeleton.ai.model_runtime.tokenization import TokenSequence, TokenizerContractError
 from skeleton.skills.tool_contract import (
     ToolContractError,
     validate_json_schema,
@@ -34,6 +34,7 @@ from .local import (
     LocalInferenceCancelled,
     LocalInferenceRequest,
     LocalInferenceResult,
+    LocalPreparedInput,
     LocalToolCall,
 )
 
@@ -62,6 +63,7 @@ class NativeRuntimeLocalModel:
         self._model_digest = runtime.model_digest
         self._runtime_digest = identity.identity_digest
         self._tokenizer_digest = runtime.tokenizer.digest
+        self._preparation_issuer = object()
 
     @property
     def model_digest(self) -> str:
@@ -121,15 +123,78 @@ class NativeRuntimeLocalModel:
         return dict(checkpoint)
 
     def count_input_tokens(self, request: LocalInferenceRequest) -> int:
+        return self.prepare_input(request).input_tokens
+
+    def prepare_input(
+        self,
+        request: LocalInferenceRequest,
+        *,
+        scope_digest: str | None = None,
+    ) -> LocalPreparedInput:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
+        limits = self.generation_limits()
+        rendered = self._render_prompt(request)
+        if len(rendered) > limits["tokenizer_max_chars"]:
+            raise NativeRuntimeBackendError("native request exceeds tokenizer character budget")
+        sequence = self.runtime.encode(rendered)
+        count = len(sequence.token_ids)
+        if (
+            count > limits["context_window"]
+            or count + request.max_output_tokens > limits["max_total_tokens"]
+            or request.max_output_tokens > limits["max_output_tokens"]
+        ):
+            raise NativeRuntimeBackendError("native prepared input exceeds activated generation limits")
+        return LocalPreparedInput(
+            request_digest=request.digest,
+            model_digest=self._model_digest,
+            runtime_digest=self._runtime_digest,
+            execution_profile_digest=self.execution_profile_digest,
+            tokenizer_digest=self._tokenizer_digest,
+            source_digest=hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
+            sequence_digest=sequence.digest,
+            input_tokens=count,
+            scope_digest=scope_digest,
+            token_sequence=sequence,
+            issuer=self._preparation_issuer,
+        )
+
+    def validate_prepared_input(self, request: LocalInferenceRequest, prepared: LocalPreparedInput) -> None:
         self.assert_identity()
-        return len(self.runtime.encode(self._render_prompt(request)).token_ids)
+        if not isinstance(prepared, LocalPreparedInput):
+            raise NativeRuntimeBackendError("native prepared input contract is invalid")
+        rendered_digest = hashlib.sha256(self._render_prompt(request).encode("utf-8")).hexdigest()
+        prepared.assert_binding(
+            request,
+            issuer=self._preparation_issuer,
+            model_digest=self._model_digest,
+            runtime_digest=self._runtime_digest,
+            execution_profile_digest=self.execution_profile_digest,
+            tokenizer_digest=self._tokenizer_digest,
+            source_digest=rendered_digest,
+        )
+        sequence = prepared.token_sequence
+        if (
+            not isinstance(sequence, TokenSequence)
+            or type(sequence.token_ids) is not tuple
+            or sequence.tokenizer_digest != self._tokenizer_digest
+            or sequence.source_text_digest != rendered_digest
+            or len(sequence.token_ids) != prepared.input_tokens
+            or sequence.digest != prepared.sequence_digest
+            or any(
+                type(token) is not int or not 0 <= token < self.runtime.tokenizer.vocab_size
+                for token in sequence.token_ids
+            )
+        ):
+            raise NativeRuntimeBackendError("native prepared token sequence changed after admission")
 
     def generation_limits(self) -> dict[str, Any]:
         """Expose activated sliding-context and tokenizer admission ceilings."""
 
         self.assert_identity()
+        return self._declared_generation_limits()
+
+    def _declared_generation_limits(self) -> dict[str, Any]:
         tokenizer_limits = self.runtime.tokenizer.limits
         return {
             "context_window": min(self.runtime.limits.max_context, tokenizer_limits.max_tokens),
@@ -417,6 +482,18 @@ class NativeRuntimeLocalModel:
         request: LocalInferenceRequest,
         cancel: threading.Event,
     ) -> LocalInferenceResult:
+        if not isinstance(cancel, threading.Event):
+            raise TypeError("cancel must be threading.Event")
+        if cancel.is_set():
+            raise LocalInferenceCancelled("native local inference cancelled")
+        return self.infer_prepared(request, cancel, self.prepare_input(request))
+
+    def infer_prepared(
+        self,
+        request: LocalInferenceRequest,
+        cancel: threading.Event,
+        prepared: LocalPreparedInput,
+    ) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
         if not isinstance(cancel, threading.Event):
@@ -424,7 +501,8 @@ class NativeRuntimeLocalModel:
         if cancel.is_set():
             raise LocalInferenceCancelled("native local inference cancelled")
 
-        limits = self.generation_limits()
+        self.validate_prepared_input(request, prepared)
+        limits = self._declared_generation_limits()
         if request.max_output_tokens > limits["max_output_tokens"]:
             raise NativeRuntimeBackendError("native request exceeds the admitted output-token budget")
         execution_profile = self.execution_profile_digest
@@ -447,10 +525,7 @@ class NativeRuntimeLocalModel:
                 raise LocalInferenceCancelled("native local inference cancelled")
 
         try:
-            rendered_input = self._render_prompt(request)
-            if len(rendered_input) > limits["tokenizer_max_chars"]:
-                raise NativeRuntimeBackendError("native request exceeds the tokenizer character budget")
-            prompt_sequence = self.runtime.encode(rendered_input)
+            prompt_sequence = prepared.token_sequence
             input_tokens = len(prompt_sequence.token_ids)
             if input_tokens > limits["context_window"]:
                 raise NativeRuntimeBackendError("native request exceeds the admitted context budget")

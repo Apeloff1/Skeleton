@@ -42,14 +42,33 @@ export type StudioGoal = {
   model_calls: number; max_model_calls: number; jobs_started: number; max_jobs: number; max_output_tokens?: number;
   expires_at?: string; last_step?: Record<string, unknown> | null; steps: Record<string, unknown>[];
   error?: string | Record<string, unknown> | null; pending_job_id?: string | null;
-  recovery?: { can_retry: boolean; can_resume: boolean; can_renew: boolean; target: StudioGoalRetryTarget | null; reason?: string | null; pending_kind?: string | null; pending_id?: string | null; legacy_read_only?: boolean; can_new_planner_attempt?: boolean; can_restore_incumbent?: boolean; restore_incumbent_reason?: string | null; reconciliation_only?: boolean; remaining_steps?: number; remaining_model_calls?: number; remaining_jobs?: number; pending_status?: string | null; child_resume_available?: boolean; child_terminal?: boolean; automatic_continuation_available?: boolean; next_action?: 'wait' | 'retry' | 'advance' | 'inspect_dependency' | 'resume' | 'authorize' | 'inspect' };
+  recovery?: { can_retry: boolean; can_resume: boolean; can_renew: boolean; target: StudioGoalRetryTarget | null; reason?: string | null; pending_kind?: string | null; pending_id?: string | null; legacy_read_only?: boolean; can_new_planner_attempt?: boolean; can_restore_incumbent?: boolean; restore_incumbent_reason?: string | null; reconciliation_only?: boolean; remaining_steps?: number; remaining_model_calls?: number; remaining_jobs?: number; pending_status?: string | null; child_resume_available?: boolean; child_terminal?: boolean; automatic_continuation_available?: boolean; next_action?: 'wait' | 'retry' | 'advance' | 'inspect_dependency' | 'resume' | 'authorize' | 'inspect'; source_refresh_available?: boolean; source_refresh_reason?: string | null; observed_project_version?: number | null; observed_tree_digest?: string | null };
   integrity?: { status: string; history_digest?: string | null; state_digest?: string | null }; outcome?: { completion_reason?: string | null; goal_satisfaction_verified: false };
   completion_mode?: StudioCompletionMode; completion_requirements?: string[]; completion?: { verified: boolean; missing?: string[]; checks?: Record<string, { verified: boolean; [key: string]: unknown }>; scope?: string; receipt_digest?: string };
   workflow?: { remaining_actions: number; active: boolean };
   quality_gate?: StudioQualityPolicy; quality?: StudioQualityProgress;
   adaptive_learning?: StudioNumericAdaptation;
+  candidate_feedback?: StudioCandidateFeedback;
+  source_refresh_receipts?: StudioSourceRefreshReceipt[];
+  last_advance?: { key: string; digest: string; start_cursor?: number; end_cursor?: number; planner_decisions?: number; work_wait_ms?: number; yield_reason?: string; interrupted?: boolean } | null;
   [key: string]: unknown;
 };
+export type StudioCandidateFeedback = {
+  schema_version: 'skeleton.game.studio_candidate_feedback.v1';
+  baseline: { job_id: string; review_digest: string }; source_head_digest: string; source_current: boolean;
+  excluded_unmatched_reviews: number; training_authorized: false; production_authority: false;
+  rounds: { review_job_id: string; review_digest: string; head_digest: string;
+    status: 'accepted' | 'rejected'; edit_step_digests: string[]; edit_payload_digests: string[];
+    failures: { code: string; [key: string]: unknown }[]; regressions: string[];
+    restored: boolean; applicable_to_current_tree: boolean; feedback_digest: string }[];
+};
+export type StudioSourceRefreshReceipt = {
+  schema_version: 'skeleton.game.studio_source_refresh.v1'; key: string; digest: string;
+  previous_head_version: number; previous_head_digest: string; head_version: number; head_digest: string;
+  revision_id: string; revision_request_digest: string; discarded_workflow_digest: string; discarded_workflow_actions: number;
+  numeric_source_compatible: boolean; grants_changed: false; counters_reset: false; receipt_digest: string;
+};
+export type StudioAdvanceOptions = { maxPlannerDecisions?: number; waitForWorkSeconds?: number };
 export type StudioNumericAdaptation = {
   schema_version: 'skeleton.game.studio_numeric_adaptation.v1'; status: string;
   context_digest?: string | null; checkpoint_digest?: string | null;
@@ -71,6 +90,43 @@ function boundedInteger(value: unknown, minimum: number, maximum: number): value
   return Number.isSafeInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
 }
 function digest(value: unknown): value is string { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value); }
+function studioContinuity(value: StudioGoal) {
+  const recovery = value?.recovery;
+  if (recovery && (recovery.source_refresh_available !== undefined && typeof recovery.source_refresh_available !== 'boolean'
+    || recovery.source_refresh_reason != null && (typeof recovery.source_refresh_reason !== 'string' || recovery.source_refresh_reason.length > 512)
+    || recovery.observed_project_version != null && !boundedInteger(recovery.observed_project_version, 1, Number.MAX_SAFE_INTEGER)
+    || recovery.observed_tree_digest != null && !digest(recovery.observed_tree_digest)
+    || recovery.source_refresh_available === true && (!boundedInteger(recovery.observed_project_version, 1, Number.MAX_SAFE_INTEGER) || !digest(recovery.observed_tree_digest)))) invalid('The current source refresh authority is invalid.');
+  const feedback = value?.candidate_feedback;
+  if (feedback && (feedback.schema_version !== 'skeleton.game.studio_candidate_feedback.v1'
+    || !feedback.baseline || typeof feedback.baseline.job_id !== 'string' || !digest(feedback.baseline.review_digest)
+    || !digest(feedback.source_head_digest) || typeof feedback.source_current !== 'boolean'
+    || feedback.training_authorized !== false || feedback.production_authority !== false
+    || !boundedInteger(feedback.excluded_unmatched_reviews, 0, 16)
+    || !Array.isArray(feedback.rounds) || feedback.rounds.length > 4
+    || feedback.rounds.some(round => !round || typeof round.review_job_id !== 'string' || !digest(round.review_digest) || !digest(round.head_digest)
+      || !['accepted', 'rejected'].includes(round.status) || !digest(round.feedback_digest)
+      || !Array.isArray(round.edit_step_digests) || round.edit_step_digests.length < 1 || round.edit_step_digests.length > 16 || round.edit_step_digests.some(item => !digest(item))
+      || !Array.isArray(round.edit_payload_digests) || round.edit_payload_digests.length !== round.edit_step_digests.length || round.edit_payload_digests.some(item => !digest(item))
+      || !Array.isArray(round.failures) || round.failures.length > 5 || round.failures.some(item => !item || typeof item.code !== 'string' || item.code.length > 128)
+      || !Array.isArray(round.regressions) || round.regressions.length > 128 || round.regressions.some(item => typeof item !== 'string' || item.length > 512)
+      || typeof round.restored !== 'boolean' || typeof round.applicable_to_current_tree !== 'boolean'))) invalid('The measured candidate feedback is invalid.');
+  const refreshes = value?.source_refresh_receipts;
+  if (refreshes && (!Array.isArray(refreshes) || refreshes.length > 16 || refreshes.some(item => !item
+    || item.schema_version !== 'skeleton.game.studio_source_refresh.v1' || !digest(item.digest) || !digest(item.receipt_digest)
+    || !digest(item.previous_head_digest) || !digest(item.head_digest) || !digest(item.revision_request_digest) || !digest(item.discarded_workflow_digest)
+    || !boundedInteger(item.previous_head_version, 1, Number.MAX_SAFE_INTEGER) || !boundedInteger(item.head_version, item.previous_head_version + 1, Number.MAX_SAFE_INTEGER)
+    || typeof item.revision_id !== 'string' || !item.revision_id || item.revision_id.length > 128
+    || !boundedInteger(item.discarded_workflow_actions, 0, 4) || typeof item.numeric_source_compatible !== 'boolean'
+    || item.grants_changed !== false || item.counters_reset !== false))) invalid('The exact source refresh receipt is invalid.');
+  const advance = value?.last_advance;
+  if (advance && (!digest(advance.digest) || typeof advance.key !== 'string' || !advance.key || advance.key.length > 512
+    || advance.start_cursor !== undefined && !boundedInteger(advance.start_cursor, 0, 16)
+    || advance.end_cursor !== undefined && !boundedInteger(advance.end_cursor, advance.start_cursor ?? 0, 16)
+    || advance.planner_decisions !== undefined && !boundedInteger(advance.planner_decisions, 0, 4)
+    || advance.work_wait_ms !== undefined && !boundedInteger(advance.work_wait_ms, 0, 10000)
+    || advance.yield_reason !== undefined && !['goal_boundary', 'time_slice_elapsed', 'waiting_for_work', 'batch_step_limit', 'batch_model_limit', 'planner_pending'].includes(advance.yield_reason))) invalid('The bounded advance continuation receipt is invalid.');
+}
 function qualityPolicy(value: StudioQualityPolicy): StudioQualityPolicy {
   if (!value || value.schema_version !== 'skeleton.game.studio_quality_policy.v1'
     || !boundedInteger(value.max_refinement_rounds, 1, 4) || !boundedInteger(value.min_available_frames, 1, 25)
@@ -118,6 +174,7 @@ function qualityProgress(value: StudioQualityProgress, projectId: string): void 
   if (value.verified && (!value.baseline || !candidate || value.failures.length)) invalid('The accepted quality receipt is incomplete.');
 }
 function goal(value: StudioGoal, projectId?: string) {
+  studioContinuity(value);
   if (value?.max_output_tokens !== undefined && (!Number.isSafeInteger(value.max_output_tokens) || value.max_output_tokens < 256 || value.max_output_tokens > 4096)) invalid('The persisted AI decision-token budget is invalid.');
   if (value?.completion_mode !== undefined && !['native', 'original'].includes(value.completion_mode)) invalid('The saved goal workflow mode is invalid.');
   if (value?.quality_gate) qualityPolicy(value.quality_gate);
@@ -148,7 +205,27 @@ function goal(value: StudioGoal, projectId?: string) {
 export async function listStudioGoals(projectId: string, input: LearningRequest = {}) { const result = await request<{ goals: StudioGoal[] }>('get', '/projects/' + id(projectId) + '/goals', null, input); if (!Array.isArray(result.goals) || result.goals.length > 128) invalid('The goal history exceeds its bounds.'); return result.goals.map(value => goal(value, projectId)); }
 export async function getStudioGoal(goalId: string, input: LearningRequest = {}) { const result = await request<{ goal: StudioGoal }>('get', '/goals/' + id(goalId), null, input); const value = goal(result.goal); if (value.goal_id !== goalId) invalid('A different studio goal was returned.'); return value; }
 export async function createStudioGoal(project: LearningProject, config: StudioGoalConfig, input: LearningRequest = {}, key = learningRequestKey('studio-goal')) { if (config.completionMode === 'original' && config.completionRequirements?.length && project.files?.some(file => ['game/editor/console.json', 'game/studio/session.json'].includes(file.path))) throw new Error('Use a separate original-game project for the desktop workflow.'); const supported = config.completionMode === 'original' ? ['edit', 'simulate', 'review', 'package', 'export'] : ['edit', 'build', 'preview', 'export']; if (config.completionRequirements && (config.completionRequirements.length > supported.length || new Set(config.completionRequirements).size !== config.completionRequirements.length || config.completionRequirements.some(requirement => !supported.includes(requirement)))) throw new Error('Choose completion requirements supported by this workflow.'); const quality = config.qualityGate ? qualityPolicy(config.qualityGate) : undefined; if (quality && (config.executionMode !== 'run' || config.completionMode !== 'original' || !config.completionRequirements?.includes('simulate') || !config.completionRequirements?.includes('review') || quality.restore_on_regression && !config.allowEdits)) throw new Error('Measured acceptance requires an original-game run with simulation and review; restoration also requires the explicit edit grant.'); if (!boundedInteger(config.maxJobs, 0, 8)) throw new Error('Choose a background-job budget between 0 and 8.'); const outputTokens = config.max_output_tokens ?? 1024; if (!Number.isSafeInteger(outputTokens) || outputTokens < 256 || outputTokens > 4096) throw new Error('Choose an AI decision-token budget between 256 and 4096.'); const result = await request<{ goal: StudioGoal }>('post', '/projects/' + id(project.project_id) + '/goals', { expected_version: project.version, idempotency_key: key, goal: config.goal, max_steps: config.maxSteps, execution_mode: config.executionMode, allow_edits: config.allowEdits, authorization_seconds: config.authorizationSeconds, max_model_calls: config.maxModelCalls, max_jobs: config.maxJobs, max_output_tokens: outputTokens, completion_requirements: config.completionRequirements, ...(quality ? { quality_gate: quality } : {}), ...(config.completionMode ? { completion_mode: config.completionMode } : {}) }, input, key); const value = goal(result.goal, project.project_id); if (value.max_output_tokens !== outputTokens) invalid('The issued goal differs from the requested decision-token budget.'); if (config.completionMode && value.completion_mode !== config.completionMode) invalid('The issued goal differs from the requested workflow mode.'); if (quality && JSON.stringify(qualityPolicy(value.quality_gate!)) !== JSON.stringify(quality)) invalid('The issued quality policy differs from the requested acceptance bounds.'); return value; }
-export async function advanceStudioGoal(current: StudioGoal, steps: number, input: LearningRequest = {}, key = learningRequestKey('studio-advance')) { const result = await request<{ goal: StudioGoal }>('post', '/goals/' + id(current.goal_id) + '/advance', { expected_goal_version: current.version, idempotency_key: key, steps }, input, key); const value = goal(result.goal, current.project_id); if (value.goal_id !== current.goal_id) invalid('A different studio goal was advanced.'); return value; }
+export async function advanceStudioGoal(current: StudioGoal, steps: number, input: LearningRequest = {}, key = learningRequestKey('studio-advance'), options: StudioAdvanceOptions = {}) {
+  if (!boundedInteger(steps, 1, 4) || options.maxPlannerDecisions !== undefined && !boundedInteger(options.maxPlannerDecisions, 1, 4)
+    || options.waitForWorkSeconds !== undefined && !boundedInteger(options.waitForWorkSeconds, 0, 10)) invalid('Choose bounded advance steps, AI decisions and issued-work waiting.');
+  const result = await request<{ goal: StudioGoal }>('post', '/goals/' + id(current.goal_id) + '/advance', {
+    expected_goal_version: current.version, idempotency_key: key, steps,
+    ...(options.maxPlannerDecisions !== undefined ? { max_planner_decisions: options.maxPlannerDecisions } : {}),
+    ...(options.waitForWorkSeconds !== undefined ? { wait_for_work_seconds: options.waitForWorkSeconds } : {}),
+  }, input, key);
+  const value = goal(result.goal, current.project_id); if (value.goal_id !== current.goal_id) invalid('A different studio goal was advanced.'); return value;
+}
+export async function refreshStudioGoalSource(current: StudioGoal, input: LearningRequest = {}, key = learningRequestKey('studio-source-refresh')) {
+  const recovery = current.recovery;
+  if (recovery?.source_refresh_available !== true || !boundedInteger(recovery.observed_project_version, 1, Number.MAX_SAFE_INTEGER) || !digest(recovery.observed_tree_digest)) invalid('Inspect the exact current source before explicitly refreshing this goal.');
+  const result = await request<{ goal: StudioGoal }>('post', '/goals/' + id(current.goal_id) + '/source-refresh', {
+    expected_goal_version: current.version, idempotency_key: key,
+    expected_project_version: recovery.observed_project_version, expected_tree_digest: recovery.observed_tree_digest,
+  }, input, key);
+  const value = goal(result.goal, current.project_id);
+  if (value.goal_id !== current.goal_id || value.head_version !== recovery.observed_project_version) invalid('The refreshed goal differs from the exact acknowledged source.');
+  return value;
+}
 export async function controlStudioGoal(current: StudioGoal, action: 'pause' | 'resume' | 'cancel', input: LearningRequest = {}, key = learningRequestKey('studio-' + action)) { const result = await request<{ goal: StudioGoal }>('post', '/goals/' + id(current.goal_id) + '/control', { expected_goal_version: current.version, idempotency_key: key, action }, input, key); const value = goal(result.goal, current.project_id); if (value.goal_id !== current.goal_id) invalid('A different studio goal was controlled.'); return value; }
 export async function retryStudioGoal(current: StudioGoal, target: StudioGoalRetryTarget, input: LearningRequest = {}, key = learningRequestKey('studio-retry'), newPlannerAttempt = false) { if (!['planner', 'action', 'job', 'play', 'reconcile', 'restore_incumbent'].includes(target) || newPlannerAttempt && target !== 'planner') invalid('This operation cannot be recovered through the studio assistant.'); const result = await request<{ goal: StudioGoal }>('post', '/goals/' + id(current.goal_id) + '/retry', { expected_goal_version: current.version, idempotency_key: key, target, new_planner_attempt: newPlannerAttempt }, input, key); const value = goal(result.goal, current.project_id); if (value.goal_id !== current.goal_id) invalid('A different studio goal was recovered.'); return value; }
 export async function authorizeStudioGoal(current: StudioGoal, authorizationSeconds: number, input: LearningRequest = {}, key = learningRequestKey('studio-authorization')) { if (!Number.isSafeInteger(authorizationSeconds) || authorizationSeconds < 60 || authorizationSeconds > 3600) throw new Error('Renew this goal for between 1 and 60 minutes.'); const result = await request<{ goal: StudioGoal }>('post', '/goals/' + id(current.goal_id) + '/authorization', { expected_goal_version: current.version, idempotency_key: key, authorization_seconds: authorizationSeconds }, input, key); const value = goal(result.goal, current.project_id); if (value.goal_id !== current.goal_id) invalid('A different studio goal was authorized.'); return value; }

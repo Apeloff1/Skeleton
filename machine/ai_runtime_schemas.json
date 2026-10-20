@@ -2518,6 +2518,159 @@
         "continuation id and monotonic attempts remain unchanged; ordinary idle admission still controls execution",
         "retry is an explicit queue-only operation with existing durable owner audit, no global policy CAS or automatic effect replay claim"
       ]
+    },
+    "RuntimeOptimizationPolicyPatch": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "actor_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "expected_version": {
+          "type": "PositiveInt"
+        },
+        "serving": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "learning": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "maintenance": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "serving_route_id": {
+          "type": "string",
+          "nullable": true,
+          "min_length": 1,
+          "max_length": 384
+        }
+      },
+      "invariants": [
+        "Pure skeleton/contracts/runtime_optimization.py enumerates strict editable scalar fields, finite bounds, units, scopes and max_patch_bytes16384; same existing owners validate merged policies before atomic CAS.",
+        "GET runtime-control.policy_controls projects the same catalog plus actual local route/global operator ceilings and availability; UI uses observed fields and explicit version-bound drafts only.",
+        "Serving and maintenance scope is host, learning scope is authenticated tenant; static operator capacity cannot be increased by adaptive policy.",
+        "Maintenance maximum_owner_heartbeat_ms is at least10000 with a15000 default to accommodate the existing five-second engine idle tick; source-cold/stale coordination stays blocked.",
+        "Stale policy version is409, bad type/field/bounds422, missing authority403; commands are not automatically retried or applied after conflicts."
+      ]
+    },
+    "RuntimeLearningDatasetExport": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "actor_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "limit": {
+          "type": "PositiveInt",
+          "maximum": 256
+        },
+        "cursor": {
+          "type": "string",
+          "nullable": true,
+          "maximum_utf8_bytes": 6144
+        },
+        "partition_id": {
+          "type": "Digest256",
+          "nullable": true
+        },
+        "include_untrained": {
+          "type": "boolean"
+        }
+      },
+      "invariants": [
+        "Admin plus sealed existing runtime-control service grant; only retained numeric diagnostics in authenticated tenant/scope are eligible. Default page128, max256 candidates with metadata-only canonical provenance checks.",
+        "Keyset cursor binds tenant/scope/filters/feature schema and fixed first-page watermark using observed_at,execution_id; current repository cursor cap4096 bytes fits the6144-byte transport bound.",
+        "Rows bind request/result/checkpoint/model/source/outcome identities, twelve finite features, three numeric operational targets and exact acceptance status; no raw prompt, response or tool payload.",
+        "Additive terminal result learning_policy_version and learning_policy_digest bind actual terminal-transaction policy; legacy values are unknown rather than inferred from present policy.",
+        "Retention and late arrivals can change membership between pages; canonical old result content is not reconstructed and pages are not an immutable full-history snapshot."
+      ]
+    },
+    "RuntimeLearningDatasetEnvelope": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "actor_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "schema_version": {
+          "type": "string",
+          "allowed_values": [
+            "skeleton.ai.runtime_learning_dataset.v1"
+          ]
+        },
+        "dataset_json": {
+          "type": "string",
+          "maximum_utf8_bytes": 1048576
+        }
+      },
+      "invariants": [
+        "Opaque canonical JSON contains skeleton.runtime.learning.dataset.v1, actor-bound tenant/scope, numeric schema/normalizers, filters, retained rows, omission reasons, watermark/window, next_cursor, retention limits and dataset_digest.",
+        "Whole page and each numeric sample have deterministic content digests; preserve exact dataset_json on download and use parsed content only for bounded preview.",
+        "Escaped transport cap3145728 bytes; explicit one-page fetch and next-page action only, account/filter changes discard stale observations and continuation.",
+        "Export is not provider training, activation, promotion, creative quality evidence or any grant of additional resources."
+      ]
+    },
+    "RuntimeMaintenanceCircuitReset": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "actor_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "kind": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "expected_generation": {
+          "type": "PositiveInt",
+          "maximum": 8999999999999999
+        },
+        "expected_failure_digest": {
+          "type": "Digest256"
+        },
+        "source_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "Admin plus sealed engine service grant; scope derives from authenticated tenant, exact current kind/generation/failure/source must match the same durable circuit row transaction.",
+        "Deny running/held physical custody and legacy unbound failures. Reset only breaker counters/cooldown; task backoff, original continuation, handler pins and enabled policy remain authoritative.",
+        "Generation monotonically increases across success, failure and reset; exact repeated reset deduplicates only its own generation with no intervening transition.",
+        "Envelope schema skeleton.ai.runtime_maintenance_circuit_reset.v1 echoes actor/tenant/kind and returns result plus current runtime; result closed/failures0/open_until_ns0 and generation expected+1.",
+        "Result includes exact scope_id,kind,generation,source_digest,failure_digest,deduplicated; snapshot reports explicit resettable/reset_reason. No HTTP auto-retry."
+      ]
     }
   },
   "cross_record_invariants": [

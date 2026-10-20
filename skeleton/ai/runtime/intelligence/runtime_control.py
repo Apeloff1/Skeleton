@@ -18,6 +18,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from skeleton.contracts.runtime_optimization import (
+    runtime_policy_controls,
+    validate_runtime_policy_patch,
+)
+
 SCHEMA_VERSION = "skeleton.ai.runtime_control.v1"
 ACTIONS = frozenset({"trim_cache", "clear_cache", "drain", "resume"})
 
@@ -532,6 +537,27 @@ class RuntimeOptimizationControl:
             "state": "degraded" if self._maintenance_coordination_error else "observed",
             "error_code": self._maintenance_coordination_error,
         }
+        controls = runtime_policy_controls()
+        controls["serving"].update(
+            available=bool(routes),
+            route_limits={
+                row["route_id"]: {
+                    "max_concurrency": row["engine"].max_concurrency,
+                    "max_queue_size": row["engine"].max_queue_size,
+                }
+                for row in routes
+            },
+            global_limits={
+                "max_concurrency": min((row["engine"].max_concurrency for row in routes), default=0),
+                "max_queue_size": min((row["engine"].max_queue_size for row in routes), default=0),
+            },
+        )
+        controls["learning"]["available"] = True
+        controls["maintenance"]["available"] = (
+            bool(maintenance.get("available"))
+            and not self._maintenance_coordination_error
+            and maintenance.get("status", {}).get("coordination_state") == "synchronized"
+        )
         execution: dict[str, Any] = {"available": False}
         if self._supervision_probe is not None:
             try:
@@ -561,6 +587,7 @@ class RuntimeOptimizationControl:
             "learning": learning,
             "maintenance": maintenance,
             "execution": execution,
+            "policy_controls": controls,
             "ratchet": {
                 "available": False,
                 "reason": "campaign_owned_observatory",
@@ -586,18 +613,14 @@ class RuntimeOptimizationControl:
             raise ValueError("expected_version must be positive")
         if all(value is None for value in (serving, learning, maintenance, action)):
             raise ValueError("runtime control patch is empty")
-        for label, values, fields in (
-            ("serving", serving, {"enabled", "max_effective_concurrency"}),
-            ("learning", learning, {"enabled"}),
-            ("maintenance", maintenance, {"enabled", "augmentation_enabled"}),
+        for label, values in (
+            ("serving", serving),
+            ("learning", learning),
+            ("maintenance", maintenance),
         ):
             if values is None:
                 continue
-            if not isinstance(values, Mapping) or not values or set(values) - fields:
-                raise ValueError(f"invalid {label} policy fields")
-            for flag in {"enabled", "augmentation_enabled"}.intersection(values):
-                if type(values[flag]) is not bool:
-                    raise ValueError(f"{label} {flag} must be boolean")
+            validate_runtime_policy_patch(label, values)
         if action is not None and action not in ACTIONS:
             raise ValueError("unsupported runtime maintenance action")
         if serving_route_id is not None and serving is None and action is None:
@@ -631,7 +654,11 @@ class RuntimeOptimizationControl:
                     overrides[serving_route_id] = {**overrides.get(serving_route_id, {}), **dict(serving)}
                     policy["serving_routes"] = overrides
             if maintenance is not None:
-                policy["maintenance"] = {**policy.get("maintenance", {}), **dict(maintenance)}
+                from skeleton.jeeves.ai.studio_maintenance import StudioMaintenancePolicy
+
+                desired = {**policy.get("maintenance", {}), **dict(maintenance)}
+                StudioMaintenancePolicy.from_mapping(desired)
+                policy["maintenance"] = desired
             if action is not None:
                 # Keep independent bounded epochs: an intervening command on
                 # another model, or a trim after a clear, must not erase work
@@ -714,6 +741,73 @@ class RuntimeOptimizationControl:
             "task_id": task_id,
             "result": result,
             "runtime": self.snapshot(actor_id=actor_id, tenant_id=tenant_id),
+        }
+
+    def reset_maintenance_circuit(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        kind: str,
+        expected_generation: int,
+        expected_failure_digest: str,
+        source_digest: str,
+    ) -> dict[str, Any]:
+        from skeleton.jeeves.ai.idle_learning_scheduler import IdleWorkKind
+
+        _identity(actor_id, "actor_id")
+        _identity(tenant_id, "tenant_id")
+        self._learning_partition(expected_failure_digest)
+        self._learning_partition(source_digest)
+        if type(expected_generation) is not int or not 1 <= expected_generation < 9_000_000_000_000_000:
+            raise ValueError("maintenance circuit requires its observed generation")
+        if self._maintenance is None or self._closed or self._maintenance_coordination_error:
+            raise ValueError("maintenance coordination must be available before circuit reset")
+        result = self._maintenance.reset_circuit(
+            scope_id=self._maintenance_scope(tenant_id),
+            kind=IdleWorkKind(kind),
+            expected_generation=expected_generation,
+            expected_failure_digest=expected_failure_digest,
+            source_digest=source_digest,
+        )
+        return {
+            "schema_version": "skeleton.ai.runtime_maintenance_circuit_reset.v1",
+            "actor_id": actor_id,
+            "tenant_id": tenant_id,
+            "kind": kind,
+            "result": result,
+            "runtime": self.snapshot(actor_id=actor_id, tenant_id=tenant_id),
+        }
+
+    def export_learning_dataset(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        limit: int = 128,
+        cursor: str | None = None,
+        partition_id: str | None = None,
+        include_untrained: bool = False,
+    ) -> dict[str, Any]:
+        _identity(actor_id, "actor_id")
+        _identity(tenant_id, "tenant_id")
+        if partition_id is not None:
+            self._learning_partition(partition_id)
+        dataset = self.repository.runtime_learning_dataset_export(
+            tenant_id=tenant_id,
+            limit=limit,
+            cursor=cursor,
+            partition_id=partition_id,
+            include_untrained=include_untrained,
+        )
+        raw = json.dumps(dataset, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+        if len(raw.encode("utf-8")) > 1024 * 1024:
+            raise ValueError("learning dataset page exceeds its byte bound")
+        return {
+            "schema_version": "skeleton.ai.runtime_learning_dataset.v1",
+            "actor_id": actor_id,
+            "tenant_id": tenant_id,
+            "dataset_json": raw,
         }
 
     @staticmethod

@@ -3616,3 +3616,25 @@ away from the canonical AI plane merely to satisfy an operational target.
 The final production promotion is evidence-only and requires current runtime
 proof. The architectural plan can be complete while `production_claim` remains
 false.
+
+### Runtime operator and learning continuation
+
+The October 2026 construction continuation adds full bounded policy editing,
+retained numeric dataset export, exact maintenance circuit reset, crawler
+source-use revisions and studio source-refresh/serial continuation. The declared
+contract is
+`machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation`;
+typed runtime records live in `machine/ai_runtime_schemas.json`. The pure shared
+field catalog is `skeleton/contracts/runtime_optimization.py`, mirrored through
+the existing contracts mapping. It owns no policy state.
+
+Existing engine SQLite and crawler/studio Mongo authorities remain unchanged.
+Canonical owners validate merged policies, enforce finite grants, pin source and
+failure identities and preserve exact opaque learning export bytes. Fresh CPU
+deltas and platform memory readings support admission; unavailable measurements
+stay unknown. Immutable per-request native input preparation avoids repeated
+tokenization without creating a cross-request token cache. See
+[first-install operations](ai/FIRST_INSTALL_AI_AND_CRAWLER.md) and
+[studio refinement](ai/STUDIO_MEASURED_QUALITY.md) for the explicit controls.
+Source compilation and metadata synchronization grant no model promotion or
+enterprise acceptance.

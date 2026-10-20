@@ -284,6 +284,14 @@ require their existing independent evidence. These controls do not train or
 promote GGUF/transformer weights, select an unrequested model or implicitly
 offload work to an external provider.
 
+**Advanced runtime policy** displays the server's editable fields, units and
+bounds for serving, tenant learning and host maintenance. Serving limits are
+further constrained by the selected model's installed capacity; a host-wide
+change must fit every local route. The form starts from observed values and
+submits only your changes. A changed model or policy version requires an explicit
+review of the draft. Retention settings govern derived numeric diagnostics;
+reducing them can remove retained rows during later bounded cleanup.
+
 Authenticated viewers can inspect state. Only administrators can change policy.
 **Serving and maintenance changes affect the entire host; learning changes affect
 the current tenant.** Idle maintenance is disabled by default. Enabling it admits
@@ -309,6 +317,27 @@ Legacy overflow catches up in bounded chunks and suppresses extra diagnostic
 JSON until capacity is available. Predictor maintenance keeps the newest 2,048
 full acknowledged receipts by default; older verified receipts retain small
 replay tombstones. Unacknowledged receipts are not discarded to meet that target.
+
+Administrators can open **Numeric learning dataset** to preview and download one
+retained page at a time. The default page contains at most 128 candidates; the
+API permits up to 256. Select a partition or include untrained outcomes before
+fetching. Each accepted row includes twelve normalized features, three operational
+targets, usage and exact execution/checkpoint/model/source provenance. Legacy
+policy provenance remains explicitly unknown. Invalid rows are omitted with a
+reason, so an empty page can still have a next page.
+
+Downloads preserve the opaque server `dataset_json` text, bounded to 1 MiB per
+page. **Read next page** uses the returned tenant/filter-bound cursor and a fixed
+first-page high-water mark. Retention and late arrivals can still change page
+membership: this exports retained diagnostics, rather than an immutable archive
+of all past runs. It includes no prompts, answers, tool payloads or provider
+credentials and grants no model-training or promotion authority.
+
+Learner readiness also considers actual outcome age. Stale evidence withholds
+advice; replay, checkpoint import and maintenance cannot make old observations
+fresh. Optimizer health reports measured gradient/update and saturation state.
+Persistent stalls can restore the last healthy predictor and require new
+canonical outcomes before confidence returns.
 
 Measured studio goals have a separate **Learn numeric control suggestions during
 this goal** opt-in. It journals bounded numeric edit observations and predictor
@@ -361,6 +390,13 @@ original continuation under the observed source and attempt count. It grants no
 extra model/action allowance and does not immediately execute or repeat verified
 optimizer work. Failed acknowledgements retry separately after verified cursor
 commit. Result-cache backpressure and unresolved physical custody remain visible.
+An eligible **Review circuit reset** action asks you to review the observed failure,
+source and generation. It clears only that scope's breaker counters and cooldown.
+Task retry/backoff, idle admission and the enabled policy remain in force. Running
+or held work and legacy failures without exact bindings cannot be reset. A stale
+failure or generation requires refreshing and making a new explicit decision.
+Maintenance also reports the age/source of its admission observations and actual
+last telemetry. Missing or stale telemetry does not imply idle capacity.
 
 Execution recovery reports aggregate active work and bounded scan progress.
 Use one engine coordinator and one engine namespace per execution database;
@@ -416,6 +452,16 @@ Cancel stops future acquisition and prevents downstream context reuse. Erase
 removes retained request/source text and fences active publication, retaining
 only the minimal scoped tombstone and deletion receipt. Previously exported
 copies are outside application erasure authority.
+
+In the source library, withdraw an individual capture or set its permitted
+capture age between 60 seconds and 24 hours. Owners can withdraw; editor/admin
+authority is required to restore use or change the age limit. Saved changes use
+the session version and an exact operation key. Conflicts require an explicit
+refresh/reapply. Withdrawing a source removes it from text/context/search/export
+and invalidates queued and reviewed references against the older policy version.
+Restoring it requires a new review before an older reference can be reused.
+Freshness is measured from capture time and consent expiry; the app does not
+claim to have rechecked the remote page. These controls do not recrawl a source.
 
 Captured material remains **unreviewed**. Acquisition does not grant verified
 knowledge status, XP, model-training permission, publication rights or automatic

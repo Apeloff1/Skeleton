@@ -388,16 +388,64 @@ class AIRuntimePolicyPatch(BaseModel):
 
 class AIRuntimeServingPatch(AIRuntimePolicyPatch):
     enabled: bool | None = None
+    min_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
     max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    target_latency_ms: float | None = Field(default=None, ge=100, le=600000)
+    cooldown_seconds: float | None = Field(default=None, ge=0.5, le=300)
+    recovery_samples: int | None = Field(default=None, ge=2, le=128)
+    max_queue_wait_seconds: float | None = Field(default=None, ge=0.05, le=3600)
+    background_max_concurrency: int | None = Field(default=None, ge=0, le=32)
+    cache_max_bytes: int | None = Field(default=None, ge=0, le=1073741824)
+    cache_ttl_seconds: float | None = Field(default=None, ge=0, le=86400)
+    memory_high_watermark: float | None = Field(default=None, ge=0.5, le=0.99)
+    memory_low_watermark: float | None = Field(default=None, ge=0.1, le=0.95)
+    max_active_per_tenant: int | None = Field(default=None, ge=1, le=32)
+    max_queued_per_tenant: int | None = Field(default=None, ge=0, le=65536)
+    background_starvation_seconds: float | None = Field(default=None, ge=0.1, le=3600)
+    memory_shed_watermark: float | None = Field(default=None, ge=0.5, le=1)
 
 
 class AIRuntimeLearningPatch(AIRuntimePolicyPatch):
     enabled: bool | None = None
+    min_samples: int | None = Field(default=None, ge=4, le=10000)
+    replay_capacity: int | None = Field(default=None, ge=8, le=256)
+    replay_steps: int | None = Field(default=None, ge=0, le=3)
+    learning_rate: float | None = Field(default=None, ge=1e-05, le=0.05)
+    gradient_clip: float | None = Field(default=None, ge=0.01, le=5)
+    max_effort_rounds: int | None = Field(default=None, ge=1, le=3)
+    target_latency_seconds: float | None = Field(default=None, ge=0.1, le=86400)
+    pressure_threshold: float | None = Field(default=None, ge=0.1, le=1)
+    uncertainty_ceiling: float | None = Field(default=None, ge=0.05, le=0.75)
+    partition_limit: int | None = Field(default=None, ge=1, le=128)
+    retained_outcomes: int | None = Field(default=None, ge=128, le=100000)
+    outcome_max_age_days: int | None = Field(default=None, ge=1, le=3650)
+    maintenance_receipt_retention: int | None = Field(default=None, ge=16, le=100000)
 
 
 class AIRuntimeMaintenancePatch(AIRuntimePolicyPatch):
     enabled: bool | None = None
     augmentation_enabled: bool | None = None
+    maximum_tasks_per_tick: int | None = Field(default=None, ge=1, le=8)
+    maximum_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_scope_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_retained_tasks: int | None = Field(default=None, ge=1, le=8192)
+    maximum_chunk_wall_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_cpu_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_polls: int | None = Field(default=None, ge=4, le=65536)
+    maximum_memory_drop_ppm: int | None = Field(default=None, ge=0, le=1000000)
+    maximum_consecutive_failures: int | None = Field(default=None, ge=1, le=32)
+    initial_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    maximum_backoff_ms: int | None = Field(default=None, ge=1, le=86400000)
+    preemption_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    circuit_failure_threshold: int | None = Field(default=None, ge=1, le=32)
+    circuit_cooldown_ms: int | None = Field(default=None, ge=1, le=86400000)
+    interrupted_lease_grace_ms: int | None = Field(default=None, ge=1000, le=300000)
+    priority_aging_ms: int | None = Field(default=None, ge=1000, le=86400000)
+    maximum_admission_wait_ms: int | None = Field(default=None, ge=1000, le=3600000)
+    clock_jump_tolerance_ms: int | None = Field(default=None, ge=100, le=60000)
+    maximum_owner_heartbeat_ms: int | None = Field(default=None, ge=10000, le=300000)
+    maximum_chunk_results: int | None = Field(default=None, ge=1, le=16384)
+    maximum_ack_retries_per_tick: int | None = Field(default=None, ge=1, le=16)
 
 
 class AIRuntimeControlUpdate(BaseModel):
@@ -423,6 +471,13 @@ class AIRuntimeMaintenanceRetry(BaseModel):
 
     source_digest: str = Field(pattern="^[0-9a-f]{64}$")
     expected_attempts: int = Field(ge=0, le=1_000_000)
+
+
+class AIRuntimeMaintenanceCircuitReset(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    expected_generation: int = Field(ge=1, le=8_999_999_999_999_999)
+    expected_failure_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
 
 
 class AIRuntimeLearningCheckpointUpdate(BaseModel):
@@ -3785,6 +3840,61 @@ async def export_ai_learning_checkpoint(
         )
     except EngineClientError as exc:
         raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/runtime-control/learning/dataset")
+async def export_ai_learning_dataset(
+    response: Response,
+    limit: int = Query(default=128, ge=1, le=256),
+    cursor: str | None = Query(default=None, min_length=1, max_length=6144),
+    partition_id: str | None = Query(default=None, pattern="^[0-9a-f]{64}$"),
+    include_untrained: bool = Query(default=False),
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = await _runtime_control_engine().export_runtime_learning_dataset(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            limit=limit,
+            cursor=cursor,
+            partition_id=partition_id,
+            include_untrained=include_untrained,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
+async def reset_ai_runtime_maintenance_circuit(
+    kind: str,
+    update: AIRuntimeMaintenanceCircuitReset,
+    response: Response,
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = await _runtime_control_engine().reset_runtime_maintenance_circuit(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            kind=kind,
+            **update.model_dump(mode="json"),
+        )
+    except EngineClientError as exc:
+        error = _runtime_control_error(exc)
+        if isinstance(exc, (EngineConflictError, EngineRequestRejectedError)) and isinstance(
+            error.detail, dict
+        ):
+            error.detail = {
+                **error.detail,
+                "message": "The circuit's failure, generation or physical custody changed.",
+                "action": "Refresh maintenance circuits and review the current failure before resetting.",
+            }
+        raise error from exc
     response.headers["Cache-Control"] = "no-store"
     return result
 

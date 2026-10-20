@@ -195,6 +195,10 @@ now accepts artifacts, GGUF deployments and catalogs, prepares read-only contain
 bindings, supplies required startup secrets and supports explicit administrator
 bootstrap. Runtime status reports model draining, bounded restart recovery,
 learner retention and failed-maintenance retry eligibility.
+The advanced policy form uses the server's actual editable fields and installed
+capacity limits. Administrators can also preview and download bounded pages of
+retained numeric learning data, and reset an eligible maintenance circuit against
+its exact failure, source and generation. Neither action starts training work.
 
 Studio goals can opt into [measured quality refinement](docs/ai/STUDIO_MEASURED_QUALITY.md):
 pin a baseline review, edit the original source, compare a candidate under the
@@ -212,6 +216,14 @@ Its suggestions remain subject to the same source, review and restoration gates.
 Outstanding play/review/editor receipts reconcile even after dispatch budgets are
 used. Eligible measured regressions expose an explicit **Restore incumbent** action
 through the existing source/editor gates, without needing another model response.
+Continuation can process up to four serial decisions per bounded request, within
+the original goal allowance. Explicit **Refresh source** re-pins a manually edited
+project after outstanding work has settled. Matched candidate feedback retains
+rejected and restored rounds for the next planning decision.
+
+The crawler source library supports individual withdrawal and capture-age limits.
+Jeeves excludes withdrawn, expired and stale captures; changing source policy
+invalidates old reference pins until the source is reviewed again.
 
 See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
 and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).

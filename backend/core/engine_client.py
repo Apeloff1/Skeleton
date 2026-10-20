@@ -22,6 +22,7 @@ import json
 import math
 import os
 import re
+from skeleton.contracts.runtime_optimization import validate_runtime_policy_patch
 from time import monotonic
 from typing import Any, Mapping, Sequence
 from urllib.parse import quote
@@ -1595,7 +1596,10 @@ class EngineClient:
     ) -> dict[str, Any]:
         """Accept only the versioned, identity-bound engine control snapshot."""
 
-        if payload.get("schema_version") != "skeleton.ai.runtime_control.v1":
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("schema_version") != "skeleton.ai.runtime_control.v1"
+        ):
             raise EngineProtocolError("engine runtime control schema is incompatible")
         if payload.get("actor_id") != actor_id or payload.get("tenant_id") != tenant_id:
             raise EngineProtocolError("engine runtime control identity mismatch")
@@ -1674,19 +1678,10 @@ class EngineClient:
             if changes is not None:
                 if not isinstance(changes, Mapping) or not changes:
                     raise EngineProtocolError(f"runtime_control.{section} must be a non-empty object")
-                allowed = {
-                    "serving": {"enabled", "max_effective_concurrency"},
-                    "learning": {"enabled"},
-                    "maintenance": {"enabled", "augmentation_enabled"},
-                }[section]
-                if set(changes) - allowed:
-                    raise EngineProtocolError(f"runtime_control.{section} has unsupported policy fields")
-                for name, value in changes.items():
-                    if name in {"enabled", "augmentation_enabled"} and not isinstance(value, bool):
-                        raise EngineProtocolError(f"runtime_control.{section}.{name} must be boolean")
-                    if name == "max_effective_concurrency":
-                        _positive_int(value, "max_effective_concurrency", maximum=32)
-                body[section] = dict(changes)
+                try:
+                    body[section] = validate_runtime_policy_patch(section, changes)
+                except ValueError as exc:
+                    raise EngineProtocolError("runtime policy fields exceed their declared bounds") from exc
         if action is not None:
             if action not in {"trim_cache", "clear_cache", "drain", "resume"}:
                 raise EngineProtocolError("runtime control action is invalid")
@@ -1710,6 +1705,181 @@ class EngineClient:
             surface_validation_rejection=True,
         )
         return self._runtime_control_state(payload, actor_id=actor, tenant_id=tenant)
+
+    async def export_runtime_learning_dataset(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        limit: int = 128,
+        cursor: str | None = None,
+        partition_id: str | None = None,
+        include_untrained: bool = False,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        count = _positive_int(limit, "limit", maximum=256)
+        if type(include_untrained) is not bool:
+            raise EngineProtocolError("runtime learning dataset filter must be boolean")
+        params = {
+            "actor_id": actor,
+            "tenant_id": tenant,
+            "limit": str(count),
+            "include_untrained": "true" if include_untrained else "false",
+        }
+        if cursor is not None:
+            params["cursor"] = _text(cursor, "cursor", maximum=6144)
+        if partition_id is not None:
+            if not isinstance(partition_id, str) or re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+                raise EngineProtocolError("runtime learning dataset partition is invalid")
+            params["partition_id"] = partition_id
+        payload = await self._request(
+            "GET",
+            "/runtime-control/learning/dataset",
+            params=params,
+            trace_id=trace_id,
+            max_response_bytes=3 * 1024 * 1024,
+            surface_validation_rejection=True,
+        )
+        if (
+            payload.get("schema_version") != "skeleton.ai.runtime_learning_dataset.v1"
+            or payload.get("actor_id") != actor
+            or payload.get("tenant_id") != tenant
+        ):
+            raise EngineProtocolError("runtime learning dataset wrapper scope differs")
+        raw = payload.get("dataset_json")
+        if not isinstance(raw, str) or len(raw) > 1024 * 1024:
+            raise EngineProtocolError("runtime learning dataset text exceeds its bound")
+        try:
+            if len(raw.encode("utf-8")) > 1024 * 1024:
+                raise ValueError("dataset page byte bound")
+
+            def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+                value: dict[str, Any] = {}
+                for key, item in pairs:
+                    if key in value:
+                        raise ValueError("duplicate dataset key")
+                    value[key] = item
+                return value
+
+            def reject_constant(_value: str) -> None:
+                raise ValueError("non-finite dataset constant")
+
+            def finite_float(value: str) -> float:
+                number = float(value)
+                if not math.isfinite(number):
+                    raise ValueError("non-finite dataset number")
+                return number
+
+            dataset = json.loads(
+                raw, object_pairs_hook=unique_object, parse_constant=reject_constant, parse_float=finite_float
+            )
+        except (ValueError, RecursionError) as exc:
+            raise EngineProtocolError("runtime learning dataset is not bounded JSON") from exc
+        if (
+            not isinstance(dataset, Mapping)
+            or dataset.get("schema_version") != "skeleton.runtime.learning.dataset.v1"
+            or dataset.get("tenant_id") != tenant
+            or dataset.get("scope_id") != "tenant"
+            or dataset.get("filters")
+            != {"partition_id": partition_id, "include_untrained": include_untrained}
+            or not isinstance(dataset.get("rows"), list)
+            or len(dataset["rows"]) > count
+            or type(dataset.get("row_count")) is not int
+            or dataset["row_count"] != len(dataset["rows"])
+            or type(dataset.get("scanned_rows")) is not int
+            or not len(dataset["rows"]) <= dataset["scanned_rows"] <= count
+            or type(dataset.get("has_more")) is not bool
+        ):
+            raise EngineProtocolError("runtime learning dataset identity or row count differs")
+        continuation = dataset.get("next_cursor")
+        if continuation is not None and (
+            not isinstance(continuation, str) or not 1 <= len(continuation) <= 6144
+        ):
+            raise EngineProtocolError("runtime learning dataset continuation is invalid")
+        if dataset["has_more"] != (continuation is not None):
+            raise EngineProtocolError("runtime learning dataset continuation state differs")
+        try:
+            canonical = json.dumps(
+                {key: value for key, value in dataset.items() if key != "dataset_digest"},
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            expected_digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+            raise EngineProtocolError("runtime learning dataset digest input is invalid") from exc
+        if dataset.get("dataset_digest") != expected_digest:
+            raise EngineProtocolError("runtime learning dataset digest differs")
+        return payload
+
+    async def reset_runtime_maintenance_circuit(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        kind: str,
+        expected_generation: int,
+        expected_failure_digest: str,
+        source_digest: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        kind = _text(kind, "kind", maximum=128)
+        if type(expected_generation) is not int or not 1 <= expected_generation < 9_000_000_000_000_000:
+            raise EngineProtocolError("runtime maintenance circuit generation is invalid")
+        for digest in (expected_failure_digest, source_digest):
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise EngineProtocolError("runtime maintenance circuit failure/source binding is invalid")
+        payload = await self._request(
+            "POST",
+            "/runtime-control/maintenance/circuits/" + quote(kind, safe="") + "/reset",
+            json_body={
+                "actor_id": actor,
+                "tenant_id": tenant,
+                "expected_generation": expected_generation,
+                "expected_failure_digest": expected_failure_digest,
+                "source_digest": source_digest,
+            },
+            trace_id=trace_id,
+            max_response_bytes=384 * 1024,
+            surface_validation_rejection=True,
+        )
+        if (
+            payload.get("schema_version") != "skeleton.ai.runtime_maintenance_circuit_reset.v1"
+            or payload.get("actor_id") != actor
+            or payload.get("tenant_id") != tenant
+            or payload.get("kind") != kind
+        ):
+            raise EngineProtocolError("runtime maintenance circuit wrapper identity differs")
+        result = payload.get("result")
+        expected_scope = (
+            "runtime-tenant-"
+            + hashlib.sha256(
+                json.dumps(tenant, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+            ).hexdigest()[:32]
+        )
+        if (
+            not isinstance(result, Mapping)
+            or result.get("kind") != kind
+            or result.get("scope_id") != expected_scope
+            or type(result.get("generation")) is not int
+            or result.get("generation") != expected_generation + 1
+            or result.get("failure_digest") != expected_failure_digest
+            or result.get("source_digest") != source_digest
+            or result.get("state") != "closed"
+            or type(result.get("failures")) is not int
+            or result.get("failures") != 0
+            or type(result.get("open_until_ns")) is not int
+            or result.get("open_until_ns") != 0
+            or type(result.get("deduplicated")) is not bool
+        ):
+            raise EngineProtocolError("runtime maintenance circuit result binding differs")
+        self._runtime_control_state(payload.get("runtime"), actor_id=actor, tenant_id=tenant)
+        return payload
 
     async def retry_runtime_maintenance(
         self, *, actor_id: str, tenant_id: str, task_id: str,

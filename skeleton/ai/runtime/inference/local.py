@@ -22,11 +22,12 @@ import os
 import random
 import re
 import secrets
+import sys
 import threading
 import time
 from collections import Counter, OrderedDict
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from skeleton.compat.datetime_utc import UTC
 from datetime import datetime
 from typing import Any, Protocol, TypedDict
@@ -50,7 +51,9 @@ from .adaptive_serving import AdaptiveServingController, ServingResources
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
 _RESOURCE_SAMPLE_LOCK = threading.Lock()
-_RESOURCE_CPU_SAMPLE: tuple[float, int, float | None] | None = None
+_RESOURCE_CPU_SAMPLES: dict[str, tuple[float, float, float | None, float | None]] = {}
+_RESOURCE_COLLECTION_LOCK = threading.Lock()
+_RESOURCE_COLLECTION: tuple[float, ServingResources] | None = None
 _ANONYMOUS_TENANT_SCOPE = hashlib.sha256(b"skeleton-local-anonymous-tenant-v1").hexdigest()
 
 
@@ -344,6 +347,74 @@ class LocalInferenceResult:
             if not math.isfinite(latency) or latency < 0:
                 raise ValueError("latency_ms must be finite and non-negative")
             object.__setattr__(self, "latency_ms", latency)
+
+
+@dataclass(frozen=True, slots=True)
+class LocalPreparedInput:
+    """Per-request native tokenization, sealed by its backend and host scope.
+
+    This value is never persisted, shared through a cache, or exposed in
+    status. Native owners validate the immutable token payload before use.
+    """
+
+    request_digest: str
+    model_digest: str
+    runtime_digest: str
+    execution_profile_digest: str | None
+    tokenizer_digest: str
+    source_digest: str
+    sequence_digest: str
+    input_tokens: int
+    scope_digest: str | None
+    token_sequence: Any = field(repr=False, compare=False)
+    issuer: object = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        for name in (
+            "request_digest",
+            "model_digest",
+            "runtime_digest",
+            "tokenizer_digest",
+            "source_digest",
+            "sequence_digest",
+            "execution_profile_digest",
+            "scope_digest",
+        ):
+            value = getattr(self, name)
+            if value is None and name in {"execution_profile_digest", "scope_digest"}:
+                continue
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(ch not in "0123456789abcdef" for ch in value)
+            ):
+                raise ValueError("prepared local input requires immutable SHA-256 bindings")
+        if type(self.input_tokens) is not int or not 1 <= self.input_tokens <= 1_048_576:
+            raise ValueError("prepared local input token count is out of bounds")
+        if self.issuer is None or self.token_sequence is None:
+            raise ValueError("prepared local input requires backend ownership")
+
+    def assert_binding(
+        self,
+        request: LocalInferenceRequest,
+        *,
+        issuer: object,
+        model_digest: str,
+        runtime_digest: str,
+        execution_profile_digest: str | None,
+        tokenizer_digest: str,
+        source_digest: str,
+    ) -> None:
+        if self.issuer is not issuer or self.request_digest != request.digest:
+            raise ValueError("prepared local input request or owner mismatch")
+        if (
+            self.model_digest != model_digest
+            or self.runtime_digest != runtime_digest
+            or self.execution_profile_digest != execution_profile_digest
+            or self.tokenizer_digest != tokenizer_digest
+            or self.source_digest != source_digest
+        ):
+            raise ValueError("prepared local input execution identity drift")
 
 
 class LocalModelBackend(Protocol):
@@ -685,81 +756,667 @@ class _CachedInference:
     size_bytes: int
 
 
-def sample_serving_resources() -> ServingResources:
-    """Best-effort bounded local samples; missing host signals stay unknown."""
-    global _RESOURCE_CPU_SAMPLE  # disposable process-local measurement only
-    memory_used = None
-    available = None
-    rss = None
-    cpu = None
+def _resource_text(path: str, maximum: int = 16_384) -> str:
+    with open(path, encoding="ascii") as handle:
+        value = handle.read(maximum + 1)
+    if len(value) > maximum:
+        raise ValueError("resource metadata exceeds read bound")
+    return value.strip()
+
+
+def _cpu_counter_sample(
+    key: str,
+    total: float,
+    *,
+    idle: float | None = None,
+    capacity: float = 1.0,
+) -> float | None:
+    """Measure a real counter delta; warmup, stale and reset values stay unknown."""
+    now = time.monotonic()
+    if not math.isfinite(total) or total < 0 or not math.isfinite(capacity) or capacity <= 0:
+        return None
+    with _RESOURCE_SAMPLE_LOCK:
+        previous = _RESOURCE_CPU_SAMPLES.get(key)
+        if (
+            previous is None
+            or now - previous[0] > 5.0
+            or total < previous[1]
+            or (idle is not None and (previous[2] is None or idle < previous[2]))
+        ):
+            if key not in _RESOURCE_CPU_SAMPLES and len(_RESOURCE_CPU_SAMPLES) >= 64:
+                del _RESOURCE_CPU_SAMPLES[next(iter(_RESOURCE_CPU_SAMPLES))]
+            _RESOURCE_CPU_SAMPLES[key] = (now, total, idle, None)
+            return None
+        elapsed = now - previous[0]
+        if elapsed < 0.25:
+            return previous[3]
+        delta = total - previous[1]
+        if idle is None:
+            ratio = delta / elapsed / capacity
+        elif delta > 0:
+            ratio = min(1.0, max(0.0, 1.0 - (idle - previous[2]) / delta))
+        else:
+            ratio = None
+        if ratio is not None and (not math.isfinite(ratio) or ratio < 0):
+            ratio = None
+        _RESOURCE_CPU_SAMPLES[key] = (now, total, idle, ratio)
+        return ratio
+
+
+def _cpu_set_size(value: str) -> int | None:
+    if not value:
+        return None
+    count = 0
+    for part in value.split(","):
+        endpoints = part.split("-")
+        if len(endpoints) not in {1, 2}:
+            raise ValueError("invalid CPU set")
+        first = int(endpoints[0])
+        last = int(endpoints[-1])
+        if not 0 <= first <= last <= 1_048_576:
+            raise ValueError("invalid CPU set range")
+        count += last - first + 1
+    return count or None
+
+
+def _linux_cgroup_paths() -> dict[str, tuple[str, str]]:
+    """Resolve this process's cgroup mounts without assuming container roots."""
+    memberships: dict[str, str] = {}
+    for line in _resource_text("/proc/self/cgroup").splitlines():
+        hierarchy, controllers, path = line.split(":", 2)
+        if not path.startswith("/") or ".." in path.split("/"):
+            continue
+        if hierarchy == "0" and not controllers:
+            memberships["v2"] = path
+        for controller in controllers.split(","):
+            if controller:
+                memberships[controller] = path
+    result: dict[str, tuple[str, str]] = {}
+    for line in _resource_text("/proc/self/mountinfo", 131_072).splitlines():
+        left, separator, right = line.partition(" - ")
+        if not separator:
+            continue
+        fields, extra = left.split(), right.split()
+        if len(fields) < 5 or len(extra) < 3 or extra[0] not in {"cgroup", "cgroup2"}:
+            continue
+
+        def unescape(value: str) -> str:
+            for old, new in (("\\040", " "), ("\\011", "\t"), ("\\012", "\n"), ("\\134", "\\")):
+                value = value.replace(old, new)
+            return value
+
+        mount_root, mount = unescape(fields[3]), unescape(fields[4])
+        controllers = ("v2",) if extra[0] == "cgroup2" else tuple(extra[2].split(","))
+        for controller in controllers:
+            path = memberships.get(controller)
+            if path is None:
+                continue
+            if path == "/":
+                relative = ""
+            elif mount_root == "/":
+                relative = path.lstrip("/")
+            elif path == mount_root:
+                relative = ""
+            elif path.startswith(mount_root.rstrip("/") + "/"):
+                relative = path[len(mount_root) :].lstrip("/")
+            else:
+                continue
+            resolved = os.path.normpath(os.path.join(mount, relative))
+            if os.path.commonpath((mount, resolved)) == mount:
+                result[controller] = (resolved, mount)
+    if memberships and not result:
+        raise ValueError("active cgroup membership has no readable mount")
+    return result
+
+
+def _cgroup_ancestors(path: str, mount: str) -> tuple[str, ...]:
+    result = []
+    current = path
+    for _ in range(32):
+        result.append(current)
+        if current == mount:
+            return tuple(reversed(result))
+        parent = os.path.dirname(current)
+        if parent == current or os.path.commonpath((mount, parent)) != mount:
+            break
+        current = parent
+    raise ValueError("cgroup ancestry exceeds sampling bound")
+
+
+def _sample_linux_resources() -> ServingResources:
+    memory = available = rss = cpu = None
     sources: list[str] = []
-
-    def read(path: str) -> str:
-        with open(path, encoding="ascii") as handle:
-            return handle.read(16_384).strip()
-
-    host_cpus = float(os.cpu_count() or 1)
-    cpus = host_cpus
+    reported_cpus = os.cpu_count()
+    host_cpus = float(reported_cpus) if type(reported_cpus) is int and reported_cpus > 0 else None
+    process_cpus = host_cpus
     try:
-        quota, period = read("/sys/fs/cgroup/cpu.max").split()
-        if quota != "max" and float(period) > 0:
-            cpus = min(cpus, max(0.01, float(quota) / float(period)))
-    except (OSError, ValueError):
-        pass
-    try:
-        cpu = max(0.0, os.getloadavg()[0] / host_cpus)
-        sources.append("host_load")
+        affinity = len(os.sched_getaffinity(0))
+        if affinity > 0:
+            process_cpus = float(affinity) if host_cpus is None else min(host_cpus, float(affinity))
     except (AttributeError, OSError, ValueError):
         pass
     try:
-        usage = next(
-            int(line.split()[1]) for line in read("/sys/fs/cgroup/cpu.stat").splitlines()
-            if line.startswith("usage_usec ")
-        )
-        now = time.monotonic()
-        with _RESOURCE_SAMPLE_LOCK:
-            previous = _RESOURCE_CPU_SAMPLE
-            if previous is not None and now - previous[0] >= 0.25:
-                elapsed = now - previous[0]
-                cpu = max(0.0, (usage - previous[1]) / 1_000_000.0 / elapsed / cpus)
-                _RESOURCE_CPU_SAMPLE = (now, usage, cpu)
-            elif previous is None:
-                _RESOURCE_CPU_SAMPLE = (now, usage, cpu)
-            else:
-                cpu = previous[2]
-        sources.append("cgroup_cpu")
-    except (OSError, ValueError, IndexError, StopIteration):
+        with open("/proc/stat", encoding="ascii") as handle:
+            first = handle.readline(16_384).split()
+        values = [int(value) for value in first[1:9]]
+        if first[0] == "cpu" and len(values) >= 4:
+            cpu = _cpu_counter_sample(
+                "linux_host",
+                float(sum(values)),
+                idle=float(values[3] + (values[4] if len(values) > 4 else 0)),
+            )
+            sources.append("linux_cpu" if cpu is not None else "linux_cpu_warming")
+    except (OSError, ValueError, IndexError):
         pass
+    process_cpu = (
+        None
+        if process_cpus is None
+        else _cpu_counter_sample(
+            "linux_process_" + str(process_cpus),
+            time.process_time(),
+            capacity=process_cpus,
+        )
+    )
+    if process_cpu is not None:
+        cpu = process_cpu if cpu is None else max(cpu, process_cpu)
     try:
         values = {}
-        for line in read("/proc/meminfo").splitlines():
-            name, _, value = line.partition(":")
+        for line in _resource_text("/proc/meminfo").splitlines():
+            name, _, raw = line.partition(":")
             if name in {"MemTotal", "MemAvailable"}:
-                values[name] = int(value.strip().split()[0]) * 1024
+                values[name] = int(raw.strip().split()[0]) * 1024
         total = values.get("MemTotal", 0)
         if total > 0 and "MemAvailable" in values:
-            available = max(0, values["MemAvailable"])
-            memory_used = min(1.0, max(0.0, 1.0 - available / total))
-            sources.append("host_memory")
+            available = min(total, max(0, values["MemAvailable"]))
+            memory = 1.0 - available / total
+            sources.append("linux_memory")
     except (OSError, ValueError, IndexError):
         pass
     try:
-        maximum = read("/sys/fs/cgroup/memory.max")
-        current = int(read("/sys/fs/cgroup/memory.current"))
-        if maximum != "max" and int(maximum) > 0:
-            total = int(maximum)
-            remaining = max(0, total - current)
-            fraction = min(1.0, max(0.0, current / total))
-            available = remaining if available is None else min(available, remaining)
-            memory_used = fraction if memory_used is None else max(memory_used, fraction)
-            sources.append("cgroup_memory")
-    except (OSError, ValueError):
+        rss = int(_resource_text("/proc/self/statm").split()[1]) * int(os.sysconf("SC_PAGE_SIZE"))
+        sources.append("linux_rss")
+    except (OSError, ValueError, IndexError):
         pass
     try:
-        rss = int(read("/proc/self/statm").split()[1]) * int(os.sysconf("SC_PAGE_SIZE"))
-    except (OSError, AttributeError, ValueError, IndexError):
-        pass
-    return ServingResources(memory_used, cpu, rss, available, ",".join(sources) or "unavailable")
+        groups = _linux_cgroup_paths()
+    except (OSError, ValueError):
+        groups = {}
+        cpu = memory = available = None
+        sources.append("cgroup_layout_unknown")
+    unified = groups.get("v2")
+    memory_group = unified or groups.get("memory")
+    if memory_group is not None:
+        try:
+            for directory in _cgroup_ancestors(*memory_group):
+                name = "memory.max" if unified else "memory.limit_in_bytes"
+                current_name = "memory.current" if unified else "memory.usage_in_bytes"
+                try:
+                    maximum = _resource_text(os.path.join(directory, name))
+                except FileNotFoundError:
+                    continue  # Root/disabled controllers have no own limit.
+                if maximum == "max":
+                    continue
+                limit = int(maximum)
+                if limit <= 0 or limit >= 1 << 60:
+                    continue
+                used = int(_resource_text(os.path.join(directory, current_name)))
+                remaining = max(0, limit - used)
+                available = remaining if available is None else min(available, remaining)
+                fraction = min(1.0, max(0.0, used / limit))
+                memory = fraction if memory is None else max(memory, fraction)
+            sources.append("cgroup_memory")
+        except (OSError, ValueError):
+            memory = available = None
+            sources.append("cgroup_memory_unknown")
+    cpu_group = unified or groups.get("cpu")
+    if cpu_group is not None:
+        try:
+            capacity = host_cpus if host_cpus is not None else math.inf
+            group_cpu: list[float] = []
+            pending = False
+            for directory in _cgroup_ancestors(*cpu_group):
+                if unified:
+                    try:
+                        quota, period = _resource_text(os.path.join(directory, "cpu.max")).split()
+                    except FileNotFoundError:
+                        quota, period = "max", "100000"
+                    if quota != "max":
+                        if int(quota) <= 0 or int(period) <= 0:
+                            raise ValueError("invalid cgroup CPU quota")
+                        capacity = min(capacity, int(quota) / int(period))
+                else:
+                    quota = int(_resource_text(os.path.join(directory, "cpu.cfs_quota_us")))
+                    period = int(_resource_text(os.path.join(directory, "cpu.cfs_period_us")))
+                    if quota > 0 and period > 0:
+                        capacity = min(capacity, quota / period)
+                try:
+                    cpus = _cpu_set_size(
+                        _resource_text(
+                            os.path.join(
+                                directory, "cpuset.cpus.effective" if unified else "cpuset.effective_cpus"
+                            )
+                        )
+                    )
+                    if cpus is not None:
+                        capacity = min(capacity, float(cpus))
+                except FileNotFoundError:
+                    pass
+                if unified:
+                    statistics = dict(
+                        line.split()
+                        for line in _resource_text(os.path.join(directory, "cpu.stat")).splitlines()
+                    )
+                    usage = int(statistics["usage_usec"]) / 1_000_000.0
+                    counter_directory = directory
+                else:
+                    # cpu and cpuacct can have separate v1 controller mounts.
+                    cpuacct = groups.get("cpuacct")
+                    if cpuacct is None:
+                        raise ValueError("cgroup CPU accounting unavailable")
+                    if directory != cpu_group[0]:
+                        continue
+                    counter_directory = cpuacct[0]
+                    usage = (
+                        int(_resource_text(os.path.join(counter_directory, "cpuacct.usage")))
+                        / 1_000_000_000.0
+                    )
+                key = (
+                    "cgroup_"
+                    + hashlib.sha256((counter_directory + ":" + str(capacity)).encode("utf-8")).hexdigest()[
+                        :16
+                    ]
+                )
+                fraction = _cpu_counter_sample(key, usage, capacity=capacity)
+                if fraction is not None:
+                    group_cpu.append(fraction)
+                else:
+                    pending = True
+            if pending:
+                cpu = None
+                sources.append("cgroup_cpu_warming")
+            elif group_cpu:
+                cpu = max(group_cpu + ([cpu] if cpu is not None else []))
+                sources.append("cgroup_cpu")
+            elif cpu is None:
+                sources.append("cgroup_cpu_warming")
+        except (OSError, ValueError, KeyError):
+            cpu = None
+            sources.append("cgroup_cpu_unknown")
+    return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+
+
+def _sample_windows_resources() -> ServingResources:
+    import ctypes
+    from ctypes import wintypes
+
+    memory = available = rss = cpu = None
+    sources: list[str] = []
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [("length", wintypes.DWORD), ("load", wintypes.DWORD)] + [
+            (name, ctypes.c_ulonglong)
+            for name in (
+                "total",
+                "available",
+                "total_pagefile",
+                "available_pagefile",
+                "total_virtual",
+                "available_virtual",
+                "available_extended",
+            )
+        ]
+
+    class ProcessMemory(ctypes.Structure):
+        _fields_ = [("cb", wintypes.DWORD), ("faults", wintypes.DWORD)] + [
+            (name, ctypes.c_size_t)
+            for name in (
+                "peak_working",
+                "working",
+                "peak_paged",
+                "paged",
+                "peak_nonpaged",
+                "nonpaged",
+                "pagefile",
+                "peak_pagefile",
+                "private",
+            )
+        ]
+
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    process = kernel.GetCurrentProcess()
+    kernel.GlobalMemoryStatusEx.argtypes = [ctypes.POINTER(MemoryStatus)]
+    kernel.GlobalMemoryStatusEx.restype = wintypes.BOOL
+    status = MemoryStatus()
+    status.length = ctypes.sizeof(status)
+    if kernel.GlobalMemoryStatusEx(ctypes.byref(status)) and status.total > 0:
+        available = int(status.available)
+        memory = min(1.0, max(0.0, 1.0 - available / status.total))
+        sources.append("windows_memory")
+    counters = ProcessMemory()
+    counters.cb = ctypes.sizeof(counters)
+    psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessMemory), wintypes.DWORD]
+    psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+    private = None
+    if psapi.GetProcessMemoryInfo(process, ctypes.byref(counters), counters.cb):
+        rss, private = int(counters.working), int(counters.private)
+        sources.append("windows_rss")
+    kernel.GetSystemTimes.argtypes = [ctypes.POINTER(wintypes.FILETIME)] * 3
+    kernel.GetSystemTimes.restype = wintypes.BOOL
+    idle, system, user = wintypes.FILETIME(), wintypes.FILETIME(), wintypes.FILETIME()
+    if kernel.GetSystemTimes(ctypes.byref(idle), ctypes.byref(system), ctypes.byref(user)):
+
+        def ticks(value: Any) -> int:
+            return int(value.dwHighDateTime) << 32 | int(value.dwLowDateTime)
+
+        cpu = _cpu_counter_sample(
+            "windows_system", float(ticks(system) + ticks(user)), idle=float(ticks(idle))
+        )
+        sources.append("windows_cpu" if cpu is not None else "windows_cpu_warming")
+    reported_cpus = os.cpu_count()
+    host_capacity = float(reported_cpus) if type(reported_cpus) is int and reported_cpus > 0 else None
+    process_capacity = host_capacity
+    kernel.GetProcessAffinityMask.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(ctypes.c_size_t),
+        ctypes.POINTER(ctypes.c_size_t),
+    ]
+    kernel.GetProcessAffinityMask.restype = wintypes.BOOL
+    process_mask, system_mask = ctypes.c_size_t(), ctypes.c_size_t()
+    if (
+        kernel.GetProcessAffinityMask(process, ctypes.byref(process_mask), ctypes.byref(system_mask))
+        and process_mask.value
+    ):
+        mask_capacity = float(bin(process_mask.value).count("1"))
+        process_capacity = mask_capacity if process_capacity is None else min(process_capacity, mask_capacity)
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    kernel.GetProcessTimes.restype = wintypes.BOOL
+    created, exited, process_system, process_user = (wintypes.FILETIME() for _ in range(4))
+    if process_capacity is not None and kernel.GetProcessTimes(
+        process,
+        ctypes.byref(created),
+        ctypes.byref(exited),
+        ctypes.byref(process_system),
+        ctypes.byref(process_user),
+    ):
+
+        def seconds(value: Any) -> float:
+            return ((int(value.dwHighDateTime) << 32) | int(value.dwLowDateTime)) / 10_000_000.0
+
+        process_cpu = _cpu_counter_sample(
+            "windows_process_" + str(process_capacity),
+            seconds(process_system) + seconds(process_user),
+            capacity=process_capacity,
+        )
+        if process_cpu is not None:
+            cpu = process_cpu if cpu is None else max(cpu, process_cpu)
+    kernel.IsProcessInJob.argtypes = [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
+    kernel.IsProcessInJob.restype = wintypes.BOOL
+    in_job = wintypes.BOOL()
+    if not kernel.IsProcessInJob(process, None, ctypes.byref(in_job)):
+        return ServingResources(None, None, rss, None, ",".join(sources + ["windows_job_unknown"]))
+    if in_job.value:
+
+        class BasicLimits(ctypes.Structure):
+            _fields_ = [
+                ("process_time", ctypes.c_longlong),
+                ("job_time", ctypes.c_longlong),
+                ("flags", wintypes.DWORD),
+                ("minimum_working", ctypes.c_size_t),
+                ("maximum_working", ctypes.c_size_t),
+                ("active_limit", wintypes.DWORD),
+                ("affinity", ctypes.c_size_t),
+                ("priority", wintypes.DWORD),
+                ("scheduling", wintypes.DWORD),
+            ]
+
+        class ExtendedLimits(ctypes.Structure):
+            _fields_ = [
+                ("basic", BasicLimits),
+                ("io", ctypes.c_ulonglong * 6),
+                ("process_memory", ctypes.c_size_t),
+                ("job_memory", ctypes.c_size_t),
+                ("peak_process", ctypes.c_size_t),
+                ("peak_job", ctypes.c_size_t),
+            ]
+
+        class Accounting(ctypes.Structure):
+            _fields_ = [
+                ("user", ctypes.c_longlong),
+                ("system", ctypes.c_longlong),
+                ("period_user", ctypes.c_longlong),
+                ("period_system", ctypes.c_longlong),
+                ("faults", wintypes.DWORD),
+                ("total", wintypes.DWORD),
+                ("active", wintypes.DWORD),
+                ("terminated", wintypes.DWORD),
+            ]
+
+        kernel.QueryInformationJobObject.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        kernel.QueryInformationJobObject.restype = wintypes.BOOL
+
+        def query(kind: int, value: Any) -> bool:
+            return bool(
+                kernel.QueryInformationJobObject(None, kind, ctypes.byref(value), ctypes.sizeof(value), None)
+            )
+
+        limits = ExtendedLimits()
+        limits_known = query(9, limits)
+        if limits_known:
+            requirements: list[tuple[int, int | None]] = []
+            if limits.basic.flags & 0x100:
+                requirements.append((int(limits.process_memory), private))
+            if limits.basic.flags & 0x200:
+                usage = (ctypes.c_ulonglong * 2)()
+                requirements.append((int(limits.job_memory), int(usage[0]) if query(28, usage) else None))
+            unknown = False
+            for limit, used in requirements:
+                if limit <= 0 or used is None:
+                    unknown = True
+                    continue
+                remaining = max(0, limit - used)
+                available = remaining if available is None else min(available, remaining)
+                fraction = min(1.0, max(0.0, used / limit))
+                memory = fraction if memory is None else max(memory, fraction)
+            if unknown:
+                memory = available = None
+                sources.append("windows_job_memory_unknown")
+            elif requirements:
+                sources.append("windows_job_memory")
+        else:
+            memory = available = None
+            sources.append("windows_job_memory_unknown")
+        rate = (wintypes.DWORD * 2)()
+        accounting = Accounting()
+        if query(15, rate) and query(1, accounting):
+            flags, raw_rate = int(rate[0]), int(rate[1])
+            # Job accounting covers all its processes. Use the job's own
+            # affinity and ceiling rather than one member's process mask.
+            capacity = host_capacity
+            if not limits_known:
+                capacity = None
+            elif limits.basic.flags & 0x10:
+                job_cpus = float(bin(limits.basic.affinity).count("1"))
+                capacity = (
+                    None if job_cpus <= 0 else (job_cpus if capacity is None else min(capacity, job_cpus))
+                )
+            if flags & 1 and flags & (4 | 0x10):
+                maximum = (raw_rate >> 16) if flags & 0x10 else raw_rate
+                if not 0 < maximum <= 10000 or host_capacity is None:
+                    capacity = None
+                else:
+                    ceiling = host_capacity * maximum / 10000.0
+                    capacity = None if capacity is None else min(capacity, ceiling)
+            ratio = (
+                None
+                if capacity is None
+                else _cpu_counter_sample(
+                    "windows_job_" + str(capacity),
+                    (accounting.user + accounting.system) / 10_000_000.0,
+                    capacity=capacity,
+                )
+            )
+            if ratio is not None:
+                cpu = max(ratio, cpu) if cpu is not None else ratio
+                sources.append("windows_job_cpu")
+            else:
+                cpu = None
+                sources.append("windows_job_cpu_unknown" if capacity is None else "windows_job_cpu_warming")
+        else:
+            cpu = None
+            sources.append("windows_job_cpu_unknown")
+    return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+
+
+def _sample_darwin_resources() -> ServingResources:
+    import ctypes
+
+    memory = available = rss = cpu = None
+    sources: list[str] = []
+    library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    library.mach_host_self.restype = ctypes.c_uint32
+    task = ctypes.c_uint32.in_dll(library, "mach_task_self_").value
+    library.mach_port_deallocate.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    library.mach_port_deallocate.restype = ctypes.c_int
+    host = library.mach_host_self()
+    try:
+        library.host_statistics.argtypes = [
+            ctypes.c_uint32,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint32),
+        ]
+        library.host_statistics.restype = ctypes.c_int
+        cpu_ticks = (ctypes.c_uint32 * 4)()
+        count = ctypes.c_uint32(4)
+        if (
+            library.host_statistics(host, 3, ctypes.byref(cpu_ticks), ctypes.byref(count)) == 0
+            and count.value == 4
+        ):
+            cpu = _cpu_counter_sample("darwin_host", float(sum(cpu_ticks)), idle=float(cpu_ticks[2]))
+            sources.append("darwin_cpu" if cpu is not None else "darwin_cpu_warming")
+
+        class VMStatistics(ctypes.Structure):
+            _fields_ = (
+                [(name, ctypes.c_uint32) for name in ("free", "active", "inactive", "wired")]
+                + [
+                    (name, ctypes.c_uint64)
+                    for name in (
+                        "zero_fill",
+                        "reactivations",
+                        "pageins",
+                        "pageouts",
+                        "faults",
+                        "cow",
+                        "lookups",
+                        "hits",
+                    )
+                ]
+                + [
+                    ("purgeable", ctypes.c_uint32),
+                    ("purges", ctypes.c_uint64),
+                    ("speculative", ctypes.c_uint32),
+                ]
+                + [
+                    (name, ctypes.c_uint64)
+                    for name in ("decompressions", "compressions", "swapins", "swapouts")
+                ]
+                + [(name, ctypes.c_uint32) for name in ("compressor", "throttled", "external", "internal")]
+                + [("uncompressed", ctypes.c_uint64)]
+            )
+
+        library.host_statistics64.argtypes = [
+            ctypes.c_uint32,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint32),
+        ]
+        library.host_statistics64.restype = ctypes.c_int
+        library.host_page_size.argtypes = [ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32)]
+        library.host_page_size.restype = ctypes.c_int
+        library.sysctlbyname.argtypes = [
+            ctypes.c_char_p,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_size_t),
+            ctypes.c_void_p,
+            ctypes.c_size_t,
+        ]
+        library.sysctlbyname.restype = ctypes.c_int
+        statistics, page_size, total = VMStatistics(), ctypes.c_uint32(), ctypes.c_uint64()
+        count, total_size = ctypes.c_uint32(ctypes.sizeof(statistics) // 4), ctypes.c_size_t(
+            ctypes.sizeof(total)
+        )
+        if (
+            library.host_statistics64(host, 4, ctypes.byref(statistics), ctypes.byref(count)) == 0
+            and library.host_page_size(host, ctypes.byref(page_size)) == 0
+            and library.sysctlbyname(b"hw.memsize", ctypes.byref(total), ctypes.byref(total_size), None, 0)
+            == 0
+            and total.value > 0
+            and page_size.value > 0
+        ):
+            available = min(
+                int(total.value), int(statistics.free + statistics.inactive) * int(page_size.value)
+            )
+            memory = 1.0 - available / total.value
+            sources.append("darwin_memory")
+
+        class TaskBasicInfo(ctypes.Structure):
+            _fields_ = [
+                ("virtual", ctypes.c_uint64),
+                ("resident", ctypes.c_uint64),
+                ("maximum_resident", ctypes.c_uint64),
+                ("user_seconds", ctypes.c_int32),
+                ("user_microseconds", ctypes.c_int32),
+                ("system_seconds", ctypes.c_int32),
+                ("system_microseconds", ctypes.c_int32),
+                ("policy", ctypes.c_int32),
+                ("suspend_count", ctypes.c_int32),
+            ]
+
+        library.task_info.argtypes = [
+            ctypes.c_uint32,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint32),
+        ]
+        library.task_info.restype = ctypes.c_int
+        info = TaskBasicInfo()
+        count = ctypes.c_uint32(ctypes.sizeof(info) // 4)
+        if library.task_info(task, 20, ctypes.byref(info), ctypes.byref(count)) == 0:
+            rss = int(info.resident)
+            sources.append("darwin_rss")
+        return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+    finally:
+        library.mach_port_deallocate(task, host)
+
+
+def sample_serving_resources() -> ServingResources:
+    """Sample fresh native counters; preserve unavailable restriction signals."""
+    global _RESOURCE_COLLECTION
+    with _RESOURCE_COLLECTION_LOCK:
+        now = time.monotonic()
+        if _RESOURCE_COLLECTION is not None and now - _RESOURCE_COLLECTION[0] < 0.2:
+            return _RESOURCE_COLLECTION[1]
+        try:
+            if os.name == "nt":
+                measured = _sample_windows_resources()
+            elif sys.platform == "darwin":
+                measured = _sample_darwin_resources()
+            elif sys.platform.startswith("linux"):
+                measured = _sample_linux_resources()
+            else:
+                measured = ServingResources(source="platform_telemetry_unavailable")
+        except (OSError, ValueError, AttributeError, ImportError):
+            measured = ServingResources(source="platform_telemetry_unavailable")
+        _RESOURCE_COLLECTION = (now, measured)
+        return measured
 
 
 class LocalInferenceEngine:
@@ -1419,13 +2076,26 @@ class LocalInferenceEngine:
         cancel: threading.Event,
         started: threading.Event,
         ticket: _ServingTicket,
+        prepared_input: LocalPreparedInput | None = None,
     ) -> LocalInferenceResult:
         started.set()
         failed = False
         try:
             if cancel.is_set():
                 raise LocalInferenceCancelled("local inference cancelled before execution")
-            result = self.model.infer(request, cancel)
+            if prepared_input is None:
+                result = self.model.infer(request, cancel)
+            else:
+                # Keep native tokenization and accounting attached to the
+                # physical worker; this value never enters the output cache.
+                if (
+                    prepared_input.scope_digest != ticket.scope_id
+                    or prepared_input.request_digest != request.digest
+                ):
+                    raise ProviderPolicyError("prepared local input authority changed before dispatch")
+                # The native owner validates its issuer, immutable sequence
+                # and current execution identity at this dispatch boundary.
+                result = self.model.infer_prepared(request, cancel, prepared_input)
             if not isinstance(result, LocalInferenceResult):
                 raise TypeError("local backend must return LocalInferenceResult")
             if cancel.is_set():
@@ -1628,7 +2298,59 @@ class LocalInferenceEngine:
                 break
         return size
 
-    def _request_memory_estimate(self, request: LocalInferenceRequest) -> int:
+    def prepare_input(
+        self,
+        request: LocalInferenceRequest,
+        *,
+        scope_id: str | None = None,
+        tenant_scope_id: str | None = None,
+    ) -> LocalPreparedInput | None:
+        """Prepare native tokens once, sealed to trusted cache/tenant authority.
+
+        Backends without native preparation retain their existing contract.
+        The caller owns this value only for the lifetime of one request.
+        """
+        if not isinstance(request, LocalInferenceRequest):
+            raise TypeError("request must be LocalInferenceRequest")
+        for name, value in (("scope_id", scope_id), ("tenant_scope_id", tenant_scope_id)):
+            if value is not None and (not isinstance(value, str) or not value or len(value) > 512):
+                raise ValueError(f"{name} must be a non-empty bounded string")
+        prepare = getattr(self.model, "prepare_input", None)
+        if not callable(prepare):
+            return None
+        scope = _digest(
+            {
+                "cache_scope": scope_id or "local",
+                "tenant_scope": tenant_scope_id or _ANONYMOUS_TENANT_SCOPE,
+            }
+        )
+        prepared = prepare(request, scope_digest=scope)
+        self._validate_prepared_input(request, prepared, scope)
+        return prepared
+
+    def _validate_prepared_input(
+        self,
+        request: LocalInferenceRequest,
+        prepared: LocalPreparedInput,
+        scope_digest: str,
+    ) -> None:
+        validate = getattr(self.model, "validate_prepared_input", None)
+        infer = getattr(self.model, "infer_prepared", None)
+        if not callable(validate) or not callable(infer):
+            raise ProviderPolicyError("activated local backend does not admit prepared input")
+        if (
+            not isinstance(prepared, LocalPreparedInput)
+            or prepared.request_digest != request.digest
+            or prepared.scope_digest != scope_digest
+        ):
+            raise ProviderPolicyError("prepared local input authority or request mismatch")
+        validate(request, prepared)
+
+    def _request_memory_estimate(
+        self,
+        request: LocalInferenceRequest,
+        prepared_input: LocalPreparedInput | None = None,
+    ) -> int:
         declared = getattr(self.model, "estimate_memory_bytes", None)
         if callable(declared):
             size = declared(request)
@@ -1640,9 +2362,14 @@ class LocalInferenceEngine:
         limits = getattr(runtime, "limits", None)
         context = getattr(limits, "max_context", None)
         count = getattr(self.model, "count_input_tokens", None)
-        if not callable(estimate) or not callable(count) or type(context) is not int or context < 1:
+        if (
+            not callable(estimate)
+            or (prepared_input is None and not callable(count))
+            or type(context) is not int
+            or context < 1
+        ):
             return 0
-        input_tokens = count(request)
+        input_tokens = count(request) if prepared_input is None else prepared_input.input_tokens
         if type(input_tokens) is not int or input_tokens < 0:
             raise ProviderPolicyError("local native memory admission received invalid token count")
         tokens = min(context, input_tokens + request.max_output_tokens)
@@ -1713,6 +2440,7 @@ class LocalInferenceEngine:
         preemption_scope_id: str | None = None,
         tenant_scope_id: str | None = None,
         deadline: float | None = None,
+        prepared_input: LocalPreparedInput | None = None,
     ) -> LocalInferenceResult:
         """Generate within trusted tenant, cache and monotonic deadline scopes.
 
@@ -1747,6 +2475,8 @@ class LocalInferenceEngine:
         tenant_scope = tenant_scope_id or _ANONYMOUS_TENANT_SCOPE
         preemption_scope = preemption_scope_id or scope_id or "local"
         scope = _digest({"cache_scope": scope_id or "local", "tenant_scope": tenant_scope})
+        if prepared_input is not None:
+            self._validate_prepared_input(request, prepared_input, scope)
         identity = self._model_identity()
         key = self._key(request, scope)
         self._trim_cache()
@@ -1818,10 +2548,24 @@ class LocalInferenceEngine:
                     tenant_scope_id=tenant_scope, deadline=deadline,
                 )
             try:
+                if prepared_input is None:
+                    # Prepare after coalescing so cache hits and followers do
+                    # not tokenize or inherit a leader's private token value.
+                    prepared_input = self.prepare_input(
+                        request, scope_id=scope_id, tenant_scope_id=tenant_scope_id
+                    )
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise LocalInferenceCancelled("local inference deadline exceeded during preparation")
                 result = await self._generate_uncached(
-                    request, key=key, scope_id=scope,
-                    preemption_scope_id=preemption_scope, work_class=work_class,
-                    tenant_scope_id=tenant_scope, deadline=deadline, cache_epoch=epoch,
+                    request,
+                    key=key,
+                    scope_id=scope,
+                    preemption_scope_id=preemption_scope,
+                    work_class=work_class,
+                    tenant_scope_id=tenant_scope,
+                    deadline=deadline,
+                    cache_epoch=epoch,
+                    prepared_input=prepared_input,
                 )
             except BaseException as exc:
                 if not future.done():
@@ -1854,9 +2598,10 @@ class LocalInferenceEngine:
         tenant_scope_id: str,
         deadline: float | None,
         cache_epoch: int,
+        prepared_input: LocalPreparedInput | None,
     ) -> LocalInferenceResult:
         cancel = threading.Event()
-        estimated_memory = self._request_memory_estimate(request)
+        estimated_memory = self._request_memory_estimate(request, prepared_input)
         ticket = self._reserve(
             work_class, scope_id, preemption_scope_id, tenant_scope_id, deadline, cancel,
             estimated_memory_bytes=estimated_memory,
@@ -1864,7 +2609,16 @@ class LocalInferenceEngine:
         await self._acquire_execution_slot(ticket)
         started = threading.Event()
         try:
-            worker = asyncio.create_task(asyncio.to_thread(self._infer_admitted, request, cancel, started, ticket))
+            worker = asyncio.create_task(
+                asyncio.to_thread(
+                    self._infer_admitted,
+                    request,
+                    cancel,
+                    started,
+                    ticket,
+                    prepared_input,
+                )
+            )
             if deadline is None:
                 result = await self._await_worker(worker, cancel)
             else:
@@ -1893,6 +2647,8 @@ class LocalInferenceEngine:
 
         if result.model_id != self.model.model_id or result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
+        if prepared_input is not None and result.input_tokens != prepared_input.input_tokens:
+            raise ProviderProtocolViolationError("local result differs from admitted native input accounting")
         if self._key(request, scope_id) != key:
             raise ValueError("local runtime identity changed during inference")
         if result.usage_source == "local_model" and result.output_tokens > request.max_output_tokens:
@@ -1988,21 +2744,39 @@ class LocalInferenceEngine:
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
+        if work_class not in {"interactive", "background"}:
+            raise ValueError("local work_class must be interactive or background")
+        for name, value in (
+            ("scope_id", scope_id),
+            ("preemption_scope_id", preemption_scope_id),
+            ("tenant_scope_id", tenant_scope_id),
+        ):
+            if value is not None and (not isinstance(value, str) or not value or len(value) > 512):
+                raise ValueError(f"{name} must be a non-empty bounded string")
+        if deadline is not None and (
+            isinstance(deadline, bool)
+            or not isinstance(deadline, (int, float))
+            or not math.isfinite(deadline)
+        ):
+            raise ValueError("local inference deadline must be finite monotonic seconds")
         batch_limits = self.batch_limits()
         if len(requests) > batch_limits["max_batch_size"]:
             raise ValueError("local inference batch exceeds configured max_batch_size")
         if any(not isinstance(item, LocalInferenceRequest) for item in requests):
             raise TypeError("batch requires LocalInferenceRequest values")
         maximum_tokens = batch_limits["max_batch_tokens"]
+        prepared_inputs: list[LocalPreparedInput | None] = [None] * len(requests)
         if maximum_tokens is not None:
             count = getattr(self.model, "count_input_tokens", None)
             if not callable(count):
                 raise ProviderPolicyError("native batch admission requires its activated tokenizer")
             reserved_tokens = 0
-            for request in requests:
+            for index, request in enumerate(requests):
                 if deadline is not None and time.monotonic() >= deadline:
                     raise LocalInferenceCancelled("local batch deadline exceeded before execution")
-                tokens = count(request)
+                prepared = self.prepare_input(request, scope_id=scope_id, tenant_scope_id=tenant_scope_id)
+                prepared_inputs[index] = prepared
+                tokens = count(request) if prepared is None else prepared.input_tokens
                 if type(tokens) is not int or tokens < 0:
                     raise ProviderPolicyError("native batch tokenizer returned an invalid count")
                 reserved_tokens += tokens + request.max_output_tokens
@@ -2027,12 +2801,18 @@ class LocalInferenceEngine:
                 next_index += 1
                 try:
                     results[index] = await self.generate(
-                        requests[index], work_class=work_class, scope_id=scope_id,
+                        requests[index],
+                        work_class=work_class,
+                        scope_id=scope_id,
                         preemption_scope_id=preemption_scope_id,
-                        tenant_scope_id=tenant_scope_id, deadline=deadline,
+                        tenant_scope_id=tenant_scope_id,
+                        deadline=deadline,
+                        prepared_input=prepared_inputs[index],
                     )
                 except Exception as exc:  # noqa: BLE001 -- batch reports admitted outcomes in input order
                     results[index] = exc
+                finally:
+                    prepared_inputs[index] = None
 
         # A large native batch must not manufacture thousands of pending
         # requests or defeat the same tenant queue budgets as normal traffic.
@@ -2431,25 +3211,6 @@ class LocalModelAdapter(ProviderAdapter):
             tool_choice=choice,
             specific_tool_id=(str(request.specific_tool_id).strip() if choice == "specific" else None),
         )
-        count_tokens = getattr(self.engine.model, "count_input_tokens", None)
-        if callable(count_tokens):
-            input_tokens = count_tokens(local_request)
-        else:
-            render = getattr(self.engine.model, "_render_prompt", None)
-            full_prompt = render(local_request) if callable(render) else local_request.rendered_input
-            input_tokens = len(full_prompt.encode("utf-8")) + 1
-        if type(input_tokens) is not int or input_tokens < 0:
-            raise ProviderPolicyError("local tokenizer returned an invalid token count")
-        if "tokenizer_max_chars" in limits and len(local_request.rendered_input) > limits["tokenizer_max_chars"]:
-            raise ProviderPolicyError("local input exceeds activated tokenizer character limit")
-        if "tokenizer_max_tokens" in limits and input_tokens > limits["tokenizer_max_tokens"]:
-            raise ProviderPolicyError("local input exceeds activated tokenizer token limit")
-        if input_tokens > budget.max_input_tokens:
-            raise ProviderPolicyError("local input token budget exceeded")
-        if input_tokens > limits["context_window"]:
-            raise ProviderPolicyError("local input exceeds activated context window")
-        if limits["max_total_tokens"] is not None and input_tokens + max_tokens > limits["max_total_tokens"]:
-            raise ProviderPolicyError("local request exceeds activated total-token limit")
         remaining = float(budget.max_wall_seconds) - (time.monotonic() - started)
         if request.deadline is not None:
             if (
@@ -2464,6 +3225,7 @@ class LocalModelAdapter(ProviderAdapter):
             )
         if not math.isfinite(remaining) or remaining <= 0:
             raise LocalInferenceCancelled("local inference deadline exceeded")
+        serving_deadline = time.monotonic() + remaining
         # Cache/coalescing authority is inherited from the validated provider
         # envelope. Anonymous requests receive an opaque scope rather than
         # sharing output merely because prompts or tenant labels coincide.
@@ -2499,6 +3261,38 @@ class LocalModelAdapter(ProviderAdapter):
             "self-augmentation", "training", "simulation_training",
             "ratchet-learning", "idle-maintenance",
         } else "interactive"
+        if (
+            "tokenizer_max_chars" in limits
+            and len(local_request.rendered_input) > limits["tokenizer_max_chars"]
+        ):
+            raise ProviderPolicyError("local input exceeds activated tokenizer character limit")
+        prepared_input = self.engine.prepare_input(
+            local_request,
+            scope_id=cache_scope,
+            tenant_scope_id=tenant_scope,
+        )
+        count_tokens = getattr(self.engine.model, "count_input_tokens", None)
+        if prepared_input is not None:
+            input_tokens = prepared_input.input_tokens
+        elif callable(count_tokens):
+            input_tokens = count_tokens(local_request)
+        else:
+            render = getattr(self.engine.model, "_render_prompt", None)
+            full_prompt = render(local_request) if callable(render) else local_request.rendered_input
+            input_tokens = len(full_prompt.encode("utf-8")) + 1
+        if type(input_tokens) is not int or input_tokens < 0:
+            raise ProviderPolicyError("local tokenizer returned an invalid token count")
+        if "tokenizer_max_tokens" in limits and input_tokens > limits["tokenizer_max_tokens"]:
+            raise ProviderPolicyError("local input exceeds activated tokenizer token limit")
+        if input_tokens > budget.max_input_tokens:
+            raise ProviderPolicyError("local input token budget exceeded")
+        if input_tokens > limits["context_window"]:
+            raise ProviderPolicyError("local input exceeds activated context window")
+        if limits["max_total_tokens"] is not None and input_tokens + max_tokens > limits["max_total_tokens"]:
+            raise ProviderPolicyError("local request exceeds activated total-token limit")
+        remaining = serving_deadline - time.monotonic()
+        if remaining <= 0:
+            raise LocalInferenceCancelled("local inference deadline exceeded during preparation")
         try:
             result = await asyncio.wait_for(
                 self.engine.generate(
@@ -2507,7 +3301,8 @@ class LocalModelAdapter(ProviderAdapter):
                     scope_id=cache_scope,
                     preemption_scope_id=preemption_scope,
                     tenant_scope_id=tenant_scope,
-                    deadline=time.monotonic() + remaining,
+                    deadline=serving_deadline,
+                    prepared_input=prepared_input,
                 ),
                 timeout=remaining,
             )

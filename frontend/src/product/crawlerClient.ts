@@ -22,7 +22,12 @@ export type CrawlSession = {
   automation?: CrawlAutomation; worker?: CrawlWorker; capabilities?: CrawlCapabilities;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
-export type CapturedSource = { source_id: string; url: string; canonical_url?: string; title: string; text?: string; content_digest: string; fetched_at: string; review_state: string; provenance: Record<string, unknown>; text_truncated?: boolean };
+export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
+export type SourceFreshness = {
+  usable: boolean; state: 'current' | 'withdrawn' | 'stale' | 'consent_expired' | 'session_revoked' | 'capture_time_invalid';
+  capture_age_seconds: number; valid_until: string; remote_freshness_verified: false;
+};
+export type CapturedSource = { source_id: string; url: string; canonical_url?: string; title: string; text?: string; content_digest: string; fetched_at: string; review_state: string; provenance: Record<string, unknown>; text_truncated?: boolean; use_policy?: SourceUsePolicy; freshness?: SourceFreshness };
 export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; consent: true; rights_acknowledged: true };
 export type CrawlCommand = { idempotency_key: string; expected_version: number };
 export type SourceExport = { filename: string; media_type: string; content: string; content_digest: string; session_id: string; source_id: string };
@@ -70,6 +75,17 @@ function source(value: CapturedSource, id?: string): CapturedSource {
   if (!value || !ID.test(value.source_id) || id && value.source_id !== id || typeof value.url !== 'string' || value.url.length > 4096 || typeof value.title !== 'string'
     || !HASH.test(value.content_digest) || typeof value.review_state !== 'string' || !value.provenance || typeof value.provenance !== 'object'
     || value.text !== undefined && (typeof value.text !== 'string' || new TextEncoder().encode(value.text).byteLength > 2 * 1024 * 1024)) invalid('The captured source projection is invalid.');
+  if ((value.use_policy === undefined) !== (value.freshness === undefined)) invalid('The source-use projection is incomplete.');
+  if (value.use_policy && value.freshness) {
+    const policy = value.use_policy, freshness = value.freshness;
+    if (!integer(policy.version, 2147483647) || typeof policy.enabled !== 'boolean' || !integer(policy.max_age_seconds, 86400) || policy.max_age_seconds < 60
+      || policy.changed_at !== null && (typeof policy.changed_at !== 'string' || !Number.isFinite(Date.parse(policy.changed_at)))
+      || policy.version === 0 && policy.changed_at !== null || policy.version > 0 && policy.changed_at === null
+      || typeof freshness.usable !== 'boolean' || !['current', 'withdrawn', 'stale', 'consent_expired', 'session_revoked', 'capture_time_invalid'].includes(freshness.state)
+      || freshness.usable !== (freshness.state === 'current') || freshness.usable && !policy.enabled
+      || !integer(freshness.capture_age_seconds) || typeof freshness.valid_until !== 'string' || !Number.isFinite(Date.parse(freshness.valid_until))
+      || freshness.remote_freshness_verified !== false) invalid('The source-use or capture-age projection is invalid.');
+  }
   return value;
 }
 export async function getCrawlerReadiness(signal?: AbortSignal): Promise<CrawlerReadiness> {
@@ -102,6 +118,17 @@ export async function listCrawlSources(id: string, cursor?: string, signal?: Abo
 }
 export async function getCrawlSource(id: string, sourceId: string, signal?: AbortSignal): Promise<CapturedSource> {
   const value = await read(api.get<{ source: CapturedSource }>(ROOT + '/sessions/' + identifier(id) + '/sources/' + identifier(sourceId), options(signal)), getAuthToken(), 'The captured source could not be read.'); return source(value.source, sourceId);
+}
+export async function configureCrawlSourceUse(id: string, sourceId: string, body: CrawlCommand & { enabled: boolean; max_age_seconds: number }, signal?: AbortSignal): Promise<{ session: CrawlSession; source: CapturedSource }> {
+  if (!HASH.test(sourceId) || !integer(body.expected_version) || body.expected_version < 1 || typeof body.enabled !== 'boolean'
+    || !integer(body.max_age_seconds, 86400) || body.max_age_seconds < 60 || typeof body.idempotency_key !== 'string'
+    || !body.idempotency_key || body.idempotency_key !== body.idempotency_key.trim() || body.idempotency_key.length > 128) {
+    throw new ChatClientError('Choose a current source and a capture-age limit between 60 and 86,400 seconds.', { kind: 'validation' });
+  }
+  const value = await read(api.post<{ session: CrawlSession; source: CapturedSource }>(ROOT + '/sessions/' + identifier(id) + '/sources/' + identifier(sourceId) + '/use', body, options(signal)), getAuthToken(), 'The source-use change was not confirmed. Retry the same saved change or refresh current settings.');
+  session(value.session, id); source(value.source, sourceId);
+  if (!value.source.use_policy || !value.source.freshness || value.source.text !== undefined) invalid('The source-use change returned an incomplete receipt.');
+  return value;
 }
 export async function exportCrawlSource(id: string, sourceId: string, format: 'json' | 'markdown', signal?: AbortSignal): Promise<SourceExport> {
   const token = getAuthToken();

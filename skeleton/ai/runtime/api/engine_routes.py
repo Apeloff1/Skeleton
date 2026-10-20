@@ -45,29 +45,79 @@ class EngineCancelBody(BaseModel):
     reason: str = Field(min_length=1, max_length=2048)
 
 
-class EngineRuntimeServingPatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    enabled: bool | None = None
-    max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
-
-
-class EngineRuntimeEnabledPatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    enabled: bool
-
-
-class EngineRuntimeMaintenancePatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    enabled: bool | None = None
-    augmentation_enabled: bool | None = None
+class EngineRuntimePolicyPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def validate_fields(self):
-        if not self.model_fields_set or any(
-            getattr(self, field) is None for field in self.model_fields_set
-        ):
-            raise ValueError("maintenance policy requires non-null fields")
+        if not self.model_fields_set or any(getattr(self, field) is None for field in self.model_fields_set):
+            raise ValueError("runtime policy requires non-null fields")
         return self
+
+
+class EngineRuntimeServingPatch(EngineRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    target_latency_ms: float | None = Field(default=None, ge=100, le=600000)
+    cooldown_seconds: float | None = Field(default=None, ge=0.5, le=300)
+    recovery_samples: int | None = Field(default=None, ge=2, le=128)
+    max_queue_wait_seconds: float | None = Field(default=None, ge=0.05, le=3600)
+    background_max_concurrency: int | None = Field(default=None, ge=0, le=32)
+    cache_max_bytes: int | None = Field(default=None, ge=0, le=1073741824)
+    cache_ttl_seconds: float | None = Field(default=None, ge=0, le=86400)
+    memory_high_watermark: float | None = Field(default=None, ge=0.5, le=0.99)
+    memory_low_watermark: float | None = Field(default=None, ge=0.1, le=0.95)
+    max_active_per_tenant: int | None = Field(default=None, ge=1, le=32)
+    max_queued_per_tenant: int | None = Field(default=None, ge=0, le=65536)
+    background_starvation_seconds: float | None = Field(default=None, ge=0.1, le=3600)
+    memory_shed_watermark: float | None = Field(default=None, ge=0.5, le=1)
+
+
+class EngineRuntimeLearningPatch(EngineRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_samples: int | None = Field(default=None, ge=4, le=10000)
+    replay_capacity: int | None = Field(default=None, ge=8, le=256)
+    replay_steps: int | None = Field(default=None, ge=0, le=3)
+    learning_rate: float | None = Field(default=None, ge=1e-05, le=0.05)
+    gradient_clip: float | None = Field(default=None, ge=0.01, le=5)
+    max_effort_rounds: int | None = Field(default=None, ge=1, le=3)
+    target_latency_seconds: float | None = Field(default=None, ge=0.1, le=86400)
+    pressure_threshold: float | None = Field(default=None, ge=0.1, le=1)
+    uncertainty_ceiling: float | None = Field(default=None, ge=0.05, le=0.75)
+    partition_limit: int | None = Field(default=None, ge=1, le=128)
+    retained_outcomes: int | None = Field(default=None, ge=128, le=100000)
+    outcome_max_age_days: int | None = Field(default=None, ge=1, le=3650)
+    maintenance_receipt_retention: int | None = Field(default=None, ge=16, le=100000)
+
+
+class EngineRuntimeMaintenancePatch(EngineRuntimePolicyPatch):
+    enabled: bool | None = None
+    augmentation_enabled: bool | None = None
+    maximum_tasks_per_tick: int | None = Field(default=None, ge=1, le=8)
+    maximum_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_scope_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_retained_tasks: int | None = Field(default=None, ge=1, le=8192)
+    maximum_chunk_wall_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_cpu_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_polls: int | None = Field(default=None, ge=4, le=65536)
+    maximum_memory_drop_ppm: int | None = Field(default=None, ge=0, le=1000000)
+    maximum_consecutive_failures: int | None = Field(default=None, ge=1, le=32)
+    initial_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    maximum_backoff_ms: int | None = Field(default=None, ge=1, le=86400000)
+    preemption_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    circuit_failure_threshold: int | None = Field(default=None, ge=1, le=32)
+    circuit_cooldown_ms: int | None = Field(default=None, ge=1, le=86400000)
+    interrupted_lease_grace_ms: int | None = Field(default=None, ge=1000, le=300000)
+    priority_aging_ms: int | None = Field(default=None, ge=1000, le=86400000)
+    maximum_admission_wait_ms: int | None = Field(default=None, ge=1000, le=3600000)
+    clock_jump_tolerance_ms: int | None = Field(default=None, ge=100, le=60000)
+    maximum_owner_heartbeat_ms: int | None = Field(default=None, ge=10000, le=300000)
+    maximum_chunk_results: int | None = Field(default=None, ge=1, le=16384)
+    maximum_ack_retries_per_tick: int | None = Field(default=None, ge=1, le=16)
+
+
+EngineRuntimeEnabledPatch = EngineRuntimeLearningPatch
 
 
 class EngineRuntimeControlPatch(BaseModel):
@@ -76,7 +126,7 @@ class EngineRuntimeControlPatch(BaseModel):
     tenant_id: str = Field(min_length=1, max_length=512)
     expected_version: int = Field(ge=1, le=2**63 - 1)
     serving: EngineRuntimeServingPatch | None = None
-    learning: EngineRuntimeEnabledPatch | None = None
+    learning: EngineRuntimeLearningPatch | None = None
     maintenance: EngineRuntimeMaintenancePatch | None = None
     action: str | None = Field(default=None, pattern="^(trim_cache|clear_cache|drain|resume)$")
     serving_route_id: str | None = Field(default=None, min_length=1, max_length=384)
@@ -121,6 +171,15 @@ class EngineMaintenanceRetry(BaseModel):
     tenant_id: str = Field(min_length=1, max_length=512)
     source_digest: str = Field(pattern="^[0-9a-f]{64}$")
     expected_attempts: int = Field(ge=0, le=1_000_000)
+
+
+class EngineMaintenanceCircuitReset(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    expected_generation: int = Field(ge=1, le=8_999_999_999_999_999)
+    expected_failure_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
 
 
 class EngineImageGenerateBody(BaseModel):
@@ -450,9 +509,11 @@ def configure_runtime_control(
         raise HTTPException(status_code=503, detail="engine runtime control unavailable")
     try:
         return coordinator.runtime_control.configure(
-            actor_id=body.actor_id, tenant_id=body.tenant_id, expected_version=body.expected_version,
+            actor_id=body.actor_id,
+            tenant_id=body.tenant_id,
+            expected_version=body.expected_version,
             serving=None if body.serving is None else body.serving.model_dump(exclude_unset=True),
-            learning=None if body.learning is None else body.learning.model_dump(),
+            learning=None if body.learning is None else body.learning.model_dump(exclude_unset=True),
             maintenance=None if body.maintenance is None else body.maintenance.model_dump(exclude_unset=True),
             action=body.action,
             serving_route_id=body.serving_route_id,
@@ -480,6 +541,53 @@ def export_runtime_learning_checkpoint(
             actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
             expected_state_version=expected_state_version,
         )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.get("/runtime-control/learning/dataset")
+def export_runtime_learning_dataset(
+    request: Request,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+    actor_id: Annotated[str, Query(min_length=1, max_length=512)],
+    tenant_id: Annotated[str, Query(min_length=1, max_length=512)],
+    limit: Annotated[int, Query(ge=1, le=256)] = 128,
+    cursor: Annotated[str | None, Query(min_length=1, max_length=6144)] = None,
+    partition_id: Annotated[str | None, Query(pattern="^[0-9a-f]{64}$")] = None,
+    include_untrained: bool = False,
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.export_learning_dataset(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            limit=limit,
+            cursor=cursor,
+            partition_id=partition_id,
+            include_untrained=include_untrained,
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
+def reset_runtime_maintenance_circuit(
+    request: Request,
+    kind: str,
+    body: EngineMaintenanceCircuitReset,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.reset_maintenance_circuit(kind=kind, **body.model_dump())
     except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
         _raise_engine_error(exc)
 

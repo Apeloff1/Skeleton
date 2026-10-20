@@ -93,11 +93,7 @@ class IdleWorkCheckpoint:
         self.last_reason = "not_polled"
         self.poll_count = 0
 
-    def permitted(self) -> bool:
-        self.poll_count += 1
-        if self._stop_requested is not None and self._stop_requested() is not False:
-            self.last_reason = "foreground_preemption"
-            return False
+    def _budget_available(self) -> bool:
         if self._budget is not None:
             if monotonic_ns() - self._started_wall_ns > self._budget.maximum_wall_ns:
                 self.last_reason = "chunk_wall_budget"
@@ -108,7 +104,24 @@ class IdleWorkCheckpoint:
             if self.poll_count > self._budget.maximum_polls:
                 self.last_reason = "chunk_checkpoint_budget"
                 return False
-        observed = self._probe()
+        return True
+
+    def permitted(self) -> bool:
+        self.poll_count += 1
+        if self._stop_requested is not None and self._stop_requested() is not False:
+            self.last_reason = "foreground_preemption"
+            return False
+        if not self._budget_available():
+            return False
+        try:
+            observed = self._probe()
+        except Exception as exc:
+            self.last_reason = "host_telemetry_unavailable"
+            raise IdleWorkPreempted(self.last_reason) from exc
+        # A host probe can itself wait on local OS/serving observations. Its
+        # elapsed work is part of this chunk, not free work before admission.
+        if not self._budget_available():
+            return False
         if (not isinstance(observed, tuple) or len(observed) != 2
                 or not isinstance(observed[0], HostIdleTelemetry)
                 or type(observed[1]) is not int):

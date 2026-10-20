@@ -3,11 +3,13 @@ import { ActivityIndicator, Platform, StyleSheet, Switch, Text, TouchableOpacity
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import { ChatClientError } from '../../product/chatErrors';
-import { canManageRuntimePartition, changeRuntimeOptimization, changeRuntimePartition, exportRuntimeCheckpoint, getRuntimeOptimization, MAX_RUNTIME_CHECKPOINT_BYTES, parseRuntimeCheckpoint, retryRuntimeMaintenanceTask, type RuntimeControlChange, type RuntimeControlObservation, type RuntimeLearningAction, type RuntimeLearningCheckpoint, type RuntimeLearningCheckpointFile, type RuntimeLearningPartition, type RuntimeMaintenanceTask } from '../../product/runtimeOptimizationClient';
+import { canManageRuntimePartition, changeRuntimeOptimization, changeRuntimePartition, exportRuntimeCheckpoint, getRuntimeOptimization, MAX_RUNTIME_CHECKPOINT_BYTES, parseRuntimeCheckpoint, resetRuntimeMaintenanceCircuit, retryRuntimeMaintenanceTask, type RuntimeControlChange, type RuntimeControlObservation, type RuntimeLearningAction, type RuntimeLearningCheckpoint, type RuntimeLearningCheckpointFile, type RuntimeLearningPartition, type RuntimeMaintenanceCircuit, type RuntimeMaintenanceTask } from '../../product/runtimeOptimizationClient';
 import { useStudioForeground } from './useStudioForeground';
+import { saveRuntimeJson } from './runtimeOptimizationFiles';
+import RuntimePolicyEditor from './RuntimePolicyEditor';
+import RuntimeDatasetExportPanel from './RuntimeDatasetExportPanel';
 
 function number(value: unknown): number | null { return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null; }
 function count(value: unknown): string { const found = number(value); return found === null ? 'Unknown' : Math.floor(found).toLocaleString(); }
@@ -18,6 +20,8 @@ function sum(left: unknown, right: unknown): number | null { const first = numbe
 function decimal(value: unknown): string { const found = number(value); return found === null ? 'Unknown' : found.toFixed(3); }
 function fingerprint(value: unknown): string { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? `${value.slice(0, 10)}…${value.slice(-6)}` : 'Unknown'; }
 function sourceFingerprint(value: unknown): string { return value === '' ? 'No source observation recorded' : fingerprint(value); }
+function percentPpm(value: unknown): string { const found = number(value); return found === null || found > 1000000 ? 'Unknown' : `${(found / 10000).toFixed(1)}%`; }
+function nanosDuration(value: unknown): string { const found = number(value); return found === null ? 'Unknown' : duration(found / 1000000); }
 function checkpointFileError(message: string): never { throw new ChatClientError(message, { kind: 'validation', retryable: false }); }
 async function pickCheckpointFile(): Promise<{ name: string; text: string } | null> {
   const picked = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain'], multiple: false, copyToCacheDirectory: true });
@@ -42,23 +46,8 @@ async function pickCheckpointFile(): Promise<{ name: string; text: string } | nu
 }
 async function saveCheckpointFile(file: RuntimeLearningCheckpointFile, isCurrent: () => boolean): Promise<void> {
   const { checkpoint, checkpointJson: content } = file;
-  if (new TextEncoder().encode(content).byteLength > MAX_RUNTIME_CHECKPOINT_BYTES || !isCurrent()) checkpointFileError('The checkpoint export is stale or exceeds 256 KiB. Refresh and try again.');
   const filename = `jeeves-learner-${checkpoint.partition_id.slice(0, 12)}-v${checkpoint.state_version}.json`;
-  if (Platform.OS === 'web') {
-    const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }));
-    const link = document.createElement('a');
-    try { if (!isCurrent()) checkpointFileError('Your account changed before the export could be downloaded.'); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); }
-    finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
-    return;
-  }
-  if (!FileSystem.cacheDirectory || !await Sharing.isAvailableAsync()) checkpointFileError('File sharing is unavailable on this device. Open the studio on a device with file export support.');
-  if (!isCurrent()) checkpointFileError('Your account changed before the checkpoint could be exported.');
-  const uri = `${FileSystem.cacheDirectory}${Date.now()}-${filename}`;
-  try {
-    await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
-    if (!isCurrent()) checkpointFileError('Your account changed before the checkpoint could be shared.');
-    await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export operational learner checkpoint' });
-  } finally { await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {}); }
+  await saveRuntimeJson({ content, filename, maximumBytes: MAX_RUNTIME_CHECKPOINT_BYTES, dialogTitle: 'Export operational learner checkpoint' }, isCurrent);
 }
 type PendingLearnerChange = { partitionId: string; stateVersion: number; policyVersion: number; action: 'reset' | 'restore_last_healthy' };
 type PendingLearnerImport = { partitionId: string; stateVersion: number; policyVersion: number; filename: string; checkpoint: RuntimeLearningCheckpoint; checkpointJson: string };
@@ -89,6 +78,7 @@ export default function RuntimeOptimizationPanel() {
   const [pendingImport, setPendingImport] = useState<PendingLearnerImport | null>(null);
   const [pickingFile, setPickingFile] = useState(false);
   const [tasksExpanded, setTasksExpanded] = useState(false);
+  const [pendingCircuitReset, setPendingCircuitReset] = useState<RuntimeMaintenanceCircuit | null>(null);
   const epoch = useRef(0);
   const requests = useRef(new Set<AbortController>());
   const refreshRequest = useRef<AbortController | null>(null);
@@ -140,6 +130,7 @@ export default function RuntimeOptimizationPanel() {
       learningOffsetRef.current = 0;
       setServingRouteId(null); setPartitionId(null); setLearningOffset(0); setPendingLearnerChange(null); setPendingImport(null); setPickingFile(false);
       setTasksExpanded(false);
+      setPendingCircuitReset(null);
       setError('Your account changed. Refresh to observe the current account.');
       commandLock.current = false;
     }, 1000);
@@ -177,8 +168,8 @@ export default function RuntimeOptimizationPanel() {
     void refresh();
   };
 
-  const apply = async (title: string, change: RuntimeControlChange) => {
-    if (!observed || !fresh || !foreground || commandLock.current || observed.scope.role !== 'admin') return;
+  const apply = async (title: string, change: RuntimeControlChange): Promise<boolean> => {
+    if (!observed || !fresh || !foreground || commandLock.current || observed.scope.role !== 'admin') return false;
     commandLock.current = true;
     refreshRequest.current?.abort();
     const request = new AbortController(); requests.current.add(request);
@@ -191,11 +182,12 @@ export default function RuntimeOptimizationPanel() {
     try {
       const routed = serving?.route_id && (change.serving || change.action) ? { ...change, serving_route_id: serving.route_id } : change;
       const next = await changeRuntimeOptimization(observed, routed, request.signal);
-      if (!mounted.current || request.signal.aborted || generation !== epoch.current || observed.scope.token !== getAuthToken()) return;
+      if (!mounted.current || request.signal.aborted || generation !== epoch.current || observed.scope.token !== getAuthToken()) return false;
       setNotice(next.state.reconciliation?.state === 'pending' ? `Policy ${next.state.policy_version} saved. The runtime is still applying it; refresh to observe progress.` : `${title} confirmed · policy ${next.state.policy_version}.`);
       await reconcileConfirmed(next, request, generation, observed.scope.token);
+      return true;
     } catch (cause) {
-      if (!mounted.current || request.signal.aborted || generation !== epoch.current) return;
+      if (!mounted.current || request.signal.aborted || generation !== epoch.current) return false;
       setFresh(false);
       const conflict = cause instanceof ChatClientError && cause.kind === 'conflict';
       const unauthorized = cause instanceof ChatClientError && cause.kind === 'authorization';
@@ -212,6 +204,7 @@ export default function RuntimeOptimizationPanel() {
       requests.current.delete(request);
       if (generation === epoch.current) { commandLock.current = false; if (mounted.current) setCommand(''); }
     }
+    return false;
   };
 
   const state = observed?.state;
@@ -239,6 +232,7 @@ export default function RuntimeOptimizationPanel() {
   const maintenanceRetryObserved = maintenance?.available === true && maintenance.coordination?.state === 'observed' && maintenance.status?.coordination_state === 'synchronized';
   const execution = state?.execution;
   const draining = serving?.draining;
+  const servingUnavailable = serving?.available === false || state?.serving.available === false;
   const currentToken = observed?.scope.token === getAuthToken();
   const selectedPartition = partitions.find(row => row.partition_id === partitionId);
   const partitionManageable = !!observed && !!selectedPartition && canManageRuntimePartition(observed, selectedPartition);
@@ -323,6 +317,32 @@ export default function RuntimeOptimizationPanel() {
       }
     } finally { requests.current.delete(request); if (generation === epoch.current) { commandLock.current = false; if (mounted.current) setCommand(''); } }
   };
+  const resetCircuit = async (circuit: RuntimeMaintenanceCircuit) => {
+    if (!observed || disabled || !maintenanceRetryObserved || circuit.resettable !== true || commandLock.current) return;
+    commandLock.current = true; refreshRequest.current?.abort();
+    const request = new AbortController(); requests.current.add(request);
+    const generation = epoch.current;
+    const valid = () => mounted.current && !request.signal.aborted && generation === epoch.current && observed.scope.token === getAuthToken();
+    setCommand('Recording scoped circuit reset'); setLoading(false); setError(''); setNotice('');
+    try {
+      const result = await resetRuntimeMaintenanceCircuit(observed, circuit, request.signal);
+      if (!valid()) return;
+      setPendingCircuitReset(null);
+      setNotice(`${result.result.deduplicated ? 'The same circuit reset was already recorded' : 'Scoped maintenance circuit reset confirmed'} · generation ${count(result.result.generation)}. Task retries, backoff and maintenance admission are unchanged.`);
+      await reconcileConfirmed(result.observation, request, generation, observed.scope.token);
+    } catch (cause) {
+      if (!valid()) return;
+      setFresh(false); setPendingCircuitReset(null);
+      const unauthorized = cause instanceof ChatClientError && cause.kind === 'authorization';
+      const message = cause instanceof ChatClientError ? cause.message : 'The circuit reset was not confirmed.';
+      if (unauthorized) setObserved(null);
+      setError(message);
+      if (!unauthorized) {
+        try { const next = await getRuntimeOptimization(request.signal, learningOffsetRef.current); if (valid()) { setObserved(next); setFresh(true); setError(`${message} Current state has been refreshed; no reset was replayed.`); } }
+        catch { /* A read failure never authorizes another reset. */ }
+      }
+    } finally { requests.current.delete(request); if (generation === epoch.current) { commandLock.current = false; if (mounted.current) setCommand(''); } }
+  };
 
   // An account can change between the timer callback and this render.
   if (observed && !currentToken) return <View style={s.panel}><Text style={s.heading}>Runtime optimization</Text><Text style={s.caption}>Account changed. Waiting for a fresh account observation.</Text></View>;
@@ -334,7 +354,8 @@ export default function RuntimeOptimizationPanel() {
     {learning?.totals_health === 'quarantined' && <Text style={s.warning}>Learning counters are unavailable because their stored integrity check failed. Completed execution results retain their own authority.</Text>}
     {!!command && <View style={s.progress}><ActivityIndicator size="small" color="#c4b5fd" /><Text style={s.caption}>{command}…</Text></View>}
     {!state ? <Text style={s.caption}>Runtime capacity and learning are shown after the authenticated engine reports them.</Text> : <>
-      <View style={s.statusRow}><View style={[s.badge, draining === true && s.warningBadge]}><Text style={s.badgeText}>{draining === true ? 'Draining new work' : draining === false ? 'Accepting work' : 'Admission unknown'}</Text></View><Text style={s.caption}>{pressure}</Text></View>
+      <View style={s.statusRow}><View style={[s.badge, (draining === true || servingUnavailable) && s.warningBadge]}><Text style={s.badgeText}>{servingUnavailable ? 'Local serving unavailable' : draining === true ? 'Draining new work' : draining === false ? 'Accepting work' : 'Admission unknown'}</Text></View><Text style={s.caption}>{pressure}</Text></View>
+      {servingUnavailable && <Text style={s.caption}>No configured local serving engine is available in this observation. Tenant learning diagnostics and host maintenance retain their own reported availability.</Text>}
       <Text style={s.caption}>{admin ? servingModels.length ? 'Administrator controls · serving actions target the selected local model; maintenance affects this host; learning is scoped to your tenant.' : 'Administrator controls · legacy serving actions and maintenance affect this host; learning is scoped to your tenant.' : 'Read-only observation · an administrator can change serving, learning and maintenance policy.'}</Text>
       {!!servingModels.length && <View style={s.modelPicker}><Text style={s.rowTitle}>Local model serving</Text><View style={s.actions}>{servingModels.map(model => <TouchableOpacity key={model.route_id} accessibilityRole="button" accessibilityState={{ selected: model.route_id === serving?.route_id, disabled: !!command || pickingFile }} disabled={!!command || pickingFile} onPress={() => setServingRouteId(model.route_id!)} style={[s.modelChoice, model.route_id === serving?.route_id && s.selectedChoice]}><Text style={s.buttonText}>{label(model.model_id)}{model.active ? ' · primary' : ''}</Text><Text style={s.caption}>{label(model.provider_id)} · {label(model.pressure?.level, 'Pressure unknown')}</Text></TouchableOpacity>)}</View><Text style={s.caption}>Showing {label(serving?.model_id)} · model digest {fingerprint(serving?.model_digest)}. Capacity and queue metrics below belong to this model.</Text></View>}
       <View style={s.metrics}><Metric title="Active / capacity" value={`${count(sum(capacity?.active_interactive, capacity?.active_background))} / ${count(capacity?.effective_concurrency)}`} /><Metric title="Queued requests" value={count(sum(capacity?.queued_interactive, capacity?.queued_background))} /><Metric title="Recent latency" value={duration(serving?.pressure?.latency_ewma_ms)} /><Metric title="Derived cache" value={bytes(serving?.cache?.bytes)} /></View>
@@ -346,6 +367,8 @@ export default function RuntimeOptimizationPanel() {
         <View style={s.metrics}><Metric title="Active tenants" value={count(serving?.fairness?.active_tenants)} /><Metric title="Queued tenants" value={count(serving?.fairness?.queued_tenants)} /><Metric title="Oldest foreground wait" value={duration(serving?.fairness?.oldest_interactive_wait_ms)} /><Metric title="Oldest background wait" value={duration(serving?.fairness?.oldest_background_wait_ms)} /></View>
         <Text style={s.caption}>Tenant active limit {count(capacity?.per_tenant_active_limit)} · tenant queue limit {count(capacity?.per_tenant_queue_limit)} · fairness rotations {count(serving?.fairness?.rotations)} · memory load shedding {count(serving?.fairness?.memory_shed_rejections)}</Text>
       </View>
+
+      {observed && <RuntimePolicyEditor observed={observed} servingRouteId={serving?.route_id} disabled={disabled} maintenanceDisabled={maintenanceDisabled} onApply={(change, expectedVersion, expectedRoute) => { if (expectedVersion !== observed.state.policy_version || expectedRoute !== serving?.route_id) { setError('The policy or selected model changed. Discard the advanced draft and review current values before applying.'); return Promise.resolve(false); } return apply('Advanced runtime policy updated', change); }} />}
 
       <View style={s.section}>
         <PolicySwitch title="Learn from execution outcomes" description="Tenant-scoped numeric learning; no transcript training" value={learningEnabled} disabled={disabled} onChange={enabled => { void apply(enabled ? 'Outcome learning enabled' : 'Outcome learning disabled', { learning: { enabled } }); }} />
@@ -377,12 +400,16 @@ export default function RuntimeOptimizationPanel() {
         </View>}
       </View>
 
+      {observed && <RuntimeDatasetExportPanel observed={observed} partitionId={selectedPartition?.partition_id} disabled={disabled} foreground={foreground} />}
+
       <View style={s.section}>
         <PolicySwitch title="Idle self-maintenance" description="Bounded local housekeeping yields to foreground work" value={maintenanceEnabled} disabled={maintenanceDisabled} onChange={enabled => { void apply(enabled ? 'Idle maintenance enabled' : 'Idle maintenance disabled', { maintenance: { enabled } }); }} />
         <PolicySwitch title="Replay adaptation" description="Update the operational predictor from recorded outcomes during idle time" value={replayEnabled} disabled={maintenanceDisabled || maintenance?.available !== true} onChange={augmentation_enabled => { void apply(augmentation_enabled ? 'Replay adaptation enabled' : 'Replay adaptation disabled', { maintenance: { augmentation_enabled } }); }} />
         {coordinationUnavailable && <Text style={s.warning}>Maintenance coordination is unavailable or degraded. Its controls are read-only until healthy coordination is observed again. Refresh to read current custody and recovery state.</Text>}
         <Text style={s.caption}>Replay adaptation starts off and runs only with idle self-maintenance enabled. It adds bounded local predictor updates; it does not train transformer weights or verify game quality.</Text>
         <Text style={s.caption}>{label(maintenance?.status?.state, 'Maintenance state unknown')} · active tasks {count(maintenance?.status?.active_tasks)} · queued {count(maintenance?.queued_tasks)}</Text>
+        {maintenance?.telemetry && <View style={s.inspector}><Text style={s.rowTitle}>Last host resource observation</Text><View style={s.metrics}><Metric title="CPU headroom observed" value={percentPpm(maintenance.telemetry.cpu_free_ppm)} /><Metric title="Memory headroom observed" value={percentPpm(maintenance.telemetry.memory_free_ppm)} /><Metric title="Telemetry age at admission" value={nanosDuration(maintenance.telemetry.age_ns)} /><Metric title="Host quiet time observed" value={nanosDuration(maintenance.telemetry.quiet_ns)} /></View><Text style={s.caption}>Admission reason: {label(maintenance.telemetry.admission_reason)} · telemetry {fingerprint(maintenance.telemetry.telemetry_digest)}. These are the last recorded observations, not a promise of current idle capacity.</Text></View>}
+        {maintenance?.quiescence?.last_admission && <Text style={s.caption}>Last coordinated host admission: {label(maintenance.quiescence.last_admission.reason)} · required quiet {nanosDuration(maintenance.quiescence.last_admission.required_quiet_ns)} · observed minimum quiet {nanosDuration(maintenance.quiescence.last_admission.minimum_quiet_ns)} · stale owners {count(maintenance.quiescence.last_admission.stale_owners)}.</Text>}
         <View style={s.metrics}><Metric title="Maintenance owner" value={label(maintenance?.ownership?.state)} /><Metric title="Owner physical tasks" value={count(maintenance?.ownership?.physical_tasks)} /><Metric title="Host foreground work" value={count(maintenance?.quiescence?.host_foreground_requests)} /><Metric title="Registered host owners" value={count(maintenance?.quiescence?.registered_host_owners)} /><Metric title="Blocked recovery tasks" value={count(maintenance?.recovery?.blocked_tasks)} /><Metric title="Clock discontinuities" value={count(maintenance?.recovery?.clock_jump_count)} /></View>
         <View style={s.metrics}><Metric title="Retained chunk receipts" value={count(maintenance?.chunk_results?.retained)} /><Metric title="Pending acknowledgements" value={count(maintenance?.acknowledgements?.pending)} /><Metric title="Acknowledgement failures" value={count(maintenance?.acknowledgements?.failed_attempts)} /><Metric title="Host receipt capacity" value={count(maintenance?.chunk_results?.maximum)} /></View>
         {maintenance?.chunk_results?.backpressure === true && <Text style={s.warning}>Durable chunk results have reached their admission limit. Maintenance waits for receipt capacity before starting more physical work.</Text>}
@@ -390,6 +417,7 @@ export default function RuntimeOptimizationPanel() {
         {number(maintenance?.recovery?.blocked_tasks) !== null && Number(maintenance?.recovery?.blocked_tasks) > 0 && <Text style={s.warning}>Recovery is blocked until the prior physical work is proven drained. Expired leases alone do not authorize takeover.</Text>}
         {!!maintenance?.leases?.length && <View style={s.partitionList}>{maintenance.leases.slice(0, 3).map((lease, index) => <Text key={`${lease.resource_id ?? index}:${index}`} style={s.caption}>Lease fence {count(lease.fencing_token)} · {label(lease.state)}{lease.drained_at_ns != null ? ' · drain recorded' : ''}</Text>)}</View>}
         {!!maintenance?.recent_tasks?.length && <View style={s.partitionList}>{maintenance.recent_tasks.slice(0, tasksExpanded ? maintenance.recent_tasks.length : 3).map((task, index) => <View key={`${task.task_id ?? index}:${index}`} style={s.partitionChoice}><View style={s.partition}><Text style={s.partitionName}>{label(task.kind, 'Maintenance task')}</Text><Text style={s.caption}>{label(task.state)} · {count(task.attempts)} attempts</Text></View>{task.state === 'failed' && task.retryable !== true && task.retry_reason && <Text style={s.caption}>Retry unavailable: {label(task.retry_reason)}</Text>}{task.retryable === true && admin && fresh && foreground && observed && Date.now() - observed.observedAt <= 60000 && maintenanceRetryObserved && <Button title="Retry failed task" icon="refresh-outline" disabled={disabled} onPress={() => { void retryMaintenance(task); }} />}</View>)}{maintenance.recent_tasks.length > 3 && <Button title={tasksExpanded ? 'Show recent three tasks' : `Show ${maintenance.recent_tasks.length} returned tasks`} onPress={() => setTasksExpanded(expanded => !expanded)} />}<Text style={s.caption}>Retry queues the exact observed task and source at its recorded attempt count. It does not enable maintenance, resume other work or force immediate execution.</Text></View>}
+        {!!maintenance?.circuits?.length && <View style={s.partitionList}><Text style={s.rowTitle}>Scoped maintenance circuits</Text>{maintenance.circuits.map((circuit, index) => <View key={`${circuit.kind ?? index}:${index}`} style={s.partitionChoice}><View style={s.partition}><Text style={s.partitionName}>{label(circuit.kind)}</Text><Text style={s.caption}>{label(circuit.state)} · generation {count(circuit.generation)} · failures {count(circuit.failures)}</Text></View><Text style={s.caption}>Failure {fingerprint(circuit.last_failure_digest)} · source {fingerprint(circuit.last_source_digest)}</Text>{circuit.resettable !== true && circuit.reset_reason && <Text style={s.caption}>Reset unavailable: {label(circuit.reset_reason)}</Text>}{circuit.resettable === true && admin && fresh && foreground && maintenanceRetryObserved && <Button title="Review circuit reset" icon="shield-outline" disabled={maintenanceDisabled} onPress={() => setPendingCircuitReset(circuit)} />}</View>)}{pendingCircuitReset && <View style={s.confirmation}><Text style={s.rowTitle}>Reset the {label(pendingCircuitReset.kind)} circuit?</Text><Text style={s.caption}>This closes the exact observed breaker at generation {count(pendingCircuitReset.generation)} for failure {fingerprint(pendingCircuitReset.last_failure_digest)} and source {fingerprint(pendingCircuitReset.last_source_digest)}. It does not retry tasks, remove their backoff, enable maintenance or force execution.</Text><View style={s.actions}><Button title="Confirm circuit reset" disabled={maintenanceDisabled || !maintenanceRetryObserved} onPress={() => { void resetCircuit(pendingCircuitReset); }} /><Button title="Cancel" disabled={!!command} onPress={() => setPendingCircuitReset(null)} /></View></View>}</View>}
       </View>
 
       {execution && <View style={s.section}><Text style={s.rowTitle}>Execution supervision and recovery</Text>{execution.available !== true ? <Text style={s.caption}>The engine could not observe its execution supervisor. No recovery counters are inferred.</Text> : <><View style={s.metrics}><Metric title="Active executions" value={count(execution.active_executions)} /><Metric title="Lifecycle leases" value={count(execution.active_lifecycle_leases)} /><Metric title="Recovery records scanned" value={count(execution.recovery?.scanned)} /><Metric title="Recovery drivers started" value={count(execution.recovery?.started)} /><Metric title="Driver failures" value={count(execution.recovery?.driver_failures)} /><Metric title="Finalization failures" value={count(execution.recovery?.driver_finalization_failures)} /></View><Text style={s.caption}>{execution.recovery?.scan_in_progress === true ? 'Recovery scan in progress' : execution.recovery?.scan_in_progress === false ? 'Recovery scan idle' : 'Recovery scan state unknown'} · driver ceiling {count(execution.recovery?.maximum_recovery_drivers)} · page limit {count(execution.recovery?.page_limit)}</Text>{execution.faulted === true && <Text style={s.warning}>Execution supervision reports a fault. Inspect the engine before submitting replacement work.</Text>}{typeof execution.recovery?.last_error === 'string' && execution.recovery.last_error && <Text style={s.warning}>Last recovery scan error: {label(execution.recovery.last_error)}</Text>}{typeof execution.recovery?.last_driver_error === 'string' && execution.recovery.last_driver_error && <Text style={s.warning}>Last recovery driver error: {label(execution.recovery.last_driver_error)}</Text>}<Text style={s.caption}>These are aggregate engine observations. A recovery scan or issued lease does not confirm an execution result.</Text></>}</View>}

@@ -5412,6 +5412,39 @@
             "owner": "Existing StudioMaintenanceController.retry_failed under RuntimeOptimizationControl host composition",
             "authority": "Authenticated administrator plus existing engine service runtime-control grant; exact tenant-derived scope, task/source/attempt guards, terminal failed state, unchanged handler and released/proven-drained custody. Preserve continuation and attempts, reset queue failures/backoff only, re-enter normal admission and append existing maintenance event. No extra provider/model/action grant or automatic command replay."
           }
+        },
+        "operator_and_learning_continuation": {
+          "shared_policy_contract": "skeleton/contracts/runtime_optimization.py pure bounded field metadata/validation; same existing serving, learning and maintenance owners validate merged policies before atomic runtime-control CAS. GET runtime-control adds policy_controls for actual editable bounds/scopes and local route operator ceilings; no new policy authority.",
+          "dataset_export": {
+            "owner": "skeleton/persistence/execution_repository.py",
+            "interfaces": [
+              "GET /api/ai/runtime-control/learning/dataset",
+              "equivalent sealed /api/v1/engine/runtime-control/learning/dataset"
+            ],
+            "authority": "Admin plus existing engine runtime-control service grant, authenticated tenant/scope, optional partition and include_untrained filter; canonical retained numeric diagnostics only. Default128/max256 rows, fixed highwater/keyset cursor <=6KiB binds all filters, <=256 metadata-only canonical provenance checks. Opaque canonical dataset_json <=1MiB with <=3MiB escaped transport; explicit per-page provenance/digests and retention-gap limitations, no full-history/immutable snapshot claim. No prompts, model responses, tool payloads or provider credentials.",
+            "policy_markers": "Additive ai_execution_result learning_policy_version and learning_policy_digest bind actual terminal-transaction policy; legacy marker values stay explicitly unknown."
+          },
+          "maintenance_circuit_reset": {
+            "owner": "skeleton/jeeves/ai/studio_maintenance.py",
+            "interface": "POST /api/ai/runtime-control/maintenance/circuits/{kind}/reset and sealed engine equivalent",
+            "authority": "Admin plus engine runtime-control grant; tenant-derived scope, exact kind/generation/failure/source checks in existing circuit row transaction. Deny held/running custody. Clears breaker counters/cooldown only; original task backoff/retry/enabled policy and continuation remain unchanged. Additive failure/source/generation metadata in same SQLite circuit rows; old unbound rows cannot be manually reset."
+          },
+          "crawler_source_use": {
+            "owner": "backend/core/dragon_crawler.py with existing Dragon practice adapter",
+            "interface": "POST /api/dragon-academy/crawler/sessions/{id}/sources/{source_id}/use",
+            "storage": "Existing Mongo session source_use_policies <=64 entries: enabled/max_age_seconds60..86400/version/changed_at. Exact expected version plus session CAS and command idempotency; same existing roles/ownership, owner can withdraw but only editor/admin restore/change use.",
+            "authority": "All source reads/search/context/export and assert_context enforce current use/freshness; new crawler_reference.v2 binds policy version; v1 admissible only unchanged default. Session erasure removes map. No implicit recrawl, rights/consent upgrade or review/model promotion."
+          },
+          "studio_continuation": {
+            "owner": "backend/core/game_studio_agent.py",
+            "interfaces": [
+              "Existing goal advance adds max_planner_decisions1..4 and wait_for_work_seconds0..10",
+              "POST existing scoped goal source-refresh with expected goal/project/tree identities and idempotency"
+            ],
+            "authority": "Original total model/job/action/wall grants stay authoritative; serial decisions rebuild source-current context from real editor/child receipts. Explicit source re-pin only with no unresolved work, preserve baseline/history/grants/consent and withhold structurally incompatible numeric advice. Bounded round feedback derives actual matched baseline/candidate review+edit receipts, including rejected/restored candidates, without invented quality scores."
+          },
+          "inference_preparation": "Existing local/native owners add immutable per-request LocalPreparedInput plus prepare_input/validate_prepared_input/infer_prepared: exact request/model/runtime/profile/tokenizer/source/issuer/trusted-scope bindings; reused count/estimate/token sequence, no cross-request cache or new store. Resource telemetry uses fresh CPU deltas and actual platform/cgroup/process memory; missing signals remain unknown.",
+          "qualification": "Build/source compilation only. Existing ownership, review floors, consent, grants and enterprise qualification state are unchanged."
         }
       }
     }
