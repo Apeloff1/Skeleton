@@ -81,6 +81,7 @@ READ_OPERATIONS = (
     "game.studio.author.preview",
     "game.studio.author.compile",
     "game.studio.author.game",
+    "game.studio.author.gameplay",
 )
 WRITE_OPERATIONS = (
     "console.edit",
