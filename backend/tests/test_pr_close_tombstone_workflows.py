@@ -54,7 +54,14 @@ def _job_block(text: str, job: str) -> str:
 
 def test_pr_validation_workflows_use_zero_work_close_tombstones() -> None:
     for name, jobs in WORKFLOWS.items():
-        text = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+        active = ROOT / ".github" / "workflows" / name
+        archived = ROOT / ".github" / "workflows-archive" / name
+        if not active.is_file():
+            # Retired workflows have no active event subscription; preserve
+            # their historic assertions without reenabling expensive jobs.
+            assert archived.is_file(), name
+            continue
+        text = active.read_text(encoding="utf-8")
         # Manual-only and opened/synchronize-only workflows must not be
         # reactivated on PR closure just to schedule a skipped no-op run.
         if "  pull_request:\n" not in text:
@@ -84,9 +91,11 @@ def test_reproducible_release_uses_pr_number_for_close_cancellation_identity() -
 
 
 def test_jeeves_absorb_does_not_put_sha_in_pr_concurrency_identity() -> None:
-    text = (ROOT / ".github" / "workflows" / "jeeves-absorb.yml").read_text(
-        encoding="utf-8"
-    )
+    active = ROOT / ".github" / "workflows" / "jeeves-absorb.yml"
+    archived = ROOT / ".github" / "workflows-archive" / "jeeves-absorb.yml"
+    selected = active if active.is_file() else archived
+    assert selected.is_file()
+    text = selected.read_text(encoding="utf-8")
     assert "group: jeeves-absorb-${{ github.event.pull_request.number || github.ref }}" in text
     concurrency = text.split("concurrency:\n", 1)[1].split("\n\n", 1)[0]
     assert "github.sha" not in concurrency
