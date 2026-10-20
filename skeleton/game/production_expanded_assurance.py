@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .production_quality import QualityGateError, _digest
+from .production_deep_gates import _sha
 from .production_studio_assurance import ALL_GATES, OWNERS as BASE_OWNERS
 from .production_advanced_assurance import NAMES as ADV_NAMES, NEW_OWNERS
 from .production_expanded_gates import SPECS, NAMES, OWNERS
@@ -15,17 +16,30 @@ def verify_84_structure(report):
         "gates", "findings", "evidence_digest",
     } or report["schema"] != "game.candidate.production_84.v1":
         raise QualityGateError("84-gate schema mismatch")
+    _sha(report["source_digest"], "advanced source digest")
+    _sha(report["evidence_digest"], "advanced report digest")
     gates = report["gates"]
     if type(gates) is not list or len(gates) != 84 or report["release_certified"] is not False:
         raise QualityGateError("incomplete or falsely released candidate")
+    if any(type(x) is not dict for x in gates):
+        raise QualityGateError("quality gate records must be objects")
     if tuple(x.get("name") for x in gates) != ORDER:
         raise QualityGateError("gate ordering mismatch")
     findings = []
     for gate in gates:
-        if type(gate.get("passed")) is not bool or type(gate.get("findings")) is not list:
+        if (set(gate) != {"name", "passed", "findings", "evidence_digest"}
+                or type(gate.get("passed")) is not bool
+                or type(gate.get("findings")) is not list):
             raise QualityGateError("gate status malformed")
         if gate["passed"] is not (not gate["findings"]):
             raise QualityGateError("gate status inconsistent")
+        _sha(gate["evidence_digest"], "individual gate digest")
+        for finding in gate["findings"]:
+            if (type(finding) is not dict
+                    or set(finding) != {"gate", "code", "subject"}
+                    or finding["gate"] != gate["name"]
+                    or any(type(v) is not str or not v for v in finding.values())):
+                raise QualityGateError("misattributed or invalid finding")
         findings.extend(gate["findings"])
     if (type(report["candidate_passed"]) is not bool
             or report["candidate_passed"] is not (not findings)
