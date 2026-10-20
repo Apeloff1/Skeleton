@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from fastapi.encoders import jsonable_encoder
 from pymongo import ReturnDocument
+from pymongo.errors import PyMongoError
 
 from core.game_learning import GameLearningError, _digest, _json, _key, _now, _time, workspace
 from core.game_studio_tools import (
@@ -105,6 +106,12 @@ PLANNER_SYSTEM = (
     "Set done=true and operation=null when the bounded goal is satisfied or cannot be achieved with its grants."
 )
 NUMERIC_LEARNING_SCHEMA = "skeleton.game.studio_numeric_adaptation.v1"
+NUMERIC_MEMORY_SCHEMA = "skeleton.game.studio_numeric_memory.v1"
+NUMERIC_MEMORY_SCAN = 32
+NUMERIC_MEMORY_DONOR_ATTEMPTS = 8
+NUMERIC_MEMORY_GOALS = 8
+NUMERIC_MEMORY_OBSERVATIONS = 32
+NUMERIC_SHARED_POLICIES = frozenset({"reuse_compatible", "reset"})
 
 
 async def _indexes():
@@ -170,9 +177,10 @@ def _public(row):
                 "schema_version": NUMERIC_LEARNING_SCHEMA,
                 "status": learning.get("status", "waiting_for_baseline"),
                 **learning.get("learning_status", {}),
-                "advice": learning.get("advice", []),
+                "numeric_memory": _numeric_memory_projection(row, learning),
+                "advice": learning.get("advice", []) if learning.get("source_head_digest") == row.get("head_digest") else [],
                 "production_authority": False,
-                "scope": "Goal-local numeric ranking from opted-in matched original reviews; proposals require the existing editor, current-source review and acceptance gates.",
+                "scope": "Numeric ranking from explicitly admitted matched original reviews under the selected memory policy; proposals require the existing editor, current-source review and acceptance gates.",
             }
     result["workflow"] = {
         "remaining_actions": len(row.get("workflow", [])),
@@ -262,6 +270,7 @@ async def _authorize_history(scope, row, *, dragon_guarded=False, allowed_editor
                 raise GameLearningError(
                     "studio_goal_policy_changed", "Historical policy evidence changed.", 409
                 )
+    await _authorize_numeric_origins(scope, row)
 
 
 async def _current(scope, row):
@@ -407,10 +416,12 @@ async def create(scope, project_id, body):
         if replay_body.get("quality_gate") is not None:
             from routes.game_studio_agent import StudioQualityGate
 
-            replay_body = {
-                **replay_body,
-                "quality_gate": StudioQualityGate.model_validate(replay_body["quality_gate"]).model_dump(),
-            }
+            normalized = StudioQualityGate.model_validate(replay_body["quality_gate"]).model_dump()
+            old_policy = prior.get("intent", {}).get("quality_gate") or {}
+            for field, default in (("adaptive_ranking", False), ("numeric_memory_policy", "goal_only")):
+                if field not in old_policy and normalized.get(field) == default:
+                    normalized.pop(field, None)
+            replay_body = {**replay_body, "quality_gate": normalized}
         if prior["request_digest"] != _digest(replay_body):
             raise GameLearningError(
                 "idempotency_conflict", "This goal key already describes another request.", 409
@@ -1379,13 +1390,324 @@ def _numeric_parameters(spec, dimensions):
     return result
 
 
+def _numeric_acceptance_policy(policy):
+    return {key: policy[key] for key in (
+        "schema_version", "min_available_frames", "min_executed_steps",
+        "max_error_findings", "max_warning_findings", "require_no_regression", "restore_on_regression",
+    )}
+
+
+def _numeric_export_allowed(row):
+    policy = row.get("quality_gate") or {}
+    return (
+        row.get("schema_version") == SCHEMA
+        and row.get("execution_mode") == "run"
+        and row.get("completion_mode") == "original"
+        and policy.get("adaptive_ranking") is True
+        and policy.get("numeric_memory_policy", "goal_only") in NUMERIC_SHARED_POLICIES
+        and row.get("status") != "cancelled"
+        and row.get("stop_requested") != "cancel"
+    )
+
+
+def _numeric_memory_projection(row, learning):
+    policy = (row.get("quality_gate") or {}).get("numeric_memory_policy", "goal_only")
+    memory = learning.get("numeric_memory") or {}
+    origins = memory.get("origins", [])
+    return {
+        "policy": policy, "status": memory.get("status", "waiting_for_baseline"),
+        "reused_goals": memory.get("reused_goals", 0),
+        "reused_observations": memory.get("reused_observations", 0),
+        "provenance_goals": len(origins), "epoch": memory.get("epoch"),
+        "reset_barrier": policy == "reset", "exclusion_counts": memory.get("exclusion_counts", {}),
+    }
+
+
+def _validate_numeric_memory(row, learning):
+    memory = learning.get("numeric_memory")
+    if memory is None:
+        if (row.get("quality_gate") or {}).get("numeric_memory_policy", "goal_only") != "goal_only":
+            raise GameLearningError("studio_goal_journal_corrupt", "Shared numeric policy requires a sealed memory record.", 503)
+        return
+    def digest(value):
+        return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+    def identity(value):
+        return isinstance(value, str) and value == value.strip() and 1 <= len(value) <= 128
+    def count(value, maximum):
+        return type(value) is int and 0 <= value <= maximum
+    policy = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+    if (not isinstance(memory, dict) or memory.get("schema_version") != NUMERIC_MEMORY_SCHEMA
+        or memory.get("policy") != policy or not digest(memory.get("reuse_context_digest"))
+        or not identity(memory.get("epoch"))
+        or memory.get("status") not in {"goal_only", "reset", "no_compatible_history", "reused_checkpoint", "rebuilt_replay", "merged_replay"}
+        or not count(memory.get("reused_goals"), NUMERIC_MEMORY_GOALS - 1)
+        or not count(memory.get("reused_observations"), NUMERIC_MEMORY_OBSERVATIONS)
+        or not isinstance(memory.get("origins"), list) or len(memory["origins"]) > NUMERIC_MEMORY_GOALS
+        or not isinstance(memory.get("exclusion_counts"), dict) or len(memory["exclusion_counts"]) > NUMERIC_MEMORY_DONOR_ATTEMPTS + 2
+        or any(not identity(key) or not count(value, NUMERIC_MEMORY_SCAN) for key, value in memory["exclusion_counts"].items())):
+        raise GameLearningError("studio_goal_journal_corrupt", "Numeric memory policy, bounds or provenance schema differs.", 503)
+    goals, observations = set(), set()
+    for origin in memory["origins"]:
+        if (not isinstance(origin, dict) or set(origin) != {"goal_id", "request_digest", "observations"}
+            or not identity(origin.get("goal_id")) or origin["goal_id"] in goals or not digest(origin.get("request_digest"))
+            or not isinstance(origin.get("observations"), list) or not 1 <= len(origin["observations"]) <= NUMERIC_MEMORY_OBSERVATIONS):
+            raise GameLearningError("studio_goal_journal_corrupt", "Numeric origin identity is malformed or duplicated.", 503)
+        goals.add(origin["goal_id"])
+        for item in origin["observations"]:
+            if (not isinstance(item, dict) or set(item) != {"observation_digest", "job_id"}
+                or not digest(item.get("observation_digest")) or item["observation_digest"] in observations
+                or not identity(item.get("job_id"))):
+                raise GameLearningError("studio_goal_journal_corrupt", "Numeric observation binding is malformed or duplicated.", 503)
+            observations.add(item["observation_digest"])
+    if policy == "goal_only":
+        if goals or memory["reused_goals"] or memory["reused_observations"] or memory["status"] != "goal_only" or memory["epoch"] != "initial":
+            raise GameLearningError("studio_goal_journal_corrupt", "Goal-local learning cannot import or export numeric history.", 503)
+    else:
+        raw = learning["archive"].get("observations", [])
+        if (not isinstance(raw, list) or len(raw) > NUMERIC_MEMORY_OBSERVATIONS
+            or observations != {_digest(item) for item in raw}
+            or memory["reused_goals"] > len(goals) or memory["reused_observations"] > len(raw)):
+            raise GameLearningError("studio_goal_journal_corrupt", "Shared numeric checkpoint provenance does not cover its bounded observations.", 503)
+        if policy == "reset" and (memory["epoch"] != row["goal_id"] or memory["reused_goals"] or memory["reused_observations"] or memory["status"] != "reset" or goals - {row["goal_id"]}):
+            raise GameLearningError("studio_goal_journal_corrupt", "A numeric reset cannot retain old shared optimizer state.", 503)
+    if "donor_goal_id" in memory and (not identity(memory["donor_goal_id"]) or not digest(memory.get("donor_archive_digest"))
+        or memory.get("donor_checkpoint_digest") is not None and not digest(memory["donor_checkpoint_digest"])):
+        raise GameLearningError("studio_goal_journal_corrupt", "Numeric checkpoint import lineage differs.", 503)
+    if "merged_donor_goals" in memory and not count(memory["merged_donor_goals"], NUMERIC_MEMORY_DONOR_ATTEMPTS):
+        raise GameLearningError("studio_goal_journal_corrupt", "Numeric replay fan-in exceeds its finite donor ceiling.", 503)
+
+
+def _numeric_observation_from_review(*, row, baseline, candidate, dimensions, baseline_parameters, shape, learner, context_digest, experiment_id, pin):
+    """Reconstruct one numeric fact from current-authority immutable receipts."""
+    from core import game_studio_review as reviews
+    from skeleton.jeeves.game_studio_review import compare_executed_reviews
+    from skeleton.learning.mirror_room import TrainingObservation
+
+    before, report = reviews._checked_result(baseline), reviews._checked_result(candidate)
+    comparison = compare_executed_reviews(before, report, mode="source_revision")
+    spec = _numeric_review_spec(candidate)
+    parameters = _numeric_parameters(spec, dimensions)
+    if (comparison["status"] != "paired_observation" or _numeric_shape(spec, dimensions) != shape
+        or parameters is None or parameters == baseline_parameters):
+        return None
+    measurements = [item for item in comparison["measurements"] if not item["advisory"] and item["metric"] in {"task_return", "observed_goal", "observed_death"}]
+    if not measurements:
+        return None
+    utility = sum((1.0 if item["preferred_direction"] == "higher" else -1.0) * item["delta"] / max(1.0, abs(item["baseline"])) for item in measurements) / len(measurements)
+    cost = sum(float(value) for frame in report.get("frames", []) for name, value in frame.get("timings", {}).items() if name in {"step_wall_ms", "render_wall_ms"}) / 1000.0
+    policy = row["quality_gate"]
+    errors = sum(item.get("severity") == "error" for item in report.get("findings", []))
+    warnings = sum(item.get("severity") == "warning" for item in report.get("findings", []))
+    frames, steps = report.get("metrics", {}).get("available_frames"), report.get("execution", {}).get("steps")
+    passed = (type(frames) is int and frames >= policy["min_available_frames"]
+        and type(steps) is int and steps >= policy["min_executed_steps"]
+        and errors <= policy["max_error_findings"] and warnings <= policy["max_warning_findings"]
+        and not (policy["require_no_regression"] and comparison["observed_regressions"]))
+    return TrainingObservation(
+        context_digest=context_digest, feature_schema_digest=learner.feature_schema_digest,
+        experiment_id=experiment_id, run_id=row["goal_id"], generation=max(1, candidate["input"]["project_version"]),
+        parent_behavior_digest=pin["source_content_digest"],
+        candidate_behavior_digest=_digest({item["path"]: item["content"] for item in candidate["input"]["files"]}),
+        candidate_id="review-" + candidate["job_id"], training_report_digest=comparison["comparison_digest"],
+        scenario_digests=(pin["protocol_digest"],), features=learner.numeric_features(baseline_parameters, parameters),
+        training_utility_delta=utility, cost_units=cost, guardrails_passed=passed,
+        scenario_utilities={pin["protocol_digest"]: utility},
+    )
+
+
+async def _authorize_numeric_origins(scope, row):
+    """Recheck donor consent at the same boundary as source/policy authority."""
+    learning = row.get("quality_learning") or {}
+    memory = learning.get("numeric_memory") or {}
+    for origin in memory.get("origins", []):
+        if origin["goal_id"] == row.get("goal_id"):
+            continue
+        try:
+            donor = await _row(scope, origin["goal_id"])
+        except PyMongoError as exc:
+            raise GameLearningError("studio_numeric_memory_store_unavailable", "Numeric sharing authority could not be confirmed.", 503) from exc
+        donor_memory = (donor.get("quality_learning") or {}).get("numeric_memory") or {}
+        if (donor.get("project_id") != row.get("project_id") or not _numeric_export_allowed(donor)
+            or donor["request_digest"] != origin["request_digest"]
+            or donor_memory.get("reuse_context_digest") != memory.get("reuse_context_digest")
+            or donor_memory.get("epoch") != memory.get("epoch")):
+            raise GameLearningError("studio_numeric_memory_withdrawn", "A numeric lesson's original scoped sharing grant is unavailable.", 409)
+
+
+async def _verify_numeric_archive(scope, row, archive, origins, *, baseline, dimensions, baseline_parameters, shape, learner, context_digest, experiment_id, pin, reuse_context, epoch, verification_cache=None):
+    from core import game_studio_review as reviews
+
+    if archive.lessons or len(archive.observations) > NUMERIC_MEMORY_OBSERVATIONS or len(origins) > NUMERIC_MEMORY_GOALS:
+        raise GameLearningError("studio_numeric_memory_capacity", "Shared numeric provenance exceeds its finite goal or observation horizon.", 409)
+    by_goal = {item["goal_id"]: item for item in origins}
+    if len(by_goal) != len(origins) or {item.run_id for item in archive.observations} != set(by_goal):
+        raise GameLearningError("studio_numeric_memory_provenance", "Numeric checkpoint provenance does not cover its observations exactly.", 409)
+    dependencies = [_dependencies(baseline["input"])]
+    cache = verification_cache if verification_cache is not None else {"goals": {}, "reviews": {}, "observations": {}}
+    for goal_id, origin in by_goal.items():
+        source_goal = row if goal_id == row["goal_id"] else cache["goals"].get(goal_id)
+        if source_goal is None:
+            source_goal = await _row(scope, goal_id)
+            cache["goals"][goal_id] = source_goal
+        source_learning = source_goal.get("quality_learning") or {}
+        source_memory = source_learning.get("numeric_memory") or {}
+        if (source_goal.get("project_id") != row["project_id"] or source_goal["request_digest"] != origin["request_digest"]
+            or not _numeric_export_allowed(source_goal)
+            or _numeric_acceptance_policy(source_goal["quality_gate"]) != _numeric_acceptance_policy(row["quality_gate"])
+            or (goal_id != row["goal_id"] and (source_memory.get("reuse_context_digest") != reuse_context or source_memory.get("epoch") != epoch))):
+            raise GameLearningError("studio_numeric_memory_consent", "A numeric observation lacks compatible original sharing consent.", 409)
+        bindings = {item["observation_digest"]: item for item in origin["observations"]}
+        observations = tuple(item for item in archive.observations if item.run_id == goal_id)
+        if len(bindings) != len(origin["observations"]) or set(bindings) != {item.digest for item in observations}:
+            raise GameLearningError("studio_numeric_memory_provenance", "Numeric review bindings do not match retained observation identities.", 409)
+        issued = {step["job_id"] for step in source_goal["steps"] if step.get("executed") and step.get("job_id") and step.get("decision", {}).get("operation") == "project.review"}
+        for observation in observations:
+            binding = bindings[observation.digest]
+            if binding["job_id"] not in issued:
+                raise GameLearningError("studio_numeric_memory_unissued", "A reused numeric review was not issued by its opted-in goal.", 409)
+            if observation.digest in cache["observations"] and cache["observations"][observation.digest] != binding["job_id"]:
+                raise GameLearningError("studio_numeric_memory_receipt_changed", "A numeric fact aliases different issued review identities.", 409)
+            candidate = cache["reviews"].get(binding["job_id"])
+            if candidate is None:
+                candidate = await reviews._load_review(scope, row["project_id"], binding["job_id"], historical=True)
+                cache["reviews"][binding["job_id"]] = candidate
+            if observation.digest not in cache["observations"]:
+                expected = _numeric_observation_from_review(row=source_goal, baseline=baseline, candidate=candidate, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=learner, context_digest=context_digest, experiment_id=experiment_id, pin=pin)
+                if expected is None or expected.digest != observation.digest:
+                    raise GameLearningError("studio_numeric_memory_receipt_changed", "A numeric observation differs from its exact currently authorized review.", 409)
+                cache["observations"][observation.digest] = binding["job_id"]
+            dependencies.append(_dependencies(candidate["input"]))
+    if archive.checkpoints:
+        checkpoint = archive.checkpoints[0]
+        if (len(archive.checkpoints) != 1 or checkpoint.observations_seen != len(archive.observations)
+            or checkpoint.context_digest != context_digest or checkpoint.feature_schema_digest != learner.feature_schema_digest
+            or checkpoint.experiment_id != experiment_id or checkpoint.generator_id != learner.generator_id
+            or checkpoint.architecture != (4 * len(dimensions) + 3, 16, 8, 2)
+            or checkpoint.training_steps + checkpoint.rejected_updates != checkpoint.observations_seen * learner.learning_policy.updates_per_observation
+            or set(checkpoint.step_sizes) != {item.name for item in dimensions}
+            or any(not item.min_step <= checkpoint.step_sizes[item.name] <= item.max_step for item in dimensions)):
+            raise GameLearningError("studio_numeric_memory_hidden_history", "Shared optimizer state includes observations outside its checked provenance horizon.", 409)
+    return list({_digest(item): item for item in dependencies}.values())
+
+
+async def _select_numeric_memory(scope, row, *, reuse_context, learner, pin, baseline, dimensions, baseline_parameters, shape):
+    """Join bounded verified replay facts; never average optimizer forks."""
+    from skeleton.learning.mirror_room import MirrorRoomError, TrainingLearningArchive
+
+    mode = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+    fresh = {"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context,
+        "policy": mode, "epoch": row["goal_id"] if mode == "reset" else "initial",
+        "status": "reset" if mode == "reset" else "goal_only" if mode == "goal_only" else "no_compatible_history",
+        "reused_goals": 0, "reused_observations": 0, "origins": [], "exclusion_counts": {}}
+    if mode != "reuse_compatible":
+        return TrainingLearningArchive(), fresh, []
+    query = {**scope, "project_id": row["project_id"], "kind": "studio_agent_goal", "_id": {"$ne": row["goal_id"]},
+        "created_at": {"$lte": row["created_at"]}, "quality_gate.adaptive_ranking": True,
+        "quality_gate.numeric_memory_policy": {"$in": sorted(NUMERIC_SHARED_POLICIES)},
+        "quality_learning.numeric_memory.reuse_context_digest": reuse_context}
+    resets = await _rows.find({**query, "quality_gate.numeric_memory_policy": "reset"}, {"_id": 1}).sort([("created_at", -1), ("_id", -1)]).limit(1).max_time_ms(2000).to_list(length=1)
+    if resets:
+        barrier = await _row(scope, resets[0]["_id"])
+        barrier_memory = (barrier.get("quality_learning") or {}).get("numeric_memory") or {}
+        if (barrier_memory.get("policy") != "reset" or barrier_memory.get("epoch") != barrier["goal_id"]
+            or barrier_memory.get("reuse_context_digest") != reuse_context):
+            raise GameLearningError("studio_numeric_reset_invalid", "The scoped numeric history reset marker differs.", 409)
+        fresh["epoch"] = barrier["goal_id"]
+    records = await _rows.find({**query, "quality_learning.numeric_memory.epoch": fresh["epoch"]}, {"_id": 1}).sort([("created_at", -1), ("_id", -1)]).limit(NUMERIC_MEMORY_SCAN).max_time_ms(2000).to_list(length=NUMERIC_MEMORY_SCAN)
+    owner_context = _digest({"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context, "epoch": fresh["epoch"]})
+    experiment = "studio-memory-" + owner_context[:32]
+    context = learner.numeric_context_digest(context_digest=owner_context, experiment_id=experiment, workload_digest=pin["protocol_digest"])
+    cache = {"goals": {}, "reviews": {}, "observations": {}}
+    eligible = []
+    reserved = max(1, NUMERIC_MEMORY_OBSERVATIONS - row["max_steps"])
+    for record in records[:NUMERIC_MEMORY_DONOR_ATTEMPTS]:
+        try:
+            donor = await _row(scope, record["_id"])
+            cache["goals"][donor["goal_id"]] = donor
+            if not _numeric_export_allowed(donor):
+                raise GameLearningError("donor_consent_unavailable", "The prior numeric sharing grant is unavailable.", 409)
+            learning = donor.get("quality_learning") or {}
+            memory = learning.get("numeric_memory") or {}
+            archive = TrainingLearningArchive.from_payload(learning["archive"], expected_digest=learning["archive_digest"])
+            origin_order = list(dict.fromkeys(item.run_id for item in archive.observations))
+            # Leave room for this goal. Dropped history must also be removed
+            # from weights; replay-only import rebuilds a bounded fresh model.
+            retained_goals = set(origin_order[-(NUMERIC_MEMORY_GOALS - 1):])
+            retained = tuple(item for item in archive.observations if item.run_id in retained_goals)[-reserved:]
+            checked_origins = {item.run_id for item_archive, _origins, _goal in eligible for item in item_archive.observations}
+            available_origins = max(0, NUMERIC_MEMORY_GOALS - 1 - len(checked_origins))
+            new_origin_order = list(dict.fromkeys(item.run_id for item in retained if item.run_id not in checked_origins))
+            admitted_origins = checked_origins | set(new_origin_order[-available_origins:] if available_origins else ())
+            retained = tuple(item for item in retained if item.run_id in admitted_origins)
+            proof_budget = max(0, NUMERIC_MEMORY_OBSERVATIONS - len(cache["observations"]))
+            new_facts = [item.digest for item in retained if item.digest not in cache["observations"]]
+            admitted_facts = set(cache["observations"]) | set(new_facts[-proof_budget:] if proof_budget else ())
+            bounded = tuple(item for item in retained if item.digest in admitted_facts)
+            if bounded != retained:
+                fresh["exclusion_counts"]["review_verification_budget"] = fresh["exclusion_counts"].get("review_verification_budget", 0) + 1
+            retained = bounded
+            retained_digests = {item.digest for item in retained}
+            origins = []
+            for origin in memory.get("origins", []):
+                bindings = [item for item in origin["observations"] if item["observation_digest"] in retained_digests]
+                if bindings:
+                    origins.append({**origin, "observations": bindings})
+            compacted = retained != archive.observations or any(item.observations_seen != len(retained) for item in archive.checkpoints)
+            if not retained:
+                continue
+            if compacted:
+                archive = TrainingLearningArchive(observations=retained)
+            await _verify_numeric_archive(scope, row, archive, origins, baseline=baseline, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=learner, context_digest=context, experiment_id=experiment, pin=pin, reuse_context=reuse_context, epoch=fresh["epoch"], verification_cache=cache)
+            eligible.append((archive, origins, donor))
+        except (GameLearningError, MirrorRoomError, KeyError, TypeError, ValueError) as exc:
+            code = exc.code if isinstance(exc, GameLearningError) else "invalid_numeric_journal"
+            fresh["exclusion_counts"][code] = fresh["exclusion_counts"].get(code, 0) + 1
+    if len(records) > NUMERIC_MEMORY_DONOR_ATTEMPTS:
+        fresh["exclusion_counts"]["donor_scan_budget"] = len(records) - NUMERIC_MEMORY_DONOR_ATTEMPTS
+    if eligible:
+        merged = TrainingLearningArchive()
+        origin_bindings = {}
+        for archive, origins, _donor in eligible:
+            for observation in archive.observations:
+                merged = merged.with_observation(observation)
+            for origin in origins:
+                entry = origin_bindings.setdefault(origin["goal_id"], {"goal_id": origin["goal_id"], "request_digest": origin["request_digest"], "observations": {}})
+                for binding in origin["observations"]:
+                    entry["observations"][binding["observation_digest"]] = binding
+        ordered = sorted(merged.observations, key=lambda item: (_time(cache["goals"][item.run_id]["created_at"]), item.generation, item.candidate_id, item.digest))
+        retained_goals = set(list(dict.fromkeys(item.run_id for item in ordered))[-(NUMERIC_MEMORY_GOALS - 1):])
+        retained = tuple(item for item in ordered if item.run_id in retained_goals)[-reserved:]
+        digests = {item.digest for item in retained}
+        origins = []
+        for goal_id in dict.fromkeys(item.run_id for item in retained):
+            origin = origin_bindings[goal_id]
+            origins.append({**origin, "observations": [item for key, item in origin["observations"].items() if key in digests]})
+        # A checkpoint may continue only if it already represents this complete
+        # retained fact set. Parallel branches otherwise rebuild one ranker from
+        # their union, preserving every retained observation's original identity.
+        complete = next((item for item in eligible if item[0].checkpoints and {value.digest for value in item[0].observations} == digests), None)
+        selected = complete if complete is not None else eligible[0]
+        result_archive = complete[0] if complete is not None else TrainingLearningArchive(observations=retained)
+        donor = selected[2]
+        learning = donor["quality_learning"]
+        result = {**fresh, "status": "reused_checkpoint" if complete is not None else "merged_replay" if len(eligible) > 1 else "rebuilt_replay",
+            "origins": origins, "reused_goals": len(origins), "reused_observations": len(retained),
+            "donor_goal_id": donor["goal_id"], "donor_archive_digest": learning["archive_digest"],
+            "donor_checkpoint_digest": learning.get("learning_status", {}).get("checkpoint_digest"),
+            "merged_donor_goals": len(eligible)}
+        dependencies = [_dependencies(baseline["input"])]
+        for origin in origins:
+            dependencies.extend(_dependencies(cache["reviews"][item["job_id"]]["input"]) for item in origin["observations"])
+        return result_archive, result, list({_digest(item): item for item in dependencies}.values())
+    return TrainingLearningArchive(), fresh, []
+
+
 async def _advance_quality_learning(scope, row, token):
     """Learn numeric ranking within the existing admitted, leased goal journal.
 
-    Ordinary historical reviews remain unauthorized for training. Only this
-    goal's explicit adaptive-ranking opt-in admits its original numeric review
-    facts. No ROM bytes, source text, teacher traces, quality labels or provider
-    weights enter the model. A ranking recommendation never executes an edit.
+    Shared history additionally requires matching original sharing grants and
+    current source authority. No ROM bytes, source text, teacher traces, quality
+    labels or provider weights enter the model. Advice cannot execute an edit.
     """
     if not (row.get("quality_gate") or {}).get("adaptive_ranking") or row.get("stop_requested") or _time(row["expires_at"]) <= _now():
         return row
@@ -1409,7 +1731,7 @@ async def _advance_quality_learning(scope, row, token):
         return row
     shape = _numeric_shape(baseline_spec, dimensions)
     identity = baseline_report["source_identity"]
-    owner_context = _digest({
+    legacy_context = _digest({
         "schema_version": NUMERIC_LEARNING_SCHEMA, **scope,
         "goal_id": row["goal_id"], "project_id": row["project_id"],
         "baseline": pin, "quality_policy": row["quality_gate"],
@@ -1419,39 +1741,65 @@ async def _advance_quality_learning(scope, row, token):
         "cost": "observed-offline-operation-seconds/v1",
     })
     previous = row.get("quality_learning")
-    if previous and previous.get("owner_context_digest") != owner_context:
-        raise GameLearningError("studio_numeric_context_changed", "Stored numeric learning belongs to a different source or protocol.", 409)
     try:
-        archive = TrainingLearningArchive.from_payload(previous["archive"], expected_digest=previous["archive_digest"]) if previous else TrainingLearningArchive()
+        learning_policy = AdaptiveLearningPolicy(minimum_rank_observations=1, replay_batch_size=8, max_candidate_pool=64)
+        probe = DeterministicCoordinateLearner(generator_id="studio-numeric-ranker-v1", dimensions=dimensions, learning_policy=learning_policy)
+        reuse_context = _digest({
+            "schema_version": NUMERIC_MEMORY_SCHEMA, **scope, "project_id": row["project_id"],
+            "baseline": pin, "source_shape_digest": shape,
+            "feature_schema_digest": probe.feature_schema_digest,
+            "reviewer": identity["reviewer_implementation_digest"], "review_protocol": identity["review_protocol"],
+            "acceptance": _numeric_acceptance_policy(row["quality_gate"]),
+            "reward": "mean-oriented-relative-task-return-goal-death/v1", "cost": "observed-offline-operation-seconds/v1",
+        })
+        mode = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+        dependencies = []
+        if previous:
+            archive = TrainingLearningArchive.from_payload(previous["archive"], expected_digest=previous["archive_digest"])
+            memory = copy.deepcopy(previous.get("numeric_memory"))
+            if memory is None:
+                # Legacy explicit learning remains goal-local. Its previous
+                # grant never silently becomes consent to share with new goals.
+                memory = {"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context,
+                    "policy": "goal_only", "epoch": "initial", "status": "goal_only",
+                    "reused_goals": 0, "reused_observations": 0, "origins": [], "exclusion_counts": {}}
+            elif memory["reuse_context_digest"] != reuse_context or memory["policy"] != mode:
+                raise GameLearningError("studio_numeric_context_changed", "Stored numeric memory belongs to a different protocol or sharing grant.", 409)
+        else:
+            archive, memory, dependencies = await _select_numeric_memory(scope, row, reuse_context=reuse_context, learner=probe, pin=pin, baseline=baseline, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape)
+        shared = mode in NUMERIC_SHARED_POLICIES
+        owner_context = _digest({"schema_version": NUMERIC_MEMORY_SCHEMA, "reuse_context_digest": reuse_context, "epoch": memory["epoch"]}) if shared else legacy_context
+        experiment = "studio-memory-" + owner_context[:32] if shared else "studio-" + row["goal_id"]
+        if previous and previous.get("owner_context_digest") != owner_context:
+            raise GameLearningError("studio_numeric_context_changed", "Stored numeric learning belongs to a different source or protocol.", 409)
+        context = probe.numeric_context_digest(context_digest=owner_context, experiment_id=experiment, workload_digest=pin["protocol_digest"])
+        if shared and previous:
+            dependencies = await _verify_numeric_archive(scope, row, archive, memory["origins"], baseline=baseline, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=probe, context_digest=context, experiment_id=experiment, pin=pin, reuse_context=reuse_context, epoch=memory["epoch"])
         learner = DeterministicCoordinateLearner(
             generator_id="studio-numeric-ranker-v1", dimensions=dimensions, training_archive=archive,
-            learning_policy=AdaptiveLearningPolicy(minimum_rank_observations=1, replay_batch_size=8, max_candidate_pool=64),
+            learning_policy=learning_policy,
         )
-        learner.bind_numeric_observations(context_digest=owner_context, experiment_id="studio-" + row["goal_id"], workload_digest=pin["protocol_digest"])
+        learner.bind_numeric_observations(context_digest=owner_context, experiment_id=experiment, workload_digest=pin["protocol_digest"])
         status = "learning" if learner.learning_status["observations_seen"] else "bootstrap"
         candidate_pin = quality.get("candidate")
         if candidate_pin and candidate_pin.get("comparison_status") == "paired_observation":
             candidate = await reviews._load_review(scope, row["project_id"], candidate_pin["job_id"], historical=True)
             candidate_report = reviews._checked_result(candidate)
             comparison = compare_executed_reviews(baseline_report, candidate_report, mode="source_revision")
-            candidate_spec = _numeric_review_spec(candidate)
-            parameters = _numeric_parameters(candidate_spec, dimensions)
             if comparison["status"] != "paired_observation" or comparison["comparison_digest"] != candidate_pin["comparison_digest"]:
                 raise GameLearningError("studio_numeric_review_changed", "Numeric ranking needs the exact matched issued review.", 503)
-            if _numeric_shape(candidate_spec, dimensions) == shape and parameters is not None and parameters != baseline_parameters:
-                measurements = [item for item in comparison["measurements"] if not item["advisory"] and item["metric"] in {"task_return", "observed_goal", "observed_death"}]
-                if measurements:
-                    utility = sum((1.0 if item["preferred_direction"] == "higher" else -1.0) * item["delta"] / max(1.0, abs(item["baseline"])) for item in measurements) / len(measurements)
-                    cost = sum(float(value) for frame in candidate_report.get("frames", []) for name, value in frame.get("timings", {}).items() if name in {"step_wall_ms", "render_wall_ms"}) / 1000.0
-                    learner.observe_numeric_training(
-                        run_id=row["goal_id"], generation=max(1, candidate["input"]["project_version"]),
-                        candidate_id="review-" + candidate["job_id"], parent_parameters=baseline_parameters,
-                        candidate_parameters=parameters, parent_behavior_digest=pin["source_content_digest"],
-                        candidate_behavior_digest=_digest({item["path"]: item["content"] for item in candidate["input"]["files"]}),
-                        report_digest=comparison["comparison_digest"], utility_delta=utility, cost_units=cost,
-                        guardrails_passed=quality["status"] == "accepted",
-                    )
-                    status = "learning"
+            observation = _numeric_observation_from_review(row=row, baseline=baseline, candidate=candidate, dimensions=dimensions, baseline_parameters=baseline_parameters, shape=shape, learner=learner, context_digest=context, experiment_id=experiment, pin=pin)
+            if observation is not None:
+                learner.admit_numeric_observation(observation)
+                status = "learning"
+                if shared:
+                    origins = {item["goal_id"]: item for item in memory["origins"]}
+                    origin = origins.setdefault(row["goal_id"], {"goal_id": row["goal_id"], "request_digest": row["request_digest"], "observations": []})
+                    binding = {"observation_digest": observation.digest, "job_id": candidate["job_id"]}
+                    if binding not in origin["observations"]:
+                        origin["observations"].append(binding)
+                    memory["origins"] = list(origins.values())
+                    dependencies.append(_dependencies(candidate["input"]))
             else:
                 status = "source_shape_changed"
         current_spec = _numeric_review_spec({"input": {"files": project["files"]}})
@@ -1480,17 +1828,21 @@ async def _advance_quality_learning(scope, row, token):
             "archive": learner.training_archive.payload(), "archive_digest": learner.training_archive.digest,
             "learning_status": dict(learner.learning_status), "advice": advice,
             "source_head_digest": _digest(project["files"]),
+            "numeric_memory": memory,
             "training_authorized": True, "production_authority": False,
         }
         # The ordinary state digest, CAS lease and admitted byte count seal the
         # whole optimizer/replay update together with its actual owner context.
-        if previous == learning:
+        deps = {_digest(item): item for item in (*row["evidence_dependencies"], *dependencies)}
+        if previous == learning and len(deps) == len(row["evidence_dependencies"]):
             return row
-        return await _set(scope, row["goal_id"], token, {"quality_learning": learning})
+        return await _set(scope, row["goal_id"], token, {"quality_learning": learning, "evidence_dependencies": list(deps.values())})
     except MirrorRoomError as exc:
         raise GameLearningError("studio_numeric_learning_invalid", "Stored numeric ranking state or measured outcome is invalid.", 409) from exc
     except (SuccessorRuntimeError, json.JSONDecodeError) as exc:
         raise GameLearningError("studio_numeric_source_invalid", "Numeric ranking needs a valid current original world.", 409) from exc
+    except PyMongoError as exc:
+        raise GameLearningError("studio_numeric_memory_store_unavailable", "The scoped numeric journal could not be confirmed; no unverified history was imported.", 503) from exc
 
 
 async def _quality_restore_payload(scope, row, project, *, allowed_editor_operation_id=None):
@@ -2356,6 +2708,7 @@ async def _context(scope, row, project, binding):
         result["numeric_adaptation"] = {
             "status": learning["status"],
             "learning_status": learning["learning_status"],
+            "numeric_memory": _numeric_memory_projection(row, learning),
             "advice": learning["advice"] if learning.get("source_head_digest") == _digest(project["files"]) else [],
             "instruction": "These are optional numeric edit proposals learned from this goal's matched original review facts. Inspect the relevant mechanics, keep the exact source digest, and use only granted world.edit fields. Advice never replaces current-source simulation, review, restoration, or acceptance gates.",
             "quality_certified": False,
@@ -2761,6 +3114,7 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
             proposed = {**data, "numeric_adaptation": {
                 "status": numeric["status"], "advice": numeric["advice"][:1],
                 "observations_seen": numeric["learning_status"]["observations_seen"],
+                "numeric_memory": {key: numeric["numeric_memory"][key] for key in ("policy", "status", "reused_goals", "reused_observations")},
                 "scope": "Optional numeric proposals; inspect and preserve current-source editor/review/restoration gates.",
                 "production_authority": False,
             }}
@@ -3756,6 +4110,9 @@ def _validate_journal(row):
     if row.get("quality_gate") is not None or intent.get("quality_gate") is not None:
         if row.get("quality_gate") != intent.get("quality_gate"):
             raise GameLearningError("studio_goal_journal_corrupt", "Original quality policy differs.", 503)
+        numeric_policy = row["quality_gate"].get("numeric_memory_policy", "goal_only")
+        if numeric_policy not in {"goal_only", "reuse_compatible", "reset"} or (numeric_policy != "goal_only" and row["quality_gate"].get("adaptive_ranking") is not True):
+            raise GameLearningError("studio_goal_journal_corrupt", "Numeric memory differs from its original explicit learning grant.", 503)
         if row.get("completion_mode") != "original" or not {"simulate", "review"}.issubset(
             row.get("completion_requirements", [])
         ):
@@ -3771,6 +4128,7 @@ def _validate_journal(row):
             or not isinstance(learning.get("advice"), list) or len(learning["advice"]) > 3
             or not isinstance(learning.get("learning_status"), dict)):
             raise GameLearningError("studio_goal_journal_corrupt", "Numeric learning state differs from its explicit scoped grant or archive digest.", 503)
+        _validate_numeric_memory(row, learning)
     if "max_output_tokens" in row or "max_output_tokens" in intent:
         if (
             type(row.get("max_output_tokens")) is not int

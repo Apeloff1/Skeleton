@@ -60,12 +60,13 @@ services:
       - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
       - SKELETON_MASTER_SECRET=${SKELETON_MASTER_SECRET:?SKELETON_MASTER_SECRET must be initialized by Skeleton setup}
       # Runtime model selection is owned by the Skeleton engine process.
-      # Local mode requires an explicit trained artifact or pinned deployment.
+      # Local mode requires one artifact, deployment or multi-model catalog.
       # Empty paths keep AI unavailable while application services can boot.
       - AI_PROVIDER=${AI_PROVIDER:-local}
       - AI_MODEL=${AI_MODEL:-}
       - AI_LOCAL_MODEL_PATH=${AI_LOCAL_MODEL_PATH:-}
       - AI_LOCAL_DEPLOYMENT_PATH=${AI_LOCAL_DEPLOYMENT_PATH:-}
+      - AI_LOCAL_MODEL_CATALOG_PATH=${AI_LOCAL_MODEL_CATALOG_PATH:-}
       - AI_TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS:-120}
       - AI_LOCAL_MODEL_CACHE_SIZE=${AI_LOCAL_MODEL_CACHE_SIZE:-128}
       - AI_LOCAL_MODEL_SEED=${AI_LOCAL_MODEL_SEED:-0}

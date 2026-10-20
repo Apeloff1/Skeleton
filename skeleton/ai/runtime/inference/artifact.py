@@ -122,7 +122,17 @@ def _payload_model(payload: Mapping[str, Any]) -> tuple[object, str]:
     raise LocalModelArtifactError("unsupported local model artifact schema")
 
 
-def load_local_model_artifact(path: str | os.PathLike[str]) -> LoadedLocalModel:
+def load_local_model_artifact(
+    path: str | os.PathLike[str], *, expected_sha256: str | None = None
+) -> LoadedLocalModel:
+    """Load an existing artifact, checking an optional source pin before parsing."""
+
+    if expected_sha256 is not None and (
+        not isinstance(expected_sha256, str)
+        or len(expected_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in expected_sha256)
+    ):
+        raise LocalModelArtifactError("expected artifact sha256 must be lowercase SHA-256")
     source = Path(os.fspath(path)).expanduser()
     if source.is_symlink():
         raise LocalModelArtifactError("local model artifact symlink is forbidden")
@@ -143,6 +153,9 @@ def load_local_model_artifact(path: str | os.PathLike[str]) -> LoadedLocalModel:
         raise LocalModelArtifactError("local model artifact violates byte bounds")
     if len(raw) != stat.st_size:
         raise LocalModelArtifactError("local model artifact changed while reading")
+    artifact_sha256 = hashlib.sha256(raw).hexdigest()
+    if expected_sha256 is not None and artifact_sha256 != expected_sha256:
+        raise LocalModelArtifactError("local model artifact differs from its expected digest pin")
     try:
         payload = json.loads(
             raw.decode("utf-8", errors="strict"),
@@ -172,13 +185,42 @@ def load_local_model_artifact(path: str | os.PathLike[str]) -> LoadedLocalModel:
     ):
         raise LocalModelArtifactError("loaded model lacks stable model_digest")
 
+    if expected_sha256 is not None:
+        # A pinned catalog must never publish an activation whose source was
+        # replaced while its native graph was being restored. Keep the reread
+        # bounded even if the source grows during activation.
+        digest = hashlib.sha256()
+        reread_bytes = 0
+        try:
+            if source.is_symlink() or resolved.is_symlink():
+                raise LocalModelArtifactError("pinned local model artifact became a symlink")
+            with resolved.open("rb") as stream:
+                while True:
+                    chunk = stream.read(min(1024 * 1024, _MAX_ARTIFACT_BYTES + 1 - reread_bytes))
+                    if not chunk:
+                        break
+                    reread_bytes += len(chunk)
+                    if reread_bytes > _MAX_ARTIFACT_BYTES:
+                        raise LocalModelArtifactError("pinned local model artifact exceeded its byte bound")
+                    digest.update(chunk)
+            current = resolved.stat()
+        except OSError as exc:
+            raise LocalModelArtifactError("pinned local model artifact became unavailable") from exc
+        if (
+            reread_bytes != len(raw)
+            or digest.hexdigest() != expected_sha256
+            or (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+            != (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns, current.st_ctime_ns)
+        ):
+            raise LocalModelArtifactError("pinned local model artifact changed during activation")
+
     return LoadedLocalModel(
         model=model,
         receipt=LocalModelArtifactReceipt(
             schema=schema,
             model_id=model_id,
             model_digest=model_digest,
-            artifact_sha256=hashlib.sha256(raw).hexdigest(),
+            artifact_sha256=artifact_sha256,
             artifact_bytes=len(raw),
         ),
     )

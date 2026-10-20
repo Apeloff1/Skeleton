@@ -21,6 +21,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from time import monotonic
 from typing import Any, Mapping, Sequence
 from urllib.parse import quote
@@ -1629,16 +1630,19 @@ class EngineClient:
         *,
         actor_id: str,
         tenant_id: str,
+        learning_offset: int = 0,
         trace_id: str | None = None,
     ) -> dict[str, Any]:
         """Read engine-owned controls using the existing service-auth boundary."""
 
         actor = _text(actor_id, "actor_id", maximum=512)
         tenant = _text(tenant_id, "tenant_id", maximum=512)
+        if type(learning_offset) is not int or not 0 <= learning_offset <= 127:
+            raise EngineProtocolError("runtime learning offset must be in [0, 127]")
         payload = await self._request(
             "GET",
             "/runtime-control",
-            params={"actor_id": actor, "tenant_id": tenant},
+            params={"actor_id": actor, "tenant_id": tenant, "learning_offset": str(learning_offset)},
             trace_id=trace_id,
             max_response_bytes=256 * 1024,
         )
@@ -1654,6 +1658,7 @@ class EngineClient:
         learning: Mapping[str, Any] | None = None,
         maintenance: Mapping[str, Any] | None = None,
         action: str | None = None,
+        serving_route_id: str | None = None,
         trace_id: str | None = None,
     ) -> dict[str, Any]:
         """Forward one optimistic operator update; never retry a stale version."""
@@ -1686,6 +1691,10 @@ class EngineClient:
             if action not in {"trim_cache", "clear_cache", "drain", "resume"}:
                 raise EngineProtocolError("runtime control action is invalid")
             body["action"] = action
+        if serving_route_id is not None:
+            if serving is None and action is None:
+                raise EngineProtocolError("a serving route requires a serving policy or action")
+            body["serving_route_id"] = _text(serving_route_id, "serving_route_id", maximum=384)
         if len(body) == 3:
             raise EngineProtocolError("runtime control update must contain a change")
         try:
@@ -1701,6 +1710,186 @@ class EngineClient:
             surface_validation_rejection=True,
         )
         return self._runtime_control_state(payload, actor_id=actor, tenant_id=tenant)
+
+    @staticmethod
+    def _learning_checkpoint_identity(
+        payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
+        partition_id: str, schema: str,
+    ) -> None:
+        if (payload.get("schema_version") != schema or payload.get("actor_id") != actor_id
+                or payload.get("tenant_id") != tenant_id or payload.get("partition_id") != partition_id):
+            raise EngineProtocolError("runtime learning checkpoint identity differs")
+
+    @staticmethod
+    def _learning_checkpoint_json(
+        raw: object, *, tenant_id: str, partition_id: str
+    ) -> dict[str, Any]:
+        """Inspect an opaque checkpoint without reserializing its numeric state."""
+
+        if not isinstance(raw, str) or not raw:
+            raise EngineProtocolError("runtime learning checkpoint_json must be non-empty UTF-8 JSON")
+        if len(raw) > 256 * 1024:
+            raise EngineProtocolError("runtime learning checkpoint_json exceeds its byte limit")
+        try:
+            encoded_size = len(raw.encode("utf-8", errors="strict"))
+        except UnicodeEncodeError as exc:
+            raise EngineProtocolError("runtime learning checkpoint_json contains invalid Unicode") from exc
+        if encoded_size > 256 * 1024:
+            raise EngineProtocolError("runtime learning checkpoint_json exceeds its byte limit")
+
+        def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            value: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in value:
+                    raise EngineProtocolError("runtime learning checkpoint_json contains duplicate keys")
+                value[key] = item
+            return value
+
+        def reject_constant(_value: str) -> None:
+            raise EngineProtocolError("runtime learning checkpoint_json must contain finite JSON")
+
+        def finite_float(value: str) -> float:
+            number = float(value)
+            if not math.isfinite(number):
+                raise EngineProtocolError("runtime learning checkpoint_json must contain finite JSON")
+            return number
+
+        try:
+            checkpoint = json.loads(
+                raw, object_pairs_hook=unique_object,
+                parse_constant=reject_constant, parse_float=finite_float,
+            )
+        except (ValueError, RecursionError, OverflowError) as exc:
+            raise EngineProtocolError("runtime learning checkpoint_json is not valid bounded JSON") from exc
+        if not isinstance(checkpoint, dict):
+            raise EngineProtocolError("runtime learning checkpoint_json must encode an object")
+        if (
+            checkpoint.get("schema_version") != "skeleton.runtime.learning.checkpoint.v1"
+            or checkpoint.get("tenant_id") != tenant_id
+            or checkpoint.get("partition_id") != partition_id
+        ):
+            raise EngineProtocolError("runtime learning checkpoint scope differs")
+        return checkpoint
+
+    async def export_runtime_learning_checkpoint(
+        self, *, actor_id: str, tenant_id: str, partition_id: str,
+        expected_state_version: int | None = None, trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        partition = _text(partition_id, "partition_id", maximum=64)
+        if re.fullmatch(r"[0-9a-f]{64}", partition) is None:
+            raise EngineProtocolError("runtime learning partition identity is invalid")
+        params = {"actor_id": actor, "tenant_id": tenant}
+        if expected_state_version is not None:
+            params["expected_state_version"] = str(_positive_int(expected_state_version, "expected_state_version", maximum=2**63 - 1))
+        payload = await self._request(
+            "GET", "/runtime-control/learning/partitions/" + partition + "/checkpoint",
+            params=params, trace_id=trace_id, max_response_bytes=768 * 1024,
+            surface_validation_rejection=True,
+        )
+        self._learning_checkpoint_identity(
+            payload, actor_id=actor, tenant_id=tenant, partition_id=partition,
+            schema="skeleton.ai.runtime_learning_checkpoint.v1",
+        )
+        if "checkpoint_json" in payload:
+            if "checkpoint" in payload:
+                raise EngineProtocolError("runtime learning checkpoint representations are ambiguous")
+            self._learning_checkpoint_json(
+                payload["checkpoint_json"], tenant_id=tenant, partition_id=partition,
+            )
+            # The parsed numeric values are inspection-only. Returning the
+            # original wire string preserves exact values through browser UI.
+            return payload
+        checkpoint = payload.get("checkpoint")
+        if not isinstance(checkpoint, Mapping):
+            raise EngineProtocolError("runtime learning checkpoint is missing")
+        try:
+            legacy_json = json.dumps(
+                checkpoint, allow_nan=False, ensure_ascii=False, separators=(",", ":"),
+            ).encode("utf-8", errors="strict")
+        except (TypeError, ValueError, RecursionError, OverflowError) as exc:
+            raise EngineProtocolError("runtime learning checkpoint must be finite JSON") from exc
+        if len(legacy_json) > 256 * 1024:
+            raise EngineProtocolError("runtime learning checkpoint exceeds its byte limit")
+        if (checkpoint.get("schema_version") != "skeleton.runtime.learning.checkpoint.v1"
+                or checkpoint.get("tenant_id") != tenant or checkpoint.get("partition_id") != partition):
+            raise EngineProtocolError("runtime learning checkpoint scope differs")
+        return payload
+
+    async def configure_runtime_learning_checkpoint(
+        self, *, actor_id: str, tenant_id: str, partition_id: str, action: str,
+        expected_policy_version: int, expected_state_version: int,
+        model_selection_digest: str, checkpoint: Mapping[str, Any] | None = None,
+        checkpoint_json: str | None = None,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        partition = _text(partition_id, "partition_id", maximum=64)
+        if (re.fullmatch(r"[0-9a-f]{64}", partition) is None
+                or re.fullmatch(r"[0-9a-f]{64}", model_selection_digest) is None):
+            raise EngineProtocolError("runtime learning model or partition identity is invalid")
+        if action not in {"import", "reset", "restore_last_healthy"}:
+            raise EngineProtocolError("runtime learning action is invalid")
+        representations = int(checkpoint is not None) + int(checkpoint_json is not None)
+        if action == "import" and representations != 1:
+            raise EngineProtocolError("checkpoint import requires exactly one checkpoint or checkpoint_json")
+        if action != "import" and representations:
+            raise EngineProtocolError("only import accepts a checkpoint payload")
+        body: dict[str, Any] = {
+            "actor_id": actor, "tenant_id": tenant, "action": action,
+            "expected_policy_version": _positive_int(expected_policy_version, "expected_policy_version", maximum=2**63 - 1),
+            "expected_state_version": _positive_int(expected_state_version, "expected_state_version", maximum=2**63 - 1),
+            "model_selection_digest": model_selection_digest,
+        }
+        if checkpoint is not None:
+            if not isinstance(checkpoint, Mapping):
+                raise EngineProtocolError("runtime learning checkpoint must be an object")
+            try:
+                encoded = json.dumps(
+                    checkpoint, allow_nan=False, ensure_ascii=False, separators=(",", ":"),
+                ).encode("utf-8", errors="strict")
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise EngineProtocolError("runtime learning checkpoint must be finite JSON") from exc
+            if len(encoded) > 256 * 1024:
+                raise EngineProtocolError("runtime learning checkpoint exceeds its byte limit")
+            body["checkpoint"] = dict(checkpoint)
+        if checkpoint_json is not None:
+            self._learning_checkpoint_json(
+                checkpoint_json, tenant_id=tenant, partition_id=partition,
+            )
+            body["checkpoint_json"] = checkpoint_json
+        payload = await self._request(
+            "POST", "/runtime-control/learning/partitions/" + partition + "/checkpoint",
+            json_body=body, trace_id=trace_id, max_response_bytes=384 * 1024,
+            surface_validation_rejection=True,
+        )
+        self._learning_checkpoint_identity(
+            payload, actor_id=actor, tenant_id=tenant, partition_id=partition,
+            schema="skeleton.ai.runtime_learning_control.v1",
+        )
+        if not isinstance(payload.get("receipt"), Mapping) or not isinstance(payload.get("runtime"), Mapping):
+            raise EngineProtocolError("runtime learning mutation receipt is incomplete")
+        receipt = payload["receipt"]
+        mutation = receipt.get("learning_checkpoint")
+        if (receipt.get("schema_version") != "skeleton.runtime.control.event.v1"
+                or receipt.get("tenant_id") != tenant
+                or receipt.get("version") != expected_policy_version + 1
+                or not isinstance(mutation, Mapping)
+                or mutation.get("partition_id") != partition or mutation.get("action") != action
+                or mutation.get("model_selection_digest") != model_selection_digest
+                or mutation.get("previous_state_version") != expected_state_version
+                or type(mutation.get("state_version")) is not int
+                or mutation["state_version"] <= expected_state_version):
+            raise EngineProtocolError("runtime learning mutation receipt binding differs")
+        for value in (receipt.get("receipt_digest"), mutation.get("state_digest"), mutation.get("previous_state_digest")):
+            if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise EngineProtocolError("runtime learning mutation digest is invalid")
+        self._runtime_control_state(payload["runtime"], actor_id=actor, tenant_id=tenant)
+        if payload["runtime"]["policy_version"] < receipt["version"]:
+            raise EngineProtocolError("runtime learning mutation projection precedes its commit")
+        return dict(payload)
 
     async def provider_status(
         self,
@@ -1725,10 +1914,10 @@ class EngineClient:
         if not isinstance(available, bool):
             raise EngineProtocolError("provider_status.available must be boolean")
         raw_providers = payload.get("providers")
-        if not isinstance(raw_providers, list) or not raw_providers:
-            raise EngineProtocolError("provider_status.providers must be a non-empty list")
+        if not isinstance(raw_providers, list) or not 1 <= len(raw_providers) <= 16:
+            raise EngineProtocolError("provider_status.providers must contain between 1 and 16 exact models")
         providers: list[dict[str, Any]] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str | None]] = set()
         for index, raw in enumerate(raw_providers):
             if not isinstance(raw, Mapping):
                 raise EngineProtocolError(f"provider_status.providers[{index}] must be an object")
@@ -1738,14 +1927,24 @@ class EngineClient:
                 f"provider_status.providers[{index}].id",
                 maximum=128,
             )
-            if provider_id in seen:
-                raise EngineProtocolError("provider_status contains duplicate provider id")
-            seen.add(provider_id)
+            model_id = item.get("model")
+            if model_id is not None:
+                model_id = _text(model_id, f"provider_status.providers[{index}].model", maximum=256)
+            identity = (provider_id, model_id)
+            if identity in seen:
+                raise EngineProtocolError("provider_status contains duplicate provider/model identity")
+            seen.add(identity)
+            if "active" in item and not isinstance(item["active"], bool):
+                raise EngineProtocolError("provider_status model active flag must be boolean")
             if not isinstance(item.get("available"), bool):
                 raise EngineProtocolError(f"provider_status.providers[{index}].available must be boolean")
             providers.append(item)
-        if active not in seen:
+        if active not in {provider_id for provider_id, _model_id in seen}:
             raise EngineProtocolError("provider_status active provider is not declared")
+        if any("active" in item for item in providers):
+            active_models = [item for item in providers if item.get("active") is True]
+            if len(active_models) != 1 or active_models[0]["id"] != active:
+                raise EngineProtocolError("provider_status must identify one exact active model")
         return {
             "active": active,
             "available": available,

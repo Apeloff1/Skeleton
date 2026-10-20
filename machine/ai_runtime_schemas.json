@@ -245,6 +245,11 @@
     ],
     "UnknownPolicy": [
       "reject"
+    ],
+    "RuntimeLearningCheckpointAction": [
+      "import",
+      "reset",
+      "restore_last_healthy"
     ]
   },
   "records": {
@@ -2431,6 +2436,54 @@
         "projection domains are source-first and may serve stale state only by explicit opt-in",
         "unknown freshness always fails closed",
         "numeric staleness bounds are not invented without a domain NFR"
+      ]
+    },
+    "RuntimeLearningCheckpointControl": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "actor_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "tenant_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "partition_id": {
+          "type": "Digest256"
+        },
+        "action": {
+          "type": "RuntimeLearningCheckpointAction"
+        },
+        "expected_policy_version": {
+          "type": "PositiveInt"
+        },
+        "expected_state_version": {
+          "type": "PositiveInt"
+        },
+        "model_selection_digest": {
+          "type": "Digest256"
+        },
+        "checkpoint": {
+          "type": "JsonObject",
+          "nullable": true,
+          "maximum_serialized_bytes": 262144
+        },
+        "checkpoint_json": {
+          "type": "string",
+          "nullable": true,
+          "maximum_utf8_bytes": 262144
+        }
+      },
+      "invariants": [
+        "exactly one of checkpoint or checkpoint_json present for import; neither for reset/restore",
+        "browser export/import preserves opaque server-canonical checkpoint_json bytes; preview parsing never rewrites numeric digest input",
+        "existing tenant/task/model/feature/partition identity and canonical outcome provenance remain bound",
+        "state CAS, policy CAS, optimizer mutation and immutable audit receipt commit atomically",
+        "import/reset/restore cannot transfer production model or verification authority; fresh canonical outcomes required for confidence"
       ]
     }
   },

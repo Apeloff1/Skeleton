@@ -51,6 +51,7 @@ _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
 _RESOURCE_SAMPLE_LOCK = threading.Lock()
 _RESOURCE_CPU_SAMPLE: tuple[float, int, float | None] | None = None
+_ANONYMOUS_TENANT_SCOPE = hashlib.sha256(b"skeleton-local-anonymous-tenant-v1").hexdigest()
 
 
 class LocalInferenceCancelled(RuntimeError):
@@ -659,11 +660,16 @@ class _ServingTicket:
     work_class: str
     scope_id: str
     preemption_scope_id: str
+    tenant_scope_id: str
     enqueued_at: float
     deadline: float
     cancel: threading.Event
     retired: str | None = None
     started_at: float | None = None
+    starvation_protected: bool = False
+    coalesced: bool = False
+    estimated_memory_bytes: int = 0
+    memory_wait_observed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -752,6 +758,14 @@ def sample_serving_resources() -> ServingResources:
 
 
 class LocalInferenceEngine:
+    """Process-bounded workers with disposable tenant and operation queues.
+
+    Scope identifiers are host-supplied authority, never inferred from model
+    text. Tenant fairness, operation preemption and cache provenance remain
+    separate; telemetry exposes only aggregate counts. Reducing limits gates
+    future grants while every existing OS worker retains its reservation.
+    """
+
     def __init__(
         self,
         model: LocalModelBackend,
@@ -788,11 +802,37 @@ class LocalInferenceEngine:
         # asyncio lock, has one authority across desktop/event-loop lifetimes.
         self._cache_lock = threading.Lock()
         self._capacity_lock = threading.Lock()
-        self._serving = AdaptiveServingController(max_concurrency)
+        self._serving = AdaptiveServingController(max_concurrency, max_queue_size)
         self._tickets: OrderedDict[int, _ServingTicket] = OrderedDict()
         self._interactive_tickets: OrderedDict[int, _ServingTicket] = OrderedDict()
         self._background_tickets: OrderedDict[int, _ServingTicket] = OrderedDict()
         self._running: dict[int, _ServingTicket] = {}
+        self._tenant_active: Counter[str] = Counter()
+        self._tenant_queued: Counter[str] = Counter()
+        self._operation_active: Counter[tuple[str, str]] = Counter()
+        self._operation_queued: Counter[tuple[str, str]] = Counter()
+        self._tenant_queues: dict[
+            str, OrderedDict[str, OrderedDict[str, OrderedDict[int, _ServingTicket]]]
+        ] = {
+            "interactive": OrderedDict(),
+            "background": OrderedDict(),
+        }
+        self._schedule_version = 0
+        self._selected_version = -1
+        self._selected_sequence: int | None = None
+        self._selection_expires_at = 0.0
+        self._fairness_rotations = 0
+        self._operation_rotations = 0
+        self._aged_background_admissions = 0
+        self._tenant_limit_rejections = 0
+        self._operation_limit_rejections = 0
+        self._memory_shed_rejections = 0
+        self._load_shed_rejections = 0
+        self._max_queue_wait_ms = 0.0
+        self._interactive_grants_since_background = 0
+        self._preemption_deferrals = 0
+        self._reserved_memory_bytes = 0
+        self._memory_headroom_waits = 0
         self._next_ticket = 0
         self._draining = False
         self._preemptions = 0
@@ -805,6 +845,7 @@ class LocalInferenceEngine:
         self._singleflight: dict[tuple[str, asyncio.AbstractEventLoop], asyncio.Future[LocalInferenceResult]] = {}
         self._singleflight_hits = 0
         self._singleflight_waiters = 0
+        self._singleflight_tenants: Counter[str] = Counter()
         self._cache_epoch = 0
         self._active = 0
         self._queued = 0
@@ -817,6 +858,262 @@ class LocalInferenceEngine:
     def _sample_pressure_locked(self, now: float) -> None:
         if self._serving.sample_due(now):
             self._serving.update(sample_serving_resources(), now=now, queued=self._queued)
+            self._schedule_version += 1
+            if self._memory_shedding_locked():
+                for ticket in tuple(self._tickets.values()):
+                    self._retire_queued_locked(ticket, "memory_pressure")
+                    self._memory_shed_rejections += 1
+                    self._overloaded += 1
+            else:
+                self._enforce_queue_limits_locked()
+
+    def _memory_shedding_locked(self) -> bool:
+        memory = self._serving.resources.memory_used_fraction
+        return memory is not None and memory >= self._serving.policy.memory_shed_watermark
+
+    def _memory_headroom_locked(self, ticket: _ServingTicket) -> bool:
+        available = self._serving.resources.available_memory_bytes
+        if not ticket.estimated_memory_bytes or available is None:
+            return True
+        # Reserve the conservative native KV estimate until physical drain.
+        # Available memory already reflects some live allocations; counting
+        # outstanding reservations again intentionally leaves safety headroom.
+        required = ticket.estimated_memory_bytes + self._reserved_memory_bytes + 32 * 1024 * 1024
+        if required <= available:
+            return True
+        if not ticket.memory_wait_observed:
+            ticket.memory_wait_observed = True
+            self._memory_headroom_waits += 1
+        return False
+
+    def _effective_queue_limit_locked(self) -> int:
+        if self._memory_shedding_locked():
+            return 0
+        if self._serving.policy.enabled and self._serving.level in {"critical", "elevated"}:
+            return min(self.max_queue_size, max(1, self._serving.effective_concurrency * 8))
+        return self.max_queue_size
+
+    def _background_starvation_seconds_locked(self) -> float:
+        return min(
+            self._serving.policy.background_starvation_seconds,
+            self._serving.policy.max_queue_wait_seconds * 0.5,
+        )
+
+    def _operation_queue_limit_locked(self) -> int:
+        maximum = self._serving.policy.max_queued_per_tenant
+        return max(1, maximum * 3 // 4) if maximum else 0
+
+    def _background_queue_limit_locked(self) -> int:
+        maximum = self.max_queue_size * 3 // 4
+        if self._serving.policy.enabled and self._serving.level in {"critical", "elevated"}:
+            maximum = min(maximum, self._serving.effective_concurrency * 2)
+        return maximum
+
+    def _enforce_queue_limits_locked(self) -> None:
+        def reject(ticket: _ServingTicket, reason: str) -> None:
+            self._retire_queued_locked(ticket, reason)
+            self._overloaded += 1
+            if reason == "tenant_capacity":
+                self._tenant_limit_rejections += 1
+            elif reason == "operation_capacity":
+                self._operation_limit_rejections += 1
+            else:
+                self._load_shed_rejections += 1
+
+        # Retire newest background work before interactive work. Every index
+        # is bounded by the operator queue ceiling and pruned on removal.
+        for operation, count in tuple(self._operation_queued.items()):
+            excess = count - self._operation_queue_limit_locked()
+            for work_class in ("background", "interactive"):
+                if excess <= 0:
+                    break
+                operations = self._tenant_queues[work_class].get(operation[0])
+                queue = None if operations is None else operations.get(operation[1])
+                while queue and excess > 0:
+                    reject(next(reversed(queue.values())), "operation_capacity")
+                    excess -= 1
+        for tenant, count in tuple(self._tenant_queued.items()):
+            excess = count - self._serving.policy.max_queued_per_tenant
+            for work_class in ("background", "interactive"):
+                if excess <= 0:
+                    break
+                operations = self._tenant_queues[work_class].get(tenant)
+                while operations and excess > 0:
+                    queue = next(reversed(operations.values()))
+                    reject(next(reversed(queue.values())), "tenant_capacity")
+                    excess -= 1
+        while len(self._background_tickets) > self._background_queue_limit_locked():
+            reject(next(reversed(self._background_tickets.values())), "load_pressure")
+        while self._queued > self._effective_queue_limit_locked():
+            queue = self._background_tickets or self._interactive_tickets
+            reject(next(reversed(queue.values())), "load_pressure")
+
+    def _remove_queued_locked(self, ticket: _ServingTicket) -> bool:
+        if self._tickets.pop(ticket.sequence, None) is None:
+            return False
+        self._interactive_tickets.pop(ticket.sequence, None)
+        self._background_tickets.pop(ticket.sequence, None)
+        self._queued -= 1
+        tenant = ticket.tenant_scope_id
+        self._tenant_queued[tenant] -= 1
+        if self._tenant_queued[tenant] == 0:
+            del self._tenant_queued[tenant]
+        operation = (tenant, ticket.preemption_scope_id)
+        self._operation_queued[operation] -= 1
+        if self._operation_queued[operation] == 0:
+            del self._operation_queued[operation]
+        tenants = self._tenant_queues[ticket.work_class]
+        operations = tenants.get(tenant)
+        queue = None if operations is None else operations.get(ticket.preemption_scope_id)
+        if queue is not None:
+            queue.pop(ticket.sequence, None)
+            if not queue:
+                del operations[ticket.preemption_scope_id]
+            if not operations:
+                del tenants[tenant]
+        self._schedule_version += 1
+        return True
+
+    def _retire_queued_locked(self, ticket: _ServingTicket, reason: str) -> None:
+        if self._remove_queued_locked(ticket):
+            ticket.retired = reason
+
+    def _release_running_locked(self, ticket: _ServingTicket) -> None:
+        if self._running.pop(ticket.sequence, None) is None:
+            raise RuntimeError("local inference reservation released without ownership")
+        self._active -= 1
+        self._reserved_memory_bytes -= ticket.estimated_memory_bytes
+        tenant = ticket.tenant_scope_id
+        self._tenant_active[tenant] -= 1
+        if self._tenant_active[tenant] == 0:
+            del self._tenant_active[tenant]
+        operation = (tenant, ticket.preemption_scope_id)
+        self._operation_active[operation] -= 1
+        if self._operation_active[operation] == 0:
+            del self._operation_active[operation]
+        self._schedule_version += 1
+
+    def _class_candidate_locked(self, work_class: str, now: float) -> _ServingTicket | None:
+        tenants = self._tenant_queues[work_class]
+        best: _ServingTicket | None = None
+        best_score: tuple[int, int] | None = None
+        starvation = self._background_starvation_seconds_locked()
+        for tenant in tuple(tenants):
+            operations = tenants.get(tenant)
+            if operations is None:
+                continue
+            active = self._tenant_active.get(tenant, 0)
+            if active >= self._serving.policy.max_active_per_tenant:
+                continue
+            tenant_head: _ServingTicket | None = None
+            operation_score: tuple[int, int] | None = None
+            for operation in tuple(operations):
+                queue = operations.get(operation)
+                if queue is None:
+                    continue
+                head = None
+                for candidate in tuple(queue.values()):
+                    if candidate.deadline <= now:
+                        self._retire_queued_locked(candidate, "deadline exceeded")
+                        self._queue_expired += 1
+                    elif not candidate.coalesced:
+                        head = candidate
+                        break
+                if head is None:
+                    continue
+                if not self._memory_headroom_locked(head):
+                    continue
+                self._selection_expires_at = min(self._selection_expires_at, head.deadline)
+                if head.deadline > now + 0.25:
+                    self._selection_expires_at = min(self._selection_expires_at, head.deadline - 0.25)
+                urgent = head.deadline - now <= 0.25
+                if work_class == "background":
+                    aged = now - head.enqueued_at >= starvation
+                    if not aged:
+                        self._selection_expires_at = min(self._selection_expires_at, head.enqueued_at + starvation)
+                    urgent = urgent or aged
+                score = (self._operation_active.get((tenant, operation), 0), 0 if urgent else 1)
+                if operation_score is None or score < operation_score:
+                    tenant_head, operation_score = head, score
+            if tenant_head is None:
+                continue
+            assert operation_score is not None
+            # Lowest active share wins; rotation breaks equal-share ties.
+            # Deadline urgency is local to an otherwise equal active share.
+            score = (active, operation_score[1])
+            if best_score is None or score < best_score:
+                best, best_score = tenant_head, score
+        return best
+
+    def _selected_ticket_locked(self, now: float) -> _ServingTicket | None:
+        if self._selected_version == self._schedule_version and now < self._selection_expires_at:
+            return self._tickets.get(self._selected_sequence)
+        self._selection_expires_at = now + 1.0
+        if self._draining or self._memory_shedding_locked() or self._active >= self._serving.effective_concurrency:
+            selected = None
+        else:
+            interactive = self._class_candidate_locked("interactive", now)
+            background_active = sum(item.work_class == "background" for item in self._running.values())
+            background = None
+            if background_active < self._serving.background_limit:
+                background = self._class_candidate_locked("background", now)
+            selected = interactive or background
+            if interactive is not None and background is not None:
+                aged = now - background.enqueued_at >= self._background_starvation_seconds_locked()
+                urgent = background.deadline - now <= 0.25 and background.deadline < interactive.deadline
+                foreground_urgent = interactive.deadline - now <= 0.25 and interactive.deadline < background.deadline
+                if aged and not foreground_urgent and (self._interactive_grants_since_background >= 3 or urgent):
+                    selected = background
+        self._selected_sequence = None if selected is None else selected.sequence
+        self._selected_version = self._schedule_version
+        return selected
+
+    def _try_admit_locked(self, ticket: _ServingTicket, now: float) -> bool:
+        if ticket.started_at is not None:
+            return True
+        if self._selected_ticket_locked(now) is not ticket:
+            return False
+        if not self._memory_headroom_locked(ticket):
+            return False
+        now = time.monotonic()
+        if now >= ticket.deadline:
+            self._retire_queued_locked(ticket, "deadline exceeded")
+            self._queue_expired += 1
+            return False
+        if not self._execution_slots.acquire(blocking=False):
+            return False
+        tenants = self._tenant_queues[ticket.work_class]
+        competing_tenants = len(tenants) > 1
+        competing_operations = len(tenants[ticket.tenant_scope_id]) > 1
+        aged = ticket.work_class == "background" and (
+            now - ticket.enqueued_at >= self._background_starvation_seconds_locked()
+        )
+        ticket.starvation_protected = aged
+        self._remove_queued_locked(ticket)
+        if ticket.tenant_scope_id in tenants:
+            operations = tenants[ticket.tenant_scope_id]
+            if ticket.preemption_scope_id in operations:
+                operations.move_to_end(ticket.preemption_scope_id)
+            tenants.move_to_end(ticket.tenant_scope_id)
+        if competing_tenants:
+            self._fairness_rotations += 1
+        if competing_operations:
+            self._operation_rotations += 1
+        if ticket.work_class == "background":
+            self._interactive_grants_since_background = 0
+            if aged:
+                self._aged_background_admissions += 1
+        else:
+            self._interactive_grants_since_background = min(3, self._interactive_grants_since_background + 1)
+        self._active += 1
+        self._reserved_memory_bytes += ticket.estimated_memory_bytes
+        self._tenant_active[ticket.tenant_scope_id] += 1
+        self._operation_active[(ticket.tenant_scope_id, ticket.preemption_scope_id)] += 1
+        ticket.started_at = now
+        self._running[ticket.sequence] = ticket
+        self._max_queue_wait_ms = max(self._max_queue_wait_ms, (now - ticket.enqueued_at) * 1000.0)
+        self._schedule_version += 1
+        return True
 
     def _effective_cache_limit_locked(self) -> int:
         maximum = self._serving.policy.cache_max_bytes
@@ -829,7 +1126,8 @@ class LocalInferenceEngine:
     def snapshot(self) -> dict[str, Any]:
         """Return bounded operational counts without prompts or model output."""
         with self._capacity_lock:
-            self._sample_pressure_locked(time.monotonic())
+            now = time.monotonic()
+            self._sample_pressure_locked(now)
             background_active = sum(item.work_class == "background" for item in self._running.values())
             background_queued = len(self._background_tickets)
             snapshot = {
@@ -854,8 +1152,47 @@ class LocalInferenceEngine:
                     "active_background": background_active,
                     "queued_interactive": self._queued - background_queued,
                     "queued_background": background_queued,
+                    "per_tenant_active_limit": min(
+                        self._serving.policy.max_active_per_tenant,
+                        self._serving.effective_concurrency,
+                    ),
+                    "per_tenant_queue_limit": self._serving.policy.max_queued_per_tenant,
+                    "per_operation_queue_limit": self._operation_queue_limit_locked(),
+                    "effective_queue_limit": self._effective_queue_limit_locked(),
+                    "reserved_memory_bytes": self._reserved_memory_bytes,
+                    "memory_estimated_active": sum(bool(item.estimated_memory_bytes) for item in self._running.values()),
                 },
                 "pressure": self._serving.pressure_snapshot(),
+                "fairness": {
+                    "active_tenants": len(self._tenant_active),
+                    "queued_tenants": len(self._tenant_queued),
+                    "active_operations": len(self._operation_active),
+                    "queued_operations": len(self._operation_queued),
+                    "largest_tenant_active": max(self._tenant_active.values(), default=0),
+                    "largest_tenant_queued": max(self._tenant_queued.values(), default=0),
+                    "rotations": self._fairness_rotations,
+                    "operation_rotations": self._operation_rotations,
+                    "aged_background_admissions": self._aged_background_admissions,
+                    "preemption_deferrals": self._preemption_deferrals,
+                    "tenant_limit_rejections": self._tenant_limit_rejections,
+                    "operation_limit_rejections": self._operation_limit_rejections,
+                    "memory_shed_rejections": self._memory_shed_rejections,
+                    "load_shed_rejections": self._load_shed_rejections,
+                    "oldest_interactive_wait_ms": (
+                        (now - next(iter(self._interactive_tickets.values())).enqueued_at) * 1000.0
+                        if self._interactive_tickets else 0.0
+                    ),
+                    "oldest_background_wait_ms": (
+                        (now - next(iter(self._background_tickets.values())).enqueued_at) * 1000.0
+                        if self._background_tickets else 0.0
+                    ),
+                    "max_observed_queue_wait_ms": self._max_queue_wait_ms,
+                    "memory_shedding": self._memory_shedding_locked(),
+                    "memory_headroom_waits": self._memory_headroom_waits,
+                    "memory_estimate_source": "native_kv_upper_bound_when_available",
+                    "background_starvation_seconds": self._background_starvation_seconds_locked(),
+                    "foreground_grants_between_background": 3,
+                },
                 "draining": self._draining,
             }
         with self._cache_lock:
@@ -872,6 +1209,8 @@ class LocalInferenceEngine:
                 "singleflight_active": len(self._singleflight),
                 "singleflight_hits": self._singleflight_hits,
                 "singleflight_waiters": self._singleflight_waiters,
+                "singleflight_tenants": len(self._singleflight_tenants),
+                "largest_tenant_singleflight_waiters": max(self._singleflight_tenants.values(), default=0),
             }
         snapshot["serving"] = serving
         return snapshot
@@ -880,6 +1219,8 @@ class LocalInferenceEngine:
         """Change derived serving policy without changing activated identity."""
         with self._capacity_lock:
             self._serving.configure(policy, time.monotonic())
+            self._schedule_version += 1
+            self._enforce_queue_limits_locked()
         self._trim_cache()
         return self.snapshot()
 
@@ -899,14 +1240,11 @@ class LocalInferenceEngine:
             with self._capacity_lock:
                 self._draining = action == "drain"
                 if self._draining:
-                    for ticket in self._tickets.values():
-                        ticket.retired = "draining"
-                    self._queued -= len(self._tickets)
-                    self._tickets.clear()
-                    self._interactive_tickets.clear()
-                    self._background_tickets.clear()
+                    for ticket in tuple(self._tickets.values()):
+                        self._retire_queued_locked(ticket, "draining")
                     # Active workers keep their reservations and physical
                     # ownership until their own finally block completes.
+                self._schedule_version += 1
         return self.snapshot()
 
     def _reserve(
@@ -914,8 +1252,12 @@ class LocalInferenceEngine:
         work_class: str,
         scope_id: str,
         preemption_scope_id: str,
+        tenant_scope_id: str,
         deadline: float | None,
         cancel: threading.Event,
+        *,
+        coalesced: bool = False,
+        estimated_memory_bytes: int = 0,
     ) -> _ServingTicket:
         now = time.monotonic()
         with self._capacity_lock:
@@ -923,6 +1265,18 @@ class LocalInferenceEngine:
             if self._draining:
                 self._overloaded += 1
                 raise LocalInferenceOverloaded("local inference is draining")
+            if self._memory_shedding_locked():
+                self._memory_shed_rejections += 1
+                self._overloaded += 1
+                raise LocalInferenceOverloaded("local inference admission shed for memory pressure")
+            available = self._serving.resources.available_memory_bytes
+            if (
+                estimated_memory_bytes and available is not None and not self._active
+                and estimated_memory_bytes + 32 * 1024 * 1024 > available
+            ):
+                self._memory_shed_rejections += 1
+                self._overloaded += 1
+                raise LocalInferenceOverloaded("local native KV estimate exceeds available memory headroom")
             queue_deadline = now + self._serving.policy.max_queue_wait_seconds
             if deadline is not None:
                 queue_deadline = min(queue_deadline, deadline)
@@ -932,44 +1286,82 @@ class LocalInferenceEngine:
             if work_class == "background" and self._serving.policy.background_max_concurrency == 0:
                 self._overloaded += 1
                 raise LocalInferenceOverloaded("local background inference is paused")
-            background_queue_limit = max(1, self.max_queue_size * 3 // 4)
-            if work_class == "background" and len(self._background_tickets) >= background_queue_limit:
-                self._overloaded += 1
-                raise LocalInferenceOverloaded("local background waiting capacity is full")
-            full = self._active + self._queued >= self.max_concurrency + self.max_queue_size
-            if full and work_class == "interactive":
+            queue_limit = self._effective_queue_limit_locked()
+            tenant_queue_limit = self._serving.policy.max_queued_per_tenant
+            full = self._queued >= queue_limit or self._tenant_queued.get(tenant_scope_id, 0) >= tenant_queue_limit
+            if full and work_class == "interactive" and not coalesced:
                 # Replace queued work only inside the same authority scope.
                 victim = next((item for item in reversed(self._background_tickets.values()) if (
                     item.preemption_scope_id == preemption_scope_id
+                    and item.tenant_scope_id == tenant_scope_id
+                    and now - item.enqueued_at < self._background_starvation_seconds_locked()
+                    and item.deadline - now > 0.25
                 )), None)
                 if victim is not None:
-                    victim.retired = "preempted"
-                    del self._tickets[victim.sequence]
-                    del self._background_tickets[victim.sequence]
-                    self._queued -= 1
+                    self._retire_queued_locked(victim, "preempted")
                     self._preemptions += 1
-                    full = False
-            if full:
-                self._overloaded += 1
-                raise LocalInferenceOverloaded("local inference waiting capacity is full")
             self._next_ticket += 1
             ticket = _ServingTicket(
                 self._next_ticket, work_class, scope_id, preemption_scope_id,
-                now, queue_deadline, cancel,
+                tenant_scope_id, now, queue_deadline, cancel,
             )
+            ticket.coalesced = coalesced
+            ticket.estimated_memory_bytes = estimated_memory_bytes
             self._tickets[ticket.sequence] = ticket
             priority_queue = self._interactive_tickets if work_class == "interactive" else self._background_tickets
             priority_queue[ticket.sequence] = ticket
+            tenants = self._tenant_queues[work_class]
+            operations = tenants.setdefault(tenant_scope_id, OrderedDict())
+            operations.setdefault(preemption_scope_id, OrderedDict())[ticket.sequence] = ticket
             self._queued += 1
-            if work_class == "interactive" and self._active >= self._serving.effective_concurrency:
+            self._tenant_queued[tenant_scope_id] += 1
+            operation = (tenant_scope_id, preemption_scope_id)
+            self._operation_queued[operation] += 1
+            self._schedule_version += 1
+            # Reserve an immediately usable slot atomically. A zero queue
+            # budget permits immediate execution, never a hidden waiting job.
+            if not coalesced and self._try_admit_locked(ticket, now):
+                return ticket
+            if ticket.retired is not None:
+                return ticket
+            tenant_full = self._tenant_queued[tenant_scope_id] > tenant_queue_limit
+            operation_full = self._operation_queued[operation] > self._operation_queue_limit_locked()
+            queue_full = self._queued > queue_limit
+            background_queue_limit = self._background_queue_limit_locked()
+            background_full = work_class == "background" and len(self._background_tickets) > background_queue_limit
+            if tenant_full or operation_full or queue_full or background_full:
+                self._retire_queued_locked(ticket, "capacity exceeded")
+                self._overloaded += 1
+                if tenant_full:
+                    self._tenant_limit_rejections += 1
+                    raise LocalInferenceOverloaded("local per-tenant waiting capacity is full")
+                if operation_full:
+                    self._operation_limit_rejections += 1
+                    raise LocalInferenceOverloaded("local per-operation waiting capacity is full")
+                if queue_full and queue_limit < self.max_queue_size:
+                    self._load_shed_rejections += 1
+                    raise LocalInferenceOverloaded("local inference waiting admission shed for load pressure")
+                raise LocalInferenceOverloaded("local inference waiting capacity is full")
+            if not coalesced and work_class == "interactive" and (
+                self._active >= self._serving.effective_concurrency
+                or self._tenant_active.get(tenant_scope_id, 0) >= self._serving.policy.max_active_per_tenant
+            ):
                 victim = next((item for item in self._running.values() if (
                     item.work_class == "background"
                     and item.preemption_scope_id == preemption_scope_id
+                    and item.tenant_scope_id == tenant_scope_id
                     and not item.cancel.is_set()
+                    and not item.starvation_protected
                 )), None)
                 if victim is not None:
                     victim.cancel.set()
                     self._preemptions += 1
+                elif any(
+                    item.work_class == "background" and item.preemption_scope_id == preemption_scope_id
+                    and item.tenant_scope_id == tenant_scope_id and item.starvation_protected
+                    for item in self._running.values()
+                ):
+                    self._preemption_deferrals += 1
             return ticket
 
     def _infer_admitted(
@@ -1003,8 +1395,7 @@ class LocalInferenceEngine:
             raise
         finally:
             with self._capacity_lock:
-                self._active -= 1
-                self._running.pop(ticket.sequence, None)
+                self._release_running_locked(ticket)
                 now = time.monotonic()
                 admitted_at = ticket.started_at if ticket.started_at is not None else now
                 self._serving.observe(
@@ -1023,39 +1414,23 @@ class LocalInferenceEngine:
                     now = time.monotonic()
                     self._sample_pressure_locked(now)
                     if ticket.retired is not None:
+                        if ticket.retired in {
+                            "memory_pressure", "load_pressure", "tenant_capacity", "operation_capacity",
+                        }:
+                            raise LocalInferenceOverloaded("local inference queued admission shed: " + ticket.retired)
                         raise LocalInferenceCancelled("local inference queue " + ticket.retired)
+                    if ticket.started_at is not None:
+                        return
                     if now >= ticket.deadline:
-                        self._tickets.pop(ticket.sequence, None)
-                        self._interactive_tickets.pop(ticket.sequence, None)
-                        self._background_tickets.pop(ticket.sequence, None)
-                        self._queued -= 1
+                        self._retire_queued_locked(ticket, "deadline exceeded")
                         self._queue_expired += 1
-                        ticket.retired = "deadline exceeded"
                         raise LocalInferenceCancelled("local inference queue deadline exceeded")
-                    interactive = next(iter(self._interactive_tickets.values()), None)
-                    head = interactive or next(iter(self._tickets.values()), None)
-                    background_active = sum(item.work_class == "background" for item in self._running.values())
-                    allowed = (
-                        head is ticket
-                        and self._active < self._serving.effective_concurrency
-                        and (ticket.work_class != "background" or background_active < self._serving.background_limit)
-                    )
-                    if allowed and self._execution_slots.acquire(blocking=False):
-                        del self._tickets[ticket.sequence]
-                        self._interactive_tickets.pop(ticket.sequence, None)
-                        self._background_tickets.pop(ticket.sequence, None)
-                        self._queued -= 1
-                        self._active += 1
-                        ticket.started_at = now
-                        self._running[ticket.sequence] = ticket
+                    if self._try_admit_locked(ticket, now):
                         return
                 await asyncio.sleep(0.01)
         except asyncio.CancelledError:
             with self._capacity_lock:
-                if self._tickets.pop(ticket.sequence, None) is not None:
-                    self._queued -= 1
-                self._interactive_tickets.pop(ticket.sequence, None)
-                self._background_tickets.pop(ticket.sequence, None)
+                self._remove_queued_locked(ticket)
                 self._cancelled += 1
             raise
         except LocalInferenceCancelled:
@@ -1106,8 +1481,7 @@ class LocalInferenceEngine:
             raise
         finally:
             with self._capacity_lock:
-                self._active -= 1
-                self._running.pop(ticket.sequence, None)
+                self._release_running_locked(ticket)
             self._execution_slots.release()
 
     async def _admit_cached_identity(
@@ -1117,10 +1491,11 @@ class LocalInferenceEngine:
         work_class: str,
         scope_id: str,
         preemption_scope_id: str,
+        tenant_scope_id: str,
         deadline: float | None,
     ) -> None:
         cancel = threading.Event()
-        ticket = self._reserve(work_class, scope_id, preemption_scope_id, deadline, cancel)
+        ticket = self._reserve(work_class, scope_id, preemption_scope_id, tenant_scope_id, deadline, cancel)
         await self._acquire_execution_slot(ticket)
         started = threading.Event()
         timeout = None
@@ -1134,8 +1509,7 @@ class LocalInferenceEngine:
         except BaseException:
             if not started.is_set():
                 with self._capacity_lock:
-                    self._active -= 1
-                    self._running.pop(ticket.sequence, None)
+                    self._release_running_locked(ticket)
                     self._failed += 1
                 self._execution_slots.release()
             raise
@@ -1205,6 +1579,76 @@ class LocalInferenceEngine:
                 break
         return size
 
+    def _request_memory_estimate(self, request: LocalInferenceRequest) -> int:
+        runtime = getattr(self.model, "runtime", None)
+        estimate = getattr(runtime, "estimate_kv_bytes", None)
+        limits = getattr(runtime, "limits", None)
+        context = getattr(limits, "max_context", None)
+        count = getattr(self.model, "count_input_tokens", None)
+        if not callable(estimate) or not callable(count) or type(context) is not int or context < 1:
+            return 0
+        input_tokens = count(request)
+        if type(input_tokens) is not int or input_tokens < 0:
+            raise ProviderPolicyError("local native memory admission received invalid token count")
+        tokens = min(context, input_tokens + request.max_output_tokens)
+        size = estimate(tokens)
+        if type(size) is not int or not 0 <= size < 2**63:
+            raise ProviderPolicyError("local native KV memory estimate is invalid")
+        maximum = getattr(limits, "max_kv_bytes", None)
+        if type(maximum) is int and size > maximum:
+            raise ProviderPolicyError("local request exceeds activated native KV memory limit")
+        return size
+
+    async def _wait_coalesced(
+        self,
+        future: asyncio.Future[LocalInferenceResult],
+        *,
+        work_class: str,
+        scope_id: str,
+        preemption_scope_id: str,
+        tenant_scope_id: str,
+        deadline: float | None,
+    ) -> LocalInferenceResult:
+        # A duplicate is still a waiting request: use the same tenant,
+        # operation and global pending budgets without acquiring an OS slot.
+        ticket = self._reserve(
+            work_class, scope_id, preemption_scope_id, tenant_scope_id,
+            deadline, threading.Event(), coalesced=True,
+        )
+        waiter = asyncio.shield(future)
+        try:
+            while True:
+                with self._capacity_lock:
+                    now = time.monotonic()
+                    self._sample_pressure_locked(now)
+                    if ticket.retired is not None:
+                        if ticket.retired in {
+                            "memory_pressure", "load_pressure", "tenant_capacity", "operation_capacity",
+                        }:
+                            raise LocalInferenceOverloaded("local inference coalesced admission shed: " + ticket.retired)
+                        raise LocalInferenceCancelled("local inference coalesced queue " + ticket.retired)
+                    if now >= ticket.deadline:
+                        self._retire_queued_locked(ticket, "deadline exceeded")
+                        self._queue_expired += 1
+                        raise LocalInferenceCancelled("local inference coalesced queue deadline exceeded")
+                if waiter.done():
+                    return replace(waiter.result())
+                await asyncio.wait((waiter,), timeout=min(0.05, max(0.001, ticket.deadline - now)))
+        except (asyncio.CancelledError, LocalInferenceCancelled):
+            with self._capacity_lock:
+                self._cancelled += 1
+            raise
+        finally:
+            if not waiter.done():
+                waiter.cancel()
+            elif not waiter.cancelled():
+                waiter.exception()
+            with self._capacity_lock:
+                self._max_queue_wait_ms = max(
+                    self._max_queue_wait_ms, (time.monotonic() - ticket.enqueued_at) * 1000.0,
+                )
+                self._remove_queued_locked(ticket)
+
     async def generate(
         self,
         request: LocalInferenceRequest,
@@ -1212,13 +1656,23 @@ class LocalInferenceEngine:
         work_class: str = "interactive",
         scope_id: str | None = None,
         preemption_scope_id: str | None = None,
+        tenant_scope_id: str | None = None,
         deadline: float | None = None,
     ) -> LocalInferenceResult:
+        """Generate within trusted tenant, cache and monotonic deadline scopes.
+
+        Tenantless direct calls share the anonymous fairness bucket. A host
+        adapter must derive explicit tenant scopes from validated authority,
+        rather than allowing an operation to select a new fairness identity.
+        """
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
         if work_class not in {"interactive", "background"}:
             raise ValueError("local work_class must be interactive or background")
-        for name, value in (("scope_id", scope_id), ("preemption_scope_id", preemption_scope_id)):
+        for name, value in (
+            ("scope_id", scope_id), ("preemption_scope_id", preemption_scope_id),
+            ("tenant_scope_id", tenant_scope_id),
+        ):
             if value is not None and (not isinstance(value, str) or not value or len(value) > 512):
                 raise ValueError(f"{name} must be a non-empty bounded string")
         if deadline is not None and (
@@ -1231,9 +1685,13 @@ class LocalInferenceEngine:
             if self._draining:
                 self._overloaded += 1
                 raise LocalInferenceOverloaded("local inference is draining")
-            follower_wait_limit = self._serving.policy.max_queue_wait_seconds
-        scope = scope_id or "local"
-        preemption_scope = preemption_scope_id or scope
+            if work_class == "background" and deadline is None:
+                deadline = time.monotonic() + min(
+                    3600.0, max(30.0, self._serving.policy.target_latency_ms / 1000.0 * 4),
+                )
+        tenant_scope = tenant_scope_id or _ANONYMOUS_TENANT_SCOPE
+        preemption_scope = preemption_scope_id or scope_id or "local"
+        scope = _digest({"cache_scope": scope_id or "local", "tenant_scope": tenant_scope})
         identity = self._model_identity()
         key = self._key(request, scope)
         self._trim_cache()
@@ -1254,7 +1712,8 @@ class LocalInferenceEngine:
                 if callable(admit_cached):
                     await self._admit_cached_identity(
                         admit_cached, work_class=work_class, scope_id=scope,
-                        preemption_scope_id=preemption_scope, deadline=deadline,
+                        preemption_scope_id=preemption_scope,
+                        tenant_scope_id=tenant_scope, deadline=deadline,
                     )
                 if self._key(request, scope) != key:
                     raise ValueError("local runtime identity changed before cache hit")
@@ -1289,6 +1748,7 @@ class LocalInferenceEngine:
                     self._singleflight[flight_key] = future
                 else:
                     self._singleflight_waiters += 1
+                    self._singleflight_tenants[tenant_scope] += 1
                     self._singleflight_hits += 1
         if overloaded:
             with self._capacity_lock:
@@ -1297,21 +1757,16 @@ class LocalInferenceEngine:
         assert future is not None
         try:
             if not leader:
-                try:
-                    remaining = follower_wait_limit
-                    if deadline is not None:
-                        remaining = min(remaining, deadline - time.monotonic())
-                    if remaining <= 0:
-                        raise LocalInferenceCancelled("local inference deadline exceeded")
-                    result = await asyncio.wait_for(asyncio.shield(future), timeout=remaining)
-                except TimeoutError as exc:
-                    raise LocalInferenceCancelled("local inference deadline exceeded") from exc
-                return replace(result)
+                return await self._wait_coalesced(
+                    future, work_class=work_class, scope_id=scope,
+                    preemption_scope_id=preemption_scope,
+                    tenant_scope_id=tenant_scope, deadline=deadline,
+                )
             try:
                 result = await self._generate_uncached(
                     request, key=key, scope_id=scope,
                     preemption_scope_id=preemption_scope, work_class=work_class,
-                    deadline=deadline, cache_epoch=epoch,
+                    tenant_scope_id=tenant_scope, deadline=deadline, cache_epoch=epoch,
                 )
             except BaseException as exc:
                 if not future.done():
@@ -1329,6 +1784,9 @@ class LocalInferenceEngine:
                     self._singleflight.pop(flight_key, None)
                 else:
                     self._singleflight_waiters -= 1
+                    self._singleflight_tenants[tenant_scope] -= 1
+                    if self._singleflight_tenants[tenant_scope] == 0:
+                        del self._singleflight_tenants[tenant_scope]
 
     async def _generate_uncached(
         self,
@@ -1338,11 +1796,16 @@ class LocalInferenceEngine:
         scope_id: str,
         preemption_scope_id: str,
         work_class: str,
+        tenant_scope_id: str,
         deadline: float | None,
         cache_epoch: int,
     ) -> LocalInferenceResult:
         cancel = threading.Event()
-        ticket = self._reserve(work_class, scope_id, preemption_scope_id, deadline, cancel)
+        estimated_memory = self._request_memory_estimate(request)
+        ticket = self._reserve(
+            work_class, scope_id, preemption_scope_id, tenant_scope_id, deadline, cancel,
+            estimated_memory_bytes=estimated_memory,
+        )
         await self._acquire_execution_slot(ticket)
         started = threading.Event()
         try:
@@ -1368,9 +1831,8 @@ class LocalInferenceEngine:
             # Once started, only the OS worker releases its own reservation.
             if not started.is_set():
                 with self._capacity_lock:
-                    self._active -= 1
+                    self._release_running_locked(ticket)
                     self._failed += 1
-                    self._running.pop(ticket.sequence, None)
                 self._execution_slots.release()
             raise
 
@@ -1431,6 +1893,7 @@ class LocalInferenceEngine:
                 raise ValueError(f"local structured output violates request schema: {exc}") from exc
 
         with self._capacity_lock:
+            self._sample_pressure_locked(time.monotonic())
             policy = self._serving.policy
             byte_limit = self._effective_cache_limit_locked()
         if (
@@ -1465,6 +1928,7 @@ class LocalInferenceEngine:
         work_class: str = "interactive",
         scope_id: str | None = None,
         preemption_scope_id: str | None = None,
+        tenant_scope_id: str | None = None,
         deadline: float | None = None,
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
@@ -1473,22 +1937,49 @@ class LocalInferenceEngine:
             raise ValueError("local inference batch exceeds configured max_batch_size")
         if any(not isinstance(item, LocalInferenceRequest) for item in requests):
             raise TypeError("batch requires LocalInferenceRequest values")
-        tasks = [asyncio.create_task(self.generate(
-            item, work_class=work_class, scope_id=scope_id,
-            preemption_scope_id=preemption_scope_id, deadline=deadline,
-        )) for item in requests]
+        with self._capacity_lock:
+            self._sample_pressure_locked(time.monotonic())
+            workers = min(
+                len(requests), self._serving.effective_concurrency,
+                self._serving.policy.max_active_per_tenant,
+            )
+        results: list[LocalInferenceResult | BaseException | None] = [None] * len(requests)
+        next_index = 0
+
+        async def consume() -> None:
+            nonlocal next_index
+            while next_index < len(requests):
+                # No await separates assignment and increment on this loop.
+                index = next_index
+                next_index += 1
+                try:
+                    results[index] = await self.generate(
+                        requests[index], work_class=work_class, scope_id=scope_id,
+                        preemption_scope_id=preemption_scope_id,
+                        tenant_scope_id=tenant_scope_id, deadline=deadline,
+                    )
+                except Exception as exc:  # noqa: BLE001 -- batch reports admitted outcomes in input order
+                    results[index] = exc
+
+        # A large native batch must not manufacture thousands of pending
+        # requests or defeat the same tenant queue budgets as normal traffic.
+        tasks = [asyncio.create_task(consume()) for _ in range(workers)]
         try:
             # A failed member must not detach still-running native workers.
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-        except asyncio.CancelledError:
+            await asyncio.gather(*tasks)
+        except BaseException:
             for task in tasks:
                 task.cancel()
             await _drain_inference_tasks(tasks)
             raise
+        settled: list[LocalInferenceResult] = []
         for result in results:
             if isinstance(result, BaseException):
                 raise result
-        return tuple(results)
+            if not isinstance(result, LocalInferenceResult):
+                raise RuntimeError("local inference batch did not settle all admitted members")
+            settled.append(result)
+        return tuple(settled)
 
 
 async def _drain_inference_tasks(tasks: Sequence[asyncio.Task]) -> None:
@@ -1909,6 +2400,11 @@ class LocalModelAdapter(ProviderAdapter):
             "governance": governance_scope,
         }
         preemption_scope = _digest(authority)
+        # Tenant fairness is deliberately independent of operation, context,
+        # cache and preemption identities. A tenant cannot gain more capacity
+        # by opening many operations, and all unowned traffic shares a bucket.
+        effective_tenant = governance.tenant_id if governance is not None else request.tenant_id
+        tenant_scope = _ANONYMOUS_TENANT_SCOPE if effective_tenant is None else _digest({"tenant": effective_tenant})
         cache_scope = _digest({
             "authority": authority,
             "purpose": request.purpose,
@@ -1929,6 +2425,7 @@ class LocalModelAdapter(ProviderAdapter):
                     work_class=work_class,
                     scope_id=cache_scope,
                     preemption_scope_id=preemption_scope,
+                    tenant_scope_id=tenant_scope,
                     deadline=time.monotonic() + remaining,
                 ),
                 timeout=remaining,

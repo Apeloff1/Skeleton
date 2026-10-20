@@ -5,6 +5,7 @@ import { learningRequestKey, type LearningProject, type LearningRequest } from '
 
 export type StudioCompletionMode = 'native' | 'original';
 export type StudioCompletionRequirement = 'edit' | 'build' | 'preview' | 'simulate' | 'review' | 'package' | 'export';
+export type StudioNumericMemoryPolicy = 'goal_only' | 'reuse_compatible' | 'reset';
 export type StudioQualityPolicy = {
   schema_version: 'skeleton.game.studio_quality_policy.v1';
   baseline_review_job_id?: string | null;
@@ -16,6 +17,7 @@ export type StudioQualityPolicy = {
   require_no_regression: boolean;
   restore_on_regression: boolean;
   adaptive_ranking?: boolean;
+  numeric_memory_policy?: StudioNumericMemoryPolicy;
 };
 export type StudioQualityMeasuredProgress = {
   schema_version: 'skeleton.game.studio_quality_progress.v1';
@@ -54,6 +56,10 @@ export type StudioNumericAdaptation = {
   observations_seen?: number; training_steps?: number; rejected_updates?: number;
   replay_size?: number; advice: { expected_spec_digest: string; edits: { op: 'set_field'; path: string[]; value: number }[] }[];
   production_authority: false; scope: string;
+  numeric_memory?: {
+    policy: StudioNumericMemoryPolicy; status: string; reused_goals: number; reused_observations: number;
+    provenance_goals: number; epoch: string | null; reset_barrier: boolean; exclusion_counts: Record<string, number>;
+  };
 };
 export type StudioGoalRetryTarget = 'planner' | 'action' | 'job' | 'play' | 'reconcile';
 export type StudioGoalConfig = { goal: string; maxSteps: number; executionMode: 'plan' | 'run'; allowEdits: boolean; authorizationSeconds: number; maxModelCalls: number; maxJobs: number; max_output_tokens?: number; completionMode?: StudioCompletionMode; completionRequirements?: StudioCompletionRequirement[]; qualityGate?: StudioQualityPolicy };
@@ -72,12 +78,14 @@ function qualityPolicy(value: StudioQualityPolicy): StudioQualityPolicy {
     || !boundedInteger(value.max_warning_findings, 0, 128) || typeof value.require_no_regression !== 'boolean'
     || typeof value.restore_on_regression !== 'boolean'
     || value.adaptive_ranking !== undefined && typeof value.adaptive_ranking !== 'boolean'
+    || value.numeric_memory_policy !== undefined && !['goal_only', 'reuse_compatible', 'reset'].includes(value.numeric_memory_policy)
+    || value.numeric_memory_policy !== undefined && value.numeric_memory_policy !== 'goal_only' && value.adaptive_ranking !== true
     || value.baseline_review_job_id != null && (typeof value.baseline_review_job_id !== 'string' || !value.baseline_review_job_id || value.baseline_review_job_id.length > 128)) invalid('The measured quality policy is invalid.');
   return { schema_version: value.schema_version, ...(value.baseline_review_job_id ? { baseline_review_job_id: value.baseline_review_job_id } : {}),
     max_refinement_rounds: value.max_refinement_rounds, min_available_frames: value.min_available_frames,
     min_executed_steps: value.min_executed_steps, max_error_findings: value.max_error_findings,
     max_warning_findings: value.max_warning_findings, require_no_regression: value.require_no_regression, restore_on_regression: value.restore_on_regression,
-    adaptive_ranking: value.adaptive_ranking ?? false };
+    adaptive_ranking: value.adaptive_ranking ?? false, numeric_memory_policy: value.numeric_memory_policy ?? 'goal_only' };
 }
 function qualityProgress(value: StudioQualityProgress, projectId: string): void {
   if (value?.status === 'unavailable') {
@@ -121,6 +129,15 @@ function goal(value: StudioGoal, projectId?: string) {
     || ['observations_seen', 'training_steps', 'rejected_updates', 'replay_size'].some(key => adaptation[key as keyof StudioNumericAdaptation] !== undefined && !boundedInteger(adaptation[key as keyof StudioNumericAdaptation], 0, 1000000))
     || adaptation.advice.some(proposal => !digest(proposal.expected_spec_digest) || !Array.isArray(proposal.edits) || proposal.edits.length > 64
       || proposal.edits.some(edit => edit.op !== 'set_field' || !Array.isArray(edit.path) || edit.path.length !== 3 || edit.path.some(part => typeof part !== 'string' || part.length > 128) || !Number.isFinite(edit.value))))) invalid('The numeric learning projection is invalid.');
+  const numericMemory = adaptation?.numeric_memory;
+  if (numericMemory && (!['goal_only', 'reuse_compatible', 'reset'].includes(numericMemory.policy)
+    || typeof numericMemory.status !== 'string' || numericMemory.status.length > 128
+    || !boundedInteger(numericMemory.reused_goals, 0, 8) || !boundedInteger(numericMemory.provenance_goals, 0, 8)
+    || !boundedInteger(numericMemory.reused_observations, 0, 32) || typeof numericMemory.reset_barrier !== 'boolean'
+    || numericMemory.epoch !== null && (typeof numericMemory.epoch !== 'string' || !numericMemory.epoch || numericMemory.epoch.length > 128)
+    || !numericMemory.exclusion_counts || Array.isArray(numericMemory.exclusion_counts) || typeof numericMemory.exclusion_counts !== 'object'
+    || Object.entries(numericMemory.exclusion_counts).length > 10
+    || Object.entries(numericMemory.exclusion_counts).some(([key, count]) => !key || key.length > 128 || !boundedInteger(count, 0, 32)))) invalid('The numeric memory provenance is invalid.');
   const recovery = value?.recovery;
   if (recovery && ([recovery.can_retry, recovery.can_resume, recovery.can_renew].some(flag => typeof flag !== 'boolean') || recovery.target !== null && !['planner', 'action', 'job', 'play', 'reconcile'].includes(recovery.target) || recovery.can_new_planner_attempt !== undefined && typeof recovery.can_new_planner_attempt !== 'boolean')) invalid('The goal recovery capabilities are invalid.');
   if (recovery && (recovery.automatic_continuation_available !== undefined && typeof recovery.automatic_continuation_available !== 'boolean' || recovery.next_action !== undefined && !['wait', 'retry', 'advance', 'inspect_dependency', 'resume', 'authorize', 'inspect'].includes(recovery.next_action))) invalid('The saved continuation hint is invalid.');

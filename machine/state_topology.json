@@ -248,7 +248,7 @@
         "machine/state_backup_policy.json",
         "scripts/state_backup_bundle.py"
       ],
-      "runtime_optimization": "Same execution SQLite authority contains versioned runtime control policy, idempotent terminal numeric outcome ledger, tenant/scope/task/model learner checkpoints and bounded replay/optimizer state; existing idle effects ledger contains maintenance tasks/attempts/backoff/circuit state. No new database or store. Host control policy changes append same-transaction versioned audit receipts with actor digest and tenant-bound projections."
+      "runtime_optimization": "Same execution SQLite authority contains versioned runtime control policy, idempotent terminal numeric outcome ledger, tenant/scope/task/model learner checkpoints and bounded replay/optimizer state; existing idle effects ledger contains maintenance tasks/attempts/backoff/circuit state. No new database or store. Host control policy changes append same-transaction versioned audit receipts with actor digest and tenant-bound projections. Learner checkpoint lifecycle mutations use tenant/model/state-version CAS plus the same-transaction global control audit. Idle maintenance extends existing same-file tables with fenced host/scope ownership and drain-confirmed recovery. Bounded-content learner maintenance receipts deduplicate continuation IDs atomically with replay optimizer changes."
     },
     {
       "id": "verification-evidence-unbound",

@@ -398,6 +398,7 @@ class DeterministicCoordinateLearner:
             # checkpoint does; deterministic order preserves reproducibility.
             for observation in replay:
                 self._learn_observation(observation, replay=(observation,))
+                self._apply_observation_steps(observation)
 
     def bind_numeric_observations(self, *, context_digest: str, experiment_id: str, workload_digest: str) -> None:
         """Bind an application-owned, explicitly admitted numeric workload.
@@ -407,10 +408,9 @@ class DeterministicCoordinateLearner:
         validation, holdout, or promotion receipts for ordinary studio reviews.
         """
 
-        owner_context = _sha256("owner numeric context", context_digest)
         workload = _sha256("numeric workload", workload_digest)
         experiment = _token("numeric experiment", experiment_id)
-        context = _digest({"schema_version": 1, "owner_numeric_context": owner_context, "workload_digest": workload, "experiment_id": experiment, "generator_id": self.generator_id, "feature_schema_digest": self._feature_schema_digest})
+        context = self.numeric_context_digest(context_digest=context_digest, experiment_id=experiment, workload_digest=workload)
         self._context_digest = context
         self._bound_experiment_id = experiment
         self._numeric_workload_digest = workload
@@ -443,6 +443,33 @@ class DeterministicCoordinateLearner:
         else:
             for observation in replay:
                 self._learn_observation(observation, replay=(observation,))
+                self._apply_observation_steps(observation)
+            if replay:
+                # Compaction discards weights that incorporated an expired
+                # provenance horizon. Rebuild from the retained verified numeric
+                # observations once, then persist exact continuation state.
+                self._save_checkpoint()
+
+    @property
+    def feature_schema_digest(self) -> str:
+        return self._feature_schema_digest
+
+    def numeric_context_digest(self, *, context_digest: str, experiment_id: str, workload_digest: str) -> str:
+        """Expose the canonical identity without restoring or training weights."""
+
+        return _digest({
+            "schema_version": 1,
+            "owner_numeric_context": _sha256("owner numeric context", context_digest),
+            "workload_digest": _sha256("numeric workload", workload_digest),
+            "experiment_id": _token("numeric experiment", experiment_id),
+            "generator_id": self.generator_id,
+            "feature_schema_digest": self._feature_schema_digest,
+        })
+
+    def numeric_features(self, parent: Mapping[str, object], candidate: Mapping[str, object]) -> tuple[float, ...]:
+        """Normalize already-authorized numeric facts without learning from them."""
+
+        return self._features(parent, candidate)
 
     def observe_numeric_training(self, *, run_id: str, generation: int, candidate_id: str, parent_parameters: Mapping[str, object], candidate_parameters: Mapping[str, object], parent_behavior_digest: str, candidate_behavior_digest: str, report_digest: str, utility_delta: float, cost_units: float, guardrails_passed: bool) -> None:
         """Admit verified numeric facts from the bound application owner only.
@@ -463,6 +490,19 @@ class DeterministicCoordinateLearner:
             training_utility_delta=utility_delta, cost_units=cost_units, guardrails_passed=guardrails_passed,
             scenario_utilities={self._numeric_workload_digest: utility_delta},
         )
+        self.admit_numeric_observation(observation)
+
+    def admit_numeric_observation(self, observation: TrainingObservation) -> None:
+        """Accept an owner-verified typed numeric fact in the exact bound context."""
+
+        if not isinstance(observation, TrainingObservation):
+            raise MirrorRoomError("numeric admission requires TrainingObservation")
+        if self._bound_spec is not None or self._numeric_workload_digest is None:
+            raise MirrorRoomError("numeric admission cannot bypass sandbox paired receipts")
+        if (observation.experiment_id != self._bound_experiment_id
+            or observation.scenario_digests != (self._numeric_workload_digest,)
+            or len(observation.features) != 4 * len(self.dimensions) + 3):
+            raise MirrorRoomError("numeric observation differs from bound workload or features")
         self._remember_observation(observation)
 
     def rank_numeric_edits(self, *, parameters: Mapping[str, object], generation: int, limit: int = 3) -> tuple[Mapping[str, object], ...]:
@@ -601,12 +641,15 @@ class DeterministicCoordinateLearner:
         self.training_archive = updated
         replay = self.training_archive.for_context(observation.context_digest, self._feature_schema_digest)
         self._learn_observation(observation, replay=replay)
+        self._apply_observation_steps(observation)
+        self._save_checkpoint()
+
+    def _apply_observation_steps(self, observation: TrainingObservation) -> None:
         for index, dimension in enumerate(self.dimensions):
             if abs(observation.features[4 * index + 2]) <= 1e-15:
                 continue
             factor = dimension.expansion if observation.training_utility_delta > 0.0 and observation.guardrails_passed else dimension.contraction
             self._steps[dimension.name] = min(dimension.max_step, max(dimension.min_step, self._steps[dimension.name] * factor))
-        self._save_checkpoint()
 
     def curriculum_priorities(self) -> Mapping[str, float]:
         """Bounded difficulty/progress scores from the fixed TRAIN corpus."""

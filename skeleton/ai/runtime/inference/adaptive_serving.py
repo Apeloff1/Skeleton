@@ -27,15 +27,26 @@ class AdaptiveServingPolicy:
     cache_ttl_seconds: float = 300.0
     memory_high_watermark: float = 0.90
     memory_low_watermark: float = 0.75
+    max_active_per_tenant: int = 1
+    max_queued_per_tenant: int = 64
+    background_starvation_seconds: float = 5.0
+    memory_shed_watermark: float = 0.97
 
     @classmethod
-    def defaults(cls, operator_max: int) -> AdaptiveServingPolicy:
+    def defaults(cls, operator_max: int, operator_queue_max: int = 256) -> AdaptiveServingPolicy:
         return cls(
             max_effective_concurrency=operator_max,
             background_max_concurrency=max(1, operator_max - 1),
+            max_active_per_tenant=operator_max,
+            max_queued_per_tenant=min(operator_queue_max, max(1, operator_queue_max // 4)),
         )
 
-    def updated(self, values: Mapping[str, Any], operator_max: int) -> AdaptiveServingPolicy:
+    def updated(
+        self,
+        values: Mapping[str, Any],
+        operator_max: int,
+        operator_queue_max: int = 256,
+    ) -> AdaptiveServingPolicy:
         if not isinstance(values, Mapping):
             raise ValueError("serving policy must be an object")
         unknown = set(values) - set(self.__dataclass_fields__)
@@ -50,6 +61,8 @@ class AdaptiveServingPolicy:
             ("background_max_concurrency", 0, operator_max),
             ("recovery_samples", 2, 128),
             ("cache_max_bytes", 0, 1024 * 1024 * 1024),
+            ("max_active_per_tenant", 1, operator_max),
+            ("max_queued_per_tenant", 0, operator_queue_max),
         ):
             value = getattr(candidate, name)
             if type(value) is not int or not lower <= value <= upper:
@@ -61,6 +74,8 @@ class AdaptiveServingPolicy:
             ("cache_ttl_seconds", 0.0, 86_400.0),
             ("memory_high_watermark", 0.5, 0.99),
             ("memory_low_watermark", 0.1, 0.95),
+            ("background_starvation_seconds", 0.1, 3600.0),
+            ("memory_shed_watermark", 0.5, 1.0),
         ):
             value = getattr(candidate, name)
             if (
@@ -113,9 +128,10 @@ class ServingResources:
 class AdaptiveServingController:
     """Hysteretic feedback, not an activation identity or a model update."""
 
-    def __init__(self, operator_max: int) -> None:
+    def __init__(self, operator_max: int, operator_queue_max: int = 256) -> None:
         self.operator_max = operator_max
-        self.policy = AdaptiveServingPolicy.defaults(operator_max)
+        self.operator_queue_max = operator_queue_max
+        self.policy = AdaptiveServingPolicy.defaults(operator_max, operator_queue_max)
         self.effective_concurrency = operator_max
         self.resources = ServingResources()
         self.latency_ewma_ms: float | None = None
@@ -135,7 +151,7 @@ class AdaptiveServingController:
         return value if previous is None else previous + 0.2 * (value - previous)
 
     def configure(self, values: Mapping[str, Any], now: float) -> None:
-        policy = self.policy.updated(values, self.operator_max)
+        policy = self.policy.updated(values, self.operator_max, self.operator_queue_max)
         self.policy = policy
         ceiling = policy.max_effective_concurrency
         effective = min(ceiling, max(policy.min_effective_concurrency, self.effective_concurrency))
@@ -166,7 +182,9 @@ class AdaptiveServingController:
         policy = self.policy
         memory = resources.memory_used_fraction
         cpu = resources.cpu_load_fraction
-        critical = memory is not None and memory >= min(0.99, policy.memory_high_watermark + 0.05)
+        critical = memory is not None and memory >= min(
+            0.99, policy.memory_high_watermark + 0.05, policy.memory_shed_watermark,
+        )
         reason = "within_operator_limits"
         if critical:
             reason = "memory_critical"

@@ -407,7 +407,8 @@
         "ChildExecutionRequest",
         "child join policy",
         "interactive steering command",
-        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS"
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS",
+        "bounded admin learner checkpoint export/import/reset/last-healthy restore under exact tenant/model/state+policy CAS with canonical audit receipts; exact named local model cooperation and per-model serving controls"
       ],
       "target_failure_contract": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden",
       "source_acceptance": [

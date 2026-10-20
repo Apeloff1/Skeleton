@@ -93,7 +93,7 @@ def _resolve(
     lexical = Path(os.path.abspath(path))
     try:
         resolved = path.resolve(strict=True)
-    except OSError as exc:
+    except (OSError, RuntimeError) as exc:
         raise LocalModelDeploymentError(f"{field} does not exist: {path}") from exc
     if reject_symlink and lexical != resolved:
         raise LocalModelDeploymentError(f"{field} symlinked path component is forbidden")
@@ -133,7 +133,19 @@ class LocalModelDeployment:
     output_framing: str = "raw"
 
     @classmethod
-    def load(cls, manifest_path: str | Path) -> LocalModelDeployment:
+    def load(
+        cls,
+        manifest_path: str | Path,
+        *,
+        expected_sha256: str | None = None,
+        max_artifact_bytes: int | None = None,
+    ) -> LocalModelDeployment:
+        if expected_sha256 is not None:
+            _digest_field(expected_sha256, "expected_sha256")
+        if max_artifact_bytes is not None and (
+            type(max_artifact_bytes) is not int or not 1 <= max_artifact_bytes <= 1024**4
+        ):
+            raise LocalModelDeploymentError("deployment artifact byte budget must be an integer in [1, 1 TiB]")
         source = Path(manifest_path).expanduser()
         try:
             resolved_manifest = source.resolve(strict=True)
@@ -147,6 +159,8 @@ class LocalModelDeployment:
                 raw = stream.read(_MAX_MANIFEST_BYTES + 1)
             if len(raw) != size or len(raw) > _MAX_MANIFEST_BYTES:
                 raise LocalModelDeploymentError("deployment manifest changed or exceeds its byte bound")
+            if expected_sha256 is not None and hashlib.sha256(raw).hexdigest() != expected_sha256:
+                raise LocalModelDeploymentError("deployment manifest differs from its expected digest pin")
             payload = json.loads(
                 raw.decode("utf-8"), object_pairs_hook=_strict_object, parse_constant=_reject_constant
             )
@@ -184,6 +198,10 @@ class LocalModelDeployment:
             "model_path",
             reject_symlink=True,
         )
+        if max_artifact_bytes is not None:
+            referenced = {path: path.stat().st_size for path in (resolved_manifest, executable, model)}
+            if sum(referenced.values()) > max_artifact_bytes:
+                raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
         executable_digest = _digest_field(payload.get("executable_sha256"), "executable_sha256")
         model_digest = _digest_field(payload.get("model_sha256"), "model_sha256")
         config = payload.get("config", {})
@@ -261,6 +279,14 @@ class LocalModelDeployment:
             manifest_digest=_stable_digest(payload),
         )
         deployment.verify_artifacts()
+        if expected_sha256 is not None:
+            try:
+                with resolved_manifest.open("rb") as stream:
+                    admitted_raw = stream.read(_MAX_MANIFEST_BYTES + 1)
+            except OSError as exc:
+                raise LocalModelDeploymentError("pinned deployment manifest became unavailable") from exc
+            if len(admitted_raw) > _MAX_MANIFEST_BYTES or hashlib.sha256(admitted_raw).hexdigest() != expected_sha256:
+                raise LocalModelDeploymentError("pinned deployment manifest changed during admission")
         return deployment
 
     def verify_artifacts(self) -> None:

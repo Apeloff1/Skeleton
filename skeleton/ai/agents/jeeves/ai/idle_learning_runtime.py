@@ -297,22 +297,44 @@ class JeevesIdleWorkExecutor:
     GENESIS = "0" * 64
 
     def _bootstrap_history(self) -> None:
-        meta = self._db.execute(
-            "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
-        ).fetchone()
-        if meta is None:
-            if self._db.execute(
-                "SELECT COUNT(*) FROM jeeves_idle_effect"
-            ).fetchone()[0] or self._db.execute(
-                "SELECT COUNT(*) FROM jeeves_idle_event"
-            ).fetchone()[0]:
-                raise IdleRuntimeError("idle effects exist without authoritative evidence history")
-            self._db.execute(
-                "INSERT INTO jeeves_idle_meta VALUES (1, ?, 0)", (self.GENESIS,),
-            )
+        # Only genesis creation needs the writer lock. Full verification uses
+        # a WAL read snapshot, so another engine's ordinary writes can proceed.
+        try:
+            self._db.execute("BEGIN IMMEDIATE")
+            meta = self._db.execute(
+                "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+            ).fetchone()
+            if meta is None:
+                if self._db.execute(
+                    "SELECT COUNT(*) FROM jeeves_idle_effect"
+                ).fetchone()[0] or self._db.execute(
+                    "SELECT COUNT(*) FROM jeeves_idle_event"
+                ).fetchone()[0]:
+                    raise IdleRuntimeError("idle effects exist without authoritative evidence history")
+                self._db.execute(
+                    "INSERT INTO jeeves_idle_meta VALUES (1, ?, 0)", (self.GENESIS,),
+                )
+            self._db.execute("COMMIT")
+        except BaseException:
+            if self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
         self._verify_history()
 
     def _verify_history(self) -> None:
+        own_snapshot = not self._db.in_transaction
+        try:
+            if own_snapshot:
+                self._db.execute("BEGIN")
+            self._verify_history_rows()
+            if own_snapshot:
+                self._db.execute("COMMIT")
+        except BaseException:
+            if own_snapshot and self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
+
+    def _verify_history_rows(self) -> None:
         prior = self.GENESIS
         count = 0
         materialized: dict[str, dict[str, Any]] = {}

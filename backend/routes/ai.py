@@ -408,12 +408,39 @@ class AIRuntimeControlUpdate(BaseModel):
     learning: AIRuntimeLearningPatch | None = None
     maintenance: AIRuntimeMaintenancePatch | None = None
     action: Literal["trim_cache", "clear_cache", "drain", "resume"] | None = None
+    serving_route_id: str | None = Field(default=None, min_length=1, max_length=384)
 
     @model_validator(mode="after")
     def require_change(self):
-        changes = self.model_fields_set - {"expected_version"}
+        changes = self.model_fields_set - {"expected_version", "serving_route_id"}
         if not changes or any(getattr(self, name) is None for name in changes):
             raise ValueError("runtime control updates require a non-null policy change or action")
+        return self
+
+
+class AIRuntimeLearningCheckpointUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    action: Literal["import", "reset", "restore_last_healthy"]
+    expected_policy_version: int = Field(ge=1, le=2**63 - 1)
+    expected_state_version: int = Field(ge=1, le=2**63 - 1)
+    model_selection_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    checkpoint: dict[str, Any] | None = None
+    checkpoint_json: str | None = Field(default=None, max_length=256 * 1024)
+
+    @model_validator(mode="after")
+    def validate_checkpoint(self):
+        count = int(self.checkpoint is not None) + int(self.checkpoint_json is not None)
+        if count != (1 if self.action == "import" else 0):
+            raise ValueError("import requires exactly one checkpoint representation; other actions accept neither")
+        if self.checkpoint_json is not None and len(self.checkpoint_json.encode("utf-8")) > 256 * 1024:
+            raise ValueError("checkpoint exceeds the 256 KiB limit")
+        if self.checkpoint is not None:
+            try:
+                encoded = json.dumps(self.checkpoint, allow_nan=False, ensure_ascii=False, separators=(",", ":")).encode()
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise ValueError("checkpoint must be finite JSON") from exc
+            if len(encoded) > 256 * 1024:
+                raise ValueError("checkpoint exceeds the 256 KiB limit")
         return self
 
 
@@ -3665,7 +3692,11 @@ async def get_ai_models(user=Depends(require_role("viewer"))):
 
 
 @router.get("/runtime-control")
-async def get_ai_runtime_control(response: Response, user=Depends(require_role("viewer"))):
+async def get_ai_runtime_control(
+    response: Response,
+    learning_offset: int = Query(default=0, ge=0, le=127),
+    user=Depends(require_role("viewer")),
+):
     """Observe the canonical runtime in the authenticated caller's tenant scope."""
 
     tenant_id, actor_id = _chat_identity(user)
@@ -3673,6 +3704,7 @@ async def get_ai_runtime_control(response: Response, user=Depends(require_role("
         state = await _runtime_control_engine().runtime_control(
             actor_id=actor_id,
             tenant_id=tenant_id,
+            learning_offset=learning_offset,
         )
     except EngineClientError as exc:
         raise _runtime_control_error(exc) from exc
@@ -3700,6 +3732,45 @@ async def configure_ai_runtime_control(
         raise _runtime_control_error(exc) from exc
     response.headers["Cache-Control"] = "no-store"
     return state
+
+
+@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+async def export_ai_learning_checkpoint(
+    partition_id: str, response: Response,
+    expected_state_version: int | None = Query(default=None, ge=1, le=2**63 - 1),
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
+    try:
+        result = await _runtime_control_engine().export_runtime_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            expected_state_version=expected_state_version,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+async def configure_ai_learning_checkpoint(
+    partition_id: str, update: AIRuntimeLearningCheckpointUpdate, response: Response,
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
+    try:
+        result = await _runtime_control_engine().configure_runtime_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            **update.model_dump(mode="json", exclude_unset=True),
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
 
 
 @router.get("/chat/readiness")

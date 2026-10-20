@@ -183,12 +183,24 @@ for defaults, persistence and conflict recovery. These controls do not implicitl
 offload to external providers or train/promote transformer weights.
 The separate **Replay adaptation** switch starts off and permits bounded idle
 updates to the operational predictor from recorded numeric outcomes.
+An optional digest-pinned local catalog supports up to eight configured models;
+the panel shows each model's own capacity, tenant fairness and pressure. Learner
+inspection adds prequential drift, confidence and last-healthy rollback state.
+Administrators can export/import a bounded numeric checkpoint or reset/restore a
+partition using exact tenant/model identity and policy plus learner-version checks.
+Checkpoint download and import preserve the original JSON text, including numeric
+spellings, so the server can verify the original integrity digests.
 
 Studio goals can opt into [measured quality refinement](docs/ai/STUDIO_MEASURED_QUALITY.md):
 pin a baseline review, edit the original source, compare a candidate under the
 same simulation protocol, and restore the baseline source when a candidate
 regresses. Lessons retain their source and review references for compatible
 future work. Continuation uses the existing finite grant.
+Adaptive advice keeps numeric memory **Only this goal** by default. **Remember
+compatible goals** requires both goals to opt in and preserve exact scoped review
+identities; **Start a new shared history** creates a fresh epoch after its verified
+baseline. These are bounded numeric lessons, not permission to reuse source text
+or promote model weights.
 The optional **Learn numeric control suggestions during this goal** setting adds
 a bounded predictor for compatible numeric edits from matched review outcomes.
 Its suggestions remain subject to the same source, review and restoration gates.

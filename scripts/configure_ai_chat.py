@@ -263,6 +263,8 @@ def _configuration(options: dict) -> tuple[dict[str, str], dict]:
         "AI_MODEL": options["model"],
         "OPENAI_API_KEY": options["key"],
         "AI_LOCAL_MODEL_PATH": "/app/data/local-model.json" if options["artifact"] else "",
+        "AI_LOCAL_DEPLOYMENT_PATH": "",
+        "AI_LOCAL_MODEL_CATALOG_PATH": "",
         "AI_LOCAL_MODEL_CACHE_SIZE": "128",
         "AI_LOCAL_MODEL_SEED": "0",
         "AI_SECONDARY_API_KEY": "",

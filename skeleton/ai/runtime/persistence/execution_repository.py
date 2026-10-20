@@ -14,7 +14,7 @@ import sqlite3
 import threading
 from dataclasses import dataclass
 from skeleton.compat.datetime_utc import UTC
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
@@ -303,6 +303,8 @@ class SQLiteExecutionRepository:
                 ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, observed_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_replay
                 ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, observed_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_source
+                ON ai_execution_learning_outcome(namespace, tenant_id, scope_id, partition_id, source_snapshot_digest);
 
                 CREATE TABLE IF NOT EXISTS ai_execution_learning_state (
                     namespace TEXT NOT NULL,
@@ -315,6 +317,7 @@ class SQLiteExecutionRepository:
                     state_digest TEXT NOT NULL,
                     state_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
+                    last_observed_at TEXT,
                     maintenance_at TEXT,
                     PRIMARY KEY(namespace, tenant_id, scope_id, partition_id)
                 );
@@ -366,7 +369,27 @@ class SQLiteExecutionRepository:
                 );
                 CREATE INDEX IF NOT EXISTS idx_ai_execution_runtime_control_history
                 ON ai_execution_runtime_control_event(namespace, tenant_id, version DESC);
+                CREATE TABLE IF NOT EXISTS ai_execution_learning_maintenance_receipt (
+                    namespace TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    scope_id TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    binding_digest TEXT NOT NULL,
+                    result_digest TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    completed_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, tenant_id, scope_id, idempotency_key)
+                );
                 """)
+            learning_columns = {
+                str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_learning_state)")
+            }
+            if "last_observed_at" not in learning_columns:
+                self._connection.execute("ALTER TABLE ai_execution_learning_state ADD COLUMN last_observed_at TEXT")
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_execution_learning_observed "
+                "ON ai_execution_learning_state(namespace, tenant_id, scope_id, last_observed_at)"
+            )
             state_columns = {
                 str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_state)")
             }
@@ -1737,6 +1760,48 @@ class SQLiteExecutionRepository:
                 raise ExecutionRepositoryCorruption("runtime control policy digest differs")
             return {"version": int(row["version"]), "policy": payload}
 
+    def _write_runtime_control_policy_locked(self, policy: dict[str, Any], version: int, instant: datetime) -> None:
+        self._connection.execute(
+            """INSERT INTO ai_execution_runtime_control_policy(
+                   namespace, version, policy_digest, policy_json, updated_at
+               ) VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(namespace) DO UPDATE SET version = excluded.version,
+                   policy_digest = excluded.policy_digest, policy_json = excluded.policy_json,
+                   updated_at = excluded.updated_at""",
+            (self.namespace, version, learning.digest(policy), _json_dump(policy), instant.isoformat()),
+        )
+
+    def _append_runtime_control_event_locked(
+        self, *, tenant_id: str | None, actor_id: str | None, version: int,
+        policy: dict[str, Any], previous_policy: dict[str, Any], changed_sections: list[str],
+        learning_policy_digest: str | None, instant: datetime,
+        learning_checkpoint: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        receipt = {
+            "schema_version": "skeleton.runtime.control.event.v1", "tenant_id": tenant_id, "version": version,
+            "actor_digest": None if actor_id is None else learning.digest({
+                "namespace": self.namespace, "tenant_id": tenant_id, "actor_id": actor_id,
+            }),
+            "policy_digest": learning.digest(policy), "previous_policy_digest": learning.digest(previous_policy),
+            "learning_policy_digest": learning_policy_digest, "changed_sections": changed_sections,
+            "updated_at": instant.isoformat(),
+        }
+        if learning_checkpoint is not None:
+            receipt["learning_checkpoint"] = learning_checkpoint
+        receipt_digest = learning.digest(receipt)
+        if len(_json_dump(receipt).encode()) > 4096:
+            raise ExecutionRepositoryError("runtime control receipt exceeds its storage bound")
+        self._connection.execute(
+            """INSERT INTO ai_execution_runtime_control_event(
+                   namespace, version, tenant_id, actor_digest, policy_digest, previous_policy_digest,
+                   learning_policy_digest, changed_sections_json, receipt_digest, receipt_json, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (self.namespace, version, tenant_id, receipt["actor_digest"], receipt["policy_digest"],
+             receipt["previous_policy_digest"], learning_policy_digest, _json_dump(changed_sections),
+             receipt_digest, _json_dump(receipt), instant.isoformat()),
+        )
+        return {**receipt, "receipt_digest": receipt_digest}
+
     def set_runtime_control_policy(
         self,
         policy: dict[str, Any],
@@ -1793,40 +1858,13 @@ class SQLiteExecutionRepository:
                         changed_sections.append("tenant_learning")
                     self._write_learning_policy_locked(tenant_id, scope_id, merged, learning_version, instant)
                 version = expected_version + 1
-                self._connection.execute(
-                    """INSERT INTO ai_execution_runtime_control_policy(
-                           namespace, version, policy_digest, policy_json, updated_at
-                       ) VALUES (?, ?, ?, ?, ?)
-                       ON CONFLICT(namespace) DO UPDATE SET version = excluded.version,
-                           policy_digest = excluded.policy_digest, policy_json = excluded.policy_json,
-                           updated_at = excluded.updated_at""",
-                    (self.namespace, version, learning.digest(policy), _json_dump(policy), instant.isoformat()),
-                )
-                receipt = {
-                    "schema_version": "skeleton.runtime.control.event.v1",
-                    "tenant_id": tenant_id, "version": version,
-                    "actor_digest": None if actor_id is None else learning.digest({
-                        "namespace": self.namespace, "tenant_id": tenant_id, "actor_id": actor_id,
-                    }),
-                    "policy_digest": learning.digest(policy),
-                    "previous_policy_digest": learning.digest(current["policy"]),
-                    "learning_policy_digest": learning_policy_digest,
-                    "changed_sections": changed_sections,
-                    "updated_at": instant.isoformat(),
-                }
-                receipt_digest = learning.digest(receipt)
-                self._connection.execute(
-                    """INSERT INTO ai_execution_runtime_control_event(
-                           namespace, version, tenant_id, actor_digest, policy_digest, previous_policy_digest,
-                           learning_policy_digest, changed_sections_json, receipt_digest, receipt_json, updated_at
-                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (self.namespace, version, tenant_id, receipt["actor_digest"], receipt["policy_digest"],
-                     receipt["previous_policy_digest"], learning_policy_digest, _json_dump(changed_sections),
-                     receipt_digest, _json_dump(receipt), instant.isoformat()),
-                )
+                self._write_runtime_control_policy_locked(policy, version, instant)
+                receipt = self._append_runtime_control_event_locked(tenant_id=tenant_id, actor_id=actor_id,
+                    version=version, policy=policy, previous_policy=current["policy"], changed_sections=changed_sections,
+                    learning_policy_digest=learning_policy_digest, instant=instant)
                 self._connection.execute("COMMIT")
                 return {"version": version, "policy": dict(policy), "learning_policy_version": learning_version,
-                        "receipt": {**receipt, "receipt_digest": receipt_digest}}
+                        "receipt": receipt}
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -1852,7 +1890,7 @@ class SQLiteExecutionRepository:
                     "schema_version", "tenant_id", "version", "actor_digest", "policy_digest",
                     "previous_policy_digest", "learning_policy_digest", "changed_sections", "updated_at",
                 }
-                if set(receipt) != expected_fields or receipt.get("schema_version") != "skeleton.runtime.control.event.v1":
+                if set(receipt) not in (expected_fields, expected_fields | {"learning_checkpoint"}) or receipt.get("schema_version") != "skeleton.runtime.control.event.v1":
                     raise ExecutionRepositoryCorruption("runtime control receipt schema differs")
                 if learning.digest(receipt) != row["receipt_digest"] or receipt.get("tenant_id") != tenant_id or receipt.get("version") != int(row["version"]):
                     raise ExecutionRepositoryCorruption("runtime control receipt identity differs")
@@ -1861,8 +1899,23 @@ class SQLiteExecutionRepository:
                     if value != row[name] or (value is not None and (not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value))):
                         raise ExecutionRepositoryCorruption("runtime control receipt digest fields differ")
                 sections = receipt["changed_sections"]
-                if not isinstance(sections, list) or len(sections) > 2 or any(not isinstance(section, str) or section not in {"global_policy", "tenant_learning"} for section in sections) or _json_dump(sections) != row["changed_sections_json"]:
+                if not isinstance(sections, list) or len(sections) > 3 or any(not isinstance(section, str) or section not in {"global_policy", "tenant_learning", "learning_checkpoint"} for section in sections) or _json_dump(sections) != row["changed_sections_json"]:
                     raise ExecutionRepositoryCorruption("runtime control receipt sections differ")
+                mutation = receipt.get("learning_checkpoint")
+                if mutation is not None:
+                    mutation_fields = {"partition_id", "action", "model_selection_digest", "previous_state_version",
+                        "state_version", "previous_state_digest", "state_digest", "checkpoint_digest"}
+                    if not isinstance(mutation, dict) or set(mutation) != mutation_fields or not isinstance(mutation["action"], str) or mutation["action"] not in {"import", "reset", "restore_last_healthy"}:
+                        raise ExecutionRepositoryCorruption("runtime control checkpoint receipt differs")
+                    try:
+                        for name in ("partition_id", "model_selection_digest", "previous_state_digest", "state_digest"):
+                            learning._sha(mutation[name], name)
+                        if mutation["checkpoint_digest"] is not None:
+                            learning._sha(mutation["checkpoint_digest"], "checkpoint_digest")
+                        learning._integer(mutation["previous_state_version"], "previous_state_version", 1, learning.MAX_COUNTER)
+                        learning._integer(mutation["state_version"], "state_version", 1, learning.MAX_COUNTER)
+                    except learning.RuntimeLearningError as exc:
+                        raise ExecutionRepositoryCorruption("runtime control checkpoint receipt metadata differs") from exc
                 if receipt["updated_at"] != row["updated_at"]:
                     raise ExecutionRepositoryCorruption("runtime control receipt timestamp differs")
                 _parse_time(receipt["updated_at"], "runtime control receipt updated_at")
@@ -1902,15 +1955,39 @@ class SQLiteExecutionRepository:
     def _learning_state_locked(self, row: sqlite3.Row | None, *, seed: str) -> dict[str, Any] | None:
         if row is None:
             return None
+        state = None
+        binding_differs = False
         try:
             raw = row["state_json"]
             if not isinstance(raw, str) or len(raw) > learning.MAX_STATE_BYTES:
                 raise learning.RuntimeLearningError("optimizer storage bound differs")
             state = _json_object(raw, "learning optimizer")
+            provenance = state.get("provenance", {})
+            if not isinstance(provenance, dict):
+                binding_differs = True
+                raise learning.RuntimeLearningError("optimizer activation binding differs")
+            if isinstance(provenance, dict) and (
+                not isinstance(provenance.get("partition_id", ""), str)
+                or not isinstance(provenance.get("model_selection_digest", ""), str)
+                or provenance.get("partition_id", "") not in {"", row["partition_id"]}
+                or provenance.get("model_selection_digest", "") not in {"", row["model_selection_digest"]}
+            ):
+                binding_differs = True
+                raise learning.RuntimeLearningError("optimizer activation binding differs")
             if learning.digest(state) != row["state_digest"]:
                 raise learning.RuntimeLearningError("optimizer digest differs")
-            return learning.validate_state(state)
+            learning.validate_state(state)
+            learning.upgrade_state(state)
+            state["provenance"].update({"partition_id": row["partition_id"], "model_selection_digest": row["model_selection_digest"]})
+            return state
         except (ExecutionRepositoryCorruption, ValueError, TypeError, RecursionError, OverflowError) as exc:
+            if not binding_differs:
+                try:
+                    recovered = learning.recover_last_healthy(state, seed=seed, policy=learning.normalize_policy(), reason=f"persisted_optimizer:{type(exc).__name__}")
+                    recovered["provenance"].update({"partition_id": row["partition_id"], "model_selection_digest": row["model_selection_digest"]})
+                    return recovered
+                except (learning.RuntimeLearningError, ArithmeticError):
+                    pass
             prior = hashlib.sha256(str(row["state_json"]).encode()).hexdigest()
             return learning.quarantine_state(seed, reason=str(exc), prior_digest=prior)
 
@@ -1918,20 +1995,33 @@ class SQLiteExecutionRepository:
         self, identity: dict[str, Any], state: dict[str, Any], previous: sqlite3.Row | None,
         instant: datetime, *, maintenance: bool = False,
     ) -> int:
+        learning.upgrade_state(state)
+        provenance = state["provenance"]
+        if provenance["partition_id"] not in {"", identity["partition_id"]} or provenance["model_selection_digest"] not in {"", identity["model_selection_digest"]}:
+            raise ExecutionRepositoryConflict("optimizer activation binding differs")
+        provenance.update({"partition_id": identity["partition_id"], "model_selection_digest": identity["model_selection_digest"]})
+        if not provenance["latest_source_digest"] and identity.get("source_snapshot_digest"):
+            provenance["latest_source_digest"] = identity["source_snapshot_digest"]
         learning.validate_state(state)
+        observed_at = identity.get("observed_at") if not maintenance else None
+        if observed_at is None and previous is not None:
+            observed_at = previous["last_observed_at"] or previous["updated_at"]
         version = 1 if previous is None else int(previous["version"]) + 1
+        state_json = _json_dump(state)
+        state_digest = hashlib.sha256(state_json.encode()).hexdigest()
         self._connection.execute(
             """INSERT INTO ai_execution_learning_state(
                    namespace, tenant_id, scope_id, partition_id, task_class, model_selection_digest,
-                   version, state_digest, state_json, updated_at, maintenance_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   version, state_digest, state_json, updated_at, last_observed_at, maintenance_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(namespace, tenant_id, scope_id, partition_id) DO UPDATE SET
                    version = excluded.version, state_digest = excluded.state_digest,
                    state_json = excluded.state_json, updated_at = excluded.updated_at,
+                   last_observed_at = excluded.last_observed_at,
                    maintenance_at = excluded.maintenance_at""",
             (self.namespace, identity["tenant_id"], identity["scope_id"], identity["partition_id"],
              identity["task_class"], identity["model_selection_digest"], version,
-             learning.digest(state), _json_dump(state), instant.isoformat(),
+             state_digest, state_json, instant.isoformat(), observed_at,
              instant.isoformat() if maintenance else (None if previous is None else previous["maintenance_at"])),
         )
         return version
@@ -1998,6 +2088,27 @@ class SQLiteExecutionRepository:
                 (self.namespace, tenant_id, scope_id),
             ).fetchone()[0]
             capacity = count < policy["partition_limit"]
+            if not capacity and policy["enabled"] and observation["trainable"]:
+                stale = self._connection.execute(
+                    """SELECT partition_id, version, last_observed_at, updated_at
+                       FROM ai_execution_learning_state
+                       WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
+                       ORDER BY last_observed_at, partition_id LIMIT 1""",
+                    (self.namespace, tenant_id, scope_id),
+                ).fetchone()
+                if stale is not None:
+                    try:
+                        last_seen = _parse_time(stale["last_observed_at"] or stale["updated_at"], "learning last observed")
+                        if last_seen <= instant - timedelta(days=7):
+                            self._connection.execute(
+                                """DELETE FROM ai_execution_learning_state
+                                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ? AND version = ?""",
+                                (self.namespace, tenant_id, scope_id, stale["partition_id"], stale["version"]),
+                            )
+                            observation["retired_inactive_partition"] = stale["partition_id"]
+                            capacity = True
+                    except ExecutionRepositoryCorruption:
+                        pass
         if policy["enabled"] and observation["trainable"] and capacity:
             state = self._learning_state_locked(row, seed=seed)
             try:
@@ -2005,7 +2116,7 @@ class SQLiteExecutionRepository:
             except (learning.RuntimeLearningError, ArithmeticError, ValueError) as exc:
                 state = learning.quarantine_state(seed, reason=f"optimizer update: {type(exc).__name__}")
             self._save_learning_state_locked(observation, state, row, instant)
-            learning_status = "trained" if trained else "optimizer_quarantined"
+            learning_status = "trained" if trained else "optimizer_quarantined" if state["quarantined"] else "optimizer_rolled_back"
         elif not capacity:
             learning_status = "partition_capacity"
         elif not policy["enabled"] and learning_status == "observed":
@@ -2073,12 +2184,191 @@ class SQLiteExecutionRepository:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def _learning_partition_locked(self, tenant_id: str, scope_id: str, partition_id: str) -> sqlite3.Row:
+        try:
+            learning._sha(partition_id, "partition_id")
+        except learning.RuntimeLearningError as exc:
+            raise ExecutionRepositoryError(str(exc)) from exc
+        row = self._connection.execute(
+            """SELECT * FROM ai_execution_learning_state
+               WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ?""",
+            (self.namespace, tenant_id, scope_id, partition_id),
+        ).fetchone()
+        if row is None:
+            raise ExecutionRepositoryError("runtime learning partition does not exist")
+        return row
+
+    def runtime_learning_export(
+        self, *, tenant_id: str, scope_id: str = "tenant", partition_id: str,
+        expected_version: int | None = None,
+    ) -> dict[str, Any]:
+        """Export one finite numeric controller checkpoint, never request text."""
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if expected_version is not None and (isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 1):
+            raise ExecutionRepositoryError("expected learning state version must be positive")
+        with self._lock:
+            row = self._learning_partition_locked(tenant_id, scope_id, partition_id)
+            if expected_version is not None and int(row["version"]) != expected_version:
+                raise ExecutionRepositoryConflict("runtime learning state version changed")
+            seed = f"{self.namespace}:{tenant_id}:{scope_id}:{partition_id}"
+            state = self._learning_state_locked(row, seed=seed)
+            state["provenance"].update({"partition_id": partition_id, "model_selection_digest": row["model_selection_digest"]})
+            try:
+                return learning.checkpoint_envelope(dict(row), state, state_version=int(row["version"]))
+            except learning.RuntimeLearningError as exc:
+                raise ExecutionRepositoryError(str(exc)) from exc
+
+    def _validate_learning_import_provenance_locked(
+        self, state: dict[str, Any], identity: sqlite3.Row, policy: dict[str, Any]
+    ) -> None:
+        samples = [*state["replay"], *state["recent_replay"]]
+        sample_ids = sorted({sample["outcome_id"] for sample in samples})
+        outcomes: dict[str, dict[str, Any]] = {}
+        if sample_ids:
+            placeholders = ",".join("?" for _ in sample_ids)
+            rows = self._connection.execute(
+                "SELECT * FROM ai_execution_learning_outcome WHERE namespace = ? AND outcome_id IN (" + placeholders + ")",
+                (self.namespace, *sample_ids),
+            ).fetchall()
+            for row in rows:
+                if any(row[name] != identity[name] for name in ("tenant_id", "scope_id", "partition_id", "model_selection_digest")):
+                    raise ExecutionRepositoryError("imported replay scope/activation differs")
+                observation = _json_object(row["observation_json"], "learning import outcome")
+                if learning.digest(observation) != row["observation_digest"] or observation.get("trainable") is not True:
+                    raise ExecutionRepositoryCorruption("imported replay canonical provenance differs")
+                outcomes[row["outcome_id"]] = observation
+            if set(outcomes) != set(sample_ids):
+                raise ExecutionRepositoryError("imported replay requires existing canonical outcomes")
+            for sample in samples:
+                observation = outcomes[sample["outcome_id"]]
+                if sample["features"] != observation["features"] or sample["targets"] != learning.observation_targets(observation, policy):
+                    raise ExecutionRepositoryError("imported replay telemetry differs from canonical outcome")
+        provenance = state["provenance"]
+        sources = {item["digest"] for item in provenance["recent_sources"]}
+        if provenance["latest_source_digest"]:
+            sources.add(provenance["latest_source_digest"])
+        for source in sources:
+            found = self._connection.execute(
+                """SELECT 1 FROM ai_execution_learning_outcome
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND partition_id = ?
+                         AND source_snapshot_digest = ? LIMIT 1""",
+                (self.namespace, identity["tenant_id"], identity["scope_id"], identity["partition_id"], source),
+            ).fetchone()
+            if found is None:
+                raise ExecutionRepositoryError("imported source fingerprint has no canonical provenance")
+
+    def _mutate_learning_checkpoint(
+        self, *, tenant_id: str, scope_id: str, partition_id: str, expected_version: int,
+        model_selection_digest: str, action: str, checkpoint: dict[str, Any] | None,
+        expected_policy_version: int | None, actor_id: str | None, now: datetime | None,
+    ) -> dict[str, Any]:
+        tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
+        if isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 1:
+            raise ExecutionRepositoryError("expected learning state version must be positive")
+        if expected_policy_version is not None and (isinstance(expected_policy_version, bool) or not isinstance(expected_policy_version, int) or expected_policy_version < 1):
+            raise ExecutionRepositoryError("expected runtime policy version must be positive")
+        try:
+            learning._sha(model_selection_digest, "model_selection_digest")
+            if actor_id is not None:
+                actor_id = learning.identifier(actor_id, "actor_id", maximum=512)
+            if action == "import":
+                checkpoint = learning.validate_checkpoint_envelope(checkpoint)
+        except learning.RuntimeLearningError as exc:
+            raise ExecutionRepositoryError(str(exc)) from exc
+        instant = _utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                controls = self.runtime_control_policy()
+                if expected_policy_version is not None and controls["version"] != expected_policy_version:
+                    raise ExecutionRepositoryConflict("runtime control policy version changed")
+                row = self._learning_partition_locked(tenant_id, scope_id, partition_id)
+                if int(row["version"]) != expected_version:
+                    raise ExecutionRepositoryConflict("runtime learning state version changed")
+                if row["model_selection_digest"] != model_selection_digest:
+                    raise ExecutionRepositoryConflict("runtime learning activation/model differs")
+                seed = f"{self.namespace}:{tenant_id}:{scope_id}:{partition_id}"
+                current = self._learning_state_locked(row, seed=seed)
+                policy = self._learning_policy_locked(tenant_id, scope_id)["policy"]
+                imported_digest = None
+                if action == "import":
+                    if any(checkpoint[name] != value for name, value in (
+                        ("tenant_id", tenant_id), ("scope_id", scope_id), ("partition_id", partition_id),
+                        ("task_class", row["task_class"]), ("model_selection_digest", model_selection_digest),
+                    )):
+                        raise ExecutionRepositoryConflict("learning checkpoint tenant/partition/activation differs")
+                    state = json.loads(_json_dump(checkpoint["state"]))
+                    if state["quarantined"]:
+                        raise ExecutionRepositoryError("quarantined checkpoints require reset or healthy restore")
+                    self._validate_learning_import_provenance_locked(state, row, policy)
+                    imported_digest = checkpoint["checkpoint_digest"]
+                    # Imported counts and health claims cannot certify advice.
+                    # Retain this repository's observed/cost/source authority.
+                    for name in ("observations", "lifetime_observations", "generation", "optimizer_cost", "provenance", "last_healthy", "last_rollback"):
+                        state[name] = json.loads(_json_dump(current[name]))
+                    state = learning.reset_confidence(state, reason="import", policy=policy)
+                elif action == "restore_last_healthy":
+                    state = learning.restore_last_healthy(current, reason="operator_restore", policy=policy)
+                    imported_digest = state["last_healthy"]["checkpoint_digest"]
+                elif action == "reset":
+                    state = learning.new_state(seed)
+                    for name in ("lifetime_observations", "generation", "optimizer_cost", "provenance"):
+                        state[name] = json.loads(_json_dump(current[name]))
+                    state = learning.reset_confidence(state, reason="reset", policy=policy)
+                else:
+                    raise ExecutionRepositoryError("learning checkpoint action is invalid")
+                state_version = self._save_learning_state_locked(dict(row), state, row, instant)
+                version = controls["version"] + 1
+                self._write_runtime_control_policy_locked(controls["policy"], version, instant)
+                mutation = {"partition_id": partition_id, "action": action, "model_selection_digest": model_selection_digest,
+                    "previous_state_version": expected_version, "state_version": state_version,
+                    "previous_state_digest": hashlib.sha256(str(row["state_json"]).encode()).hexdigest(),
+                    "state_digest": learning.digest(state),
+                    "checkpoint_digest": imported_digest}
+                receipt = self._append_runtime_control_event_locked(tenant_id=tenant_id, actor_id=actor_id,
+                    version=version, policy=controls["policy"], previous_policy=controls["policy"],
+                    changed_sections=["learning_checkpoint"], learning_policy_digest=learning.digest(policy),
+                    instant=instant, learning_checkpoint=mutation)
+                self._connection.execute("COMMIT")
+                return {"version": version, "state_version": state_version, "partition_id": partition_id,
+                    "model_selection_digest": model_selection_digest, "receipt": receipt,
+                    **learning.state_readiness(state, policy)}
+            except learning.RuntimeLearningError as exc:
+                self._connection.execute("ROLLBACK")
+                raise ExecutionRepositoryError(str(exc)) from exc
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def runtime_learning_import(
+        self, *, tenant_id: str, scope_id: str = "tenant", partition_id: str,
+        checkpoint: dict[str, Any], expected_version: int, model_selection_digest: str,
+        expected_policy_version: int | None = None, actor_id: str | None = None, now: datetime | None = None,
+    ) -> dict[str, Any]:
+        return self._mutate_learning_checkpoint(tenant_id=tenant_id, scope_id=scope_id, partition_id=partition_id,
+            checkpoint=checkpoint, expected_version=expected_version, model_selection_digest=model_selection_digest,
+            action="import", expected_policy_version=expected_policy_version, actor_id=actor_id, now=now)
+
+    def runtime_learning_reset(
+        self, *, tenant_id: str, scope_id: str = "tenant", partition_id: str, expected_version: int,
+        model_selection_digest: str, to_last_healthy: bool = False,
+        expected_policy_version: int | None = None, actor_id: str | None = None, now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if type(to_last_healthy) is not bool:
+            raise ExecutionRepositoryError("to_last_healthy must be boolean")
+        return self._mutate_learning_checkpoint(tenant_id=tenant_id, scope_id=scope_id, partition_id=partition_id,
+            checkpoint=None, expected_version=expected_version, model_selection_digest=model_selection_digest,
+            action="restore_last_healthy" if to_last_healthy else "reset",
+            expected_policy_version=expected_policy_version, actor_id=actor_id, now=now)
+
     def runtime_learning_snapshot(
-        self, *, tenant_id: str, scope_id: str = "tenant", limit: int = 20
+        self, *, tenant_id: str, scope_id: str = "tenant", limit: int = 20, offset: int = 0
     ) -> dict[str, Any]:
         tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
             raise ExecutionRepositoryError("learning snapshot limit must be in [1, 100]")
+        if isinstance(offset, bool) or not isinstance(offset, int) or not 0 <= offset <= 127:
+            raise ExecutionRepositoryError("learning snapshot offset must be in [0, 127]")
         with self._lock:
             configuration = self._learning_policy_locked(tenant_id, scope_id)
             policy = configuration["policy"]
@@ -2091,15 +2381,21 @@ class SQLiteExecutionRepository:
             rows = self._connection.execute(
                 """SELECT * FROM ai_execution_learning_state
                    WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
-                   ORDER BY updated_at DESC, partition_id LIMIT ?""",
-                (self.namespace, tenant_id, scope_id, limit),
+                   ORDER BY updated_at DESC, partition_id LIMIT ? OFFSET ?""",
+                (self.namespace, tenant_id, scope_id, limit, offset),
             ).fetchall()
+            total_partitions = int(self._connection.execute(
+                """SELECT COUNT(*) FROM ai_execution_learning_state
+                   WHERE namespace = ? AND tenant_id = ? AND scope_id = ?""",
+                (self.namespace, tenant_id, scope_id),
+            ).fetchone()[0])
             partitions = []
             for row in rows:
                 seed = f"{self.namespace}:{tenant_id}:{scope_id}:{row['partition_id']}"
                 state = self._learning_state_locked(row, seed=seed)
                 partitions.append({"partition_id": row["partition_id"], "task_class": row["task_class"],
                     "model_selection_digest": row["model_selection_digest"], "state_version": int(row["version"]),
+                    "last_observed_at": row["last_observed_at"] or row["updated_at"],
                     "last_updated_at": row["updated_at"], **learning.state_readiness(state, policy)})
             recent_rows = self._connection.execute(
                 """SELECT execution_id, model_selection_digest, source_snapshot_digest, observation_json,
@@ -2137,10 +2433,13 @@ class SQLiteExecutionRepository:
                 "observations": None if totals is None else totals["outcomes"], "partitions": partitions,
                 "recent_outcomes": recent, "recent_outcome_errors": recent_outcome_errors,
                 "model": {"kind": "bounded_online_mlp", "architecture": [12, 16, 8, 3], "optimizer": "adam",
+                    "controller_version": learning.CONTROLLER_VERSION,
                     "parameter_count": learning.PARAMETER_COUNT, "outputs": list(learning.OUTPUT_NAMES),
                     "latency_reference_seconds": learning.LATENCY_REFERENCE_SECONDS,
                     "labels": "canonical operational telemetry; not creative quality or verified correctness"},
                 "limits": {"returned_partitions": len(partitions), "returned_outcomes": len(recent),
+                    "partition_offset": offset, "total_partitions": total_partitions,
+                    "has_more_partitions": offset + len(partitions) < total_partitions,
                     "max_optimizer_updates_per_outcome": 1 + policy["replay_steps"],
                     "partition_limit": policy["partition_limit"], "replay_capacity": policy["replay_capacity"]}}
 
@@ -2185,14 +2484,36 @@ class SQLiteExecutionRepository:
                 seed = f"{self.namespace}:{tenant_id}:{scope_id}:{identity['partition_id']}"
                 state = self._learning_state_locked(row, seed=seed)
                 result = learning.recommend(state, configuration["policy"], features, allowed_rounds=allowed_rounds,
-                    requested_rounds=requested_rounds, pressure=pressure)
+                    requested_rounds=requested_rounds, pressure=pressure,
+                    source_snapshot_digest=identity["source_snapshot_digest"] or None)
                 return {**result, **identity, "policy_version": configuration["version"],
                     "state_version": 0 if row is None else int(row["version"])}
         except learning.RuntimeLearningError as exc:
             raise ExecutionRepositoryError(str(exc)) from exc
 
+    def _learning_maintenance_result_locked(
+        self, result: dict[str, Any], *, tenant_id: str, scope_id: str,
+        idempotency_key: str | None, binding_digest: str | None, instant: datetime,
+    ) -> dict[str, Any]:
+        if idempotency_key is None:
+            return result
+        payload = {**result, "idempotency_key": idempotency_key, "binding_digest": binding_digest}
+        result_digest = learning.digest(payload)
+        if len(_json_dump(payload).encode()) > 128 * 1024:
+            raise ExecutionRepositoryError("learning maintenance receipt exceeds its storage bound")
+        self._connection.execute(
+            """INSERT INTO ai_execution_learning_maintenance_receipt(
+                   namespace, tenant_id, scope_id, idempotency_key, binding_digest,
+                   result_digest, result_json, completed_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (self.namespace, tenant_id, scope_id, idempotency_key, binding_digest,
+             result_digest, _json_dump(payload), instant.isoformat()),
+        )
+        return {**payload, "maintenance_receipt_digest": result_digest}
+
     def runtime_learning_maintenance(
-        self, *, tenant_id: str, scope_id: str = "tenant", max_partitions: int = 4, now: datetime | None = None
+        self, *, tenant_id: str, scope_id: str = "tenant", max_partitions: int = 4,
+        idempotency_key: str | None = None, now: datetime | None = None
     ) -> dict[str, Any]:
         """Bounded idle replay/integrity work on this repository's existing state.
 
@@ -2203,17 +2524,45 @@ class SQLiteExecutionRepository:
         tenant_id, scope_id = self._learning_scope(tenant_id, scope_id)
         if isinstance(max_partitions, bool) or not isinstance(max_partitions, int) or not 1 <= max_partitions <= 8:
             raise ExecutionRepositoryError("maintenance partition bound must be in [1, 8]")
+        if idempotency_key is not None:
+            try:
+                idempotency_key = learning.identifier(idempotency_key, "idempotency_key", maximum=256)
+            except learning.RuntimeLearningError as exc:
+                raise ExecutionRepositoryError(str(exc)) from exc
+        binding_digest = None if idempotency_key is None else learning.digest({
+            "namespace": self.namespace, "tenant_id": tenant_id, "scope_id": scope_id,
+            "max_partitions": max_partitions, "idempotency_key": idempotency_key,
+        })
         instant = _utc(now)
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
+                if idempotency_key is not None:
+                    prior = self._connection.execute(
+                        """SELECT * FROM ai_execution_learning_maintenance_receipt
+                           WHERE namespace = ? AND tenant_id = ? AND scope_id = ? AND idempotency_key = ?""",
+                        (self.namespace, tenant_id, scope_id, idempotency_key),
+                    ).fetchone()
+                    if prior is not None:
+                        if prior["binding_digest"] != binding_digest:
+                            raise ExecutionRepositoryConflict("learning maintenance idempotency binding differs")
+                        if not isinstance(prior["result_json"], str) or len(prior["result_json"]) > 128 * 1024:
+                            raise ExecutionRepositoryCorruption("learning maintenance receipt exceeds its storage bound")
+                        previous_result = _json_object(prior["result_json"], "learning maintenance receipt")
+                        if learning.digest(previous_result) != prior["result_digest"]:
+                            raise ExecutionRepositoryCorruption("learning maintenance receipt digest differs")
+                        self._connection.execute("COMMIT")
+                        return {**previous_result, "maintenance_receipt_digest": prior["result_digest"]}
                 policy = self._learning_policy_locked(tenant_id, scope_id)["policy"]
                 if not policy["enabled"]:
-                    self._connection.execute("COMMIT")
-                    return {"schema_version": "skeleton.runtime.learning.maintenance.v1", "tenant_id": tenant_id,
+                    result = self._learning_maintenance_result_locked({
+                        "schema_version": "skeleton.runtime.learning.maintenance.v1", "tenant_id": tenant_id,
                         "scope_id": scope_id, "processed_partitions": 0, "partitions": [],
                         "deferred_reason": "learning_disabled", "external_model_work": False,
-                        "completed_at": instant.isoformat()}
+                        "completed_at": instant.isoformat()}, tenant_id=tenant_id, scope_id=scope_id,
+                        idempotency_key=idempotency_key, binding_digest=binding_digest, instant=instant)
+                    self._connection.execute("COMMIT")
+                    return result
                 rows = self._connection.execute(
                     """SELECT * FROM ai_execution_learning_state
                        WHERE namespace = ? AND tenant_id = ? AND scope_id = ?
@@ -2247,6 +2596,12 @@ class SQLiteExecutionRepository:
                                     raise ExecutionRepositoryCorruption("learning recovery terminal identity differs")
                                 candidate, _ = learning.learn_outcome(candidate, observation, {**policy, "replay_steps": 0}, seed=seed)
                             candidate["recovery"] = {"prior_quarantine": old_quarantine, "recovered_at": instant.isoformat()}
+                            costs = candidate["optimizer_cost"]
+                            costs["maintenance_updates"] = min(learning.MAX_COUNTER, costs["maintenance_updates"] + costs["terminal_updates"])
+                            costs["terminal_updates"] = 0
+                            # Reconstructing historical examples is replay;
+                            # it cannot certify fresh prequential performance.
+                            candidate = learning.reset_confidence(candidate, reason="maintenance_recovery", policy=policy)
                             state = candidate
                         else:
                             state = learning.replay_maintenance(state, policy, max_updates=2)
@@ -2257,11 +2612,15 @@ class SQLiteExecutionRepository:
                     entries.append({"partition_id": row["partition_id"], "recovered": recovering and not state["quarantined"],
                         "optimizer_updates": max(0, int(state["optimizer"]["step"]) - (0 if recovering else updates_before)),
                         "maintenance_error": maintenance_error, **learning.state_readiness(state, policy)})
-                self._connection.execute("COMMIT")
-                return {"schema_version": "skeleton.runtime.learning.maintenance.v1", "tenant_id": tenant_id,
+                result = self._learning_maintenance_result_locked({
+                    "schema_version": "skeleton.runtime.learning.maintenance.v1", "tenant_id": tenant_id,
                     "scope_id": scope_id, "processed_partitions": len(entries), "partitions": entries,
                     "quarantined_partitions": sum(entry["quarantined"] for entry in entries),
-                    "external_model_work": False, "completed_at": instant.isoformat()}
+                    "external_model_work": False, "completed_at": instant.isoformat()},
+                    tenant_id=tenant_id, scope_id=scope_id, idempotency_key=idempotency_key,
+                    binding_digest=binding_digest, instant=instant)
+                self._connection.execute("COMMIT")
+                return result
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise

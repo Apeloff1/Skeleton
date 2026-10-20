@@ -144,6 +144,48 @@ Hosted execution remains optional: configure the approved provider through the
 existing engine environment. Provider credentials stay in the engine process.
 The backend and browser do not construct provider clients or load weights.
 
+### Optional multiple local models
+
+To configure multiple existing local models, set `AI_PROVIDER=local`, leave
+`AI_LOCAL_MODEL_PATH` and `AI_LOCAL_DEPLOYMENT_PATH` empty, and set
+`AI_LOCAL_MODEL_CATALOG_PATH` to the catalog's engine-visible path, for example
+`/app/local-ai/catalog.json` inside the existing read-only local-AI mount. Exactly
+one of those three model-path alternatives may be configured. Prepare and mount
+the referenced artifacts first; catalog activation does not download them.
+
+A catalog uses this shape; replace both digest placeholders with the SHA256 of
+the exact deployment manifest file bytes:
+
+```json
+{
+  "schema_version": "skeleton.local_model.catalog.v1",
+  "primary_model_id": "builder",
+  "verifier_model_id": "reviewer",
+  "max_total_artifact_bytes": 17179869184,
+  "models": [
+    {"model_id": "builder", "kind": "deployment", "path": "builder-deployment.json", "sha256": "REPLACE_WITH_MANIFEST_SHA256"},
+    {"model_id": "reviewer", "kind": "deployment", "path": "reviewer-deployment.json", "sha256": "REPLACE_WITH_MANIFEST_SHA256"}
+  ]
+}
+```
+
+Paths resolve relative to the catalog. Existing deployment manifests independently
+pin model and executable digests. The catalog is limited to 1 MiB and 1–8 unique
+model aliases; `verifier_model_id` is optional. Aliases for identical weights do
+not establish an independent verifier. The explicit positive byte budget covers
+unique referenced files, including manifests, executables and weights; it is
+bounded at 1 TiB and does not reserve that amount of RAM. Native JSON artifact
+entries additionally require fresh available-memory telemetry and conservative
+admission at twelve times serialized artifact bytes plus a 256 MiB reserve.
+That estimate is an admission guard, not a resident-memory guarantee. GGUF CLI
+deployments retain their existing process, capacity and weight checks.
+
+Recreate the engine after configuring the catalog. Invalid catalogs report
+`local_catalog_invalid`; correct the files, digests, budget or activation choice
+before retrying. Chat lists exact configured model identities. Runtime optimization
+shows each model's own queue, pressure and tenant fairness; serving controls target
+the selected model. Selecting a status view does not change the chat's model.
+
 ## Chat, recovery and captured knowledge
 
 Open AI chat after signing in. The model list comes from current canonical
@@ -224,6 +266,46 @@ Every command carries the observed policy version. A conflict reloads current
 state and requires you to review and reapply the change; commands are never
 silently replayed. If a request is unconfirmed, inspect refreshed state before
 trying again.
+Cache actions retain separate host and model markers so each engine worker can
+reconcile intervening commands even when another model receives a later action.
+
+Select a learner partition to inspect prequential error, drift, confidence
+constraints, source fingerprints, optimizer work and its last healthy checkpoint.
+**Previous learners** and **Next learners** fetch canonical pages of ten partitions;
+the panel reports the returned page and total retained count. Confirmed mutations
+reload the current page without replaying the action or discarding its receipt.
+Prequential loss describes operational prediction error measured before an update;
+it does not measure answer correctness or creative quality. Drift, source novelty
+and insufficient fresh outcomes withhold learned confidence.
+
+Administrators can **Export checkpoint**, **Import checkpoint**, **Restore last
+healthy** or **Reset learner**. JSON files are limited to 256 KiB and contain
+bounded numeric predictor/replay state and provenance fingerprints. Import previews
+the selected tenant, scope, task, model and feature-schema binding; the engine
+validates state and checkpoint digests. Historical source fingerprints remain
+provenance. Keep exported files unmodified. Downloads and imports preserve the
+original JSON text, including numeric spellings covered by those digests; the
+parsed preview is never serialized back into the checkpoint file or import body.
+Import, reset and restore require fresh canonical outcomes before
+learned guidance resumes. Mutations atomically check both the observed policy
+version and learner state version and append an audit receipt. A conflict requires
+review and an explicit new action. These files import no policy, grants, execution
+results, prompts or transformer weights.
+
+Maintenance reports ownership, physical work, fencing and blocked recovery. Lease
+expiry alone does not prove that old work stopped; takeover requires positive
+physical-drain evidence. Degraded coordination suspends maintenance and makes its
+controls read-only until healthy coordination is observed again.
+
+Studio adaptive numeric advice uses **Only this goal** by default. **Remember
+compatible goals** permits reuse only when both source and recipient explicitly
+opt in and match tenant, principal, project, original baseline/source, review
+protocol, reviewer implementation, feature schema and acceptance floors. Current
+permissions and original review receipts are checked again. **Start a new shared
+history** starts a fresh numeric epoch once that goal has a verified original
+baseline; it preserves historical journals and running goals. Retained memory is
+bounded to eight provenance goals and 32 observations. It grants no source-text
+reuse, quality certification or model-weight promotion.
 
 This runtime implementation is a construction draft, not enterprise certification.
 No automated tests were authored or run for this build, following the user's

@@ -606,6 +606,7 @@
     "service_scope": "engine:runtime-control",
     "application_policy": "authenticated administrator only; scoped viewer observations",
     "implementation_state": "draft",
-    "grants": "existing attester grant and allowed tenant/capability configuration; no provider selection or model promotion authority"
+    "grants": "existing attester grant and allowed tenant/capability configuration; no provider selection or model promotion authority",
+    "checkpoint_lifecycle": "bounded numeric controller checkpoints only; admin tenant/model/state+policy CAS with immutable audit; imported state cold starts confidence"
   }
 }

@@ -88,6 +88,10 @@ _READINESS = {
         "The local model settings are invalid.",
         "Ask an administrator to review the local engine settings.",
     ),
+    "local_catalog_invalid": (
+        "The configured local model catalog could not be activated safely.",
+        "Ask an administrator to check its pinned files, route names, byte budget and available memory, then restart the engine.",
+    ),
     "local_model_unavailable": (
         "The activated local model is no longer ready.",
         "Ask an administrator to verify its artifact and restart the engine.",
@@ -177,6 +181,16 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
     artifact_model = _text(value.get("model_id"), maximum=256)
     if model_id != artifact_model:
         raise EngineProtocolError("model catalog artifact/model identity mismatch")
+    catalog_binding = {}
+    catalog_keys = {"catalog_digest", "catalog_entry_digest", "catalog_source_sha256", "source_model_id"}
+    if catalog_keys.intersection(value):
+        if not catalog_keys <= set(value):
+            raise EngineProtocolError("model catalog route binding is incomplete")
+        catalog_binding["source_model_id"] = _text(value["source_model_id"], maximum=256)
+        for key in catalog_keys - {"source_model_id"}:
+            if not isinstance(value[key], str) or _DIGEST.fullmatch(value[key]) is None:
+                raise EngineProtocolError("model catalog route digest is invalid")
+            catalog_binding[key] = value[key]
     digests = {}
     for key in ("model_digest", "artifact_sha256"):
         digest = value.get(key)
@@ -201,6 +215,7 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
             "artifact_bytes": _integer(value.get("artifact_bytes"), maximum=1024**4),
             "runtime_kind": "llama.cpp-cli",
             "reference": reference,
+            **catalog_binding,
         }
     reference = "local-model-artifact:" + digests["artifact_sha256"]
     if value.get("reference", reference) != reference:
@@ -214,6 +229,7 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
             maximum=1024**4 if schema == "skeleton.ai.native-llm-runtime.v2" else 128 * 1024 * 1024,
         ),
         "reference": reference,
+        **catalog_binding,
     }
 
 
@@ -222,11 +238,11 @@ def _local_handoff(*, activated: bool) -> dict[str, Any]:
         "credential_free": True,
         "activated": activated,
         "operator_required": True,
-        "configuration_keys": ["AI_PROVIDER", "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH"],
-        "configuration_exclusive_alternatives": [["AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH"]],
+        "configuration_keys": ["AI_PROVIDER", "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH"],
+        "configuration_exclusive_alternatives": [["AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH"]],
         "required_provider_value": "local",
         "restart_required": True,
-        "instruction": "An administrator can export a governed local model, configure AI_LOCAL_MODEL_PATH or an approved AI_LOCAL_DEPLOYMENT_PATH manifest exclusively, and restart the engine. No hosted AI credentials are required.",
+        "instruction": "An administrator can configure one governed AI_LOCAL_MODEL_PATH artifact, an AI_LOCAL_DEPLOYMENT_PATH manifest, or an AI_LOCAL_MODEL_CATALOG_PATH catalog of 1–8 pinned local models, and restart the engine. Catalogs declare an exact primary and optional independent verifier within an operator byte budget. No hosted AI credentials are required.",
         "production_promotion_authorized": False,
     }
 
@@ -253,16 +269,21 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
     rows = inventory.get("providers")
     if not isinstance(rows, list) or not 1 <= len(rows) <= _MAX_ROWS:
         raise EngineProtocolError("model inventory row count is invalid")
+    explicit_active = any(isinstance(row, Mapping) and "active" in row for row in rows)
     models, providers, seen = [], [], set()
     active = None
     for raw in rows:
         if not isinstance(raw, Mapping):
             raise EngineProtocolError("model inventory row is invalid")
         provider_id = _text(raw.get("id"), maximum=128)
-        if provider_id in seen:
-            raise EngineProtocolError("model inventory provider is duplicated")
-        seen.add(provider_id)
         model_id = _text(raw.get("model"), maximum=256, optional=True)
+        identity = (provider_id, model_id)
+        if identity in seen:
+            raise EngineProtocolError("model inventory provider/model identity is duplicated")
+        seen.add(identity)
+        active_row = raw.get("active", False) if explicit_active else provider_id == active_provider
+        if type(active_row) is not bool or (active_row and provider_id != active_provider):
+            raise EngineProtocolError("model inventory active route is invalid")
         if type(raw.get("available")) is not bool or type(raw.get("architecture_acknowledged")) is not bool:
             raise EngineProtocolError("model inventory readiness is invalid")
         mode = raw.get("execution_mode")
@@ -284,7 +305,7 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             {
                 "provider_id": provider_id,
                 "available": available,
-                "active": provider_id == active_provider,
+                "active": active_row,
                 "fallback": raw.get("fallback") is True,
                 "credential_free": local,
                 "execution_mode": mode,
@@ -301,7 +322,7 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         max_output = _integer(raw.get("max_output_tokens"), maximum=131_072)
         default_output = _integer(raw.get("default_output_tokens"), maximum=max_output)
         limits_source = raw.get("limits_source")
-        if limits_source not in {"engine_chat_policy", "activated_local_backend"} or (
+        if limits_source not in {"engine_chat_policy", "activated_local_backend", "activated_native_runtime"} or (
             not local and limits_source != "engine_chat_policy"
         ):
             raise EngineProtocolError("model inventory context/output capacity is invalid")
@@ -350,7 +371,8 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             "label": label,
             "available": available,
             "selectable": available and "text-generation" in capabilities,
-            "active": provider_id == active_provider,
+            "active": active_row,
+            "fallback": raw.get("fallback") is True,
             "credential_free": local,
             "execution_mode": mode,
             "context_window": context_window,
@@ -378,8 +400,21 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         models.append(row)
         if row["active"]:
             active = {"provider_id": provider_id, "model_id": model_id}
-    if active_provider not in seen:
+    if active_provider not in {provider_id for provider_id, _model_id in seen}:
         raise EngineProtocolError("model inventory active provider is missing")
+    if sum(provider["active"] for provider in providers) != 1:
+        raise EngineProtocolError("model inventory must identify one exact active model")
+    grouped_providers: dict[str, dict[str, Any]] = {}
+    for provider in providers:
+        grouped = grouped_providers.get(provider["provider_id"])
+        if grouped is None:
+            grouped_providers[provider["provider_id"]] = dict(provider)
+            continue
+        for flag in ("available", "active", "fallback", "configured"):
+            grouped[flag] = grouped[flag] or provider[flag]
+        if provider["available"] or (provider["active"] and not grouped["available"]):
+            grouped["readiness"] = provider["readiness"]
+    providers = list(grouped_providers.values())
     available = any(row["selectable"] for row in models)
     issue = (
         readiness("ready")
@@ -395,8 +430,7 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             row["readiness"]["code"] == "model_context_too_small"
             and (
                 row["active"]
-                or row["provider_id"]
-                in {provider["provider_id"] for provider in providers if provider["fallback"]}
+                or row["fallback"]
             )
             for row in models
         ),
@@ -467,9 +501,7 @@ def resolve_selection(
             raise ModelSelectionError("automatic_route_unavailable", status_code=503)
         issue = catalog.get("readiness") or {}
         raise ModelSelectionError(issue.get("code", "no_ready_model"), status_code=503)
-    providers = catalog.get("providers", [])
-    eligible = {row["provider_id"] for row in providers if row["active"] or row["fallback"]}
-    routes = [row for row in models if row["provider_id"] in eligible]
+    routes = [row for row in models if row["active"] or row.get("fallback") is True]
     ready = [row for row in routes if row["selectable"]]
     if not ready:
         raise ModelSelectionError("no_ready_model", status_code=503)

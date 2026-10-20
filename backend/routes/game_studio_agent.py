@@ -25,6 +25,13 @@ class StudioQualityGate(Request):
     require_no_regression: bool = Field(default=True, strict=True)
     restore_on_regression: bool = Field(default=True, strict=True)
     adaptive_ranking: bool = Field(default=False, strict=True)
+    numeric_memory_policy: Literal["goal_only", "reuse_compatible", "reset"] = "goal_only"
+
+    @model_validator(mode="after")
+    def numeric_memory_grant(self):
+        if self.numeric_memory_policy != "goal_only" and not self.adaptive_ranking:
+            raise ValueError("shared numeric memory requires the explicit adaptive-ranking grant")
+        return self
 
 
 class GoalCreate(WriteRequest):

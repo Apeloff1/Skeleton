@@ -5337,6 +5337,35 @@
           "frontend/src/features/Jeeves/StudioGoalQualityPanel.tsx",
           "frontend/src/product/gameStudioAgentClient.ts"
         ]
+      },
+      "runtime_completion_pass": {
+        "catalog_owner": "skeleton/ai/runtime/inference/catalog.py",
+        "catalog_configuration": "AI_LOCAL_MODEL_CATALOG_PATH explicit bounded digest-pinned local catalog, mutually exclusive with single artifact/deployment; existing ProviderRegistry exact provider/model identity, explicit primary and optional independent verifier; no implicit download or hosted fallback",
+        "admission": "existing local serving owner adds trusted tenant fairness separate from cache/operation/preemption identities; static operator ceilings and physical worker custody remain authoritative; host/per-route cache-action epochs persist in existing policy to reconcile every worker without losing intervening commands",
+        "learner_lifecycle": {
+          "owner": "skeleton/persistence/execution_repository.py",
+          "helper": "skeleton/intelligence/runtime_learning.py",
+          "interfaces": [
+            "GET /api/ai/runtime-control/learning/partitions/{partition_id}/checkpoint",
+            "POST /api/ai/runtime-control/learning/partitions/{partition_id}/checkpoint",
+            "equivalent sealed /api/v1/engine/runtime-control/learning/partitions/{partition_id}/checkpoint"
+          ],
+          "authority": "administrator plus engine service grant; tenant/model-bound finite checkpoint, exact state version CAS and same-transaction global policy version/audit receipt; no provider model promotion or output-quality claim",
+          "model": "prequential operational residual/drift/novelty confidence, bounded replay/last-healthy optimizer rollback and cold-start after import/reset",
+          "wire": "export/import opaque canonical checkpoint_json at most 256 KiB UTF-8 to preserve Python numeric digest input across browser JSON; parsed previews confer no authority; object checkpoint remains service-compatible"
+        },
+        "studio_numeric_memory": {
+          "owner": "backend/core/game_studio_agent.py with canonical mirror_room numeric ranker",
+          "policy": "quality_gate.numeric_memory_policy=goal_only|reuse_compatible|reset default goal_only; cross-goal reuse requires both donor and recipient explicitly opted into compatible reuse",
+          "authority": "same scoped tenant/principal/project/baseline/protocol/reviewer/feature/floor identities; existing sealed goal records/CAS/storage only; no unconsented review training",
+          "operator_surfaces": [
+            "StudioGoalQualityPanel.tsx",
+            "GameStudioAssistantPanel.tsx",
+            "gameStudioAgentClient.ts"
+          ]
+        },
+        "maintenance": "same-database durable host/scope ownership leases with fencing, cooperative heartbeat, positive physical-drain proof before stale-owner replay; expiry alone never proves a worker stopped; unknown remote ownership stays blocked; learner replay effects deduplicate the stable continuation_id and commit the optimizer mutation with its result receipt in the same execution SQLite transaction",
+        "boundaries": "no new service/store/provider boundary or automatic production-weight training; all learned controls remain subordinate to exact selections, grants, source pins, independent validation and promotion floors"
       }
     }
   },

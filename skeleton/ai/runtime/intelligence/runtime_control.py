@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 import threading
 import time
 from collections.abc import Mapping
@@ -39,6 +40,31 @@ def _identity(value: object, label: str) -> str:
     return value
 
 
+def _checkpoint_from_json(value: str) -> dict[str, Any]:
+    """Parse the opaque checkpoint without a browser numeric rewrite."""
+    if not isinstance(value, str) or len(value.encode("utf-8")) > 256 * 1024:
+        raise ValueError("checkpoint exceeds the 256 KiB limit")
+
+    def object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError("checkpoint contains a duplicate JSON key")
+            result[key] = item
+        return result
+
+    def invalid_constant(value: str) -> None:
+        raise ValueError("checkpoint contains a non-finite number")
+
+    try:
+        parsed = json.loads(value, object_pairs_hook=object_pairs, parse_constant=invalid_constant)
+    except (ValueError, RecursionError) as exc:
+        raise ValueError("checkpoint must be an unambiguous finite JSON object") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError("checkpoint must be a JSON object")
+    return parsed
+
+
 class RuntimeOptimizationControl:
     """Bounded host optimization with tenant-isolated learning projections."""
 
@@ -50,23 +76,82 @@ class RuntimeOptimizationControl:
         self._foreground = 0
         self._enqueued_buckets: OrderedDict[str, int] = OrderedDict()
         self._last_activity_ns = time.time_ns()
+        self._last_activity_monotonic_ns = time.monotonic_ns()
         self._applied_version = 0
-        self._applied_action_version = 0
+        self._applied_cache_actions: dict[str, dict[str, int]] = {}
         self._applied_host_policy: dict[str, Any] = {}
         self._last_error: str | None = None
         self._closed = False
         self._maintenance = None
         self._maintenance_unavailable = "durable_execution_store_required"
+        self._maintenance_retry_at = 0.0
+        self._maintenance_retryable = False
+        self._maintenance_coordination_error: str | None = None
         try:
             self._initialize_maintenance()
         except Exception as exc:
             # Optional upkeep must not prevent the configured AI from starting.
             self._maintenance_unavailable = "maintenance_initialization_" + type(exc).__name__
+            self._maintenance_retryable = isinstance(exc, (sqlite3.OperationalError, OSError))
+            self._maintenance_retry_at = time.monotonic() + 30.0
         self.reconcile()
 
     def _engines(self) -> tuple[Any, ...]:
-        selector = getattr(self.providers, "runtime_serving_engines", None)
-        return tuple(selector()) if callable(selector) else ()
+        unique: dict[int, Any] = {}
+        for row in self._routes():
+            unique.setdefault(id(row["engine"]), row["engine"])
+        return tuple(unique.values())
+
+    def _routes(self) -> tuple[dict[str, Any], ...]:
+        selector = getattr(self.providers, "runtime_serving_routes", None)
+        if callable(selector):
+            return tuple(selector())
+        legacy = getattr(self.providers, "runtime_serving_engines", None)
+        engines = tuple(legacy()) if callable(legacy) else ()
+        return tuple(
+            {
+                "provider_id": "local",
+                "model_id": getattr(engine.model, "model_id", "primary"),
+                "route_id": "local:" + str(getattr(engine.model, "model_id", "primary")),
+                "model_digest": getattr(engine.model, "model_digest", None),
+                "engine": engine,
+            }
+            for engine in engines
+        )
+
+    def _selected_routes(self, route_id: str | None = None) -> tuple[dict[str, Any], ...]:
+        rows = self._routes()
+        if route_id is None:
+            return rows
+        selected = tuple(row for row in rows if row["route_id"] == route_id)
+        if not selected:
+            raise ValueError("selected local serving route is not configured")
+        return selected
+
+    @staticmethod
+    def _serving_policy(policy: Mapping[str, Any], route_id: str) -> dict[str, Any]:
+        return {**policy.get("serving", {}), **policy.get("serving_routes", {}).get(route_id, {})}
+
+    @staticmethod
+    def _route_draining(policy: Mapping[str, Any], route_id: str) -> bool:
+        return policy.get("route_draining", {}).get(route_id, policy.get("draining", False))
+
+    @staticmethod
+    def _cache_action_versions(policy: Mapping[str, Any], route_id: str) -> dict[str, int]:
+        epochs = policy.get("cache_actions", {})
+        global_epochs = epochs.get("global", {})
+        route_epochs = epochs.get("routes", {}).get(route_id, {})
+        result = {
+            action: max(global_epochs.get(action, 0), route_epochs.get(action, 0))
+            for action in ("clear_cache", "trim_cache")
+        }
+        # Existing policy rows predate per-route epochs. Retain their last
+        # cache action until the next operator mutation migrates the marker.
+        legacy = policy.get("last_action", {})
+        if legacy.get("action") in result and legacy.get("route_id") in (None, route_id):
+            action = legacy["action"]
+            result[action] = max(result[action], legacy.get("version", 0))
+        return result
 
     def _initialize_maintenance(self) -> None:
         raw_path = getattr(self.repository, "path", ":memory:")
@@ -95,6 +180,31 @@ class RuntimeOptimizationControl:
             maximum_history_events=2_000_000,
         )
         self._maintenance_unavailable = ""
+        self._maintenance_retryable = False
+        synchronize = getattr(self._maintenance, "synchronize_foreground", None)
+        if callable(synchronize):
+            with self._activity_lock:
+                foreground = self._foreground
+            try:
+                synchronize(foreground)
+            except Exception as exc:
+                self._maintenance_coordination_error = type(exc).__name__
+
+    def _recover_maintenance_initialization(self) -> None:
+        if self._maintenance is not None or not self._maintenance_retryable or self._closed:
+            return
+        if time.monotonic() < self._maintenance_retry_at:
+            return
+        with self._lock:
+            if self._maintenance is not None or self._closed:
+                return
+            self._maintenance_retry_at = time.monotonic() + 60.0
+            try:
+                self._initialize_maintenance()
+                self._applied_version = 0
+            except Exception as exc:
+                self._maintenance_unavailable = "maintenance_initialization_" + type(exc).__name__
+                self._maintenance_retryable = isinstance(exc, (sqlite3.OperationalError, OSError))
 
     def _authorize_maintenance(self, assignment: Any, intent: Any, task: Any) -> bool:
         del intent
@@ -125,6 +235,7 @@ class RuntimeOptimizationControl:
         result = self.repository.runtime_learning_maintenance(
             tenant_id=task.payload["tenant_id"],
             max_partitions=1,
+            idempotency_key=task.continuation_id,
         )
         checkpoint()
         return result
@@ -150,7 +261,8 @@ class RuntimeOptimizationControl:
             configured += int(getattr(engine, "max_concurrency", 1))
         with self._activity_lock:
             foreground = self._foreground
-            last_activity = self._last_activity_ns
+            quiet_ns = max(0, time.monotonic_ns() - self._last_activity_monotonic_ns)
+            last_activity = max(0, now - quiet_ns)
         cpu, memory = resources.cpu_load_fraction, resources.memory_used_fraction
         # Missing resource observations deny idle work rather than assuming
         # spare CPU/memory. Network/accelerator work is never registered here.
@@ -185,8 +297,12 @@ class RuntimeOptimizationControl:
         with self._activity_lock:
             self._foreground += 1
             self._last_activity_ns = time.time_ns()
+            self._last_activity_monotonic_ns = time.monotonic_ns()
         if self._maintenance is not None:
-            self._maintenance.foreground_started()
+            try:
+                self._maintenance.foreground_started()
+            except Exception as exc:
+                self._maintenance_coordination_error = type(exc).__name__
 
     def pressure(self) -> float:
         active = queued = capacity = 0
@@ -203,8 +319,12 @@ class RuntimeOptimizationControl:
         with self._activity_lock:
             self._foreground = max(0, self._foreground - 1)
             self._last_activity_ns = time.time_ns()
+            self._last_activity_monotonic_ns = time.monotonic_ns()
         if self._maintenance is not None:
-            self._maintenance.foreground_finished()
+            try:
+                self._maintenance.foreground_finished()
+            except Exception as exc:
+                self._maintenance_coordination_error = type(exc).__name__
         if self._maintenance is None or self._closed:
             return
         if not self._maintenance.policy.enabled:
@@ -259,15 +379,17 @@ class RuntimeOptimizationControl:
                 version, policy = state["version"], state["policy"]
                 if version == self._applied_version:
                     return
-                for engine in self._engines():
-                    if not self._applied_version or policy.get(
-                        "serving", {}
-                    ) != self._applied_host_policy.get("serving", {}):
-                        engine.configure_serving(policy.get("serving", {}))
-                    if not self._applied_version or policy.get(
-                        "draining", False
-                    ) != self._applied_host_policy.get("draining", False):
-                        engine.maintain("drain" if policy.get("draining", False) else "resume")
+                for route in self._routes():
+                    engine, route_id = route["engine"], route["route_id"]
+                    desired = self._serving_policy(policy, route_id)
+                    previous = self._serving_policy(self._applied_host_policy, route_id)
+                    if not self._applied_version or desired != previous:
+                        engine.configure_serving(desired)
+                    draining = self._route_draining(policy, route_id)
+                    if not self._applied_version or draining != self._route_draining(
+                        self._applied_host_policy, route_id
+                    ):
+                        engine.maintain("drain" if draining else "resume")
                 if self._maintenance is not None and (
                     not self._applied_version
                     or policy.get("maintenance", {}) != self._applied_host_policy.get("maintenance", {})
@@ -277,13 +399,18 @@ class RuntimeOptimizationControl:
                     self._maintenance.configure(
                         replace(StudioMaintenancePolicy(), **policy.get("maintenance", {}))
                     )
-                action = policy.get("last_action")
-                action_version = action.get("version", 0) if isinstance(action, Mapping) else 0
-                if isinstance(action, Mapping) and action_version != self._applied_action_version:
-                    if action.get("action") in {"trim_cache", "clear_cache"}:
-                        for engine in self._engines():
-                            engine.maintain(action["action"])
-                    self._applied_action_version = action_version
+                for route in self._routes():
+                    route_id = route["route_id"]
+                    markers = self._cache_action_versions(policy, route_id)
+                    applied = self._applied_cache_actions.get(route_id, {})
+                    clearing = markers["clear_cache"] > applied.get("clear_cache", 0)
+                    if clearing:
+                        route["engine"].maintain("clear_cache")
+                    if markers["trim_cache"] > applied.get("trim_cache", 0) and (
+                        not clearing or markers["trim_cache"] > markers["clear_cache"]
+                    ):
+                        route["engine"].maintain("trim_cache")
+                    self._applied_cache_actions[route_id] = markers
                 self._applied_version = version
                 self._applied_host_policy = dict(policy)
                 self._last_error = None
@@ -292,15 +419,24 @@ class RuntimeOptimizationControl:
                 # reveal a type, never paths, credentials, prompts or payloads.
                 self._last_error = type(exc).__name__
 
-    def snapshot(self, *, actor_id: str, tenant_id: str) -> dict[str, Any]:
+    def snapshot(self, *, actor_id: str, tenant_id: str, learning_offset: int = 0) -> dict[str, Any]:
         actor_id, tenant_id = _identity(actor_id, "actor_id"), _identity(tenant_id, "tenant_id")
         self.reconcile()
         state = self.repository.runtime_control_policy()
-        engines = self._engines()
-        if engines:
-            serving = dict(engines[0].snapshot().get("serving", {}))
+        routes = self._routes()
+        primary = getattr(getattr(self.providers, "active", None), "model", None)
+        models = [
+            {
+                **dict(row["engine"].snapshot().get("serving", {})),
+                **{key: row.get(key) for key in ("provider_id", "model_id", "model_digest", "route_id")},
+                "active": row["model_id"] == primary,
+            }
+            for row in routes
+        ]
+        if models:
+            serving = dict(next((row for row in models if row["active"]), models[0]))
             serving["available"] = True
-            serving["engine_count"] = len(engines)
+            serving["engine_count"] = len(models)
         else:
             serving = {
                 "available": False,
@@ -312,19 +448,35 @@ class RuntimeOptimizationControl:
                 "draining": False,
             }
         serving["desired_policy"] = state["policy"].get("serving", {})
-        learning = self.repository.runtime_learning_snapshot(tenant_id=tenant_id, limit=10)
+        serving["models"] = models
+        learning = self.repository.runtime_learning_snapshot(
+            tenant_id=tenant_id, limit=10, offset=learning_offset
+        )
         learning["available"] = True
-        maintenance = (
-            self._maintenance.snapshot(scope_id=self._maintenance_scope(tenant_id))
-            if self._maintenance is not None
-            else {
+        try:
+            maintenance = (
+                self._maintenance.snapshot(scope_id=self._maintenance_scope(tenant_id))
+                if self._maintenance is not None
+                else {
+                    "available": False,
+                    "policy": {"enabled": False},
+                    "status": {"state": "unavailable", "reason": self._maintenance_unavailable},
+                    "recent_tasks": [],
+                }
+            )
+        except Exception as exc:
+            self._maintenance_coordination_error = type(exc).__name__
+            maintenance = {
                 "available": False,
                 "policy": {"enabled": False},
-                "status": {"state": "unavailable", "reason": self._maintenance_unavailable},
+                "status": {"state": "degraded", "reason": "maintenance_observation_unavailable"},
                 "recent_tasks": [],
             }
-        )
         maintenance.setdefault("available", self._maintenance is not None)
+        maintenance["coordination"] = {
+            "state": "degraded" if self._maintenance_coordination_error else "observed",
+            "error_code": self._maintenance_coordination_error,
+        }
         return {
             "schema_version": SCHEMA_VERSION,
             "actor_id": actor_id,
@@ -357,6 +509,7 @@ class RuntimeOptimizationControl:
         learning: Mapping[str, Any] | None = None,
         maintenance: Mapping[str, Any] | None = None,
         action: str | None = None,
+        serving_route_id: str | None = None,
     ) -> dict[str, Any]:
         _identity(actor_id, "actor_id")
         _identity(tenant_id, "tenant_id")
@@ -378,31 +531,68 @@ class RuntimeOptimizationControl:
                     raise ValueError(f"{label} {flag} must be boolean")
         if action is not None and action not in ACTIONS:
             raise ValueError("unsupported runtime maintenance action")
-        engines = self._engines()
-        if (serving is not None or action is not None) and not engines:
+        if serving_route_id is not None and serving is None and action is None:
+            raise ValueError("a serving route requires a serving policy or action")
+        routes = self._selected_routes(serving_route_id)
+        if (serving is not None or action is not None) and not routes:
             raise ValueError("local serving is not configured")
         if maintenance is not None and self._maintenance is None:
-            raise ValueError("maintenance requires durable execution storage")
+            raise ValueError("maintenance is unavailable: " + self._maintenance_unavailable)
         with self._lock:
             current = self.repository.runtime_control_policy()
             policy = dict(current["policy"])
             if serving is not None:
-                desired = {**policy.get("serving", {}), **dict(serving)}
                 from skeleton.ai.runtime.inference.adaptive_serving import AdaptiveServingPolicy
 
-                for engine in engines:
+                for route in routes:
+                    engine = route["engine"]
+                    desired = {**self._serving_policy(policy, route["route_id"]), **dict(serving)}
                     cap = int(engine.max_concurrency)
-                    AdaptiveServingPolicy.defaults(cap).updated(desired, cap)
-                policy["serving"] = desired
+                    queue_cap = int(engine.max_queue_size)
+                    AdaptiveServingPolicy.defaults(cap, queue_cap).updated(desired, cap, queue_cap)
+                if serving_route_id is None:
+                    policy["serving"] = {**policy.get("serving", {}), **dict(serving)}
+                    overrides = {
+                        key: {field: value for field, value in values.items() if field not in serving}
+                        for key, values in policy.get("serving_routes", {}).items()
+                    }
+                    policy["serving_routes"] = {key: value for key, value in overrides.items() if value}
+                else:
+                    overrides = dict(policy.get("serving_routes", {}))
+                    overrides[serving_route_id] = {**overrides.get(serving_route_id, {}), **dict(serving)}
+                    policy["serving_routes"] = overrides
             if maintenance is not None:
                 policy["maintenance"] = {**policy.get("maintenance", {}), **dict(maintenance)}
             if action is not None:
+                # Keep independent bounded epochs: an intervening command on
+                # another model, or a trim after a clear, must not erase work
+                # a different process has not reconciled yet.
+                policy["cache_actions"] = {
+                    "routes": {
+                        row["route_id"]: self._cache_action_versions(policy, row["route_id"])
+                        for row in self._routes()
+                    },
+                    "global": dict(policy.get("cache_actions", {}).get("global", {})),
+                }
+                if action in {"clear_cache", "trim_cache"}:
+                    if serving_route_id is None:
+                        policy["cache_actions"]["global"][action] = expected_version + 1
+                    else:
+                        policy["cache_actions"]["routes"][serving_route_id][action] = expected_version + 1
                 if action in {"drain", "resume"}:
-                    policy["draining"] = action == "drain"
+                    if serving_route_id is None:
+                        policy["draining"] = action == "drain"
+                        policy.pop("route_draining", None)
+                    else:
+                        policy["route_draining"] = {
+                            **policy.get("route_draining", {}),
+                            serving_route_id: action == "drain",
+                        }
                 policy["last_action"] = {
                     "action": action,
                     "actor_digest": _digest(actor_id),
                     "version": expected_version + 1,
+                    "route_id": serving_route_id,
                 }
             self.repository.set_runtime_control_policy(
                 policy,
@@ -415,9 +605,116 @@ class RuntimeOptimizationControl:
         return self.snapshot(actor_id=actor_id, tenant_id=tenant_id)
 
     def tick(self) -> None:
+        self._recover_maintenance_initialization()
         self.reconcile()
         if self._maintenance is not None and not self._closed:
-            self._maintenance.tick()
+            try:
+                self._maintenance.tick()
+                self._maintenance_coordination_error = None
+            except Exception as exc:
+                self._maintenance_coordination_error = type(exc).__name__
+                raise
+
+    @staticmethod
+    def _learning_partition(partition_id: str) -> str:
+        if (
+            not isinstance(partition_id, str)
+            or len(partition_id) != 64
+            or any(char not in "0123456789abcdef" for char in partition_id)
+        ):
+            raise ValueError("learning partition must be a lowercase SHA-256 identity")
+        return partition_id
+
+    def export_learning_checkpoint(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        partition_id: str,
+        expected_state_version: int | None = None,
+    ) -> dict[str, Any]:
+        _identity(actor_id, "actor_id")
+        _identity(tenant_id, "tenant_id")
+        partition_id = self._learning_partition(partition_id)
+        checkpoint = self.repository.runtime_learning_export(
+            tenant_id=tenant_id,
+            partition_id=partition_id,
+            expected_version=expected_state_version,
+        )
+        return {
+            "schema_version": "skeleton.ai.runtime_learning_checkpoint.v1",
+            "actor_id": actor_id,
+            "tenant_id": tenant_id,
+            "partition_id": partition_id,
+            "checkpoint_json": json.dumps(
+                checkpoint, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+            ),
+        }
+
+    def configure_learning_checkpoint(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        partition_id: str,
+        action: str,
+        expected_policy_version: int,
+        expected_state_version: int,
+        model_selection_digest: str,
+        checkpoint: dict[str, Any] | None = None,
+        checkpoint_json: str | None = None,
+    ) -> dict[str, Any]:
+        _identity(actor_id, "actor_id")
+        _identity(tenant_id, "tenant_id")
+        partition_id = self._learning_partition(partition_id)
+        self._learning_partition(model_selection_digest)
+        if action not in {"import", "reset", "restore_last_healthy"}:
+            raise ValueError("unsupported learning checkpoint action")
+        for version in (expected_policy_version, expected_state_version):
+            if type(version) is not int or version < 1:
+                raise ValueError("learning checkpoint versions must be positive integers")
+        count = int(checkpoint is not None) + int(checkpoint_json is not None)
+        if count != (1 if action == "import" else 0):
+            raise ValueError(
+                "import requires exactly one checkpoint representation; other actions accept neither"
+            )
+        if checkpoint_json is not None:
+            checkpoint = _checkpoint_from_json(checkpoint_json)
+        if checkpoint is not None:
+            try:
+                encoded = json.dumps(
+                    checkpoint, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+                ).encode()
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise ValueError("checkpoint must be finite JSON") from exc
+            if len(encoded) > 256 * 1024:
+                raise ValueError("checkpoint exceeds the 256 KiB limit")
+        kwargs = {
+            "tenant_id": tenant_id,
+            "partition_id": partition_id,
+            "expected_version": expected_state_version,
+            "model_selection_digest": model_selection_digest,
+            "expected_policy_version": expected_policy_version,
+            "actor_id": actor_id,
+        }
+        if action == "import":
+            mutation = self.repository.runtime_learning_import(**kwargs, checkpoint=checkpoint)
+        else:
+            mutation = self.repository.runtime_learning_reset(
+                **kwargs,
+                to_last_healthy=action == "restore_last_healthy",
+            )
+        return {
+            "schema_version": "skeleton.ai.runtime_learning_control.v1",
+            "actor_id": actor_id,
+            "tenant_id": tenant_id,
+            "partition_id": partition_id,
+            "receipt": mutation["receipt"],
+            "partition": {
+                key: mutation[key] for key in ("partition_id", "model_selection_digest", "state_version")
+            },
+            "runtime": self.snapshot(actor_id=actor_id, tenant_id=tenant_id),
+        }
 
     def close(self) -> None:
         with self._lock:

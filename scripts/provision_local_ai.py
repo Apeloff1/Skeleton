@@ -491,6 +491,7 @@ def provision(args) -> dict:
             "AI_PROVIDER": "local",
             "AI_LOCAL_MODEL_PATH": "",
             "AI_LOCAL_DEPLOYMENT_PATH": "/app/local-ai/deployment.json",
+            "AI_LOCAL_MODEL_CATALOG_PATH": "",
         },
         "inference_executed": False,
     }

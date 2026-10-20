@@ -807,7 +807,7 @@
       "qualification": "manifest admission is not trained-model or runtime qualification"
     },
     "session_adapter": "skeleton/app/local_ai.py",
-    "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx reads readiness and mounts RuntimeOptimizationPanel.tsx for authenticated /api/ai/runtime-control; scoped read-only status for viewers, administrator-only versioned host runtime policy/maintenance actions; never executes or selects a provider",
+    "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx reads readiness and mounts authenticated RuntimeOptimizationPanel with exact local model route controls, bounded tenant learner checkpoint lifecycle and maintenance ownership status; administrator writes use state/policy CAS and durable audit; no provider execution in frontend",
     "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred"
   }
 }

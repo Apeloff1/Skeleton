@@ -77,7 +77,9 @@ def first_install_report(
         live = False
     provider = values.get("AI_PROVIDER", "local").strip().lower() or "local"
     provider = provider if provider in {"local", "openai"} else "unsupported"
-    local_paths = [values.get(key, "").strip() for key in ("AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH")]
+    local_paths = [values.get(key, "").strip() for key in (
+        "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH",
+    )]
     configured = (
         sum(bool(path) for path in local_paths) == 1
         if provider == "local"
@@ -94,6 +96,16 @@ def first_install_report(
         "observed": False,
         "scope": "Configuration only; no model execution or quality measurement performed.",
     }
+    if provider == "local":
+        configured_paths = sum(bool(path) for path in local_paths)
+        ai["configuration_valid"] = configured_paths == 1
+        ai["configuration_code"] = (
+            "local_configuration_invalid" if configured_paths > 1
+            else "local_model_not_configured" if configured_paths == 0
+            else "local_model_catalog_configured" if local_paths[2]
+            else "local_model_configured"
+        )
+        ai["catalog_configured"] = bool(local_paths[2])
     services_ready = None
     live_checks: list[dict[str, object]] = []
     if live:

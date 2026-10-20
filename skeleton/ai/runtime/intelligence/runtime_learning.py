@@ -9,6 +9,7 @@ provider selection, verification, budgets, and approval remain authoritative.
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import math
 import random
@@ -23,6 +24,12 @@ MAX_COUNTER = 2**53 - 1
 MAX_STATE_BYTES = 192 * 1024
 OUTPUT_NAMES = ("operational_completion", "resource_failure", "normalized_latency")
 LATENCY_REFERENCE_SECONDS = 30.0
+CONTROLLER_VERSION = 2
+MAX_RECENT_SOURCES = 16
+MAX_RECENT_LOSSES = 32
+MAX_CHECKPOINT_BYTES = 256 * 1024
+CHECKPOINT_SCHEMA = "skeleton.runtime.learning.checkpoint.v1"
+OPTIMIZER_CHECKPOINT_SCHEMA = "skeleton.runtime.learning.optimizer_checkpoint.v1"
 DEFAULT_POLICY: dict[str, Any] = {
     "schema_version": SCHEMA,
     "enabled": True,
@@ -282,13 +289,89 @@ def new_state(seed: str) -> dict[str, Any]:
         limit = math.sqrt(6.0 / (inputs + outputs))
         weights.extend(generator.uniform(-limit, limit) for _ in range(inputs * outputs))
         weights.extend(0.0 for _ in range(outputs))
-    return {
+    state = {
         "schema_version": SCHEMA, "feature_schema": FEATURE_SCHEMA,
         "architecture": [12, 16, 8, 3], "weights": weights,
         "optimizer": {"step": 0, "m": [0.0] * PARAMETER_COUNT, "v": [0.0] * PARAMETER_COUNT},
         "observations": 0, "residual_ema": [0.25, 0.25, 0.25],
         "replay": [], "quarantined": False, "quarantine": None,
     }
+    return upgrade_state(state)
+
+
+def _new_prequential() -> dict[str, Any]:
+    return {
+        "count": 0, "mean_loss": 0.0, "m2_loss": 0.0,
+        "absolute_error_mean": [0.0, 0.0, 0.0], "squared_error_mean": [0.0, 0.0, 0.0],
+        "fast_loss": 0.25, "slow_loss": 0.25, "last_loss": 0.0,
+        "drift_debt": 0.0, "drift_score": 0.0, "drift_events": 0,
+        "drift_active": False, "cooldown_remaining": 0, "stable_observations": 0,
+        "last_drift_observation": 0, "recent_losses": [],
+    }
+
+
+def _optimizer_checkpoint(state: Mapping[str, Any]) -> dict[str, Any]:
+    checkpoint = {
+        "schema_version": OPTIMIZER_CHECKPOINT_SCHEMA,
+        "weights": list(state["weights"]), "optimizer": copy.deepcopy(state["optimizer"]),
+        "observations": int(state.get("observations", 0)),
+        "baseline_loss": float(_mapping(state.get("prequential")).get("slow_loss", 0.25)),
+        "health_basis": "finite_optimizer_and_prior_prequential_stability",
+    }
+    return {**checkpoint, "checkpoint_digest": digest(checkpoint)}
+
+
+def upgrade_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Lazily upgrade finite legacy weights without inventing past confidence."""
+    if state.get("controller_version") == CONTROLLER_VERSION:
+        return state
+    if "controller_version" in state:
+        raise RuntimeLearningError("controller state version differs")
+    state.update({
+        "controller_version": CONTROLLER_VERSION, "generation": 0,
+        "fresh_observations": 0, "lifetime_observations": int(state.get("observations", 0)),
+        "prequential": _new_prequential(), "recent_replay": [],
+        "provenance": {"partition_id": "", "model_selection_digest": "", "latest_source_digest": "",
+            "recent_sources": [], "source_switches": 0, "last_observation_at": None},
+        "optimizer_cost": {"terminal_updates": 0, "replay_updates": 0, "maintenance_updates": 0,
+            "total_updates": int(_mapping(state.get("optimizer")).get("step", 0)),
+            "deferred_replay_updates": 0, "rollbacks": 0},
+        "last_rollback": None,
+    })
+    state["last_healthy"] = _optimizer_checkpoint(state)
+    return state
+
+
+def _sha(value: object, name: str, *, allow_empty: bool = False) -> str:
+    if allow_empty and value == "":
+        return ""
+    if not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+        raise RuntimeLearningError(f"{name} must be sha256")
+    return value
+
+
+def _validate_optimizer(value: object) -> Mapping[str, Any]:
+    optimizer = _mapping(value)
+    if set(optimizer) != {"step", "m", "v"}:
+        raise RuntimeLearningError("optimizer fields differ")
+    _integer(optimizer.get("step"), "optimizer step", 0, MAX_COUNTER)
+    _vector(optimizer.get("m"), PARAMETER_COUNT, "optimizer first moment", -5.0, 5.0)
+    _vector(optimizer.get("v"), PARAMETER_COUNT, "optimizer second moment", 0.0, 25.0)
+    return optimizer
+
+
+def validate_optimizer_checkpoint(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"schema_version", "weights", "optimizer", "observations", "baseline_loss", "health_basis", "checkpoint_digest"}:
+        raise RuntimeLearningError("healthy optimizer checkpoint shape differs")
+    if value["schema_version"] != OPTIMIZER_CHECKPOINT_SCHEMA or value["health_basis"] != "finite_optimizer_and_prior_prequential_stability":
+        raise RuntimeLearningError("healthy optimizer checkpoint schema differs")
+    _vector(value["weights"], PARAMETER_COUNT, "checkpoint weights", -8.0, 8.0)
+    _validate_optimizer(value["optimizer"])
+    _integer(value["observations"], "checkpoint observations", 0, MAX_COUNTER)
+    _finite(value["baseline_loss"], "checkpoint loss", 0.0, 1.0)
+    if digest({key: item for key, item in value.items() if key != "checkpoint_digest"}) != _sha(value["checkpoint_digest"], "checkpoint_digest"):
+        raise RuntimeLearningError("healthy optimizer checkpoint digest differs")
+    return value
 
 
 def _vector(value: object, length: int, name: str, minimum: float, maximum: float) -> list[float]:
@@ -300,21 +383,34 @@ def _vector(value: object, length: int, name: str, minimum: float, maximum: floa
 def validate_state(value: object, *, replay_capacity: int = 256) -> dict[str, Any]:
     if not isinstance(value, dict) or len(canonical(value).encode()) > MAX_STATE_BYTES:
         raise RuntimeLearningError("optimizer state exceeds its storage bound")
+    allowed_fields = {
+        "schema_version", "feature_schema", "architecture", "weights", "optimizer", "observations",
+        "residual_ema", "replay", "quarantined", "quarantine", "controller_version", "generation",
+        "fresh_observations", "lifetime_observations", "prequential", "recent_replay", "provenance",
+        "optimizer_cost", "last_rollback", "last_healthy", "recovery", "last_operator_action",
+    }
+    if set(value) - allowed_fields:
+        raise RuntimeLearningError("optimizer state fields differ")
     if value.get("schema_version") != SCHEMA or value.get("feature_schema") != FEATURE_SCHEMA or value.get("architecture") != [12, 16, 8, 3]:
         raise RuntimeLearningError("optimizer architecture differs")
     _vector(value.get("weights"), PARAMETER_COUNT, "weights", -8.0, 8.0)
-    optimizer = _mapping(value.get("optimizer"))
-    _integer(optimizer.get("step"), "optimizer step", 0, MAX_COUNTER)
-    _vector(optimizer.get("m"), PARAMETER_COUNT, "optimizer first moment", -5.0, 5.0)
-    _vector(optimizer.get("v"), PARAMETER_COUNT, "optimizer second moment", 0.0, 25.0)
+    _validate_optimizer(value.get("optimizer"))
     _integer(value.get("observations"), "observations", 0, MAX_COUNTER)
     _vector(value.get("residual_ema"), 3, "residual_ema", 0.0, 1.0)
     if type(value.get("quarantined")) is not bool:
         raise RuntimeLearningError("optimizer quarantine flag is invalid")
+    quarantine = value.get("quarantine")
+    if quarantine is not None:
+        if not isinstance(quarantine, dict) or set(quarantine) != {"reason", "prior_digest"}:
+            raise RuntimeLearningError("optimizer quarantine metadata differs")
+        if not isinstance(quarantine["reason"], str) or len(quarantine["reason"]) > 192:
+            raise RuntimeLearningError("optimizer quarantine reason differs")
+        _sha(quarantine["prior_digest"], "quarantined optimizer digest", allow_empty=True)
     replay = value.get("replay")
-    if not isinstance(replay, list) or len(replay) > replay_capacity:
+    recent_replay = value.get("recent_replay", [])
+    if not isinstance(replay, list) or not isinstance(recent_replay, list) or len(replay) + len(recent_replay) > replay_capacity:
         raise RuntimeLearningError("optimizer replay bound differs")
-    for sample in replay:
+    for sample in [*replay, *recent_replay]:
         if not isinstance(sample, dict) or set(sample) != {"outcome_id", "features", "targets"}:
             raise RuntimeLearningError("replay sample shape differs")
         sample_id = identifier(sample["outcome_id"], "outcome_id", maximum=64)
@@ -322,6 +418,81 @@ def validate_state(value: object, *, replay_capacity: int = 256) -> dict[str, An
             raise RuntimeLearningError("replay outcome identity must be sha256")
         _vector(sample["features"], 12, "features", 0.0, 1.0)
         _vector(sample["targets"], 3, "targets", 0.0, 1.0)
+    if "controller_version" not in value:
+        return value
+    if value["controller_version"] != CONTROLLER_VERSION:
+        raise RuntimeLearningError("controller state version differs")
+    for name in ("generation", "fresh_observations", "lifetime_observations"):
+        _integer(value.get(name), name, 0, MAX_COUNTER)
+    prequential = _mapping(value.get("prequential"))
+    if set(prequential) != set(_new_prequential()):
+        raise RuntimeLearningError("prequential fields differ")
+    for name in ("count", "drift_events", "cooldown_remaining", "stable_observations", "last_drift_observation"):
+        _integer(prequential.get(name), name, 0, MAX_COUNTER)
+    for name in ("mean_loss", "fast_loss", "slow_loss", "last_loss", "drift_score"):
+        _finite(prequential.get(name), name, 0.0, 1.0)
+    _finite(prequential.get("m2_loss"), "loss squared deviations", 0.0, MAX_COUNTER)
+    _finite(prequential.get("drift_debt"), "drift debt", 0.0, 100.0)
+    _vector(prequential.get("absolute_error_mean"), 3, "absolute_error_mean", 0.0, 1.0)
+    _vector(prequential.get("squared_error_mean"), 3, "squared_error_mean", 0.0, 1.0)
+    if type(prequential.get("drift_active")) is not bool:
+        raise RuntimeLearningError("drift flag differs")
+    recent_losses = prequential.get("recent_losses")
+    if not isinstance(recent_losses, list) or len(recent_losses) > MAX_RECENT_LOSSES:
+        raise RuntimeLearningError("prequential loss window bound differs")
+    _vector(recent_losses, len(recent_losses), "recent_losses", 0.0, 1.0)
+    provenance = _mapping(value.get("provenance"))
+    if set(provenance) != {"partition_id", "model_selection_digest", "latest_source_digest", "recent_sources", "source_switches", "last_observation_at"}:
+        raise RuntimeLearningError("source provenance fields differ")
+    for name in ("partition_id", "model_selection_digest", "latest_source_digest"):
+        _sha(provenance.get(name), name, allow_empty=True)
+    _integer(provenance.get("source_switches"), "source_switches", 0, MAX_COUNTER)
+    sources = provenance.get("recent_sources")
+    if not isinstance(sources, list) or len(sources) > MAX_RECENT_SOURCES:
+        raise RuntimeLearningError("source provenance bound differs")
+    seen_sources = set()
+    for source in sources:
+        if not isinstance(source, dict) or set(source) != {"digest", "observations", "last_seen"}:
+            raise RuntimeLearningError("source provenance shape differs")
+        source_digest = _sha(source["digest"], "source digest")
+        if source_digest in seen_sources:
+            raise RuntimeLearningError("source provenance is duplicated")
+        seen_sources.add(source_digest)
+        _integer(source["observations"], "source observations", 1, MAX_COUNTER)
+        _integer(source["last_seen"], "source sequence", 0, MAX_COUNTER)
+    observed_at = provenance.get("last_observation_at")
+    if observed_at is not None and (not isinstance(observed_at, str) or len(observed_at) > 64):
+        raise RuntimeLearningError("source observation timestamp differs")
+    costs = _mapping(value.get("optimizer_cost"))
+    if set(costs) != {"terminal_updates", "replay_updates", "maintenance_updates", "total_updates", "deferred_replay_updates", "rollbacks"}:
+        raise RuntimeLearningError("optimizer cost fields differ")
+    for name in ("terminal_updates", "replay_updates", "maintenance_updates", "total_updates", "deferred_replay_updates", "rollbacks"):
+        _integer(costs.get(name), name, 0, MAX_COUNTER)
+    validate_optimizer_checkpoint(value.get("last_healthy"))
+    rollback = value.get("last_rollback")
+    if rollback is not None:
+        if not isinstance(rollback, dict) or set(rollback) != {"reason", "checkpoint_digest", "at_observation"}:
+            raise RuntimeLearningError("optimizer rollback metadata differs")
+        if not isinstance(rollback["reason"], str) or len(rollback["reason"]) > 192:
+            raise RuntimeLearningError("optimizer rollback reason differs")
+        _sha(rollback["checkpoint_digest"], "rollback checkpoint digest")
+        _integer(rollback["at_observation"], "rollback observation", 0, MAX_COUNTER)
+    operator = value.get("last_operator_action")
+    if operator is not None:
+        if not isinstance(operator, dict) or set(operator) != {"action", "at_observation"}:
+            raise RuntimeLearningError("operator checkpoint metadata differs")
+        if not isinstance(operator["action"], str) or operator["action"] not in {"import", "reset", "maintenance_recovery"}:
+            raise RuntimeLearningError("operator checkpoint action differs")
+        _integer(operator["at_observation"], "operator action observation", 0, MAX_COUNTER)
+    recovery = value.get("recovery")
+    if recovery is not None:
+        if not isinstance(recovery, dict) or set(recovery) != {"prior_quarantine", "recovered_at"} or not isinstance(recovery["recovered_at"], str) or len(recovery["recovered_at"]) > 64:
+            raise RuntimeLearningError("optimizer recovery metadata differs")
+        prior = recovery["prior_quarantine"]
+        if prior is not None:
+            if not isinstance(prior, dict) or set(prior) != {"reason", "prior_digest"} or not isinstance(prior["reason"], str) or len(prior["reason"]) > 192:
+                raise RuntimeLearningError("optimizer recovery quarantine differs")
+            _sha(prior["prior_digest"], "prior quarantine digest", allow_empty=True)
     return value
 
 
@@ -382,6 +553,178 @@ def quarantine_state(seed: str, *, reason: str, prior_digest: str = "") -> dict[
     return state
 
 
+def _increment(mapping: dict[str, Any], key: str, amount: int = 1) -> None:
+    mapping[key] = min(MAX_COUNTER, int(mapping.get(key, 0)) + amount)
+
+
+def _record_provenance(state: dict[str, Any], observation: Mapping[str, Any]) -> None:
+    provenance = state["provenance"]
+    partition = _sha(observation.get("partition_id"), "partition_id")
+    model = _sha(observation.get("model_selection_digest"), "model_selection_digest")
+    source = _sha(observation.get("source_snapshot_digest"), "source_snapshot_digest")
+    if provenance["partition_id"] not in {"", partition} or provenance["model_selection_digest"] not in {"", model}:
+        raise RuntimeLearningError("optimizer activation/partition provenance differs")
+    previous_source = provenance["latest_source_digest"]
+    if previous_source and previous_source != source:
+        _increment(provenance, "source_switches")
+    provenance.update({"partition_id": partition, "model_selection_digest": model,
+        "latest_source_digest": source, "last_observation_at": observation.get("observed_at")})
+    sources = provenance["recent_sources"]
+    selected = next((item for item in sources if item["digest"] == source), None)
+    if selected is None:
+        if len(sources) >= MAX_RECENT_SOURCES:
+            sources.remove(min(sources, key=lambda item: (item["last_seen"], item["digest"])))
+        selected = {"digest": source, "observations": 0, "last_seen": 0}
+        sources.append(selected)
+    _increment(selected, "observations")
+    selected["last_seen"] = state["lifetime_observations"]
+
+
+def _record_prequential(state: dict[str, Any], prediction: Sequence[float], targets: Sequence[float], policy: Mapping[str, Any]) -> None:
+    """Update only from predictions made before this outcome enters SGD/replay."""
+    absolute = [abs(predicted - target) for predicted, target in zip(prediction, targets, strict=True)]
+    squared = [value * value for value in absolute]
+    loss = sum(squared) / 3.0
+    stats = state["prequential"]
+    _increment(stats, "count")
+    count = stats["count"]
+    difference = loss - stats["mean_loss"]
+    stats["mean_loss"] += difference / count
+    stats["m2_loss"] = min(MAX_COUNTER, max(0.0, stats["m2_loss"] + difference * (loss - stats["mean_loss"])))
+    for name, values in (("absolute_error_mean", absolute), ("squared_error_mean", squared)):
+        stats[name] = [previous + (value - previous) / count for previous, value in zip(stats[name], values, strict=True)]
+    old_slow = stats["slow_loss"]
+    if count == 1:
+        stats["fast_loss"] = stats["slow_loss"] = loss
+    else:
+        stats["fast_loss"] = 0.85 * stats["fast_loss"] + 0.15 * loss
+        stats["slow_loss"] = 0.99 * old_slow + 0.01 * loss
+    stats["last_loss"] = loss
+    stats["recent_losses"] = [*stats["recent_losses"], loss][-MAX_RECENT_LOSSES:]
+    stats["drift_debt"] = min(100.0, max(0.0, stats["drift_debt"] + loss - old_slow - 0.02))
+    excess = max(0.0, stats["fast_loss"] - stats["slow_loss"] - 0.02)
+    stats["drift_score"] = min(1.0, excess * 4.0 + stats["drift_debt"] / 1.5)
+    minimum = max(16, int(policy["min_samples"]))
+    if count >= minimum and not stats["drift_active"] and excess >= 0.06 and stats["drift_debt"] >= 0.6:
+        stats.update({"drift_active": True, "cooldown_remaining": minimum,
+            "stable_observations": 0, "last_drift_observation": state["lifetime_observations"], "drift_debt": 0.0})
+        _increment(stats, "drift_events")
+        # Rebase the detector, while withholding advice until fresh stable
+        # outcomes demonstrate adaptation to the changed operating conditions.
+        stats["slow_loss"] = max(stats["slow_loss"], stats["fast_loss"])
+    elif stats["drift_active"]:
+        if loss <= stats["slow_loss"] + 0.05 and excess <= 0.06:
+            _increment(stats, "stable_observations")
+            stats["cooldown_remaining"] = max(0, stats["cooldown_remaining"] - 1)
+        else:
+            stats["stable_observations"] = 0
+            stats["cooldown_remaining"] = min(minimum, stats["cooldown_remaining"] + 1)
+        if stats["cooldown_remaining"] == 0 and stats["stable_observations"] >= minimum:
+            stats["drift_active"] = False
+            stats["drift_debt"] = 0.0
+    state["residual_ema"] = [0.95 * previous + 0.05 * value for previous, value in zip(state["residual_ema"], squared, strict=True)]
+
+
+def restore_last_healthy(state: dict[str, Any], *, reason: str, policy: Mapping[str, Any]) -> dict[str, Any]:
+    """Restore numeric controller weights without changing result/grant state."""
+    checkpoint = validate_optimizer_checkpoint(state.get("last_healthy"))
+    state["weights"] = list(checkpoint["weights"])
+    state["optimizer"] = copy.deepcopy(checkpoint["optimizer"])
+    state["quarantined"], state["quarantine"] = False, None
+    state["fresh_observations"] = 0
+    state["prequential"] = _new_prequential()
+    state["prequential"].update({"drift_active": True, "cooldown_remaining": max(16, policy["min_samples"])})
+    _increment(state, "generation")
+    _increment(state["optimizer_cost"], "rollbacks")
+    state["last_rollback"] = {"reason": reason[:192], "checkpoint_digest": checkpoint["checkpoint_digest"],
+        "at_observation": state["lifetime_observations"]}
+    validate_state(state)
+    return state
+
+
+def recover_last_healthy(value: object, *, seed: str, policy: Mapping[str, Any], reason: str) -> dict[str, Any]:
+    """Recover only independently hashed finite optimizer data from bad state."""
+    if not isinstance(value, dict):
+        raise RuntimeLearningError("invalid state has no healthy checkpoint")
+    if value.get("schema_version") != SCHEMA or value.get("feature_schema") != FEATURE_SCHEMA or value.get("architecture") != [12, 16, 8, 3] or value.get("controller_version") != CONTROLLER_VERSION:
+        raise RuntimeLearningError("healthy recovery feature/controller binding differs")
+    checkpoint = validate_optimizer_checkpoint(value.get("last_healthy"))
+    recovered = new_state(seed)
+    recovered["last_healthy"] = copy.deepcopy(checkpoint)
+    recovered["observations"] = checkpoint["observations"]
+    lifetime = value.get("lifetime_observations", value.get("observations", checkpoint["observations"]))
+    try:
+        recovered["lifetime_observations"] = _integer(lifetime, "lifetime observations", checkpoint["observations"], MAX_COUNTER)
+    except RuntimeLearningError:
+        recovered["lifetime_observations"] = checkpoint["observations"]
+    return restore_last_healthy(recovered, reason=reason, policy=policy)
+
+
+def reset_confidence(state: dict[str, Any], *, reason: str, policy: Mapping[str, Any]) -> dict[str, Any]:
+    """An operator checkpoint is a candidate until new canonical outcomes arrive."""
+    validate_state(state)
+    upgrade_state(state)
+    state["fresh_observations"] = 0
+    state["prequential"] = _new_prequential()
+    state["prequential"].update({"drift_active": True, "cooldown_remaining": max(16, policy["min_samples"])})
+    state["residual_ema"] = [0.25, 0.25, 0.25]
+    _increment(state, "generation")
+    state["last_operator_action"] = {"action": reason[:64], "at_observation": state["lifetime_observations"]}
+    return state
+
+
+def checkpoint_envelope(identity: Mapping[str, Any], state: dict[str, Any], *, state_version: int) -> dict[str, Any]:
+    validate_state(state)
+    upgrade_state(state)
+    checkpoint = {
+        "schema_version": CHECKPOINT_SCHEMA, "tenant_id": identity["tenant_id"], "scope_id": identity["scope_id"],
+        "partition_id": identity["partition_id"], "task_class": identity["task_class"],
+        "model_selection_digest": identity["model_selection_digest"], "feature_schema": FEATURE_SCHEMA,
+        "state_version": state_version, "state_digest": digest(state),
+        "source_snapshot_digest": state["provenance"]["latest_source_digest"], "state": copy.deepcopy(state),
+    }
+    checkpoint["checkpoint_digest"] = digest(checkpoint)
+    return validate_checkpoint_envelope(checkpoint)
+
+
+def validate_checkpoint_envelope(value: object) -> dict[str, Any]:
+    fields = {"schema_version", "tenant_id", "scope_id", "partition_id", "task_class", "model_selection_digest",
+        "feature_schema", "state_version", "state_digest", "source_snapshot_digest", "state", "checkpoint_digest"}
+    if not isinstance(value, dict) or set(value) != fields or len(canonical(value).encode()) > MAX_CHECKPOINT_BYTES:
+        raise RuntimeLearningError("learning checkpoint fields/storage bound differ")
+    if value["schema_version"] != CHECKPOINT_SCHEMA or value["feature_schema"] != FEATURE_SCHEMA:
+        raise RuntimeLearningError("learning checkpoint schema differs")
+    identifier(value["tenant_id"], "tenant_id", maximum=512)
+    identifier(value["scope_id"], "scope_id")
+    identifier(value["task_class"], "task_class", maximum=256)
+    _integer(value["state_version"], "state_version", 1, MAX_COUNTER)
+    _sha(value["model_selection_digest"], "model_selection_digest")
+    _sha(value["source_snapshot_digest"], "source_snapshot_digest", allow_empty=True)
+    partition = digest({"task_class": value["task_class"], "model_selection_digest": value["model_selection_digest"]})
+    if _sha(value["partition_id"], "partition_id") != partition:
+        raise RuntimeLearningError("learning checkpoint partition binding differs")
+    state = validate_state(value["state"])
+    if state.get("controller_version") != CONTROLLER_VERSION:
+        raise RuntimeLearningError("learning checkpoint controller version differs")
+    provenance = state["provenance"]
+    if provenance["partition_id"] != partition or provenance["model_selection_digest"] != value["model_selection_digest"] or provenance["latest_source_digest"] != value["source_snapshot_digest"]:
+        raise RuntimeLearningError("learning checkpoint activation/source provenance differs")
+    if _sha(value["state_digest"], "state_digest") != digest(state):
+        raise RuntimeLearningError("learning checkpoint state digest differs")
+    if _sha(value["checkpoint_digest"], "checkpoint_digest") != digest({key: item for key, item in value.items() if key != "checkpoint_digest"}):
+        raise RuntimeLearningError("learning checkpoint envelope digest differs")
+    return value
+
+
+def _replay_sample(state: Mapping[str, Any], index: int, *, recent_only: bool = False) -> Mapping[str, Any] | None:
+    recent = state.get("recent_replay", [])
+    historical = state.get("replay", [])
+    pool = recent if recent_only or (index % 2 == 0 and recent) else historical
+    if not pool:
+        pool = recent or historical
+    return None if not pool else pool[(int(state["optimizer"]["step"]) + index) % len(pool)]
+
+
 def learn_outcome(state: dict[str, Any] | None, observation: Mapping[str, Any], policy: Mapping[str, Any], *, seed: str) -> tuple[dict[str, Any], bool]:
     """One canonical sample plus at most three replay updates, deterministically."""
     policy = normalize_policy(policy)
@@ -391,11 +734,19 @@ def learn_outcome(state: dict[str, Any] | None, observation: Mapping[str, Any], 
         validate_state(state)
     except RuntimeLearningError as exc:
         try:
+            return recover_last_healthy(state, seed=seed, policy=policy, reason=f"invalid_state:{type(exc).__name__}"), False
+        except RuntimeLearningError:
+            pass
+        try:
             prior_digest = digest(state)
         except RuntimeLearningError:
             prior_digest = ""
         return quarantine_state(seed, reason=str(exc), prior_digest=prior_digest), False
-    state["replay"] = state["replay"][-int(policy["replay_capacity"]):]
+    upgrade_state(state)
+    recent_capacity = int(policy["replay_capacity"]) // 2
+    historical_capacity = int(policy["replay_capacity"]) - recent_capacity
+    state["replay"] = state["replay"][-historical_capacity:]
+    state["recent_replay"] = state["recent_replay"][-recent_capacity:]
     if state["quarantined"] or not policy["enabled"] or observation.get("trainable") is not True:
         return state, False
     sample = {
@@ -404,23 +755,43 @@ def learn_outcome(state: dict[str, Any] | None, observation: Mapping[str, Any], 
         "targets": observation_targets(observation, policy),
     }
     prediction = _forward(state["weights"], sample["features"])[-1]
-    state["residual_ema"] = [0.95 * previous + 0.05 * (predicted - target) ** 2 for previous, predicted, target in zip(state["residual_ema"], prediction, sample["targets"], strict=True)]
-    state["observations"] = min(MAX_COUNTER, state["observations"] + 1)
+    _increment(state, "observations")
+    _increment(state, "lifetime_observations")
+    _increment(state, "fresh_observations")
+    _record_provenance(state, observation)
+    _record_prequential(state, prediction, sample["targets"], policy)
+    costs = state["optimizer_cost"]
     _optimize(state, sample, policy)
+    _increment(costs, "terminal_updates")
+    _increment(costs, "total_updates")
     replay = state["replay"]
-    for index in range(min(int(policy["replay_steps"]), len(replay))):
-        _optimize(state, replay[(int(state["optimizer"]["step"]) + index) % len(replay)], policy)
-    if len(replay) < policy["replay_capacity"]:
+    requested_replays = min(int(policy["replay_steps"]), len(replay) + len(state["recent_replay"]))
+    replay_steps = 0 if sample["features"][8] >= policy["pressure_threshold"] else min(1 if state["prequential"]["drift_active"] else 3, requested_replays)
+    _increment(costs, "deferred_replay_updates", requested_replays - replay_steps)
+    for index in range(replay_steps):
+        replay_sample = _replay_sample(state, index, recent_only=state["prequential"]["drift_active"])
+        if replay_sample is not None:
+            _optimize(state, replay_sample, policy)
+            _increment(costs, "replay_updates")
+            _increment(costs, "total_updates")
+    if len(replay) < historical_capacity:
         replay.append(sample)
     else:
         # Deterministic reservoir: old failures are not erased by a recent streak.
         slot = int(sample["outcome_id"][:16], 16) % state["observations"]
         if slot < len(replay):
             replay[slot] = sample
+    state["recent_replay"] = [*state["recent_replay"], sample][-recent_capacity:]
     try:
         validate_state(state)
+        checkpoint = state["last_healthy"]
+        if state["fresh_observations"] >= policy["min_samples"] and not state["prequential"]["drift_active"] and state["prequential"]["fast_loss"] <= state["prequential"]["slow_loss"] + 0.03 and state["observations"] - checkpoint["observations"] >= 32:
+            state["last_healthy"] = _optimizer_checkpoint(state)
     except RuntimeLearningError as exc:
-        return quarantine_state(seed, reason=str(exc)), False
+        try:
+            return restore_last_healthy(state, reason=f"invalid_update:{type(exc).__name__}", policy=policy), False
+        except RuntimeLearningError:
+            return quarantine_state(seed, reason=str(exc)), False
     return state, True
 
 
@@ -428,26 +799,72 @@ def replay_maintenance(state: dict[str, Any], policy: Mapping[str, Any], *, max_
     """Bounded idle optimization; does not invent samples or observed outcomes."""
     policy = normalize_policy(policy)
     validate_state(state)
+    upgrade_state(state)
     max_updates = _integer(max_updates, "max_updates", 0, 4)
     if policy["enabled"] and not state["quarantined"]:
-        for _ in range(min(max_updates, len(state["replay"]))):
-            _optimize(state, state["replay"][int(state["optimizer"]["step"]) % len(state["replay"])], policy)
+        for index in range(min(max_updates, len(state["replay"]) + len(state["recent_replay"]))):
+            sample = _replay_sample(state, index, recent_only=state["prequential"]["drift_active"])
+            if sample is not None:
+                _optimize(state, sample, policy)
+                _increment(state["optimizer_cost"], "maintenance_updates")
+                _increment(state["optimizer_cost"], "total_updates")
     validate_state(state)
     return state
 
 
-def state_readiness(state: Mapping[str, Any], policy: Mapping[str, Any]) -> dict[str, Any]:
+def state_readiness(state: Mapping[str, Any], policy: Mapping[str, Any], *, source_snapshot_digest: str | None = None) -> dict[str, Any]:
+    state = upgrade_state(state if isinstance(state, dict) else dict(state))
     samples = int(state.get("observations", 0))
+    fresh_samples = state["fresh_observations"]
     residual = _vector(state.get("residual_ema"), 3, "residual_ema", 0.0, 1.0)
-    uncertainty = min(1.0, math.sqrt(sum(residual) / 3.0) + 1.0 / math.sqrt(samples + 1.0))
+    stats = state["prequential"]
+    provenance = state["provenance"]
+    source = source_snapshot_digest or provenance["latest_source_digest"]
+    known_source = next((item for item in provenance["recent_sources"] if item["digest"] == source), None)
+    novelty_penalty = 0.1 if source and known_source is None else 0.0
+    variance = stats["m2_loss"] / max(1, stats["count"] - 1)
+    uncertainty = min(1.0, math.sqrt(max(sum(residual) / 3.0, stats["fast_loss"]))
+        + 1.0 / math.sqrt(fresh_samples + 1.0)
+        + min(0.15, 2.0 * math.sqrt(variance / max(1, stats["count"])))
+        + (0.25 if stats["drift_active"] else 0.0) + novelty_penalty)
     quarantined = state.get("quarantined") is True
-    readiness = "disabled" if not policy["enabled"] else "quarantined" if quarantined else "ready" if samples >= policy["min_samples"] and uncertainty <= policy["uncertainty_ceiling"] else "cold_start"
+    reasons = []
+    if not policy["enabled"]:
+        reasons.append("learning_disabled")
+    if quarantined:
+        reasons.append("optimizer_quarantined")
+    if fresh_samples < policy["min_samples"]:
+        reasons.append("fresh_samples_required")
+    if stats["drift_active"]:
+        reasons.append("drift_active")
+    if novelty_penalty:
+        reasons.append("source_novelty")
+    if uncertainty > policy["uncertainty_ceiling"]:
+        reasons.append("uncertainty_above_policy")
+    readiness = "disabled" if not policy["enabled"] else "quarantined" if quarantined else "ready" if fresh_samples >= policy["min_samples"] and not stats["drift_active"] and uncertainty <= policy["uncertainty_ceiling"] else "cold_start"
+    checkpoint = state["last_healthy"]
     return {"samples": samples, "optimizer_steps": int(_mapping(state.get("optimizer")).get("step", 0)),
             "readiness": readiness, "quarantined": quarantined, "uncertainty": uncertainty,
-            "prediction_error": math.sqrt(sum(residual) / 3.0)}
+            "prediction_error": math.sqrt(sum(residual) / 3.0), "fresh_samples": fresh_samples,
+            "lifetime_samples": state["lifetime_observations"], "confidence_reasons": reasons,
+            "generation": state["generation"], "rollback_count": state["optimizer_cost"]["rollbacks"],
+            "last_rollback": state["last_rollback"],
+            "last_healthy": {"available": True, "observations": checkpoint["observations"],
+                "optimizer_step": checkpoint["optimizer"]["step"], "checkpoint_digest": checkpoint["checkpoint_digest"]},
+            "drift": {"active": stats["drift_active"], "score": stats["drift_score"], "events": stats["drift_events"],
+                "cooldown_remaining": stats["cooldown_remaining"], "fast_loss": stats["fast_loss"],
+                "slow_loss": stats["slow_loss"], "last_prequential_loss": stats["last_loss"], "prequential_count": stats["count"]},
+            "prequential": {"mean_squared_loss": stats["mean_loss"], "absolute_error_mean": stats["absolute_error_mean"],
+                "squared_error_mean": stats["squared_error_mean"], "recent_losses": stats["recent_losses"]},
+            "source_provenance": {"latest_source_digest": provenance["latest_source_digest"],
+                "requested_source_digest": source, "source_known": known_source is not None,
+                "latest_source_samples": 0 if known_source is None else known_source["observations"],
+                "recent_source_count": len(provenance["recent_sources"]), "source_switches": provenance["source_switches"]},
+            "optimizer_cost": dict(state["optimizer_cost"]),
+            "replay_samples": len(state["replay"]) + len(state["recent_replay"])}
 
 
-def recommend(state: dict[str, Any] | None, policy: Mapping[str, Any], features: list[float], *, allowed_rounds: int = 1, requested_rounds: int = 1, pressure: float = 0.0) -> dict[str, Any]:
+def recommend(state: dict[str, Any] | None, policy: Mapping[str, Any], features: list[float], *, allowed_rounds: int = 1, requested_rounds: int = 1, pressure: float = 0.0, source_snapshot_digest: str | None = None) -> dict[str, Any]:
     policy = normalize_policy(policy)
     allowed_rounds = _integer(allowed_rounds, "allowed_rounds", 1, 3)
     requested_rounds = _integer(requested_rounds, "requested_rounds", 1, 3)
@@ -467,7 +884,7 @@ def recommend(state: dict[str, Any] | None, policy: Mapping[str, Any], features:
         return result
     try:
         validate_state(state)
-        result.update(state_readiness(state, policy))
+        result.update(state_readiness(state, policy, source_snapshot_digest=source_snapshot_digest))
     except RuntimeLearningError:
         result.update({"readiness": "quarantined", "quarantined": True})
         return result

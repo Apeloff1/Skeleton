@@ -1,15 +1,15 @@
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
-import type { StudioQualityPolicy, StudioQualityProgress, StudioQualityMeasuredProgress, StudioNumericAdaptation } from '../../product/gameStudioAgentClient';
+import type { StudioQualityPolicy, StudioQualityProgress, StudioQualityMeasuredProgress, StudioNumericAdaptation, StudioNumericMemoryPolicy } from '../../product/gameStudioAgentClient';
 import s, { gameLearningColors as C } from './GameLearningWorkspace.styles';
 import v from './GameConsoleStudio.styles';
 
 export type StudioQualityDraft = {
   rounds: string; frames: string; steps: string; errors: string; warnings: string; baseline: string;
-  restore: boolean; adaptiveRanking: boolean;
+  restore: boolean; adaptiveRanking: boolean; numericMemoryPolicy: StudioNumericMemoryPolicy;
 };
 export const DEFAULT_QUALITY_DRAFT: StudioQualityDraft = {
-  rounds: '2', frames: '2', steps: '64', errors: '0', warnings: '128', baseline: '', restore: true, adaptiveRanking: false,
+  rounds: '2', frames: '2', steps: '64', errors: '0', warnings: '128', baseline: '', restore: true, adaptiveRanking: false, numericMemoryPolicy: 'goal_only',
 };
 
 export function studioQualityPolicy(draft: StudioQualityDraft): StudioQualityPolicy {
@@ -27,6 +27,7 @@ export function studioQualityPolicy(draft: StudioQualityDraft): StudioQualityPol
     max_warning_findings: number(draft.warnings, 0, 128, 'Maximum warning findings'),
     require_no_regression: true, restore_on_regression: draft.restore,
     adaptive_ranking: draft.adaptiveRanking,
+    numeric_memory_policy: draft.adaptiveRanking ? draft.numericMemoryPolicy : 'goal_only',
   };
 }
 
@@ -62,10 +63,27 @@ export function StudioQualityForm({ enabled, available, changeEnabled, draft, ch
       </TouchableOpacity>
       <Text style={s.dim}>Restoration uses this run’s edit grant. Refinement, simulation, review and packaging consume the visible action, model and background-job budgets above.</Text>
       <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: draft.adaptiveRanking, disabled }} disabled={disabled}
-        onPress={() => changeDraft({ ...draft, adaptiveRanking: !draft.adaptiveRanking })} style={s.checkbox}>
+        onPress={() => changeDraft({ ...draft, adaptiveRanking: !draft.adaptiveRanking, numericMemoryPolicy: draft.adaptiveRanking ? 'goal_only' : draft.numericMemoryPolicy })} style={s.checkbox}>
         <Text style={s.checkboxText}>{draft.adaptiveRanking ? '☑' : '☐'} Learn numeric control suggestions during this goal</Text>
       </TouchableOpacity>
       <Text style={s.dim}>Allow local learning from this goal’s matched original-game reviews. Jeeves uses the results to suggest mechanics edits; each edit still needs the recorded simulation and review checks.</Text>
+      {draft.adaptiveRanking && <View style={s.source}>
+        <Text style={s.label}>Numeric lesson memory</Text>
+        {([
+          ['goal_only', 'Only this goal'],
+          ['reuse_compatible', 'Remember compatible goals'],
+          ['reset', 'Start a new shared history'],
+        ] as [StudioNumericMemoryPolicy, string][]).map(([policy, label]) => <TouchableOpacity key={policy}
+          accessibilityRole="radio" accessibilityState={{ checked: draft.numericMemoryPolicy === policy, disabled }} disabled={disabled}
+          onPress={() => changeDraft({ ...draft, numericMemoryPolicy: policy })} style={s.checkbox}>
+          <Text style={s.checkboxText}>{draft.numericMemoryPolicy === policy ? '◉' : '○'} {label}</Text>
+        </TouchableOpacity>)}
+        <Text style={s.dim}>{draft.numericMemoryPolicy === 'goal_only'
+          ? 'Learning stays in this goal. It is never imported into another goal.'
+          : draft.numericMemoryPolicy === 'reset'
+            ? 'Start fresh after the reference is verified. Future opted-in goals can use these new lessons; older shared history stays recorded and is excluded from new imports.'
+            : 'Reuse and save numeric lessons only for this account and project with the same reference review, controls, reviewer and acceptance settings. Both goals must permit sharing.'}</Text>
+      </View>}
     </>}
   </View>;
 }
@@ -111,6 +129,15 @@ export function StudioQualityObservation({ value, learning }: { value: StudioQua
     {learning && <View style={s.source}>
       <Text style={s.label}>Learning numeric control suggestions</Text>
       <Text accessibilityLiveRegion="polite" style={s.muted}>{learning.observations_seen ?? 0} matched observations · {learning.training_steps ?? 0} local learning steps · {learning.advice.length} current proposals</Text>
+      {learning.numeric_memory && <>
+        <Text style={s.muted}>{learning.numeric_memory.reused_observations} earlier observations reused from {learning.numeric_memory.reused_goals} opted-in goals.</Text>
+        {learning.numeric_memory.policy === 'goal_only' && <Text style={s.dim}>Numeric lessons stay within this goal.</Text>}
+        {learning.numeric_memory.reset_barrier && <Text style={s.dim}>{learning.numeric_memory.status === 'waiting_for_baseline' ? 'A new shared history will start when the reference is verified.' : 'A new shared history has started. Earlier history was retained separately.'}</Text>}
+        {learning.numeric_memory.status === 'no_compatible_history' && <Text style={s.dim}>No earlier sharing grant and matching reference were available. This goal starts with fresh suggestions.</Text>}
+        {learning.numeric_memory.status === 'rebuilt_replay' && <Text style={s.dim}>The learner was rebuilt from recent verified lessons to keep its history within the recorded limits.</Text>}
+        {learning.numeric_memory.status === 'merged_replay' && <Text style={s.dim}>Verified lessons from parallel goals were combined into one bounded learner.</Text>}
+        {!!Object.values(learning.numeric_memory.exclusion_counts).reduce((total, count) => total + count, 0) && <Text style={s.dim}>Some prior histories were withheld because their grants, evidence or capacity limits could not be confirmed.</Text>}
+      </>}
       {learning.status === 'source_shape_changed' && <Text style={s.dim}>The world changed beyond the numeric controls in this reference. Its measurements stay separate.</Text>}
     </View>}
     <Text style={s.dim}>Acceptance is limited to these recorded simulation, review and regression checks. It does not certify overall game quality or an unobserved desktop play session.</Text>

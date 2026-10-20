@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hmac
+import sqlite3
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -78,10 +79,11 @@ class EngineRuntimeControlPatch(BaseModel):
     learning: EngineRuntimeEnabledPatch | None = None
     maintenance: EngineRuntimeMaintenancePatch | None = None
     action: str | None = Field(default=None, pattern="^(trim_cache|clear_cache|drain|resume)$")
+    serving_route_id: str | None = Field(default=None, min_length=1, max_length=384)
 
     @model_validator(mode="after")
     def validate_patch(self):
-        fields = self.model_fields_set - {"actor_id", "tenant_id", "expected_version"}
+        fields = self.model_fields_set - {"actor_id", "tenant_id", "expected_version", "serving_route_id"}
         if not fields or any(getattr(self, field) is None for field in fields):
             raise ValueError("runtime control requires a non-null patch")
         if self.serving is not None:
@@ -89,6 +91,27 @@ class EngineRuntimeControlPatch(BaseModel):
                 getattr(self.serving, field) is None for field in self.serving.model_fields_set
             ):
                 raise ValueError("serving policy requires non-null fields")
+        return self
+
+
+class EngineLearningCheckpointUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    action: str = Field(pattern="^(import|reset|restore_last_healthy)$")
+    expected_policy_version: int = Field(ge=1, le=2**63 - 1)
+    expected_state_version: int = Field(ge=1, le=2**63 - 1)
+    model_selection_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    checkpoint: dict[str, Any] | None = None
+    checkpoint_json: str | None = Field(default=None, max_length=256 * 1024)
+
+    @model_validator(mode="after")
+    def validate_checkpoint(self):
+        count = int(self.checkpoint is not None) + int(self.checkpoint_json is not None)
+        if count != (1 if self.action == "import" else 0):
+            raise ValueError("import requires exactly one checkpoint representation; other actions accept neither")
+        if self.checkpoint_json is not None and len(self.checkpoint_json.encode("utf-8")) > 256 * 1024:
+            raise ValueError("checkpoint exceeds the 256 KiB limit")
         return self
 
 
@@ -319,6 +342,7 @@ def providers(
     artifact_fields = (
         "schema", "model_id", "model_digest", "artifact_sha256", "artifact_bytes",
         "manifest_digest", "runtime_digest", "runtime_kind", "reference",
+        "source_model_id", "catalog_digest", "catalog_entry_digest", "catalog_source_sha256",
     )
     for row in rows:
         row.setdefault("id", row.get("provider_id"))
@@ -331,6 +355,7 @@ def providers(
             "generation_limits": (
                 "context_window", "max_output_tokens", "max_total_tokens", "shared_context",
                 "tokenizer", "limits_source",
+                "tokenizer_max_chars", "tokenizer_max_tokens",
             ),
             "capacity": ("max_concurrency", "max_batch_size", "max_queue_size", "cache_entries"),
             "runtime": ("active", "queued", "completed", "failed", "cancelled", "overloaded", "cache_hits", "cache_entries"),
@@ -380,13 +405,14 @@ def runtime_control_snapshot(
     service_token: Annotated[str, Depends(_engine_service_token)],
     actor_id: Annotated[str, Query(min_length=1, max_length=512)],
     tenant_id: Annotated[str, Query(min_length=1, max_length=512)],
+    learning_offset: Annotated[int, Query(ge=0, le=127)] = 0,
 ) -> dict[str, Any]:
     _authorize_runtime_control(request, service, service_token, tenant_id=tenant_id)
     if coordinator is None:
         raise HTTPException(status_code=503, detail="engine runtime control unavailable")
     try:
-        return coordinator.runtime_control.snapshot(actor_id=actor_id, tenant_id=tenant_id)
-    except (ExecutionRepositoryError, ValueError, TypeError) as exc:
+        return coordinator.runtime_control.snapshot(actor_id=actor_id, tenant_id=tenant_id, learning_offset=learning_offset)
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
         _raise_engine_error(exc)
 
 
@@ -410,8 +436,50 @@ def configure_runtime_control(
             learning=None if body.learning is None else body.learning.model_dump(),
             maintenance=None if body.maintenance is None else body.maintenance.model_dump(exclude_unset=True),
             action=body.action,
+            serving_route_id=body.serving_route_id,
         )
-    except (ExecutionRepositoryError, ValueError, TypeError) as exc:
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+def export_runtime_learning_checkpoint(
+    request: Request,
+    partition_id: str,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+    actor_id: Annotated[str, Query(min_length=1, max_length=512)],
+    tenant_id: Annotated[str, Query(min_length=1, max_length=512)],
+    expected_state_version: Annotated[int | None, Query(ge=1, le=2**63 - 1)] = None,
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.export_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            expected_state_version=expected_state_version,
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+def update_runtime_learning_checkpoint(
+    request: Request, partition_id: str, body: EngineLearningCheckpointUpdate,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.configure_learning_checkpoint(
+            partition_id=partition_id, **body.model_dump(exclude_unset=True),
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
         _raise_engine_error(exc)
 
 
@@ -432,6 +500,8 @@ def _decode_media(raw: str, field: str, *, maximum: int = 20 * 1024 * 1024) -> b
 
 
 def _raise_engine_error(exc: Exception) -> None:
+    if isinstance(exc, sqlite3.Error):
+        raise HTTPException(status_code=503, detail="engine durable state is temporarily unavailable") from exc
     if isinstance(exc, EngineAuthorityError):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
