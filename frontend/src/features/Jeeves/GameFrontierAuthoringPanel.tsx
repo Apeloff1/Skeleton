@@ -26,6 +26,29 @@ const GROUPS: { title: string; actions: string[] }[] = [
   { title: 'Events & quests', actions: ['event_add','event_remove','event_condition','event_action',
     'event_trigger','quest_add','quest_remove','quest_stage_append','quest_objective','quest_title'] },
   { title: 'Soundtracks', actions: ['soundtrack_add','soundtrack_remove','soundtrack_reorder'] },
+  { title: 'Environment RPG', actions: [
+    'environment_page_add','environment_page_remove','environment_page_clone',
+    'environment_page_priority','environment_page_enable','environment_page_repeat',
+    'environment_page_cooldown','environment_condition_add','environment_condition_edit',
+    'environment_condition_remove','environment_action_add','environment_action_edit',
+    'environment_action_remove','environment_flag_require','environment_flag_clear',
+  ] },
+  { title: 'Native game trigger zones', actions: [
+    'zone_add','zone_remove','zone_clone','zone_bind_actor','zone_bind_event',
+    'zone_radius','zone_offset','zone_translate','zone_scale','zone_duplicate_to_actor',
+  ] },
+  { title: 'Active native physics fields', actions: [
+    'field_add','field_remove','field_clone','field_bind_actor','field_kind',
+    'field_radius','field_strength','field_offset','field_invert','field_duplicate_to_actor',
+  ] },
+  { title: 'Quest structure', actions: [
+    'quest_stage_remove','quest_stage_link','quest_stage_unlink','quest_stage_split',
+    'quest_stage_rename','quest_start_change','quest_stage_swap_objectives',
+    'quest_duplicate','quest_stage_reorder','quest_rewrite_objectives',
+  ] },
+  { title: 'Procedural terrain', actions: [
+    'terrain_noise','terrain_smooth','terrain_terrace','terrain_outline','terrain_erode',
+  ] },
 ];
 const SAMPLE: Record<string, Record<string, unknown>> = {
   tile_set: { x: 0, y: 0, tile: 1 }, rect_fill: { x: 0, y: 0, width: 3, height: 3, tile: 1 },
@@ -69,6 +92,56 @@ const SAMPLE: Record<string, Record<string, unknown>> = {
   soundtrack_add: { soundtrack_id: 'exploration_theme' },
   soundtrack_remove: { soundtrack_id: 'exploration_theme' },
   soundtrack_reorder: { soundtrack_id: 'exploration_theme', position: 0 },
+  environment_page_add: {"page_id":"weather_rise","signal":"temperature_c","comparison":"above","threshold":27,"kind":"set_flag","channel":"world","target":"temperature_alarm","value":"true"},
+  environment_page_remove: {"page_id":"weather_rise"},
+  environment_page_clone: {"page_id":"weather_rise","new_page_id":"weather_rise_alt"},
+  environment_page_priority: {"page_id":"weather_rise","priority":10},
+  environment_page_enable: {"page_id":"weather_rise","enabled":false},
+  environment_page_repeat: {"page_id":"weather_rise","repeat":false},
+  environment_page_cooldown: {"page_id":"weather_rise","cooldown_ms":1500},
+  environment_condition_add: {"page_id":"weather_rise","signal":"humidity","comparison":"above","threshold":0.8},
+  environment_condition_edit: {"page_id":"weather_rise","index":0,"signal":"temperature_c","comparison":"above","threshold":30},
+  environment_condition_remove: {"page_id":"weather_rise","index":1},
+  environment_action_add: {"page_id":"weather_rise","kind":"change_light","channel":"environment","target":"world","value":"dim"},
+  environment_action_edit: {"page_id":"weather_rise","index":0,"kind":"set_flag","channel":"world","target":"weather_alert","value":"true"},
+  environment_action_remove: {"page_id":"weather_rise","index":1},
+  environment_flag_require: {"page_id":"weather_rise","flag":"storm_ready","required":true},
+  environment_flag_clear: {"page_id":"weather_rise","flag":"storm_ready"},
+  zone_add: {"zone_id":"river_entry","actor_id":"tree:0","event_id":"river_enter","radius_m":2,"x":0,"y":0,"z":0},
+  zone_remove: {"zone_id":"river_entry"},
+  zone_clone: {"zone_id":"river_entry","new_zone_id":"river_entry2"},
+  zone_bind_actor: {"zone_id":"river_entry","actor_id":"tree:1"},
+  zone_bind_event: {"zone_id":"river_entry","event_id":"river_enter"},
+  zone_radius: {"zone_id":"river_entry","radius_m":5},
+  zone_offset: {"zone_id":"river_entry","x":1,"y":2,"z":0},
+  zone_translate: {"zone_id":"river_entry","dx":0,"dy":3,"dz":0},
+  zone_scale: {"zone_id":"river_entry","factor":1.3},
+  zone_duplicate_to_actor: {"zone_id":"river_entry","new_zone_id":"river_entry3","new_actor_id":"tree:1"},
+  field_add: {"field_id":"rise","actor_id":"tree:0","kind":"updraft","radius_m":10,"acceleration_mps2":8,"x":0,"y":0,"z":2},
+  field_remove: {"field_id":"rise"},
+  field_clone: {"field_id":"rise","new_field_id":"rise_alt"},
+  field_bind_actor: {"field_id":"rise","actor_id":"tree:1"},
+  field_kind: {"field_id":"rise","kind":"vortex"},
+  field_radius: {"field_id":"rise","radius_m":12},
+  field_strength: {"field_id":"rise","acceleration_mps2":6},
+  field_offset: {"field_id":"rise","x":0,"y":0,"z":2},
+  field_invert: {"field_id":"rise"},
+  field_duplicate_to_actor: {"field_id":"rise","new_field_id":"rise2","new_actor_id":"tree:1"},
+  quest_stage_remove: {"quest_id":"journey","stage_id":"optional"},
+  quest_stage_link: {"quest_id":"journey","from_stage_id":"middle","to_stage_id":"final"},
+  quest_stage_unlink: {"quest_id":"journey","from_stage_id":"middle","to_stage_id":"final"},
+  quest_stage_split: {"quest_id":"journey","from_stage_id":"middle","to_stage_id":"final","new_stage_id":"bridge","objective":"Cross the pass"},
+  quest_stage_rename: {"quest_id":"journey","stage_id":"middle","new_stage_id":"encounter"},
+  quest_start_change: {"quest_id":"journey","stage_id":"middle"},
+  quest_stage_swap_objectives: {"quest_id":"journey","stage_a":"start","stage_b":"middle"},
+  quest_duplicate: {"quest_id":"journey","new_quest_id":"journey2","title":"A different journey"},
+  quest_stage_reorder: {"quest_id":"journey","stage_id":"middle","position":0},
+  quest_rewrite_objectives: {"quest_id":"journey","objectives":{"middle":"Scout the watchtower"}},
+  terrain_noise: {"layer":"ground","x":0,"y":0,"width":8,"height":8,"seed":42,"a":0,"b":1,"percent_b":45},
+  terrain_smooth: {"layer":"ground","x":0,"y":0,"width":8,"height":8,"passes":2},
+  terrain_terrace: {"layer":"ground","x":0,"y":0,"width":8,"height":8,"bands":2},
+  terrain_outline: {"layer":"ground","x":0,"y":0,"width":8,"height":8,"target":1,"replacement":2},
+  terrain_erode: {"layer":"ground","x":0,"y":0,"width":8,"height":8,"target":1,"replacement":0},
 };
 function label(name: string) { return name.replace(/_/g, ' '); }
 const palette = ['#1b4230','#62727f','#406c99','#7d704c','#8b5b83','#777c3e','#5e6274'];
@@ -183,7 +256,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   };
   return <View style={{ gap: 12, paddingVertical: 10 }}>
     <Text style={{ color: '#eef3fa', fontSize: 20, fontWeight: '700' }}>Forge Studio · Real Game Authoring</Text>
-    <Text style={{ color: '#a7bacf' }}>50 editable tools for maps, characters, quests, events and soundtracks.
+    <Text style={{ color: '#a7bacf' }}>100 editable tools for maps, characters, quests, environmental events, native physics and soundtracks.
       Every saved edit changes the project source and is consumed by the real game compiler.</Text>
     {!doc ? <ActivityIndicator color="#8bd5e8" /> : <View>
       <Text style={{ color: '#bdcddd' }}>Revision {doc.expected_version} · {doc.layers.length} layers
@@ -215,7 +288,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
           disabled={pending} press={() => setSelectedLayer(layer.id)} />)}</View>
     </ScrollView>
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Choose an executable editor tool</Text>
-    <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 50 game editor tools"
+    <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 100 game editor tools"
       placeholder="Search tiles, NPCs, quests, events…" placeholderTextColor="#75869a"
       style={{ color: '#f0f5fb', borderWidth: 1, borderColor: '#526478', borderRadius: 7, padding: 10 }} />
     {listed.map(group => <View key={group.title} style={{ gap: 4 }}>
