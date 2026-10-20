@@ -81,8 +81,11 @@ def test_watchdog_does_not_send_issue_alerts_for_failed_retry_attempts() -> None
     assert 'gh issue comment "$issue" --repo "$REPO" --body "CI watchdog retrying' in retries
     # Match complete Bash control lines. Substrings like "fi" inside
     # notification comments must not truncate the failure branch.
-    failed = retries.split("\\n            else\\n", 1)[1].split(
-        "\\n            fi\\n", 1
-    )[0]
+    lines = retries.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.strip() == "else")
+    stop = next(
+        i for i in range(start + 1, len(lines)) if lines[i].strip() == "fi"
+    )
+    failed = "\n".join(lines[start + 1:stop])
     assert "gh issue comment" not in failed
     assert "echo \"::warning::CI watchdog could not rerun" in failed
