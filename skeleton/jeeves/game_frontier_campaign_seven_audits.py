@@ -34,17 +34,17 @@ def audit_topology(world:ExpeditionWorld)->dict:
     """M1: directed graph, dead ends, destination cuts, no invented reverse edges."""
     if not isinstance(world,ExpeditionWorld):
         raise ExpeditionError("topology needs canonical expedition")
-    graph={key:[] for key in world.by_id}
+    labeled={key:[] for key in world.by_id}
     for edge in world.edges:
-        graph[edge.source].append(edge.target)
-    graph={key:tuple(sorted(values)) for key,values in graph.items()}
+        labeled[edge.source].append((edge.edge_id,edge.target))
+    graph={key:tuple(sorted(dst for _,dst in values)) for key,values in labeled.items()}
     seen=_reachable(graph,world.arrival)
     cuts=[]
     if len(world.edges)<=512:
         for edge in world.edges:
-            reduced={start:tuple(target for target in targets
-                     if start!=edge.source or target!=edge.target)
-                     for start,targets in graph.items()}
+            reduced={start:tuple(dst for edge_id,dst in pairs
+                     if edge_id!=edge.edge_id)
+                     for start,pairs in labeled.items()}
             remainder=_reachable(reduced,world.arrival)
             if any(target in seen and target not in remainder
                    for target in world.destinations):

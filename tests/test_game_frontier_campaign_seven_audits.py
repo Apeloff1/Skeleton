@@ -1,8 +1,11 @@
 """Real source-bound seven-milestone game QA and tamper rejection."""
 from copy import deepcopy
+from dataclasses import replace
 import pytest
 
-from skeleton.jeeves.game_frontier_expedition import ExpeditionError, _digest
+from skeleton.jeeves.game_frontier_expedition import (
+    ExpeditionError, ExpeditionWorld, TravelEdge, Waypoint, _digest,
+)
 from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile, author_archipelago
 from skeleton.jeeves.game_frontier_expedition_campaign import original_campaign_player
 from skeleton.jeeves.game_frontier_expedition_assets import forge_expedition_assets
@@ -96,3 +99,20 @@ def test_m7_rejects_foreign_assets(source):
     forged["manifest"]["world_digest"]="f"*64
     with pytest.raises(ExpeditionError,match="original world"):
         compile_seven_campaign_audits(w,p,forged)
+
+
+def test_m1_parallel_edges_are_not_false_critical_choke_points():
+    nodes=(
+        Waypoint("entry",0,0,0,"settlement"),
+        Waypoint("middle",10,0,0,"ground"),
+        Waypoint("goal",20,0,0,"sky_island"),
+    )
+    links=(
+        TravelEdge("parallel_a","entry","middle","walk",10,1,1),
+        TravelEdge("parallel_b","entry","middle","walk",10,1,1),
+        TravelEdge("final","middle","goal","walk",10,1,1),
+    )
+    world=ExpeditionWorld("parallel_graph","e"*64,nodes,links,"entry",("goal",))
+    audit=audit_topology(world)
+    assert audit["destination_cut_edges"]==["final"]
+    assert not audit["unreachable_destinations"]
