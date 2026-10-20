@@ -16,6 +16,14 @@ def test_full_campaign_cli_builds_runnable_authored_artifacts_and_all_receipts(t
     assert report["schema"]=="skeleton.game.original_campaign_cli_report.v1"
     assert report["independent_recompile_verified"]
     assert report["original_generated_meshes"]>10
+    assert report["original_npc_cast"]==3
+    assert report["original_foliage_instances"]>10
+    assert report["source_replayed_story_branches"]==2
+    assert report["source_replayed_distinct_endings"]==2
+    assert report["native_camera_frame_verification_required"]
+    assert len(report["generated_adaptive_music_receipt"])==64
+    assert not report["dragon_source_note_promotion_automatic"]
+    assert report["narrative_and_game_canon_replay_required"]
     assert report["executed_qa_scenarios"]==14
     assert report["dragon_independently_replayed_objective_routes"]==4
     assert report["source_files"]>20

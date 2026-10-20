@@ -45,6 +45,8 @@ READ_OPERATIONS = (
     "expedition.preview",
     "expedition.qa",
     "expedition.release.inspect",
+    "expedition.production.inspect",
+    "expedition.production.ending",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -79,6 +81,9 @@ WRITE_OPERATIONS = (
     "expedition.start",
     "expedition.action",
     "expedition.export",
+    "expedition.production.start",
+    "expedition.production.act",
+    "expedition.production.choose",
 )
 OPERATIONS = frozenset((*READ_OPERATIONS, *WRITE_OPERATIONS))
 

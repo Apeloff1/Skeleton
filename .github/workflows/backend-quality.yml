@@ -217,6 +217,8 @@ jobs:
             skeleton/jeeves/game_frontier_expedition_npcs.py \
             skeleton/jeeves/game_frontier_expedition_ecology.py \
             skeleton/jeeves/game_frontier_expedition_learning.py \
+            skeleton/jeeves/game_frontier_expedition_production_store.py \
+            skeleton/jeeves/game_frontier_expedition_production_tools.py \
             skeleton/jeeves/game_frontier_expedition_release.py \
             skeleton/jeeves/game_frontier_expedition_studio_tools.py \
             skeleton/jeeves/game_studio_tools.py \
@@ -248,7 +250,9 @@ jobs:
             tests/test_game_frontier_expedition_render.py \
             tests/test_game_frontier_expedition_dragon_review.py \
             tests/test_game_frontier_expedition_crash.py \
-            tests/test_game_frontier_production_seven.py
+            tests/test_game_frontier_production_seven.py \
+            tests/test_game_frontier_expedition_production_store.py \
+            tests/test_game_frontier_expedition_production_tools.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
