@@ -832,10 +832,18 @@ def compile_studio_expedition(project: StudioProject, profile, *, weather=None,
             max_stamina=1000,skill=0.8,
         )
         files=emit_expedition_godot_project(world,native_player)
-        out["godot_project_files"]=files
         out["godot_candidate_proof"]=verify_expedition_godot_project(
             files,world,native_player,
         )
+        from skeleton.forge.game_frontier_studio_native_runtime import (
+            add_studio_native_gameplay,
+        )
+        compiled_files=add_studio_native_gameplay(project, files)
+        out["godot_project_files"]=compiled_files
+        out["studio_native_runtime_installed"]=len(compiled_files)>len(files)
+        out["studio_native_runtime_sha256"]=sha256(json.dumps(
+            compiled_files, sort_keys=True, separators=(",", ":"),
+            allow_nan=False).encode("utf-8")).hexdigest()
     out["receipt_digest"]=sha256(json.dumps(
         out,sort_keys=True,separators=(",",":"),allow_nan=False,
     ).encode("utf-8")).hexdigest()
