@@ -203,7 +203,7 @@ class ForgeNewFiftyFunctionalAcceptance(unittest.TestCase):
         route=find_route(world,traveler,target)
         self.assertEqual(target,route.destination)
         proof=verify_route(world,traveler,route)
-        self.assertEqual(target,proof["final_state"]["location"])
+        self.assertEqual(target,proof["final_state"]["position"])
 
     def test_unwalkable_water_tiles_cannot_become_free_paths(self):
         from skeleton.forge.game_frontier_studio_tile_navigation import add_studio_walkable_paths
