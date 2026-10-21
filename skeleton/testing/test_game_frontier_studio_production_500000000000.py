@@ -105,6 +105,26 @@ class FiveHundredBillionEpochs(unittest.TestCase):
         self.assertEqual(10, len(hashes))
         self.assertEqual(before, project_digest(base))
 
+    def test_epoch_native_godot_source_emission(self):
+        """Exercise real typed terrain and navigation compilation, not mock code."""
+        from skeleton.forge.game_frontier_studio import compile_studio_expedition
+        from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile
+
+        base = original_project()
+        operation = EPOCH_ACTIONS[3]
+        updated = execute_authoring(base, operation, arguments(operation))
+        game = compile_studio_expedition(
+            updated,
+            ArchipelagoProfile(seed=37, islands=4, caverns=0,
+                               include_portals=False, include_underwater=False),
+            include_godot=True, playtest_routes=2,
+        )
+        files = game["godot_project_files"]
+        self.assertIn("game/frontier/studio_terrain.gd", files)
+        self.assertIn("game/frontier/studio_terrain.json", files)
+        self.assertGreater(game["travel_edges"], 0)
+        self.assertNotEqual(project_digest(base), project_digest(updated))
+
     def test_full_transaction_receipts_and_failure_rollback(self):
         base = original_project()
         action = EPOCH_ACTIONS[0]
