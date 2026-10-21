@@ -153,7 +153,7 @@ class ForgeFiveThousandRealProducers(unittest.TestCase):
         made=execute_authoring(original,recipe,arguments(recipe))
         page=made.environmental_pages[-1]
         self.assertEqual(3,len(page.conditions))
-        self.assertEqual("set_flag",page.actions[0].kind)
+        self.assertEqual("show_dialogue",page.actions[0].kind)
         conditions={c.signal:c for c in page.conditions}
         self.assertIn("party_morale",conditions)
 
