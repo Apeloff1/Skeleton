@@ -390,7 +390,8 @@ class RealGodotSourceBuildTests(unittest.TestCase):
 
     def test_invalid_sprite_source_blocks_game_export_without_partial_file(self):
         self.populate_3d()
-        self.create("invalid-art", "sprite_forge", {
+        with self.assertRaises(StudioSpriteError):
+            self.create("invalid-art", "sprite_forge", {
             "kind": "pixel_sprite", "asset_id": "invalid-art",
             "width": 1, "height": 1, "pixel_scale": 1,
             "palette": ["#3366ffff"],
@@ -398,9 +399,8 @@ class RealGodotSourceBuildTests(unittest.TestCase):
                         "pixels": [9]}],
             "animations": [{"name": "idle", "frame_ids": ["empty"],
                             "loop": True}],
-        }, depends=("config-3d",))
-        with self.assertRaises(StudioSpriteError):
-            self.export_godot()
+            }, depends=("config-3d",))
+        self.assertEqual(self.owner.snapshot()["source_count"], 4)
         self.assertFalse(any(self.export.iterdir()))
 
     def test_existing_uncompiled_story_is_never_claimed_as_engine_content(self):
