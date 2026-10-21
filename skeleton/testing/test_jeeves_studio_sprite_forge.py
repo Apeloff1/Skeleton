@@ -181,6 +181,11 @@ class PersistentSpriteExportTests(unittest.TestCase):
         self.assertEqual(result["export_format"], "sprite-atlas-zip")
         self.assertEqual(sha256(target.read_bytes()).hexdigest(),
                          result["artifact_sha256"])
+        disk = result["disk_verification"]
+        self.assertTrue(disk["actual_archive_bytes_verified"])
+        self.assertEqual(disk["source_head_sha256"],
+                         created["history_sha256"])
+        self.assertEqual(disk["archive_sha256"], result["artifact_sha256"])
         with zipfile.ZipFile(target) as archive:
             names = set(archive.namelist())
             self.assertEqual(names, {
