@@ -91,11 +91,9 @@ def sample_visual_layer(layer: MapLayer, quota: int) -> list[int]:
         return output
     # Keep coherent large-scale coverage even for the most uneven terrain.
     stride = max(1, math.ceil(math.sqrt(len(nonempty) / quota)))
-    chosen: set[int] = set()
+    representatives = []
     for y in range(0, layer.height, stride):
         for x in range(0, layer.width, stride):
-            if len(chosen) >= quota:
-                break
             # Select closest valid tile to cell center within this block.
             tx = min(layer.width - 1, x + stride // 2)
             ty = min(layer.height - 1, y + stride // 2)
@@ -108,7 +106,14 @@ def sample_visual_layer(layer: MapLayer, quota: int) -> list[int]:
             )
             candidate = min(options, default=None)
             if candidate is not None:
-                chosen.add(candidate[3])
+                representatives.append(candidate[3])
+    # Quantiles over all spatial blocks rather than taking only the first
+    # occupied blocks: preserve visual coverage at every map extremity.
+    chosen: set[int] = (
+        {representatives[(position * len(representatives)) // quota]
+         for position in range(quota)}
+        if len(representatives) > quota else set(representatives)
+    )
     # Add deterministically distributed positions without source mutation.
     missing = quota - len(chosen)
     if missing:
