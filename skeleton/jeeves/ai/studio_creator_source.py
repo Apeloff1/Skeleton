@@ -263,7 +263,7 @@ class CreatorProjectSourceStore:
             raise CreatorSourceError("authoring-context retrieval budget invalid")
         if facet is not None and facet not in FACETS:
             raise CreatorSourceError("unknown source facet filter")
-        terms = set(re.findall(r"[^\\W_]+", query.casefold())) - {
+        terms = set(re.findall(r"[^\W_]+", query.casefold())) - {
             "the", "and", "are", "you", "how", "that", "with", "from", "for",
         }
         if not terms:
@@ -278,7 +278,7 @@ class CreatorProjectSourceStore:
                     record["document"], sort_keys=True, ensure_ascii=False,
                 )
                 overlap = len(terms & set(re.findall(
-                    r"[^\\W_]+", searchable.casefold(),
+                    r"[^\W_]+", searchable.casefold(),
                 )))
                 if overlap:
                     scores.append((-overlap, key, record))
