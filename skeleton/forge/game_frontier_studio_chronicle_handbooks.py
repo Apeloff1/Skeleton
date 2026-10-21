@@ -201,7 +201,7 @@ def grade(markdown:str,meta:dict[str,Any])->dict[str,Any]:
         raise StudioError("invalid rendered chronicle manuscript")
     criteria={
         "registered_source":bool(meta.get("source_bound")) and meta.get("covered_commands")==5000,
-        "fifty_archetypes":sum(line.startswith("| ") and "chronicle_" in line
+        "fifty_archetypes":sum(line.startswith("| ") and " | chronicle_" in line
                                for line in markdown.splitlines())==50,
         "ten_system_examples":markdown.count("Executable source operation: ")==10,
         "seven_required_sections":all(part in markdown for part in (
