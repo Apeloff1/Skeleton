@@ -31,6 +31,7 @@ from .game_frontier_studio_structure_factory import STRUCTURE_ACTIONS, edit_stru
 from .game_frontier_studio_encounter_factory import ENCOUNTER_ACTIONS, edit_encounter
 from .game_frontier_studio_quest_blueprint_factory import QUEST_BLUEPRINT_ACTIONS, edit_quest_blueprint
 from .game_frontier_studio_reactive_scene_factory import REACTIVE_SCENE_ACTIONS, edit_reactive_scene
+from .game_frontier_studio_production_recipes import RECIPE_ACTIONS, edit_recipe
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
@@ -41,9 +42,10 @@ AUTHORING_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIO
                      TERRAIN_TOPOLOGY_ACTIONS + ACTOR_LAYOUT_ACTIONS +
                      STORY_PRODUCTION_ACTIONS + ENVIRONMENT_COMPOSER_ACTIONS +
                      BIOME_ACTIONS + STRUCTURE_ACTIONS + ENCOUNTER_ACTIONS +
-                     QUEST_BLUEPRINT_ACTIONS + REACTIVE_SCENE_ACTIONS)
-if len(AUTHORING_ACTIONS) != 500 or len(set(AUTHORING_ACTIONS)) != 500:
-    raise RuntimeError("Forge Studio must expose 500 implemented, distinct operations")
+                     QUEST_BLUEPRINT_ACTIONS + REACTIVE_SCENE_ACTIONS +
+                     RECIPE_ACTIONS)
+if len(AUTHORING_ACTIONS) != 5000 or len(set(AUTHORING_ACTIONS)) != 5000:
+    raise RuntimeError("Forge Studio must expose 5000 implemented, distinct operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -115,6 +117,8 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_quest_blueprint(project, operation, payload)
     if operation in REACTIVE_SCENE_ACTIONS:
         return edit_reactive_scene(project, operation, payload)
+    if operation in RECIPE_ACTIONS:
+        return edit_recipe(project, operation, payload, execute_authoring)
     raise StudioError("unknown executable Studio editor action")
 
 
