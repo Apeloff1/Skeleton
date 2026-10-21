@@ -102,6 +102,8 @@ def edit_topology(project: StudioProject, action: str,
             votes=sum(p in chosen for p in neighbors)
             paint(pt,wall if votes>=max(1,math.ceil(len(neighbors)/2)) else floor)
     elif action in ("terrain_largest_region","terrain_connect_regions"):
+        if len(region)>4096:
+            raise StudioError("connected-component topology editing is limited to 4096 tiles")
         comps=components(chosen)
         if not comps:
             raise StudioError("no authored wall topology to rewrite")
@@ -257,6 +259,8 @@ def edit_topology(project: StudioProject, action: str,
             y=round(mid[1]+math.sin((x-x0)/max(1,w-1)*math.pi*2)*min(3,h/4))
             line((x,y),(x,y),floor,width())
     elif action=="terrain_archipelago_bridges":
+        if len(region)>4096:
+            raise StudioError("bridge connectivity operation is limited to 4096 authored tiles")
         # Detect separate traversable islands and connect nearest shoreline.
         land={pt for pt in region if previous[pt]==wall}
         groups=components_local(land,region)
