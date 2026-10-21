@@ -240,6 +240,11 @@ export default function JeevesStudioPalette({
   };
   const mutatePersistedGoal = async (action: 'pause' | 'resume' | 'cancel' | StudioGoalRetryTarget) => {
     if (!goalReceipt || disabled || advancingGoal) return;
+    if ((action === 'resume' || action === 'restore_incumbent') &&
+        goalReceipt.execution_mode === 'run' && !effectAcknowledged) {
+      setGoalError('Reconfirm project effect acknowledgement before resuming or restoring.');
+      return;
+    }
     setAdvancingGoal(true);
     setGoalError('');
     const goalId = goalReceipt.goal_id;
@@ -287,6 +292,7 @@ export default function JeevesStudioPalette({
       // edit acknowledgment, or a stale in-memory authorization scope.
       setEffectAcknowledged(false);
       setEditAuthorization(false);
+      setExecutionMode(saved.execution_mode);
       setGoalReceipt(saved);
       setShowGoalSteps(false);
     } catch (error) {
@@ -352,6 +358,8 @@ export default function JeevesStudioPalette({
                   // A source digest is a cross-slice reference, not a substitute
                   // for the server's own project and receipt verification.
                   if (goalReceipt?.integrity?.status === 'verified' &&
+                      ['completed', 'succeeded'].includes(goalReceipt.status) &&
+                      !goalReceipt.pending_job_id &&
                       goalReceipt.integrity.state_digest) {
                     setPreviousFlowReceipt(goalReceipt.integrity.state_digest);
                   } else {
@@ -501,10 +509,10 @@ export default function JeevesStudioPalette({
                 {chip(advancingGoal ? 'Inspecting…' : 'Reload authoritative receipts', false,
                   () => { void reloadGoal(); })}
                 {goalReceipt.execution_mode === 'run' && effectAcknowledged &&
-                  !['completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
+                  !['paused', 'completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
                   chip(advancingGoal ? 'Working…' : 'Advance 2 authorized steps', true,
                     () => { void advanceGoal(); })}
-                {!['completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
+                {!['paused', 'completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
                   chip('Pause workflow', false, () => { void mutatePersistedGoal('pause'); })}
                 {goalReceipt.status === 'paused' &&
                   chip('Resume workflow', false, () => { void mutatePersistedGoal('resume'); })}
