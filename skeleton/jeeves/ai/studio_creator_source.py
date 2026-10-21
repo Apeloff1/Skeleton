@@ -21,7 +21,7 @@ from threading import RLock
 from typing import Any
 
 from skeleton.forge.creator.command_surface import (
-    CreatorCommand, dispatch_creator_command, validate_creator_command,
+    CreatorCommand, build_creator_command, dispatch_creator_command,
 )
 from skeleton.jeeves.agent.tools import (
     ArgumentRule, ToolDenied, ToolExecutionContext, ToolRegistry, ToolSpec,
@@ -493,16 +493,10 @@ def register_creator_source_tool(
 
     def perform(arguments: Mapping[str, Any],
                 context: ToolExecutionContext) -> dict[str, Any]:
-        command = validate_creator_command(
-            # Build the canonical digest from exactly the host-validated
-            # arguments instead of trusting a model supplied hash.
-            __import__(
-                "skeleton.forge.creator.command_surface",
-                fromlist=["build_creator_command"],
-            ).build_creator_command(
-                arguments["operation"], project_id=arguments["project_id"],
-                payload=arguments["payload"],
-            )
+        # Only the existing typed command compiler may mint command identity.
+        command = build_creator_command(
+            arguments["operation"], project_id=arguments["project_id"],
+            payload=arguments["payload"],
         )
         if command.project_id != store.project_id:
             raise ToolDenied("creator operation belongs to another project")
