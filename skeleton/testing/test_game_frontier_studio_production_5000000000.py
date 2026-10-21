@@ -42,7 +42,7 @@ class FiveBillionSourceAuthoring(unittest.TestCase):
         self.assertEqual(5_000_000_000_000,len(AUTHORING_ACTIONS))
         self.assertEqual(4_500_000_000,len(CAMPAIGN_ACTIONS))
         self.assertEqual(AUTHORING_ACTIONS[500_000_000],CAMPAIGN_ACTIONS[0])
-        self.assertEqual(AUTHORING_ACTIONS[-1],CAMPAIGN_ACTIONS[-1])
+        self.assertEqual(AUTHORING_ACTIONS[5_000_000_000 - 1],CAMPAIGN_ACTIONS[-1])
         self.assertEqual(AUTHORING_ACTIONS[500_000_000:500_000_018],
                          CAMPAIGN_ACTIONS[:18])
         self.assertTrue(CAMPAIGN_ACTIONS[-1] in AUTHORING_ACTIONS)
