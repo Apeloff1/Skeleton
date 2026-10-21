@@ -12,6 +12,10 @@ from skeleton.forge.creator.command_surface import build_creator_command
 from skeleton.jeeves.ai.studio_creator_source import (
     CreatorProjectSourceStore, CreatorSourceError,
 )
+from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
+from skeleton.jeeves.ai.studio_interaction_contract import (
+    StudioEvidenceJournal, StudioInteractionError,
+)
 from skeleton.jeeves.ai.studio_godot_zip_verify import (
     NativeSourceVerificationError, verify_published_godot_zip,
 )
@@ -307,6 +311,47 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         with self.assertRaises(FrontierSourceError):
             self.export_godot()
         self.assertFalse(any(self.export.iterdir()))
+
+    def test_missing_real_godot_binary_refuses_native_playthrough(self):
+        self.populate_3d()
+        with self.assertRaises(FrontierSourceError):
+            self.owner.run_native_playthrough(
+                godot_executable=str(self.root / "absent-godot4"),
+                timeout_seconds=1,
+            )
+        self.assertFalse(any(self.export.iterdir()))
+
+    def test_model_cannot_self_claim_native_gameplay_receipt(self):
+        with StudioEvidenceJournal(
+            self.root / "native-journal.sqlite",
+            project_id="new-game", session_id="human-session",
+        ) as journal:
+            with self.assertRaises(StudioInteractionError):
+                journal.append("native_gameplay_verified", {
+                    "native_process_executed": True, "completed": True,
+                })
+            self.assertEqual(len(journal.read()), 0)
+
+    def test_host_permission_denied_before_engine_launch(self):
+        self.populate_3d()
+        with StudioEvidenceJournal(
+            self.root / "native-journal.sqlite",
+            project_id="new-game", session_id="human-session",
+        ) as journal:
+            host = NativeStudioHost.__new__(NativeStudioHost)
+            host.journal = journal
+            host.source_store = self.owner
+            calls = []
+            with self.assertRaises(StudioInteractionError):
+                host.verify_real_native_gameplay(
+                    godot_executable=str(self.root / "absent-godot4"),
+                    actor_id="human-producer",
+                    authorize_native_execution=lambda project, binary, actor: (
+                        calls.append((project, binary, actor)) or False
+                    ),
+                )
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(len(journal.read()), 0)
 
     def test_existing_uncompiled_story_is_never_claimed_as_engine_content(self):
         self.populate_3d()
