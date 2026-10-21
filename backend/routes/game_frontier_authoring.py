@@ -69,13 +69,21 @@ def _write_scope(user):
 @router.get("/recipes")
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
+    generation: str = "classic", system_layer: str = "",
     user=Depends(get_current_user),
 ):
-    """Discover only one small bounded page of actually executable recipes."""
+    """Discover bounded pages of real 4,500 or 45,000 production workflows."""
     _scope(user)
     from skeleton.forge.game_frontier_studio_production_recipes import search_recipes
+    from skeleton.forge.game_frontier_studio_system_expansions import search_expansions
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "expanded":
+            return search_expansions(query=query, domain=domain,
+                                     system_layer=system_layer,
+                                     offset=offset, limit=limit)
+        if generation != "classic" or system_layer:
+            raise StudioError("unknown producer generation or layer")
         return search_recipes(query=query, domain=domain,
                               offset=offset, limit=limit)
     except StudioError as exc:
