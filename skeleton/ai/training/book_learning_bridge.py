@@ -111,8 +111,15 @@ def _load_manifest(path: Path) -> tuple[dict[str, Any], bytes]:
 
 def _segments(text: str):
     """Lossless by construction: concatenated chunks MUST equal original text."""
-    for offset in range(0, len(text), CHUNK_CHARS):
-        yield offset, text[offset:offset + CHUNK_CHARS]
+    if len(text) < 20:
+        raise BookIntakeError("chapter needs at least 20 characters for the trainer")
+    start = 0
+    while start < len(text):
+        end = min(start + CHUNK_CHARS, len(text))
+        if 0 < len(text) - end < 20:
+            end = len(text)
+        yield start, text[start:end]
+        start = end
 
 
 def _validate_book(root: Path, book: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -127,6 +134,7 @@ def _validate_book(root: Path, book: dict[str, Any]) -> tuple[list[dict[str, Any
     rows: list[dict[str, Any]] = []
     chapter_receipts: list[dict[str, object]] = []
     seen: set[str] = set()
+    complete_text_hash = sha256()
     for chapter_no, chapter in enumerate(chapters):
         if not isinstance(chapter, dict):
             raise BookIntakeError("chapter review record must be an object")
@@ -149,6 +157,7 @@ def _validate_book(root: Path, book: dict[str, Any]) -> tuple[list[dict[str, Any
             raise BookIntakeError("book chapters must be valid UTF-8") from exc
         if not text.strip():
             raise BookIntakeError("cannot train an empty chapter")
+        complete_text_hash.update(text.encode("utf-8"))
         if chapter.get("family") not in FAMILIES:
             raise BookIntakeError("chapter needs an existing game curriculum family")
         if chapter.get("quality_approved") is not True:
@@ -198,10 +207,7 @@ def _validate_book(root: Path, book: dict[str, Any]) -> tuple[list[dict[str, Any
         "rights_review_id": rights["review_id"],
         "rights_kind": rights["source_kind"],
         "chapters": chapter_receipts, "training_rows": len(rows),
-        "source_text_sha256": _sha("".join(
-            (root / chapter["file"]).read_text(encoding="utf-8")
-            for chapter in chapters
-        ).encode("utf-8")),
+        "source_text_sha256": complete_text_hash.hexdigest(),
     }
 
 
