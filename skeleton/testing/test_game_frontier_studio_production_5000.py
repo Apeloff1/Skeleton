@@ -169,6 +169,39 @@ class ForgeFiveThousandRealProducers(unittest.TestCase):
             ])
         self.assertEqual(original_hash,project_digest(base))
 
+    def test_repeated_quest_campaign_instances_are_real_and_independent(self):
+        base=original_project()
+        action=RECIPE_ACTIONS[8*450+1]
+        first=execute_authoring(base, action, {
+            **arguments(action),"instance_id":"chapterA"})
+        second=execute_authoring(first, action, {
+            **arguments(action),"instance_id":"chapterB"})
+        self.assertEqual(len(base.native_quests)+2,len(second.native_quests))
+        self.assertEqual(len(base.placements)+8,len(second.placements))
+        self.assertEqual(len(base.events)+10,len(second.events))
+        quest_ids={q.quest_id for q in second.native_quests}
+        self.assertEqual(len(second.native_quests),len(quest_ids))
+        self.assertEqual(project_digest(second),project_digest(
+            load_authored_document(
+                authored_document(second),project_id=base.project_id)))
+        with self.assertRaises(StudioError):
+            execute_authoring(first, action, {
+                **arguments(action),"instance_id":"chapterA"})
+        self.assertEqual(project_digest(base),project_digest(original_project()))
+
+    def test_untrusted_embedded_recipe_command_is_not_executed(self):
+        base=original_project()
+        action=RECIPE_ACTIONS[5*450]
+        with self.assertRaises(StudioError):
+            execute_authoring(base,action,{
+                **arguments(action),
+                "steps":[{"action":"delete_project","parameters":{}}],
+            })
+        with self.assertRaises(StudioError):
+            execute_authoring(base,action,{
+                **arguments(action),"instance_id":"../../escape",
+            })
+
     def test_large_catalog_summary_does_not_send_4500_names_per_edit(self):
         summary=authored_summary(original_project())
         self.assertEqual(500,len(summary["action_catalog"]))
