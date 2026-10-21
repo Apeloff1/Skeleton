@@ -37,6 +37,7 @@ class NativeStudioHost:
         runbook_directory: Path,
         book_index: Path | None = None,
         book_admission_sha256: str | None = None,
+        book_source_root_sha256: str | None = None,
     ) -> None:
         identifier(project_id, "project")
         identifier(session_id, "session")
@@ -45,8 +46,9 @@ class NativeStudioHost:
                 or runbook_directory.is_symlink()
                 or not runbook_directory.is_dir()):
             raise StudioInteractionError("private existing runbook directory required")
-        if (book_index is None) != (book_admission_sha256 is None):
-            raise StudioInteractionError("book index and independently pinned admission must coexist")
+        if len({book_index is None, book_admission_sha256 is None,
+                book_source_root_sha256 is None}) != 1:
+            raise StudioInteractionError("book index, admission and independent source-root pin must coexist")
         self.directory = runbook_directory
         self.journal = StudioEvidenceJournal(
             Path(journal_path), project_id=project_id, session_id=session_id,
@@ -57,6 +59,7 @@ class NativeStudioHost:
                 self.book_memory = ReviewedBookMemory(
                     Path(book_index), project_id=project_id,
                     admission_sha256=book_admission_sha256,
+                    expected_source_root_sha256=book_source_root_sha256,
                 )
             self.controller = JeevesStudioController(self.journal)
             self.model = NativeStudioModel(engine, book_memory=self.book_memory)
