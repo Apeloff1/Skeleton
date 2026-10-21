@@ -428,6 +428,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [doc, setDoc] = useState<ForgeDocument | null>(null);
   const [action, setAction] = useState('tile_set');
   const [search, setSearch] = useState('');
+  const [toolFamily, setToolFamily] = useState('Tiles & geometry');
   const [parameters, setParameters] = useState('{"layer":"ground","x":0,"y":0,"tile":1}');
   const [steps, setSteps] = useState<ForgeStep[]>([]);
   const [selectedLayer, setSelectedLayer] = useState('ground');
@@ -471,10 +472,14 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     }).catch(() => { if (live) setTilePixels([]); });
     return () => { live = false; };
   }, [doc?.source_sha256, selectedLayer, project.project_id]);
-  const listed = useMemo(() => GROUPS.map(group => ({
-    ...group, actions: group.actions.filter(item => (!doc || doc.action_catalog.includes(item))
-      && item.includes(search.trim().toLowerCase())),
-  })).filter(group => group.actions.length), [doc, search]);
+  const listed = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return GROUPS.filter(group => query.length > 0 || group.title === toolFamily)
+      .map(group => ({
+        ...group, actions: group.actions.filter(item =>
+          (!doc || doc.action_catalog.includes(item)) && item.includes(query)),
+      })).filter(group => group.actions.length);
+  }, [doc, search, toolFamily]);
   const choose = (name: string) => {
     setAction(name);
     const args = { ...(newFiveHundredDefaults(name, selectedLayer) || hundredActionDefaults(name, selectedLayer) || newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
@@ -583,6 +588,11 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 500 game editor tools"
       placeholder="Search tiles, NPCs, quests, events…" placeholderTextColor="#75869a"
       style={{ color: '#f0f5fb', borderWidth: 1, borderColor: '#526478', borderRadius: 7, padding: 10 }} />
+    <ScrollView horizontal showsHorizontalScrollIndicator accessibilityLabel="Forge tool categories">
+      <View style={{ flexDirection: 'row' }}>{GROUPS.map(group =>
+        <Button key={group.title} title={(toolFamily === group.title ? '✓ ' : '') + group.title}
+          disabled={pending} press={() => { setToolFamily(group.title); setSearch(''); }} />)}</View>
+    </ScrollView>
     {listed.map(group => <View key={group.title} style={{ gap: 4 }}>
       <Text style={{ color: '#a8c1d6', fontWeight: '600' }}>{group.title}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{group.actions.map(name =>
