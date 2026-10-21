@@ -151,7 +151,7 @@ class StudioEvidenceJournal:
         "question_answered", "modality_registered", "modality_observation_reviewed",
         "model_inference_observed", "model_proposed", "book_memory_retrieved",
         "canon_context_retrieved", "source_context_retrieved",
-        "plan_context_bound",
+        "plan_context_bound", "native_gameplay_verified",
         "plan_compiled", "plan_approved", "execution_succeeded",
         "execution_uncertain", "execution_aborted",
     ))
@@ -176,6 +176,7 @@ class StudioEvidenceJournal:
         self._execution_token = object()
         self._observation_token = object()
         self._plan_token = object()
+        self._native_execution_token = object()
         self.read()
 
     def read(self) -> tuple[dict[str, Any], ...]:
@@ -220,6 +221,8 @@ class StudioEvidenceJournal:
             raise StudioInteractionError("multimodal observations require reviewed host admission")
         if kind == "plan_context_bound" and _authority is not self._plan_token:
             raise StudioInteractionError("source-bound plan context requires a trusted native host")
+        if kind == "native_gameplay_verified" and _authority is not self._native_execution_token:
+            raise StudioInteractionError("native gameplay requires observed host engine process")
         body = dict(payload)
         canonical(body)
         with self._lock:
