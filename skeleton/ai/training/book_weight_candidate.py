@@ -15,7 +15,7 @@ from typing import Any
 
 from .book_learning_bridge import BookIntakeError, _encode, _regular, _sha
 from .jeeves_game_corpus import load_approved_corpus
-from .jeeves_production_game_train import ProductionCheckpointError, train
+from .jeeves_production_game_train import train
 
 
 def _receipt(path: Path) -> dict[str, Any]:
