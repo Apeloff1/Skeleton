@@ -332,19 +332,27 @@ def _branch_new_quests(project: StudioProject, initial: int,
     suffix = sha256(operation.encode("utf8")).hexdigest()[:12]
     for i in range(initial, len(quests)):
         quest = quests[i]
-        root = quest.stages[0]
-        end = next((s.stage_id for s in reversed(quest.stages)
-                    if not s.next_stage_ids), None)
+        entry = next((j for j, stage in enumerate(quest.stages)
+                      if stage.stage_id == quest.first_stage_id), None)
+        if entry is None:
+            raise StudioError("Epic path requires an existing canonical quest entry")
+        root = quest.stages[entry]
+        end = next((stage.stage_id for stage in reversed(quest.stages)
+                    if not stage.next_stage_ids), None)
         if end is None or len(quest.stages) > 4094 or len(root.next_stage_ids) >= 32:
             raise StudioError("Epic branch cannot preserve existing quest terminal")
         optional_id = quest.quest_id + "_epic_" + suffix
-        if len(optional_id) > 128 or optional_id in {s.stage_id for s in quest.stages}:
+        if len(optional_id) > 128 or optional_id in {stage.stage_id for stage in quest.stages}:
             raise StudioError("Epic branch duplicates an authored quest stage")
-        stage = StudioQuestStage(optional_id, OBJECTIVES[axis], (end,))
-        quests[i] = replace(quest, stages=(
-            replace(root, next_stage_ids=(*root.next_stage_ids, optional_id)),
-            *quest.stages[1:], stage,
-        ))
+        # When the entry is already terminal, the new branch *becomes*
+        # an ending; pointing back to the former terminal would create a loop.
+        terminal_edge = () if end == root.stage_id else (end,)
+        stage = StudioQuestStage(optional_id, OBJECTIVES[axis], terminal_edge)
+        altered = list(quest.stages)
+        altered[entry] = replace(
+            root, next_stage_ids=(*root.next_stage_ids, optional_id),
+        )
+        quests[i] = replace(quest, stages=(*altered, stage))
     return replace(project, native_quests=tuple(quests))
 
 
