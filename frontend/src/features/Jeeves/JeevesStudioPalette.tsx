@@ -201,7 +201,7 @@ export default function JeevesStudioPalette({
           </View>
           <View style={{ gap: 9, borderTopWidth: 1, borderColor: C.border, paddingTop: 12 }}>
             <Text style={{ color: C.text, fontWeight: '700' }}>Actual project planning · saved to studio</Text>
-            <Text style={{ color: C.subtle, fontSize: 12 }}>Create a plan-only, versioned studio goal for an existing project. This uses the app's existing authenticated goal runner and creates no editor mutation or high-impact grant.</Text>
+            <Text style={{ color: C.subtle, fontSize: 12 }}>Create a plan-only, versioned studio goal for an existing project. This uses the existing authenticated studio goal runner and creates no editor mutation or high-impact grant.</Text>
             {loadingProjects && <Text style={{ color: C.subtle }}>Loading available projects…</Text>}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
               {projects.map(project => chip(project.name, projectId === project.project_id,
