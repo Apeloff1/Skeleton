@@ -131,7 +131,7 @@ async def compile_game(scope: Mapping[str, str], project_id: str,
 
 def catalog() -> dict:
     return {"schema": "skeleton.game.frontier_studio_authoring_catalog.v1",
-            "actions": AUTHORING_ACTIONS, "action_count": 250,
+            "actions": AUTHORING_ACTIONS, "action_count": 500,
             "persistence_owner": "canonical_game_learning_workspace",
             "source_file": SOURCE_PATH}
 
