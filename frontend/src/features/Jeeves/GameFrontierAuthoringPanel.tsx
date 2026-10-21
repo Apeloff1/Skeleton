@@ -434,13 +434,14 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [recipeView, setRecipeView] = useState(false);
   const [recipeQuery, setRecipeQuery] = useState('');
   const [recipeDomain, setRecipeDomain] = useState('');
-  const [recipeGeneration, setRecipeGeneration] = useState<'classic' | 'expanded' | 'directed' | 'final' | 'worldline' | 'phase' | 'campaign'>('campaign');
+  const [recipeGeneration, setRecipeGeneration] = useState<'classic' | 'expanded' | 'directed' | 'final' | 'worldline' | 'phase' | 'campaign' | 'chronicle'>('chronicle');
   const [systemLayer, setSystemLayer] = useState('');
   const [director, setDirector] = useState('');
   const [finish, setFinish] = useState('');
   const [worldline, setWorldline] = useState('');
   const [phase, setPhase] = useState('');
   const [campaign, setCampaign] = useState('');
+  const [chronicle, setChronicle] = useState('');
   const [recipeResults, setRecipeResults] = useState<ForgeRecipeResults | null>(null);
   const [parameters, setParameters] = useState('{"layer":"ground","x":0,"y":0,"tile":1}');
   const [steps, setSteps] = useState<ForgeStep[]>([]);
@@ -499,7 +500,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     setError('');
     try {
       const result = await searchForgeRecipes(recipeQuery, recipeDomain, offset, 32,
-        recipeGeneration, systemLayer, director, finish, worldline, phase, campaign);
+        recipeGeneration, systemLayer, director, finish, worldline, phase, campaign, chronicle);
       setRecipeResults(result);
       setNotice(result.matched + ' source-changing production recipes match your search.');
     } catch (reason: any) {
@@ -507,7 +508,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     } finally { setBusy(false); }
   };
   const selectRecipe = (recipe: ForgeRecipe) => {
-    if (!(/^(produce_[a-z_]+__[a-z_]+|expand_[a-z_]+__[a-z_]+___[a-z_]+|direct_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+|complete_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+|worldline_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+|phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+|campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+)$/.test(recipe.operation))) {
+    if (!(/^(produce_[a-z_]+__[a-z_]+|expand_[a-z_]+__[a-z_]+___[a-z_]+|direct_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+|complete_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+|worldline_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+|phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+|campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+|chronicle_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+)$/.test(recipe.operation))) {
       setError('Invalid game production recipe identity.'); return;
     }
     const layer = doc?.layers.find(item => item.id === selectedLayer) || doc?.layers[0];
@@ -532,6 +533,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       (recipe.worldline ? ' / '+recipe.worldline : '') +
       (recipe.phase ? ' / '+recipe.phase : '') +
       (recipe.campaign ? ' / '+recipe.campaign : '') +
+      (recipe.chronicle ? ' / '+recipe.chronicle : '') +
       '. Preview actual source edits before saving.');
   };
   const choose = (name: string) => {
@@ -673,21 +675,24 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Button disabled={pending} title={(recipeGeneration === 'classic' ? '✓ ' : '') + 'Original 4,500'}
-          press={() => { setRecipeGeneration('classic'); setSystemLayer(''); setDirector(''); setFinish(''); setWorldline(''); setPhase(''); setCampaign(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('classic'); setChronicle(''); setSystemLayer(''); setDirector(''); setFinish(''); setWorldline(''); setPhase(''); setCampaign(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'expanded' ? '✓ ' : '') + 'Gameplay 45,000'}
-          press={() => { setRecipeGeneration('expanded'); setDirector(''); setFinish(''); setWorldline(''); setPhase(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('expanded'); setChronicle(''); setDirector(''); setFinish(''); setWorldline(''); setPhase(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'directed' ? '✓ ' : '') + 'Directed 450,000'}
-          press={() => { setRecipeGeneration('directed'); setFinish(''); setWorldline(''); setPhase(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('directed'); setChronicle(''); setFinish(''); setWorldline(''); setPhase(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'final' ? '✓ ' : '') + 'Final 4,500,000'}
-          press={() => { setRecipeGeneration('final'); setWorldline(''); setPhase(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('final'); setChronicle(''); setWorldline(''); setPhase(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'worldline' ? '✓ ' : '') + 'Worldlines 45M'}
-          press={() => { setRecipeGeneration('worldline'); setPhase(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('worldline'); setChronicle(''); setPhase(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'phase' ? '✓ ' : '') + 'Phases 450M'}
-          press={() => { setRecipeGeneration('phase'); setCampaign(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('phase'); setChronicle(''); setCampaign(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'campaign' ? '✓ ' : '') + 'Campaigns 4.5B'}
-          press={() => { setRecipeGeneration('campaign'); setRecipeQuery(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('campaign'); setChronicle(''); setRecipeQuery(''); setRecipeResults(null); }}/>
+        <Button disabled={pending} title={(recipeGeneration === 'chronicle' ? '✓ ' : '') + 'Chronicles 45B'}
+          press={() => { setRecipeGeneration('chronicle'); setRecipeQuery(''); setRecipeResults(null); }}/>
       </View>
       <TextInput value={recipeQuery} onChangeText={setRecipeQuery}
+        editable={recipeGeneration !== 'chronicle' && recipeGeneration !== 'campaign'}
         accessibilityLabel="Search production recipes"
         placeholder="Search worlds, quests, NPCs, weather…"
         placeholderTextColor="#8393a6"
@@ -702,7 +707,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setRecipeDomain(domain); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>
-      {(recipeGeneration === 'expanded' || recipeGeneration === 'directed' || recipeGeneration === 'final' || recipeGeneration === 'worldline' || recipeGeneration === 'phase' || recipeGeneration === 'campaign') && <ScrollView horizontal showsHorizontalScrollIndicator>
+      {(recipeGeneration === 'expanded' || recipeGeneration === 'directed' || recipeGeneration === 'final' || recipeGeneration === 'worldline' || recipeGeneration === 'phase' || recipeGeneration === 'campaign' || recipeGeneration === 'chronicle') && <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ flexDirection: 'row' }}>
           {['','wayfinding','seasons','destructibles','weather','combat','commerce',
             'stealth','verticality','migration','story_convergence'].map(layer =>
@@ -711,7 +716,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setSystemLayer(layer); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>}
-      {(recipeGeneration === 'directed' || recipeGeneration === 'final' || recipeGeneration === 'worldline' || recipeGeneration === 'phase') && <ScrollView horizontal showsHorizontalScrollIndicator>
+      {(recipeGeneration === 'directed' || recipeGeneration === 'final' || recipeGeneration === 'worldline' || recipeGeneration === 'phase' || recipeGeneration === 'campaign' || recipeGeneration === 'chronicle') && <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ flexDirection: 'row' }}>
           {['','navigation_alternates','ecology_cycles','tactical_zones','cinematic_staging',
             'resource_routes','faction_reactions','physics_obstacles','audio_cues',
@@ -721,7 +726,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setDirector(name); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>}
-      {(recipeGeneration === 'final' || recipeGeneration === 'worldline') && <ScrollView horizontal showsHorizontalScrollIndicator>
+      {(recipeGeneration === 'final' || recipeGeneration === 'worldline' || recipeGeneration === 'phase' || recipeGeneration === 'campaign' || recipeGeneration === 'chronicle') && <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ flexDirection:'row' }}>
           {['','route_optimization','settlement_life','environmental_fidelity',
             'character_staging','combat_readiness','resource_balance',
@@ -732,7 +737,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setFinish(name); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>}
-      {(recipeGeneration === 'worldline' || recipeGeneration === 'phase') && <ScrollView horizontal showsHorizontalScrollIndicator>
+      {(recipeGeneration === 'worldline' || recipeGeneration === 'phase' || recipeGeneration === 'campaign' || recipeGeneration === 'chronicle') && <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ flexDirection:'row' }}>
           {['','river_network','city_circulation','wilderness_ecology','tactical_encounters',
             'subterranean_routes','sky_navigation','social_reputation',
@@ -742,7 +747,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setWorldline(name); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>}
-      {(recipeGeneration === 'phase' || recipeGeneration === 'campaign') && <ScrollView horizontal showsHorizontalScrollIndicator>
+      {(recipeGeneration === 'phase' || recipeGeneration === 'campaign' || recipeGeneration === 'chronicle') && <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ flexDirection:'row' }}>
           {['','dawn_routes','winter_crossings','storm_shelters','market_cycles','siege_fronts',
             'night_patrols','habitat_migrations','sky_transits','faction_turns',
@@ -752,7 +757,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setPhase(name); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>}
-      {recipeGeneration === 'campaign' && <ScrollView horizontal showsHorizontalScrollIndicator>
+      {(recipeGeneration === 'campaign' || recipeGeneration === 'chronicle') && <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ flexDirection:'row' }}>
           {['','chapter_crossroads','civic_worlds','open_ocean_routes','sky_island_circuit',
             'underground_transit','faction_frontiers','siege_campaigns',
@@ -762,6 +767,17 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setCampaign(name); setRecipeQuery(''); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>}
+      {recipeGeneration === 'chronicle' && <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={{ flexDirection: 'row' }}>
+          {['','first_arrival','survey_and_discovery','settlement_growth',
+            'regional_upheaval','emergency_response','diaspora_routes',
+            'institutional_change','faction_reconciliation',
+            'generational_legacy','renewal_and_return'].map(name =>
+            <Button key={name || 'all'} disabled={pending}
+              title={(chronicle === name ? '✓ ' : '') + (name || 'All chronicles')}
+              press={() => { setChronicle(name); setRecipeResults(null); }} />)}
+        </View>
+      </ScrollView>}
       <Button title="Search executable recipes" disabled={pending}
         press={() => { void loadRecipes(0); }} />
       {recipeResults && <Text style={{ color:'#b1cada' }}>
@@ -769,7 +785,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         {recipeResults.offset + recipeResults.items.length}
       </Text>}
       {recipeResults?.items.map(recipe => <Button key={recipe.operation}
-        disabled={pending} title={recipe.operation.replace(/^(produce_|expand_|direct_|complete_|worldline_|phase_|campaign_)/, '').replace(/_/g, ' ')}
+        disabled={pending} title={recipe.operation.replace(/^(produce_|expand_|direct_|complete_|worldline_|phase_|campaign_|chronicle_)/, '').replace(/_/g, ' ')}
         press={() => selectRecipe(recipe)} />)}
       {recipeResults?.next_offset !== null && recipeResults?.next_offset !== undefined &&
         <Button title="Next recipes" disabled={pending}
