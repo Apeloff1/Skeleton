@@ -247,7 +247,7 @@ class NativeStudioModel:
                 "project canon changed during local deliberation; rebuild context"
             )
         if (self.source_store is not None
-                and self.source_store.snapshot()["head_sha256"] != source_head):
+                and self.source_store.head_identity() != source_head):
             raise StudioInteractionError(
                 "original game source changed during local deliberation; rebuild context"
             )
