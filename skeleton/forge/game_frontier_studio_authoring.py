@@ -26,6 +26,11 @@ from .game_frontier_studio_topology_edit import TERRAIN_TOPOLOGY_ACTIONS, edit_t
 from .game_frontier_studio_actor_layout_edit import ACTOR_LAYOUT_ACTIONS, edit_actor_layout
 from .game_frontier_studio_story_production_edit import STORY_PRODUCTION_ACTIONS, edit_story_production
 from .game_frontier_studio_environment_composer import ENVIRONMENT_COMPOSER_ACTIONS, edit_environment_composer
+from .game_frontier_studio_biome_factory import BIOME_ACTIONS, edit_biome
+from .game_frontier_studio_structure_factory import STRUCTURE_ACTIONS, edit_structure
+from .game_frontier_studio_encounter_factory import ENCOUNTER_ACTIONS, edit_encounter
+from .game_frontier_studio_quest_blueprint_factory import QUEST_BLUEPRINT_ACTIONS, edit_quest_blueprint
+from .game_frontier_studio_reactive_scene_factory import REACTIVE_SCENE_ACTIONS, edit_reactive_scene
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
@@ -34,9 +39,11 @@ AUTHORING_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIO
                      QUEST_ACTIONS + TERRAIN_ACTIONS + PROCEDURAL_ACTIONS +
                      POPULATION_ACTIONS + STORY_ACTIONS +
                      TERRAIN_TOPOLOGY_ACTIONS + ACTOR_LAYOUT_ACTIONS +
-                     STORY_PRODUCTION_ACTIONS + ENVIRONMENT_COMPOSER_ACTIONS)
-if len(AUTHORING_ACTIONS) != 250 or len(set(AUTHORING_ACTIONS)) != 250:
-    raise RuntimeError("Forge Studio must expose 250 implemented, distinct operations")
+                     STORY_PRODUCTION_ACTIONS + ENVIRONMENT_COMPOSER_ACTIONS +
+                     BIOME_ACTIONS + STRUCTURE_ACTIONS + ENCOUNTER_ACTIONS +
+                     QUEST_BLUEPRINT_ACTIONS + REACTIVE_SCENE_ACTIONS)
+if len(AUTHORING_ACTIONS) != 500 or len(set(AUTHORING_ACTIONS)) != 500:
+    raise RuntimeError("Forge Studio must expose 500 implemented, distinct operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -98,6 +105,16 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_story_production(project, operation, payload)
     if operation in ENVIRONMENT_COMPOSER_ACTIONS:
         return edit_environment_composer(project, operation, payload)
+    if operation in BIOME_ACTIONS:
+        return edit_biome(project, operation, payload)
+    if operation in STRUCTURE_ACTIONS:
+        return edit_structure(project, operation, payload)
+    if operation in ENCOUNTER_ACTIONS:
+        return edit_encounter(project, operation, payload)
+    if operation in QUEST_BLUEPRINT_ACTIONS:
+        return edit_quest_blueprint(project, operation, payload)
+    if operation in REACTIVE_SCENE_ACTIONS:
+        return edit_reactive_scene(project, operation, payload)
     raise StudioError("unknown executable Studio editor action")
 
 
