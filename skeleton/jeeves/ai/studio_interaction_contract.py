@@ -148,7 +148,7 @@ class StudioEvidenceJournal:
     """
 
     EVENTS = frozenset((
-        "question_answered", "modality_registered", "model_proposed",
+        "question_answered", "modality_registered", "model_inference_observed", "model_proposed",
         "plan_compiled", "plan_approved", "execution_succeeded",
         "execution_uncertain", "execution_aborted",
     ))
