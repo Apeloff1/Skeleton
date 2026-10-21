@@ -623,3 +623,82 @@ export async function rankForgeEpicHandbooks(
     throw new Error('Epic handbook ranking violates strict source contract.');
   return response;
 }
+
+/** Source-only cross-layer route audit; transport proposals are NOT native moves. */
+export type ForgeEpicWaypoint = { layer: string; x: number; y: number };
+export type ForgeEpicTransfer = {
+  connector_id: string; from: ForgeEpicWaypoint; to: ForgeEpicWaypoint;
+  mode: 'walk' | 'stairs' | 'elevator' | 'bridge' | 'ferry' | 'shuttle' | 'portal';
+  bidirectional: boolean;
+};
+export type ForgeEpicJourney = {
+  journey_id: string; start: ForgeEpicWaypoint; goal: ForgeEpicWaypoint;
+  require_alternate: boolean;
+};
+export type ForgeEpicRouteRequest = {
+  layer_ids: string[]; connectors: ForgeEpicTransfer[];
+  itineraries: ForgeEpicJourney[];
+};
+export type ForgeEpicRouteWitness = {
+  reachable: boolean; steps: number | null; transfers: number;
+  connector_ids: string[]; path_sha256: string | null;
+  sample: [string, number, number][];
+  sample_truncated: boolean;
+};
+export type ForgeEpicRouteAudit = {
+  schema: 'skeleton.forge.epic_interlayer_reference.v1';
+  project_id: string; project_sha256: string; source_version: number;
+  layer_ids: string[]; layer_source_sha256: Record<string, string>;
+  connectors: { connector_id: string; mode: string; distance_m: number }[];
+  journey_count: number; passed_count: number; failed_count: number;
+  journeys: {
+    journey_id: string; start: [string, number, number];
+    goal: [string, number, number]; require_alternate: boolean;
+    primary: ForgeEpicRouteWitness; alternate: ForgeEpicRouteWitness | null;
+    passed: boolean; failure: string | null;
+  }[];
+  receipt_sha256: string; verified_against_authoritative_source: true;
+  native_engine_executed: false; transport_actions_applied: false;
+  release_certified: false; source_reference_only: true;
+};
+export async function auditForgeEpicRoutes(
+  projectId: string, body: ForgeEpicRouteRequest,
+): Promise<ForgeEpicRouteAudit> {
+  if (!Array.isArray(body.layer_ids) || body.layer_ids.length < 1 ||
+      body.layer_ids.length > 8 || new Set(body.layer_ids).size !== body.layer_ids.length ||
+      !Array.isArray(body.connectors) || body.connectors.length > 64 ||
+      !Array.isArray(body.itineraries) || body.itineraries.length < 1 ||
+      body.itineraries.length > 32)
+    throw new Error('Epic route audit requires 1..8 unique layers, <=64 transfers, and 1..32 journeys.');
+  const result = await data(api.post<ForgeEpicRouteAudit>(
+    route(projectId) + '/epic-routes/audit', body, options()
+  ), 'Could not replay Epic multi-layer itineraries from the saved project.');
+  const witness = (value: ForgeEpicRouteWitness | null): value is ForgeEpicRouteWitness =>
+    !!value && typeof value.reachable === 'boolean'
+      && (value.path_sha256 === null || SHA.test(value.path_sha256))
+      && Array.isArray(value.sample) && value.sample.length <= 128
+      && value.sample.every(node =>
+        Array.isArray(node) && node.length === 3 && typeof node[0] === 'string'
+        && Number.isSafeInteger(node[1]) && Number.isSafeInteger(node[2]))
+      && Number.isSafeInteger(value.transfers) && value.transfers >= 0
+      && Array.isArray(value.connector_ids);
+  if (!result || result.schema !== 'skeleton.forge.epic_interlayer_reference.v1'
+      || result.project_id !== projectId || !SHA.test(result.project_sha256)
+      || !SHA.test(result.receipt_sha256) || !Number.isSafeInteger(result.source_version)
+      || result.source_reference_only !== true
+      || result.native_engine_executed !== false
+      || result.transport_actions_applied !== false
+      || result.release_certified !== false
+      || result.verified_against_authoritative_source !== true
+      || !Array.isArray(result.layer_ids) || !Array.isArray(result.connectors)
+      || !Array.isArray(result.journeys)
+      || result.journey_count !== body.itineraries.length
+      || result.passed_count + result.failed_count !== result.journey_count
+      || result.journeys.some(j => typeof j.passed !== 'boolean'
+          || !witness(j.primary)
+          || (j.require_alternate ? !witness(j.alternate) : j.alternate !== null))) {
+    throw new ChatClientError('Epic multi-layer route report failed replay contract checks.',
+      {kind: 'protocol', retryable: false});
+  }
+  return result;
+}
