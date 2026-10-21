@@ -27,7 +27,7 @@ from skeleton.forge.game_frontier_studio_campaign_production import (
 from skeleton.forge.game_frontier_studio_phase_production import PHASE_ACTIONS
 from skeleton.forge.game_frontier_studio_campaign_handbooks import (
     BOOK_COUNT,CAMPAIGN_BOOK_PATHS,identity,number,list_books,
-    receipt,rank_variants,
+    receipt,rank_variants,grade,metadata,
 )
 from skeleton.forge.game_frontier_studio_document import (
     authored_document,load_authored_document,
@@ -218,6 +218,20 @@ class RankedMillionBookLibrary(unittest.TestCase):
         self.assertEqual(item["quality_kind"],
             "objective_document_completeness_not_playability")
         self.assertTrue(item["criteria"]["fifty_archetypes"])
+
+    def test_quality_score_requires_evidence_not_just_more_words(self):
+        args=identity(0)
+        manual=receipt(*args)
+        self.assertTrue(manual["criteria"]["seven_required_sections"])
+        erased=manual["markdown"].replace(
+            "## Ten gameplay systems with actual execution examples",
+            "## Unspecified gameplay",1)
+        degraded=grade(erased,metadata(*args))
+        self.assertLess(degraded["quality_score"],manual["quality_score"])
+        padding=manual["markdown"]+"\\n"+("decorative verbosity "*2000)
+        enlarged=grade(padding,metadata(*args))
+        self.assertEqual(enlarged["quality_score"],manual["quality_score"])
+        self.assertGreater(enlarged["words"],manual["words"])
 
     def test_paginated_book_discovery_and_real_batch_ranking_export(self):
         page=list_books(domain="living_story",campaign="epilogue_variants",limit=4)
