@@ -176,10 +176,11 @@ def _sprite_archive(
         raw = entry["png"]
         if sha256(raw).hexdigest() != proof["png_sha256"]:
             raise CreatorSourceError("sprite output differs from its generated proof")
-        if _decode_verified_png(
+        pixels = _decode_verified_png(
             raw, proof["sheet_width_px"], proof["sheet_height_px"],
-        ) is None:
-            raise CreatorSourceError("published PNG cannot be independently decoded")
+        )
+        if sha256(pixels).hexdigest() != proof["pixel_content_sha256"]:
+            raise CreatorSourceError("published PNG pixel content changed from authored source")
         files["sprites/" + name + ".png"] = raw
         files["sprites/" + name + ".json"] = _json(proof)
     files["jeeves_sprite_receipt.json"] = _json(metadata, limit=MAX_BUNDLE_BYTES)
