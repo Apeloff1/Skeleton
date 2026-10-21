@@ -139,6 +139,7 @@ def rasterize_atlas(
             "source_pixels": width * height,
             "collision_alpha_threshold": policy["alpha_threshold"],
             "collision_mask_sha256": sha256(mask).hexdigest(),
+            "collision_mask_bits_hex": mask.hex(),
             "original_rgba_sha256": sha256(original).hexdigest(),
         })
     return {
