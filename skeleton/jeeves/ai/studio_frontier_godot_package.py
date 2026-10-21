@@ -128,6 +128,40 @@ def compile_original_godot_candidate(
     }
     if file_hashes != godot_proof["file_hashes"]:
         raise FrontierSourceError("Godot compiler proof does not match file bytes")
+    # Keep original image resources in the REAL Godot project directory.
+    # They are explicitly marked not yet bound to engine actor render nodes:
+    # a PNG present on disk does not prove animated asset presentation.
+    binary_assets: dict[str, bytes] = {}
+    authored_sprites: list[dict[str, Any]] = []
+    sprite_names: list[str] = []
+    if any(
+        isinstance(record.get("document"), dict)
+        and record["document"].get("kind") == "pixel_sprite"
+        for record in records.values()
+    ):
+        from .studio_sprite_forge import compile_sprite_collection
+        artwork = compile_sprite_collection(records)
+        for sprite in artwork["assets"]:
+            info = sprite["metadata"]
+            name = info["asset_id"]
+            sprite_names.append(info["record_id"])
+            png_path = "game/frontier/sprites/" + name + ".png"
+            json_path = "game/frontier/sprites/" + name + ".json"
+            metadata_bytes = json.dumps(
+                info, ensure_ascii=True, sort_keys=True,
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
+            binary_assets[png_path] = sprite["png"]
+            binary_assets[json_path] = metadata_bytes
+            file_hashes[png_path] = sha256(sprite["png"]).hexdigest()
+            file_hashes[json_path] = sha256(metadata_bytes).hexdigest()
+            authored_sprites.append({
+                "asset_id": name, "source_record_id": info["record_id"],
+                "source_sha256": info["source_sha256"],
+                "frame_count": len(info["frames"]),
+                "animation_count": len(info["animations"]),
+                "png_sha256": info["png_sha256"],
+            })
     metadata = {
         "schema_version": SCHEMA, "project_id": project_id,
         "source_head_sha256": source_head_sha256,
@@ -141,6 +175,9 @@ def compile_original_godot_candidate(
         "world_sha256": world.digest,
         "godot_verification_sha256": godot_proof["receipt_digest"],
         "godot_file_hashes": file_hashes,
+        "packaged_original_sprites": authored_sprites,
+        "source_sprite_record_ids": sprite_names,
+        "native_sprite_scene_binding_verified": False,
         "gameplay_route_digest": route.digest,
         "gameplay_execution_head_sha256": playthrough["receipt_head"],
         "real_python_route_playtest_passed": True,
@@ -152,7 +189,10 @@ def compile_original_godot_candidate(
         ),
     }
     metadata["receipt_sha256"] = digest(metadata)
-    return {"files": files, "receipt": metadata}
+    return {
+        "files": files, "binary_assets": binary_assets,
+        "receipt": metadata,
+    }
 
 
 def run_original_game_native_playthrough(
