@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import re
+import re
 import sqlite3
 from threading import RLock
 from typing import Any
@@ -213,34 +214,85 @@ class CreatorProjectSourceStore:
             self._data_version = version
 
     def _validate_graph(self, documents: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
-        missing: list[str] = []
-        cycles: list[str] = []
+        """Iterative DFS avoids depth failures in multi-year dependency graphs."""
+        missing: set[str] = set()
+        cycles: set[str] = set()
         done: set[str] = set()
         visiting: set[str] = set()
-
-        def visit(key: str) -> None:
-            if key in done:
-                return
-            if key in visiting:
-                cycles.append(key)
-                return
-            if key not in documents:
-                missing.append(key)
-                return
-            visiting.add(key)
-            for dep in documents[key]["depends_on"]:
-                visit(dep)
-            visiting.remove(key)
-            done.add(key)
-
-        for record in sorted(documents):
-            visit(record)
+        for key in sorted(documents):
+            stack: list[tuple[str, bool]] = [(key, False)]
+            while stack:
+                node, leaving = stack.pop()
+                if leaving:
+                    visiting.discard(node)
+                    done.add(node)
+                    continue
+                if node in done:
+                    continue
+                if node in visiting:
+                    cycles.add(node)
+                    continue
+                if node not in documents:
+                    missing.add(node)
+                    continue
+                visiting.add(node)
+                stack.append((node, True))
+                stack.extend((dep, False) for dep in
+                             reversed(documents[node]["depends_on"]))
         return {
             "sources_checked": len(documents),
-            "missing_dependencies": sorted(set(missing)),
-            "cyclic_dependencies": sorted(set(cycles)),
+            "missing_dependencies": sorted(missing),
+            "cyclic_dependencies": sorted(cycles),
             "valid": not missing and not cycles,
         }
+
+    def search(self, query: str, *, limit: int = 6,
+               facet: str | None = None) -> dict[str, Any]:
+        """Find relevant real authored documents with exact revision proofs."""
+        if not isinstance(query, str) or not 1 <= len(query.strip()) <= 2048:
+            raise CreatorSourceError("bounded source question required")
+        if type(limit) is not int or not 1 <= limit <= 12:
+            raise CreatorSourceError("authoring-context retrieval budget invalid")
+        if facet is not None and facet not in FACETS:
+            raise CreatorSourceError("unknown source facet filter")
+        terms = set(re.findall(r"[^\\W_]+", query.casefold())) - {
+            "the", "and", "are", "you", "how", "that", "with", "from", "for",
+        }
+        if not terms:
+            raise CreatorSourceError("source query contains no searchable terms")
+        with self._lock:
+            self._refresh()
+            scores: list[tuple[int, str, dict[str, Any]]] = []
+            for key, record in self._records.items():
+                if facet is not None and record["facet"] != facet:
+                    continue
+                searchable = key + " " + record["facet"] + " " + json.dumps(
+                    record["document"], sort_keys=True, ensure_ascii=False,
+                )
+                overlap = len(terms & set(re.findall(
+                    r"[^\\W_]+", searchable.casefold(),
+                )))
+                if overlap:
+                    scores.append((-overlap, key, record))
+            scores.sort(key=lambda item: (item[0], item[1]))
+            excerpts = []
+            for _, key, record in scores[:limit]:
+                raw = _json(record["document"])
+                excerpts.append({
+                    "record_id": key, "facet": record["facet"],
+                    "revision": record["revision"],
+                    "source_sha256": record["source_sha256"],
+                    "depends_on": record["depends_on"],
+                    "document_excerpt": raw[:1000].decode("utf-8", errors="ignore"),
+                    "excerpt_is_partial": len(raw) > 1000,
+                })
+            return {
+                "schema_version": SCHEMA, "project_id": self.project_id,
+                "source_head_sha256": self._head,
+                "source_count": len(self._records), "results": excerpts,
+                "results_sha256": digest(excerpts),
+                "native_engine_compilation_performed": False,
+            }
 
     def _mutate(self, command: CreatorCommand, *,
                 record_id: str, facet: str, document: dict[str, Any],
@@ -509,7 +561,10 @@ def register_creator_source_tool(
 
     registry.register(ToolSpec(
         name="creator_execute_authorized",
-        description="Execute host-reviewed original game-source create/edit/test/static preview or export with persistent source receipts",
+        description=(
+            "Execute host-reviewed original game-source create/edit/test/"
+            "static preview or export with persistent source receipts"
+        ),
         risk=RiskTier.HIGH_IMPACT, idempotent=False,
         arguments=(
             ArgumentRule("operation", "string",
