@@ -184,7 +184,7 @@ class NativeStudioHost:
             raise StudioInteractionError("native plan's reviewed book source is unavailable")
         if self.canon_memory is not None:
             if (pinned["canon_head_sha256"] !=
-                    self.canon_memory.verify()["history_sha256"]):
+                    self.canon_memory.head_identity()):
                 raise StudioInteractionError(
                     "project canon changed since this native model proposal"
                 )
