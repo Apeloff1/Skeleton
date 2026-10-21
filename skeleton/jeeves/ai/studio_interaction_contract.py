@@ -151,6 +151,7 @@ class StudioEvidenceJournal:
         "question_answered", "modality_registered", "modality_observation_reviewed",
         "model_inference_observed", "model_proposed", "book_memory_retrieved",
         "canon_context_retrieved", "source_context_retrieved",
+        "plan_context_bound",
         "plan_compiled", "plan_approved", "execution_succeeded",
         "execution_uncertain", "execution_aborted",
     ))
