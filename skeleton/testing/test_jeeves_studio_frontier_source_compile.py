@@ -353,6 +353,55 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(journal.read()), 0)
 
+    def test_original_sprite_png_is_packaged_inside_real_godot_project(self):
+        self.populate_3d()
+        self.create("hero-art", "sprite_forge", {
+            "kind": "pixel_sprite", "asset_id": "hero-idle",
+            "width": 2, "height": 2, "pixel_scale": 2,
+            "palette": ["#00000000", "#3366ffff"],
+            "frames": [
+                {"frame_id": "first", "duration_ms": 100,
+                 "pixels": [0, 1, 1, 0]},
+                {"frame_id": "second", "duration_ms": 200,
+                 "pixels": [1, 0, 0, 1]},
+            ],
+            "animations": [
+                {"name": "idle", "frame_ids": ["first", "second"],
+                 "loop": True},
+            ],
+        }, depends=("config-3d",))
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as z:
+            png = z.read("game/frontier/sprites/hero-idle.png")
+            info = json.loads(z.read("game/frontier/sprites/hero-idle.json"))
+            receipt = json.loads(z.read("jeeves_source_receipt.json"))
+        self.assertTrue(png.startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+        self.assertEqual(info["sheet_width_px"], 8)
+        self.assertEqual(info["frames"][1]["duration_ms"], 200)
+        self.assertEqual(info["png_sha256"], sha256(png).hexdigest())
+        self.assertEqual(receipt["packaged_original_sprites"][0]["asset_id"],
+                         "hero-idle")
+        self.assertIn("hero-art", receipt["source_sprite_record_ids"])
+        self.assertFalse(receipt["native_sprite_scene_binding_verified"])
+        self.assertIn("hero-art", receipt["uncompiled_record_ids"])
+        self.assertFalse(receipt["all_studio_facets_compiled"])
+        self.assertTrue(result["disk_verification"]["all_emitted_file_hashes_verified"])
+
+    def test_invalid_sprite_source_blocks_game_export_without_partial_file(self):
+        self.populate_3d()
+        self.create("invalid-art", "sprite_forge", {
+            "kind": "pixel_sprite", "asset_id": "invalid-art",
+            "width": 1, "height": 1, "pixel_scale": 1,
+            "palette": ["#3366ffff"],
+            "frames": [{"frame_id": "empty", "duration_ms": 100,
+                        "pixels": [9]}],
+            "animations": [{"name": "idle", "frame_ids": ["empty"],
+                            "loop": True}],
+        }, depends=("config-3d",))
+        with self.assertRaises(Exception):
+            self.export_godot()
+        self.assertFalse(any(self.export.iterdir()))
+
     def test_existing_uncompiled_story_is_never_claimed_as_engine_content(self):
         self.populate_3d()
         self.create("uncompiled-acts", "story", {
