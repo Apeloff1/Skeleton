@@ -124,7 +124,8 @@ class ReviewedBookMemory:
                     or rights.get("source_kind") not in
                     ("original_authoring", "licensed_training", "public_domain")):
                 raise BookMemoryError("segment source or approved rights is invalid")
-            rows.append((key, book_id, family, text, _hash(text), _hash(rights)))
+            rows.append((key, book_id, family, text,
+                         sha256(text.encode("utf-8")).hexdigest(), _hash(rights)))
         source_root = _hash(rows)
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
         os.close(fd)
@@ -197,7 +198,7 @@ class ReviewedBookMemory:
             if len(rows) != meta[0][3] or not 1 <= len(rows) <= MAX_ROWS:
                 raise BookMemoryError("book memory lost a reviewed source segment")
             for row in rows:
-                if _hash(row[3]) != row[4] or not HEX.fullmatch(row[5]):
+                if sha256(row[3].encode("utf-8")).hexdigest() != row[4] or not HEX.fullmatch(row[5]):
                     raise BookMemoryError("book memory source text changed")
             if _hash(rows) != meta[0][2]:
                 raise BookMemoryError("book memory source root does not match admission")
@@ -322,14 +323,30 @@ class ReviewedBookMemory:
                 (match, family, family, limit),
             ).fetchall()
             for row in dbrows:
-                if _hash(row[3]) != row[4]:
+                if sha256(row[3].encode("utf-8")).hexdigest() != row[4]:
                     raise BookMemoryError("retrieved segment differs from source hash")
-            citations = [{
-                "segment_id": row[0], "book_id": row[1], "family": row[2],
-                "excerpt": row[3][:excerpt_chars], "source_text_sha256": row[4],
-                "rights_sha256": row[5], "truncated": len(row[3]) > excerpt_chars,
-                "score": round(float(row[6]), 8),
-            } for row in dbrows]
+            citations = []
+            for row in dbrows:
+                source = row[3]
+                # FTS may match deep into a full chapter: carry the relevant
+                # reviewed span, not merely the first paragraph of a chunk.
+                start_at = 0
+                for term in sorted(terms, key=len, reverse=True):
+                    hit = re.search(re.escape(term), source, re.IGNORECASE)
+                    if hit:
+                        start_at = max(0, hit.start() - excerpt_chars // 3)
+                        break
+                end_at = min(len(source), start_at + excerpt_chars)
+                start_at = max(0, end_at - excerpt_chars)
+                citations.append({
+                    "segment_id": row[0], "book_id": row[1], "family": row[2],
+                    "excerpt": source[start_at:end_at],
+                    "excerpt_start": start_at, "excerpt_end": end_at,
+                    "source_text_sha256": row[4],
+                    "rights_sha256": row[5],
+                    "truncated": start_at > 0 or end_at < len(source),
+                    "score": round(float(row[6]), 8),
+                })
             result_sha = _hash(citations)
             query_sha = sha256(query.encode("utf-8")).hexdigest()
             event = self._event("retrieval", {
