@@ -152,6 +152,7 @@ class StudioEvidenceJournal:
         "model_inference_observed", "model_proposed", "book_memory_retrieved",
         "canon_context_retrieved", "source_context_retrieved",
         "plan_context_bound", "native_gameplay_verified",
+        "native_sprite_import_verified",
         "plan_compiled", "plan_approved", "execution_succeeded",
         "execution_uncertain", "execution_aborted",
     ))
@@ -221,7 +222,7 @@ class StudioEvidenceJournal:
             raise StudioInteractionError("multimodal observations require reviewed host admission")
         if kind == "plan_context_bound" and _authority is not self._plan_token:
             raise StudioInteractionError("source-bound plan context requires a trusted native host")
-        if kind == "native_gameplay_verified" and _authority is not self._native_execution_token:
+        if kind in ("native_gameplay_verified", "native_sprite_import_verified") and _authority is not self._native_execution_token:
             raise StudioInteractionError("native gameplay requires observed host engine process")
         body = dict(payload)
         canonical(body)
