@@ -10,7 +10,7 @@ external effects become IN_DOUBT, never unconditionally replayed.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from hashlib import sha256
 from typing import Any
 
@@ -33,6 +33,7 @@ def execute_approved_studio_batch(
     *, executor: ToolExecutor, store: CreatorRunbookStore,
     host_grants: Mapping[str, tuple[ToolExecutionContext, ToolGrant]],
     max_steps: int = 8,
+    before_step: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Execute only explicitly granted ready steps, with complete host receipts.
 
@@ -52,6 +53,8 @@ def execute_approved_studio_batch(
         raise StudioDelegationError("fresh host-issued grants must be a step map")
     if type(max_steps) is not int or not 1 <= max_steps <= MAX_BATCH_STEPS:
         raise StudioDelegationError("bounded number of authorized actions required")
+    if before_step is not None and not callable(before_step):
+        raise StudioDelegationError("production action freshness check must be a host callback")
     runner = controller.runner(plan, executor=executor, store=store)
     step_ids = {item.step_id for item in runner.plan.steps}
     if any(step not in step_ids for step in host_grants):
@@ -75,6 +78,11 @@ def execute_approved_studio_batch(
             stopped = "host_grant_required"
             break
         context, grant = host_grants[selected]
+        # Recheck project canon, rights and other source writers before EACH
+        # possible mutation, not just when the batch was first admitted.
+        # This callback executes before the runner persists its IN_FLIGHT intent.
+        if before_step is not None:
+            before_step(selected)
         try:
             outcome = runner.execute_step(selected, context=context, grant=grant)
         except Exception as exc:
