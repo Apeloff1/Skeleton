@@ -414,3 +414,83 @@ export async function rankForgeEpochHandbooks(
     throw new Error('Temporal handbook comparison protocol invalid.');
   return ranking;
 }
+
+
+/** Source-tile route replay. This checks deterministic reference movement,
+ * not native engine execution or shipping-grade playthrough certification. */
+export type ForgeRouteScenario = {
+  scenario_id: string; layer: string; start: [number, number];
+  goal: [number, number]; require_alternate: boolean;
+};
+export type ForgeRouteWitness = {
+  reachable: boolean; steps: number | null; path_sha256: string | null;
+  path_sample: [number, number][]; sample_truncated: boolean;
+};
+export type ForgeRouteAudit = {
+  schema: 'skeleton.forge.route_playthrough_assurance.v1';
+  project_id: string; project_sha256: string; source_version: number;
+  scenario_count: number; passed_count: number; failed_count: number;
+  scenarios: Array<ForgeRouteScenario & {
+    source_layer_sha256: string; primary: ForgeRouteWitness;
+    alternate: ForgeRouteWitness | null; passed: boolean; failure: string | null;
+  }>;
+  receipt_sha256: string;
+  verified_against_authoritative_source: true;
+  reference_source_replay: true;
+  native_engine_executed: false; release_certified: false;
+};
+function boundedTilePoint(point: readonly number[]): boolean {
+  return Array.isArray(point) && point.length === 2 &&
+    point.every(value => Number.isInteger(value) && value >= 0 && value <= 255);
+}
+function checkRouteWitness(witness: ForgeRouteWitness | null): boolean {
+  return !!witness && typeof witness.reachable === 'boolean' &&
+    (witness.steps === null || (Number.isSafeInteger(witness.steps) && witness.steps >= 0)) &&
+    (witness.path_sha256 === null || SHA.test(witness.path_sha256)) &&
+    Array.isArray(witness.path_sample) && witness.path_sample.length <= 256 &&
+    witness.path_sample.every(boundedTilePoint) &&
+    typeof witness.sample_truncated === 'boolean' &&
+    (!witness.reachable || (witness.steps !== null && SHA.test(witness.path_sha256 || '')));
+}
+export async function auditForgeRoutes(
+  projectId: string, scenarios: ForgeRouteScenario[], signal?: AbortSignal,
+): Promise<ForgeRouteAudit> {
+  if (!Array.isArray(scenarios) || scenarios.length < 1 || scenarios.length > 100 ||
+      new Set(scenarios.map(row => row.scenario_id)).size !== scenarios.length ||
+      scenarios.some(row => !row || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(row.scenario_id) ||
+        typeof row.layer !== 'string' || row.layer.length < 1 || row.layer.length > 128 ||
+        !boundedTilePoint(row.start) || !boundedTilePoint(row.goal) ||
+        (row.start[0] === row.goal[0] && row.start[1] === row.goal[1]) ||
+        typeof row.require_alternate !== 'boolean')) {
+    throw new ChatClientError('Invalid bounded source-route inspection request.',
+      { kind: 'protocol', retryable: false });
+  }
+  const report = await data(api.post<ForgeRouteAudit>(
+    route(projectId) + '/routes/audit', {scenarios}, options(undefined, signal)),
+    'Could not verify authored routes.');
+  if (!report || report.schema !== 'skeleton.forge.route_playthrough_assurance.v1' ||
+      report.project_id !== projectId || !SHA.test(report.project_sha256) ||
+      !SHA.test(report.receipt_sha256) || !Number.isSafeInteger(report.source_version) ||
+      !Number.isSafeInteger(report.passed_count) || !Number.isSafeInteger(report.failed_count) ||
+      report.scenario_count !== scenarios.length ||
+      report.passed_count + report.failed_count !== report.scenario_count ||
+      report.verified_against_authoritative_source !== true ||
+      report.reference_source_replay !== true ||
+      report.native_engine_executed !== false || report.release_certified !== false ||
+      !Array.isArray(report.scenarios) || report.scenarios.length !== scenarios.length ||
+      report.scenarios.some((entry, index) => entry.scenario_id !== scenarios[index].scenario_id ||
+        entry.layer !== scenarios[index].layer ||
+        entry.require_alternate !== scenarios[index].require_alternate ||
+        entry.start.join(',') !== scenarios[index].start.join(',') ||
+        entry.goal.join(',') !== scenarios[index].goal.join(',') ||
+        !SHA.test(entry.source_layer_sha256) ||
+        !checkRouteWitness(entry.primary) ||
+        (entry.require_alternate
+          ? !checkRouteWitness(entry.alternate)
+          : entry.alternate !== null) ||
+        typeof entry.passed !== 'boolean')) {
+    throw new ChatClientError('Forge route replay returned inconsistent or unverified evidence.',
+      { kind: 'protocol', retryable: false });
+  }
+  return report;
+}
