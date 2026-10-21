@@ -41,6 +41,10 @@ on:
       - "skeleton/testing/test_game_frontier_studio_production_500000000000.py"
       - "skeleton/testing/test_game_frontier_studio_production_5000000000000.py"
       - "skeleton/testing/test_game_frontier_studio_production_50000000000000.py"
+      - "skeleton/testing/test_game_frontier_book_curriculum_operational.py"
+      - "skeleton/jeeves/game_frontier_curriculum_path.py"
+      - "frontend/src/features/Jeeves/GameFrontierCurriculumPanel.tsx"
+      - "frontend/src/product/gameFrontierCurriculumClient.ts"
       - "skeleton/testing/test_game_frontier_studio_epic_routes.py"
       - "skeleton/testing/test_game_frontier_studio_epic_lod.py"
       - "skeleton/forge/game_frontier_studio_epic_lod.py"
@@ -107,5 +111,6 @@ jobs:
             skeleton/testing/test_game_frontier_studio_production_500000000000.py \
             skeleton/testing/test_game_frontier_studio_production_5000000000000.py \
             skeleton/testing/test_game_frontier_studio_production_50000000000000.py \
+            skeleton/testing/test_game_frontier_book_curriculum_operational.py \
             skeleton/testing/test_game_frontier_studio_epic_routes.py \
             skeleton/testing/test_game_frontier_studio_epic_lod.py
