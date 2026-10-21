@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
-import math
 import re
 from typing import Mapping
 
@@ -107,51 +106,14 @@ def add_studio_native_terrain(project: StudioProject,
         raise StudioError("native terrain export would replace existing authored files")
     if _SCENE not in original:
         raise StudioError("native terrain must attach to existing expedition root")
-    layers=[]
-    drawn=0
-    for layer in project.layers:
-        count=sum(value>=0 for value in layer.data)
-        if count == 0:
-            continue
-        remaining=_LIMIT-drawn
-        if count>remaining:
-            # Explicit deterministic coarse LOD for large authored layers.
-            stride=max(2,math.ceil(math.sqrt(count/max(1,remaining))))
-            sampled=[]
-            for y in range(0,layer.height,stride):
-                for x in range(0,layer.width,stride):
-                    index=y*layer.width+x
-                    if layer.data[index]>=0:
-                        sampled.append((x,y,layer.data[index]))
-            if len(sampled)>remaining:
-                sampled=sampled[:remaining]
-            # Keep full original coordinates by using an erased sparse grid.
-            values=[-1]*len(layer.data)
-            for x,y,value in sampled:
-                values[y*layer.width+x]=value
-        else:
-            values=list(layer.data)
-        count=sum(value>=0 for value in values)
-        if count>remaining:
-            raise StudioError("native terrain exceeds renderer instance budget")
-        drawn+=count
-        layers.append({
-            "id":layer.layer_id,"width":layer.width,"height":layer.height,
-            "elevation_m":layer.elevation_m,
-            "palette":list(layer.palette),"tiles":values,
-            "source_nonempty_cells":sum(v>=0 for v in layer.data),
-            "rendered_cells":count,
-        })
-        if drawn >= _LIMIT:
-            break
+    from .game_frontier_studio_epic_lod import planned_native_visual_layers
+    # Balance the existing low-memory MultiMesh budget across every nonempty
+    # source layer; old sequential LOD could completely hide later sky worlds.
+    layers, visual = planned_native_visual_layers(project.layers, _LIMIT)
     result={
         "schema":"skeleton.forge.godot_studio_terrain.v1",
         "studio_sha256":compile_studio_project(project)["content_sha256"],
-        "source_layer_count":len(project.layers),
-        "rendered_layer_count":len(layers),
-        "rendered_cells":drawn,
-        "source_cells":sum(sum(v>=0 for v in layer.data) for layer in project.layers),
-        "visual_lod_only":True,"collision_unmodified":True,
+        **visual,
         "layers":layers,
     }
     if result["rendered_cells"]==0:
