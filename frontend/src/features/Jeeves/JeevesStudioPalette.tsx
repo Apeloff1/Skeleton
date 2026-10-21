@@ -62,7 +62,9 @@ export default function JeevesStudioPalette({
   const [visible, setVisible] = useState(false);
   const [facet, setFacet] = useState('vision');
   const [mode, setMode] = useState<Mode>('questionnaire');
-  const [reply, setReply] = useState('');
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const reply = answers[facet] || '';
+  const setReply = (value: string) => setAnswers(current => ({ ...current, [facet]: value }));
   const [source, setSource] = useState('');
   const [group, setGroup] = useState('All');
   const domains = useMemo(() => JEEVES_STUDIO_DOMAINS.filter(item => group === 'All' || item.family === group), [group]);
@@ -74,7 +76,8 @@ export default function JeevesStudioPalette({
       'Jeeves: operate as the locally running game-studio AI, not an external API proxy.',
       `Studio facet: ${chosen.id} (${chosen.title}). Interaction mode: ${mode}.`,
       `Guiding question: ${chosen.question}`,
-      reply.trim() ? `User requirements: ${reply.trim()}` : 'Ask for the next missing requirement; do not invent an answer.',
+      reply.trim() ? `Selected-facet requirements: ${reply.trim()}` : 'Ask for the next missing requirement; do not invent an answer.',
+      `Reviewed questionnaire answers (proposals only): ${JSON.stringify(Object.entries(answers).filter(([, answer]) => answer.trim()).map(([id, answer]) => ({ facet: id, answer: answer.trim() })))}`,
       source.trim() ? `User-supplied context/source reference (verify before reuse): ${source.trim()}` : 'No source attachment has been verified in this turn.',
       'Read the project canon and current editor state when available. Produce concrete, editable options and dependencies.',
       'For effects: propose a typed creator command and exact scopes, show the intended changes, wait for operator authorization, then delegate to the existing creator runbook.',
@@ -110,8 +113,8 @@ export default function JeevesStudioPalette({
           <Text style={{ color: C.subtle }}>Choose a studio capability, questionnaire, forge or production flow. Jeeves will work in chat; open the real editor to perform changes. No hidden execution occurs from this selector.</Text>
           <Text style={{ color: C.text, fontWeight: '700' }}>Production family</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{groups.map(name => chip(name, name === group, () => setGroup(name)))}</View>
-          <Text style={{ color: C.text, fontWeight: '700' }}>Capability</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{domains.map(item => chip(item.title, chosen.id === item.id, () => { setFacet(item.id); setReply(''); }))}</View>
+          <Text style={{ color: C.text, fontWeight: '700' }}>Capability · {Object.values(answers).filter(answer => answer.trim()).length} / {JEEVES_STUDIO_DOMAINS.length} questions answered</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{domains.map(item => chip(`${answers[item.id]?.trim() ? '✓ ' : ''}${item.title}`, chosen.id === item.id, () => setFacet(item.id)))}</View>
           <Text style={{ color: C.text, fontWeight: '700' }}>Working mode</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{MODES.map(name => chip(name, mode === name, () => setMode(name)))}</View>
           <Text style={{ color: C.subtle }}>{chosen.question}</Text>
