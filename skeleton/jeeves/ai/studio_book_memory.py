@@ -75,6 +75,9 @@ class ReviewedBookMemory:
         self._db.execute("PRAGMA query_only=ON")
         try:
             self.verify()
+            self._checked_data_version = self._db.execute(
+                "PRAGMA data_version"
+            ).fetchone()[0]
         except BaseException:
             self._db.close()
             raise
@@ -197,6 +200,11 @@ class ReviewedBookMemory:
                     raise BookMemoryError("book memory source text changed")
             if _hash(rows) != meta[0][2]:
                 raise BookMemoryError("book memory source root does not match admission")
+            indexed = self._db.execute(
+                "SELECT segment_id,text FROM segment_search ORDER BY segment_id"
+            ).fetchall()
+            if indexed != [(item[0], item[3]) for item in rows]:
+                raise BookMemoryError("full-book search index differs from source identity")
             for table, fields in (
                 ("policy", "book_id,reviewer_id,reason"),
                 ("retrieval", "actor_id,query_sha,filter_family,result_sha"),
@@ -216,6 +224,18 @@ class ReviewedBookMemory:
                         raise BookMemoryError("book evidence digest mismatch")
                     prev = record[-1]
             return {"source_root_sha256": meta[0][2], "segments": len(rows)}
+
+    def _verify_external_changes(self) -> None:
+        """Full replay on external writes; constant-time checks during local search.
+
+        Our own connection only appends audited policies and retrieval events.
+        SQLite data_version changes when another connection commits, so bulk
+        book text is not rescanned on each local model inference.
+        """
+        current = self._db.execute("PRAGMA data_version").fetchone()[0]
+        if current != self._checked_data_version:
+            self.verify()
+            self._checked_data_version = current
 
     def _event(self, table: str, fields: Mapping[str, object]) -> str:
         if table not in ("policy", "retrieval"):
@@ -256,7 +276,7 @@ class ReviewedBookMemory:
         if not isinstance(reason, str) or not 16 <= len(reason) <= 512:
             raise BookMemoryError("documented withdrawal reason required")
         with self._lock:
-            self.verify()
+            self._verify_external_changes()
             if not self._db.execute(
                 "SELECT 1 FROM segment WHERE book_id=? LIMIT 1", (book_id,)
             ).fetchone():
@@ -289,7 +309,7 @@ class ReviewedBookMemory:
         # column syntax from user/model text.
         match = " OR ".join('"' + word.replace('"', '""') + '"' for word in terms)
         with self._lock:
-            self.verify()
+            self._verify_external_changes()
             dbrows = self._db.execute(
                 "SELECT s.segment_id,s.book_id,s.family,s.text,s.text_sha,s.rights_sha,"
                 "bm25(segment_search) AS relevance "
@@ -300,6 +320,9 @@ class ReviewedBookMemory:
                 "ORDER BY relevance ASC,s.segment_id ASC LIMIT ?",
                 (match, family, family, limit),
             ).fetchall()
+            for row in dbrows:
+                if _hash(row[3]) != row[4]:
+                    raise BookMemoryError("retrieved segment differs from source hash")
             citations = [{
                 "segment_id": row[0], "book_id": row[1], "family": row[2],
                 "excerpt": row[3][:excerpt_chars], "source_text_sha256": row[4],
