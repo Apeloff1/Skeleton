@@ -169,6 +169,19 @@ def verify_published_godot_zip(
                         raise NativeSourceVerificationError(
                             "Godot sprite decoded pixel identity differs from source"
                         )
+                    from .studio_sprite_verify import (
+                        SpriteVerificationError, verify_published_sprite,
+                    )
+                    try:
+                        inspected = verify_published_sprite(image, sprite)
+                    except SpriteVerificationError as exc:
+                        raise NativeSourceVerificationError(
+                            "embedded Godot sprite fails independent pixel-atlas replay"
+                        ) from exc
+                    if not inspected["layout_and_padding_reproduced"]:
+                        raise NativeSourceVerificationError(
+                            "Godot sprite atlas verification did not replay source"
+                        )
                     from .studio_sprite_godot_resources import (
                         SpriteResourceError, verify_godot_sprite_resources,
                     )
