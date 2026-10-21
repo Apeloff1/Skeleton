@@ -199,8 +199,16 @@ class PersistentSpriteExportTests(unittest.TestCase):
             self.assertEqual(names, {
                 "sprites/hero-idle.png",
                 "sprites/hero-idle.json",
+                "sprites/hero-idle.tres",
+                "sprites/hero-idle.tscn",
                 "jeeves_sprite_receipt.json",
             })
+            self.assertIn(
+                b'SpriteFrames', archive.read("sprites/hero-idle.tres"),
+            )
+            self.assertIn(
+                b'AnimatedSprite2D', archive.read("sprites/hero-idle.tscn"),
+            )
             proof = json.loads(archive.read("jeeves_sprite_receipt.json"))
             asset = json.loads(archive.read("sprites/hero-idle.json"))
             image = archive.read("sprites/hero-idle.png")
