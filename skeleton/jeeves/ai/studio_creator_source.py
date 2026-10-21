@@ -426,6 +426,17 @@ class CreatorProjectSourceStore:
         expected = old["source_sha256"] if old else None
         version = old["revision"] + 1 if old else 1
         content_sha = digest([record_id, facet, version, document, depends_on])
+        # Do not persist a structurally invalid image as a valid game asset.
+        # Validate original pixel bytes and independent verification before
+        # opening the SQLite write transaction (which stays short).
+        if facet == "sprite_forge" and document.get("kind") == "pixel_sprite":
+            from .studio_sprite_forge import compile_authored_sprite
+            compile_authored_sprite({
+                "record_id": record_id, "facet": facet,
+                "revision": version, "document": document,
+                "depends_on": depends_on,
+                "source_sha256": content_sha,
+            })
         if self._event_count >= MAX_EVENTS:
             raise CreatorSourceError("source event journal needs archival")
         self._db.execute("BEGIN IMMEDIATE")
