@@ -63,7 +63,7 @@ export default function GameFrontierCurriculumPanel({
   const activeCount = catalog?.curriculum_levels.find(row =>
     row.generation === generation)?.book_count || 0;
   const selectedIndex = Number(bookIndex);
-  const validIndex = /^\d{1,13}$/.test(bookIndex) &&
+  const validIndex = /^(0|[1-9]\d{0,12})$/.test(bookIndex) &&
     Number.isSafeInteger(selectedIndex) &&
     selectedIndex >= 0 && selectedIndex < activeCount;
   const ref = 'forgebook:' + generation + ':' + bookIndex;
