@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -79,10 +81,46 @@ def _all_rows(receipt: dict[str, Any], root: Path) -> dict[str, dict[str, Any]]:
     return compiled
 
 
+def _bounded_output_hash(path: Path, *, max_bytes: int = 256 * 1024 * 1024) -> str:
+    """Pin actual published tensor/evaluation bytes, never a reported digest."""
+    if path.is_symlink() or not path.is_file():
+        raise BookIntakeError("trained output is absent or a symlink")
+    size = path.stat().st_size
+    if not 1 <= size <= max_bytes:
+        raise BookIntakeError("trained output is outside independent audit bounds")
+    h = sha256()
+    n = 0
+    with path.open("rb") as reader:
+        while block := reader.read(1024 * 1024):
+            n += len(block)
+            if n > max_bytes:
+                raise BookIntakeError("trained output changed or exceeded limit")
+            h.update(block)
+    if n != size or path.stat().st_size != size:
+        raise BookIntakeError("trained artifact was modified during independent hashing")
+    return h.hexdigest()
+
+
+def _publish_receipt(destination: Path, receipt: dict[str, Any]) -> None:
+    """Exclusive creation; never replace an existing audit or prior candidate."""
+    if not destination.is_absolute() or destination.is_symlink() or destination.exists():
+        raise BookIntakeError("audit receipt requires a new absolute file path")
+    if not destination.parent.is_dir():
+        raise BookIntakeError("audit receipt directory is missing")
+    fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "wb", closefd=False) as target:
+            target.write(_encode(receipt))
+            target.flush()
+            os.fsync(target.fileno())
+    finally:
+        os.close(fd)
+
+
 def train_admitted_books(
     *, admission_receipt: Path, data_directory: Path,
     dataset_manifest: Path, expected_checkpoint_sha256: str,
-    candidate: Path, report: Path, epochs: int = 1,
+    candidate: Path, report: Path, receipt_path: Path | None = None, epochs: int = 1,
     max_training_seconds: int = 1200,
     max_optimizer_steps: int = 25000,
 ) -> dict[str, Any]:
@@ -139,14 +177,33 @@ def train_admitted_books(
         max_training_seconds=max_training_seconds,
         max_optimizer_steps=max_optimizer_steps,
     )
-    return {
-        "schema_version": "skeleton.jeeves.book_weight_candidate_run.v1",
+    # Verify the bytes the actual optimizer published. Its return object alone
+    # is not an artifact receipt; neither the candidate nor the evaluation may
+    # be represented as successful by a fabricated digest in model prose.
+    published_candidate = _bounded_output_hash(Path(candidate))
+    published_report = _bounded_output_hash(Path(report))
+    record = {
+        "schema_version": "skeleton.jeeves.book_weight_candidate_run.v2",
         "admission_receipt_sha256": admitted["digest"],
+        "dataset_manifest_sha256": _sha(raw_manifest),
+        "approved_train_sha256": _sha(train_bytes),
+        "independent_holdout_sha256": _sha(heldout_bytes),
+        "serving_checkpoint_sha256": expected_checkpoint_sha256,
+        "candidate_sha256": published_candidate,
+        "evaluation_report_sha256": published_report,
+        "trainer_result_sha256": _sha(_encode(trained)),
         "admitted_book_count": admitted["source_books"],
         "all_book_segments_admitted": len(segments),
         "candidate_trainer_report": trained,
+        "actual_candidate_bytes_verified": True,
+        "actual_evaluation_bytes_verified": True,
         "production_model_auto_promoted": False,
+        "release_qualified": False,
     }
+    record["receipt_sha256"] = _sha(_encode(record))
+    if receipt_path is not None:
+        _publish_receipt(Path(receipt_path), record)
+    return record
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -157,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-checkpoint-sha256", required=True)
     parser.add_argument("--candidate", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
+    parser.add_argument("--receipt", type=Path,
+                        help="New absolute path for immutable candidate audit receipt")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--max-training-seconds", type=int, default=1200)
     parser.add_argument("--max-optimizer-steps", type=int, default=25000)
@@ -165,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
         admission_receipt=args.admission_receipt, data_directory=args.data_directory,
         dataset_manifest=args.dataset_manifest,
         expected_checkpoint_sha256=args.expected_checkpoint_sha256,
-        candidate=args.candidate, report=args.report, epochs=args.epochs,
+        candidate=args.candidate, report=args.report, receipt_path=args.receipt, epochs=args.epochs,
         max_training_seconds=args.max_training_seconds,
         max_optimizer_steps=args.max_optimizer_steps,
     )
