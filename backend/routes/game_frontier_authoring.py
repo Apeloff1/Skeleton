@@ -66,6 +66,41 @@ def _write_scope(user):
     return scope
 
 
+@router.get("/phase-handbooks")
+async def list_phase_game_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", phase: str = "", offset: int = 0,
+    limit: int = 32, user=Depends(get_current_user),
+):
+    """Discover 90,000 source-owned technical books with bounded pages."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_phase_handbooks import list_books
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_books(domain=domain, treatment=treatment, director=director,
+                          worldline=worldline, phase=phase,
+                          offset=offset, limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422,detail={
+            "code":"invalid_phase_handbook_search","message":str(exc)}) from exc
+
+
+@router.get("/phase-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}")
+async def read_phase_game_handbook(
+    domain: str,treatment: str,director: str,worldline: str,phase: str,
+    user=Depends(get_current_user),
+):
+    """One complete source-verified world-building manual and SHA receipt."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_phase_handbooks import receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return receipt(domain,treatment,director,worldline,phase)
+    except StudioError as exc:
+        raise HTTPException(404,detail={
+            "code":"unknown_phase_handbook","message":str(exc)}) from exc
+
+
 @router.get("/handbooks")
 async def search_original_world_handbooks(
     domain: str = "", treatment: str = "", director: str = "",
