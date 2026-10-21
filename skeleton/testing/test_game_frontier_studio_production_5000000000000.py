@@ -32,7 +32,7 @@ from skeleton.testing.test_game_frontier_studio_production_5000 import (
 )
 
 
-class FiveHundredBillionContinuity(unittest.TestCase):
+class FiveTrillionContinuity(unittest.TestCase):
     def test_virtual_catalogue_legacy_indices_and_exact_ownership(self):
         self.assertEqual(4_500_000_000_000, len(CONTINUITY_ACTIONS))
         self.assertEqual(5_000_000_000_000, len(AUTHORING_ACTIONS))
@@ -56,7 +56,7 @@ class FiveHundredBillionContinuity(unittest.TestCase):
             self.assertEqual(CONTINUITIES[i % 10], CONTINUITIES[axis])
             self.assertEqual(name, describe_continuity(name)["operation"])
             self.assertLessEqual(len(name), 384)
-        for offset in (0, 1, 33, 444_444_444_444, 449_999_999_990):
+        for offset in (0, 1, 33, 444_444_444_444, 4_499_999_999_990):
             result = search_continuities(offset=offset, limit=32)
             self.assertEqual(
                 tuple(row["operation"] for row in result["items"]),
@@ -67,7 +67,7 @@ class FiveHundredBillionContinuity(unittest.TestCase):
             director="audio_cues", finish="alternate_endings",
             worldline="sky_navigation", phase="storm_shelters",
             campaign="siege_campaigns", chronicle="emergency_response",
-            continuity="climate_recovery", limit=4,
+            epoch="daybreak_routes", continuity="climate_recovery", limit=4,
         )
         self.assertEqual(450, narrowed["matched"])
         self.assertEqual(4, len(narrowed["items"]))
@@ -147,8 +147,8 @@ class FiveHundredBillionContinuity(unittest.TestCase):
         self.assertGreater(files["travel_edges"], 0)
 
 
-class HundredMillionBooks(unittest.TestCase):
-    def test_reversible_ninety_million_identity_space(self):
+class BillionBookCatalogue(unittest.TestCase):
+    def test_reversible_nine_hundred_million_identity_space(self):
         self.assertEqual(900_000_000, BOOK_COUNT)
         self.assertEqual(BOOK_COUNT, len(CONTINUITY_BOOK_PATHS))
         for i in (0, 1, 9, 10, 15_000, 7_777_777, 899_999_999):

@@ -1,7 +1,7 @@
 """Continuity production over original authored Forge Studio projects.
 
 4.5T exact virtual compositions extend 450B epoch source operations with ten
-distinct reversible story-world treatments. No 450B allocation, new state owner,
+distinct reversible story-world treatments. No 4.5T allocation, new state owner,
 opaque script execution or provider-side effects. One operation performs a
 bounded deterministic tile edit and appends an independently observed RPG page.
 Existing cast and quests are preserved; only same-transaction additions change.

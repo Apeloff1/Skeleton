@@ -34,7 +34,7 @@ SCHEMA = "skeleton.forge.continuity_handbook.v1"
 RANK_SCHEMA = "skeleton.forge.continuity_handbook_ranking.v1"
 BOOK_COUNT = PARENT_COUNT * len(CONTINUITIES)
 if BOOK_COUNT != 900_000_000:
-    raise RuntimeError("continuity handbook index must contain 90 million volumes")
+    raise RuntimeError("continuity handbook index must contain 900 million volumes")
 
 BOOK_REVIEW = (
     "Exact tenant and source version are known to the editing host",
