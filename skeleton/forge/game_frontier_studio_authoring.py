@@ -31,7 +31,7 @@ from .game_frontier_studio_structure_factory import STRUCTURE_ACTIONS, edit_stru
 from .game_frontier_studio_encounter_factory import ENCOUNTER_ACTIONS, edit_encounter
 from .game_frontier_studio_quest_blueprint_factory import QUEST_BLUEPRINT_ACTIONS, edit_quest_blueprint
 from .game_frontier_studio_reactive_scene_factory import REACTIVE_SCENE_ACTIONS, edit_reactive_scene
-from .game_frontier_studio_production_recipes import RECIPE_ACTIONS, edit_recipe
+from .game_frontier_studio_production_recipes import RECIPE_ACTIONS, RECIPE_INDEX, edit_recipe
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
@@ -117,7 +117,7 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_quest_blueprint(project, operation, payload)
     if operation in REACTIVE_SCENE_ACTIONS:
         return edit_reactive_scene(project, operation, payload)
-    if operation in RECIPE_ACTIONS:
+    if operation in RECIPE_INDEX:
         return edit_recipe(project, operation, payload, execute_authoring)
     raise StudioError("unknown executable Studio editor action")
 
