@@ -1,0 +1,50 @@
+name: Forge Studio Handbook Export
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-studio-handbooks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export-game-books:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Generate 9000 original-game Markdown handbooks
+        run: |
+          python -m scripts.export_game_studio_worldline_handbooks \
+            --out build/forge-studio-books --all
+      - name: Prove all 9000 books and receipt manifests exist
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('build/forge-studio-books')
+          files=list(root.rglob('*.md'))
+          manifest=root/'worldline_handbooks_0_9000.json'
+          receipt=json.loads(manifest.read_text(encoding='utf-8'))
+          assert len(files)==9000, len(files)
+          assert receipt['exported']==9000
+          assert len(receipt['receipts'])==9000
+          print(f'Generated {len(files)} original-game technical books.')
+          PY
+      - name: Archive generated books and SHA receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-studio-9000-handbooks
+          path: build/forge-studio-books/
+          if-no-files-found: error
+          retention-days: 30
