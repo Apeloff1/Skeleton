@@ -12,6 +12,7 @@ from skeleton.forge.creator.command_surface import build_creator_command
 from skeleton.jeeves.ai.studio_creator_source import (
     CreatorProjectSourceStore, CreatorSourceError,
 )
+from skeleton.jeeves.ai.studio_sprite_forge import StudioSpriteError
 from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
 from skeleton.jeeves.ai.studio_interaction_contract import (
     StudioEvidenceJournal, StudioInteractionError,
@@ -375,7 +376,7 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             png = z.read("game/frontier/sprites/hero-idle.png")
             info = json.loads(z.read("game/frontier/sprites/hero-idle.json"))
             receipt = json.loads(z.read("jeeves_source_receipt.json"))
-        self.assertTrue(png.startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+        self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(info["sheet_width_px"], 8)
         self.assertEqual(info["frames"][1]["duration_ms"], 200)
         self.assertEqual(info["png_sha256"], sha256(png).hexdigest())
@@ -398,7 +399,7 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             "animations": [{"name": "idle", "frame_ids": ["empty"],
                             "loop": True}],
         }, depends=("config-3d",))
-        with self.assertRaises(Exception):
+        with self.assertRaises(StudioSpriteError):
             self.export_godot()
         self.assertFalse(any(self.export.iterdir()))
 
