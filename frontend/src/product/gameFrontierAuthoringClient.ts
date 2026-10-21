@@ -26,6 +26,7 @@ export type ForgeDocument = {
   worldline_recipe_count: number;
   phase_recipe_count: number;
   campaign_recipe_count: number;
+  chronicle_recipe_count: number;
 };
 export type ForgeStep = { action: string; parameters: Record<string, unknown> };
 export type ForgePreview = {
@@ -61,9 +62,9 @@ function verifyDoc(doc: ForgeDocument): ForgeDocument {
   if (!doc || doc.schema !== 'skeleton.game.frontier_studio_document.v1'
       || !SHA.test(doc.source_sha256) || !Number.isSafeInteger(doc.expected_version)
       || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 500
-      || doc.recipe_catalog_count !== 4999999500 || doc.catalog_total !== 5000000000
+      || doc.recipe_catalog_count !== 49999999500 || doc.catalog_total !== 50000000000
       || doc.classic_recipe_count !== 4500 || doc.expanded_recipe_count !== 45000
-      || doc.directed_recipe_count !== 450000 || doc.final_recipe_count !== 4500000 || doc.worldline_recipe_count !== 45000000 || doc.phase_recipe_count !== 450000000 || doc.campaign_recipe_count !== 4500000000
+      || doc.directed_recipe_count !== 450000 || doc.final_recipe_count !== 4500000 || doc.worldline_recipe_count !== 45000000 || doc.phase_recipe_count !== 450000000 || doc.campaign_recipe_count !== 4500000000 || doc.chronicle_recipe_count !== 45000000000
       || !Array.isArray(doc.layers) || doc.layers.length > 128
       || (doc.prefab_catalog !== undefined && !Array.isArray(doc.prefab_catalog))
       || (doc.actor_catalog !== undefined && !Array.isArray(doc.actor_catalog))
@@ -81,7 +82,7 @@ export async function inspectForge(projectId: string, signal?: AbortSignal): Pro
 export async function getForgeActions(signal?: AbortSignal): Promise<string[]> {
   const result = await data(api.get<{ actions: string[]; action_count: number }>(
     ROOT + '/actions', options(undefined, signal)), 'Forge tool catalogue unavailable.');
-  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 5000000000)
+  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 50000000000)
     throw new Error('Forge Studio action catalogue is incomplete.');
   return result.actions;
 }
@@ -93,6 +94,7 @@ export type ForgeRecipe = {
   worldline?: string; worldline_index?: number; worldline_objective?: string;
   phase?: string; phase_index?: number; phase_objective?: string;
   campaign?: string; campaign_index?: number; campaign_objective?: string;
+  chronicle?: string; chronicle_index?: number; chronicle_objective?: string;
   treatment: string; recipe_steps: string[]; source_index: number;
   style_index: number; actual_project_mutation: boolean;
 };
@@ -101,12 +103,12 @@ export type ForgeRecipeResults = {
   total_catalog: number; matched: number; offset: number; limit: number;
   next_offset: number | null; domains: string[]; styles: string[];
   system_layers?: string[]; directors?: string[]; finishes?: string[];
-  worldlines?: string[]; campaigns?: string[];
+  worldlines?: string[]; campaigns?: string[]; chronicles?: string[];
   items: ForgeRecipe[];
 };
 export async function searchForgeRecipes(query = '', domain = '', offset = 0,
-                                         limit = 32, generation: 'classic' | 'expanded' | 'directed' | 'final' | 'worldline' | 'phase' | 'campaign' = 'classic',
-                                         systemLayer = '', director = '', finish = '', worldline = '', phase = '', campaign = ''): Promise<ForgeRecipeResults> {
+                                         limit = 32, generation: 'classic' | 'expanded' | 'directed' | 'final' | 'worldline' | 'phase' | 'campaign' | 'chronicle' = 'classic',
+                                         systemLayer = '', director = '', finish = '', worldline = '', phase = '', campaign = '', chronicle = ''): Promise<ForgeRecipeResults> {
   const params = [
     'query=' + encodeURIComponent(query),
     'generation=' + encodeURIComponent(generation),
@@ -116,6 +118,7 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
     'worldline=' + encodeURIComponent(worldline),
     'phase=' + encodeURIComponent(phase),
     'campaign=' + encodeURIComponent(campaign),
+    'chronicle=' + encodeURIComponent(chronicle),
     'domain=' + encodeURIComponent(domain),
     'offset=' + encodeURIComponent(String(offset)),
     'limit=' + encodeURIComponent(String(limit)),
@@ -123,7 +126,7 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
   const results = await data(api.get<ForgeRecipeResults>(
     ROOT + '/recipes?' + params, options()), 'Could not search original-game production recipes.');
   if (!results || results.schema !== 'skeleton.forge.production_recipe_search.v1'
-      || results.total_catalog !== (generation === 'campaign' ? 4500000000 : generation === 'phase' ? 450000000 : generation === 'worldline' ? 45000000 : generation === 'final' ? 4500000 : generation === 'directed' ? 450000 : generation === 'expanded' ? 45000 : 4500)
+      || results.total_catalog !== (generation === 'chronicle' ? 45000000000 : generation === 'campaign' ? 4500000000 : generation === 'phase' ? 450000000 : generation === 'worldline' ? 45000000 : generation === 'final' ? 4500000 : generation === 'directed' ? 450000 : generation === 'expanded' ? 45000 : 4500)
       || !Array.isArray(results.items)
       || results.items.length > 64
       || results.items.some(recipe => !(generation === 'classic' ? /^produce_[a-z_]+__[a-z_]+$/.test(recipe.operation)
@@ -132,6 +135,7 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
           : generation === 'final' ? /^complete_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+$/.test(recipe.operation)
           : generation === 'worldline' ? /^worldline_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+$/.test(recipe.operation)
           : generation === 'phase' ? /^phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+$/.test(recipe.operation)
+          : generation === 'chronicle' ? /^chronicle_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+$/.test(recipe.operation)
           : /^campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+$/.test(recipe.operation))
         || recipe.actual_project_mutation !== true)) {
     throw new ChatClientError('Forge production recipe search returned invalid source.',
@@ -227,6 +231,61 @@ export async function readForgeCampaignHandbook(
   return { markdown: book.markdown, score: book.quality_score, words: book.words };
 }
 
+
+export type ForgeChronicleRank = {
+  rank: number; chronicle: string; path: string; quality_score: number;
+  quality_max: number; quality_kind: string; words: number; characters: number;
+  bytes: number; content_sha256: string; criteria: Record<string, boolean>;
+};
+export type ForgeChronicleRanking = {
+  schema: 'skeleton.forge.chronicle_handbook_ranking.v1';
+  sort: 'quality' | 'length';
+  scope: 'ten_chronicle_variants_for_one_exact_campaign_context';
+  compared: 10; items: ForgeChronicleRank[];
+};
+export async function readForgeChronicleHandbook(
+  domain: string, treatment: string, director: string, worldline: string,
+  phase: string, campaign: string, chronicle: string,
+): Promise<{ markdown: string; score: number; words: number }> {
+  const parts = [domain,treatment,director,worldline,phase,campaign,chronicle];
+  if (parts.some(part => !/^[a-z][a-z_]{0,40}$/.test(part)))
+    throw new Error('Invalid exact chronicle manuscript identity.');
+  const book = await data(api.get<{schema: string; markdown: string;
+    quality_score: number; content_sha256: string; words: number;
+    covered_commands: number}>(
+    ROOT+'/chronicle-handbooks/'+parts.map(encodeURIComponent).join('/'),
+    options()), 'Unable to render exact original-game chronicle manual.');
+  if (book.schema !== 'skeleton.forge.chronicle_handbook.v1'
+      || !SHA.test(book.content_sha256) || book.covered_commands !== 5000
+      || typeof book.markdown !== 'string' || book.markdown.length > 192000
+      || !Number.isSafeInteger(book.words) || book.words < 1
+      || !Number.isFinite(book.quality_score) || book.quality_score < 0
+      || book.quality_score > 100)
+    throw new Error('Chronicle manuscript failed source integrity validation.');
+  return {markdown: book.markdown, score: book.quality_score, words: book.words};
+}
+export async function rankForgeChronicleHandbooks(
+  domain: string, treatment: string, director: string, worldline: string,
+  phase: string, campaign: string, sort: 'quality' | 'length' = 'quality',
+): Promise<ForgeChronicleRanking> {
+  const parts = [domain,treatment,director,worldline,phase,campaign];
+  if (parts.some(part => !/^[a-z][a-z_]{0,40}$/.test(part)))
+    throw new Error('Invalid comparable chronicle source context.');
+  const ranked = await data(api.get<ForgeChronicleRanking>(
+    ROOT+'/chronicle-handbooks/rank/'+parts.map(encodeURIComponent).join('/')
+      +'?sort='+sort, options()), 'Unable to rank chronicle source manuscripts.');
+  if (!ranked || ranked.schema !== 'skeleton.forge.chronicle_handbook_ranking.v1'
+      || ranked.scope !== 'ten_chronicle_variants_for_one_exact_campaign_context'
+      || ranked.sort !== sort || ranked.compared !== 10
+      || !Array.isArray(ranked.items) || ranked.items.length !== 10
+      || ranked.items.some(item => !SHA.test(item.content_sha256)
+        || !Number.isFinite(item.quality_score) || item.quality_score < 0
+        || item.quality_score > 100 || !Number.isSafeInteger(item.words)
+        || item.words < 1))
+    throw new Error('Chronicle manuscript comparison contract invalid.');
+  return ranked;
+}
+
 export async function copyForgeTiles(projectId: string, layer: string, x: number, y: number,
                                      width: number, height: number) {
   return data(api.post<{ tiles: number[]; palette: string[]; receipt_sha256: string }>(
@@ -250,7 +309,9 @@ export async function editForge(projectId: string, doc: ForgeDocument, steps: Fo
         && !(doc.phase_recipe_count === 450000000
           && /^phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+$/.test(step.action))
         && !(doc.campaign_recipe_count === 4500000000
-          && /^campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+$/.test(step.action)))) throw new Error(
+          && /^campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+$/.test(step.action))
+        && !(doc.chronicle_recipe_count === 45000000000
+          && /^chronicle_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+$/.test(step.action)))) throw new Error(
     'Select one or more supported editor operations.');
   const key = learningRequestKey('forge-author');
   const body = { expected_version: doc.expected_version,
