@@ -32,10 +32,10 @@ from skeleton.testing.test_game_frontier_studio_production_5000 import (
 class FiveHundredBillionEpochs(unittest.TestCase):
     def test_stable_legacy_boundaries_and_virtual_rank(self):
         self.assertEqual(450_000_000_000, len(EPOCH_ACTIONS))
-        self.assertEqual(500_000_000_000, len(AUTHORING_ACTIONS))
+        self.assertEqual(5_000_000_000_000, len(AUTHORING_ACTIONS))
         self.assertEqual(CHRONICLE_ACTIONS[0], AUTHORING_ACTIONS[5_000_000_000])
         self.assertEqual(EPOCH_ACTIONS[0], AUTHORING_ACTIONS[50_000_000_000])
-        self.assertEqual(EPOCH_ACTIONS[-1], AUTHORING_ACTIONS[-1])
+        self.assertEqual(EPOCH_ACTIONS[-1], AUTHORING_ACTIONS[500_000_000_000 - 1])
         for index in (0, 1, 9, 10, 110, 9999, 45_000_000_000,
                       99_999_999_999, 449_999_999_999):
             operation = EPOCH_ACTIONS[index]
