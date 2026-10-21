@@ -483,6 +483,12 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const choose = (name: string) => {
     setAction(name);
     const args = { ...(newFiveHundredDefaults(name, selectedLayer) || hundredActionDefaults(name, selectedLayer) || newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
+    if (NEW_500_ENCOUNTER.has(name) && doc?.prefab_catalog?.length)
+      args.prefab_id = doc.prefab_catalog[0].id;
+    if (NEW_500_QUEST.has(name) && doc?.actor_catalog?.length) {
+      const actor = doc.actor_catalog[0];
+      args.target = actor.prefab_id + ':' + actor.index;
+    }
     if (!NEW_PROCEDURAL.has(name) && ['tile_set','rect_fill','line_draw','ellipse_fill','flood_fill','replace_tile',
       'checker_fill','stamp','region_paste','shift_layer','flip_horizontal','flip_vertical',
       'rotate_90','layer_remove','layer_duplicate','layer_reorder','layer_elevation',
@@ -559,6 +565,16 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       <Text style={{ color: '#bdcddd' }}>Revision {doc.expected_version} · {doc.layers.length} layers
         · {doc.placed_actor_count} actors · {doc.quest_count} quests · {doc.music_cue_count} audio cues</Text>
       <Text selectable style={{ color: '#829db0', fontSize: 11 }}>{doc.source_sha256}</Text>
+      <Text selectable style={{ color: '#aec5d6', fontSize: 12 }}>
+        Actual prefabs: {doc.prefab_catalog?.map(item => item.id).join(', ') || '(author a prefab first)'}
+      </Text>
+      <Text selectable style={{ color: '#aec5d6', fontSize: 12 }}>
+        Placed actors: {doc.actor_catalog?.map(item => item.prefab_id + ':' + item.index).join(', ')
+          || '(place an actor before creating quest-giver events)'}
+      </Text>
+      <Text selectable style={{ color: '#aec5d6', fontSize: 12 }}>
+        Authored quests: {doc.quest_catalog?.map(item => item.id).join(', ') || '(none yet)'}
+      </Text>
     </View>}
     {!!error && <Text accessibilityRole="alert" style={{ color: '#ffb1a9' }}>{error}</Text>}
     {!!notice && <Text style={{ color: '#b2e3c7' }}>{notice}</Text>}
