@@ -175,6 +175,7 @@ class StudioEvidenceJournal:
         self._sequence = 0
         self._execution_token = object()
         self._observation_token = object()
+        self._plan_token = object()
         self.read()
 
     def read(self) -> tuple[dict[str, Any], ...]:
@@ -217,6 +218,8 @@ class StudioEvidenceJournal:
             raise StudioInteractionError("execution evidence must come from the host runner")
         if kind == "modality_observation_reviewed" and _authority is not self._observation_token:
             raise StudioInteractionError("multimodal observations require reviewed host admission")
+        if kind == "plan_context_bound" and _authority is not self._plan_token:
+            raise StudioInteractionError("source-bound plan context requires a trusted native host")
         body = dict(payload)
         canonical(body)
         with self._lock:
