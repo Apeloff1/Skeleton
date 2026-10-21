@@ -765,6 +765,29 @@ class CreatorProjectSourceStore:
                  "record_id": row[2]} for row in rows
             ]
 
+    def verify_native_sprite_import(
+        self, record_id: str, *, godot_executable: str,
+        timeout_seconds: int = 90,
+    ) -> dict[str, Any]:
+        """Load actual Godot SpriteFrames in a real engine under host authority."""
+        from .studio_sprite_native_import import inspect_godot_sprite_import
+        key = identifier(record_id, "original sprite source record")
+        with self._lock:
+            self._refresh()
+            record = self._records.get(key)
+            if record is None or record["facet"] != "sprite_forge":
+                raise CreatorSourceError("requested real sprite asset is not in this game")
+            before = self._head
+            evidence = inspect_godot_sprite_import(
+                record, godot_executable=godot_executable,
+                timeout_seconds=timeout_seconds,
+            )
+            self._refresh()
+            if self._head != before:
+                raise CreatorSourceError("game source changed during native sprite import")
+            return {**evidence, "project_id": self.project_id,
+                    "project_source_head_sha256": before, "record_id": key}
+
     def run_native_playthrough(
         self, *, godot_executable: str, timeout_seconds: int = 90,
     ) -> dict[str, Any]:
