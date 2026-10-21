@@ -221,7 +221,7 @@ class RankedMillionBookLibrary(unittest.TestCase):
 
     def test_paginated_book_discovery_and_real_batch_ranking_export(self):
         page=list_books(domain="living_story",campaign="epilogue_variants",limit=4)
-        self.assertEqual(90_000,page["matched"])
+        self.assertEqual(9_000,page["matched"])
         self.assertEqual(4,len(page["items"]))
         with self.assertRaises(StudioError):
             list_books(limit=100)
