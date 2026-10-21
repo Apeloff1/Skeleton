@@ -239,3 +239,67 @@ def manifest(generation: str, index: int, *, include_content: bool = True) -> di
     if include_content:
         out["markdown"] = markdown
     return out
+
+
+def materialize_archive(requests: list[dict[str, Any]]) -> tuple[bytes, dict[str, Any]]:
+    """Physically manifest 1..4 exact books as a deterministic downloadable ZIP.
+
+    Materializes only request-selected source manuals, never an impossible
+    billion-file archive; byte SHA receipts are checked before packaging.
+    A complete archive has a deterministic manifest and no filesystem writes.
+    """
+    from io import BytesIO
+    from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+
+    if type(requests) is not list or not 1 <= len(requests) <= 4:
+        raise StudioError("Book manifestation requires one to four exact references")
+    resolved = []
+    seen = set()
+    for item in requests:
+        if type(item) is not dict or set(item) != {"generation", "index"}:
+            raise StudioError("Exact generation and index required for each manifested book")
+        gen, idx = item["generation"], item["index"]
+        if type(gen) is not str or type(idx) is not int:
+            raise StudioError("Book manifestation requires typed exact references")
+        key = (gen, idx)
+        if key in seen:
+            raise StudioError("Duplicate book manifestation identity")
+        seen.add(key)
+        resolved.append(manifest(gen, idx))
+    payloads = []
+    total = 0
+    for item in resolved:
+        path = item["path"]
+        if (not isinstance(path, str) or len(path) > 400
+                or path.startswith("/") or any(x in (".", "..", "")
+                                                 for x in path.split("/"))
+                or not path.endswith(".md")):
+            raise StudioError("Source book path violates safe archive boundary")
+        content = item.pop("markdown").encode("utf8")
+        total += len(content)
+        if total > 1_500_000:
+            raise StudioError("Materialized manuscript bundle exceeds 1.5MB")
+        if sha256(content).hexdigest() != item["content_sha256"]:
+            raise StudioError("Manifested source content hash mismatch")
+        payloads.append((path, content))
+    record = {
+        "schema": "skeleton.jeeves.forge_book_bundle.v1",
+        "manifestations": resolved,
+        "complete": True,
+        "books_physically_rendered": len(resolved),
+        "training_weights_promoted": False,
+    }
+    payloads.append(("manifest.json", (json.dumps(record, ensure_ascii=False,
+                         sort_keys=True, separators=(",", ":")) + "\n").encode("utf8")))
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", compression=ZIP_DEFLATED, compresslevel=6) as archive:
+        for name, data in payloads:
+            info = ZipInfo(name, date_time=(2020, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_DEFLATED
+            info.external_attr = 0o600 << 16
+            archive.writestr(info, data, compress_type=ZIP_DEFLATED, compresslevel=6)
+    zipped = buffer.getvalue()
+    return zipped, {
+        **record, "archive_sha256": sha256(zipped).hexdigest(),
+        "archive_bytes": len(zipped),
+    }
