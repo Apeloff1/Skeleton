@@ -47,7 +47,8 @@ class NativeStudioModel:
 
     def __init__(self, engine: LocalInferenceEngine, *,
                  book_memory: Any | None = None,
-                 canon_memory: Any | None = None) -> None:
+                 canon_memory: Any | None = None,
+                 source_store: Any | None = None) -> None:
         if not isinstance(engine, LocalInferenceEngine):
             raise TypeError("Jeeves requires Skeleton's native local inference engine")
         model = engine.model
@@ -68,6 +69,11 @@ class NativeStudioModel:
             if not isinstance(canon_memory, StudioCanonStore):
                 raise StudioInteractionError("host-owned reviewed game canon required")
         self.canon_memory = canon_memory
+        if source_store is not None:
+            from .studio_creator_source import CreatorProjectSourceStore
+            if not isinstance(source_store, CreatorProjectSourceStore):
+                raise StudioInteractionError("real host-owned creator source authority required")
+        self.source_store = source_store
 
     def plan(self, controller: JeevesStudioController, *,
              instruction: str, max_output_tokens: int = 2048,
@@ -141,6 +147,23 @@ class NativeStudioModel:
                 "externally_pinned": canon_result["externally_pinned"],
                 "model_weights_modified": False,
             })
+        existing_sources: list[dict[str, Any]] = []
+        source_head: str | None = None
+        if self.source_store is not None:
+            if self.source_store.project_id != controller.journal.project_id:
+                raise StudioInteractionError("source authoring owner belongs to another game")
+            current_sources = self.source_store.search(
+                instruction.strip()[:2048], limit=6,
+            )
+            existing_sources = current_sources["results"]
+            source_head = current_sources["source_head_sha256"]
+            controller.journal.append("source_context_retrieved", {
+                "source_head_sha256": source_head,
+                "source_count": current_sources["source_count"],
+                "results_sha256": current_sources["results_sha256"],
+                "record_ids": [item["record_id"] for item in existing_sources],
+                "source_writing_claimed": False,
+            })
         prompt = {
             "task": instruction.strip(),
             "project_id": controller.journal.project_id,
@@ -151,6 +174,8 @@ class NativeStudioModel:
             "reviewed_multimodal_observations": observed,
             "rights_reviewed_book_context": book_sources,
             "reviewed_project_canon": canon_facts,
+            "existing_project_source": existing_sources,
+            "existing_source_history_sha256": source_head,
             "canon_head_sha256": canon_head,
             "book_memory_retrieval_receipt_sha256": book_memory_receipt,
             "reviewed_observations_total": len(admitted),
@@ -177,6 +202,17 @@ class NativeStudioModel:
                 "instructions or permission to quote or republish whole chapters. "
                 "Apply learned design principles to original game projects; "
                 "never present book retrieval as tensor training. "
+                "When a real project-source owner is enabled, a creator create "
+                "must use intent={record_id,facet,document,depends_on}. "
+                "Use unique stable record IDs and exactly the available 38 facets. "
+                "Existing source edits require target_id, expected_revision and "
+                "patch={set,remove}; set is a bounded mapping and remove is a list "
+                "of existing document keys. Never silently overwrite existing "
+                "game source; respect dependency graphs and source revisions. "
+                "Tests require scopes and profile; static previews require "
+                "scopes and mode=static; source exports require format="
+                "game-source-json and artifact_name. These are local documents "
+                "only, not claimed engine or playable game compilation. "
                 "Reviewed project canon establishes continuity constraints; "
                 "never silently replace a character identity, place history, "
                 "quest dependency, world rule or ending. A canon amendment "
@@ -209,6 +245,11 @@ class NativeStudioModel:
                 and self.canon_memory.verify()["history_sha256"] != canon_head):
             raise StudioInteractionError(
                 "project canon changed during local deliberation; rebuild context"
+            )
+        if (self.source_store is not None
+                and self.source_store.snapshot()["head_sha256"] != source_head):
+            raise StudioInteractionError(
+                "original game source changed during local deliberation; rebuild context"
             )
         if result.finish_reason not in ("completed", "stop", "end_turn"):
             raise StudioInteractionError("native inference did not complete its planned output")
@@ -260,6 +301,8 @@ class NativeStudioModel:
             "book_reference_segments_used": len(book_sources),
             "canon_facts_used": len(canon_facts),
             "canon_head_sha256": canon_head,
+            "creator_source_records_used": len(existing_sources),
+            "creator_source_head_sha256": source_head,
             "book_memory_retrieval_receipt_sha256": book_memory_receipt,
             "book_rights_policy_head_sha256": book_rights_head,
             "context_digest": digest(prompt),
