@@ -161,7 +161,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
             width=width, height=height, scale=scale,
         )
         if policy["extrude_edges"] and any(
-            color[3] == 0 and color[:3] != b"\\x00\\x00\\x00" for color in colors
+            color[3] == 0 and color[:3] != bytes(3) for color in colors
         ):
             raise StudioSpriteError(
                 "bleed-safe extrusion requires zero RGB for fully transparent palette entries"
