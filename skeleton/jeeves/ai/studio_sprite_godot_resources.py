@@ -32,8 +32,8 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
     if not isinstance(meta, Mapping):
         raise SpriteResourceError("reviewed sprite receipt required")
     asset = _label(meta.get("asset_id"), "sprite resource name")
-    if directory != "game/frontier/sprites":
-        raise SpriteResourceError("Godot source resources must use their bounded project root")
+    if directory not in ("game/frontier/sprites", "sprites"):
+        raise SpriteResourceError("Godot source resources must use a known relative project root")
     frames = meta.get("frames")
     animations = meta.get("animations")
     if (type(frames) is not list or not 1 <= len(frames) <= 64
@@ -141,9 +141,10 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
 
 def verify_godot_sprite_resources(
     meta: Mapping[str, Any], files: Mapping[str, str],
+    *, directory: str = "game/frontier/sprites",
 ) -> dict[str, Any]:
     """Regenerate byte-identical Godot engine resources from the approved atlas."""
-    expected = compile_godot_sprite_resources(meta)
+    expected = compile_godot_sprite_resources(meta, directory=directory)
     if set(files) != set(expected) or any(files[name] != raw for name, raw in expected.items()):
         raise SpriteResourceError("Godot SpriteFrames resource differs from original source")
     result = {
