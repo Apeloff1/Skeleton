@@ -6,7 +6,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { composeStudioFlow, JEEVES_STUDIO_FLOWS } from './JeevesStudioFlows';
 import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
-  advanceStudioGoal, createStudioGoal, getStudioGoal, type StudioGoal,
+  advanceStudioGoal, controlStudioGoal, createStudioGoal, getStudioGoal,
+  listStudioGoals, retryStudioGoal, type StudioGoal, type StudioGoalRetryTarget,
 } from '../../product/gameStudioAgentClient';
 import {
   getLearningProject, listLearningProjects, type LearningProjectSummary,
@@ -87,6 +88,9 @@ export default function JeevesStudioPalette({
   const [editAuthorization, setEditAuthorization] = useState(false);
   const [effectAcknowledged, setEffectAcknowledged] = useState(false);
   const [advancingGoal, setAdvancingGoal] = useState(false);
+  const [goals, setGoals] = useState<StudioGoal[]>([]);
+  const [loadingGoals, setLoadingGoals] = useState(false);
+  const [showGoalSteps, setShowGoalSteps] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -103,6 +107,24 @@ export default function JeevesStudioPalette({
     }).finally(() => { if (active) setLoadingProjects(false); });
     return () => { active = false; };
   }, [visible]);
+  useEffect(() => {
+    if (!visible || !projectId) {
+      setGoals([]);
+      return;
+    }
+    let active = true;
+    setLoadingGoals(true);
+    void listStudioGoals(projectId).then(records => {
+      if (active) setGoals(records);
+    }).catch(error => {
+      if (active) {
+        setGoals([]);
+        setGoalError(error instanceof Error ? error.message : 'Unable to inspect persisted studio goals.');
+      }
+    }).finally(() => { if (active) setLoadingGoals(false); });
+    return () => { active = false; };
+  }, [visible, projectId]);
+
   const domains = useMemo(() => JEEVES_STUDIO_DOMAINS.filter(item => group === 'All' || item.family === group), [group]);
   const chosen = JEEVES_STUDIO_DOMAINS.find(item => item.id === facet) || JEEVES_STUDIO_DOMAINS[0];
   const groups = ['All', ...Array.from(new Set(JEEVES_STUDIO_DOMAINS.map(item => item.family)))];
@@ -168,6 +190,7 @@ export default function JeevesStudioPalette({
         max_output_tokens: 1024,
       });
       setGoalReceipt(saved);
+      setGoals(existing => [saved, ...existing.filter(item => item.goal_id !== saved.goal_id)].slice(0, 128));
     } catch (error) {
       setGoalError(error instanceof Error ? error.message : 'Studio goal was not saved.');
     } finally {
@@ -182,6 +205,7 @@ export default function JeevesStudioPalette({
       const saved = await getStudioGoal(goalReceipt.goal_id);
       if (saved.project_id !== projectId) throw new Error('This goal belongs to another project.');
       setGoalReceipt(saved);
+      setGoals(existing => existing.map(item => item.goal_id === saved.goal_id ? saved : item));
     } catch (error) {
       setGoalError(error instanceof Error ? error.message : 'Unable to verify persisted goal.');
     } finally {
@@ -202,6 +226,7 @@ export default function JeevesStudioPalette({
       const changed = await advanceStudioGoal(observed, 2, {}, undefined,
         { maxPlannerDecisions: 2, waitForWorkSeconds: 0 });
       setGoalReceipt(changed);
+      setGoals(existing => existing.map(item => item.goal_id === changed.goal_id ? changed : item));
     } catch (error) {
       // A timeout can be an in-doubt effect. Reload state; never resend automatically.
       try {
@@ -213,6 +238,64 @@ export default function JeevesStudioPalette({
       setAdvancingGoal(false);
     }
   };
+  const mutatePersistedGoal = async (action: 'pause' | 'resume' | 'cancel' | StudioGoalRetryTarget) => {
+    if (!goalReceipt || disabled || advancingGoal) return;
+    setAdvancingGoal(true);
+    setGoalError('');
+    const goalId = goalReceipt.goal_id;
+    try {
+      const authoritative = await getStudioGoal(goalId);
+      if (authoritative.project_id !== projectId)
+        throw new Error('Cannot control a goal from another project.');
+      if (action === 'pause' || action === 'resume' || action === 'cancel') {
+        const changed = await controlStudioGoal(authoritative, action);
+        setGoalReceipt(changed);
+        setGoals(existing => existing.map(item => item.goal_id === goalId ? changed : item));
+      } else {
+        if (!authoritative.recovery?.can_retry ||
+            authoritative.recovery.target !== action) {
+          throw new Error('The host has not authorized that recovery target.');
+        }
+        const changed = await retryStudioGoal(authoritative, action);
+        setGoalReceipt(changed);
+        setGoals(existing => existing.map(item => item.goal_id === goalId ? changed : item));
+      }
+    } catch (error) {
+      // Do not replay a potentially mutating control after ambiguous transport
+      // failure: reconcile the host state before offering another decision.
+      try {
+        const saved = await getStudioGoal(goalId);
+        if (saved.project_id === projectId) {
+          setGoalReceipt(saved);
+          setGoals(existing => existing.map(item => item.goal_id === goalId ? saved : item));
+        }
+      } catch { /* retain last known state for explicit operator inspection */ }
+      setGoalError(error instanceof Error ? error.message : 'Studio control outcome is uncertain.');
+    } finally {
+      setAdvancingGoal(false);
+    }
+  };
+  const openGoal = async (record: StudioGoal) => {
+    if (advancingGoal || disabled) return;
+    setAdvancingGoal(true);
+    setGoalError('');
+    try {
+      const saved = await getStudioGoal(record.goal_id);
+      if (saved.project_id !== projectId)
+        throw new Error('Saved workflow is outside the selected project.');
+      // A reopened real workflow never silently inherits a previous user's
+      // edit acknowledgment, or a stale in-memory authorization scope.
+      setEffectAcknowledged(false);
+      setEditAuthorization(false);
+      setGoalReceipt(saved);
+      setShowGoalSteps(false);
+    } catch (error) {
+      setGoalError(error instanceof Error ? error.message : 'Cannot reopen saved goal.');
+    } finally {
+      setAdvancingGoal(false);
+    }
+  };
+
   const chip = (label: string, selected: boolean, press: () => void) => (
     <TouchableOpacity key={label} onPress={press} accessibilityRole="button"
       accessibilityState={{ selected }}
@@ -324,6 +407,17 @@ export default function JeevesStudioPalette({
             </View>
             {projects.length === 0 && !loadingProjects &&
               <Text style={{ color: C.subtle }}>No studio projects were returned. Open Game Learning to create one.</Text>}
+            <Text style={{ color: C.text, fontWeight: '700' }}>Saved project operations · {goals.length} returned</Text>
+            {loadingGoals && <Text style={{ color: C.subtle }}>Retrieving durable goal history…</Text>}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+              {goals.slice(0, 16).map(record => chip(
+                record.goal_id + ' · ' + record.status + ' · ' + record.execution_mode,
+                goalReceipt?.goal_id === record.goal_id,
+                () => { void openGoal(record); }
+              ))}
+            </View>
+            {goals.length > 16 &&
+              <Text style={{ color: C.subtle, fontSize: 12 }}>Most recent 16 shown; open Game Learning for complete project history.</Text>}
             <Text style={{ color: C.text, fontWeight: '700' }}>Authority for the selected project</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
               {chip('Draft a plan (no effects)', executionMode === 'plan',
@@ -387,6 +481,22 @@ export default function JeevesStudioPalette({
                 <Text selectable style={{ color: C.subtle, fontSize: 11 }}>
                   Last server-observed step: {JSON.stringify(goalReceipt.last_step).slice(0, 2500)}
                 </Text>}
+              {chip(showGoalSteps ? 'Hide recorded steps' : 'Inspect recorded steps', showGoalSteps,
+                () => setShowGoalSteps(value => !value))}
+              {showGoalSteps && goalReceipt.steps.map((record, index) =>
+                <Text key={index} selectable style={{ color: C.subtle, fontSize: 11 }}>
+                  {index + 1}. {JSON.stringify(record).slice(0, 2500)}
+                </Text>)}
+              {!!goalReceipt.error &&
+                <Text selectable accessibilityRole="alert" style={{ color: '#fca5a5' }}>
+                  Host error: {JSON.stringify(goalReceipt.error).slice(0, 1500)}
+                </Text>}
+              {goalReceipt.recovery &&
+                <Text selectable style={{ color: C.subtle, fontSize: 12 }}>
+                  Recovery: {goalReceipt.recovery.reason || 'No reason supplied'}
+                  {' · '}next: {goalReceipt.recovery.next_action || 'inspect'}
+                  {' · '}pending: {goalReceipt.recovery.pending_kind || 'none'}
+                </Text>}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
                 {chip(advancingGoal ? 'Inspecting…' : 'Reload authoritative receipts', false,
                   () => { void reloadGoal(); })}
@@ -394,6 +504,16 @@ export default function JeevesStudioPalette({
                   !['completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
                   chip(advancingGoal ? 'Working…' : 'Advance 2 authorized steps', true,
                     () => { void advanceGoal(); })}
+                {!['completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
+                  chip('Pause workflow', false, () => { void mutatePersistedGoal('pause'); })}
+                {goalReceipt.status === 'paused' &&
+                  chip('Resume workflow', false, () => { void mutatePersistedGoal('resume'); })}
+                {!['completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
+                  chip('Cancel workflow', false, () => { void mutatePersistedGoal('cancel'); })}
+                {goalReceipt.recovery?.can_retry === true && goalReceipt.recovery.target &&
+                  chip('Recover ' + goalReceipt.recovery.target, false, () => {
+                    void mutatePersistedGoal(goalReceipt.recovery!.target!);
+                  })}
                 {chip('Open goal history in Game Learning ↗', false, () => {
                   setVisible(false); onNavigate('/game-learning');
                 })}
