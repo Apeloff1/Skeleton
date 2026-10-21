@@ -13,8 +13,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from hashlib import sha256
 import json
+import io
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import zipfile
 import re
 import re
 import sqlite3
@@ -96,6 +98,48 @@ def _deps(value: Any, *, record_id: str) -> list[str]:
     if len(set(result)) != len(result) or record_id in result:
         raise CreatorSourceError("duplicate or self-referential source dependency")
     return result
+
+
+def _godot_archive(files: Mapping[str, str], receipt: Mapping[str, Any]) -> bytes:
+    """Deterministically package exact independently verified Godot source."""
+    if not isinstance(files, Mapping) or not files or len(files) > 128:
+        raise CreatorSourceError("Godot archive requires bounded native source files")
+    expected = receipt.get("godot_file_hashes")
+    if not isinstance(expected, Mapping) or set(expected) != set(files):
+        raise CreatorSourceError("Godot file hash ancestry differs from native proof")
+    manifest = _json(dict(receipt), limit=MAX_RECORD_BYTES)
+    output = io.BytesIO()
+    total = len(manifest)
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED,
+                         compresslevel=9, allowZip64=False) as archive:
+        for name in sorted(files):
+            path = PurePosixPath(name)
+            if (not isinstance(name, str) or not name
+                    or path.is_absolute() or ".." in path.parts
+                    or "\\" in name or path.as_posix() != name
+                    or name == "jeeves_source_receipt.json"):
+                raise CreatorSourceError("Godot source path attempts archive traversal")
+            content = files[name]
+            if not isinstance(content, str):
+                raise CreatorSourceError("Godot exporter supplied nontext native file")
+            raw = content.encode("utf-8")
+            if sha256(raw).hexdigest() != expected[name]:
+                raise CreatorSourceError("Godot native source differs from validated receipt")
+            total += len(raw)
+            if total > MAX_BUNDLE_BYTES:
+                raise CreatorSourceError("Godot game source exceeds archive budget")
+            entry = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, raw)
+        proof = zipfile.ZipInfo("jeeves_source_receipt.json", (1980, 1, 1, 0, 0, 0))
+        proof.compress_type = zipfile.ZIP_DEFLATED
+        proof.external_attr = 0o100644 << 16
+        archive.writestr(proof, manifest)
+    data = output.getvalue()
+    if len(data) > MAX_BUNDLE_BYTES:
+        raise CreatorSourceError("compressed native project exceeds artifact budget")
+    return data
 
 
 def _project_path(path: Path) -> Path:
@@ -466,8 +510,10 @@ class CreatorProjectSourceStore:
 
     def export(self, command: CreatorCommand) -> dict[str, Any]:
         export_format = command.payload["format"]
-        if export_format not in ("game-source-json", "frontier-studio-json"):
-            raise CreatorSourceError("unsupported game source or typed Forge export format")
+        if export_format not in (
+            "game-source-json", "frontier-studio-json", "frontier-godot4-zip",
+        ):
+            raise CreatorSourceError("unsupported typed game source export format")
         artifact = identifier(command.payload["artifact_name"], "artifact")
         if "/" in artifact or "\\" in artifact:
             raise CreatorSourceError("source artifact name must not contain path separators")
@@ -476,7 +522,15 @@ class CreatorProjectSourceStore:
             report = self._validate_graph(self._records)
             if not self._records or not report["valid"]:
                 raise CreatorSourceError("unresolved sources or dependencies block export")
-            if export_format == "frontier-studio-json":
+            if export_format == "frontier-godot4-zip":
+                from .studio_frontier_godot_package import compile_original_godot_candidate
+                candidate = compile_original_godot_candidate(
+                    self.project_id, self._records,
+                    source_head_sha256=self._head,
+                )
+                raw = _godot_archive(candidate["files"], candidate["receipt"])
+                extension = ".zip"
+            elif export_format == "frontier-studio-json":
                 from .studio_frontier_source_compile import (
                     compile_persisted_frontier_source,
                 )
@@ -495,9 +549,11 @@ class CreatorProjectSourceStore:
                     "dependency_assurance": report,
                     "native_binary_compiled": False,
                 }
-            raw = _json(bundle, limit=MAX_BUNDLE_BYTES)
+            if export_format != "frontier-godot4-zip":
+                raw = _json(bundle, limit=MAX_BUNDLE_BYTES)
+                extension = ".json"
             content_sha = sha256(raw).hexdigest()
-            name = artifact + "-" + content_sha[:24] + ".json"
+            name = artifact + "-" + content_sha[:24] + extension
             target = self.export_root / name
             if target.is_symlink():
                 raise CreatorSourceError("export target cannot be a symbolic link")
