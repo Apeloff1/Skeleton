@@ -139,7 +139,7 @@ class RealForgeStudioAuthoringTests(unittest.TestCase):
     def test_first_fifty_distinct_supported_game_edits(self):
         self.assertGreaterEqual(len(AUTHORING_ACTIONS), 150)
         self.assertEqual(50, len(PARAMETERS))
-        self.assertTrue(set(PARAMETERS) <= set(AUTHORING_ACTIONS))
+        self.assertTrue(all(name in AUTHORING_ACTIONS for name in PARAMETERS))
 
     def test_batch_edits_real_tile_geometry_quest_and_actor(self):
         original = project()
