@@ -528,6 +528,45 @@ class CreatorProjectSourceStore:
                 "already_exported": False, "native_binary_compiled": False,
             }
 
+    def mutations_after(self, expected_head_sha256: str | None,
+                        *, limit: int = 32) -> list[dict[str, str]]:
+        """Reconstruct host source effects since an independently pinned head.
+
+        Production resume can admit only effects whose command hashes have
+        already succeeded in the identical durable CreatorRunbook. Any other
+        project mutation makes the model's decision context stale.
+        """
+        if (expected_head_sha256 is not None
+                and not HEX.fullmatch(expected_head_sha256)):
+            raise CreatorSourceError("source lineage pin requires a valid SHA-256")
+        if type(limit) is not int or not 1 <= limit <= 128:
+            raise CreatorSourceError("bounded source-delta inspection required")
+        with self._lock:
+            self._refresh()
+            if expected_head_sha256 == self._head:
+                return []
+            if expected_head_sha256 is None:
+                start = -1
+            else:
+                match = self._db.execute(
+                    "SELECT sequence FROM creator_source_event WHERE digest=?",
+                    (expected_head_sha256,),
+                ).fetchone()
+                if match is None:
+                    raise CreatorSourceError("source history does not contain plan generation")
+                start = match[0]
+            rows = self._db.execute(
+                "SELECT command_sha256,digest,record_id FROM creator_source_event "
+                "WHERE sequence>? ORDER BY sequence LIMIT ?",
+                (start, limit + 1),
+            ).fetchall()
+            if len(rows) > limit:
+                raise CreatorSourceError("more source edits than current runbook supports")
+            return [
+                {"command_sha256": row[0], "event_sha256": row[1],
+                 "record_id": row[2]} for row in rows
+            ]
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             self._refresh()
