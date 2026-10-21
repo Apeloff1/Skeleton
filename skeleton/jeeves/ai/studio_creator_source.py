@@ -557,11 +557,23 @@ class CreatorProjectSourceStore:
             target = self.export_root / name
             if target.is_symlink():
                 raise CreatorSourceError("export target cannot be a symbolic link")
+            def disk_proof() -> dict[str, Any] | None:
+                if export_format != "frontier-godot4-zip":
+                    return None
+                from .studio_godot_zip_verify import verify_published_godot_zip
+                return verify_published_godot_zip(
+                    target, project_id=self.project_id,
+                    source_head_sha256=self._head,
+                    expected_archive_sha256=content_sha,
+                )
+
             if target.exists():
                 if target.read_bytes() != raw:
                     raise CreatorSourceError("previous export identity has conflicting bytes")
+                published = disk_proof()
                 return {
                     "project_id": self.project_id, "artifact_name": name,
+                    "disk_verification": published,
                     "bytes": len(raw), "artifact_sha256": content_sha,
                     "source_head_sha256": self._head,
                     "export_format": export_format,
@@ -576,8 +588,17 @@ class CreatorProjectSourceStore:
             except BaseException:
                 target.unlink(missing_ok=True)
                 raise
+            try:
+                published = disk_proof()
+            except BaseException:
+                # Do not publish an unverified Godot archive. Keep it for
+                # forensics if an external actor changed its bytes meanwhile.
+                if target.read_bytes() == raw:
+                    target.unlink(missing_ok=True)
+                raise
             return {
                 "project_id": self.project_id, "artifact_name": name,
+                "disk_verification": published,
                 "bytes": len(raw), "artifact_sha256": content_sha,
                 "source_head_sha256": self._head,
                 "export_format": export_format,
