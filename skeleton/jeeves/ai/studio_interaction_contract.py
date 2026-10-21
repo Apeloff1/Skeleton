@@ -170,6 +170,7 @@ class StudioEvidenceJournal:
             previous TEXT, digest TEXT NOT NULL UNIQUE)""")
         self._head: str | None = None
         self._sequence = 0
+        self._execution_token = object()
         self.read()
 
     def read(self) -> tuple[dict[str, Any], ...]:
@@ -204,9 +205,12 @@ class StudioEvidenceJournal:
             self._head = prev
             return tuple(out)
 
-    def append(self, kind: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+    def append(self, kind: str, payload: Mapping[str, Any], *,
+               _authority: object | None = None) -> dict[str, Any]:
         if kind not in self.EVENTS:
             raise StudioInteractionError("unsupported studio event")
+        if kind.startswith("execution_") and _authority is not self._execution_token:
+            raise StudioInteractionError("execution evidence must come from the host runner")
         body = dict(payload)
         canonical(body)
         with self._lock:
@@ -395,7 +399,7 @@ class JeevesStudioController:
             "observation_sha256": outcome["observation_digest"],
             "reason": outcome["outcome_reason"],
             "runbook_state_sha256": snapshot["head_digest"],
-        })
+        }, _authority=self.journal._execution_token)
 
 
 
