@@ -35,6 +35,7 @@ from .game_frontier_studio_production_recipes import RECIPE_ACTIONS, RECIPE_INDE
 from .game_frontier_studio_system_expansions import EXPANDED_RECIPE_ACTIONS, EXPANDED_RECIPE_INDEX, edit_expansion
 from .game_frontier_studio_directed_production import DIRECTED_ACTIONS, edit_direction
 from .game_frontier_studio_final_production import FINAL_PRODUCTION_ACTIONS, edit_final_production
+from .game_frontier_studio_worldline_production import WORLDLINE_ACTIONS, edit_worldline
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
@@ -48,7 +49,7 @@ _LEGACY_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIONS
                      QUEST_BLUEPRINT_ACTIONS + REACTIVE_SCENE_ACTIONS +
                      RECIPE_ACTIONS + EXPANDED_RECIPE_ACTIONS)
 class AuthoringCatalogue(Sequence[str]):
-    """Virtual last 4.95M commands; exact indexed lookup without startup allocation."""
+    """Virtual fifty-million-operation source-authoring catalog, stable legacy indices."""
     def __init__(self):
         self._legacy = _LEGACY_ACTIONS
         self._known = frozenset(_LEGACY_ACTIONS)
@@ -58,7 +59,7 @@ class AuthoringCatalogue(Sequence[str]):
             raise RuntimeError("director namespace may not overwrite original commands")
 
     def __len__(self) -> int:
-        return len(self._legacy) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS)
+        return len(self._legacy) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS)
 
     def __getitem__(self, index):
         if isinstance(index, slice):
@@ -72,11 +73,16 @@ class AuthoringCatalogue(Sequence[str]):
         if index < len(self._legacy):
             return self._legacy[index]
         offset = index - len(self._legacy)
-        return DIRECTED_ACTIONS[offset] if offset < len(DIRECTED_ACTIONS) else FINAL_PRODUCTION_ACTIONS[offset - len(DIRECTED_ACTIONS)]
+        if offset < len(DIRECTED_ACTIONS):
+            return DIRECTED_ACTIONS[offset]
+        offset -= len(DIRECTED_ACTIONS)
+        return FINAL_PRODUCTION_ACTIONS[offset] if offset < len(FINAL_PRODUCTION_ACTIONS) else WORLDLINE_ACTIONS[offset - len(FINAL_PRODUCTION_ACTIONS)]
 
     def __contains__(self, action: object) -> bool:
         if type(action) is not str:
             return False
+        if action.startswith("worldline_"):
+            return action in WORLDLINE_ACTIONS
         if action.startswith("complete_"):
             return action in FINAL_PRODUCTION_ACTIONS
         if action.startswith("direct_"):
@@ -87,11 +93,12 @@ class AuthoringCatalogue(Sequence[str]):
         yield from self._legacy
         yield from DIRECTED_ACTIONS
         yield from FINAL_PRODUCTION_ACTIONS
+        yield from WORLDLINE_ACTIONS
 
 
 AUTHORING_ACTIONS = AuthoringCatalogue()
-if len(AUTHORING_ACTIONS) != 5000000:
-    raise RuntimeError("Forge Studio must expose 500000 executable production operations")
+if len(AUTHORING_ACTIONS) != 50000000:
+    raise RuntimeError("Forge Studio must expose 50000000 executable production operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -171,6 +178,8 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_direction(project, operation, payload, execute_authoring)
     if operation in FINAL_PRODUCTION_ACTIONS:
         return edit_final_production(project, operation, payload, execute_authoring)
+    if operation in WORLDLINE_ACTIONS:
+        return edit_worldline(project, operation, payload, execute_authoring)
     raise StudioError("unknown executable Studio editor action")
 
 
@@ -257,11 +266,12 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "native_force_field_count": len(project.native_gameplay_force_fields),
         "quest_stage_count": sum(len(q.stages) for q in project.native_quests),
         "action_catalog": AUTHORING_ACTIONS[:500],
-        "recipe_catalog_count": len(RECIPE_ACTIONS) + len(EXPANDED_RECIPE_ACTIONS) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS),
+        "recipe_catalog_count": len(RECIPE_ACTIONS) + len(EXPANDED_RECIPE_ACTIONS) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS),
         "classic_recipe_count": len(RECIPE_ACTIONS),
         "expanded_recipe_count": len(EXPANDED_RECIPE_ACTIONS),
         "directed_recipe_count": len(DIRECTED_ACTIONS),
         "final_recipe_count": len(FINAL_PRODUCTION_ACTIONS),
+        "worldline_recipe_count": len(WORLDLINE_ACTIONS),
         "catalog_total": len(AUTHORING_ACTIONS),
         "recipe_search_required": True,
         "candidate_only": True,
