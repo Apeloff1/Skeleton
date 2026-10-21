@@ -66,6 +66,25 @@ def _write_scope(user):
     return scope
 
 
+@router.get("/recipes")
+async def search_production_recipes(
+    query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
+    user=Depends(get_current_user),
+):
+    """Discover only one small bounded page of actually executable recipes."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_production_recipes import search_recipes
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return search_recipes(query=query, domain=domain,
+                              offset=offset, limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422, detail={
+            "code": "invalid_forge_recipe_search",
+            "message": str(exc),
+        }) from exc
+
+
 @router.get("/actions")
 async def actions(user=Depends(get_current_user)):
     _scope(user)
