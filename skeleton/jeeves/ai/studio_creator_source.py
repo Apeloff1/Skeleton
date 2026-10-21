@@ -644,6 +644,36 @@ class CreatorProjectSourceStore:
                  "record_id": row[2]} for row in rows
             ]
 
+    def run_native_playthrough(
+        self, *, godot_executable: str, timeout_seconds: int = 90,
+    ) -> dict[str, Any]:
+        """Execute existing Godot 4 native verification against actual source.
+
+        The caller MUST be a host-authenticated producer; this method does
+        not expose a model tool or issue runtime execution permission.
+        """
+        from .studio_frontier_godot_package import (
+            run_original_game_native_playthrough,
+        )
+        with self._lock:
+            self._refresh()
+            previous = self._head
+            evidence = run_original_game_native_playthrough(
+                self.project_id, self._records,
+                source_head_sha256=previous,
+                godot_executable=godot_executable,
+                timeout_seconds=timeout_seconds,
+            )
+            # Refuse to attach the verified native result to a different
+            # source generation if an outside producer changed the SQLite
+            # game while the Godot process executed.
+            self._refresh()
+            if self._head != previous:
+                raise CreatorSourceError(
+                    "game source changed during native engine execution"
+                )
+            return evidence
+
     def head_identity(self) -> str | None:
         """O(1) trusted in-process project head; verify external SQLite changes."""
         with self._lock:
