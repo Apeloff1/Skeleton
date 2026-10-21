@@ -153,6 +153,31 @@ class FiveHundredThousandSourceProductions(unittest.TestCase):
         with self.assertRaises(StudioError):
             search_directions(limit=999)
 
+    def test_arithmetic_pagination_matches_exact_virtual_registry(self):
+        for offset in (0,1,31,1024,123456,449968,449999):
+            with self.subTest(offset=offset):
+                result=search_directions(offset=offset,limit=32)
+                expected=DIRECTED_ACTIONS[offset:min(offset+32,450000)]
+                self.assertEqual(
+                    expected,
+                    tuple(item["operation"] for item in result["items"]))
+                self.assertEqual(450000,result["matched"])
+        selected=search_directions(
+            domain="stronghold",system_layer="stealth",
+            director="physics_obstacles",offset=123,limit=4)
+        self.assertEqual(450,selected["matched"])
+        expected=[]
+        for n in range(123,127):
+            # stronghold domain index 7; every recipe has 10 system-layer
+            # expansions; stealth index 6 and physics director index 6.
+            index=((7*450+n)*10+6)*10+6
+            expected.append(DIRECTED_ACTIONS[index])
+        self.assertEqual(expected,[
+            item["operation"] for item in selected["items"]])
+        self.assertEqual([],search_directions(
+            domain="stronghold",system_layer="stealth",
+            director="physics_obstacles",offset=451,limit=7)["items"])
+
     def test_replay_determinism_and_immutable_transaction(self):
         base=original_project()
         name=DIRECTED_ACTIONS[5*45000+44]
