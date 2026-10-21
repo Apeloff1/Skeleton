@@ -192,6 +192,12 @@ class CompleteJeevesSourceCurriculum(unittest.TestCase):
 
 class HostAuthorizedCurriculumOperation(unittest.IsolatedAsyncioTestCase):
     async def test_host_scoped_plan_preview_commit_and_reject_stale(self):
+        # Focused CI runs with --noconftest, so resolve the canonical app root
+        # explicitly rather than relying on another test suite's sys.path.
+        import sys
+        backend = str(Path(__file__).resolve().parents[2] / "backend")
+        if backend not in sys.path:
+            sys.path.insert(0, backend)
         from core.game_studio_tools import execute_studio_command
         from core import game_frontier_authoring as forge_author
         from core.game_learning import workspace
