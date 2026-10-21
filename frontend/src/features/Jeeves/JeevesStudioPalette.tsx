@@ -3,6 +3,7 @@
  * The game-studio goal runner owns actual execution, authorization and receipts.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { composeStudioFlow, JEEVES_STUDIO_FLOWS } from './JeevesStudioFlows';
 import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   advanceStudioGoal, createStudioGoal, getStudioGoal, type StudioGoal,
@@ -68,6 +69,7 @@ export default function JeevesStudioPalette({
   const [visible, setVisible] = useState(false);
   const [facet, setFacet] = useState('vision');
   const [mode, setMode] = useState<Mode>('questionnaire');
+  const [flowId, setFlowId] = useState('full-production');
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const reply = answers[facet] || '';
   const setReply = (value: string) => setAnswers(current => ({ ...current, [facet]: value }));
@@ -102,8 +104,14 @@ export default function JeevesStudioPalette({
   const domains = useMemo(() => JEEVES_STUDIO_DOMAINS.filter(item => group === 'All' || item.family === group), [group]);
   const chosen = JEEVES_STUDIO_DOMAINS.find(item => item.id === facet) || JEEVES_STUDIO_DOMAINS[0];
   const groups = ['All', ...Array.from(new Set(JEEVES_STUDIO_DOMAINS.map(item => item.family)))];
+  const selectedFlow = JEEVES_STUDIO_FLOWS.find(item => item.id === flowId) ||
+    JEEVES_STUDIO_FLOWS[0];
 
   const buildRequest = () => {
+    if (mode === 'flow') {
+      const stage = selectedFlow.stages.includes(chosen.id) ? chosen.id : selectedFlow.stages[0];
+      return composeStudioFlow(selectedFlow, answers, source, stage);
+    }
     const request = [
       'Jeeves: operate as the locally running game-studio AI, not an external API proxy.',
       `Studio facet: ${chosen.id} (${chosen.title}). Interaction mode: ${mode}.`,
@@ -231,6 +239,24 @@ export default function JeevesStudioPalette({
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{domains.map(item => chip(`${answers[item.id]?.trim() ? '✓ ' : ''}${item.title}`, chosen.id === item.id, () => setFacet(item.id)))}</View>
           <Text style={{ color: C.text, fontWeight: '700' }}>Working mode</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{MODES.map(name => chip(name, mode === name, () => setMode(name)))}</View>
+          {mode === 'flow' && <>
+            <Text style={{ color: C.text, fontWeight: '700' }}>Cross-forge production workflow</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+              {JEEVES_STUDIO_FLOWS.map(flow => chip(flow.title, flow.id === flowId,
+                () => { setFlowId(flow.id); setFacet(flow.stages[0]); setGoalReceipt(null); }))}
+            </View>
+            <Text style={{ color: C.subtle }}>{selectedFlow.purpose}</Text>
+            <Text style={{ color: C.subtle, fontSize: 12 }}>Acceptance: {selectedFlow.finish}</Text>
+            <Text style={{ color: C.text, fontWeight: '700' }}>Select and answer each stage</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+              {selectedFlow.stages.map(stage => chip(stage + (answers[stage]?.trim() ? ' ✓' : ''),
+                chosen.id === stage, () => setFacet(stage)))}
+            </View>
+            <Text style={{ color: C.subtle, fontSize: 12 }}>
+              Unanswered stages are explicit decisions for Jeeves, not permission to
+              invent canon. Long flows must be partitioned into smaller scoped goals.
+            </Text>
+          </>}
           <Text style={{ color: C.subtle }}>{chosen.question}</Text>
           <TextInput accessibilityLabel={`Requirements for ${chosen.title}`} value={reply}
             onChangeText={setReply} multiline maxLength={4096}
