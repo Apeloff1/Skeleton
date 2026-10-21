@@ -161,6 +161,7 @@ def verify_receipts(flow: Mapping[str, Any], receipts: list[Any]) -> dict[str, A
     from skeleton.forge.creator.command_surface import (
         CreatorCommandReceipt, build_creator_command, validate_creator_receipt,
     )
+    from skeleton.jeeves.ai.creator_runbook_runtime import CreatorRunbook
     if not isinstance(flow, Mapping) or flow.get("schema_version") != SCHEMA:
         raise ValueError("Invalid flow")
     plan = flow.get("plan")
@@ -168,6 +169,8 @@ def verify_receipts(flow: Mapping[str, Any], receipts: list[Any]) -> dict[str, A
             or not isinstance(plan.get("steps"), list)
             or not isinstance(receipts, list) or len(receipts) != len(plan["steps"])):
         raise ValueError("Plan/receipt mismatch")
+    # Recompute and validate the original creator-plan step digest before receipts.
+    CreatorRunbook(plan)
     prior = "0" * 64
     for step, receipt in zip(plan["steps"], receipts):
         data = step["command"]

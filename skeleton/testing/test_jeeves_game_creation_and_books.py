@@ -122,3 +122,22 @@ def test_host_model_tools_are_only_read_only():
     tools = register_dialogue_tools(registry)
     assert len(tools) == 3
     assert all(registry.get(name).spec.risk is RiskTier.READ_ONLY for name in tools)
+
+
+def test_real_weight_pipeline_denies_unpinned_checkpoint_before_any_training(tmp_path):
+    from skeleton.ai.training.jeeves_book_weight_pipeline import run_book_candidate
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps(approved_book()))
+    checkpoint = tmp_path / "model.json"
+    checkpoint.write_text('{"not": "a real serving checkpoint"}')
+    output = tmp_path / "dataset"
+    output.mkdir()
+    with pytest.raises(ProductionCheckpointError):
+        run_book_candidate(source=source, source_sha256=sha256(source.read_bytes()).hexdigest(),
+            intake=tmp_path / "intake.jsonl", coverage=tmp_path / "coverage.json",
+            dataset_directory=output, prefix="books", partition_seed="explicit-seed",
+            rights_review_id="review-001", checkpoint=checkpoint,
+            checkpoint_sha256="f" * 64, candidate=tmp_path / "candidate.json",
+            report=tmp_path / "report.json", operation_receipt=tmp_path / "operation.json")
+    assert not (tmp_path / "intake.jsonl").exists()
+    assert not (tmp_path / "candidate.json").exists()

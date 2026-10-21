@@ -29,3 +29,7 @@ The canonical dataset builder and loader enforce SHA pinning, per-source project
 ## Explicit nonclaims and readiness
 
 Creating records does not train tensors. Training was not run for this code change: authorized books, the actual serving checkpoint, compute, and independent rights approvals are external prerequisites. No complete engine compatibility, full studio automation, book ingestion, or end-to-end game release is claimed absent actual execution receipts.
+
+## One-command real candidate training
+
+For an installed, operator-controlled Jeeves model with an independently hashed live checkpoint and enough authorized full books, invoke python -m skeleton.ai.training.jeeves_book_weight_pipeline with --source, --source-sha256, --intake, --coverage, --dataset-directory, --prefix, --partition-seed, --rights-review-id, --checkpoint, --checkpoint-sha256, --candidate, --report and --operation-receipt. The command uses the exact three existing owners above; it performs real checkpoint-based candidate optimization only after all rights, corpus and checkpoint conditions pass. Its final receipt hash-links book coverage, project-disjoint dataset manifest and train/holdout hashes, actual candidate checksum and the trainer evaluation report. If interrupted, reconcile existing immutable artifacts before any new invocation; neither promotion nor fallback to a provider is implied.
