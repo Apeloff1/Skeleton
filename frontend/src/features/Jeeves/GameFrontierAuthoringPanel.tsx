@@ -433,6 +433,8 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [recipeView, setRecipeView] = useState(false);
   const [recipeQuery, setRecipeQuery] = useState('');
   const [recipeDomain, setRecipeDomain] = useState('');
+  const [recipeGeneration, setRecipeGeneration] = useState<'classic' | 'expanded'>('expanded');
+  const [systemLayer, setSystemLayer] = useState('');
   const [recipeResults, setRecipeResults] = useState<ForgeRecipeResults | null>(null);
   const [parameters, setParameters] = useState('{"layer":"ground","x":0,"y":0,"tile":1}');
   const [steps, setSteps] = useState<ForgeStep[]>([]);
@@ -490,7 +492,8 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     setBusy(true);
     setError('');
     try {
-      const result = await searchForgeRecipes(recipeQuery, recipeDomain, offset, 32);
+      const result = await searchForgeRecipes(recipeQuery, recipeDomain, offset, 32,
+        recipeGeneration, systemLayer);
       setRecipeResults(result);
       setNotice(result.matched + ' source-changing production recipes match your search.');
     } catch (reason: any) {
@@ -498,7 +501,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     } finally { setBusy(false); }
   };
   const selectRecipe = (recipe: ForgeRecipe) => {
-    if (!/^produce_[a-z_]+__[a-z_]+$/.test(recipe.operation)) {
+    if (!(/^(produce_[a-z_]+__[a-z_]+|expand_[a-z_]+__[a-z_]+___[a-z_]+)$/.test(recipe.operation))) {
       setError('Invalid game production recipe identity.'); return;
     }
     const layer = doc?.layers.find(item => item.id === selectedLayer) || doc?.layers[0];
@@ -516,7 +519,9 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     setAction(recipe.operation);
     setParameters(JSON.stringify(chosen, null, 2));
     setNotice('Selected: ' + recipe.domain + ' / ' + recipe.source_blueprint +
-      ' / ' + recipe.treatment + '. Preview actual source edits before saving.');
+      ' / ' + recipe.treatment +
+      (recipe.system_layer ? ' / '+recipe.system_layer : '') +
+      '. Preview actual source edits before saving.');
   };
   const choose = (name: string) => {
     setAction(name);
@@ -647,14 +652,20 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         <Button key={group.title} title={(toolFamily === group.title ? '✓ ' : '') + group.title}
           disabled={pending} press={() => { setToolFamily(group.title); setSearch(''); }} />)}</View>
     </ScrollView>
-    <Button title={(recipeView ? '✓ ' : '') + 'Browse 4,500 production recipes'}
+    <Button title={(recipeView ? '✓ ' : '') + 'Browse 49,500 production recipes'}
       disabled={pending || !doc} press={() => {
         setRecipeView(value => !value); setRecipeResults(null);
       }} />
     {recipeView && <View style={{ gap: 8 }}>
       <Text style={{ color: '#dae8f4', fontWeight: '700' }}>
-        Production recipes · 10 domains × 50 original blueprints × 9 source-changing treatments
+        Production · 4,500 original recipes plus 45,000 gameplay-system expansions
       </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+        <Button disabled={pending} title={(recipeGeneration === 'classic' ? '✓ ' : '') + 'Original 4,500'}
+          press={() => { setRecipeGeneration('classic'); setSystemLayer(''); setRecipeResults(null); }}/>
+        <Button disabled={pending} title={(recipeGeneration === 'expanded' ? '✓ ' : '') + 'Gameplay 45,000'}
+          press={() => { setRecipeGeneration('expanded'); setRecipeResults(null); }}/>
+      </View>
       <TextInput value={recipeQuery} onChangeText={setRecipeQuery}
         accessibilityLabel="Search production recipes"
         placeholder="Search worlds, quests, NPCs, weather…"
@@ -670,6 +681,15 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
               press={() => { setRecipeDomain(domain); setRecipeResults(null); }} />)}
         </View>
       </ScrollView>
+      {recipeGeneration === 'expanded' && <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={{ flexDirection: 'row' }}>
+          {['','wayfinding','seasons','destructibles','weather','combat','commerce',
+            'stealth','verticality','migration','story_convergence'].map(layer =>
+            <Button key={layer || 'all'} disabled={pending}
+              title={(systemLayer === layer ? '✓ ' : '') + (layer || 'All systems')}
+              press={() => { setSystemLayer(layer); setRecipeResults(null); }} />)}
+        </View>
+      </ScrollView>}
       <Button title="Search executable recipes" disabled={pending}
         press={() => { void loadRecipes(0); }} />
       {recipeResults && <Text style={{ color:'#b1cada' }}>
@@ -677,7 +697,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         {recipeResults.offset + recipeResults.items.length}
       </Text>}
       {recipeResults?.items.map(recipe => <Button key={recipe.operation}
-        disabled={pending} title={recipe.operation.replace(/^produce_/, '').replace(/_/g, ' ')}
+        disabled={pending} title={recipe.operation.replace(/^(produce_|expand_)/, '').replace(/_/g, ' ')}
         press={() => selectRecipe(recipe)} />)}
       {recipeResults?.next_offset !== null && recipeResults?.next_offset !== undefined &&
         <Button title="Next recipes" disabled={pending}
