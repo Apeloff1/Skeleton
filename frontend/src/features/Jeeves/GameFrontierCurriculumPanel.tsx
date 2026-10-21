@@ -55,6 +55,10 @@ export default function GameFrontierCurriculumPanel({
     candidate_sha256: string; operations: string[]; books: string[];
     persisted: boolean; measured_changed: boolean}|null>(null);
   const [approval, setApproval] = useState(false);
+  const [practiceEvidence, setPracticeEvidence] = useState<{
+    source_practice_verified: true; evidence_sha256: string;
+    source_sha256: string; candidate_sha256: string; book: string;
+  }|null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -72,11 +76,15 @@ export default function GameFrontierCurriculumPanel({
   const verified = preview && source &&
     preview.source_sha256 === source.expected_sha256 &&
     preview.books.length === 1 && preview.books[0] === ref &&
-    preview.measured_changed && CHECK.test(preview.candidate_sha256);
+    preview.measured_changed && CHECK.test(preview.candidate_sha256) &&
+    practiceEvidence?.source_practice_verified === true &&
+    practiceEvidence.source_sha256 === preview.source_sha256 &&
+    practiceEvidence.candidate_sha256 === preview.candidate_sha256 &&
+    practiceEvidence.book === ref;
   const invalidate = () => {
     setLesson(null); setCourse(null); setManifested(null); setWorklist(null);
     setAssessment(null); setAnswers([]); setPlan(null); setPreview(null);
-    setApproval(false); setError(''); setStatus('');
+    setApproval(false); setPracticeEvidence(null); setError(''); setStatus('');
   };
   useEffect(() => {
     let active = true;
@@ -85,7 +93,7 @@ export default function GameFrontierCurriculumPanel({
     return () => { active = false; };
   }, []);
   useEffect(() => {
-    setPlan(null); setPreview(null); setApproval(false);
+    setPlan(null); setPreview(null); setApproval(false); setPracticeEvidence(null);
   }, [document?.source_sha256, document?.expected_version, projectId]);
   const perform = async (fn: () => Promise<void>) => {
     if (pending) return;
@@ -107,7 +115,7 @@ export default function GameFrontierCurriculumPanel({
     ]);
     setLesson(unit); setCourse(path); setAnswers(unit.questions.map(() => ''));
     setManifested(null); setWorklist(null); setAssessment(null);
-    setPlan(null); setPreview(null); setApproval(false);
+    setPlan(null); setPreview(null); setApproval(false); setPracticeEvidence(null);
     const activeLayer = document?.layers[0];
     setParams(JSON.stringify({
       layer: activeLayer?.id || 'ground', x: 0, y: 0,
@@ -147,7 +155,7 @@ export default function GameFrontierCurriculumPanel({
       throw new Error('Practice requires a bounded JSON object for actual source editor parameters.');
     return parsed as Record<string, unknown>;
   };
-  const practice = (mode: 'plan'|'preview'|'commit') => perform(async () => {
+  const practice = (mode: 'plan'|'preview'|'practice'|'commit') => perform(async () => {
     const book = selectedBook();
     if (!lesson || lesson.reference.ref !== ref)
       throw new Error('Load the exact lesson and source operation before an automated practice.');
@@ -156,26 +164,33 @@ export default function GameFrontierCurriculumPanel({
     if (mode === 'commit' && (!verified || !approval))
       throw new Error('Explicitly approve the previewed exact project hash before commit.');
     const result = await executeCurriculumAction(
-      'game.studio.curriculum.automation.' + mode as
+      (mode === 'practice' ? 'game.studio.curriculum.practice' :
+        'game.studio.curriculum.automation.' + mode) as
         'game.studio.curriculum.automation.plan' |
         'game.studio.curriculum.automation.preview' |
-        'game.studio.curriculum.automation.commit',
+        'game.studio.curriculum.automation.commit' |
+        'game.studio.curriculum.practice',
       projectId, [book], parameters, source,
       mode === 'commit' ? preview?.candidate_sha256 : undefined,
     );
     if (mode === 'plan') {
       setPlan(result as typeof plan & {source_sha256: string; operations: string[]; books: string[]; persisted: boolean});
-      setPreview(null); setApproval(false);
+      setPreview(null); setApproval(false); setPracticeEvidence(null);
       setStatus('Jeeves resolved one exact book to one registered original-game edit. Not persisted.');
-    } else if (mode === 'preview') {
+    } else if (mode === 'preview' || mode === 'practice') {
       if (!result.candidate_sha256 || !CHECK.test(result.candidate_sha256) ||
           result.source_sha256 !== source.expected_sha256)
         throw new Error('Host did not return a source-bound measured preview.');
       setPreview(result as NonNullable<typeof preview>);
+      setPracticeEvidence(mode === 'practice'
+        ? result.practical_attestation as NonNullable<typeof practiceEvidence>
+        : null);
       setApproval(false);
-      setStatus('Host evaluated the real edit and returned a candidate hash. No save occurred.');
+      setStatus(mode === 'practice'
+        ? 'Verified the source operation, exact book and hash-linked preview receipt. No weight training or save.'
+        : 'Host evaluated the real edit and returned a candidate hash. No save occurred.');
     } else {
-      setPreview(null); setPlan(null); setApproval(false);
+      setPreview(null); setPlan(null); setApproval(false); setPracticeEvidence(null);
       setStatus('One exactly approved candidate revision was saved; native playthrough and weight training remain unverified.');
       await onCommitted?.();
     }
@@ -278,6 +293,7 @@ export default function GameFrontierCurriculumPanel({
         <TextInput accessibilityLabel="Book practice edit JSON" value={params}
           onChangeText={v => {
             setParams(v); setPlan(null); setPreview(null); setApproval(false);
+            setPracticeEvidence(null);
           }} editable={!pending} autoCorrect={false} autoCapitalize="none"
           maxLength={12000} multiline style={{...fieldStyle, minHeight:110,
             fontFamily:'monospace', textAlignVertical:'top'}}/>
@@ -286,6 +302,8 @@ export default function GameFrontierCurriculumPanel({
             disabled={pending || !document} onPress={() => practice('plan')}/>
           <Action title="2. Preview actual source change"
             disabled={pending || !document} onPress={() => practice('preview')}/>
+          <Action title="3. Verify factual book-source practice"
+            disabled={pending || !document} onPress={() => practice('practice')}/>
         </View>
         {!!plan && <Text selectable style={textStyle}>
           Plan: {plan.operations.join(' · ')} · saved: {String(plan.persisted)}
@@ -297,10 +315,14 @@ export default function GameFrontierCurriculumPanel({
             {'\n'}Candidate: {preview.candidate_sha256}
             {'\n'}Persisted: {String(preview.persisted)}
           </Text>
-          <Action title={(approval ? '✓ ' : '')+'Approve EXACT candidate digest'}
+          {!!practiceEvidence && <Text selectable style={textStyle}>
+            Source practice verified · SHA-256: {practiceEvidence.evidence_sha256}
+            {'\n'}Native gameplay, legal clearance and neural weights still unverified.
+          </Text>}
+          <Action title={(approval ? '✓ ' : '')+'4. Approve EXACT candidate digest'}
             disabled={pending || !verified}
             onPress={() => setApproval(value => !value)}/>
-          <Action title="3. Commit only this approved source revision"
+          <Action title="5. Commit only this approved source revision"
             disabled={pending || !verified || !approval}
             onPress={() => practice('commit')}/>
         </View>}
