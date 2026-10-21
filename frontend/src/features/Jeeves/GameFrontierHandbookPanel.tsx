@@ -120,8 +120,8 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
         Word counts measured from rendered Markdown.
       </Text>
       {ranking.items.map(item =>
-        <Text key={'saga' in item ? item.saga : 'saga' in item ? item.saga : 'epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign} style={{ color: '#dcefff', fontSize: 12 }}>
-          {item.rank}. {('epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign).replace(/_/g,' ')} ·
+        <Text key={'saga' in item ? item.saga : 'epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign} style={{ color: '#dcefff', fontSize: 12 }}>
+          {item.rank}. {('saga' in item ? item.saga : 'epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign).replace(/_/g,' ')} ·
           {' '}{item.quality_score}/100 · {item.words.toLocaleString()} words
         </Text>)}
     </View>}
