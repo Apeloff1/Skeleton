@@ -120,6 +120,8 @@ def verify_published_godot_zip(
                     if not isinstance(item, dict) or set(item) != {
                         "asset_id", "source_record_id", "source_sha256",
                         "frame_count", "animation_count", "png_sha256",
+                        "godot_spriteframes_resource_sha256",
+                        "godot_preview_scene_path",
                     }:
                         raise NativeSourceVerificationError(
                             "compiled sprite record has incomplete source references"
@@ -166,6 +168,32 @@ def verify_published_godot_zip(
                     if sha256(pixels).hexdigest() != sprite["pixel_content_sha256"]:
                         raise NativeSourceVerificationError(
                             "Godot sprite decoded pixel identity differs from source"
+                        )
+                    from .studio_sprite_godot_resources import (
+                        SpriteResourceError, verify_godot_sprite_resources,
+                    )
+                    resource_paths = [
+                        "game/frontier/sprites/" + asset_name + suffix
+                        for suffix in (".tres", ".tscn")
+                    ]
+                    if (item["godot_preview_scene_path"] != resource_paths[1]
+                            or any(path not in expected for path in resource_paths)):
+                        raise NativeSourceVerificationError(
+                            "original animation frames lack bound Godot preview source"
+                        )
+                    resources = {
+                        path: archive.read(path).decode("utf-8")
+                        for path in resource_paths
+                    }
+                    try:
+                        bound = verify_godot_sprite_resources(sprite, resources)
+                    except SpriteResourceError as exc:
+                        raise NativeSourceVerificationError(
+                            "Godot SpriteFrames resource differs from authored frames"
+                        ) from exc
+                    if bound["receipt_sha256"] != item["godot_spriteframes_resource_sha256"]:
+                        raise NativeSourceVerificationError(
+                            "original source SpriteFrames resource hash differs"
                         )
     except (zipfile.BadZipFile, RuntimeError, OSError, UnicodeError) as exc:
         raise NativeSourceVerificationError("published Godot archive is unreadable") from exc
