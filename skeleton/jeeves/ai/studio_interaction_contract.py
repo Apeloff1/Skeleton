@@ -148,7 +148,8 @@ class StudioEvidenceJournal:
     """
 
     EVENTS = frozenset((
-        "question_answered", "modality_registered", "model_inference_observed", "model_proposed",
+        "question_answered", "modality_registered", "modality_observation_reviewed",
+        "model_inference_observed", "model_proposed",
         "plan_compiled", "plan_approved", "execution_succeeded",
         "execution_uncertain", "execution_aborted",
     ))
@@ -283,6 +284,54 @@ class JeevesStudioController:
             "modality": modality, "artifact_sha256": artifact_digest,
             "source_id": source_id, "rights_scope": rights_scope,
             "model_weights_modified": False,
+        })
+
+    def review_media_observation(
+        self, *, source_id: str, observation: str,
+        observation_sha256: str, reviewer_id: str,
+        decoder_id: str, source_sha256: str,
+    ) -> dict[str, Any]:
+        """Admit independently reviewed OCR/transcript/visual descriptions.
+
+        This does not perform vision, ASR or tensor training; a trusted decoder
+        owner must supply the real derived text bytes and the exact hash of the
+        pinned media previously admitted into this project/session.
+        """
+        identifier(source_id, "media source")
+        identifier(reviewer_id, "media reviewer")
+        identifier(decoder_id, "decoder")
+        if (not isinstance(source_sha256, str) or not HEX.fullmatch(source_sha256)
+                or not isinstance(observation_sha256, str)
+                or not HEX.fullmatch(observation_sha256)):
+            raise StudioInteractionError("pinned media and observation SHA-256 required")
+        if (not isinstance(observation, str) or
+                not 16 <= len(observation) <= 8192 or
+                sha256(observation.encode("utf-8")).hexdigest() != observation_sha256):
+            raise StudioInteractionError("reviewed media text has a byte identity mismatch")
+        ledger = self.journal.read()
+        matching = [
+            row for row in ledger if row["kind"] == "modality_registered"
+            and row["payload"]["source_id"] == source_id
+            and row["payload"]["artifact_sha256"] == source_sha256
+            and row["payload"]["rights_scope"] != "reference_only"
+        ]
+        if not matching:
+            raise StudioInteractionError("media is absent, rights-limited or replaced")
+        if any(row["kind"] == "modality_observation_reviewed"
+               and row["payload"]["source_id"] == source_id
+               and row["payload"]["observation_sha256"] == observation_sha256
+               for row in ledger):
+            raise StudioInteractionError("duplicate reviewed media observation")
+        return self.journal.append("modality_observation_reviewed", {
+            "source_id": source_id,
+            "source_sha256": source_sha256,
+            "modality": matching[-1]["payload"]["modality"],
+            "observation": observation,
+            "observation_sha256": observation_sha256,
+            "reviewer_id": reviewer_id,
+            "decoder_id": decoder_id,
+            "generated_image_embedding": False,
+            "trained_weights": False,
         })
 
     def propose(self, proposals: Sequence[StudioProposal], *,
