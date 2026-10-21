@@ -40,7 +40,7 @@ def arguments(action: str) -> dict:
 class ForgeFiveThousandRealProducers(unittest.TestCase):
     def test_all_5000_game_producers_have_stable_unique_registry(self):
         self.assertGreaterEqual(len(AUTHORING_ACTIONS), 5000)
-        self.assertEqual(5000, len(set(AUTHORING_ACTIONS)))
+        self.assertEqual(len(AUTHORING_ACTIONS), len(set(AUTHORING_ACTIONS)))
         self.assertEqual(4500, len(RECIPE_ACTIONS))
         self.assertEqual(4500, len(RECIPE_INDEX))
         self.assertEqual(RECIPE_ACTIONS, AUTHORING_ACTIONS[500:5000])
