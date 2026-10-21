@@ -328,6 +328,23 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
                 "native_executed": False, "trained_weights": False,
                 "candidate_only": True,
             }
+            if operation == "game.studio.curriculum.practice":
+                if len(chosen) != 1:
+                    raise StudioError("One exact source book per independently verified practice")
+                from skeleton.jeeves.game_frontier_curriculum_practice import (
+                    verify_source_practice,
+                )
+                record = verify_source_practice(
+                    command.project_id, chosen[0][0]["generation"],
+                    chosen[0][0]["index"], proof["batch_receipt"],
+                    current_source_sha256=doc["source_sha256"],
+                    expected_candidate_sha256=candidate,
+                )
+                return {**base,
+                        "schema": "skeleton.jeeves.forge_practice_attested.v1",
+                        "practical_attestation": record,
+                        "persisted": False,
+                        "requires_explicit_operator_approval": True}
             if operation != "game.studio.curriculum.automation.commit":
                 return {**base, "persisted": False,
                         "requires_explicit_operator_approval": True}

@@ -6,7 +6,7 @@ two human reviews, native gameplay testing, or model weight training.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from hashlib import sha256
 import json
 from typing import Any
