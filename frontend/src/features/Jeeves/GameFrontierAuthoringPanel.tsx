@@ -1,6 +1,7 @@
 /** Interactive 500-operation Forge Studio editor over live authenticated project revisions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import GameFrontierHandbookPanel from './GameFrontierHandbookPanel';
+import GameFrontierCurriculumPanel from './GameFrontierCurriculumPanel';
 import GameFrontierEpicRoutePanel from './GameFrontierEpicRoutePanel';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
@@ -685,6 +686,12 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         <Button key={layer.id} title={(selectedLayer === layer.id ? '✓ ' : '') + layer.id}
           disabled={pending} press={() => setSelectedLayer(layer.id)} />)}</View>
     </ScrollView>
+    <GameFrontierCurriculumPanel projectId={project.project_id}
+      document={doc} disabled={pending} onCommitted={async () => {
+        setSteps([]);
+        await load();
+        onSaved(await getLearningProject(project.project_id));
+      }} />
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Choose an executable editor tool</Text>
     <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 500 core game editor tools"
       placeholder="Search tiles, NPCs, quests, events…" placeholderTextColor="#75869a"
