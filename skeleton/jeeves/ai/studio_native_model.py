@@ -242,7 +242,7 @@ class NativeStudioModel:
                 "book-use rights changed during local deliberation; rebuild context"
             )
         if (self.canon_memory is not None
-                and self.canon_memory.verify()["history_sha256"] != canon_head):
+                and self.canon_memory.head_identity() != canon_head):
             raise StudioInteractionError(
                 "project canon changed during local deliberation; rebuild context"
             )
