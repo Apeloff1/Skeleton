@@ -1,4 +1,4 @@
-/** Interactive 50-operation Forge Studio editor over live authenticated project revisions. */
+/** Interactive 500-operation Forge Studio editor over live authenticated project revisions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
@@ -16,6 +16,51 @@ type Props = {
 };
 
 const GROUPS: { title: string; actions: string[] }[] = [
+  { title: 'Original world ecology', actions: [
+    'terrain_fault_lines', 'terrain_plate_edges', 'terrain_tectonic_ridges', 'terrain_graben_valley', 'terrain_volcano_cone', 'terrain_lava_channels', 'terrain_caldera_ring', 'terrain_mesa_terraces',
+    'terrain_karst_sinkholes', 'terrain_mountain_chain', 'terrain_alluvial_fans', 'terrain_delta_branches', 'terrain_oxbow_lakes', 'terrain_braided_streams', 'terrain_watershed_divide', 'terrain_glacial_valley',
+    'terrain_moraine_ridges', 'terrain_fjord_channels', 'terrain_reef_atolls', 'terrain_tidal_flats', 'terrain_rainforest', 'terrain_savanna', 'terrain_taiga', 'terrain_tundra',
+    'terrain_alpine_meadow', 'terrain_desert_badlands', 'terrain_mangrove', 'terrain_swamp_bog', 'terrain_grass_steppe', 'terrain_volcanic_ash', 'terrain_fungal_caverns', 'terrain_crystal_caves',
+    'terrain_stalagmite_fields', 'terrain_limestone_pillars', 'terrain_underground_rivers', 'terrain_lava_tubes', 'terrain_geode_chambers', 'terrain_abyssal_pits', 'terrain_bioluminescent_groves', 'terrain_ruined_catacombs',
+    'terrain_floating_islands', 'terrain_cloud_banks', 'terrain_wind_corridors', 'terrain_sky_arches', 'terrain_storm_belts', 'terrain_levitation_nodes', 'terrain_aurora_paths', 'terrain_meteor_craters',
+    'terrain_gravity_wells', 'terrain_portal_constellations',
+  ] },
+  { title: 'Level & settlement architecture', actions: [
+    'structure_village_square', 'structure_market_stalls', 'structure_courtyard', 'structure_town_grid', 'structure_radial_city', 'structure_harbor_piers', 'structure_farm_fields', 'structure_orchard_rows',
+    'structure_house_cluster', 'structure_canal_district', 'structure_castle_keep', 'structure_outer_wall', 'structure_gatehouse', 'structure_corner_bastions', 'structure_moat_bridge', 'structure_watchtowers',
+    'structure_wall_walk', 'structure_arrow_slits', 'structure_turret_ring', 'structure_fortified_crossroads', 'structure_dungeon_rooms', 'structure_dungeon_corridors', 'structure_spiral_vault', 'structure_treasure_chambers',
+    'structure_pillar_hall', 'structure_prison_cells', 'structure_cathedral_nave', 'structure_catacomb_grid', 'structure_trap_gauntlet', 'structure_boss_arena', 'structure_factory_floor', 'structure_conveyor_lanes',
+    'structure_power_grid', 'structure_storage_racks', 'structure_warehouse_aisles', 'structure_rail_depot', 'structure_shipyard_slips', 'structure_mining_shafts', 'structure_pipeline_array', 'structure_reactor_chamber',
+    'structure_suspension_bridge', 'structure_stepping_stones', 'structure_ramp_switchbacks', 'structure_cliff_stairs', 'structure_tunnel_bore', 'structure_treetop_walks', 'structure_sky_platforms', 'structure_rope_bridge',
+    'structure_portal_plaza', 'structure_island_airfield',
+  ] },
+  { title: 'Interactive game encounters', actions: [
+    'encounter_village_crowd', 'encounter_market_vendors', 'encounter_tavern_guests', 'encounter_festival_parade', 'encounter_harbor_workers', 'encounter_farm_hands', 'encounter_caravan_merchants', 'encounter_city_patrol',
+    'encounter_castle_guards', 'encounter_royal_court', 'encounter_wolf_pack', 'encounter_deer_herd', 'encounter_bird_flock', 'encounter_fish_school', 'encounter_insect_swarm', 'encounter_horse_stampede',
+    'encounter_bear_den', 'encounter_predator_ring', 'encounter_migratory_line', 'encounter_turtle_nesting', 'encounter_squad_wedge', 'encounter_siege_lines', 'encounter_archer_wall', 'encounter_shield_circle',
+    'encounter_cavalry_charge', 'encounter_ambush_arcs', 'encounter_flanking_pincer', 'encounter_rear_guard', 'encounter_scout_net', 'encounter_boss_minions', 'encounter_sky_pirates', 'encounter_airship_crew',
+    'encounter_cloud_drakes', 'encounter_floating_island_settlers', 'encounter_wind_surfers', 'encounter_tower_watchers', 'encounter_balloon_riders', 'encounter_glider_convoy', 'encounter_sky_fishermen', 'encounter_aurora_procession',
+    'encounter_dungeon_slimes', 'encounter_cave_bats', 'encounter_crypt_guardians', 'encounter_labyrinth_wardens', 'encounter_treasure_mimics', 'encounter_portal_sentinels', 'encounter_ruin_explorers', 'encounter_mine_workers',
+    'encounter_fungal_foragers', 'encounter_underground_merchants',
+  ] },
+  { title: 'Original quest foundations', actions: [
+    'quest_lighthouse_blackout', 'quest_sky_island_rescue', 'quest_stolen_compass', 'quest_moon_tide_survey', 'quest_forest_railway', 'quest_clockwork_herald', 'quest_flooded_archive', 'quest_starlit_observatory',
+    'quest_copper_mine_dispute', 'quest_mountain_pass', 'quest_marsh_lanterns', 'quest_garden_of_machines', 'quest_whispering_canyon', 'quest_archipelago_mail', 'quest_ironwood_heirloom', 'quest_saltwind_market',
+    'quest_beacon_constellation', 'quest_ruins_of_ash', 'quest_library_of_winds', 'quest_mirror_lake', 'quest_tower_chimes', 'quest_glass_dunes', 'quest_deepwater_engine', 'quest_hidden_canal',
+    'quest_ember_festival', 'quest_orchard_winter', 'quest_jade_quarry', 'quest_bridge_of_mist', 'quest_river_sentinel', 'quest_northern_outpost', 'quest_cavern_echos', 'quest_sky_orchards',
+    'quest_clocktower_apprentice', 'quest_wildlife_corridor', 'quest_aurora_station', 'quest_drowned_temple', 'quest_coral_foundry', 'quest_lost_weather_balloon', 'quest_underground_orchard', 'quest_firefly_navigation',
+    'quest_solar_tide_engine', 'quest_icebound_caravan', 'quest_treetop_council', 'quest_sextant_apprentice', 'quest_broken_portal', 'quest_floating_foundry', 'quest_night_ferry', 'quest_echoes_of_the_city',
+    'quest_moonlit_greenhouse', 'quest_last_skybridge',
+  ] },
+  { title: 'Reactive gameplay scenes', actions: [
+    'reaction_storm_warning', 'reaction_rain_audio', 'reaction_fog_camera', 'reaction_gale_sails', 'reaction_wet_roads', 'reaction_river_flood', 'reaction_ground_freeze', 'reaction_turbulence_fx',
+    'reaction_hail_shelter', 'reaction_humidity_fog', 'reaction_terminal_fall', 'reaction_rough_landing', 'reaction_kinetic_impact', 'reaction_skin_tension', 'reaction_low_stability', 'reaction_cliff_climb',
+    'reaction_weight_shift', 'reaction_slick_fabric', 'reaction_updraft_lift', 'reaction_native_field', 'reaction_altitude_chart', 'reaction_sextant_sighting', 'reaction_bubble_sextant', 'reaction_compass_turn',
+    'reaction_triangulation', 'reaction_skyisland_arrival', 'reaction_gyro_drift', 'reaction_pressure_front', 'reaction_navigation_current', 'reaction_night_navigation', 'reaction_party_low_morale', 'reaction_heroic_reputation',
+    'reaction_quest_music', 'reaction_village_emotion', 'reaction_party_morale_boost', 'reaction_combat_music', 'reaction_stealth_audio', 'reaction_world_axis', 'reaction_quest_unlock', 'reaction_morale_camp',
+    'reaction_moon_tide', 'reaction_sunrise_cinematic', 'reaction_eclipse_shadows', 'reaction_foliage_shadow', 'reaction_terrain_erosion', 'reaction_falling_building', 'reaction_cloud_portal', 'reaction_tidal_reef',
+    'reaction_deep_night', 'reaction_seasonal_bloom',
+  ] },
   { title: 'Tiles & geometry', actions: ['tile_set','rect_fill','line_draw','ellipse_fill','flood_fill',
     'replace_tile','checker_fill','stamp','region_paste','shift_layer','flip_horizontal','flip_vertical','rotate_90'] },
   { title: 'Layers & palettes', actions: ['layer_add','layer_remove','layer_duplicate','layer_reorder',
@@ -341,6 +386,34 @@ function hundredActionDefaults(name: string, layer: string): Record<string, unkn
   return undefined;
 }
 
+
+const NEW_500_BIOME=new Set<string>(['terrain_fault_lines','terrain_plate_edges','terrain_tectonic_ridges','terrain_graben_valley','terrain_volcano_cone','terrain_lava_channels','terrain_caldera_ring','terrain_mesa_terraces','terrain_karst_sinkholes','terrain_mountain_chain','terrain_alluvial_fans','terrain_delta_branches','terrain_oxbow_lakes','terrain_braided_streams','terrain_watershed_divide','terrain_glacial_valley','terrain_moraine_ridges','terrain_fjord_channels','terrain_reef_atolls','terrain_tidal_flats','terrain_rainforest','terrain_savanna','terrain_taiga','terrain_tundra','terrain_alpine_meadow','terrain_desert_badlands','terrain_mangrove','terrain_swamp_bog','terrain_grass_steppe','terrain_volcanic_ash','terrain_fungal_caverns','terrain_crystal_caves','terrain_stalagmite_fields','terrain_limestone_pillars','terrain_underground_rivers','terrain_lava_tubes','terrain_geode_chambers','terrain_abyssal_pits','terrain_bioluminescent_groves','terrain_ruined_catacombs','terrain_floating_islands','terrain_cloud_banks','terrain_wind_corridors','terrain_sky_arches','terrain_storm_belts','terrain_levitation_nodes','terrain_aurora_paths','terrain_meteor_craters','terrain_gravity_wells','terrain_portal_constellations']);
+const NEW_500_STRUCTURE=new Set<string>(['structure_village_square','structure_market_stalls','structure_courtyard','structure_town_grid','structure_radial_city','structure_harbor_piers','structure_farm_fields','structure_orchard_rows','structure_house_cluster','structure_canal_district','structure_castle_keep','structure_outer_wall','structure_gatehouse','structure_corner_bastions','structure_moat_bridge','structure_watchtowers','structure_wall_walk','structure_arrow_slits','structure_turret_ring','structure_fortified_crossroads','structure_dungeon_rooms','structure_dungeon_corridors','structure_spiral_vault','structure_treasure_chambers','structure_pillar_hall','structure_prison_cells','structure_cathedral_nave','structure_catacomb_grid','structure_trap_gauntlet','structure_boss_arena','structure_factory_floor','structure_conveyor_lanes','structure_power_grid','structure_storage_racks','structure_warehouse_aisles','structure_rail_depot','structure_shipyard_slips','structure_mining_shafts','structure_pipeline_array','structure_reactor_chamber','structure_suspension_bridge','structure_stepping_stones','structure_ramp_switchbacks','structure_cliff_stairs','structure_tunnel_bore','structure_treetop_walks','structure_sky_platforms','structure_rope_bridge','structure_portal_plaza','structure_island_airfield']);
+const NEW_500_ENCOUNTER=new Set<string>(['encounter_village_crowd','encounter_market_vendors','encounter_tavern_guests','encounter_festival_parade','encounter_harbor_workers','encounter_farm_hands','encounter_caravan_merchants','encounter_city_patrol','encounter_castle_guards','encounter_royal_court','encounter_wolf_pack','encounter_deer_herd','encounter_bird_flock','encounter_fish_school','encounter_insect_swarm','encounter_horse_stampede','encounter_bear_den','encounter_predator_ring','encounter_migratory_line','encounter_turtle_nesting','encounter_squad_wedge','encounter_siege_lines','encounter_archer_wall','encounter_shield_circle','encounter_cavalry_charge','encounter_ambush_arcs','encounter_flanking_pincer','encounter_rear_guard','encounter_scout_net','encounter_boss_minions','encounter_sky_pirates','encounter_airship_crew','encounter_cloud_drakes','encounter_floating_island_settlers','encounter_wind_surfers','encounter_tower_watchers','encounter_balloon_riders','encounter_glider_convoy','encounter_sky_fishermen','encounter_aurora_procession','encounter_dungeon_slimes','encounter_cave_bats','encounter_crypt_guardians','encounter_labyrinth_wardens','encounter_treasure_mimics','encounter_portal_sentinels','encounter_ruin_explorers','encounter_mine_workers','encounter_fungal_foragers','encounter_underground_merchants']);
+const NEW_500_QUEST=new Set<string>(['quest_lighthouse_blackout','quest_sky_island_rescue','quest_stolen_compass','quest_moon_tide_survey','quest_forest_railway','quest_clockwork_herald','quest_flooded_archive','quest_starlit_observatory','quest_copper_mine_dispute','quest_mountain_pass','quest_marsh_lanterns','quest_garden_of_machines','quest_whispering_canyon','quest_archipelago_mail','quest_ironwood_heirloom','quest_saltwind_market','quest_beacon_constellation','quest_ruins_of_ash','quest_library_of_winds','quest_mirror_lake','quest_tower_chimes','quest_glass_dunes','quest_deepwater_engine','quest_hidden_canal','quest_ember_festival','quest_orchard_winter','quest_jade_quarry','quest_bridge_of_mist','quest_river_sentinel','quest_northern_outpost','quest_cavern_echos','quest_sky_orchards','quest_clocktower_apprentice','quest_wildlife_corridor','quest_aurora_station','quest_drowned_temple','quest_coral_foundry','quest_lost_weather_balloon','quest_underground_orchard','quest_firefly_navigation','quest_solar_tide_engine','quest_icebound_caravan','quest_treetop_council','quest_sextant_apprentice','quest_broken_portal','quest_floating_foundry','quest_night_ferry','quest_echoes_of_the_city','quest_moonlit_greenhouse','quest_last_skybridge']);
+const NEW_500_REACTION=new Set<string>(['reaction_storm_warning','reaction_rain_audio','reaction_fog_camera','reaction_gale_sails','reaction_wet_roads','reaction_river_flood','reaction_ground_freeze','reaction_turbulence_fx','reaction_hail_shelter','reaction_humidity_fog','reaction_terminal_fall','reaction_rough_landing','reaction_kinetic_impact','reaction_skin_tension','reaction_low_stability','reaction_cliff_climb','reaction_weight_shift','reaction_slick_fabric','reaction_updraft_lift','reaction_native_field','reaction_altitude_chart','reaction_sextant_sighting','reaction_bubble_sextant','reaction_compass_turn','reaction_triangulation','reaction_skyisland_arrival','reaction_gyro_drift','reaction_pressure_front','reaction_navigation_current','reaction_night_navigation','reaction_party_low_morale','reaction_heroic_reputation','reaction_quest_music','reaction_village_emotion','reaction_party_morale_boost','reaction_combat_music','reaction_stealth_audio','reaction_world_axis','reaction_quest_unlock','reaction_morale_camp','reaction_moon_tide','reaction_sunrise_cinematic','reaction_eclipse_shadows','reaction_foliage_shadow','reaction_terrain_erosion','reaction_falling_building','reaction_cloud_portal','reaction_tidal_reef','reaction_deep_night','reaction_seasonal_bloom']);
+function newFiveHundredDefaults(action: string, layer: string): Record<string, unknown> | undefined {
+  if (NEW_500_BIOME.has(action)) return {
+    layer, x: 0, y: 0, width: 12, height: 12,
+    floor: 0, wall: 1, seed: 42, threshold: 0.53, scale: 5,
+  };
+  if (NEW_500_STRUCTURE.has(action)) return {
+    layer, x: 0, y: 0, width: 12, height: 12, floor: 0, wall: 1, seed: 42,
+  };
+  if (NEW_500_ENCOUNTER.has(action)) return {
+    prefab_id: 'merchant', count: 8, event_prefix: action,
+    dialogue: 'Welcome to this world', x: 8, y: 8, z: 0,
+    seed: 42, radius: 9, spacing: 2,
+  };
+  if (NEW_500_QUEST.has(action)) return {
+    quest_id: action, event_id: action + '_start',
+  };
+  if (NEW_500_REACTION.has(action)) return {
+    page_id: action + '_page', priority: 5, cooldown_ms: 2000,
+  };
+  return undefined;
+}
+
 function label(name: string) { return name.replace(/_/g, ' '); }
 const palette = ['#1b4230','#62727f','#406c99','#7d704c','#8b5b83','#777c3e','#5e6274'];
 function Button({ title, press, disabled }: { title: string; press: () => void; disabled?: boolean }) {
@@ -404,7 +477,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   })).filter(group => group.actions.length), [doc, search]);
   const choose = (name: string) => {
     setAction(name);
-    const args = { ...(hundredActionDefaults(name, selectedLayer) || newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
+    const args = { ...(newFiveHundredDefaults(name, selectedLayer) || hundredActionDefaults(name, selectedLayer) || newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
     if (!NEW_PROCEDURAL.has(name) && ['tile_set','rect_fill','line_draw','ellipse_fill','flood_fill','replace_tile',
       'checker_fill','stamp','region_paste','shift_layer','flip_horizontal','flip_vertical',
       'rotate_90','layer_remove','layer_duplicate','layer_reorder','layer_elevation',
