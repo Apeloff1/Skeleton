@@ -168,6 +168,8 @@ class StudioEvidenceJournal:
             sequence INTEGER PRIMARY KEY, project_id TEXT NOT NULL,
             session_id TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL,
             previous TEXT, digest TEXT NOT NULL UNIQUE)""")
+        self._head: str | None = None
+        self._sequence = 0
         self.read()
 
     def read(self) -> tuple[dict[str, Any], ...]:
@@ -198,6 +200,8 @@ class StudioEvidenceJournal:
                 row["digest"] = head
                 out.append(row)
                 prev = head
+            self._sequence = len(out)
+            self._head = prev
             return tuple(out)
 
     def append(self, kind: str, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -208,15 +212,22 @@ class StudioEvidenceJournal:
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
             try:
-                rows = self.read()
-                sequence = len(rows)
+                # Startup/read verifies the whole chain. During steady-state
+                # append, an atomic head check avoids quadratic scan costs.
+                latest = self._db.execute(
+                    "SELECT sequence,digest FROM studio_event ORDER BY sequence DESC LIMIT 1"
+                ).fetchone()
+                current_seq = latest[0] + 1 if latest else 0
+                current_head = latest[1] if latest else None
+                if current_seq != self._sequence or current_head != self._head:
+                    raise StudioInteractionError("concurrent writer or altered journal head")
+                sequence = current_seq
                 if sequence >= MAX_EVENTS:
                     raise StudioInteractionError("journal needs archival before more work")
                 event = {
                     "schema": SCHEMA, "sequence": sequence,
                     "project_id": self.project_id, "session_id": self.session_id,
-                    "kind": kind, "payload": body,
-                    "previous": rows[-1]["digest"] if rows else None,
+                    "kind": kind, "payload": body, "previous": current_head,
                 }
                 head = digest(event)
                 self._db.execute("INSERT INTO studio_event VALUES (?,?,?,?,?,?,?)", (
@@ -224,6 +235,8 @@ class StudioEvidenceJournal:
                     canonical(body).decode("utf-8"), event["previous"], head,
                 ))
                 self._db.execute("COMMIT")
+                self._sequence = sequence + 1
+                self._head = head
             except BaseException:
                 if self._db.in_transaction:
                     self._db.execute("ROLLBACK")
