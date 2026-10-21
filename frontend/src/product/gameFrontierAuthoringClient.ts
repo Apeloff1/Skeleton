@@ -19,6 +19,7 @@ export type ForgeDocument = {
   actor_catalog?: { index: number; prefab_id: string; position: [number,number,number]; facing_deg: number }[];
   quest_catalog?: { id: string; title: string; stage_count: number }[];
   action_catalog: string[]; already_saved: boolean;
+  recipe_catalog_count: number; catalog_total: number; recipe_search_required: boolean;
 };
 export type ForgeStep = { action: string; parameters: Record<string, unknown> };
 export type ForgePreview = {
@@ -54,6 +55,7 @@ function verifyDoc(doc: ForgeDocument): ForgeDocument {
   if (!doc || doc.schema !== 'skeleton.game.frontier_studio_document.v1'
       || !SHA.test(doc.source_sha256) || !Number.isSafeInteger(doc.expected_version)
       || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 500
+      || doc.recipe_catalog_count !== 4500 || doc.catalog_total !== 5000
       || !Array.isArray(doc.layers) || doc.layers.length > 128
       || (doc.prefab_catalog !== undefined && !Array.isArray(doc.prefab_catalog))
       || (doc.actor_catalog !== undefined && !Array.isArray(doc.actor_catalog))
@@ -71,7 +73,7 @@ export async function inspectForge(projectId: string, signal?: AbortSignal): Pro
 export async function getForgeActions(signal?: AbortSignal): Promise<string[]> {
   const result = await data(api.get<{ actions: string[]; action_count: number }>(
     ROOT + '/actions', options(undefined, signal)), 'Forge tool catalogue unavailable.');
-  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 500)
+  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 5000)
     throw new Error('Forge Studio action catalogue is incomplete.');
   return result.actions;
 }
