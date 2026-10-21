@@ -99,29 +99,39 @@ def _deps(value: Any, *, record_id: str) -> list[str]:
     return result
 
 
-def _godot_archive(files: Mapping[str, str], receipt: Mapping[str, Any]) -> bytes:
+def _godot_archive(
+    files: Mapping[str, str], receipt: Mapping[str, Any],
+    *, binary_assets: Mapping[str, bytes] | None = None,
+) -> bytes:
     """Deterministically package exact independently verified Godot source."""
     if not isinstance(files, Mapping) or not files or len(files) > 128:
         raise CreatorSourceError("Godot archive requires bounded native source files")
+    binary = {} if binary_assets is None else dict(binary_assets)
+    if (set(files) & set(binary) or len(files) + len(binary) > 128
+            or any(type(payload) is not bytes for payload in binary.values())):
+        raise CreatorSourceError("native image source must be distinct bounded binary files")
     expected = receipt.get("godot_file_hashes")
-    if not isinstance(expected, Mapping) or set(expected) != set(files):
+    if not isinstance(expected, Mapping) or set(expected) != set(files) | set(binary):
         raise CreatorSourceError("Godot file hash ancestry differs from native proof")
     manifest = _json(dict(receipt), limit=MAX_RECORD_BYTES)
     output = io.BytesIO()
     total = len(manifest)
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9, allowZip64=False) as archive:
-        for name in sorted(files):
+        for name in sorted(set(files) | set(binary)):
             path = PurePosixPath(name)
             if (not isinstance(name, str) or not name
                     or path.is_absolute() or ".." in path.parts
                     or "\\" in name or path.as_posix() != name
                     or name == "jeeves_source_receipt.json"):
                 raise CreatorSourceError("Godot source path attempts archive traversal")
-            content = files[name]
-            if not isinstance(content, str):
-                raise CreatorSourceError("Godot exporter supplied nontext native file")
-            raw = content.encode("utf-8")
+            if name in binary:
+                raw = binary[name]
+            else:
+                content = files[name]
+                if not isinstance(content, str):
+                    raise CreatorSourceError("Godot exporter supplied nontext native file")
+                raw = content.encode("utf-8")
             if sha256(raw).hexdigest() != expected[name]:
                 raise CreatorSourceError("Godot native source differs from validated receipt")
             total += len(raw)
@@ -592,7 +602,10 @@ class CreatorProjectSourceStore:
                     self.project_id, self._records,
                     source_head_sha256=self._head,
                 )
-                raw = _godot_archive(candidate["files"], candidate["receipt"])
+                raw = _godot_archive(
+                    candidate["files"], candidate["receipt"],
+                    binary_assets=candidate["binary_assets"],
+                )
                 extension = ".zip"
             elif export_format == "frontier-studio-json":
                 from .studio_frontier_source_compile import (
