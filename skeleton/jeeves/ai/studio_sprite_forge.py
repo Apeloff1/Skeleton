@@ -8,9 +8,8 @@ diffusion, generative-image checkpoint execution or an artist's approval.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from hashlib import sha256
-import json
 import re
 import struct
 from typing import Any
