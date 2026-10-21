@@ -180,8 +180,8 @@ class FiftyMillionAuthoringAcceptance(unittest.TestCase):
         s=authored_summary(original_project())
         self.assertEqual(500,len(s["action_catalog"]))
         self.assertEqual(45_000_000,s["worldline_recipe_count"])
-        self.assertEqual(499_999_999_500,s["recipe_catalog_count"])
-        self.assertEqual(500_000_000_000,s["catalog_total"])
+        self.assertEqual(4_999_999_999_500,s["recipe_catalog_count"])
+        self.assertEqual(5_000_000_000_000,s["catalog_total"])
 
 
 class NineThousandHandbooks(unittest.TestCase):

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/game-frontier-authoring", tags=["Game Studio authori
 
 
 class EditorStep(Request):
-    action: str = Field(min_length=1, max_length=256)
+    action: str = Field(min_length=1, max_length=384)
     parameters: dict[str, Any] = Field(default_factory=dict, max_length=32)
 
 
@@ -64,6 +64,64 @@ def _write_scope(user):
             "message": "Project editor role required for source modification.",
         })
     return scope
+
+
+@router.get("/continuity-handbooks")
+async def search_continuity_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", phase: str = "", campaign: str = "",
+    chronicle: str = "", epoch: str = "", continuity: str = "",
+    offset: int = 0, limit: int = 32, user=Depends(get_current_user),
+):
+    """Authenticated exact-filter discovery over virtual continuity books."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import list_books
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_books(domain=domain, treatment=treatment, director=director,
+                          worldline=worldline, phase=phase, campaign=campaign,
+                          chronicle=chronicle, epoch=epoch, continuity=continuity,
+                          offset=offset, limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422, detail={
+            "code": "invalid_continuity_handbook_query", "message": str(exc),
+        }) from exc
+
+
+@router.get("/continuity-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}")
+async def rank_continuity_handbooks(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, chronicle: str, epoch: str, sort: str = "quality",
+    user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import rank_variants
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return rank_variants(domain, treatment, director, worldline, phase,
+                             campaign, chronicle, epoch, sort=sort)
+    except StudioError as exc:
+        raise HTTPException(422, detail={
+            "code": "invalid_continuity_ranking", "message": str(exc),
+        }) from exc
+
+
+@router.get("/continuity-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{continuity}")
+async def read_continuity_handbook(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, chronicle: str, epoch: str, continuity: str,
+    user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return receipt(domain, treatment, director, worldline,
+                       phase, campaign, chronicle, epoch, continuity)
+    except StudioError as exc:
+        raise HTTPException(404, detail={
+            "code": "unknown_continuity_handbook", "message": str(exc),
+        }) from exc
 
 
 @router.get("/epoch-handbooks")
@@ -305,7 +363,7 @@ async def read_original_world_handbook(
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "",
+    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "", continuity: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -319,8 +377,20 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_campaign_production import search_campaigns
     from skeleton.forge.game_frontier_studio_chronicle_production import search_chronicles
     from skeleton.forge.game_frontier_studio_epoch_production import search_epochs
+    from skeleton.forge.game_frontier_studio_continuity_production import search_continuities
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "continuity":
+            if query:
+                raise StudioError("continuity discovery uses exact indexed filters")
+            return search_continuities(domain=domain,system_layer=system_layer,
+                                       director=director,finish=finish,
+                                       worldline=worldline,phase=phase,
+                                       campaign=campaign,chronicle=chronicle,
+                                       epoch=epoch,continuity=continuity,
+                                       offset=offset,limit=limit)
+        if continuity:
+            raise StudioError("continuity filter requires continuity generation")
         if generation == "epoch":
             if query:
                 raise StudioError("epoch discovery uses exact filters, not scans")

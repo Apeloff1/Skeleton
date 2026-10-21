@@ -185,8 +185,8 @@ class FiftyThousandProductionOperations(unittest.TestCase):
         self.assertEqual(500,len(data["action_catalog"]))
         self.assertEqual(4500,data["classic_recipe_count"])
         self.assertEqual(45000,data["expanded_recipe_count"])
-        self.assertEqual(499999999500,data["recipe_catalog_count"])
-        self.assertEqual(500000000000,data["catalog_total"])
+        self.assertEqual(4_999_999_999_500,data["recipe_catalog_count"])
+        self.assertEqual(5_000_000_000_000,data["catalog_total"])
 
     def test_native_game_export_consumes_expanded_terrain_and_event_source(self):
         from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile

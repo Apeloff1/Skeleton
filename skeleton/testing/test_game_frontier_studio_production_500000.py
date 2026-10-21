@@ -215,8 +215,8 @@ class FiveHundredThousandSourceProductions(unittest.TestCase):
         self.assertEqual(4500,summary["classic_recipe_count"])
         self.assertEqual(45000,summary["expanded_recipe_count"])
         self.assertEqual(450000,summary["directed_recipe_count"])
-        self.assertEqual(499999999500,summary["recipe_catalog_count"])
-        self.assertEqual(500000000000,summary["catalog_total"])
+        self.assertEqual(4_999_999_999_500,summary["recipe_catalog_count"])
+        self.assertEqual(5_000_000_000_000,summary["catalog_total"])
 
     def test_native_godot_exports_directed_source_content(self):
         from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile

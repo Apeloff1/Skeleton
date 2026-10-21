@@ -5,6 +5,7 @@ import {
   readForgeHandbook, readForgePhaseHandbook, readForgeCampaignHandbook,
   readForgeChronicleHandbook, rankForgeChronicleHandbooks,
   readForgeEpochHandbook, rankForgeEpochHandbooks, type ForgeEpochRanking,
+  readForgeContinuityHandbook, rankForgeContinuityHandbooks, type ForgeContinuityRanking,
   rankForgeCampaignHandbooks, type ForgeRecipe, type ForgeCampaignRanking, type ForgeChronicleRanking,
 } from '../../product/gameFrontierAuthoringClient';
 
@@ -15,14 +16,21 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [metrics, setMetrics] = useState('');
-  const [ranking, setRanking] = useState<ForgeCampaignRanking | ForgeChronicleRanking | ForgeEpochRanking | null>(null);
+  const [ranking, setRanking] = useState<ForgeCampaignRanking | ForgeChronicleRanking | ForgeEpochRanking | ForgeContinuityRanking | null>(null);
   if (!recipe.worldline || !recipe.direction || !recipe.treatment || !recipe.domain)
     return null;
   const load = async () => {
     if (busy || disabled) return;
     setBusy(true); setError('');
     try {
-      if (recipe.epoch && recipe.chronicle && recipe.campaign && recipe.phase) {
+      if (recipe.continuity && recipe.epoch && recipe.chronicle && recipe.campaign && recipe.phase) {
+        const doc = await readForgeContinuityHandbook(
+          recipe.domain, recipe.treatment, recipe.direction!, recipe.worldline!,
+          recipe.phase, recipe.campaign, recipe.chronicle, recipe.epoch, recipe.continuity);
+        setMarkdown(doc.markdown);
+        setMetrics('Document completeness ' + doc.score + '/100 · ' +
+          doc.words.toLocaleString() + ' measured words');
+      } else if (recipe.epoch && recipe.chronicle && recipe.campaign && recipe.phase) {
         const doc = await readForgeEpochHandbook(
           recipe.domain, recipe.treatment, recipe.direction!,
           recipe.worldline!, recipe.phase, recipe.campaign, recipe.chronicle, recipe.epoch);
@@ -59,7 +67,12 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
     if (!recipe.phase || busy || disabled) return;
     setBusy(true); setError('');
     try {
-      if (recipe.epoch && recipe.chronicle && recipe.campaign) {
+      if (recipe.continuity && recipe.epoch && recipe.chronicle && recipe.campaign) {
+        setRanking(await rankForgeContinuityHandbooks(
+          recipe.domain, recipe.treatment, recipe.direction!,
+          recipe.worldline!, recipe.phase, recipe.campaign,
+          recipe.chronicle, recipe.epoch, sort));
+      } else if (recipe.epoch && recipe.chronicle && recipe.campaign) {
         setRanking(await rankForgeEpochHandbooks(
           recipe.domain, recipe.treatment, recipe.direction!,
           recipe.worldline!, recipe.phase, recipe.campaign, recipe.chronicle, sort));
@@ -99,15 +112,15 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
     {!!ranking && <View style={{ gap: 4 }}>
       <Text style={{ color:'#dcefff', fontWeight: '700' }}>
         {ranking.sort === 'quality' ? 'Quality-first' : 'Longest-first'}
-        {' · ranked within ten ' + (recipe.epoch ? 'epoch' : recipe.chronicle ? 'chronicle' : 'campaign') + ' variants'}
+        {' · ranked within ten ' + (recipe.continuity ? 'continuity' : recipe.epoch ? 'epoch' : recipe.chronicle ? 'chronicle' : 'campaign') + ' variants'}
       </Text>
       <Text style={{ color: '#b1cada', fontSize: 11 }}>
         Heuristic documentation completeness, not native game quality.
         Word counts measured from rendered Markdown.
       </Text>
       {ranking.items.map(item =>
-        <Text key={'epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign} style={{ color: '#dcefff', fontSize: 12 }}>
-          {item.rank}. {('epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign).replace(/_/g,' ')} ·
+        <Text key={'continuity' in item ? item.continuity : 'epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign} style={{ color: '#dcefff', fontSize: 12 }}>
+          {item.rank}. {('continuity' in item ? item.continuity : 'epoch' in item ? item.epoch : 'chronicle' in item ? item.chronicle : item.campaign).replace(/_/g,' ')} ·
           {' '}{item.quality_score}/100 · {item.words.toLocaleString()} words
         </Text>)}
     </View>}

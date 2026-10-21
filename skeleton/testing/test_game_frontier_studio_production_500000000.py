@@ -162,8 +162,8 @@ class FiveHundredMillionGameProduction(unittest.TestCase):
         meta=authored_summary(original_project())
         self.assertEqual(500,len(meta["action_catalog"]))
         self.assertEqual(450_000_000,meta["phase_recipe_count"])
-        self.assertEqual(499_999_999_500,meta["recipe_catalog_count"])
-        self.assertEqual(500_000_000_000,meta["catalog_total"])
+        self.assertEqual(4_999_999_999_500,meta["recipe_catalog_count"])
+        self.assertEqual(5_000_000_000_000,meta["catalog_total"])
 
 
 class NinetyThousandGameHandbooks(unittest.TestCase):
