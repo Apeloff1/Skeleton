@@ -9,17 +9,21 @@ tool permission, or production achievement is fabricated by this wrapper.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
 from skeleton.ai.runtime.inference.local import LocalInferenceEngine
 from skeleton.jeeves.agent.tools import (
-    ToolExecutionContext, ToolExecutor, ToolGrant,
+    ToolExecutionContext, ToolExecutor, ToolGrant, ToolRegistry,
 )
 from .creator_runbook_store import CreatorRunbookStore
 from .studio_book_memory import ReviewedBookMemory
 from .studio_canon_memory import StudioCanonStore
+from .studio_creator_source import (
+    CreatorProjectSourceStore, register_creator_source_tool,
+)
+from skeleton.forge.creator.command_surface import CreatorCommand
 from .studio_delegate_executor import execute_approved_studio_batch
 from .studio_interaction_contract import (
     JeevesStudioController, StudioEvidenceJournal, StudioInteractionError,
@@ -41,6 +45,8 @@ class NativeStudioHost:
         book_source_root_sha256: str | None = None,
         canon_index: Path | None = None,
         canon_expected_head_sha256: str | None = None,
+        source_index: Path | None = None,
+        source_export_root: Path | None = None,
     ) -> None:
         identifier(project_id, "project")
         identifier(session_id, "session")
@@ -58,6 +64,7 @@ class NativeStudioHost:
         )
         self.book_memory: ReviewedBookMemory | None = None
         self.canon_memory: StudioCanonStore | None = None
+        self.source_store: CreatorProjectSourceStore | None = None
         try:
             if book_index is not None and book_admission_sha256 is not None:
                 self.book_memory = ReviewedBookMemory(
@@ -72,12 +79,21 @@ class NativeStudioHost:
                 )
             elif canon_expected_head_sha256 is not None:
                 raise StudioInteractionError("cannot pin a nonexistent project canon")
+            if (source_index is None) != (source_export_root is None):
+                raise StudioInteractionError("creator source DB and export authority must coexist")
+            if source_index is not None and source_export_root is not None:
+                self.source_store = CreatorProjectSourceStore(
+                    Path(source_index), project_id=project_id,
+                    export_root=Path(source_export_root),
+                )
             self.controller = JeevesStudioController(self.journal)
             self.model = NativeStudioModel(
                 engine, book_memory=self.book_memory,
                 canon_memory=self.canon_memory,
             )
         except BaseException:
+            if self.source_store is not None:
+                self.source_store.close()
             if self.canon_memory is not None:
                 self.canon_memory.close()
             if self.book_memory is not None:
@@ -119,6 +135,21 @@ class NativeStudioHost:
         """Durable human review ONLY; high-impact grants are still separate."""
         return self.controller.approve(plan, reviewer_id=reviewer_id)
 
+    def register_native_creator_tools(
+        self, registry: ToolRegistry, *,
+        authorize: Callable[[CreatorCommand, ToolExecutionContext], bool],
+    ) -> str:
+        """Give the existing host ToolExecutor REAL project-source handlers.
+
+        This installs zero grants and does not approve any model-proposed
+        action; every command still requires independent host authorization.
+        """
+        if self.source_store is None:
+            raise StudioInteractionError("host has not supplied a private source store")
+        return register_creator_source_tool(
+            registry, store=self.source_store, authorize=authorize,
+        )
+
     def execute_authorized(
         self, plan: Mapping[str, Any], *,
         executor: ToolExecutor,
@@ -148,6 +179,7 @@ class NativeStudioHost:
         events = self.journal.read()
         book = self.book_memory.verify() if self.book_memory is not None else None
         canon = self.canon_memory.verify() if self.canon_memory is not None else None
+        source = self.source_store.snapshot() if self.source_store is not None else None
         report = {
             "schema_version": "skeleton.jeeves.native_studio_host_audit.v1",
             "project_id": self.journal.project_id,
@@ -156,6 +188,7 @@ class NativeStudioHost:
             "last_event_sha256": events[-1]["digest"] if events else None,
             "reviewed_book_memory": book,
             "reviewed_game_canon": canon,
+            "source_authoring_state": source,
             "standalone_native_owner": True,
             "production_game_complete": False,
         }
@@ -163,6 +196,8 @@ class NativeStudioHost:
         return report
 
     def close(self) -> None:
+        if self.source_store is not None:
+            self.source_store.close()
         if self.canon_memory is not None:
             self.canon_memory.close()
         if self.book_memory is not None:
