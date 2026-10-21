@@ -1,7 +1,7 @@
 /** Exact, authenticated reader for one generated original-game construction book. */
 import React, { useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { readForgeHandbook, type ForgeRecipe } from '../../product/gameFrontierAuthoringClient';
+import { readForgeHandbook, readForgePhaseHandbook, type ForgeRecipe } from '../../product/gameFrontierAuthoringClient';
 
 export default function GameFrontierHandbookPanel({ recipe, disabled = false }: {
   recipe: ForgeRecipe;
@@ -17,9 +17,11 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
     setBusy(true);
     setError('');
     try {
-      const content = await readForgeHandbook(
-        recipe.domain, recipe.treatment, recipe.direction!, recipe.worldline!,
-      );
+      const content = recipe.phase
+        ? await readForgePhaseHandbook(recipe.domain, recipe.treatment,
+            recipe.direction!, recipe.worldline!, recipe.phase)
+        : await readForgeHandbook(recipe.domain, recipe.treatment,
+            recipe.direction!, recipe.worldline!);
       setMarkdown(content);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -33,7 +35,7 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
       onPress={() => { void load(); }}
       style={{ borderColor: '#537a9f', borderWidth: 1, borderRadius: 8, padding: 10 }}>
       <Text style={{ color: '#dcefff' }}>
-        {busy ? 'Loading source-backed game handbook…' : 'Read this worldline production handbook'}
+        {busy ? 'Loading source-backed game handbook…' : 'Read this worldline or phase production handbook'}
       </Text>
     </TouchableOpacity>
     {!!error && <Text selectable style={{ color: '#ffb2b2' }}>{error}</Text>}
