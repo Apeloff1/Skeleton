@@ -10,7 +10,7 @@ import unittest
 import zipfile
 
 from skeleton.forge.creator.command_surface import build_creator_command
-from skeleton.jeeves.ai.studio_creator_source import CreatorProjectSourceStore
+from skeleton.jeeves.ai.studio_creator_source import (CreatorProjectSourceStore, CreatorSourceError)
 from skeleton.jeeves.ai.studio_sprite_forge import (
     StudioSpriteError, _decode_verified_png, compile_authored_sprite,
     compile_sprite_collection,
@@ -235,7 +235,7 @@ class PersistentSpriteExportTests(unittest.TestCase):
         target = self.export_root / first["artifact_name"]
         with target.open("ab") as stream:
             stream.write(b"externally-altered")
-        with self.assertRaises(Exception):
+        with self.assertRaises(CreatorSourceError):
             self.export()
 
 
