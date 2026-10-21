@@ -237,6 +237,9 @@ class NativeStudioHost:
             return execute_approved_studio_batch(
                 self.controller, plan, executor=executor, store=store,
                 host_grants=host_grants, max_steps=max_steps,
+                before_step=lambda _step: self._require_fresh_native_plan(
+                    plan, store.load(),
+                ),
             )
 
     def audit(self) -> dict[str, Any]:
