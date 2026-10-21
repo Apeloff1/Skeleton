@@ -124,8 +124,7 @@ class AuthoredTileRouteReplayTests(unittest.TestCase):
         self.assertEqual(100, result["passed_count"])
         self.assertEqual(100, len(result["scenarios"]))
         self.assertTrue(verify_route_playthroughs(project, queries, result))
-        self.assertEqual(100, result["scenarios"][-1]["scenario_id"] == "Route099" and
-                         len(result["scenarios"]))
+        self.assertEqual("Route099", result["scenarios"][-1]["scenario_id"])
 
     def test_no_overwrite_and_roundtrip_source_semantics(self):
         project = project_with_barrier((2, 3))
