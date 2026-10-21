@@ -10,6 +10,7 @@ import unittest
 import zipfile
 
 from skeleton.forge.creator.command_surface import build_creator_command
+from skeleton.jeeves.ai.studio_interaction_contract import digest
 from skeleton.jeeves.ai.studio_creator_source import (CreatorProjectSourceStore, CreatorSourceError)
 from skeleton.jeeves.ai.studio_sprite_forge import (
     StudioSpriteError, _decode_verified_png, compile_authored_sprite,
@@ -37,9 +38,13 @@ def original_sprite() -> dict:
 
 
 def original_record() -> dict:
+    content = original_sprite()
     return {
         "record_id": "hero-source", "facet": "sprite_forge", "revision": 1,
-        "source_sha256": "a" * 64, "document": original_sprite(),
+        "source_sha256": digest([
+            "hero-source", "sprite_forge", 1, content, [],
+        ]),
+        "depends_on": [], "document": content,
     }
 
 
@@ -124,6 +129,9 @@ class SpriteForgeTests(unittest.TestCase):
         first = original_record()
         second = deepcopy(first)
         second["record_id"] = "other-hero"
+        second["source_sha256"] = digest([
+            "other-hero", "sprite_forge", 1, second["document"], [],
+        ])
         with self.assertRaises(StudioSpriteError):
             compile_sprite_collection({
                 "hero-source": first, "other-hero": second,
