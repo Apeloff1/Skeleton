@@ -37,6 +37,9 @@ on:
       - "skeleton/testing/test_game_frontier_studio_production_500000000.py"
       - "skeleton/testing/test_game_frontier_studio_production_5000000000.py"
       - "skeleton/testing/test_game_frontier_studio_production_50000000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_500000000000.py"
+      - "skeleton/forge/game_frontier_studio_epoch_*.py"
+      - "scripts/export_game_studio_epoch_handbooks.py"
       - "skeleton/forge/game_frontier_studio_chronicle_*.py"
       - "scripts/export_game_studio_chronicle_handbooks.py"
       - ".github/workflows/game-frontier-validation.yml"
@@ -86,4 +89,5 @@ jobs:
             skeleton/testing/test_game_frontier_studio_production_50000000.py \
             skeleton/testing/test_game_frontier_studio_production_500000000.py \
             skeleton/testing/test_game_frontier_studio_production_5000000000.py \
-            skeleton/testing/test_game_frontier_studio_production_50000000000.py
+            skeleton/testing/test_game_frontier_studio_production_50000000000.py \
+            skeleton/testing/test_game_frontier_studio_production_500000000000.py
