@@ -85,6 +85,8 @@ READ_OPERATIONS = (
     "game.studio.curriculum.catalog",
     "game.studio.curriculum.reference",
     "game.studio.curriculum.lesson",
+    "game.studio.curriculum.path",
+    "game.studio.curriculum.worklist",
     "game.studio.curriculum.assess",
     "game.studio.curriculum.practice",
     "game.studio.curriculum.automation.plan",

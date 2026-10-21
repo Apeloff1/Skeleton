@@ -80,6 +80,37 @@ class BookManifestBatch(Request):
     books: list[ManifestBookRequest] = Field(min_length=1, max_length=4)
 
 
+@router.get("/curriculum/path/{generation}/{index}")
+async def jeeves_complete_curriculum_path(
+    generation: str, index: int, user=Depends(get_current_user),
+):
+    """A real hash-linked chain of each exact ancestor book, without weight claims."""
+    _scope(user)
+    from skeleton.jeeves.game_frontier_curriculum_path import learning_path
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return learning_path(generation, index)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "invalid_jeeves_learning_path",
+                                         "message": str(exc)}) from exc
+
+
+@router.get("/curriculum/worklist")
+async def jeeves_curriculum_worklist(
+    generation: str, index: int = 0, sessions: int = 8,
+    stride: int = 1, user=Depends(get_current_user),
+):
+    """Bounded candidate reading/practice worklist, not auto-queued jobs."""
+    _scope(user)
+    from skeleton.jeeves.game_frontier_curriculum_path import batch_program
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return batch_program(generation, index, sessions=sessions, stride=stride)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "invalid_jeeves_study_worklist",
+                                         "message": str(exc)}) from exc
+
+
 @router.get("/curriculum")
 async def jeeves_book_curriculum_catalog(user=Depends(get_current_user)):
     """Seven source-derived levels, exact reference bounds, and truthful training state."""

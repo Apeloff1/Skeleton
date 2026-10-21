@@ -220,6 +220,19 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
         from skeleton.forge.game_frontier_studio import StudioError
         from core import game_frontier_authoring as forge_author
 
+        if operation in {"game.studio.curriculum.path", "game.studio.curriculum.worklist"}:
+            from skeleton.jeeves.game_frontier_curriculum_path import (
+                learning_path, batch_program,
+            )
+            _only(payload, ("generation", "index", "sessions", "stride"),
+                  required=("generation", "index"))
+            if operation == "game.studio.curriculum.path":
+                _only(payload, ("generation", "index"),
+                      required=("generation", "index"))
+                return learning_path(payload["generation"], payload["index"])
+            return batch_program(payload["generation"], payload["index"],
+                                 sessions=payload.get("sessions", 8),
+                                 stride=payload.get("stride", 1))
         if operation == "game.studio.curriculum.catalog":
             _only(payload, ())
             return books.curriculum_catalog()
