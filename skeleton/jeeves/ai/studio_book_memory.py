@@ -214,6 +214,7 @@ class ReviewedBookMemory:
             ).fetchall()
             if indexed != [(item[0], item[3]) for item in rows]:
                 raise BookMemoryError("full-book search index differs from source identity")
+            heads: dict[str, str | None] = {}
             for table, fields in (
                 ("policy", "book_id,reviewer_id,reason"),
                 ("retrieval", "actor_id,query_sha,filter_family,result_sha"),
@@ -232,7 +233,13 @@ class ReviewedBookMemory:
                     if _hash(payload) != record[-1]:
                         raise BookMemoryError("book evidence digest mismatch")
                     prev = record[-1]
-            return {"source_root_sha256": meta[0][2], "segments": len(rows)}
+                heads[table] = prev
+            return {
+                "source_root_sha256": meta[0][2],
+                "segments": len(rows),
+                "rights_policy_head_sha256": heads["policy"],
+                "retrieval_history_head_sha256": heads["retrieval"],
+            }
 
     def _verify_external_changes(self) -> None:
         """Full replay on external writes; constant-time checks during local search.
@@ -245,6 +252,15 @@ class ReviewedBookMemory:
         if current != self._checked_data_version:
             self.verify()
             self._checked_data_version = current
+
+    def rights_policy_head(self) -> str | None:
+        """Current withdrawal ancestry, including external-reviewer writes."""
+        with self._lock:
+            self._verify_external_changes()
+            entry = self._db.execute(
+                "SELECT digest FROM policy ORDER BY sequence DESC LIMIT 1"
+            ).fetchone()
+            return entry[0] if entry else None
 
     def _event(self, table: str, fields: Mapping[str, object]) -> str:
         if table not in ("policy", "retrieval"):
@@ -319,6 +335,7 @@ class ReviewedBookMemory:
         match = " OR ".join('"' + word.replace('"', '""') + '"' for word in terms)
         with self._lock:
             self._verify_external_changes()
+            rights_policy_before = self.rights_policy_head()
             dbrows = self._db.execute(
                 "SELECT s.segment_id,s.book_id,s.family,s.text,s.text_sha,s.rights_sha,"
                 "bm25(segment_search) AS relevance "
@@ -365,6 +382,7 @@ class ReviewedBookMemory:
                 "admission_receipt_sha256": self.admission_sha256,
                 "query_sha256": query_sha, "results": citations,
                 "results_sha256": result_sha, "retrieval_receipt_sha256": event,
+                "rights_policy_head_sha256": rights_policy_before,
                 "host_verified": True, "model_weights_modified": False,
             }
 
