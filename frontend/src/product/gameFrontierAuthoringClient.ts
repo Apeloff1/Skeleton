@@ -303,7 +303,7 @@ export async function copyForgeTiles(projectId: string, layer: string, x: number
 export async function editForge(projectId: string, doc: ForgeDocument, steps: ForgeStep[],
                                 preview: boolean): Promise<ForgePreview | ForgeCommit> {
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 64 ||
-      steps.some(step => !doc.action_catalog.includes(step.action)
+      steps.some(step => typeof step.action !== 'string' || step.action.length > 512 || !doc.action_catalog.includes(step.action)
         && !(doc.classic_recipe_count === 4500
           && /^produce_[a-z_]+__[a-z_]+$/.test(step.action))
         && !(doc.expanded_recipe_count === 45000
