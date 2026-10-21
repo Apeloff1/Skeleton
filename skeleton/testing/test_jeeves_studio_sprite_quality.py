@@ -9,7 +9,6 @@ from skeleton.jeeves.ai.studio_interaction_contract import digest
 from skeleton.jeeves.ai.studio_sprite_forge import (
     StudioSpriteError, _decode_verified_png, compile_authored_sprite,
 )
-from skeleton.jeeves.ai.studio_sprite_geometry import AtlasGeometryError
 from skeleton.jeeves.ai.studio_sprite_godot_resources import (
     SpriteResourceError, compile_godot_sprite_resources,
     verify_godot_sprite_resources,
