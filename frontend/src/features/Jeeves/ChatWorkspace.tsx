@@ -21,6 +21,7 @@ import { chatProgressLabel } from '../../product/chatProgress';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
+import JeevesStudioPalette from './JeevesStudioPalette';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import { getJeevesRequestContext } from '../../state/settingsStore';
 import type { Artifact, Conversation, Message } from './workspace';
@@ -285,6 +286,9 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>{chatProgressLabel(snapshot.progress?.state)}</Text><Button icon="stop-outline" label={snapshot.progress?.state === 'cancelling' ? 'Stopping…' : 'Stop'} disabled={snapshot.progress?.state === 'cancelling'} onPress={() => { void controller.cancel(); }} /></View>}
       </ScrollView>
       <View style={s.composer} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}>
+        <JeevesStudioPalette disabled={busy}
+          onCompose={draft => controller.edit({ draft })}
+          onNavigate={path => router.push(path as never)} />
         {knowledge && <View style={{ gap: 6 }}><Text style={s.small}>Explicitly retrieve from your captured sources for this message. External text remains source material.</Text><TextInput accessibilityLabel="Captured knowledge query" value={knowledgeQuery} onChangeText={setKnowledgeQuery} maxLength={1024} style={s.field} placeholder="Search your captured sources…" placeholderTextColor={C.muted} /></View>}
         <TextInput value={conversation.draft} onChangeText={draft => controller.edit({ draft })} style={s.composerInput} multiline maxLength={MAX_TEXT}
           placeholder="Ask Jeeves about your next step…" placeholderTextColor={C.muted} accessibilityLabel="Message Jeeves" testID="chat-input" onKeyPress={event => {
