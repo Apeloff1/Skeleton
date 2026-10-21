@@ -726,3 +726,104 @@ invalid art refusal. `tests/test_jeeves_native_studio_real_artifacts.py`
 also imports the creator/source/Forge/Godot/sprite suites into the
 repository's root Python test collection, so CI checks these concrete
 artifacts rather than only the original auxiliary test directory.
+
+
+## Advanced sprite asset standard: authored pixels to native engine resources
+
+The `studio_sprite_forge.py` production pipeline now also supports
+`studio_sprite_geometry.py`, `studio_sprite_verify.py`,
+`studio_sprite_godot_resources.py`, `studio_sprite_quality_metrics.py`
+and `studio_sprite_native_import.py` as a deliberately separate
+authoring/rasterization/independent-proof/engine-resource/quality/engine-test
+pipeline. Source edits cannot bypass preflight: before a source record is
+committed, the store validates actual pixel contents, their SQLite
+content-addressed revision, the complete animation source and a generated
+Godot `SpriteFrames`/preview scene.
+
+### Explicit optional atlas design contract
+
+The existing sprite schema still works. For high-quality sprites, add an
+optional `atlas` object in the source document:
+
+```json
+{
+  "columns": 4,
+  "padding_px": 2,
+  "extrude_edges": true,
+  "power_of_two": true,
+  "alpha_threshold": 16,
+  "pivot_px": [8, 12]
+}
+```
+
+The compiler validates every field and refuses unknown alternatives. It
+packs frames into a deterministic multirow atlas with precise per-frame
+UV rectangles, optional power-of-two dimensions, transparent unused
+surfaces, 0–8 pixel gutters and edge-extruded padding against texture
+sampling bleed. The authored frame interiors remain **bit-identical**
+nearest-neighbor pixels, including straight alpha: no lossy resampling,
+unreviewed AI repainting, or implicit palette substitution. Unsafe
+hidden nonzero RGB in fully transparent colors is refused in extruded
+mode. Sprite file names use portable ASCII identifiers, and GPU atlas
+surfaces are bounded to 8,192 pixels per edge and one million pixels total.
+
+The alpha-threshold policy creates **actual per-pixel collision masks**
+(bit-packed hexadecimal source plus SHA), visible-pixel bounding boxes,
+pixel occupancy counts, original unscaled RGBA hashes and scaled pivots.
+The PNG is encoded as validated 8-bit RGBA; a second subsystem decodes
+every pixel from the emitted PNG, reconstructs the palette, frame scale,
+grid, padded/extruded regions, alpha masks and animation timings, and
+requires exact output equivalence. This verifier runs both immediately
+after compilation and during Godot ZIP inspection. Changing image bytes,
+collision masks, gutter geometry, quality scores or frame timings is
+a detectable integrity failure.
+
+Every compiled sprite also receives a reproducible, objective
+`objective_quality` report: alpha coverage, animation frame variety,
+atlas utilization, unusually long holds, empty sprites and potential
+texture-filtering bleed. Quality grading can help the human producer
+prioritize improvements. It **does not** certify subjective artwork,
+licensed originality or copyright compliance; those human review statuses
+are explicitly false.
+
+### Actual Godot resources, not just embedded PNG
+
+Every sprite ZIP now packages `.png`, machine-readable frame/animation
+metadata, a Godot 4 `.tres` file with a genuine `SpriteFrames` resource
+and `AtlasTexture` frame rectangles, and a companion `.tscn` preview
+scene with `AnimatedSprite2D` actually referencing that resource.
+The full Godot game ZIP includes these files under
+`game/frontier/sprites/`. Animation frame duration is preserved by the
+resource's 10-FPS normalization (e.g., 120 ms is duration 1.2 at 10 FPS).
+The independent ZIP verifier reconstructs these resources and checks
+that every referenced atlas frame exists and matches its source.
+
+To inspect asset compatibility **inside an installed Godot 4 process**,
+the authenticated host may call:
+
+```python
+verified = studio.verify_real_sprite_import(
+    record_id="hero-sprite-source",
+    godot_executable="/usr/bin/godot4",
+    actor_id="authenticated-human-producer",
+    authorize_sprite_import=host_check_this_exact_sprite_binary_actor,
+    timeout_seconds=90,
+)
+```
+
+The native inspection runs Godot headless, loads the original sprite
+preview scene, instantiates its `AnimatedSprite2D`, and checks real
+`SpriteFrames` animation names, frame counts, loops, AtlasTexture sizes
+and timing with bounded engine-output evidence. It writes a trusted studio
+journal event **only if** a separately authorized real Godot 4 binary
+actually ran, the frame/source data agreed and the project generation
+did not change. It does not claim actual on-screen rendering, artistic
+quality approval or that the main 3D avatar uses the sprite. The source
+package has engine-binding authoring capability; in-engine verification
+still depends on running Godot in an installed deployment.
+
+New tests include the 24-case adversarial sprite-quality suite, separate
+original-asset tests, and real game ZIP packaging checks. Root backend CI
+imports these suites from `tests/test_jeeves_native_studio_real_artifacts.py`.
+**Passing exact-head CI remains required** before calling this production
+pipeline verified.
