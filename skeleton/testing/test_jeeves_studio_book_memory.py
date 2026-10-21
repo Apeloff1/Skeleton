@@ -65,16 +65,19 @@ class BookMemoryTests(unittest.TestCase):
         self.expected = sha256(self.receipt_path.read_bytes()).hexdigest()
 
     def build(self):
-        return ReviewedBookMemory.build(
+        receipt = ReviewedBookMemory.build(
             self.index, project_id="game-one",
             admission_receipt=self.receipt_path, admitted_dir=self.admitted,
             expected_receipt_sha256=self.expected,
         )
+        self.root_sha = receipt["source_root_sha256"]
+        return receipt
 
     def open_index(self):
         memory = ReviewedBookMemory(
             self.index, project_id="game-one",
             admission_sha256=self.expected,
+            expected_source_root_sha256=self.root_sha,
         )
         self.addCleanup(memory.close)
         return memory
@@ -150,10 +153,34 @@ class BookMemoryTests(unittest.TestCase):
         self.build()
         with self.assertRaises(BookMemoryError):
             ReviewedBookMemory(self.index, project_id="another-game",
-                               admission_sha256=self.expected)
+                               admission_sha256=self.expected,
+                               expected_source_root_sha256=self.root_sha)
         with self.assertRaises(BookMemoryError):
             ReviewedBookMemory(self.index, project_id="game-one",
-                               admission_sha256="0" * 64)
+                               admission_sha256="0" * 64,
+                               expected_source_root_sha256=self.root_sha)
+
+    def test_independent_source_root_pin_rejects_coordinated_db_changes(self):
+        self.build()
+        with sqlite3.connect(self.index) as database:
+            database.execute("UPDATE segment SET text='altered' WHERE book_id='book-narrative'")
+            rows = database.execute(
+                "SELECT segment_id,book_id,family,text,text_sha,rights_sha "
+                "FROM segment ORDER BY segment_id"
+            ).fetchall()
+            forged_root = sha256(json.dumps(
+                rows, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                allow_nan=False,
+            ).encode("utf-8")).hexdigest()
+            database.execute("UPDATE metadata SET source_root=?", (forged_root,))
+        with self.assertRaises(BookMemoryError):
+            self.open_index()
+        with self.assertRaises(BookMemoryError):
+            ReviewedBookMemory(
+                self.index, project_id="game-one",
+                admission_sha256=self.expected,
+                expected_source_root_sha256="f" * 64,
+            )
 
     def test_independently_pinned_receipt_must_match_source_bytes(self):
         with self.assertRaises(BookMemoryError):
