@@ -131,8 +131,8 @@ async def compile_game(scope: Mapping[str, str], project_id: str,
 
 def catalog() -> dict:
     return {"schema": "skeleton.game.frontier_studio_authoring_catalog.v1",
-            "actions": AUTHORING_ACTIONS[:500], "action_count": 50000000000,
-            "core_action_count": 500, "recipe_count": 49999999500,
+            "actions": AUTHORING_ACTIONS[:500], "action_count": 500000000000,
+            "core_action_count": 500, "recipe_count": 499999999500,
             "classic_recipe_count": 4500, "expanded_recipe_count": 45000,
             "directed_recipe_count": 450000,
             "final_recipe_count": 4500000,
@@ -140,6 +140,7 @@ def catalog() -> dict:
             "phase_recipe_count": 450000000,
             "campaign_recipe_count": 4500000000,
             "chronicle_recipe_count": 45000000000,
+             "epoch_recipe_count": 450000000000,
             "recipe_search_path": "/api/game-frontier-authoring/recipes",
             "persistence_owner": "canonical_game_learning_workspace",
             "source_file": SOURCE_PATH}

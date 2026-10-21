@@ -66,6 +66,62 @@ def _write_scope(user):
     return scope
 
 
+@router.get("/epoch-handbooks")
+async def search_epoch_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", phase: str = "", campaign: str = "",
+    chronicle: str = "", epoch: str = "",
+    offset: int = 0, limit: int = 32, user=Depends(get_current_user),
+):
+    """Authorized bounded arithmetic search of 90M on-demand manuals."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_epoch_handbooks import list_books
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_books(domain=domain, treatment=treatment, director=director,
+                          worldline=worldline, phase=phase, campaign=campaign,
+                          chronicle=chronicle, epoch=epoch, offset=offset, limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code":"invalid_epoch_handbook_search",
+                                         "message":str(exc)}) from exc
+
+
+@router.get("/epoch-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}")
+async def rank_epoch_handbooks(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, chronicle: str, sort: str = "quality",
+    user=Depends(get_current_user),
+):
+    """Compare ten actually rendered epoch books within one exact chronicle."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_epoch_handbooks import rank_variants
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return rank_variants(domain, treatment, director, worldline,
+                             phase, campaign, chronicle, sort=sort)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code":"invalid_epoch_ranking",
+                                         "message":str(exc)}) from exc
+
+
+@router.get("/epoch-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}")
+async def read_epoch_handbook(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, chronicle: str, epoch: str,
+    user=Depends(get_current_user),
+):
+    """Exact SHA-addressed temporal authoring source manual."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_epoch_handbooks import receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return receipt(domain, treatment, director, worldline, phase,
+                       campaign, chronicle, epoch)
+    except StudioError as exc:
+        raise HTTPException(404, detail={"code":"unknown_epoch_handbook",
+                                         "message":str(exc)}) from exc
+
+
 @router.get("/chronicle-handbooks")
 async def search_chronicle_handbooks(
     domain: str = "", treatment: str = "", director: str = "",
@@ -249,7 +305,7 @@ async def read_original_world_handbook(
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "",
+    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -262,8 +318,18 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_phase_production import search_phases
     from skeleton.forge.game_frontier_studio_campaign_production import search_campaigns
     from skeleton.forge.game_frontier_studio_chronicle_production import search_chronicles
+    from skeleton.forge.game_frontier_studio_epoch_production import search_epochs
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "epoch":
+            if query:
+                raise StudioError("epoch discovery uses exact filters, not scans")
+            return search_epochs(domain=domain,system_layer=system_layer,
+                                 director=director,finish=finish,worldline=worldline,
+                                 phase=phase,campaign=campaign,chronicle=chronicle,
+                                 epoch=epoch,offset=offset,limit=limit)
+        if epoch:
+            raise StudioError("epoch filtering requires epoch generation")
         if generation == "chronicle":
             if query:
                 raise StudioError("chronicle discovery requires exact indexed filters")
