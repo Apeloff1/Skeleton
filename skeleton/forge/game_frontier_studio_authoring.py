@@ -33,11 +33,12 @@ from .game_frontier_studio_quest_blueprint_factory import QUEST_BLUEPRINT_ACTION
 from .game_frontier_studio_reactive_scene_factory import REACTIVE_SCENE_ACTIONS, edit_reactive_scene
 from .game_frontier_studio_production_recipes import RECIPE_ACTIONS, RECIPE_INDEX, edit_recipe
 from .game_frontier_studio_system_expansions import EXPANDED_RECIPE_ACTIONS, EXPANDED_RECIPE_INDEX, edit_expansion
+from .game_frontier_studio_directed_production import DIRECTED_ACTIONS, edit_direction
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
 
-AUTHORING_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIONS +
+_LEGACY_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIONS +
                      QUEST_ACTIONS + TERRAIN_ACTIONS + PROCEDURAL_ACTIONS +
                      POPULATION_ACTIONS + STORY_ACTIONS +
                      TERRAIN_TOPOLOGY_ACTIONS + ACTOR_LAYOUT_ACTIONS +
@@ -45,8 +46,43 @@ AUTHORING_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIO
                      BIOME_ACTIONS + STRUCTURE_ACTIONS + ENCOUNTER_ACTIONS +
                      QUEST_BLUEPRINT_ACTIONS + REACTIVE_SCENE_ACTIONS +
                      RECIPE_ACTIONS + EXPANDED_RECIPE_ACTIONS)
-if len(AUTHORING_ACTIONS) != 50000 or len(set(AUTHORING_ACTIONS)) != 50000:
-    raise RuntimeError("Forge Studio must expose 50000 registered, distinct executable production operations")
+class AuthoringCatalogue(Sequence[str]):
+    """Virtual last 450k commands; exact, stable indexing without huge startup RAM."""
+    def __init__(self):
+        self._legacy = _LEGACY_ACTIONS
+        self._known = frozenset(_LEGACY_ACTIONS)
+        if len(self._legacy) != 50000 or len(self._known) != 50000:
+            raise RuntimeError("legacy game editor registry must contain 50000 unique actions")
+        if any(name.startswith("direct_") for name in self._known):
+            raise RuntimeError("director namespace may not overwrite original commands")
+
+    def __len__(self) -> int:
+        return len(self._legacy) + len(DIRECTED_ACTIONS)
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return tuple(self[i] for i in range(*index.indices(len(self))))
+        if type(index) is not int:
+            raise TypeError("authoring catalogue indexes must be integers")
+        if index < 0:
+            index += len(self)
+        if not 0 <= index < len(self):
+            raise IndexError("authoring operation outside virtual catalogue")
+        if index < len(self._legacy):
+            return self._legacy[index]
+        return DIRECTED_ACTIONS[index - len(self._legacy)]
+
+    def __contains__(self, action: object) -> bool:
+        return action in self._known if isinstance(action, str) and not action.startswith("direct_") else action in DIRECTED_ACTIONS
+
+    def __iter__(self):
+        yield from self._legacy
+        yield from DIRECTED_ACTIONS
+
+
+AUTHORING_ACTIONS = AuthoringCatalogue()
+if len(AUTHORING_ACTIONS) != 500000:
+    raise RuntimeError("Forge Studio must expose 500000 executable production operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -122,6 +158,8 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_recipe(project, operation, payload, execute_authoring)
     if operation in EXPANDED_RECIPE_INDEX:
         return edit_expansion(project, operation, payload, execute_authoring)
+    if operation in DIRECTED_ACTIONS:
+        return edit_direction(project, operation, payload, execute_authoring)
     raise StudioError("unknown executable Studio editor action")
 
 
@@ -208,9 +246,10 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "native_force_field_count": len(project.native_gameplay_force_fields),
         "quest_stage_count": sum(len(q.stages) for q in project.native_quests),
         "action_catalog": AUTHORING_ACTIONS[:500],
-        "recipe_catalog_count": len(RECIPE_ACTIONS) + len(EXPANDED_RECIPE_ACTIONS),
+        "recipe_catalog_count": len(RECIPE_ACTIONS) + len(EXPANDED_RECIPE_ACTIONS) + len(DIRECTED_ACTIONS),
         "classic_recipe_count": len(RECIPE_ACTIONS),
         "expanded_recipe_count": len(EXPANDED_RECIPE_ACTIONS),
+        "directed_recipe_count": len(DIRECTED_ACTIONS),
         "catalog_total": len(AUTHORING_ACTIONS),
         "recipe_search_required": True,
         "candidate_only": True,
