@@ -21,6 +21,7 @@ export type ForgeDocument = {
   action_catalog: string[]; already_saved: boolean;
   recipe_catalog_count: number; catalog_total: number; recipe_search_required: boolean;
   classic_recipe_count: number; expanded_recipe_count: number;
+  directed_recipe_count: number;
 };
 export type ForgeStep = { action: string; parameters: Record<string, unknown> };
 export type ForgePreview = {
@@ -56,8 +57,9 @@ function verifyDoc(doc: ForgeDocument): ForgeDocument {
   if (!doc || doc.schema !== 'skeleton.game.frontier_studio_document.v1'
       || !SHA.test(doc.source_sha256) || !Number.isSafeInteger(doc.expected_version)
       || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 500
-      || doc.recipe_catalog_count !== 49500 || doc.catalog_total !== 50000
+      || doc.recipe_catalog_count !== 499500 || doc.catalog_total !== 500000
       || doc.classic_recipe_count !== 4500 || doc.expanded_recipe_count !== 45000
+      || doc.directed_recipe_count !== 450000
       || !Array.isArray(doc.layers) || doc.layers.length > 128
       || (doc.prefab_catalog !== undefined && !Array.isArray(doc.prefab_catalog))
       || (doc.actor_catalog !== undefined && !Array.isArray(doc.actor_catalog))
@@ -75,13 +77,14 @@ export async function inspectForge(projectId: string, signal?: AbortSignal): Pro
 export async function getForgeActions(signal?: AbortSignal): Promise<string[]> {
   const result = await data(api.get<{ actions: string[]; action_count: number }>(
     ROOT + '/actions', options(undefined, signal)), 'Forge tool catalogue unavailable.');
-  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 50000)
+  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 500000)
     throw new Error('Forge Studio action catalogue is incomplete.');
   return result.actions;
 }
 export type ForgeRecipe = {
   operation: string; domain: string; source_blueprint: string;
   base_operation?: string; system_layer?: string; system_layer_index?: number;
+  direction?: string; director_index?: number; director_purpose?: string;
   treatment: string; recipe_steps: string[]; source_index: number;
   style_index: number; actual_project_mutation: boolean;
 };
@@ -89,16 +92,17 @@ export type ForgeRecipeResults = {
   schema: 'skeleton.forge.production_recipe_search.v1';
   total_catalog: number; matched: number; offset: number; limit: number;
   next_offset: number | null; domains: string[]; styles: string[];
-  system_layers?: string[];
+  system_layers?: string[]; directors?: string[];
   items: ForgeRecipe[];
 };
 export async function searchForgeRecipes(query = '', domain = '', offset = 0,
-                                         limit = 32, generation: 'classic' | 'expanded' = 'classic',
-                                         systemLayer = ''): Promise<ForgeRecipeResults> {
+                                         limit = 32, generation: 'classic' | 'expanded' | 'directed' = 'classic',
+                                         systemLayer = '', director = ''): Promise<ForgeRecipeResults> {
   const params = [
     'query=' + encodeURIComponent(query),
     'generation=' + encodeURIComponent(generation),
     'system_layer=' + encodeURIComponent(systemLayer),
+    'director=' + encodeURIComponent(director),
     'domain=' + encodeURIComponent(domain),
     'offset=' + encodeURIComponent(String(offset)),
     'limit=' + encodeURIComponent(String(limit)),
@@ -106,11 +110,12 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
   const results = await data(api.get<ForgeRecipeResults>(
     ROOT + '/recipes?' + params, options()), 'Could not search original-game production recipes.');
   if (!results || results.schema !== 'skeleton.forge.production_recipe_search.v1'
-      || results.total_catalog !== (generation === 'expanded' ? 45000 : 4500)
+      || results.total_catalog !== (generation === 'directed' ? 450000 : generation === 'expanded' ? 45000 : 4500)
       || !Array.isArray(results.items)
       || results.items.length > 64
       || results.items.some(recipe => !(generation === 'classic' ? /^produce_[a-z_]+__[a-z_]+$/.test(recipe.operation)
-          : /^expand_[a-z_]+__[a-z_]+___[a-z_]+$/.test(recipe.operation))
+          : generation === 'expanded' ? /^expand_[a-z_]+__[a-z_]+___[a-z_]+$/.test(recipe.operation)
+          : /^direct_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+$/.test(recipe.operation))
         || recipe.actual_project_mutation !== true)) {
     throw new ChatClientError('Forge production recipe search returned invalid source.',
       {kind: 'protocol', retryable: false});
@@ -128,10 +133,12 @@ export async function editForge(projectId: string, doc: ForgeDocument, steps: Fo
                                 preview: boolean): Promise<ForgePreview | ForgeCommit> {
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 64 ||
       steps.some(step => !doc.action_catalog.includes(step.action)
-        && !(doc.recipe_catalog_count === 4500
-          && (/^produce_[a-z_]+__[a-z_]+$/.test(step.action)
-            || (doc.expanded_recipe_count === 45000
-              && /^expand_[a-z_]+__[a-z_]+___[a-z_]+$/.test(step.action)))))) throw new Error(
+        && !(doc.classic_recipe_count === 4500
+          && /^produce_[a-z_]+__[a-z_]+$/.test(step.action))
+        && !(doc.expanded_recipe_count === 45000
+          && /^expand_[a-z_]+__[a-z_]+___[a-z_]+$/.test(step.action))
+        && !(doc.directed_recipe_count === 450000
+          && /^direct_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+$/.test(step.action)))) throw new Error(
     'Select one or more supported editor operations.');
   const key = learningRequestKey('forge-author');
   const body = { expected_version: doc.expected_version,
