@@ -86,6 +86,14 @@ class ReviewedMultimodalTest(unittest.TestCase):
             admit_reviewed_media(self.host, **self.kwargs())
         self.assertEqual(len(self.journal.read()), 2)
 
+    def test_direct_review_event_injection_is_rejected(self):
+        with self.assertRaises(StudioInteractionError):
+            self.journal.append("modality_observation_reviewed", {
+                "source_id": "forged", "observation": "I saw the full image.",
+                "observation_sha256": "0" * 64,
+            })
+        self.assertEqual(self.journal.read(), ())
+
     def test_unadmitted_media_cannot_receive_fabricated_review(self):
         with self.assertRaises(StudioInteractionError):
             self.host.review_media_observation(
