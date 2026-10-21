@@ -132,6 +132,22 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
   return results;
 }
 
+export async function readForgeHandbook(domain: string, treatment: string,
+                                         director: string, worldline: string): Promise<string> {
+  const parts = [domain, treatment, director, worldline];
+  if (parts.some(part => !/^[a-z][a-z_]{0,40}$/.test(part)))
+    throw new Error('Unknown Forge technical handbook identity.');
+  const response = await data(api.get<{schema: string; markdown: string;
+    content_sha256: string; covered_commands: number}>(
+    ROOT + '/handbooks/' + parts.map(encodeURIComponent).join('/'), options()),
+    'Could not load the source-backed game-production handbook.');
+  if (response.schema !== 'skeleton.forge.worldline_handbook.v1'
+      || !SHA.test(response.content_sha256) || response.covered_commands !== 5000
+      || typeof response.markdown !== 'string' || response.markdown.length > 64000)
+    throw new Error('Forge handbook integrity contract invalid.');
+  return response.markdown;
+}
+
 export async function copyForgeTiles(projectId: string, layer: string, x: number, y: number,
                                      width: number, height: number) {
   return data(api.post<{ tiles: number[]; palette: string[]; receipt_sha256: string }>(
