@@ -12,6 +12,9 @@ from skeleton.forge.creator.command_surface import build_creator_command
 from skeleton.jeeves.ai.studio_creator_source import (
     CreatorProjectSourceStore, CreatorSourceError,
 )
+from skeleton.jeeves.ai.studio_godot_zip_verify import (
+    NativeSourceVerificationError, verify_published_godot_zip,
+)
 from skeleton.jeeves.ai.studio_frontier_source_compile import (
     FrontierSourceError, compile_persisted_frontier_source,
 )
@@ -238,6 +241,44 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             )
             for name, expected in receipt["godot_file_hashes"].items():
                 self.assertEqual(sha256(artifact.read(name)).hexdigest(), expected)
+
+    def test_independent_reader_attests_real_file_bytes(self):
+        self.populate_3d()
+        result = self.export_godot()
+        self.assertIsNotNone(result["disk_verification"])
+        report = verify_published_godot_zip(
+            self.export / result["artifact_name"], project_id="new-game",
+            source_head_sha256=self.owner.head_identity(),
+            expected_archive_sha256=result["artifact_sha256"],
+        )
+        self.assertEqual(report["archive_sha256"], result["artifact_sha256"])
+        self.assertGreaterEqual(report["verified_file_count"], 5)
+        self.assertFalse(report["actual_godot_execution_verified"])
+
+    def test_tampered_export_is_rejected_against_original_receipt(self):
+        self.populate_3d()
+        result = self.export_godot()
+        target = self.export / result["artifact_name"]
+        with target.open("ab") as writer:
+            writer.write(b"altered-after-fsync")
+        with self.assertRaises(NativeSourceVerificationError):
+            verify_published_godot_zip(
+                target, project_id="new-game",
+                source_head_sha256=self.owner.head_identity(),
+                expected_archive_sha256=result["artifact_sha256"],
+            )
+        with self.assertRaises(CreatorSourceError):
+            self.export_godot()
+
+    def test_reject_foreign_project_pretending_to_own_valid_zip(self):
+        self.populate_3d()
+        result = self.export_godot()
+        with self.assertRaises(NativeSourceVerificationError):
+            verify_published_godot_zip(
+                self.export / result["artifact_name"], project_id="foreign-game",
+                source_head_sha256=self.owner.head_identity(),
+                expected_archive_sha256=result["artifact_sha256"],
+            )
 
     def test_native_zip_reexport_is_identical_and_non_destructive(self):
         self.populate_3d()
