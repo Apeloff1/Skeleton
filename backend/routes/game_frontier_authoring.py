@@ -66,6 +66,59 @@ def _write_scope(user):
     return scope
 
 
+@router.get("/chronicle-handbooks")
+async def search_chronicle_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", phase: str = "", campaign: str = "",
+    chronicle: str = "", offset: int = 0, limit: int = 32,
+    user=Depends(get_current_user),
+):
+    """Read the arithmetic index of 9M source-grounded technical manuals."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_chronicle_handbooks import list_books
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_books(domain=domain,treatment=treatment,director=director,
+                          worldline=worldline,phase=phase,campaign=campaign,
+                          chronicle=chronicle,offset=offset,limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422,detail={"code":"invalid_chronicle_handbook_query",
+                                        "message":str(exc)}) from exc
+
+
+@router.get("/chronicle-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}")
+async def rank_chronicle_handbooks(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, sort: str = "quality",
+    user=Depends(get_current_user),
+):
+    """Compare only ten actually rendered variants of one common campaign."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_chronicle_handbooks import rank_variants
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return rank_variants(domain,treatment,director,worldline,phase,campaign,sort=sort)
+    except StudioError as exc:
+        raise HTTPException(422,detail={"code":"invalid_chronicle_ranking",
+                                        "message":str(exc)}) from exc
+
+
+@router.get("/chronicle-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}")
+async def read_chronicle_handbook(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, chronicle: str, user=Depends(get_current_user),
+):
+    """Render exactly one SHA-addressed source-derived chronicle document."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_chronicle_handbooks import receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return receipt(domain,treatment,director,worldline,phase,campaign,chronicle)
+    except StudioError as exc:
+        raise HTTPException(404,detail={"code":"unknown_chronicle_handbook",
+                                        "message":str(exc)}) from exc
+
+
 @router.get("/campaign-handbooks")
 async def search_campaign_handbooks(
     domain: str = "", treatment: str = "", director: str = "",
@@ -196,7 +249,7 @@ async def read_original_world_handbook(
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "",
+    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -208,8 +261,18 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_worldline_production import search_worldlines
     from skeleton.forge.game_frontier_studio_phase_production import search_phases
     from skeleton.forge.game_frontier_studio_campaign_production import search_campaigns
+    from skeleton.forge.game_frontier_studio_chronicle_production import search_chronicles
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "chronicle":
+            if query:
+                raise StudioError("chronicle discovery requires exact indexed filters")
+            return search_chronicles(domain=domain,system_layer=system_layer,
+                                     director=director,finish=finish,worldline=worldline,
+                                     phase=phase,campaign=campaign,chronicle=chronicle,
+                                     offset=offset,limit=limit)
+        if chronicle:
+            raise StudioError("chronicle filtering requires chronicle generation")
         if generation == "campaign":
             if query:
                 raise StudioError("campaign discovery uses exact filters, not unbounded text scanning")
