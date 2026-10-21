@@ -1,0 +1,9 @@
+"""Milestone 78662: op_78662.
+
+Candidate-only pure identity. No GPU claims.
+"""
+from __future__ import annotations
+
+
+def op_78662(value):
+    return value
