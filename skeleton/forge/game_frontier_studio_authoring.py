@@ -41,6 +41,7 @@ from .game_frontier_studio_campaign_production import CAMPAIGN_ACTIONS, edit_cam
 from .game_frontier_studio_chronicle_production import CHRONICLE_ACTIONS, edit_chronicle
 from .game_frontier_studio_epoch_production import EPOCH_ACTIONS, edit_epoch
 from .game_frontier_studio_saga_production import SAGA_ACTIONS, edit_saga
+from .game_frontier_studio_epic_variations import EPIC_ACTIONS, edit_epic
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
@@ -64,7 +65,7 @@ class AuthoringCatalogue(Sequence[str]):
             raise RuntimeError("director namespace may not overwrite original commands")
 
     def __len__(self) -> int:
-        return len(self._legacy) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS) + len(PHASE_ACTIONS) + len(CAMPAIGN_ACTIONS) + len(CHRONICLE_ACTIONS) + len(EPOCH_ACTIONS) + len(SAGA_ACTIONS)
+        return len(self._legacy) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS) + len(PHASE_ACTIONS) + len(CAMPAIGN_ACTIONS) + len(CHRONICLE_ACTIONS) + len(EPOCH_ACTIONS) + len(SAGA_ACTIONS) + len(EPIC_ACTIONS)
 
     def __getitem__(self, index):
         if isinstance(index, slice):
@@ -98,11 +99,16 @@ class AuthoringCatalogue(Sequence[str]):
         offset -= len(CHRONICLE_ACTIONS)
         if offset < len(EPOCH_ACTIONS):
             return EPOCH_ACTIONS[offset]
-        return SAGA_ACTIONS[offset - len(EPOCH_ACTIONS)]
+        offset -= len(EPOCH_ACTIONS)
+        if offset < len(SAGA_ACTIONS):
+            return SAGA_ACTIONS[offset]
+        return EPIC_ACTIONS[offset - len(SAGA_ACTIONS)]
 
     def __contains__(self, action: object) -> bool:
         if type(action) is not str:
             return False
+        if action.startswith("epic_"):
+            return action in EPIC_ACTIONS
         if action.startswith("saga_"):
             return action in SAGA_ACTIONS
         if action.startswith("epoch_"):
@@ -131,11 +137,12 @@ class AuthoringCatalogue(Sequence[str]):
         yield from CHRONICLE_ACTIONS
         yield from EPOCH_ACTIONS
         yield from SAGA_ACTIONS
+        yield from EPIC_ACTIONS
 
 
 AUTHORING_ACTIONS = AuthoringCatalogue()
-if len(AUTHORING_ACTIONS) != 5000000000000:
-    raise RuntimeError("Forge Studio must expose 5000000000000 composable source operations")
+if len(AUTHORING_ACTIONS) != 50000000000000:
+    raise RuntimeError("Forge Studio must expose 50000000000000 composable source operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -227,6 +234,8 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_epoch(project, operation, payload, execute_authoring)
     if operation in SAGA_ACTIONS:
         return edit_saga(project, operation, payload, execute_authoring)
+    if operation in EPIC_ACTIONS:
+        return edit_epic(project, operation, payload, execute_authoring)
     raise StudioError("unknown executable Studio editor action")
 
 
@@ -313,7 +322,7 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "native_force_field_count": len(project.native_gameplay_force_fields),
         "quest_stage_count": sum(len(q.stages) for q in project.native_quests),
         "action_catalog": AUTHORING_ACTIONS[:500],
-        "recipe_catalog_count": len(RECIPE_ACTIONS) + len(EXPANDED_RECIPE_ACTIONS) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS) + len(PHASE_ACTIONS) + len(CAMPAIGN_ACTIONS) + len(CHRONICLE_ACTIONS) + len(EPOCH_ACTIONS),
+        "recipe_catalog_count": len(RECIPE_ACTIONS) + len(EXPANDED_RECIPE_ACTIONS) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS) + len(PHASE_ACTIONS) + len(CAMPAIGN_ACTIONS) + len(CHRONICLE_ACTIONS) + len(EPOCH_ACTIONS) + len(SAGA_ACTIONS) + len(EPIC_ACTIONS),
         "classic_recipe_count": len(RECIPE_ACTIONS),
         "expanded_recipe_count": len(EXPANDED_RECIPE_ACTIONS),
         "directed_recipe_count": len(DIRECTED_ACTIONS),
@@ -324,6 +333,7 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "chronicle_recipe_count": len(CHRONICLE_ACTIONS),
         "epoch_recipe_count": len(EPOCH_ACTIONS),
         "saga_recipe_count": len(SAGA_ACTIONS),
+        "epic_recipe_count": len(EPIC_ACTIONS),
         "catalog_total": len(AUTHORING_ACTIONS),
         "recipe_search_required": True,
         "candidate_only": True,

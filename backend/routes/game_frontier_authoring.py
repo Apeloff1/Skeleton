@@ -66,6 +66,63 @@ def _write_scope(user):
     return scope
 
 
+@router.get("/epic-handbooks")
+async def search_epic_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", phase: str = "", campaign: str = "",
+    chronicle: str = "", epoch: str = "", saga: str = "", epic: str = "",
+    offset: int = 0, limit: int = 32, user=Depends(get_current_user),
+):
+    """Authenticated indexed discovery of nine billion bounded virtual manuals."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_epic_handbooks import list_books
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_books(domain=domain, treatment=treatment, director=director,
+                          worldline=worldline, phase=phase, campaign=campaign,
+                          chronicle=chronicle, epoch=epoch, saga=saga, epic=epic,
+                          offset=offset, limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "invalid_epic_manual_search",
+                                         "message": str(exc)}) from exc
+
+
+@router.get("/epic-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{saga}")
+async def rank_epic_handbooks(
+    domain: str, treatment: str, director: str, worldline: str, phase: str,
+    campaign: str, chronicle: str, epoch: str, saga: str,
+    sort: str = "quality", user=Depends(get_current_user),
+):
+    """Rank ten actually rendered longform worlds on source evidence and length."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_epic_handbooks import rank_variants
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return rank_variants(domain, treatment, director, worldline, phase,
+                             campaign, chronicle, epoch, saga, sort=sort)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "invalid_epic_manual_ranking",
+                                         "message": str(exc)}) from exc
+
+
+@router.get("/epic-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{saga}/{epic}")
+async def read_epic_handbook(
+    domain: str, treatment: str, director: str, worldline: str, phase: str,
+    campaign: str, chronicle: str, epoch: str, saga: str, epic: str,
+    user=Depends(get_current_user),
+):
+    """Return source-grounded Markdown and SHA receipt; no creation side effect."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_epic_handbooks import receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return receipt(domain, treatment, director, worldline, phase,
+                       campaign, chronicle, epoch, saga, epic)
+    except StudioError as exc:
+        raise HTTPException(404, detail={"code": "unknown_epic_manual",
+                                         "message": str(exc)}) from exc
+
+
 @router.get("/saga-handbooks")
 async def search_saga_handbooks(
     domain: str = "", treatment: str = "", director: str = "",
@@ -362,7 +419,7 @@ async def read_original_world_handbook(
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "", saga: str = "",
+    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "", saga: str = "", epic: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -377,8 +434,19 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_chronicle_production import search_chronicles
     from skeleton.forge.game_frontier_studio_epoch_production import search_epochs
     from skeleton.forge.game_frontier_studio_saga_production import search_sagas
+    from skeleton.forge.game_frontier_studio_epic_variations import search_epics
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "epic":
+            if query:
+                raise StudioError("Epic source search requires exact indexed filters")
+            return search_epics(domain=domain,system_layer=system_layer,
+                                director=director,finish=finish,worldline=worldline,
+                                phase=phase,campaign=campaign,chronicle=chronicle,
+                                epoch=epoch,saga=saga,epic=epic,
+                                offset=offset,limit=limit)
+        if epic:
+            raise StudioError("Epic filtering requires Epic generation")
         if generation == "saga":
             if query:
                 raise StudioError("saga search only accepts indexed exact filters")
