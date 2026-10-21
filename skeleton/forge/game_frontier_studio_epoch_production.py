@@ -12,6 +12,7 @@ from typing import Any
 import math
 
 from .game_frontier_studio import StudioError, StudioProject
+from .game_frontier_rpg_events import EnvironmentalTrigger, RPGEventAction
 from .game_frontier_studio_map_edit import _layer, _rectangle, _tile, _replace_layer
 from .game_frontier_studio_chronicle_production import (
     CHRONICLE_ACTIONS, CHRONICLES, describe_chronicle,
@@ -44,7 +45,31 @@ OBJECTIVES = (
     "Reconnect reforested clearings along navigable paths",
     "Join future districts through a redundant civic ring",
 )
-if len(EPOCHS) != 10 or len(set(EPOCHS)) != 10:
+# Two real sensor predicates and one proposal-only game effect per epoch.
+# Timed/replayed observations are supplied by the existing canonical runtime.
+EPOCH_SIGNALS = (
+    ("daylight", "above", .35, "solar_height", "above", 0.,
+     "change_light", "environment", "epoch_lighting", "daybreak"),
+    ("daylight", "below", .3, "moon_phase", "above", .2,
+     "change_light", "environment", "epoch_lighting", "nightfall"),
+    ("temperature_c", "above", 0., "ground_ice_fraction", "below", .4,
+     "deform_terrain", "environment", "thawwater", "drainage"),
+    ("temperature_c", "above", 24., "soil_wetness", "below", .25,
+     "weather_transition", "environment", "drought", "dry"),
+    ("wind_mps", "above", 4., "leaf_shadow_area_m2", "above", .2,
+     "trigger_foliage_fx", "environment", "leaves", "autumn"),
+    ("temperature_c", "below", 0., "ground_ice_fraction", "above", .6,
+     "set_flag", "world", "winter_shelter", "active"),
+    ("water_depth_m", "above", .4, "tide_height_m", "above", .2,
+     "change_tide", "environment", "floodplain", "recede"),
+    ("building_integrity", "below", .8, "party_morale", "above", .1,
+     "set_flag", "world", "repair_route", "open"),
+    ("soil_wetness", "above", .4, "humidity", "above", .6,
+     "trigger_foliage_fx", "environment", "forest", "regrow"),
+    ("quest_progress", "at_least", .9, "npc_reputation", "above", 10.,
+     "advance_quest", "quest", "epoch", "reconcile"),
+)
+if len(EPOCHS) != 10 or len(EPOCH_SIGNALS) != len(EPOCHS) or len(set(EPOCHS)) != 10:
     raise RuntimeError("ten distinct temporal editing patterns are required")
 
 
@@ -193,6 +218,21 @@ def _epoch_tiles(project: StudioProject, args: Mapping[str, Any],
     return _replace_layer(project, index, replace(layer, data=tuple(cells)))
 
 
+def _epoch_page(project: StudioProject, operation: str,
+                args: Mapping[str, Any], axis: int) -> StudioProject:
+    # Reuse the validated, unique, hashed event identity and instance guard.
+    with_page = _page(project, operation, args, axis)
+    page = with_page.environmental_pages[-1]
+    effect = EPOCH_SIGNALS[axis]
+    amended = replace(page,
+        conditions=(EnvironmentalTrigger(*effect[:3]),
+                    EnvironmentalTrigger(*effect[3:6])),
+        actions=(RPGEventAction(*effect[6:]),))
+    return replace(with_page, environmental_pages=(
+        *with_page.environmental_pages[:-1], amended,
+    ))
+
+
 def edit_epoch(project: StudioProject, operation: str,
                args: Mapping[str, Any],
                execute: Callable[[StudioProject, str, Mapping[str, Any]], StudioProject]
@@ -206,6 +246,6 @@ def edit_epoch(project: StudioProject, operation: str,
     old_cast, old_quests = len(project.placements), len(project.native_quests)
     candidate = execute(project, parent, args)
     candidate = _epoch_tiles(candidate, args, axis)
-    candidate = _page(candidate, operation, args, axis)
+    candidate = _epoch_page(candidate, operation, args, axis)
     candidate = _cast(candidate, old_cast, axis)
     return _quest(candidate, old_quests, axis, operation)
