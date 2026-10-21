@@ -276,3 +276,26 @@ async def simulate_gameplay(scope: Mapping[str, str], project_id: str,
         result, sort_keys=True, separators=(",", ":"),
         allow_nan=False).encode("utf-8")).hexdigest()
     return result
+
+
+async def audit_walkable_routes(scope: Mapping[str, str], project_id: str,
+                                body: Mapping[str, Any]) -> dict:
+    """Inspect up to 100 source-tile routes without modifying project state.
+
+    Existing game-learning workspace authorization and versioning remain the
+    only source owners. Reference replay is not a native Godot playthrough.
+    """
+    from skeleton.forge.game_frontier_studio_route_assurance import (
+        audit_route_playthroughs, verify_route_playthroughs,
+    )
+
+    owner, authored = await _source(scope, project_id)
+    scenarios = body.get("scenarios")
+    report = audit_route_playthroughs(authored, scenarios)
+    if not verify_route_playthroughs(authored, scenarios, report):
+        raise StudioError("route replay proof diverged from the authored source")
+    return {
+        **report,
+        "source_version": owner["version"],
+        "verified_against_authoritative_source": True,
+    }
