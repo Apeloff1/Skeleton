@@ -16,6 +16,9 @@ from typing import Any
 import zlib
 
 from .studio_interaction_contract import digest, identifier
+from .studio_sprite_geometry import (
+    AtlasGeometryError, layout_policy, rasterize_atlas,
+)
 
 SCHEMA = "skeleton.jeeves.authored_sprite_atlas.v1"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -114,10 +117,14 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
     """Produce one actual spritesheet, metadata and independently checked pixels."""
     if not isinstance(record, Mapping) or record.get("facet") != "sprite_forge":
         raise StudioSpriteError("sprite asset must originate from an approved sprite forge record")
-    doc = _exact(record.get("document"), {
-        "kind", "asset_id", "width", "height", "palette", "frames", "animations",
-        "pixel_scale",
-    }, "original sprite source")
+    base_fields = {
+        "kind", "asset_id", "width", "height", "palette",
+        "frames", "animations", "pixel_scale",
+    }
+    doc = record.get("document")
+    if (not isinstance(doc, dict)
+            or set(doc) not in (base_fields, base_fields | {"atlas"})):
+        raise StudioSpriteError("sprite document has undeclared or missing source fields")
     if doc["kind"] != "pixel_sprite":
         raise StudioSpriteError("cannot compile unknown sprite asset source kind")
     asset = identifier(doc["asset_id"], "original sprite asset")
@@ -135,15 +142,8 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
     frames = doc["frames"]
     if type(frames) is not list or not 1 <= len(frames) <= 64:
         raise StudioSpriteError("sprite atlas requires 1..64 authored pixel frames")
-    sheet_width = width * len(frames) * scale
-    sheet_height = height * scale
-    if sheet_width * sheet_height > MAX_PIXELS:
-        raise StudioSpriteError("sprite sheet exceeds output pixel budget")
-    ids = set()
-    rows: list[bytearray] = [
-        bytearray(sheet_width * 4) for _ in range(sheet_height)
-    ]
-    frame_meta = []
+    ids: set[str] = set()
+    frame_meta: list[dict[str, Any]] = []
     for frame_index, candidate in enumerate(frames):
         frame = _exact(candidate, {"frame_id", "duration_ms", "pixels"}, "sprite frame")
         frame_id = identifier(frame["frame_id"], "sprite frame")
@@ -151,24 +151,31 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
             raise StudioSpriteError("sprite frame identity repeated")
         ids.add(frame_id)
         duration = _integer(frame["duration_ms"], "frame duration", 10, 60_000)
-        pixels = frame["pixels"]
-        if (type(pixels) is not list or len(pixels) != width * height
-                or any(type(index) is not int or index < 0 or index >= len(colors)
-                       for index in pixels)):
-            raise StudioSpriteError("pixel data must map to explicitly declared RGBA palette")
-        for y in range(height):
-            for x in range(width):
-                rgba = colors[pixels[y * width + x]]
-                for dy in range(scale):
-                    row = rows[y * scale + dy]
-                    for dx in range(scale):
-                        column = (frame_index * width * scale + x * scale + dx) * 4
-                        row[column:column + 4] = rgba
         frame_meta.append({
             "frame_id": frame_id, "duration_ms": duration,
             "source_order": frame_index,
-            "rect_px": [frame_index * width * scale, 0, width * scale, height * scale],
         })
+    try:
+        policy = layout_policy(
+            doc.get("atlas"), frame_count=len(frames),
+            width=width, height=height, scale=scale,
+        )
+        if policy["extrude_edges"] and any(
+            color[3] == 0 and color[:3] != b"\\x00\\x00\\x00" for color in colors
+        ):
+            raise StudioSpriteError(
+                "bleed-safe extrusion requires zero RGB for fully transparent palette entries"
+            )
+        atlas = rasterize_atlas(
+            colors, frames, width=width, height=height, scale=scale,
+            policy=policy,
+        )
+    except AtlasGeometryError as exc:
+        raise StudioSpriteError(str(exc)) from exc
+    for frame, geometry in zip(frame_meta, atlas["frames"], strict=True):
+        frame.update(geometry)
+    sheet_width = atlas["sheet_width_px"]
+    sheet_height = atlas["sheet_height_px"]
 
     animations = doc["animations"]
     if type(animations) is not list or not 1 <= len(animations) <= 32:
@@ -193,7 +200,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
             "name": name, "frame_ids": list(sequence), "loop": state["loop"],
             "duration_ms": sum(durations[key] for key in sequence),
         })
-    surface = b"".join(rows)
+    surface = atlas["pixels"]
     image = _encode_rgba_png(sheet_width, sheet_height, surface)
     if _decode_verified_png(image, sheet_width, sheet_height) != surface:
         raise StudioSpriteError("independent PNG pixel reconstruction disagrees")
@@ -206,6 +213,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "frame_height_px": height * scale,
         "sheet_width_px": sheet_width, "sheet_height_px": sheet_height,
         "rgba_palette_size": len(colors), "pixel_scale": scale,
+        "atlas_geometry": atlas["geometry"],
         "frames": frame_meta, "animations": animation_meta,
         "png_sha256": sha256(image).hexdigest(),
         "pixel_content_sha256": sha256(surface).hexdigest(),
