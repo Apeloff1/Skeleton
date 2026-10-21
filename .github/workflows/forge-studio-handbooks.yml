@@ -22,7 +22,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
       - name: Generate 9000 original-game Markdown handbooks
         run: |
           python -m scripts.export_game_studio_worldline_handbooks \
