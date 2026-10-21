@@ -22,6 +22,7 @@ from typing import Any
 from .game_frontier_studio import StudioError, StudioProject, StudioQuestStage
 from .game_frontier_rpg_events import RPGEventAction, RPGEventPage, EnvironmentalTrigger
 from .game_frontier_studio_map_edit import _layer, _rectangle, _tile, _replace_layer
+from .game_frontier_studio_production_recipes import _DOMAINS, TREATMENTS
 from .game_frontier_studio_system_expansions import (
     EXPANDED_RECIPE_ACTIONS, EXPANDED_RECIPE_INDEX, _LAYER_EFFECTS,
     describe_expansion, GAMEPLAY_LAYERS,
@@ -127,7 +128,6 @@ def search_directions(*, query: str = "", domain: str = "",
     For exact-match domain/system/director filters only relevant archetypes
     are generated; query filtering checks at most 450,000 small names.
     """
-    from .game_frontier_studio_production_recipes import _DOMAINS
     if (type(query) is not str or len(query) > 96 or
             type(domain) is not str or len(domain) > 32 or
             type(system_layer) is not str or len(system_layer) > 32 or
@@ -161,9 +161,7 @@ def search_directions(*, query: str = "", domain: str = "",
         "offset": offset, "limit": limit,
         "next_offset": offset + limit if offset + limit < count else None,
         "domains": [d for d, _, _ in _DOMAINS],
-        "styles": list(__import__(
-            "skeleton.forge.game_frontier_studio_production_recipes",
-            fromlist=["TREATMENTS"]).TREATMENTS),
+        "styles": list(TREATMENTS),
         "system_layers": list(GAMEPLAY_LAYERS), "directors": list(DIRECTORS),
         "items": page,
     }
