@@ -120,7 +120,7 @@ def render(domain:str,treatment:str,director:str,worldline:str,phase:str)->str:
                 f"______{worldline}_______{phase}")
         if action not in PHASE_ACTIONS:
             raise StudioError("phase manuscript references unimplemented authoring")
-        sources.append(f"| {i+1} | \`{name}\` | \`{action}\` |")
+        sources.append(f"| {i+1} | `{name}` | `{action}` |")
     systems=[]
     for i,system in enumerate(GAMEPLAY_LAYERS):
         name=(f"phase_{domain}_{_slug(blueprints[i])}__{treatment}___"
@@ -129,15 +129,15 @@ def render(domain:str,treatment:str,director:str,worldline:str,phase:str)->str:
         if name not in PHASE_ACTIONS:
             raise StudioError("game phase manuscript has missing executable command")
         systems.append(
-            f"{i+1}. **{system}:** run \`{name}\`, then inspect changed "
+            f"{i+1}. **{system}:** run `{name}`, then inspect changed "
             "tile cells, two measured RPG event conditions and any newly authored "
             "quest/actor references. The actual native engine must authorize effects.")
     checks="\n".join(f"{i+1}. {x}." for i,x in enumerate(ORIGINAL_ACCEPTANCE))
     result=(
         f"# Production volume {record['volume']}/100,000 — "
         f"{domain} / {treatment} / {director} / {worldline} / {phase}\n\n"
-        "**Implemented owner:** \`skeleton/forge/game_frontier_studio_phase_production.py\`\n\n"
-        f"**Exact source path:** \`{record['path']}\` · "
+        "**Implemented owner:** `skeleton/forge/game_frontier_studio_phase_production.py`\n\n"
+        f"**Exact source path:** `{record['path']}` · "
         f"**Owned composition count:** {record['covered_commands']:,}\n\n"
         "## Executable, playable source production\n\n"
         f"The **{phase}** phase adds a further world geometry transformation, "
@@ -152,9 +152,9 @@ def render(domain:str,treatment:str,director:str,worldline:str,phase:str)->str:
         "|---:|---|---|\n"+"\n".join(sources)+"\n\n"
         "## Ten real gameplay-system constructions\n\n"+"\n".join(systems)+"\n\n"
         "## Observed game action\n\n"
-        f"\`{data[0]}\` {data[1]} {data[2]} and \`{data[3]}\` {data[4]} "
-        f"{data[5]} gate the **proposal-only** \`{data[6]}\` action on "
-        f"channel \`{data[7]}\`. Observations come from the real game runtime; "
+        f"`{data[0]}` {data[1]} {data[2]} and `{data[3]}` {data[4]} "
+        f"{data[5]} gate the **proposal-only** `{data[6]}` action on "
+        f"channel `{data[7]}`. Observations come from the real game runtime; "
         "the source editor cannot invent weather, NPC reputation or quest outcomes.\n\n"
         "## Production transaction\n\n"
         "1. Fetch the authorized project revision and immutable source SHA-256.\n"
