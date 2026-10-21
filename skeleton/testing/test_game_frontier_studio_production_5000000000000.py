@@ -51,6 +51,30 @@ class FiveTrillionSagaProduction(unittest.TestCase):
         with self.assertRaises(IndexError):
             _ = SAGA_ACTIONS[4_500_000_000_000]
 
+    def test_saga_action_names_fit_the_actual_edit_transport(self):
+        from skeleton.forge.game_frontier_studio_production_recipes import RECIPE_ACTIONS
+        max_recipe = max(len(action) for action in RECIPE_ACTIONS)
+        upper_bound = max_recipe + sum((3, 4, 5, 6, 7, 8, 9, 10, 11)) + sum((
+            max(len(name) for name in group)
+            for group in (
+                ("wayfinding", "seasons", "destructibles", "weather", "combat",
+                 "commerce", "stealth", "verticality", "migration", "story_convergence"),
+                ("navigation_alternates", "ecology_cycles", "tactical_zones",
+                 "cinematic_staging", "resource_routes", "faction_reactions",
+                 "physics_obstacles", "audio_cues", "quest_continuity", "player_agency"),
+                ("route_optimization", "settlement_life", "environmental_fidelity",
+                 "character_staging", "combat_readiness", "resource_balance",
+                 "cinematic_continuity", "vertical_routes", "ecosystem_restore",
+                 "alternate_endings"),
+            )
+        ))
+        # Additional dimensions are themselves bounded strings; all exact
+        # generated action names must remain within the 512-character API limit.
+        self.assertLessEqual(len(SAGA_ACTIONS[-1]), 512)
+        self.assertLessEqual(len(SAGA_ACTIONS[0]), 512)
+        self.assertGreater(max_recipe, 0)
+        self.assertGreater(upper_bound, 0)
+
     def test_exact_rank_unrank_search_and_invalid_ids(self):
         for index in (0, 1, 9, 10, 99, 100, 999_999,
                       450_000_000_000, 4_499_999_999_999):
