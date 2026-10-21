@@ -642,6 +642,23 @@ class CreatorProjectSourceStore:
             if target.is_symlink():
                 raise CreatorSourceError("export target cannot be a symbolic link")
             def disk_proof() -> dict[str, Any] | None:
+                if export_format == "sprite-atlas-zip":
+                    # Independently reread the exact bytes from the export
+                    # directory, not the in-memory ZIP buffer used by PNG forge.
+                    published_bytes = target.read_bytes()
+                    if published_bytes != raw:
+                        raise CreatorSourceError(
+                            "saved original sprite archive differs from reviewed bytes"
+                        )
+                    return {
+                        "schema_version": "skeleton.jeeves.sprite_disk_receipt.v1",
+                        "project_id": self.project_id,
+                        "source_head_sha256": self._head,
+                        "archive_sha256": sha256(published_bytes).hexdigest(),
+                        "archive_bytes": len(published_bytes),
+                        "actual_archive_bytes_verified": True,
+                        "native_sprite_scene_binding_verified": False,
+                    }
                 if export_format != "frontier-godot4-zip":
                     return None
                 from .studio_godot_zip_verify import verify_published_godot_zip
