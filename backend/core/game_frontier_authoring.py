@@ -280,6 +280,26 @@ async def simulate_gameplay(scope: Mapping[str, str], project_id: str,
     return result
 
 
+async def audit_epic_interlayer(scope: Mapping[str, str], project_id: str,
+                                body: Mapping[str, Any]) -> dict:
+    """Recheck registered interlayer references against authoritative project.
+
+    No native transfer and no new source owner. Each receipt binds the exact
+    canonical project revision and is independently replayed before reply.
+    """
+    from skeleton.forge.game_frontier_studio_epic_route_graph import (
+        audit_epic_interlayer_routes, verify_epic_interlayer_routes,
+    )
+    owner, authored = await _source(scope, project_id)
+    report = audit_epic_interlayer_routes(authored, body)
+    if not verify_epic_interlayer_routes(authored, body, report):
+        raise StudioError("Epic route witness failed replay against saved source")
+    return {
+        **report, "source_version": owner["version"],
+        "verified_against_authoritative_source": True,
+    }
+
+
 async def audit_walkable_routes(scope: Mapping[str, str], project_id: str,
                                 body: Mapping[str, Any]) -> dict:
     """Inspect up to 100 source-tile routes without modifying project state.

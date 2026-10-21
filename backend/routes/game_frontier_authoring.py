@@ -579,6 +579,21 @@ async def simulate_authored_gameplay(project_id: str, body: GameplayProbe,
         _scope(user), project_id, body.model_dump()))
 
 
+class EpicRouteInspection(Request):
+    layer_ids: list[str] = Field(min_length=1, max_length=8)
+    connectors: list[dict[str, Any]] = Field(default_factory=list, max_length=64)
+    itineraries: list[dict[str, Any]] = Field(min_length=1, max_length=32)
+
+
+@router.post("/projects/{project_id}/epic-routes/audit")
+async def audit_epic_crosslayer_navigation(
+    project_id: str, body: EpicRouteInspection, user=Depends(get_current_user),
+):
+    """Read-only source-authenticated Epic route and proposed transfer audit."""
+    return await _call(studio.audit_epic_interlayer(
+        _scope(user), project_id, body.model_dump()))
+
+
 class RouteInspection(Request):
     scenarios: list[dict[str, Any]] = Field(min_length=1, max_length=100)
 
