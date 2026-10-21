@@ -18,7 +18,7 @@ router = APIRouter(prefix="/game-frontier-authoring", tags=["Game Studio authori
 
 
 class EditorStep(Request):
-    action: str = Field(min_length=1, max_length=192)
+    action: str = Field(min_length=1, max_length=256)
     parameters: dict[str, Any] = Field(default_factory=dict, max_length=32)
 
 
@@ -142,7 +142,7 @@ async def read_original_world_handbook(
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "", worldline: str = "", phase: str = "",
+    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -153,8 +153,18 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_final_production import search_final_actions
     from skeleton.forge.game_frontier_studio_worldline_production import search_worldlines
     from skeleton.forge.game_frontier_studio_phase_production import search_phases
+    from skeleton.forge.game_frontier_studio_campaign_production import search_campaigns
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "campaign":
+            if query:
+                raise StudioError("campaign discovery uses exact filters, not unbounded text scanning")
+            return search_campaigns(domain=domain,system_layer=system_layer,
+                                    director=director,finish=finish,worldline=worldline,
+                                    phase=phase,campaign=campaign,
+                                    offset=offset,limit=limit)
+        if campaign:
+            raise StudioError("campaign filtering requires campaign generation")
         if generation == "phase":
             return search_phases(query=query,domain=domain,system_layer=system_layer,
                                  director=director,finish=finish,worldline=worldline,
