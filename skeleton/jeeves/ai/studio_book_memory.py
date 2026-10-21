@@ -61,12 +61,17 @@ def _private_db(path: Path) -> Path:
 class ReviewedBookMemory:
     """One project-bound local source memory with independently pinned admission."""
 
-    def __init__(self, path: Path, *, project_id: str, admission_sha256: str) -> None:
+    def __init__(self, path: Path, *, project_id: str, admission_sha256: str,
+                 expected_source_root_sha256: str) -> None:
         self.path = _private_db(path)
         self.project_id = _valid_id(project_id, "project")
         if not isinstance(admission_sha256, str) or not HEX.fullmatch(admission_sha256):
             raise BookMemoryError("independently pinned admission SHA-256 required")
         self.admission_sha256 = admission_sha256
+        if (not isinstance(expected_source_root_sha256, str)
+                or not HEX.fullmatch(expected_source_root_sha256)):
+            raise BookMemoryError("independent indexed source-root SHA-256 required")
+        self.expected_source_root_sha256 = expected_source_root_sha256
         if not path.is_file():
             raise BookMemoryError("admitted book index has not been built")
         self._lock = RLock()
@@ -189,8 +194,10 @@ class ReviewedBookMemory:
             meta = self._db.execute(
                 "SELECT project_id,admission_sha,source_root,source_count FROM metadata"
             ).fetchall()
-            if len(meta) != 1 or meta[0][:2] != (self.project_id, self.admission_sha256):
-                raise BookMemoryError("book memory project or admission identity changed")
+            if (len(meta) != 1
+                    or meta[0][:2] != (self.project_id, self.admission_sha256)
+                    or meta[0][2] != self.expected_source_root_sha256):
+                raise BookMemoryError("book memory project, admission or independently pinned source root changed")
             rows = self._db.execute(
                 "SELECT segment_id,book_id,family,text,text_sha,rights_sha "
                 "FROM segment ORDER BY segment_id"
@@ -380,6 +387,9 @@ def main(argv: list[str] | None = None) -> int:
         run.add_argument("--index", required=True, type=Path)
         run.add_argument("--project-id", required=True)
         run.add_argument("--admission-sha256", required=True)
+        if command != "build":
+            run.add_argument("--source-root-sha256", required=True,
+                             help="Separately retained source_root_sha256 from build receipt")
         if command == "build":
             run.add_argument("--admission-receipt", required=True, type=Path)
             run.add_argument("--admitted-dir", required=True, type=Path)
@@ -404,6 +414,7 @@ def main(argv: list[str] | None = None) -> int:
         with ReviewedBookMemory(
             args.index, project_id=args.project_id,
             admission_sha256=args.admission_sha256,
+            expected_source_root_sha256=args.source_root_sha256,
         ) as memory:
             if args.command == "verify":
                 result = memory.verify()
