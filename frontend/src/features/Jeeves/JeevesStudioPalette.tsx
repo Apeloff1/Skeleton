@@ -261,7 +261,7 @@ export default function JeevesStudioPalette({
               {flowStageStart > 0 && chip('← Previous slice', false, () => {
                 const offset = Math.max(0, flowStageStart - 6);
                 setFlowStageStart(offset); setFacet(selectedFlow.stages[offset]);
-                setGoalReceipt(null);
+                setPreviousFlowReceipt(undefined); setGoalReceipt(null);
               })}
               {flowStageStart + 6 < selectedFlow.stages.length &&
                 chip('Next production slice →', false, () => {
