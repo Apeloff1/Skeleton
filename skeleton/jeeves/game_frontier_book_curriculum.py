@@ -174,15 +174,9 @@ def exemplar(generation: str, index: int) -> str:
     stem = f"{domain}_{_slug(family[0])}__{treatment}___{GAMEPLAY_LAYERS[0]}"
     stem += f"____{director}_____{FINISHES[0]}______{worldline}"
     suffix_lengths = (7, 8, 9, 10, 11, 12)
-    name = "worldline_" + stem
     for label, size in zip(rest, suffix_lengths):
-        name = name.replace("worldline_", generation+"_", 1)
         stem += "_" * size + label
-        name = generation + "_" + stem
-    # Each source production generation is a registered longest-prefix
-    # composition. Crucially, worldline also resolves without a suffix.
-    if generation == "worldline":
-        name = "worldline_" + stem
+    name = generation + "_" + stem
     if name not in AUTHORING_ACTIONS:
         raise StudioError("Curriculum book does not resolve to a real editor action")
     return name
