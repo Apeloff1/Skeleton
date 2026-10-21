@@ -1,0 +1,139 @@
+/** Jeeves' interactive game-studio cockpit. No model-authored effect is executed
+ * by this component: each action is a reviewed draft or a real editor route.
+ * The game-studio goal runner owns actual execution, authorization and receipts.
+ */
+import React, { useMemo, useState } from 'react';
+import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+type Route = '/galaxy' | '/gameforge-studio' | '/forge-hub' | '/worldforge'
+  | '/studio' | '/media-studio' | '/physics-studio' | '/game-learning'
+  | '/jeeves-workbench' | '/skeleton-studio' | '/construct-forge'
+  | '/systems-forge' | '/world-workbench' | '/jeeves-hub';
+
+type Domain = { id: string; title: string; question: string; route: Route; family: string };
+export const JEEVES_STUDIO_DOMAINS: readonly Domain[] = [
+  { id: 'vision', title: 'Game vision', question: 'What is the distinctive player fantasy?', route: '/galaxy', family: 'Design' },
+  { id: 'platform', title: 'Platforms & eras', question: 'Which consoles, SDKs and hardware tiers?', route: '/gameforge-studio', family: 'Engineering' },
+  { id: 'engine', title: 'Engines', question: 'Which rendering and runtime targets?', route: '/gameforge-studio', family: 'Engineering' },
+  { id: 'scope', title: 'Production scope', question: 'What are the non-negotiable playable completion criteria?', route: '/jeeves-workbench', family: 'Production' },
+  { id: 'canon', title: 'Canon & continuity', question: 'Which worldbuilding facts must not drift?', route: '/world-workbench', family: 'Narrative' },
+  { id: 'world', title: 'Worldbuilding', question: 'Which world layers, regions and biomes?', route: '/worldforge', family: 'World' },
+  { id: 'map', title: 'Map design', question: 'Which maps, regions and position systems?', route: '/worldforge', family: 'World' },
+  { id: 'pathing', title: 'Paths & transport', question: 'What alternate routes and movement types?', route: '/worldforge', family: 'World' },
+  { id: 'story', title: 'Story & endings', question: 'Which arcs, acts, scenes and endings?', route: '/studio', family: 'Narrative' },
+  { id: 'dialogue', title: 'Dialogue', question: 'How can dialogue affect subsequent scenes?', route: '/studio', family: 'Narrative' },
+  { id: 'cast', title: 'Characters & cast', question: 'What are the cast identities, designs and arcs?', route: '/studio', family: 'Narrative' },
+  { id: 'npc', title: 'NPC simulation', question: 'Which autonomous schedules and motivations?', route: '/systems-forge', family: 'Simulation' },
+  { id: 'quests', title: 'Quest systems', question: 'Which interdependent quest paths and outcomes?', route: '/gameforge-studio', family: 'Design' },
+  { id: 'combat', title: 'Combat', question: 'Which combat loops, moves and effects?', route: '/gameforge-studio', family: 'Design' },
+  { id: 'movement', title: 'Locomotion', question: 'Which traversal and camera mechanics?', route: '/physics-studio', family: 'Simulation' },
+  { id: 'physics', title: 'Physics', question: 'Which collision, traction and weight distribution rules?', route: '/physics-studio', family: 'Simulation' },
+  { id: 'weather', title: 'Weather & forces', question: 'Which wind, turbulence and weather responses?', route: '/physics-studio', family: 'Simulation' },
+  { id: 'economy', title: 'Economy', question: 'Which resource, crafting and trade loops?', route: '/systems-forge', family: 'Design' },
+  { id: 'inventory', title: 'Inventory', question: 'How will equipment weight and items interact?', route: '/systems-forge', family: 'Design' },
+  { id: 'progression', title: 'Progression', question: 'Which skills, classes and factions?', route: '/systems-forge', family: 'Design' },
+  { id: 'puzzles', title: 'Puzzles', question: 'Which diverse puzzle solution paths?', route: '/gameforge-studio', family: 'Design' },
+  { id: 'multiplayer', title: 'Multiplayer', question: 'Which network ownership and gameplay modes?', route: '/gameforge-studio', family: 'Engineering' },
+  { id: 'accessibility', title: 'Accessibility', question: 'Which accessibility requirements?', route: '/skeleton-studio', family: 'Quality' },
+  { id: 'localization', title: 'Localization', question: 'Which languages and localization formats?', route: '/skeleton-studio', family: 'Quality' },
+  { id: 'ui', title: 'UI & HUD', question: 'Which screens, input schemes and HUD elements?', route: '/skeleton-studio', family: 'Interface' },
+  { id: 'ux', title: 'Interaction flows', question: 'Which onboarding and interaction flows?', route: '/galaxy', family: 'Interface' },
+  { id: 'sprite_forge', title: 'Sprite forge', question: 'Which sprite sheets, poses and palettes?', route: '/forge-hub', family: 'Forge' },
+  { id: 'asset_forge', title: 'Asset forge', question: 'Which props, materials and original meshes?', route: '/construct-forge', family: 'Forge' },
+  { id: 'scene_forge', title: 'Scene forge', question: 'Which scene graphs and triggers?', route: '/gameforge-studio', family: 'Forge' },
+  { id: 'animation_forge', title: 'Animation forge', question: 'Which motion states, rigs and clips?', route: '/media-studio', family: 'Forge' },
+  { id: 'audio_forge', title: 'Audio forge', question: 'Which original soundtrack and effects?', route: '/media-studio', family: 'Forge' },
+  { id: 'lighting_forge', title: 'Lighting forge', question: 'Which shadows, reflections and light sources?', route: '/gameforge-studio', family: 'Forge' },
+  { id: 'cinematics', title: 'Cinematics', question: 'Which shots and scene direction?', route: '/media-studio', family: 'Forge' },
+  { id: 'playtest', title: 'Playtesting', question: 'Which scenarios prove actual gameplay?', route: '/game-learning', family: 'Quality' },
+  { id: 'qa', title: 'Adversarial QA', question: 'Which quality gates and verification evidence?', route: '/jeeves-workbench', family: 'Quality' },
+  { id: 'training', title: 'Books & weights', question: 'Which rights-cleared material and model candidate?', route: '/jeeves-hub', family: 'AI' },
+  { id: 'delegation', title: 'AI delegation', question: 'Which specialist tools may Jeeves request?', route: '/jeeves-workbench', family: 'AI' },
+  { id: 'release', title: 'Release & packaging', question: 'Which export, provenance and distribution goals?', route: '/skeleton-studio', family: 'Production' },
+] as const;
+
+type Mode = 'questionnaire' | 'forge' | 'flow' | 'inspect' | 'automation';
+const MODES: readonly Mode[] = ['questionnaire', 'forge', 'flow', 'inspect', 'automation'];
+const C = { bg: '#0b1220', card: '#151c30', border: '#35405e', text: '#e2e8f0', subtle: '#b9c3d8', accent: '#a78bfa' };
+
+export default function JeevesStudioPalette({
+  onCompose, onNavigate, disabled = false,
+}: { onCompose: (draft: string) => void; onNavigate: (route: Route) => void; disabled?: boolean }) {
+  const [visible, setVisible] = useState(false);
+  const [facet, setFacet] = useState('vision');
+  const [mode, setMode] = useState<Mode>('questionnaire');
+  const [reply, setReply] = useState('');
+  const [source, setSource] = useState('');
+  const [group, setGroup] = useState('All');
+  const domains = useMemo(() => JEEVES_STUDIO_DOMAINS.filter(item => group === 'All' || item.family === group), [group]);
+  const chosen = JEEVES_STUDIO_DOMAINS.find(item => item.id === facet) || JEEVES_STUDIO_DOMAINS[0];
+  const groups = ['All', ...Array.from(new Set(JEEVES_STUDIO_DOMAINS.map(item => item.family)))];
+
+  const prepare = () => {
+    const request = [
+      'Jeeves: operate as the locally running game-studio AI, not an external API proxy.',
+      `Studio facet: ${chosen.id} (${chosen.title}). Interaction mode: ${mode}.`,
+      `Guiding question: ${chosen.question}`,
+      reply.trim() ? `User requirements: ${reply.trim()}` : 'Ask for the next missing requirement; do not invent an answer.',
+      source.trim() ? `User-supplied context/source reference (verify before reuse): ${source.trim()}` : 'No source attachment has been verified in this turn.',
+      'Read the project canon and current editor state when available. Produce concrete, editable options and dependencies.',
+      'For effects: propose a typed creator command and exact scopes, show the intended changes, wait for operator authorization, then delegate to the existing creator runbook.',
+      'For every actual automated action require a durable hash-linked intent, host-issued receipt, validation, and independent review. Do not claim success without observed execution.',
+      'Respect source licenses. Keep multimodal media under the app media/crawler workflows until ingestion and provenance are verified.',
+    ].join('\n');
+    onCompose(request);
+    setVisible(false);
+  };
+  const chip = (label: string, selected: boolean, press: () => void) => (
+    <TouchableOpacity key={label} onPress={press} accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={{ borderWidth: 1, borderColor: selected ? C.accent : C.border,
+        backgroundColor: selected ? '#302547' : C.card,
+        borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 }}>
+      <Text style={{ color: C.text, fontSize: 12 }}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  return <>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Jeeves studio controls"
+      disabled={disabled} onPress={() => setVisible(true)}
+      style={{ borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 10, alignSelf: 'flex-start' }}>
+      <Text style={{ color: C.text, fontSize: 12, fontWeight: '700' }}>Studio controls · 38 facets · Forges / questionnaires / flows</Text>
+    </TouchableOpacity>
+    <Modal visible={visible} animationType="slide" onRequestClose={() => setVisible(false)}>
+      <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: 35 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 }}>
+          <Text accessibilityRole="header" style={{ color: C.text, fontSize: 20, fontWeight: '700' }}>Jeeves Studio Controller</Text>
+          {chip('Close', false, () => setVisible(false))}
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 15 }} keyboardShouldPersistTaps="handled">
+          <Text style={{ color: C.subtle }}>Choose a studio capability, questionnaire, forge or production flow. Jeeves will work in chat; open the real editor to perform changes. No hidden execution occurs from this selector.</Text>
+          <Text style={{ color: C.text, fontWeight: '700' }}>Production family</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{groups.map(name => chip(name, name === group, () => setGroup(name)))}</View>
+          <Text style={{ color: C.text, fontWeight: '700' }}>Capability</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{domains.map(item => chip(item.title, chosen.id === item.id, () => { setFacet(item.id); setReply(''); }))}</View>
+          <Text style={{ color: C.text, fontWeight: '700' }}>Working mode</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>{MODES.map(name => chip(name, mode === name, () => setMode(name)))}</View>
+          <Text style={{ color: C.subtle }}>{chosen.question}</Text>
+          <TextInput accessibilityLabel={`Requirements for ${chosen.title}`} value={reply}
+            onChangeText={setReply} multiline maxLength={4096}
+            placeholder="Answer the question or describe the changes…" placeholderTextColor={C.subtle}
+            style={{ color: C.text, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, minHeight: 90 }} />
+          <Text style={{ color: C.text, fontWeight: '700' }}>Source references / multimodal context</Text>
+          <TextInput accessibilityLabel="Source evidence reference" value={source}
+            onChangeText={setSource} maxLength={1024}
+            placeholder="Verified asset digest or source identifier (optional)" placeholderTextColor={C.subtle}
+            style={{ color: C.text, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12 }} />
+          <Text style={{ color: C.subtle }}>Media and screenshots are handled in the editor or media studio; entering a reference does not ingest a file.</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            {chip('Compose for Jeeves', true, prepare)}
+            {chip(`Open ${chosen.title} editor ↗`, false, () => {
+              setVisible(false); onNavigate(chosen.route);
+            })}
+          </View>
+          <Text style={{ color: C.subtle, fontSize: 12 }}>AI-generated proposals are not execution receipts. Runtime authorization and artifact evidence remain required for each effect.</Text>
+        </ScrollView>
+      </View>
+    </Modal>
+  </>;
+}
