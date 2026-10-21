@@ -12,8 +12,8 @@ from typing import Any
 
 from skeleton.forge.game_frontier_studio import StudioError
 from .game_frontier_book_curriculum import (
-    GENERATIONS, COMPETENCIES, PREREQUISITES,
-    curriculum_catalog, reference, lesson, exemplar,
+    GENERATIONS,
+    reference, lesson, exemplar,
 )
 
 SCHEMA = "skeleton.jeeves.forge_learning_path.v1"
@@ -43,16 +43,14 @@ def learning_path(generation: str, index: int) -> dict[str, Any]:
         raise StudioError("Learning path requires an indexed Forge generation")
     # Validates the terminal volume before computing any ancestors.
     selected = reference(generation, index)
-    cursor = index
     steps = []
     previous_ref = None
     previous_receipt = None
-    for level, family in reversed(list(enumerate(names[:names.index(generation)+1]))):
+    target_level = names.index(generation)
+    for level, family in reversed(list(enumerate(names[:target_level+1]))):
         # Determine exact parent IDs from end to beginning, not from a
         # prefix or a user-provided source string.
-        ancestor_index = index // (10 ** (names.index(generation)-level))
-        if previous_ref is None:  # first step in reverse is the terminal
-            pass
+        ancestor_index = index // (10 ** (target_level-level))
         ancestor = reference(family, ancestor_index)
         steps.append((family, ancestor_index, ancestor))
     steps.reverse()
