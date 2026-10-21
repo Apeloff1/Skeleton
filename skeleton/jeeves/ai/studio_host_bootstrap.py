@@ -19,6 +19,7 @@ from skeleton.jeeves.agent.tools import (
 )
 from .creator_runbook_store import CreatorRunbookStore
 from .studio_book_memory import ReviewedBookMemory
+from .studio_canon_memory import StudioCanonStore
 from .studio_delegate_executor import execute_approved_studio_batch
 from .studio_interaction_contract import (
     JeevesStudioController, StudioEvidenceJournal, StudioInteractionError,
@@ -38,6 +39,8 @@ class NativeStudioHost:
         book_index: Path | None = None,
         book_admission_sha256: str | None = None,
         book_source_root_sha256: str | None = None,
+        canon_index: Path | None = None,
+        canon_expected_head_sha256: str | None = None,
     ) -> None:
         identifier(project_id, "project")
         identifier(session_id, "session")
@@ -54,6 +57,7 @@ class NativeStudioHost:
             Path(journal_path), project_id=project_id, session_id=session_id,
         )
         self.book_memory: ReviewedBookMemory | None = None
+        self.canon_memory: StudioCanonStore | None = None
         try:
             if book_index is not None and book_admission_sha256 is not None:
                 self.book_memory = ReviewedBookMemory(
@@ -61,9 +65,21 @@ class NativeStudioHost:
                     admission_sha256=book_admission_sha256,
                     expected_source_root_sha256=book_source_root_sha256,
                 )
+            if canon_index is not None:
+                self.canon_memory = StudioCanonStore(
+                    Path(canon_index), project_id=project_id,
+                    expected_head_sha256=canon_expected_head_sha256,
+                )
+            elif canon_expected_head_sha256 is not None:
+                raise StudioInteractionError("cannot pin a nonexistent project canon")
             self.controller = JeevesStudioController(self.journal)
-            self.model = NativeStudioModel(engine, book_memory=self.book_memory)
+            self.model = NativeStudioModel(
+                engine, book_memory=self.book_memory,
+                canon_memory=self.canon_memory,
+            )
         except BaseException:
+            if self.canon_memory is not None:
+                self.canon_memory.close()
             if self.book_memory is not None:
                 self.book_memory.close()
             self.journal.close()
@@ -75,6 +91,22 @@ class NativeStudioHost:
     def admit_media(self, **host_media_arguments: Any) -> dict[str, Any]:
         """Real file bytes + verified sidecar, never a model-authored path claim."""
         return admit_reviewed_media(self.controller, **host_media_arguments)
+
+    def revise_canon(
+        self, *, subject_id: str, attribute_id: str,
+        action: str, expected_fact_sha256: str | None,
+        actor_id: str, reviewer_id: str, source_receipt_sha256: str,
+        fact: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """The authenticated host supplies distinct author and human reviewer."""
+        if self.canon_memory is None:
+            raise StudioInteractionError("project canon store is not configured")
+        return self.canon_memory.revise(
+            subject_id=subject_id, attribute_id=attribute_id,
+            action=action, expected_fact_sha256=expected_fact_sha256,
+            actor_id=actor_id, reviewer_id=reviewer_id,
+            source_receipt_sha256=source_receipt_sha256, fact=fact,
+        )
 
     def plan(self, instruction: str, *, max_output_tokens: int = 2048,
              seed: int = 0) -> dict[str, Any]:
@@ -115,6 +147,7 @@ class NativeStudioHost:
         """Read and reverify the project/session history and optional book index."""
         events = self.journal.read()
         book = self.book_memory.verify() if self.book_memory is not None else None
+        canon = self.canon_memory.verify() if self.canon_memory is not None else None
         report = {
             "schema_version": "skeleton.jeeves.native_studio_host_audit.v1",
             "project_id": self.journal.project_id,
@@ -122,6 +155,7 @@ class NativeStudioHost:
             "events": len(events),
             "last_event_sha256": events[-1]["digest"] if events else None,
             "reviewed_book_memory": book,
+            "reviewed_game_canon": canon,
             "standalone_native_owner": True,
             "production_game_complete": False,
         }
@@ -129,6 +163,8 @@ class NativeStudioHost:
         return report
 
     def close(self) -> None:
+        if self.canon_memory is not None:
+            self.canon_memory.close()
         if self.book_memory is not None:
             self.book_memory.close()
         self.journal.close()
