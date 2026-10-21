@@ -431,12 +431,17 @@ class CreatorProjectSourceStore:
         # opening the SQLite write transaction (which stays short).
         if facet == "sprite_forge" and document.get("kind") == "pixel_sprite":
             from .studio_sprite_forge import compile_authored_sprite
-            compile_authored_sprite({
+            from .studio_sprite_godot_resources import (
+                compile_godot_sprite_resources, verify_godot_sprite_resources,
+            )
+            candidate = compile_authored_sprite({
                 "record_id": record_id, "facet": facet,
                 "revision": version, "document": document,
                 "depends_on": depends_on,
                 "source_sha256": content_sha,
             })
+            resources = compile_godot_sprite_resources(candidate["metadata"])
+            verify_godot_sprite_resources(candidate["metadata"], resources)
         if self._event_count >= MAX_EVENTS:
             raise CreatorSourceError("source event journal needs archival")
         self._db.execute("BEGIN IMMEDIATE")
