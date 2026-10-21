@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   buildForge, copyForgeTiles, editForge, exportForge, inspectForge,
+  searchForgeRecipes, type ForgeRecipeResults, type ForgeRecipe,
   previewForgeGameplay, type ForgeGameplayProbe,
   type ForgeDocument, type ForgeStep, type ForgeBuild,
 } from '../../product/gameFrontierAuthoringClient';
@@ -429,6 +430,10 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [action, setAction] = useState('tile_set');
   const [search, setSearch] = useState('');
   const [toolFamily, setToolFamily] = useState('Tiles & geometry');
+  const [recipeView, setRecipeView] = useState(false);
+  const [recipeQuery, setRecipeQuery] = useState('');
+  const [recipeDomain, setRecipeDomain] = useState('');
+  const [recipeResults, setRecipeResults] = useState<ForgeRecipeResults | null>(null);
   const [parameters, setParameters] = useState('{"layer":"ground","x":0,"y":0,"tile":1}');
   const [steps, setSteps] = useState<ForgeStep[]>([]);
   const [selectedLayer, setSelectedLayer] = useState('ground');
@@ -480,6 +485,38 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
           (!doc || doc.action_catalog.includes(item)) && item.includes(query)),
       })).filter(group => group.actions.length);
   }, [doc, search, toolFamily]);
+  const loadRecipes = async (offset = 0) => {
+    if (pending) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await searchForgeRecipes(recipeQuery, recipeDomain, offset, 32);
+      setRecipeResults(result);
+      setNotice(result.matched + ' source-changing production recipes match your search.');
+    } catch (reason: any) {
+      setError(String(reason?.message || reason));
+    } finally { setBusy(false); }
+  };
+  const selectRecipe = (recipe: ForgeRecipe) => {
+    if (!/^produce_[a-z_]+__[a-z_]+$/.test(recipe.operation)) {
+      setError('Invalid game production recipe identity.'); return;
+    }
+    const layer = doc?.layers.find(item => item.id === selectedLayer) || doc?.layers[0];
+    const actor = doc?.actor_catalog?.[0];
+    const chosen = {
+      layer: layer?.id || 'ground', x: 0, y: 0,
+      width: Math.min(12, layer?.size[0] || 12),
+      height: Math.min(12, layer?.size[1] || 12),
+      floor: 0, wall: 1, seed: 42, scale: 5, threshold: .53,
+      prefab_id: doc?.prefab_catalog?.[0]?.id || 'author_prefab_first',
+      count: 4, z: 0, radius: 8, spacing: 2,
+      ...(actor ? {target: actor.prefab_id + ':' + actor.index} : {}),
+    };
+    setAction(recipe.operation);
+    setParameters(JSON.stringify(chosen, null, 2));
+    setNotice('Selected: ' + recipe.domain + ' / ' + recipe.source_blueprint +
+      ' / ' + recipe.treatment + '. Preview actual source edits before saving.');
+  };
   const choose = (name: string) => {
     setAction(name);
     const args = { ...(newFiveHundredDefaults(name, selectedLayer) || hundredActionDefaults(name, selectedLayer) || newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
@@ -559,7 +596,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   };
   return <View style={{ gap: 12, paddingVertical: 10 }}>
     <Text style={{ color: '#eef3fa', fontSize: 20, fontWeight: '700' }}>Forge Studio · Real Game Authoring</Text>
-    <Text style={{ color: '#a7bacf' }}>500 executable tools for maps, characters, quests, environmental events, native physics and soundtracks.
+    <Text style={{ color: '#a7bacf' }}>5,000 executable tools for maps, characters, quests, environmental events, native physics and soundtracks.
       Every saved edit changes the project source and is consumed by the real game compiler.</Text>
     {!doc ? <ActivityIndicator color="#8bd5e8" /> : <View>
       <Text style={{ color: '#bdcddd' }}>Revision {doc.expected_version} · {doc.layers.length} layers
@@ -601,7 +638,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
           disabled={pending} press={() => setSelectedLayer(layer.id)} />)}</View>
     </ScrollView>
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Choose an executable editor tool</Text>
-    <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 500 game editor tools"
+    <TextInput value={search} onChangeText={setSearch} accessibilityLabel="Search 500 core game editor tools"
       placeholder="Search tiles, NPCs, quests, events…" placeholderTextColor="#75869a"
       style={{ color: '#f0f5fb', borderWidth: 1, borderColor: '#526478', borderRadius: 7, padding: 10 }} />
     <ScrollView horizontal showsHorizontalScrollIndicator accessibilityLabel="Forge tool categories">
@@ -609,6 +646,45 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         <Button key={group.title} title={(toolFamily === group.title ? '✓ ' : '') + group.title}
           disabled={pending} press={() => { setToolFamily(group.title); setSearch(''); }} />)}</View>
     </ScrollView>
+    <Button title={(recipeView ? '✓ ' : '') + 'Browse 4,500 production recipes'}
+      disabled={pending || !doc} press={() => {
+        setRecipeView(value => !value); setRecipeResults(null);
+      }} />
+    {recipeView && <View style={{ gap: 8 }}>
+      <Text style={{ color: '#dae8f4', fontWeight: '700' }}>
+        Production recipes · 10 domains × 50 original blueprints × 9 source-changing treatments
+      </Text>
+      <TextInput value={recipeQuery} onChangeText={setRecipeQuery}
+        accessibilityLabel="Search production recipes"
+        placeholder="Search worlds, quests, NPCs, weather…"
+        placeholderTextColor="#8393a6"
+        style={{ color:'#f3f7ff', borderWidth:1, borderRadius:7,
+          padding:10, borderColor:'#51677e' }} />
+      <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={{ flexDirection:'row' }}>
+          {['','realm','architecture','population','chronicle','atmosphere',
+            'settlement','wildland','stronghold','expedition','living_story'].map(domain =>
+            <Button key={domain || 'all'} disabled={pending}
+              title={(recipeDomain === domain ? '✓ ' : '') + (domain || 'All')}
+              press={() => { setRecipeDomain(domain); setRecipeResults(null); }} />)}
+        </View>
+      </ScrollView>
+      <Button title="Search executable recipes" disabled={pending}
+        press={() => { void loadRecipes(0); }} />
+      {recipeResults && <Text style={{ color:'#b1cada' }}>
+        {recipeResults.matched} matching recipes · showing {recipeResults.offset + 1}–
+        {recipeResults.offset + recipeResults.items.length}
+      </Text>}
+      {recipeResults?.items.map(recipe => <Button key={recipe.operation}
+        disabled={pending} title={recipe.operation.replace(/^produce_/, '').replace(/_/g, ' ')}
+        press={() => selectRecipe(recipe)} />)}
+      {recipeResults?.next_offset !== null && recipeResults?.next_offset !== undefined &&
+        <Button title="Next recipes" disabled={pending}
+          press={() => { void loadRecipes(recipeResults.next_offset ?? 0); }} />}
+      {recipeResults && recipeResults.offset > 0 &&
+        <Button title="Previous recipes" disabled={pending}
+          press={() => { void loadRecipes(Math.max(0, recipeResults.offset - 32)); }} />}
+    </View>}
     {listed.map(group => <View key={group.title} style={{ gap: 4 }}>
       <Text style={{ color: '#a8c1d6', fontWeight: '600' }}>{group.title}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{group.actions.map(name =>
