@@ -128,6 +128,9 @@ def inspect_godot_sprite_import(
     if (version.returncode != 0 or len(version.stdout) > 1000
             or not version.stdout.decode("utf-8", "replace").strip().startswith("4.")):
         raise NativeSpriteImportError("real installed Godot 4 binary is required")
+    # Pin real executable bytes before and after the subprocess: approval
+    # of a path alone is insufficient if another actor replaces that binary.
+    before_executable_sha256 = _file_sha256(binary)
     candidate = compile_authored_sprite(record)
     meta = candidate["metadata"]
     resources = compile_godot_sprite_resources(meta)
@@ -179,6 +182,10 @@ def inspect_godot_sprite_import(
                 raise NativeSpriteImportError("native sprite engine log exceeds evidence budget")
             output.seek(0)
             log = output.read().decode("utf-8", errors="replace")
+    if _file_sha256(binary) != before_executable_sha256:
+        raise NativeSpriteImportError(
+            "Godot executable content changed during original sprite inspection"
+        )
     if execution.returncode != 0:
         raise NativeSpriteImportError(
             "real Godot SpriteFrames import failed with return code "
@@ -210,7 +217,7 @@ def inspect_godot_sprite_import(
         "source_revision_sha256": meta["source_sha256"],
         "sprite_png_sha256": meta["png_sha256"],
         "sprite_metadata_sha256": meta["receipt_sha256"],
-        "godot_executable_sha256": _file_sha256(binary),
+        "godot_executable_sha256": before_executable_sha256,
         "godot_version": version.stdout.decode("utf-8", "replace").strip()[:100],
         "native_log_sha256": sha256(log.encode("utf-8")).hexdigest(),
         "native_process_executed": True,
