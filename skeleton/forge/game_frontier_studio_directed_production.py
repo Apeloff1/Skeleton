@@ -139,6 +139,51 @@ def search_directions(*, query: str = "", domain: str = "",
             type(limit) is not int or not 1 <= limit <= 64):
         raise StudioError("invalid bounded directed production search")
     query = query.strip().lower()
+    # Common discovery (browse, domain, system and director selection) can be
+    # answered by rank/unrank arithmetic without scanning 450,000 strings.
+    # The resulting page has exactly the same stable iteration order as the
+    # virtual source registry. Substring search below remains a bounded scan.
+    if not query:
+        domain_indices = tuple(
+            i for i, row in enumerate(_DOMAINS) if not domain or row[0] == domain
+        )
+        system_indices = tuple(
+            i for i, item in enumerate(GAMEPLAY_LAYERS)
+            if not system_layer or item == system_layer
+        )
+        director_indices = tuple(
+            i for i, item in enumerate(DIRECTORS)
+            if not director or item == director
+        )
+        per_recipe = len(system_indices) * len(director_indices)
+        per_domain = 450 * per_recipe
+        matching = len(domain_indices) * per_domain
+        page = []
+        for rank in range(offset, min(matching, offset + limit)):
+            domain_slot, within_domain = divmod(rank, per_domain)
+            recipe_slot, within_recipe = divmod(within_domain, per_recipe)
+            system_slot, director_slot = divmod(
+                within_recipe, len(director_indices)
+            )
+            recipe_index = domain_indices[domain_slot] * 450 + recipe_slot
+            expansion_index = recipe_index * 10 + system_indices[system_slot]
+            source_name = EXPANDED_RECIPE_ACTIONS[expansion_index]
+            action_name = (
+                "direct_" + source_name.removeprefix("expand_") + "____"
+                + DIRECTORS[director_indices[director_slot]]
+            )
+            page.append(describe_direction(action_name))
+        return {
+            "schema": "skeleton.forge.production_recipe_search.v1",
+            "total_catalog": len(DIRECTED_ACTIONS), "matched": matching,
+            "offset": offset, "limit": limit,
+            "next_offset": offset + limit if offset + limit < matching else None,
+            "domains": [d for d, _, _ in _DOMAINS],
+            "styles": list(TREATMENTS),
+            "system_layers": list(GAMEPLAY_LAYERS),
+            "directors": list(DIRECTORS), "items": page,
+        }
+
     wanted_directors = (director,) if director else DIRECTORS
     count = 0
     page: list[dict[str, Any]] = []
