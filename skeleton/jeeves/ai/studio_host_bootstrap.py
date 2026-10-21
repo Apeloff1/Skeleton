@@ -151,6 +151,41 @@ class NativeStudioHost:
             registry, store=self.source_store, authorize=authorize,
         )
 
+    def verify_real_sprite_import(
+        self, *, record_id: str, godot_executable: str, actor_id: str,
+        authorize_sprite_import: Callable[[str, str, str, str], bool],
+        timeout_seconds: int = 90,
+    ) -> dict[str, Any]:
+        """Verify actual Godot SpriteFrames without granting AI process rights.
+
+        Host checks authorization for the exact project, sprite, binary and
+        authenticated reviewer. The model only receives the journal receipt.
+        """
+        identifier(actor_id, "sprite import reviewer")
+        record_id = identifier(record_id, "original sprite source")
+        if self.source_store is None:
+            raise StudioInteractionError("native sprite source owner is unavailable")
+        if (not isinstance(godot_executable, str) or not godot_executable.strip()
+                or not callable(authorize_sprite_import)
+                or authorize_sprite_import(
+                    self.journal.project_id, record_id, godot_executable,
+                    actor_id,
+                ) is not True):
+            raise StudioInteractionError("host denied reviewed Godot sprite verification")
+        verified = self.source_store.verify_native_sprite_import(
+            record_id, godot_executable=godot_executable,
+            timeout_seconds=timeout_seconds,
+        )
+        proof = self.journal.append(
+            "native_sprite_import_verified",
+            {**verified, "actor_id": actor_id},
+            _authority=self.journal._native_execution_token,
+        )
+        return {
+            **verified, "studio_event_sha256": proof["digest"],
+            "host_permission_verified": True,
+        }
+
     def verify_real_native_gameplay(
         self, *, godot_executable: str,
         actor_id: str, authorize_native_execution: Callable[[str, str, str], bool],
