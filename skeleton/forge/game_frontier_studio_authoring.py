@@ -22,15 +22,21 @@ from .game_frontier_studio_physics_edit import PHYSICAL_ACTIONS, edit_physical
 from .game_frontier_studio_procedural_edit import PROCEDURAL_ACTIONS, edit_procedural
 from .game_frontier_studio_population_edit import POPULATION_ACTIONS, edit_population
 from .game_frontier_studio_narrative_edit import STORY_ACTIONS, edit_story
+from .game_frontier_studio_topology_edit import TERRAIN_TOPOLOGY_ACTIONS, edit_topology
+from .game_frontier_studio_actor_layout_edit import ACTOR_LAYOUT_ACTIONS, edit_actor_layout
+from .game_frontier_studio_story_production_edit import STORY_PRODUCTION_ACTIONS, edit_story_production
+from .game_frontier_studio_environment_composer import ENVIRONMENT_COMPOSER_ACTIONS, edit_environment_composer
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
 
 AUTHORING_ACTIONS = (MAP_ACTIONS + OBJECT_ACTIONS + ENV_ACTIONS + PHYSICAL_ACTIONS +
                      QUEST_ACTIONS + TERRAIN_ACTIONS + PROCEDURAL_ACTIONS +
-                     POPULATION_ACTIONS + STORY_ACTIONS)
-if len(AUTHORING_ACTIONS) != 150 or len(set(AUTHORING_ACTIONS)) != 150:
-    raise RuntimeError("Forge Studio must expose 150 implemented, distinct operations")
+                     POPULATION_ACTIONS + STORY_ACTIONS +
+                     TERRAIN_TOPOLOGY_ACTIONS + ACTOR_LAYOUT_ACTIONS +
+                     STORY_PRODUCTION_ACTIONS + ENVIRONMENT_COMPOSER_ACTIONS)
+if len(AUTHORING_ACTIONS) != 250 or len(set(AUTHORING_ACTIONS)) != 250:
+    raise RuntimeError("Forge Studio must expose 250 implemented, distinct operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -84,6 +90,14 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_population(project, operation, payload)
     if operation in STORY_ACTIONS:
         return edit_story(project, operation, payload)
+    if operation in TERRAIN_TOPOLOGY_ACTIONS:
+        return edit_topology(project, operation, payload)
+    if operation in ACTOR_LAYOUT_ACTIONS:
+        return edit_actor_layout(project, operation, payload)
+    if operation in STORY_PRODUCTION_ACTIONS:
+        return edit_story_production(project, operation, payload)
+    if operation in ENVIRONMENT_COMPOSER_ACTIONS:
+        return edit_environment_composer(project, operation, payload)
     raise StudioError("unknown executable Studio editor action")
 
 
