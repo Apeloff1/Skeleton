@@ -90,6 +90,7 @@ class NativeStudioHost:
             self.model = NativeStudioModel(
                 engine, book_memory=self.book_memory,
                 canon_memory=self.canon_memory,
+                source_store=self.source_store,
             )
         except BaseException:
             if self.source_store is not None:
