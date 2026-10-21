@@ -67,9 +67,15 @@ with CreatorRunbookStore(
 ```
 
 Jeeves Chat now exposes **38 named game-production facets** and
-questionnaire/forge/flow/inspect/automation modes. Its editor button navigates
-into existing real app studios. A prepared chat turn remains a proposal,
-**not** an executed editor action. Canonical chat remains text-only; images,
+questionnaire/forge/flow/inspect/automation modes, with per-facet questionnaire
+answers kept while the palette is mounted. Its editor button navigates
+into existing real app studios. The operator can also select an existing real
+game-learning project and explicitly create a **plan-only** goal through
+`getLearningProject` + `createStudioGoal`. The goal service returns the
+actual persisted `goal_id` and status; the user may open the real Game Learning
+studio to inspect goal history and receipts. This plan-only action sets
+`allowEdits=false`, `maxJobs=0` and does not grant execution authority.
+A prepared chat turn remains a proposal, **not** an executed editor action. Canonical chat remains text-only; images,
 audio, video and engine assets require the separate existing media/crawler and
 editor ingestion path. References alone do not decode or train on an image.
 
