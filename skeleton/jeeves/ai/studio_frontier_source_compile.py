@@ -43,11 +43,11 @@ def _record_doc(record: Mapping[str, Any]) -> Mapping[str, Any]:
     return item
 
 
-def compile_persisted_frontier_source(
+def materialize_persisted_frontier_source(
     project_id: str,
     records: Mapping[str, Mapping[str, Any]],
     *, source_head_sha256: str | None,
-) -> dict[str, Any]:
+) -> tuple[StudioProject, dict[str, Any]]:
     """Compile real typed world, map, sprites, actors, RPG events and quests.
 
     A 'studio_settings' record and at least one map_layer are mandatory;
@@ -177,7 +177,22 @@ def compile_persisted_frontier_source(
         "commercial_game_complete": False,
     }
     result["receipt_sha256"] = digest(result)
-    return result
+    return project, result
 
 
-__all__ = ["FrontierSourceError", "compile_persisted_frontier_source"]
+def compile_persisted_frontier_source(
+    project_id: str,
+    records: Mapping[str, Mapping[str, Any]],
+    *, source_head_sha256: str | None,
+) -> dict[str, Any]:
+    """Return the exact serializable approved typed Forge candidate."""
+    _, receipt = materialize_persisted_frontier_source(
+        project_id, records, source_head_sha256=source_head_sha256,
+    )
+    return receipt
+
+
+__all__ = [
+    "FrontierSourceError", "materialize_persisted_frontier_source",
+    "compile_persisted_frontier_source",
+]
