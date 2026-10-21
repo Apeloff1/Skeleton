@@ -103,6 +103,7 @@ class NativeStudioModel:
         observed.reverse()
         book_sources: list[dict[str, Any]] = []
         book_memory_receipt: str | None = None
+        book_rights_head: str | None = None
         if self.book_memory is not None:
             if self.book_memory.project_id != controller.journal.project_id:
                 raise StudioInteractionError("book memory belongs to another game project")
@@ -112,11 +113,13 @@ class NativeStudioModel:
             )
             book_sources = remembered["results"]
             book_memory_receipt = remembered["retrieval_receipt_sha256"]
+            book_rights_head = remembered["rights_policy_head_sha256"]
             controller.journal.append("book_memory_retrieved", {
                 "admission_receipt_sha256": remembered["admission_receipt_sha256"],
                 "query_sha256": remembered["query_sha256"],
                 "results_sha256": remembered["results_sha256"],
                 "retrieval_receipt_sha256": book_memory_receipt,
+                "rights_policy_head_sha256": book_rights_head,
                 "segment_ids": [item["segment_id"] for item in book_sources],
                 "source_excerpt_count": len(book_sources),
                 "model_weights_modified": False,
@@ -194,6 +197,19 @@ class NativeStudioModel:
         model.assert_identity()
         if result.model_digest != before or model.model_digest != before:
             raise StudioInteractionError("local model checkpoint changed during deliberation")
+        # A source can be withdrawn, or another project owner can amend canon,
+        # WHILE inference executes. Never approve an obsolete proposal based
+        # on authority that no longer existed by the time the model answered.
+        if (self.book_memory is not None
+                and self.book_memory.rights_policy_head() != book_rights_head):
+            raise StudioInteractionError(
+                "book-use rights changed during local deliberation; rebuild context"
+            )
+        if (self.canon_memory is not None
+                and self.canon_memory.verify()["history_sha256"] != canon_head):
+            raise StudioInteractionError(
+                "project canon changed during local deliberation; rebuild context"
+            )
         if result.finish_reason not in ("completed", "stop", "end_turn"):
             raise StudioInteractionError("native inference did not complete its planned output")
         candidate = result.structured_output
@@ -245,6 +261,7 @@ class NativeStudioModel:
             "canon_facts_used": len(canon_facts),
             "canon_head_sha256": canon_head,
             "book_memory_retrieval_receipt_sha256": book_memory_receipt,
+            "book_rights_policy_head_sha256": book_rights_head,
             "context_digest": digest(prompt),
         }
         controller.journal.append("model_inference_observed", evidence)
