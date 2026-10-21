@@ -20,7 +20,7 @@ from typing import Any
 
 from skeleton.forge.creator.command_surface import build_creator_command
 from skeleton.jeeves.ai.creator_runbook_runtime import (
-    CreatorRunbook, CreatorRunbookRunner, RunbookStepStatus, RunbookState,
+    CreatorRunbook, CreatorRunbookRunner, RunbookState,
 )
 from skeleton.jeeves.ai.creator_runbook_store import CreatorRunbookStore
 from skeleton.jeeves.agent.tools import ToolExecutor
@@ -334,36 +334,56 @@ class JeevesStudioController:
         return CreatorRunbookRunner(contract, executor=executor,
                                    persist=store.persist, restored=store.load())
 
-    def observe(self, *, plan_sha256: str, outcome: RunbookStepStatus) -> dict[str, Any]:
-        """Caller passes the status produced by the HOST runner, not model text."""
-        if not isinstance(outcome, RunbookStepStatus) or not HEX.fullmatch(plan_sha256):
-            raise StudioInteractionError("typed host observation and bound plan required")
+    def observe(self, *, runner: CreatorRunbookRunner,
+                store: CreatorRunbookStore, step_id: str) -> dict[str, Any]:
+        """Inspect the HOST-persisted runner, never a caller-constructed success.
+
+        The runner already validates a real CreatorCommandReceipt before writing
+        succeeded. Loading the matching CAS store verifies its entire durable
+        chain before the supplementary studio journal records the result.
+        """
+        if not isinstance(runner, CreatorRunbookRunner) or not isinstance(store, CreatorRunbookStore):
+            raise StudioInteractionError("host-owned runner and durable store required")
+        identifier(step_id, "step")
+        plan_sha256 = runner.plan.plan_sha256
+        if store.plan_sha256 != plan_sha256 or runner.plan.project_id != self.journal.project_id:
+            raise StudioInteractionError("runbook ownership or persistence binding differs")
+        persisted = store.load()
+        snapshot = runner.snapshot()
+        if persisted is None or persisted != snapshot:
+            raise StudioInteractionError("runner is not equal to durable verified state")
         if not any(row["kind"] == "plan_approved" and
                    row["payload"]["plan_sha256"] == plan_sha256 for row in self.journal.read()):
             raise StudioInteractionError("cannot observe unapproved plan")
+        matches = [entry for entry in snapshot["steps"] if entry["step_id"] == step_id]
+        if len(matches) != 1:
+            raise StudioInteractionError("unknown runbook step")
+        outcome = matches[0]
         status_to_event = {
-            RunbookState.SUCCEEDED: "execution_succeeded",
-            RunbookState.IN_DOUBT: "execution_uncertain",
-            RunbookState.ABORTED: "execution_aborted",
+            RunbookState.SUCCEEDED.value: "execution_succeeded",
+            RunbookState.IN_DOUBT.value: "execution_uncertain",
+            RunbookState.ABORTED.value: "execution_aborted",
         }
-        kind = status_to_event.get(outcome.status)
-        if kind is None or (outcome.status is RunbookState.SUCCEEDED and
-                            not outcome.receipt_digest):
+        kind = status_to_event.get(outcome["status"])
+        if kind is None or (outcome["status"] == RunbookState.SUCCEEDED.value and
+                            not outcome["receipt_digest"]):
             raise StudioInteractionError("cannot issue success from an unverified state")
         if any(row["kind"].startswith("execution_") and
-               row["payload"].get("step_id") == outcome.step_id and
+               row["payload"].get("step_id") == step_id and
                row["payload"].get("plan_sha256") == plan_sha256
                for row in self.journal.read()):
             raise StudioInteractionError("outcome already observed; reconcile existing receipt")
         return self.journal.append(kind, {
             "plan_sha256": plan_sha256,
-            "step_id": identifier(outcome.step_id, "step"),
-            "status": outcome.status.value,
-            "attempts": outcome.attempts,
-            "command_receipt_sha256": outcome.receipt_digest,
-            "observation_sha256": outcome.observation_digest,
-            "reason": outcome.outcome_reason,
+            "step_id": step_id,
+            "status": outcome["status"],
+            "attempts": outcome["attempts"],
+            "command_receipt_sha256": outcome["receipt_digest"],
+            "observation_sha256": outcome["observation_digest"],
+            "reason": outcome["outcome_reason"],
+            "runbook_state_sha256": snapshot["head_digest"],
         })
+
 
 
 __all__ = ["FACETS", "questions", "StudioProposal", "StudioEvidenceJournal",
