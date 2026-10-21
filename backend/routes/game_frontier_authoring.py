@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import Field
 
 from core import game_frontier_authoring as studio
@@ -64,6 +64,128 @@ def _write_scope(user):
             "message": "Project editor role required for source modification.",
         })
     return scope
+
+
+
+class BookAssessment(Request):
+    answers: list[str] = Field(min_length=4, max_length=10)
+
+
+class ManifestBookRequest(Request):
+    generation: str = Field(min_length=3, max_length=24)
+    index: int = Field(ge=0, le=9_000_000_000, strict=True)
+
+
+class BookManifestBatch(Request):
+    books: list[ManifestBookRequest] = Field(min_length=1, max_length=4)
+
+
+@router.get("/curriculum")
+async def jeeves_book_curriculum_catalog(user=Depends(get_current_user)):
+    """Seven source-derived levels, exact reference bounds, and truthful training state."""
+    _scope(user)
+    from skeleton.jeeves.game_frontier_book_curriculum import curriculum_catalog
+    return curriculum_catalog()
+
+
+@router.get("/curriculum/book/{generation}/{index}")
+async def jeeves_source_book_reference(
+    generation: str, index: int, user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.jeeves.game_frontier_book_curriculum import reference
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return reference(generation, index)
+    except StudioError as exc:
+        raise HTTPException(404, detail={"code": "unknown_jeeves_source_book",
+                                         "message": str(exc)}) from exc
+
+
+@router.get("/curriculum/lesson/{generation}/{index}")
+async def jeeves_source_book_lesson(
+    generation: str, index: int, user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.jeeves.game_frontier_book_curriculum import lesson
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return lesson(generation, index)
+    except StudioError as exc:
+        raise HTTPException(404, detail={"code": "unknown_jeeves_source_lesson",
+                                         "message": str(exc)}) from exc
+
+
+@router.post("/curriculum/assess/{generation}/{index}")
+async def assess_source_book_lesson(
+    generation: str, index: int, body: BookAssessment,
+    user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.jeeves.game_frontier_book_curriculum import assessment
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return assessment(generation, index, body.answers)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "invalid_jeeves_curriculum_attempt",
+                                         "message": str(exc)}) from exc
+
+
+@router.get("/curriculum/manifest/{generation}/{index}")
+async def manifest_jeeves_source_book(
+    generation: str, index: int, user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.jeeves.game_frontier_book_curriculum import manifest
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return manifest(generation, index)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "book_manifestation_failed",
+                                         "message": str(exc)}) from exc
+
+
+@router.get("/curriculum/download/{generation}/{index}")
+async def download_jeeves_source_book(
+    generation: str, index: int, user=Depends(get_current_user),
+):
+    """Actually materialize one verified Markdown volume as a ZIP download."""
+    _scope(user)
+    from skeleton.jeeves.game_frontier_book_curriculum import materialize_archive
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        archive, evidence = materialize_archive([
+            {"generation": generation, "index": index},
+        ])
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "book_archive_failed",
+                                         "message": str(exc)}) from exc
+    return Response(archive, media_type="application/zip", headers={
+        "Content-Disposition": f'attachment; filename="forgebook_{generation}_{index}.zip"',
+        "X-Content-SHA256": evidence["archive_sha256"],
+        "Cache-Control": "private, no-store",
+    })
+
+
+@router.post("/curriculum/download")
+async def download_selected_jeeves_source_books(
+    body: BookManifestBatch, user=Depends(get_current_user),
+):
+    """Make real reproducible source-book ZIPs without untrusted paths or file stores."""
+    _scope(user)
+    from skeleton.jeeves.game_frontier_book_curriculum import materialize_archive
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        archive, evidence = materialize_archive(
+            [record.model_dump() for record in body.books])
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "book_archive_failed",
+                                         "message": str(exc)}) from exc
+    return Response(archive, media_type="application/zip", headers={
+        "Content-Disposition": 'attachment; filename="jeeves_forge_books.zip"',
+        "X-Content-SHA256": evidence["archive_sha256"],
+        "Cache-Control": "private, no-store",
+    })
 
 
 @router.get("/epic-handbooks")
