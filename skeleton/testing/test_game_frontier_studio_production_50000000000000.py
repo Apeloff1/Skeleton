@@ -160,6 +160,45 @@ class FiftyTrillionEpicVariations(unittest.TestCase):
                 **args, "epic_layers": ["epic_support_0"] * 2,
             })
 
+    def test_sibling_layer_requires_the_same_tile_materials(self):
+        base = original_project()
+        primary = base.layers[0]
+        changed = replace(primary, layer_id="misleading_palette",
+                          palette=tuple(reversed(primary.palette)))
+        initial = replace(base, layers=(primary, changed))
+        operation = EPIC_ACTIONS[0]
+        with self.assertRaises(StudioError):
+            execute_authoring(initial, operation, {
+                **arguments(operation), "epic_layers": ["misleading_palette"],
+            })
+
+    def test_optional_quest_branch_uses_declared_entry_and_never_cycles(self):
+        from skeleton.forge.game_frontier_studio import StudioQuest, StudioQuestStage
+        from skeleton.forge.game_frontier_studio_epic_variations import _branch_new_quests
+        base = original_project()
+        # A valid single-stage story must remain solvable after adding an
+        # optional Epic ending, with no circular root->branch->root edge.
+        solo = StudioQuest("single_scene", "Single scene", "start",
+                           (StudioQuestStage("start", "Arrive"),))
+        alternate = StudioQuest(
+            "reordered_arc", "Chapter", "begin",
+            (StudioQuestStage("old_end", "Reach the end"),
+             StudioQuestStage("begin", "Choose a path", ("old_end",))),
+        )
+        input_project = replace(base, native_quests=(solo, alternate))
+        output = _branch_new_quests(input_project, 0, 0, EPIC_ACTIONS[0])
+        self.assertEqual(2, len(output.native_quests))
+        first = output.native_quests[0]
+        self.assertTrue(first.stages[0].next_stage_ids)
+        self.assertFalse(first.stages[-1].next_stage_ids)
+        second = output.native_quests[1]
+        root = next(stage for stage in second.stages
+                    if stage.stage_id == second.first_stage_id)
+        self.assertEqual("old_end", root.next_stage_ids[0])
+        self.assertTrue(any("_epic_" in edge for edge in root.next_stage_ids))
+        self.assertTrue(compile_studio_native_quest_graph(output)["quests"])
+        self.assertEqual(input_project.native_quests[0], solo)
+
     def test_all_epic_patterns_keep_route_spine_and_differ(self):
         grids = set()
         for mode in range(10):
