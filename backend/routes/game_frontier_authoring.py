@@ -70,7 +70,7 @@ def _write_scope(user):
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "",
+    director: str = "", finish: str = "", worldline: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -79,8 +79,16 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_system_expansions import search_expansions
     from skeleton.forge.game_frontier_studio_directed_production import search_directions
     from skeleton.forge.game_frontier_studio_final_production import search_final_actions
+    from skeleton.forge.game_frontier_studio_worldline_production import search_worldlines
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "worldline":
+            return search_worldlines(query=query,domain=domain,
+                                     system_layer=system_layer,director=director,
+                                     finish=finish,worldline=worldline,
+                                     offset=offset,limit=limit)
+        if worldline:
+            raise StudioError("worldline filtering requires worldline generation")
         if generation == "final":
             return search_final_actions(query=query, domain=domain,
                                         system_layer=system_layer,
