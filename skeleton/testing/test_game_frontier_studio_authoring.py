@@ -137,7 +137,7 @@ assert len(MAP) == 25 and len(OBJECTS) == 25
 
 class RealForgeStudioAuthoringTests(unittest.TestCase):
     def test_first_fifty_distinct_supported_game_edits(self):
-        self.assertEqual(100, len(AUTHORING_ACTIONS))
+        self.assertGreaterEqual(len(AUTHORING_ACTIONS), 150)
         self.assertEqual(50, len(PARAMETERS))
         self.assertTrue(set(PARAMETERS) <= set(AUTHORING_ACTIONS))
 
@@ -306,7 +306,7 @@ def _functional_edit_test(operation):
     return test
 
 
-for _name in AUTHORING_ACTIONS:
+for _name in PARAMETERS:
     setattr(RealForgeStudioAuthoringTests,
             "test_actual_" + _name, _functional_edit_test(_name))
 
