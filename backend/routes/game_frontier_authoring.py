@@ -70,14 +70,22 @@ def _write_scope(user):
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
+    director: str = "",
     user=Depends(get_current_user),
 ):
-    """Discover bounded pages of real 4,500 or 45,000 production workflows."""
+    """Discover bounded 4,500, 45,000 or 450,000 authentic game-workflow pages."""
     _scope(user)
     from skeleton.forge.game_frontier_studio_production_recipes import search_recipes
     from skeleton.forge.game_frontier_studio_system_expansions import search_expansions
+    from skeleton.forge.game_frontier_studio_directed_production import search_directions
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "directed":
+            return search_directions(query=query, domain=domain,
+                                     system_layer=system_layer, director=director,
+                                     offset=offset, limit=limit)
+        if director:
+            raise StudioError("director filtering requires directed generation")
         if generation == "expanded":
             return search_expansions(query=query, domain=domain,
                                      system_layer=system_layer,
