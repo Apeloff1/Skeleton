@@ -41,7 +41,7 @@ from skeleton.testing.test_game_frontier_studio_production_5000 import (
 class FiftyBillionChronicleAuthoring(unittest.TestCase):
     def test_catalog_boundaries_and_legacy_stability(self):
         self.assertEqual(45_000_000_000, len(CHRONICLE_ACTIONS))
-        self.assertEqual(5_000_000_000_000, len(AUTHORING_ACTIONS))
+        self.assertEqual(50_000_000_000_000, len(AUTHORING_ACTIONS))
         self.assertEqual(CAMPAIGN_ACTIONS[0],AUTHORING_ACTIONS[500_000_000])
         self.assertEqual(CHRONICLE_ACTIONS[0],AUTHORING_ACTIONS[5_000_000_000])
         self.assertEqual(CHRONICLE_ACTIONS[-1],AUTHORING_ACTIONS[50_000_000_000-1])
@@ -143,8 +143,8 @@ class FiftyBillionChronicleAuthoring(unittest.TestCase):
         summary=authored_summary(edited)
         self.assertEqual(500,len(summary["action_catalog"]))
         self.assertEqual(45_000_000_000,summary["chronicle_recipe_count"])
-        self.assertEqual(4_999_999_999_500,summary["recipe_catalog_count"])
-        self.assertEqual(5_000_000_000_000,summary["catalog_total"])
+        self.assertEqual(49_999_999_999_500,summary["recipe_catalog_count"])
+        self.assertEqual(50_000_000_000_000,summary["catalog_total"])
 
     def test_actual_native_godot_world_source_export(self):
         from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile

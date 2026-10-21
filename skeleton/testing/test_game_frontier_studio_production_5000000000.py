@@ -39,7 +39,7 @@ from skeleton.testing.test_game_frontier_studio_production_5000 import (
 
 class FiveBillionSourceAuthoring(unittest.TestCase):
     def test_virtual_indexes_and_legacy_orders(self):
-        self.assertEqual(5_000_000_000_000,len(AUTHORING_ACTIONS))
+        self.assertEqual(50_000_000_000_000,len(AUTHORING_ACTIONS))
         self.assertEqual(4_500_000_000,len(CAMPAIGN_ACTIONS))
         self.assertEqual(AUTHORING_ACTIONS[500_000_000],CAMPAIGN_ACTIONS[0])
         self.assertEqual(AUTHORING_ACTIONS[5_000_000_000 - 1],CAMPAIGN_ACTIONS[-1])
@@ -171,8 +171,8 @@ class FiveBillionSourceAuthoring(unittest.TestCase):
         summary=authored_summary(original_project())
         self.assertEqual(500,len(summary["action_catalog"]))
         self.assertEqual(4_500_000_000,summary["campaign_recipe_count"])
-        self.assertEqual(4_999_999_999_500,summary["recipe_catalog_count"])
-        self.assertEqual(5_000_000_000_000,summary["catalog_total"])
+        self.assertEqual(49_999_999_999_500,summary["recipe_catalog_count"])
+        self.assertEqual(50_000_000_000_000,summary["catalog_total"])
 
 
 class RankedMillionBookLibrary(unittest.TestCase):

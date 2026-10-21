@@ -40,6 +40,9 @@ on:
       - "skeleton/testing/test_game_frontier_studio_route_assurance.py"
       - "skeleton/testing/test_game_frontier_studio_production_500000000000.py"
       - "skeleton/testing/test_game_frontier_studio_production_5000000000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_50000000000000.py"
+      - "skeleton/forge/game_frontier_studio_epic_*.py"
+      - "scripts/export_game_studio_epic_handbooks.py"
       - "skeleton/forge/game_frontier_studio_saga_*.py"
       - "scripts/export_game_studio_saga_handbooks.py"
       - "skeleton/forge/game_frontier_studio_epoch_*.py"
@@ -96,4 +99,5 @@ jobs:
             skeleton/testing/test_game_frontier_studio_production_5000000000.py \
             skeleton/testing/test_game_frontier_studio_production_50000000000.py \
             skeleton/testing/test_game_frontier_studio_production_500000000000.py \
-            skeleton/testing/test_game_frontier_studio_production_5000000000000.py
+            skeleton/testing/test_game_frontier_studio_production_5000000000000.py \
+            skeleton/testing/test_game_frontier_studio_production_50000000000000.py

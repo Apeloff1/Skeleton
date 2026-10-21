@@ -40,12 +40,12 @@ from skeleton.testing.test_game_frontier_studio_production_5000 import (
 class FiveTrillionSagaProduction(unittest.TestCase):
     def test_catalog_boundaries_and_original_indices_remain_stable(self):
         self.assertEqual(4_500_000_000_000, len(SAGA_ACTIONS))
-        self.assertEqual(5_000_000_000_000, len(AUTHORING_ACTIONS))
+        self.assertEqual(50_000_000_000_000, len(AUTHORING_ACTIONS))
         self.assertEqual(EPOCH_ACTIONS[0], AUTHORING_ACTIONS[50_000_000_000])
         self.assertEqual(EPOCH_ACTIONS[-1],
                          AUTHORING_ACTIONS[500_000_000_000 - 1])
         self.assertEqual(SAGA_ACTIONS[0], AUTHORING_ACTIONS[500_000_000_000])
-        self.assertEqual(SAGA_ACTIONS[-1], AUTHORING_ACTIONS[-1])
+        self.assertEqual(SAGA_ACTIONS[-1], AUTHORING_ACTIONS[5_000_000_000_000 - 1])
         self.assertNotIn("saga_exec_untrusted___________homecoming",
                          AUTHORING_ACTIONS)
         with self.assertRaises(IndexError):
@@ -172,7 +172,7 @@ class FiveTrillionSagaProduction(unittest.TestCase):
             {"action": name, "parameters": arguments(name)}
         ])
         self.assertTrue(result["receipt"]["actually_changed"])
-        self.assertEqual(5_000_000_000_000,
+        self.assertEqual(50_000_000_000_000,
                          authored_summary(result["project"])["catalog_total"])
         self.assertEqual(4_500_000_000_000,
                          authored_summary(result["project"])["saga_recipe_count"])
