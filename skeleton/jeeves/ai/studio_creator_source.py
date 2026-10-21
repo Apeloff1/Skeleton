@@ -142,6 +142,61 @@ def _godot_archive(files: Mapping[str, str], receipt: Mapping[str, Any]) -> byte
     return data
 
 
+def _sprite_archive(
+    compiled: Mapping[str, Any], *, project_id: str,
+    source_head_sha256: str | None,
+) -> bytes:
+    """Write reproducible PNG and animation-state assets with source receipts."""
+    from .studio_sprite_forge import _decode_verified_png
+
+    atlas = compiled["assets"]
+    metadata = {
+        "schema_version": "skeleton.jeeves.sprite_package.v1",
+        "project_id": project_id, "source_head_sha256": source_head_sha256,
+        "asset_count": compiled["count"],
+        "atlas_hashes": compiled["atlas_hashes"],
+        "sprites": [item["metadata"] for item in atlas],
+        "native_engine_sprite_binding_verified": False,
+        "artist_review_claimed": False,
+    }
+    metadata["receipt_sha256"] = digest(metadata)
+    files: dict[str, bytes] = {}
+    for entry in atlas:
+        proof = entry["metadata"]
+        name = proof["asset_id"]
+        raw = entry["png"]
+        if sha256(raw).hexdigest() != proof["png_sha256"]:
+            raise CreatorSourceError("sprite output differs from its generated proof")
+        if _decode_verified_png(
+            raw, proof["sheet_width_px"], proof["sheet_height_px"],
+        ) is None:
+            raise CreatorSourceError("published PNG cannot be independently decoded")
+        files["sprites/" + name + ".png"] = raw
+        files["sprites/" + name + ".json"] = _json(proof)
+    files["jeeves_sprite_receipt.json"] = _json(metadata, limit=MAX_BUNDLE_BYTES)
+    total = sum(len(raw) for raw in files.values())
+    if total > MAX_BUNDLE_BYTES:
+        raise CreatorSourceError("sprite project would exceed export size budget")
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED,
+                         compresslevel=9, allowZip64=False) as archive:
+        for name in sorted(files):
+            entry = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, files[name])
+    data = output.getvalue()
+    if len(data) > MAX_BUNDLE_BYTES:
+        raise CreatorSourceError("compressed sprite atlas exceeds artifact size")
+    with zipfile.ZipFile(io.BytesIO(data)) as reread:
+        if set(reread.namelist()) != set(files):
+            raise CreatorSourceError("published sprite package membership differs")
+        for name, raw in files.items():
+            if reread.read(name) != raw:
+                raise CreatorSourceError("published sprite bytes differ from original")
+    return data
+
+
 def _project_path(path: Path) -> Path:
     if not isinstance(path, Path) or not path.is_absolute() or path.is_symlink():
         raise CreatorSourceError("private absolute SQLite source-store path required")
@@ -512,6 +567,7 @@ class CreatorProjectSourceStore:
         export_format = command.payload["format"]
         if export_format not in (
             "game-source-json", "frontier-studio-json", "frontier-godot4-zip",
+            "sprite-atlas-zip",
         ):
             raise CreatorSourceError("unsupported typed game source export format")
         artifact = identifier(command.payload["artifact_name"], "artifact")
@@ -523,7 +579,15 @@ class CreatorProjectSourceStore:
             report = self._validate_graph(self._records)
             if not self._records or not report["valid"]:
                 raise CreatorSourceError("unresolved sources or dependencies block export")
-            if export_format == "frontier-godot4-zip":
+            if export_format == "sprite-atlas-zip":
+                from .studio_sprite_forge import compile_sprite_collection
+                compiled = compile_sprite_collection(self._records)
+                raw = _sprite_archive(
+                    compiled, project_id=self.project_id,
+                    source_head_sha256=self._head,
+                )
+                extension = ".zip"
+            elif export_format == "frontier-godot4-zip":
                 from .studio_frontier_godot_package import compile_original_godot_candidate
                 candidate = compile_original_godot_candidate(
                     self.project_id, self._records,
@@ -550,7 +614,7 @@ class CreatorProjectSourceStore:
                     "dependency_assurance": report,
                     "native_binary_compiled": False,
                 }
-            if export_format != "frontier-godot4-zip":
+            if export_format not in ("frontier-godot4-zip", "sprite-atlas-zip"):
                 raw = _json(bundle, limit=MAX_BUNDLE_BYTES)
                 extension = ".json"
             # Compilation can take longer than ordinary SQLite mutations.
