@@ -21,6 +21,8 @@ from skeleton.jeeves.ai.studio_interaction_contract import (
 )
 from skeleton.jeeves.ai.creator_runbook_store import CreatorRunbookStore
 from skeleton.jeeves.ai.studio_delegate_executor import execute_approved_studio_batch
+from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
+from skeleton.jeeves.ai.studio_interaction_contract import StudioInteractionError
 
 
 class CreatorSourceTests(unittest.TestCase):
@@ -293,6 +295,98 @@ class CreatorSourceTests(unittest.TestCase):
                 )
                 self.assertEqual(again["completed_effects"], 0)
                 self.assertEqual(self.owner.snapshot()["event_count"], 1)
+
+
+class NativePlanSourceFreshnessTests(CreatorSourceTests):
+    """Exercise dispatch admission without substituting a fake local checkpoint."""
+
+    def bound(self, *, approved: bool = True):
+        journal = StudioEvidenceJournal(
+            self.root / "plan-evidence.sqlite",
+            project_id="original-game", session_id="human-session",
+        )
+        self.addCleanup(journal.close)
+        controller = JeevesStudioController(journal)
+        intent = {
+            "record_id": "world-one", "facet": "world",
+            "document": self.document, "depends_on": [],
+        }
+        plan = controller.propose(
+            [StudioProposal("world", "create", {"intent": intent})],
+            model_checkpoint_sha256="a" * 64,
+        )
+        if approved:
+            controller.approve(plan, reviewer_id="human-producer")
+        host = NativeStudioHost.__new__(NativeStudioHost)
+        host.journal = journal
+        host.source_store = self.owner
+        host.book_memory = None
+        host.canon_memory = None
+        return host, journal, plan
+
+    def pin(self, journal, plan, *, source=None):
+        return journal.append("plan_context_bound", {
+            "plan_sha256": plan["plan_sha256"],
+            "model_checkpoint_sha256": "a" * 64,
+            "book_admission_sha256": None,
+            "book_source_root_sha256": None,
+            "book_rights_head_sha256": None,
+            "canon_head_sha256": None,
+            "creator_source_head_sha256": source,
+            "context_sha256": "b" * 64,
+            "host_tool_authority_granted": False,
+        }, _authority=journal._plan_token)
+
+    def test_bound_native_plan_allows_first_unmodified_source(self):
+        host, journal, plan = self.bound()
+        self.pin(journal, plan, source=self.owner.snapshot()["head_sha256"])
+        host._require_fresh_native_plan(plan, None)
+        self.assertEqual(self.owner.snapshot()["source_count"], 0)
+
+    def test_external_edit_after_native_planning_blocks_host_dispatch(self):
+        host, journal, plan = self.bound()
+        self.pin(journal, plan)
+        self.create(record="unrelated-world")
+        with self.assertRaises(StudioInteractionError):
+            host._require_fresh_native_plan(plan, None)
+
+    def test_own_completed_creator_step_can_resume_without_duplicate_mutation(self):
+        host, journal, plan = self.bound()
+        self.pin(journal, plan)
+        self.owner.create(build_creator_command(
+            "create", project_id="original-game",
+            payload=plan["steps"][0]["command"]["payload"],
+        ))
+        committed = {"steps": [{"step_id": "step-000", "status": "succeeded"}]}
+        host._require_fresh_native_plan(plan, committed)
+        self.assertEqual(self.owner.snapshot()["source_count"], 1)
+
+    def test_external_action_after_valid_own_step_blocks_resume(self):
+        host, journal, plan = self.bound()
+        self.pin(journal, plan)
+        self.owner.create(build_creator_command(
+            "create", project_id="original-game",
+            payload=plan["steps"][0]["command"]["payload"],
+        ))
+        self.create(record="other-producer-sky-island")
+        committed = {"steps": [{"step_id": "step-000", "status": "succeeded"}]}
+        with self.assertRaises(StudioInteractionError):
+            host._require_fresh_native_plan(plan, committed)
+
+    def test_unbound_proposal_cannot_be_executed_by_standalone_host(self):
+        host, _journal, plan = self.bound()
+        with self.assertRaises(StudioInteractionError):
+            host._require_fresh_native_plan(plan, None)
+
+    def test_model_cannot_forge_native_plan_binding(self):
+        host, journal, plan = self.bound()
+        with self.assertRaises(StudioInteractionError):
+            journal.append("plan_context_bound", {
+                "plan_sha256": plan["plan_sha256"],
+                "creator_source_head_sha256": None,
+            })
+        with self.assertRaises(StudioInteractionError):
+            host._require_fresh_native_plan(plan, None)
 
 
 if __name__ == "__main__":
