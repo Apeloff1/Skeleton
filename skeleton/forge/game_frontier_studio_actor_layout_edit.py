@@ -14,6 +14,7 @@ import random
 from .game_frontier_studio import StudioError, StudioProject
 from .game_frontier_studio_map_edit import _integer, _name
 from .game_frontier_studio_population_edit import _real
+from .game_frontier_studio_tile_navigation import _traversable
 
 ACTOR_LAYOUT_ACTIONS = (
     "actors_snap_grid", "actors_snap_ground", "actors_quantize_facing",
@@ -157,7 +158,7 @@ def edit_actor_layout(project: StudioProject, operation: str,
         if not any(v>=0 for v in layer.data):
             raise StudioError("cannot snap to wholly erased world")
         valid={(x,y) for y in range(layer.height) for x in range(layer.width)
-               if layer.data[y*layer.width+x]>=0}
+               if _traversable(layer,x,y)}
         for i in indices:
             p=actors[i]
             x,y=min(valid,key=lambda v:((p.x-v[0])**2+(p.y-v[1])**2,v))
@@ -209,7 +210,7 @@ def edit_actor_layout(project: StudioProject, operation: str,
         if layer is None:
             raise StudioError("source map layer not found")
         terrain=[(x,y) for y in range(layer.height) for x in range(layer.width)
-                 if layer.data[y*layer.width+x]>=0]
+                 if _traversable(layer,x,y)]
         if len(terrain)<len(indices):
             raise StudioError("insufficient terrain for unique actors")
         occupied=set()
