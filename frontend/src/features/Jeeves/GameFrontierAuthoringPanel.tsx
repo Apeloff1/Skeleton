@@ -70,6 +70,34 @@ const GROUPS: { title: string; actions: string[] }[] = [
     'event_batch_retrigger', 'event_bind_quest', 'event_actor_dialogue_batch',
     'event_actor_audio_batch', 'event_actor_loot_batch'
   ] },
+  { title: 'Level topology', actions: [
+    'terrain_dilate_mask', 'terrain_erode_mask', 'terrain_open_mask', 'terrain_close_mask', 'terrain_majority_eight',
+    'terrain_largest_region', 'terrain_connect_regions', 'terrain_diamond_landmass', 'terrain_hex_landmass', 'terrain_triangular_landmass',
+    'terrain_radial_spokes', 'terrain_concentric_paths', 'terrain_bezier_road', 'terrain_spline_river', 'terrain_random_walker',
+    'terrain_flow_channels', 'terrain_edge_falloff', 'terrain_moat_castle', 'terrain_ruin_foundations', 'terrain_forest_clusters',
+    'terrain_patch_scatter', 'terrain_wave_pattern', 'terrain_checker_rotated', 'terrain_mountain_pass', 'terrain_archipelago_bridges',
+  ] },
+  { title: 'Actor layout', actions: [
+    'actors_snap_grid', 'actors_snap_ground', 'actors_quantize_facing', 'actors_face_point', 'actors_face_actor',
+    'actors_align_x', 'actors_align_y', 'actors_even_spacing', 'actors_radial_expand', 'actors_radial_contract',
+    'actors_scale_cloud', 'actors_shift_altitude', 'actors_seeded_jitter', 'actors_separate_overlap', 'actors_snap_terrain',
+    'actors_clamp_bounds', 'actors_swap_poses', 'actors_copy_facing', 'actors_center_group', 'actors_wave_offsets',
+    'actors_staircase', 'actors_terrain_walk', 'actors_depth_rank', 'actors_random_facing', 'actors_clone_selected',
+  ] },
+  { title: 'Story production', actions: [
+    'quest_add_prologue', 'quest_add_epilogue', 'quest_extend_terminal', 'quest_fork_terminal', 'quest_bridge_endings',
+    'quest_detour_leaf', 'quest_stage_reparent', 'quest_swap_branches', 'quest_order_choices', 'quest_backfill_objectives',
+    'quest_template_sequence', 'quest_template_binary_tree', 'quest_stage_cleanup', 'quest_mirror_branch', 'quest_convert_to_linear',
+    'event_stage_dialogue', 'event_stage_flag', 'event_stage_cutscene', 'event_stage_music', 'event_stage_item',
+    'event_stage_camera', 'event_stage_portal', 'event_trigger_promote', 'event_flag_gate', 'event_mass_duplicate',
+  ] },
+  { title: 'Environmental scenes', actions: [
+    'sensor_wind_gust', 'sensor_rain_onset', 'sensor_visibility_warning', 'sensor_flood_tide', 'sensor_updraft_boost',
+    'sensor_turbulence_alarm', 'sensor_low_traction', 'sensor_fast_fall', 'sensor_collision_impact', 'sensor_instrument_heading',
+    'sensor_sextant_fix', 'sensor_gyro_tilt', 'sensor_island_altitude', 'sensor_pressure_change', 'sensor_party_morale',
+    'page_condition_copy', 'page_action_copy', 'page_condition_swap', 'page_action_swap', 'page_condition_rotate',
+    'page_action_rotate', 'page_threshold_shift', 'page_threshold_scale', 'page_duplicate_signal', 'page_dual_threshold_branches',
+  ] },
 ];
 const SAMPLE: Record<string, Record<string, unknown>> = {
   tile_set: { x: 0, y: 0, tile: 1 }, rect_fill: { x: 0, y: 0, width: 3, height: 3, tile: 1 },
@@ -242,6 +270,77 @@ function newActionDefaults(name: string, layer: string): Record<string, unknown>
   return undefined;
 }
 
+
+const NEW_HUNDRED_GROUPS = {
+  topology: new Set<string>(['terrain_dilate_mask','terrain_erode_mask','terrain_open_mask','terrain_close_mask','terrain_majority_eight','terrain_largest_region','terrain_connect_regions','terrain_diamond_landmass','terrain_hex_landmass','terrain_triangular_landmass','terrain_radial_spokes','terrain_concentric_paths','terrain_bezier_road','terrain_spline_river','terrain_random_walker','terrain_flow_channels','terrain_edge_falloff','terrain_moat_castle','terrain_ruin_foundations','terrain_forest_clusters','terrain_patch_scatter','terrain_wave_pattern','terrain_checker_rotated','terrain_mountain_pass','terrain_archipelago_bridges']),
+  actors: new Set<string>(['actors_snap_grid','actors_snap_ground','actors_quantize_facing','actors_face_point','actors_face_actor','actors_align_x','actors_align_y','actors_even_spacing','actors_radial_expand','actors_radial_contract','actors_scale_cloud','actors_shift_altitude','actors_seeded_jitter','actors_separate_overlap','actors_snap_terrain','actors_clamp_bounds','actors_swap_poses','actors_copy_facing','actors_center_group','actors_wave_offsets','actors_staircase','actors_terrain_walk','actors_depth_rank','actors_random_facing','actors_clone_selected']),
+  story: new Set<string>(['quest_add_prologue','quest_add_epilogue','quest_extend_terminal','quest_fork_terminal','quest_bridge_endings','quest_detour_leaf','quest_stage_reparent','quest_swap_branches','quest_order_choices','quest_backfill_objectives','quest_template_sequence','quest_template_binary_tree','quest_stage_cleanup','quest_mirror_branch','quest_convert_to_linear','event_stage_dialogue','event_stage_flag','event_stage_cutscene','event_stage_music','event_stage_item','event_stage_camera','event_stage_portal','event_trigger_promote','event_flag_gate','event_mass_duplicate']),
+  environment: new Set<string>(['sensor_wind_gust','sensor_rain_onset','sensor_visibility_warning','sensor_flood_tide','sensor_updraft_boost','sensor_turbulence_alarm','sensor_low_traction','sensor_fast_fall','sensor_collision_impact','sensor_instrument_heading','sensor_sextant_fix','sensor_gyro_tilt','sensor_island_altitude','sensor_pressure_change','sensor_party_morale','page_condition_copy','page_action_copy','page_condition_swap','page_action_swap','page_condition_rotate','page_action_rotate','page_threshold_shift','page_threshold_scale','page_duplicate_signal','page_dual_threshold_branches']),
+};
+function hundredActionDefaults(name: string, layer: string): Record<string, unknown> | undefined {
+  if (NEW_HUNDRED_GROUPS.topology.has(name)) {
+    const args: Record<string, unknown> = {
+      layer, x: 0, y: 0, width: 12, height: 12, floor: 0, wall: 1, seed: 42,
+    };
+    if (name === 'terrain_bezier_road' || name === 'terrain_spline_river')
+      args.control_points = [[0,0],[6,8],[11,11]];
+    if (name === 'terrain_archipelago_bridges') args.seed = 42;
+    return args;
+  }
+  if (NEW_HUNDRED_GROUPS.actors.has(name)) {
+    const args: Record<string, unknown> = {indices: [0, 1]};
+    const extras: Record<string, Record<string, unknown>> = {
+      actors_snap_grid:{step:2},actors_snap_ground:{ground_z:0},
+      actors_quantize_facing:{degrees:45},actors_face_point:{target_x:10,target_y:10},
+      actors_face_actor:{target_index:2},actors_align_x:{value:5},
+      actors_align_y:{value:5},actors_radial_expand:{distance:2},
+      actors_radial_contract:{distance:2},actors_scale_cloud:{factor:1.5},
+      actors_shift_altitude:{dz:2},actors_seeded_jitter:{seed:42,amplitude:1},
+      actors_separate_overlap:{minimum_distance:2},actors_snap_terrain:{layer},
+      actors_clamp_bounds:{min_x:0,max_x:12,min_y:0,max_y:12},
+      actors_copy_facing:{source_index:2},actors_center_group:{x:5,y:5},
+      actors_wave_offsets:{amplitude:2,period:3},actors_staircase:{step:2},
+      actors_terrain_walk:{layer},actors_depth_rank:{base_z:0,step_z:1},
+      actors_random_facing:{seed:42},actors_clone_selected:{dx:3,dy:2,dz:0},
+    };
+    return {...args,...(extras[name] || {})};
+  }
+  if (NEW_HUNDRED_GROUPS.story.has(name)) {
+    const a: Record<string, unknown> = {quest_id:'first_quest'};
+    if (name.startsWith('event_stage_')) return {
+      event_id:'chapter_scene',target:'hero',value:'Welcome',trigger:'quest',
+    };
+    if (name === 'event_trigger_promote') return {event_id:'opening',trigger:'quest'};
+    if (name === 'event_flag_gate') return {event_id:'opening',flag:'quest_ready',expected:true};
+    if (name === 'event_mass_duplicate') return {
+      source_event_ids:['opening'],prefix:'chapter',
+    };
+    return {...a,stage_id:'begin',new_stage_id:'next_chapter',
+      objective:'Explore the region',prefix:'chapter',count:4,depth:2,
+      from_stage_id:'begin',stage_a:'begin',stage_b:'middle',
+      parent_stage_id:'begin',new_parent_id:'begin',
+      choices:['middle'],objectives:['Find the temple','Follow the road'],
+      stage_order:['begin','middle','ending']};
+  }
+  if (NEW_HUNDRED_GROUPS.environment.has(name)) {
+    if (name.startsWith('sensor_')) return {page_id:name+'_event',priority:5};
+    const a:Record<string,unknown>={page_id:'weather_rise'};
+    if (name.endsWith('_copy')) a.source_index=0;
+    if (name.endsWith('_swap')) Object.assign(a,{a:0,b:1});
+    if (name.endsWith('_rotate')) a.offset=1;
+    if (name==='page_threshold_shift') a.delta=5;
+    if (name==='page_threshold_scale') a.factor=1.2;
+    if (name==='page_duplicate_signal') Object.assign(a,{
+      new_page_id:'weather_alt',signal:'altitude_m',comparison:'above',threshold:100,
+    });
+    if (name==='page_dual_threshold_branches') Object.assign(a,{
+      low_page_id:'sensor_low',high_page_id:'sensor_high',low:10,high:100,
+    });
+    return a;
+  }
+  return undefined;
+}
+
 function label(name: string) { return name.replace(/_/g, ' '); }
 const palette = ['#1b4230','#62727f','#406c99','#7d704c','#8b5b83','#777c3e','#5e6274'];
 function Button({ title, press, disabled }: { title: string; press: () => void; disabled?: boolean }) {
@@ -305,7 +404,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   })).filter(group => group.actions.length), [doc, search]);
   const choose = (name: string) => {
     setAction(name);
-    const args = { ...(newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
+    const args = { ...(hundredActionDefaults(name, selectedLayer) || newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
     if (!NEW_PROCEDURAL.has(name) && ['tile_set','rect_fill','line_draw','ellipse_fill','flood_fill','replace_tile',
       'checker_fill','stamp','region_paste','shift_layer','flip_horizontal','flip_vertical',
       'rotate_90','layer_remove','layer_duplicate','layer_reorder','layer_elevation',
