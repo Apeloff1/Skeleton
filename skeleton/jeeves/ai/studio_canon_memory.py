@@ -12,7 +12,7 @@ and check source receipts before passing them into this owner.
 from __future__ import annotations
 
 from collections.abc import Mapping
- import json
+import json
 from pathlib import Path
 import re
 import sqlite3
