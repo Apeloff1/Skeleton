@@ -665,3 +665,64 @@ adding these source files; the code has to run inside an installed host.
 Regressions for real project files, deterministic reexport, content
 tampering, profile/capability denial, owner binding and engine execution
 permission appear in `test_jeeves_studio_frontier_source_compile.py`.
+
+
+## Original pixel sprite, animation and native art-resource production
+
+Jeeves' local creator source can now produce **real lossless PNG sprite-sheet
+files** using `skeleton.jeeves.ai.studio_sprite_forge`. The independent
+`create` permission boundary remains unchanged. A proposed pixel-art asset
+is a `sprite_forge` source record with an explicitly authored
+`document.kind="pixel_sprite"` and eight required fields:
+
+```json
+{
+  "kind": "pixel_sprite",
+  "asset_id": "original-hero",
+  "width": 2,
+  "height": 2,
+  "pixel_scale": 2,
+  "palette": ["#00000000", "#fb764aff"],
+  "frames": [
+    {"frame_id": "idle-a", "duration_ms": 120, "pixels": [0, 1, 1, 0]},
+    {"frame_id": "idle-b", "duration_ms": 160, "pixels": [1, 0, 0, 1]}
+  ],
+  "animations": [
+    {"name": "idle", "frame_ids": ["idle-a", "idle-b"], "loop": true}
+  ]
+}
+```
+
+The real PNG compiler expands frame pixel indices against the complete,
+explicit RGBA palette, scales pixels by the declared integer factor,
+assembles horizontal animation frames and emits deterministic PNG chunks
+with CRCs. It independently decodes and hashes the resulting RGBA image
+and records each frame rectangle, duration, source revision and animation
+loop. Missing pixels, invalid colors, duplicate frame IDs, undeclared
+animations, invalid palette indexes and excessive image budgets fail
+closed rather than inventing content.
+
+`export(format="sprite-atlas-zip")` writes versioned, SHA-addressed
+`sprites/<asset_id>.png` and `.json` animation-state files, plus a
+full package receipt. The ZIP is built deterministically and its
+published bytes are reread after fsync for an independent disk receipt.
+
+`export(format="frontier-godot4-zip")` now also embeds original sprite
+assets under `game/frontier/sprites/<asset_id>.png` with metadata. The
+existing world exporter remains the source of the gameplay scripts;
+sprite files are additional genuine Godot project resources, with
+independently verified PNG pixels and source/animation hashes.
+
+**Important distinction:** These assets are truly created and shipped as
+native image resources, but the runtime actor meshes/sprite nodes have not
+been automatically bound to them. The proofs explicitly report
+`native_sprite_scene_binding_verified=false`; presence inside the ZIP
+does not count as in-engine sprite rendering or a complete released game.
+
+Dedicated tests cover PNG lossless roundtrips, timed animation states,
+palette and dimension rejection, persisted/exported game source identity,
+duplicate asset names, corrupt ZIP files, Godot-embedded image hashes and
+invalid art refusal. `tests/test_jeeves_native_studio_real_artifacts.py`
+also imports the creator/source/Forge/Godot/sprite suites into the
+repository's root Python test collection, so CI checks these concrete
+artifacts rather than only the original auxiliary test directory.
