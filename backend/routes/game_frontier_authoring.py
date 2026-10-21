@@ -442,3 +442,17 @@ async def simulate_authored_gameplay(project_id: str, body: GameplayProbe,
                                                  user=Depends(get_current_user)):
     return await _call(studio.simulate_gameplay(
         _scope(user), project_id, body.model_dump()))
+
+
+class RouteInspection(Request):
+    scenarios: list[dict[str, Any]] = Field(min_length=1, max_length=100)
+
+
+@router.post("/projects/{project_id}/routes/audit")
+async def audit_authored_walkable_routes(
+    project_id: str, body: RouteInspection,
+    user=Depends(get_current_user),
+):
+    """Authenticated read-only source replay, not a native-game certification."""
+    return await _call(studio.audit_walkable_routes(
+        _scope(user), project_id, body.model_dump()))
