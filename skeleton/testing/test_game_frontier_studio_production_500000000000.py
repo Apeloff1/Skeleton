@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from skeleton.forge.game_frontier_studio import StudioError, StudioProject
+from skeleton.forge.game_frontier_rpg_events import evaluate_environment_events
 from skeleton.forge.game_frontier_studio_authoring import (
     AUTHORING_ACTIONS, execute_authoring, authored_summary,
     project_digest, apply_authoring_batch,
@@ -85,6 +86,21 @@ class FiveHundredBillionEpochs(unittest.TestCase):
             self.assertEqual(base.placements, one.placements[:len(base.placements)])
             self.assertEqual(base.native_quests, one.native_quests[:len(base.native_quests)])
             self.assertGreater(len(one.environmental_pages), len(base.environmental_pages))
+            if axis == 0:
+                page = one.environmental_pages[-1]
+                self.assertEqual({"daylight", "solar_height"},
+                                 {condition.signal for condition in page.conditions})
+                accepted = evaluate_environment_events(
+                    (page,), current={"daylight": .8, "solar_height": 15.},
+                    now_ms=50_000,
+                )
+                rejected = evaluate_environment_events(
+                    (page,), current={"daylight": .1, "solar_height": -1.},
+                    now_ms=50_000,
+                )
+                self.assertEqual(1, len(accepted.accepted))
+                self.assertEqual(0, len(rejected.accepted))
+                self.assertTrue(accepted.required_runtime_approvals)
             hashes.add(project_digest(one))
         self.assertEqual(10, len(hashes))
         self.assertEqual(before, project_digest(base))
