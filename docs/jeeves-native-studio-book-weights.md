@@ -607,3 +607,61 @@ New regressions are in
 This implementation is a real persistent game-design source compiler and
 controlled workflow, not proof of live Godot gameplay, final art/audio,
 complete playable world production or an installed native checkpoint.
+
+
+## Runnable original Godot 4 source and genuine native playthrough path
+
+The source compiler additionally supports a host-authorized
+`export(format="frontier-godot4-zip")`. This executes the repository's
+existing `author_studio_expedition`, original route simulation,
+`emit_expedition_godot_project`, and
+`verify_expedition_godot_project` rather than emitting a dummy image
+or synthetic engine-completion receipt. It builds real `project.godot`,
+`.tscn`, `.gd`, `expedition.json` and the host-authored traveler
+profile and bundles them into a deterministic content-addressed ZIP.
+
+Two **actual saved creator records** are required in addition to typed
+project settings and a map layer. The `world` facet supplies an
+`expedition_profile` with explicit seed, islands, spacing_m, rise_m,
+branch_factor, caverns, include_underwater and include_portals. The
+`movement` or `cast` facet supplies a `traveler_profile` with
+permitted_modes, flags, equipment, max_stamina, carried_kg, capacity_kg,
+skill and shelter. The user/host must author those settings. Jeeves does
+not get undisclosed movement permissions.
+
+The exporter exercises a real Python game route under exactly these
+authored traveler constraints, then verifies that every generated Godot
+file matches the existing deterministic native compiler. It writes a
+`jeeves_source_receipt.json` containing the reviewed source head,
+compiled/noncompiled facet coverage, world SHA, route evidence and per-file
+hashes. A separate **post-fsync disk verifier** rereads the actual ZIP,
+rejects unknown/unsafe ZIP entries, duplicate paths, forged ownership,
+source/hash discrepancies and unbounded expansion, and returns
+`disk_verification` evidence.
+
+**Real Godot execution is a distinct privileged host operation:**
+
+```python
+# The host must authenticate the actor and independently authorize
+# this exact Godot binary. This does not grant shell execution to Jeeves.
+result = studio.verify_real_native_gameplay(
+    godot_executable="/usr/bin/godot4",
+    actor_id="authenticated-human-producer",
+    authorize_native_execution=host_check_native_engine_authority,
+    timeout_seconds=90,
+)
+```
+
+This method calls the existing
+`skeleton.jeeves.game_frontier_expedition_native_runner.run_headless_expedition`
+to launch an **installed Godot 4 executable**, capture actual engine output,
+and independently replay gameplay observations against the canonical Python
+ExpeditionEpisode. A native receipt is journaled only if the executable ran,
+the gameplay agrees, the full route completed, and no other source editor
+changed the game mid-run. A missing binary, declined permission, engine
+failure or mismatched result fails closed. No native engine was launched by
+adding these source files; the code has to run inside an installed host.
+
+Regressions for real project files, deterministic reexport, content
+tampering, profile/capability denial, owner binding and engine execution
+permission appear in `test_jeeves_studio_frontier_source_compile.py`.
