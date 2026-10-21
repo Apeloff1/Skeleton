@@ -99,8 +99,11 @@ def _decode_verified_png(image: bytes, width: int, height: int) -> bytes:
     if chunks[0][1] != struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0):
         raise StudioSpriteError("PNG dimensions or color mode changed")
     expanded_size = height * (width * 4 + 1)
-    inflater = zlib.decompressobj()
-    decompressed = inflater.decompress(chunks[1][1], expanded_size + 1)
+    try:
+        inflater = zlib.decompressobj()
+        decompressed = inflater.decompress(chunks[1][1], expanded_size + 1)
+    except zlib.error as exc:
+        raise StudioSpriteError("PNG pixel compression is invalid") from exc
     if (not inflater.eof or inflater.unused_data or inflater.unconsumed_tail
             or len(decompressed) != expanded_size):
         raise StudioSpriteError("PNG pixel stream size differs from authored image")
@@ -128,8 +131,8 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
     if doc["kind"] != "pixel_sprite":
         raise StudioSpriteError("cannot compile unknown sprite asset source kind")
     asset = identifier(doc["asset_id"], "original sprite asset")
-    if "/" in asset or "\\" in asset or ".." in asset:
-        raise StudioSpriteError("original asset id cannot be an output path")
+    if re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", asset) is None:
+        raise StudioSpriteError("sprite file identity must be portable lowercase ASCII")
     width = _integer(doc["width"], "sprite width", 1, 64)
     height = _integer(doc["height"], "sprite height", 1, 64)
     scale = _integer(doc["pixel_scale"], "pixel art integer scale", 1, 8)
@@ -222,7 +225,14 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "native_engine_sprite_binding_verified": False,
     }
     metadata["receipt_sha256"] = digest(metadata)
-    return {"png": image, "metadata": metadata}
+    # An independent verifier samples source pixels from the actual decoded
+    # PNG, reconstructs the complete atlas, and checks alpha masks and timing.
+    from .studio_sprite_verify import verify_published_sprite
+    checked = verify_published_sprite(image, metadata)
+    return {
+        "png": image, "metadata": metadata,
+        "independent_pixel_replay": checked,
+    }
 
 
 def compile_sprite_collection(records: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
