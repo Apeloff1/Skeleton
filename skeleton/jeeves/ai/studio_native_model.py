@@ -327,5 +327,5 @@ class NativeStudioModel:
             "creator_source_head_sha256": source_head,
             "context_sha256": digest(prompt),
             "host_tool_authority_granted": False,
-        })
+        }, _authority=controller.journal._plan_token)
         return plan
