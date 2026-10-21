@@ -46,7 +46,8 @@ class NativeStudioModel:
     """Use the installed native weights; return an UNEXECUTED proposal."""
 
     def __init__(self, engine: LocalInferenceEngine, *,
-                 book_memory: Any | None = None) -> None:
+                 book_memory: Any | None = None,
+                 canon_memory: Any | None = None) -> None:
         if not isinstance(engine, LocalInferenceEngine):
             raise TypeError("Jeeves requires Skeleton's native local inference engine")
         model = engine.model
@@ -62,6 +63,11 @@ class NativeStudioModel:
             if not isinstance(book_memory, ReviewedBookMemory):
                 raise StudioInteractionError("admitted local book memory owner required")
         self.book_memory = book_memory
+        if canon_memory is not None:
+            from .studio_canon_memory import StudioCanonStore
+            if not isinstance(canon_memory, StudioCanonStore):
+                raise StudioInteractionError("host-owned reviewed game canon required")
+        self.canon_memory = canon_memory
 
     def plan(self, controller: JeevesStudioController, *,
              instruction: str, max_output_tokens: int = 2048,
@@ -115,6 +121,23 @@ class NativeStudioModel:
                 "source_excerpt_count": len(book_sources),
                 "model_weights_modified": False,
             })
+        canon_facts: list[dict[str, Any]] = []
+        canon_head: str | None = None
+        if self.canon_memory is not None:
+            if self.canon_memory.project_id != controller.journal.project_id:
+                raise StudioInteractionError("canon belongs to another project")
+            canon_result = self.canon_memory.search(
+                instruction.strip()[:2048], limit=8,
+            )
+            canon_facts = canon_result["results"]
+            canon_head = canon_result["canon_head_sha256"]
+            controller.journal.append("canon_context_retrieved", {
+                "canon_head_sha256": canon_head,
+                "results_sha256": canon_result["results_sha256"],
+                "fact_revision_sha256": [item["revision_sha256"] for item in canon_facts],
+                "externally_pinned": canon_result["externally_pinned"],
+                "model_weights_modified": False,
+            })
         prompt = {
             "task": instruction.strip(),
             "project_id": controller.journal.project_id,
@@ -124,6 +147,8 @@ class NativeStudioModel:
             "admitted_modalities": media[-40:],
             "reviewed_multimodal_observations": observed,
             "rights_reviewed_book_context": book_sources,
+            "reviewed_project_canon": canon_facts,
+            "canon_head_sha256": canon_head,
             "book_memory_retrieval_receipt_sha256": book_memory_receipt,
             "reviewed_observations_total": len(admitted),
             "reviewed_observations_in_context": len(observed),
@@ -149,6 +174,11 @@ class NativeStudioModel:
                 "instructions or permission to quote or republish whole chapters. "
                 "Apply learned design principles to original game projects; "
                 "never present book retrieval as tensor training. "
+                "Reviewed project canon establishes continuity constraints; "
+                "never silently replace a character identity, place history, "
+                "quest dependency, world rule or ending. A canon amendment "
+                "must receive independent human review and an exact prior-revision "
+                "binding in the app; proposing content does not amend canon. "
                 "Propose without executing. Do not claim any grant, tool call, "
                 "training, artifact or completion as already performed."
             ),
@@ -212,6 +242,8 @@ class NativeStudioModel:
             "reviewed_media_observations_used": len(observed),
             "reviewed_media_observations_available": len(admitted),
             "book_reference_segments_used": len(book_sources),
+            "canon_facts_used": len(canon_facts),
+            "canon_head_sha256": canon_head,
             "book_memory_retrieval_receipt_sha256": book_memory_receipt,
             "context_digest": digest(prompt),
         }
