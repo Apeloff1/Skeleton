@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from skeleton.ai.training.book_learning_bridge import BookIntakeError, CHUNK_CHARS, compile_book_intake
-from skeleton.ai.training.book_weight_candidate import _receipt, _all_rows
+from skeleton.ai.training.book_weight_candidate import (_receipt, _all_rows, _bounded_output_hash, _publish_receipt)
 from skeleton.jeeves.ai.studio_interaction_contract import (
     FACETS, questions, StudioProposal, StudioEvidenceJournal,
     StudioInteractionError, JeevesStudioController,
@@ -147,6 +147,39 @@ class InteractionTests(unittest.TestCase):
                 modality="image", artifact_digest="bad",
                 source_id="asset-01", rights_scope="original",
             )
+
+
+class BookCandidateReceiptTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+
+    def test_actual_model_bytes_are_hashed(self):
+        checkpoint = self.root / "candidate.json"
+        checkpoint.write_bytes(b"actual tensor checkpoint bytes")
+        self.assertEqual(_bounded_output_hash(checkpoint),
+                         sha256(checkpoint.read_bytes()).hexdigest())
+        checkpoint.write_bytes(checkpoint.read_bytes() + b"mutated")
+        self.assertNotEqual(_bounded_output_hash(checkpoint),
+                            sha256(b"actual tensor checkpoint bytes").hexdigest())
+
+    def test_evaluation_receipt_is_immutable(self):
+        target = self.root / "evaluation-receipt.json"
+        record = {"candidate_sha256": "a" * 64,
+                  "production_model_auto_promoted": False}
+        _publish_receipt(target, record)
+        self.assertEqual(json.loads(target.read_text()), record)
+        with self.assertRaises(BookIntakeError):
+            _publish_receipt(target, record)
+
+    def test_refuse_fake_or_symlink_candidate(self):
+        with self.assertRaises(BookIntakeError):
+            _bounded_output_hash(self.root / "missing")
+        (self.root / "real").write_bytes(b"real model")
+        (self.root / "link").symlink_to(self.root / "real")
+        with self.assertRaises(BookIntakeError):
+            _bounded_output_hash(self.root / "link")
 
 
 if __name__ == "__main__":
