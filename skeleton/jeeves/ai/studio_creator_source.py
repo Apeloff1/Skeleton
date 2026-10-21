@@ -156,7 +156,10 @@ def _sprite_archive(
     source_head_sha256: str | None,
 ) -> bytes:
     """Write reproducible PNG and animation-state assets with source receipts."""
-    from .studio_sprite_forge import _decode_verified_png
+    from .studio_sprite_verify import verify_published_sprite
+    from .studio_sprite_godot_resources import (
+        compile_godot_sprite_resources, verify_godot_sprite_resources,
+    )
 
     atlas = compiled["assets"]
     metadata = {
@@ -176,13 +179,19 @@ def _sprite_archive(
         raw = entry["png"]
         if sha256(raw).hexdigest() != proof["png_sha256"]:
             raise CreatorSourceError("sprite output differs from its generated proof")
-        pixels = _decode_verified_png(
-            raw, proof["sheet_width_px"], proof["sheet_height_px"],
-        )
-        if sha256(pixels).hexdigest() != proof["pixel_content_sha256"]:
-            raise CreatorSourceError("published PNG pixel content changed from authored source")
+        independent = verify_published_sprite(raw, proof)
+        if not independent["layout_and_padding_reproduced"]:
+            raise CreatorSourceError("published sprite pixel atlas does not replay")
         files["sprites/" + name + ".png"] = raw
         files["sprites/" + name + ".json"] = _json(proof)
+        resources = compile_godot_sprite_resources(
+            proof, directory="sprites",
+        )
+        verify_godot_sprite_resources(proof, resources, directory="sprites")
+        for path, source in resources.items():
+            if path in files:
+                raise CreatorSourceError("Godot sprite resource identity collides")
+            files[path] = source.encode("utf-8")
     files["jeeves_sprite_receipt.json"] = _json(metadata, limit=MAX_BUNDLE_BYTES)
     total = sum(len(raw) for raw in files.values())
     if total > MAX_BUNDLE_BYTES:
