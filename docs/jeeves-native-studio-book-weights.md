@@ -288,3 +288,123 @@ receipt also distinguishes an actual optimizer artifact from a completed,
 deployed or release-qualified Jeeves model. `--receipt` exclusively creates
 one private audit file and refuses to overwrite any prior output. This does
 not weaken the existing separate candidate evaluation and promotion process.
+
+## Operational: local books used by the speaking Jeeves model
+
+The rights-reviewed full-book curriculum now has TWO distinct usable
+paths. The original `book_weight_candidate` runs real checkpoint-derived
+candidate training when actual approved texts and a trainable active Jeeves
+checkpoint are present. Separately, the new
+`skeleton.jeeves.ai.studio_book_memory.ReviewedBookMemory` creates a private
+FTS5-backed local knowledge memory from exactly those admitted shards, without
+waiting for optimizer training. This is grounded retrieval augmentation, **not**
+a substitute for changed model weights. Neither path uses a hosted provider.
+
+Build and independently pin the exact original book admission receipt:
+
+```bash
+sha256sum /private/books/admitted/jeeves-books-legal-review-01-receipts.json
+
+python -m skeleton.jeeves.ai.studio_book_memory build \
+  --index /private/jeeves/book-index.sqlite \
+  --project-id my-game \
+  --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256 \
+  --admission-receipt /private/books/admitted/jeeves-books-legal-review-01-receipts.json \
+  --admitted-dir /private/books/admitted
+
+python -m skeleton.jeeves.ai.studio_book_memory search \
+  --index /private/jeeves/book-index.sqlite \
+  --project-id my-game \
+  --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256 \
+  --query "How should alternate quests preserve world canon?" \
+  --actor-id game-designer
+
+python -m skeleton.jeeves.ai.studio_book_memory verify \
+  --index /private/jeeves/book-index.sqlite \
+  --project-id my-game \
+  --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256
+```
+
+When a source must stop being used:
+
+```bash
+python -m skeleton.jeeves.ai.studio_book_memory revoke \
+  --index /private/jeeves/book-index.sqlite \
+  --project-id my-game \
+  --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256 \
+  --book-id original-design-volume-one \
+  --reviewer-id authorized-human-reviewer \
+  --reason "The original rights holder has withdrawn inference permission"
+```
+
+Retrieval verifies project and pinned source, uses literal non-executable FTS
+query terms, bounds excerpts, excludes withdrawn volumes and chains each
+result to a host-persisted search receipt. Explicit withdrawal prevents future
+searches but does **not** erase the original private source file; the owner
+must separately execute lawful retention or erasure policies. Trained
+checkpoints already exposed to a withdrawn source require a separate model
+governance decision; removal from retrieval cannot reverse training.
+
+## Operational: standalone host session and real delegation
+
+The application host can construct one `NativeStudioHost` around the
+**already running local** `LocalInferenceEngine` and an approved project.
+An operator supplies an installed native checkpoint, private working paths and
+previously built book memory:
+
+```python
+from pathlib import Path
+from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
+
+# engine = host's ACTUAL loaded local inference engine.
+with NativeStudioHost(
+    engine, project_id="my-game", session_id="session-001",
+    journal_path=Path("/private/jeeves/studio-events.sqlite"),
+    runbook_directory=Path("/private/jeeves/runbooks"),
+    book_index=Path("/private/jeeves/book-index.sqlite"),
+    book_admission_sha256="INDEPENDENT_RECEIPT_FILE_SHA256",
+) as studio:
+    studio.answer(
+        "world", "Author an original multi-island world with optional routes",
+        actor_id="human-producer",
+    )
+    plan = studio.plan(
+        "Implement original quest structure, consistent cast and sky islands"
+    )
+    approval_receipt = studio.approve(
+        plan, reviewer_id="human-producer",
+    )
+    # These objects MUST be provided by trusted application ownership:
+    # executor = actual ToolExecutor with registered creator handlers
+    # grants = {step_id: (host_execution_context, fresh_exact_ToolGrant)}
+    # result = studio.execute_authorized(
+    #     plan, executor=executor, host_grants=grants, max_steps=8
+    # )
+    audit = studio.audit()
+```
+
+The real host path now composes the existing local model and typed creator
+command contract, 38 game facets, reviewed media and indexed books, durable
+model/plan approval history, host-bound ToolExecutor delegation and one-shot
+runbook stores. `execute_authorized` never manufactures permissions.
+`studio_delegate_executor.execute_approved_studio_batch` can process
+dependency-ordered authorized actions, link each successful step to its
+actual persisted host command receipt, and quarantine ambiguous effects as
+`in_doubt` requiring independent reconciliation. Restarting with the same
+plan and project reopens the existing plan-specific SQLite execution chain.
+The output's `all_runbook_steps_succeeded` is only evidence that scoped
+commands finished; it does not certify full-game playthrough or release.
+
+Additional regressions:
+`test_jeeves_studio_book_memory.py` and
+`test_jeeves_studio_delegate_executor.py`.
+
+### Capability readiness
+
+The native studio planning path requires a genuine loaded model, not merely
+a reference-language-model fallback. Not all game engines, SDKs or editor
+handlers are already installed. If an existing command's runtime handler is
+missing, the goal remains blocked or in doubt instead of pretending that the
+forge changed source files. The host must explicitly attach actual creator
+handlers, target engine, media decoders, checkpoints, resources and the approved
+reviewed book library before executing the corresponding production work.
