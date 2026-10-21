@@ -567,6 +567,12 @@ class CreatorProjectSourceStore:
                  "record_id": row[2]} for row in rows
             ]
 
+    def head_identity(self) -> str | None:
+        """O(1) trusted in-process project head; verify external SQLite changes."""
+        with self._lock:
+            self._refresh()
+            return self._head
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             self._refresh()
