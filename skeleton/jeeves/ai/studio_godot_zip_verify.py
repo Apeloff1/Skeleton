@@ -105,6 +105,68 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "published native game source does not match build proof"
                     )
+            original_sprites = proof.get("packaged_original_sprites", [])
+            if (not isinstance(original_sprites, list)
+                    or len(original_sprites) > 128
+                    or proof.get("native_sprite_scene_binding_verified") is not False):
+                raise NativeSourceVerificationError(
+                    "native sprite asset and runtime-binding claims are inconsistent"
+                )
+            if original_sprites:
+                from .studio_sprite_forge import (
+                    StudioSpriteError, _decode_verified_png,
+                )
+                for item in original_sprites:
+                    if not isinstance(item, dict) or set(item) != {
+                        "asset_id", "source_record_id", "source_sha256",
+                        "frame_count", "animation_count", "png_sha256",
+                    }:
+                        raise NativeSourceVerificationError(
+                            "compiled sprite record has incomplete source references"
+                        )
+                    asset_name = item["asset_id"]
+                    png_name = "game/frontier/sprites/" + asset_name + ".png"
+                    json_name = "game/frontier/sprites/" + asset_name + ".json"
+                    if png_name not in expected or json_name not in expected:
+                        raise NativeSourceVerificationError(
+                            "Godot candidate omitted authored sprite resources"
+                        )
+                    image = archive.read(png_name)
+                    try:
+                        sprite = json.loads(archive.read(json_name))
+                    except (ValueError, TypeError, UnicodeDecodeError) as exc:
+                        raise NativeSourceVerificationError(
+                            "authored sprite metadata is corrupt"
+                        ) from exc
+                    if not isinstance(sprite, dict):
+                        raise NativeSourceVerificationError(
+                            "sprite metadata must be a typed original object"
+                        )
+                    complete = dict(sprite)
+                    claim = complete.pop("receipt_sha256", None)
+                    if (digest(complete) != claim
+                            or sprite.get("asset_id") != asset_name
+                            or sprite.get("source_sha256") != item["source_sha256"]
+                            or sprite.get("record_id") != item["source_record_id"]
+                            or sprite.get("png_sha256") != item["png_sha256"]
+                            or len(sprite.get("frames", [])) != item["frame_count"]
+                            or len(sprite.get("animations", [])) != item["animation_count"]):
+                        raise NativeSourceVerificationError(
+                            "Godot sprite source identity or animation receipt differs"
+                        )
+                    try:
+                        pixels = _decode_verified_png(
+                            image, sprite["sheet_width_px"],
+                            sprite["sheet_height_px"],
+                        )
+                    except (StudioSpriteError, KeyError, TypeError) as exc:
+                        raise NativeSourceVerificationError(
+                            "embedded Godot PNG differs from authored sprite pixels"
+                        ) from exc
+                    if sha256(pixels).hexdigest() != sprite["pixel_content_sha256"]:
+                        raise NativeSourceVerificationError(
+                            "Godot sprite decoded pixel identity differs from source"
+                        )
     except (zipfile.BadZipFile, RuntimeError, OSError, UnicodeError) as exc:
         raise NativeSourceVerificationError("published Godot archive is unreadable") from exc
     return {
