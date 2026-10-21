@@ -130,6 +130,22 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         raise StudioSpriteError("sprite document has undeclared or missing source fields")
     if doc["kind"] != "pixel_sprite":
         raise StudioSpriteError("cannot compile unknown sprite asset source kind")
+    # The compiler must not promote arbitrary model-supplied metadata as
+    # a persisted, versioned original asset. Validate against the SAME
+    # exact SHA input used by CreatorProjectSourceStore._documents.
+    record_id = identifier(record.get("record_id"), "original game sprite record")
+    revision = record.get("revision")
+    depends_on = record.get("depends_on")
+    if (type(revision) is not int or revision < 1
+            or type(depends_on) is not list
+            or len(depends_on) > 32
+            or any(type(dependency) is not str for dependency in depends_on)):
+        raise StudioSpriteError("sprite source lacks reviewed durable revision provenance")
+    expected_source = digest([
+        record_id, "sprite_forge", revision, doc, depends_on,
+    ])
+    if record.get("source_sha256") != expected_source:
+        raise StudioSpriteError("sprite source content differs from original SQLite revision")
     asset = identifier(doc["asset_id"], "original sprite asset")
     if re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", asset) is None:
         raise StudioSpriteError("sprite file identity must be portable lowercase ASCII")
@@ -221,6 +237,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "png_sha256": sha256(image).hexdigest(),
         "pixel_content_sha256": sha256(surface).hexdigest(),
         "pixels_losslessly_verified": True,
+        "source_revision_independently_verified": True,
         "generated_with_model_image_weights": False,
         "native_engine_sprite_binding_verified": False,
     }
