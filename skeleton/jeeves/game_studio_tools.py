@@ -82,6 +82,14 @@ READ_OPERATIONS = (
     "game.studio.author.compile",
     "game.studio.author.game",
     "game.studio.author.gameplay",
+    "game.studio.curriculum.catalog",
+    "game.studio.curriculum.reference",
+    "game.studio.curriculum.lesson",
+    "game.studio.curriculum.assess",
+    "game.studio.curriculum.practice",
+    "game.studio.curriculum.automation.plan",
+    "game.studio.curriculum.automation.preview",
+    "game.studio.book.manifest",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -131,6 +139,7 @@ WRITE_OPERATIONS = (
     "game.studio.expanded.review",
     "game.studio.author.edit",
     "game.studio.author.export",
+    "game.studio.curriculum.automation.commit",
 )
 OPERATIONS = frozenset((*READ_OPERATIONS, *WRITE_OPERATIONS))
 
