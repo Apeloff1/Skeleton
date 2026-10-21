@@ -24,6 +24,7 @@ from skeleton.jeeves.game_frontier_book_curriculum import (
 from skeleton.jeeves.game_frontier_curriculum_path import (
     learning_path, batch_program, PRACTICE_CHECKS,
 )
+from skeleton.jeeves.game_frontier_curriculum_practice import verify_source_practice
 from skeleton.jeeves.game_studio_tools import (
     StudioCommand, READ_OPERATIONS, WRITE_OPERATIONS,
 )
@@ -169,6 +170,47 @@ class CompleteJeevesSourceCurriculum(unittest.TestCase):
         self.assertEqual(output["receipt"]["action_count"], 1)
         self.assertTrue(output["receipt"]["actually_changed"])
 
+    def test_independent_practical_evidence_rejects_forged_source_or_book(self):
+        original = original_project()
+        operation = exemplar("epic", 0)
+        result = apply_authoring_batch(original, [
+            {"action": operation, "parameters": arguments(operation)}
+        ])
+        evidence = verify_source_practice(
+            original.project_id, "epic", 0, result["receipt"],
+            current_source_sha256=project_digest(original),
+            expected_candidate_sha256=project_digest(result["project"]),
+        )
+        self.assertTrue(evidence["source_practice_verified"])
+        self.assertEqual("forgebook:epic:0", evidence["book"])
+        self.assertEqual(operation, evidence["source_operation"])
+        self.assertFalse(evidence["model_weights_trained"])
+        self.assertFalse(evidence["project_saved"])
+        self.assertFalse(evidence["independent_human_reviewed"])
+        self.assertEqual(64, len(evidence["evidence_sha256"]))
+        with self.assertRaises(StudioError):
+            verify_source_practice(
+                original.project_id, "epic", 1, result["receipt"],
+                current_source_sha256=project_digest(original),
+                expected_candidate_sha256=project_digest(result["project"]),
+            )
+        fake = {**result["receipt"],
+                "changes": [dict(result["receipt"]["changes"][0],
+                                 operation="epic_fake_authoring_operation")]}
+        with self.assertRaises(StudioError):
+            verify_source_practice(
+                original.project_id, "epic", 0, fake,
+                current_source_sha256=project_digest(original),
+                expected_candidate_sha256=project_digest(result["project"]),
+            )
+        forged = dict(result["receipt"], receipt_sha256="0"*64)
+        with self.assertRaises(StudioError):
+            verify_source_practice(
+                original.project_id, "epic", 0, forged,
+                current_source_sha256=project_digest(original),
+                expected_candidate_sha256=project_digest(result["project"]),
+            )
+
     def test_jeeves_registry_advertises_separate_read_and_write_auth(self):
         for name in (
             "game.studio.curriculum.catalog", "game.studio.curriculum.reference",
@@ -248,6 +290,17 @@ class HostAuthorizedCurriculumOperation(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(candidate, preview["candidate_sha256"])
             self.assertFalse(preview["persisted"])
             self.assertTrue(preview["measured_changed"])
+            practical = await execute_studio_command(scope, StudioCommand(
+                "game.studio.curriculum.practice", "owned", {
+                    "books": [{"generation": "epic", "index": 0}],
+                    "parameters": arguments(op),
+                    "expected_revision": 7,
+                    "expected_sha256": initial,
+                }))
+            self.assertFalse(practical["persisted"])
+            self.assertTrue(practical["practical_attestation"]["source_practice_verified"])
+            self.assertEqual(candidate,
+                             practical["practical_attestation"]["candidate_sha256"])
             with self.assertRaises(StudioError):
                 await execute_studio_command(scope, command(
                     "commit", expected_revision=7, expected_sha256=initial,
