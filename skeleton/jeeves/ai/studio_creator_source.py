@@ -519,6 +519,7 @@ class CreatorProjectSourceStore:
             raise CreatorSourceError("source artifact name must not contain path separators")
         with self._lock:
             self._refresh()
+            generation = self._head
             report = self._validate_graph(self._records)
             if not self._records or not report["valid"]:
                 raise CreatorSourceError("unresolved sources or dependencies block export")
@@ -552,6 +553,12 @@ class CreatorProjectSourceStore:
             if export_format != "frontier-godot4-zip":
                 raw = _json(bundle, limit=MAX_BUNDLE_BYTES)
                 extension = ".json"
+            # Compilation can take longer than ordinary SQLite mutations.
+            # Do not emit a supposedly current source bundle if another
+            # producer committed during compilation.
+            self._refresh()
+            if self._head != generation:
+                raise CreatorSourceError("project source changed during candidate compilation")
             content_sha = sha256(raw).hexdigest()
             name = artifact + "-" + content_sha[:24] + extension
             target = self.export_root / name
