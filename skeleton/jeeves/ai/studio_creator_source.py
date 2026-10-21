@@ -457,8 +457,9 @@ class CreatorProjectSourceStore:
             }
 
     def export(self, command: CreatorCommand) -> dict[str, Any]:
-        if command.payload["format"] != "game-source-json":
-            raise CreatorSourceError("only actual original JSON game-source export is available")
+        export_format = command.payload["format"]
+        if export_format not in ("game-source-json", "frontier-studio-json"):
+            raise CreatorSourceError("unsupported game source or typed Forge export format")
         artifact = identifier(command.payload["artifact_name"], "artifact")
         if "/" in artifact or "\\" in artifact:
             raise CreatorSourceError("source artifact name must not contain path separators")
@@ -467,14 +468,25 @@ class CreatorProjectSourceStore:
             report = self._validate_graph(self._records)
             if not self._records or not report["valid"]:
                 raise CreatorSourceError("unresolved sources or dependencies block export")
-            bundle = {
-                "schema_version": SCHEMA, "project_id": self.project_id,
-                "source_head_sha256": self._head,
-                "source_count": len(self._records),
-                "source_documents": [self._records[key] for key in sorted(self._records)],
-                "dependency_assurance": report,
-                "native_binary_compiled": False,
-            }
+            if export_format == "frontier-studio-json":
+                from .studio_frontier_source_compile import (
+                    compile_persisted_frontier_source,
+                )
+                bundle = compile_persisted_frontier_source(
+                    self.project_id, self._records,
+                    source_head_sha256=self._head,
+                )
+            else:
+                bundle = {
+                    "schema_version": SCHEMA, "project_id": self.project_id,
+                    "source_head_sha256": self._head,
+                    "source_count": len(self._records),
+                    "source_documents": [
+                        self._records[key] for key in sorted(self._records)
+                    ],
+                    "dependency_assurance": report,
+                    "native_binary_compiled": False,
+                }
             raw = _json(bundle, limit=MAX_BUNDLE_BYTES)
             content_sha = sha256(raw).hexdigest()
             name = artifact + "-" + content_sha[:24] + ".json"
@@ -488,6 +500,7 @@ class CreatorProjectSourceStore:
                     "project_id": self.project_id, "artifact_name": name,
                     "bytes": len(raw), "artifact_sha256": content_sha,
                     "source_head_sha256": self._head,
+                    "export_format": export_format,
                     "already_exported": True, "native_binary_compiled": False,
                 }
             fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -503,6 +516,7 @@ class CreatorProjectSourceStore:
                 "project_id": self.project_id, "artifact_name": name,
                 "bytes": len(raw), "artifact_sha256": content_sha,
                 "source_head_sha256": self._head,
+                "export_format": export_format,
                 "already_exported": False, "native_binary_compiled": False,
             }
 
