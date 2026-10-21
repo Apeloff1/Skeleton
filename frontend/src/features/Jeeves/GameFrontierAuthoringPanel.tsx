@@ -1,6 +1,7 @@
 /** Interactive 500-operation Forge Studio editor over live authenticated project revisions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import GameFrontierHandbookPanel from './GameFrontierHandbookPanel';
+import GameFrontierEpicRoutePanel from './GameFrontierEpicRoutePanel';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   buildForge, copyForgeTiles, editForge, exportForge, inspectForge,
@@ -898,6 +899,9 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     {steps.slice(-8).map((step, index) => <Text key={index} style={{ color: '#a5bdcc' }}>
       {steps.length - Math.min(steps.length, 8) + index + 1}. {label(step.action)}</Text>)}
 
+    {recipeGeneration === 'epic' && <GameFrontierEpicRoutePanel
+      projectId={project.project_id} document={doc}
+      selectedLayer={selectedLayer} siblingLayers={epicLayers} disabled={pending} />}
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Audit authored routes & alternatives</Text>
     <Text style={{ color: '#a7bacf' }}>Source tile coordinates; traversability matches the canonical
       movement bridge. Multiple scenarios and independent alternate paths are supported.
