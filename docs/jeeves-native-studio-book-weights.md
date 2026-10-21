@@ -158,7 +158,8 @@ python -m skeleton.ai.training.book_weight_candidate \
   --dataset-manifest /private/corpus/book-train-manifest.json \
   --expected-checkpoint-sha256 ACTUAL_LIVE_CHECKPOINT_SHA256 \
   --candidate /private/candidates/jeeves-book-candidate.json \
-  --report /private/candidates/jeeves-book-evaluation.json
+  --report /private/candidates/jeeves-book-evaluation.json \
+  --receipt /private/candidates/jeeves-book-admission-to-weights-receipt.json
 ```
 
 The final runner verifies all admitted shards and exact TRAIN membership,
@@ -276,3 +277,14 @@ bytes were provided; they are not proof of the description's accuracy.
   effects. Unsupported forge targets must remain unexecuted, not invented.
 - Production release still requires exact-source and native engine evidence,
   measured quality, independently reviewed rights and explicit promotion.
+
+### Candidate training final provenance
+
+After the actual existing optimizer returns and publishes its files, the
+book-training bridge independently hashes the **candidate checkpoint bytes**
+and the **evaluation report bytes** as well as the exact approved train,
+holdout, manifest, book admission and serving checkpoint hashes. The new v2
+receipt also distinguishes an actual optimizer artifact from a completed,
+deployed or release-qualified Jeeves model. `--receipt` exclusively creates
+one private audit file and refuses to overwrite any prior output. This does
+not weaken the existing separate candidate evaluation and promotion process.
