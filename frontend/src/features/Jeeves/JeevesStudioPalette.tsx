@@ -70,6 +70,8 @@ export default function JeevesStudioPalette({
   const [facet, setFacet] = useState('vision');
   const [mode, setMode] = useState<Mode>('questionnaire');
   const [flowId, setFlowId] = useState('full-production');
+  const [flowStageStart, setFlowStageStart] = useState(0);
+  const [previousFlowReceipt, setPreviousFlowReceipt] = useState<string | undefined>();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const reply = answers[facet] || '';
   const setReply = (value: string) => setAnswers(current => ({ ...current, [facet]: value }));
@@ -106,11 +108,13 @@ export default function JeevesStudioPalette({
   const groups = ['All', ...Array.from(new Set(JEEVES_STUDIO_DOMAINS.map(item => item.family)))];
   const selectedFlow = JEEVES_STUDIO_FLOWS.find(item => item.id === flowId) ||
     JEEVES_STUDIO_FLOWS[0];
+  const flowStages = selectedFlow.stages.slice(flowStageStart, flowStageStart + 6);
 
   const buildRequest = () => {
     if (mode === 'flow') {
-      const stage = selectedFlow.stages.includes(chosen.id) ? chosen.id : selectedFlow.stages[0];
-      return composeStudioFlow(selectedFlow, answers, source, stage);
+      const stage = flowStages.includes(chosen.id) ? chosen.id : flowStages[0];
+      return composeStudioFlow(selectedFlow, answers, source, stage,
+        flowStageStart, 6, previousFlowReceipt);
     }
     const request = [
       'Jeeves: operate as the locally running game-studio AI, not an external API proxy.',
@@ -243,13 +247,45 @@ export default function JeevesStudioPalette({
             <Text style={{ color: C.text, fontWeight: '700' }}>Cross-forge production workflow</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
               {JEEVES_STUDIO_FLOWS.map(flow => chip(flow.title, flow.id === flowId,
-                () => { setFlowId(flow.id); setFacet(flow.stages[0]); setGoalReceipt(null); }))}
+                () => { setFlowId(flow.id); setFacet(flow.stages[0]);
+                  setFlowStageStart(0); setPreviousFlowReceipt(undefined); setGoalReceipt(null); }))}
             </View>
             <Text style={{ color: C.subtle }}>{selectedFlow.purpose}</Text>
             <Text style={{ color: C.subtle, fontSize: 12 }}>Acceptance: {selectedFlow.finish}</Text>
+            <Text style={{ color: C.text, fontWeight: '700' }}>
+              Slice {Math.floor(flowStageStart / 6) + 1} /
+              {' '}{Math.ceil(selectedFlow.stages.length / 6)} · stages
+              {' '}{flowStageStart + 1}–{Math.min(flowStageStart + 6, selectedFlow.stages.length)}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+              {flowStageStart > 0 && chip('← Previous slice', false, () => {
+                const offset = Math.max(0, flowStageStart - 6);
+                setFlowStageStart(offset); setFacet(selectedFlow.stages[offset]);
+                setGoalReceipt(null);
+              })}
+              {flowStageStart + 6 < selectedFlow.stages.length &&
+                chip('Next production slice →', false, () => {
+                  const offset = flowStageStart + 6;
+                  // A source digest is a cross-slice reference, not a substitute
+                  // for the server's own project and receipt verification.
+                  if (goalReceipt?.integrity?.status === 'verified' &&
+                      goalReceipt.integrity.state_digest) {
+                    setPreviousFlowReceipt(goalReceipt.integrity.state_digest);
+                  } else {
+                    setPreviousFlowReceipt(undefined);
+                  }
+                  setFlowStageStart(offset); setFacet(selectedFlow.stages[offset]);
+                  setGoalReceipt(null);
+                })}
+            </View>
+            {flowStageStart > 0 && !previousFlowReceipt &&
+              <Text style={{ color: '#fbbf24', fontSize: 12 }}>
+                No independently verified prior-slice receipt is pinned. Inspect actual
+                saved project history before accepting continuity or completion.
+              </Text>}
             <Text style={{ color: C.text, fontWeight: '700' }}>Select and answer each stage</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
-              {selectedFlow.stages.map(stage => chip(stage + (answers[stage]?.trim() ? ' ✓' : ''),
+              {flowStages.map(stage => chip(stage + (answers[stage]?.trim() ? ' ✓' : ''),
                 chosen.id === stage, () => setFacet(stage)))}
             </View>
             <Text style={{ color: C.subtle, fontSize: 12 }}>
