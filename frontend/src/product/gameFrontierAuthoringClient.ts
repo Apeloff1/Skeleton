@@ -77,6 +77,38 @@ export async function getForgeActions(signal?: AbortSignal): Promise<string[]> {
     throw new Error('Forge Studio action catalogue is incomplete.');
   return result.actions;
 }
+export type ForgeRecipe = {
+  operation: string; domain: string; source_blueprint: string;
+  treatment: string; recipe_steps: string[]; source_index: number;
+  style_index: number; actual_project_mutation: boolean;
+};
+export type ForgeRecipeResults = {
+  schema: 'skeleton.forge.production_recipe_search.v1';
+  total_catalog: number; matched: number; offset: number; limit: number;
+  next_offset: number | null; domains: string[]; styles: string[];
+  items: ForgeRecipe[];
+};
+export async function searchForgeRecipes(query = '', domain = '', offset = 0,
+                                         limit = 32): Promise<ForgeRecipeResults> {
+  const params = [
+    'query=' + encodeURIComponent(query),
+    'domain=' + encodeURIComponent(domain),
+    'offset=' + encodeURIComponent(String(offset)),
+    'limit=' + encodeURIComponent(String(limit)),
+  ].join('&');
+  const results = await data(api.get<ForgeRecipeResults>(
+    ROOT + '/recipes?' + params, options()), 'Could not search original-game production recipes.');
+  if (!results || results.schema !== 'skeleton.forge.production_recipe_search.v1'
+      || results.total_catalog !== 4500 || !Array.isArray(results.items)
+      || results.items.length > 64
+      || results.items.some(recipe => !/^produce_[a-z_]+__[a-z_]+$/.test(recipe.operation)
+        || recipe.actual_project_mutation !== true)) {
+    throw new ChatClientError('Forge production recipe search returned invalid source.',
+      {kind: 'protocol', retryable: false});
+  }
+  return results;
+}
+
 export async function copyForgeTiles(projectId: string, layer: string, x: number, y: number,
                                      width: number, height: number) {
   return data(api.post<{ tiles: number[]; palette: string[]; receipt_sha256: string }>(
@@ -86,7 +118,9 @@ export async function copyForgeTiles(projectId: string, layer: string, x: number
 export async function editForge(projectId: string, doc: ForgeDocument, steps: ForgeStep[],
                                 preview: boolean): Promise<ForgePreview | ForgeCommit> {
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 64 ||
-      steps.some(step => !doc.action_catalog.includes(step.action))) throw new Error(
+      steps.some(step => !doc.action_catalog.includes(step.action)
+        && !(doc.recipe_catalog_count === 4500
+          && /^produce_[a-z_]+__[a-z_]+$/.test(step.action)))) throw new Error(
     'Select one or more supported editor operations.');
   const key = learningRequestKey('forge-author');
   const body = { expected_version: doc.expected_version,
