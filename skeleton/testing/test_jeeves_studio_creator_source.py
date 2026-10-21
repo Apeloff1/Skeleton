@@ -297,8 +297,12 @@ class CreatorSourceTests(unittest.TestCase):
                 self.assertEqual(self.owner.snapshot()["event_count"], 1)
 
 
-class NativePlanSourceFreshnessTests(CreatorSourceTests):
+class NativePlanSourceFreshnessTests(unittest.TestCase):
     """Exercise dispatch admission without substituting a fake local checkpoint."""
+
+    setUp = CreatorSourceTests.setUp
+    create = CreatorSourceTests.create
+    command = CreatorSourceTests.command
 
     def bound(self, *, approved: bool = True):
         journal = StudioEvidenceJournal(
