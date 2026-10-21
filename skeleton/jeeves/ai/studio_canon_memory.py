@@ -346,6 +346,12 @@ class StudioCanonStore:
                 "externally_pinned": self.expected_head_sha256 is not None,
             }
 
+    def head_identity(self) -> str | None:
+        """Read verified canon head cheaply unless another process edited it."""
+        with self._lock:
+            self._check_external()
+            return self._head
+
     def close(self) -> None:
         self._db.close()
 
