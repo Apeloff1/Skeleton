@@ -18,7 +18,7 @@ router = APIRouter(prefix="/game-frontier-authoring", tags=["Game Studio authori
 
 
 class EditorStep(Request):
-    action: str = Field(min_length=1, max_length=64)
+    action: str = Field(min_length=1, max_length=192)
     parameters: dict[str, Any] = Field(default_factory=dict, max_length=32)
 
 
