@@ -142,7 +142,7 @@ def _payload(args: Mapping[str, Any], recipe: str) -> dict[str, Any]:
         "scale", "threshold", "seed", "prefab_id", "count",
         "radius", "spacing", "z", "angle_deg", "dialogue",
         "target", "quest_id", "event_id", "page_id", "priority",
-        "cooldown_ms", "event_prefix",
+        "cooldown_ms", "event_prefix", "instance_id",
     }
     if set(args) - allowed:
         raise StudioError("recipe accepts parameters only; arbitrary subcommands forbidden")
@@ -150,13 +150,17 @@ def _payload(args: Mapping[str, Any], recipe: str) -> dict[str, Any]:
     if type(params.get("seed")) is not int:
         raise StudioError("recipe needs explicit reproducible integer seed")
     _integer(params, "seed", 0, 2**63 - 1)
+    instance = params.get("instance_id", "a")
+    if (type(instance) is not str or not 1 <= len(instance) <= 16 or
+            not (instance[0].isalpha() and all(x.isalnum() or x == "_" for x in instance))):
+        raise StudioError("production instance must be a bounded stable identifier")
     for key in ("quest_id", "event_id", "page_id", "event_prefix"):
         if key not in params:
-            # Name lengths remain within the canonical 128-character IDs.
+            # Each authoring instance gets distinct persistent source IDs.
             params[key] = {
                 "quest_id": "q_", "event_id": "e_", "page_id": "r_",
                 "event_prefix": "n_",
-            }[key] + recipe.removeprefix("produce_")
+            }[key] + recipe.removeprefix("produce_") + "_" + instance
         _name(params, key)
     return params
 
