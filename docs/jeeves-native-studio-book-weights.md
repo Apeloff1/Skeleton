@@ -417,3 +417,66 @@ missing, the goal remains blocked or in doubt instead of pretending that the
 forge changed source files. The host must explicitly attach actual creator
 handlers, target engine, media decoders, checkpoints, resources and the approved
 reviewed book library before executing the corresponding production work.
+
+
+## Verified project canon across months-long game production
+
+The new `skeleton.jeeves.ai.studio_canon_memory.StudioCanonStore` is a real
+SQLite-backed continuity memory: original NPC identities, regions, game-world
+rules, timelines, quest outcomes, dialogue dependencies and endings can be
+represented as named facts with reviewed revision history. This is persistent
+working game-canon data, not language-model weights.
+
+```python
+from pathlib import Path
+from skeleton.jeeves.ai.studio_canon_memory import StudioCanonStore
+
+with StudioCanonStore(
+    Path("/private/jeeves/project-canon.sqlite"),
+    project_id="my-game",
+) as canon:
+    receipt = canon.revise(
+        subject_id="captain-sera",
+        attribute_id="origin",
+        action="establish",
+        expected_fact_sha256=None,  # establish only when fact is absent
+        actor_id="authenticated-narrative-author",
+        reviewer_id="independent-human-producer",
+        source_receipt_sha256="e" * 64,  # replace with real source receipt!
+        fact={
+            "statement": "Captain Sera grew up on the northern sky islands.",
+            "scopes": ["cast", "story", "world"],
+            "anchors": ["sera", "sky_islands"],
+        },
+    )
+    current = canon.get("captain-sera", "origin")
+    refs = canon.search("Sera on the northern sky islands", limit=8)
+    history = canon.verify()
+```
+
+Amendment is never an unscoped overwrite: it requires
+`action="amend"`, the *exact* currently stored `revision_sha256`, a
+separate reviewer and a fresh source-receipt binding. Retirement is similarly
+explicit; an audit history remains. All revisions form a deterministic
+SHA-256 chain across app restarts; startup optionally pins a separately
+retained `expected_head_sha256` for independent attestation. The embedding
+host must authenticate actor/reviewer identities and actually verify
+external source receipts; passing an invented SHA string is NOT source review.
+
+Enable this for a native session using
+`NativeStudioHost(..., canon_index=Path("/private/jeeves/project-canon.sqlite"),
+canon_expected_head_sha256=PREVIOUSLY_SIGNED_HEAD)`. The optional canonical
+store starts empty when genuinely new. `studio.revise_canon(...)` exposes
+authenticated host-owned changes; `studio.plan(...)` includes only relevant
+source-revision-pinned reviewed canon facts in Jeeves' actual native context.
+Its inference result is rejected if any project canon revision or source-book
+withdrawal occurred while local inference was running, requiring a fresh
+deliberation rather than stale action approval. The studio journal records
+`canon_context_retrieved` and `book_memory_retrieved` as evidence separate
+from the actual source-maintenance journals.
+
+This is an implementation of persistent original game-story continuity,
+not a claim that every possible plot inconsistency has been detected.
+`skeleton/testing/test_jeeves_studio_canon_memory.py` contains 11 regression
+cases for mutation authority, optimistic concurrency, restart/replay, source
+identity, cross-project safety, and retirement.
