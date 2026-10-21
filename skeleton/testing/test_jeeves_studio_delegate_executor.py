@@ -182,6 +182,45 @@ class NativeExecutionTests(unittest.TestCase):
                 )
             self.assertEqual(self.events, [])
 
+    def test_host_freshness_checker_denies_effect_before_intent(self):
+        with self.store() as store:
+            attempts = []
+
+            def reject(step_id):
+                attempts.append(step_id)
+                raise ValueError("reviewed project source changed")
+
+            with self.assertRaises(ValueError):
+                execute_approved_studio_batch(
+                    self.controller, self.plan, executor=self.executor,
+                    store=store, host_grants=self.grants(),
+                    before_step=reject,
+                )
+            self.assertEqual(attempts, ["step-000"])
+            self.assertIsNone(store.load())
+            self.assertEqual(self.events, [])
+
+    def test_host_freshness_checker_runs_between_dependent_effects(self):
+        with self.store() as store:
+            checked = []
+
+            def guard(step_id):
+                checked.append(step_id)
+                if step_id == "step-001":
+                    raise ValueError("book rights withdrawn mid-runbook")
+
+            with self.assertRaises(ValueError):
+                execute_approved_studio_batch(
+                    self.controller, self.plan, executor=self.executor,
+                    store=store, host_grants=self.grants(),
+                    before_step=guard, max_steps=2,
+                )
+            self.assertEqual(checked, ["step-000", "step-001"])
+            self.assertEqual(len(self.events), 1)
+            latest = store.load()
+            self.assertEqual(latest["steps"][0]["status"], "succeeded")
+            self.assertEqual(latest["steps"][1]["status"], "pending")
+
     def test_foreign_step_grant_rejected_before_dispatch(self):
         grants = self.grants()
         grants["another-plan-step"] = grants["step-000"]
