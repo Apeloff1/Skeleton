@@ -4,7 +4,9 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { createStudioGoal } from '../../product/gameStudioAgentClient';
+import {
+  advanceStudioGoal, createStudioGoal, getStudioGoal, type StudioGoal,
+} from '../../product/gameStudioAgentClient';
 import {
   getLearningProject, listLearningProjects, type LearningProjectSummary,
 } from '../../product/gameLearningClient';
@@ -75,8 +77,12 @@ export default function JeevesStudioPalette({
   const [projectId, setProjectId] = useState('');
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
-  const [goalReceipt, setGoalReceipt] = useState<{ id: string; status: string } | null>(null);
+  const [goalReceipt, setGoalReceipt] = useState<StudioGoal | null>(null);
   const [goalError, setGoalError] = useState('');
+  const [executionMode, setExecutionMode] = useState<'plan' | 'run'>('plan');
+  const [editAuthorization, setEditAuthorization] = useState(false);
+  const [effectAcknowledged, setEffectAcknowledged] = useState(false);
+  const [advancingGoal, setAdvancingGoal] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -123,8 +129,12 @@ export default function JeevesStudioPalette({
     setVisible(false);
   };
 
-  const savePlanOnly = async () => {
-    if (disabled || savingGoal || !projectId) return;
+  const saveGoal = async () => {
+    if (disabled || savingGoal || advancingGoal || !projectId) return;
+    if (executionMode === 'run' && (!editAuthorization || !effectAcknowledged)) {
+      setGoalError('Real production requires explicit edit permission and acknowledgement of project changes.');
+      return;
+    }
     const proposedGoal = buildRequest();
     if (proposedGoal.length > 4096) {
       setGoalError('Project goal exceeds the 4096-character admission limit. Use a smaller scoped plan.');
@@ -138,18 +148,57 @@ export default function JeevesStudioPalette({
       const saved = await createStudioGoal(project, {
         goal: proposedGoal,
         maxSteps: 8,
-        executionMode: 'plan',
-        allowEdits: false,
+        executionMode,
+        allowEdits: executionMode === 'run' && editAuthorization,
         authorizationSeconds: 600,
-        maxModelCalls: 4,
-        maxJobs: 0,
+        maxModelCalls: executionMode === 'run' ? 8 : 4,
+        maxJobs: executionMode === 'run' ? 2 : 0,
         max_output_tokens: 1024,
       });
-      setGoalReceipt({ id: saved.goal_id, status: saved.status });
+      setGoalReceipt(saved);
     } catch (error) {
       setGoalError(error instanceof Error ? error.message : 'Studio goal was not saved.');
     } finally {
       setSavingGoal(false);
+    }
+  };
+  const reloadGoal = async () => {
+    if (!goalReceipt || advancingGoal) return;
+    setAdvancingGoal(true);
+    setGoalError('');
+    try {
+      const saved = await getStudioGoal(goalReceipt.goal_id);
+      if (saved.project_id !== projectId) throw new Error('This goal belongs to another project.');
+      setGoalReceipt(saved);
+    } catch (error) {
+      setGoalError(error instanceof Error ? error.message : 'Unable to verify persisted goal.');
+    } finally {
+      setAdvancingGoal(false);
+    }
+  };
+  const advanceGoal = async () => {
+    if (!goalReceipt || goalReceipt.execution_mode !== 'run' ||
+        !effectAcknowledged || disabled || advancingGoal) return;
+    setAdvancingGoal(true);
+    setGoalError('');
+    try {
+      // Always reload the authoritative version before a possibly mutating call;
+      // the service independently enforces project revision and idempotency.
+      const observed = await getStudioGoal(goalReceipt.goal_id);
+      if (observed.project_id !== projectId || observed.execution_mode !== 'run')
+        throw new Error('The inspected goal scope or execution permission changed.');
+      const changed = await advanceStudioGoal(observed, 2, {}, undefined,
+        { maxPlannerDecisions: 2, waitForWorkSeconds: 0 });
+      setGoalReceipt(changed);
+    } catch (error) {
+      // A timeout can be an in-doubt effect. Reload state; never resend automatically.
+      try {
+        const authoritative = await getStudioGoal(goalReceipt.goal_id);
+        if (authoritative.project_id === projectId) setGoalReceipt(authoritative);
+      } catch { /* keep the prior receipt and show the original error */ }
+      setGoalError(error instanceof Error ? error.message : 'Run advanced uncertainly; inspect before any retry.');
+    } finally {
+      setAdvancingGoal(false);
     }
   };
   const chip = (label: string, selected: boolean, press: () => void) => (
@@ -200,33 +249,93 @@ export default function JeevesStudioPalette({
             })}
           </View>
           <View style={{ gap: 9, borderTopWidth: 1, borderColor: C.border, paddingTop: 12 }}>
-            <Text style={{ color: C.text, fontWeight: '700' }}>Actual project planning · saved to studio</Text>
-            <Text style={{ color: C.subtle, fontSize: 12 }}>Create a plan-only, versioned studio goal for an existing project. This uses the existing authenticated studio goal runner and creates no editor mutation or high-impact grant.</Text>
+            <Text style={{ color: C.text, fontWeight: '700' }}>Actual project workflow · durable receipts</Text>
+            <Text style={{ color: C.subtle, fontSize: 12 }}>
+              Save a reviewed plan or explicitly authorize real studio execution. The
+              existing authenticated goal runner owns edits, jobs, decisions, revisions,
+              and receipts. Jeeves proposals alone never execute.
+            </Text>
             {loadingProjects && <Text style={{ color: C.subtle }}>Loading available projects…</Text>}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
               {projects.map(project => chip(project.name, projectId === project.project_id,
-                () => { setProjectId(project.project_id); setGoalReceipt(null); }))}
+                () => { setProjectId(project.project_id); setGoalReceipt(null); setEffectAcknowledged(false); }))}
             </View>
-            {projects.length === 0 && !loadingProjects && <Text style={{ color: C.subtle }}>No studio projects were returned. Open Game Learning to create one.</Text>}
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Save plan-only studio goal with evidence in selected project"
-              accessibilityState={{ disabled: disabled || savingGoal || !projectId }}
-              disabled={disabled || savingGoal || !projectId}
-              onPress={() => { void savePlanOnly(); }}
+            {projects.length === 0 && !loadingProjects &&
+              <Text style={{ color: C.subtle }}>No studio projects were returned. Open Game Learning to create one.</Text>}
+            <Text style={{ color: C.text, fontWeight: '700' }}>Authority for the selected project</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+              {chip('Draft a plan (no effects)', executionMode === 'plan',
+                () => { setExecutionMode('plan'); setEditAuthorization(false); setEffectAcknowledged(false); })}
+              {chip('Run real studio workflow', executionMode === 'run',
+                () => { setExecutionMode('run'); setGoalReceipt(null); setEffectAcknowledged(false); })}
+            </View>
+            {executionMode === 'run' && <>
+              <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: editAuthorization }}
+                disabled={disabled} onPress={() => setEditAuthorization(value => !value)}
+                style={{ padding: 9, borderWidth: 1, borderColor: C.border, borderRadius: 8 }}>
+                <Text style={{ color: C.text }}>{editAuthorization ? '☑' : '☐'} Allow this goal to edit the selected project</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: effectAcknowledged }}
+                disabled={disabled} onPress={() => setEffectAcknowledged(value => !value)}
+                style={{ padding: 9, borderWidth: 1, borderColor: C.border, borderRadius: 8 }}>
+                <Text style={{ color: C.text }}>{effectAcknowledged ? '☑' : '☐'} I authorize scoped editor and job effects within this goal’s 10-minute window and budgets</Text>
+              </TouchableOpacity>
+              <Text style={{ color: C.subtle, fontSize: 12 }}>
+                Up to 8 goal steps, 8 model decisions and 2 jobs. The server validates
+                source revision, permissions and tool authority. Check actual project
+                history before authorizing additional work.
+              </Text>
+            </>}
+            <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel={executionMode === 'run' ? 'Create scoped executable studio goal' : 'Save plan-only studio goal'}
+              accessibilityState={{ disabled: disabled || savingGoal || advancingGoal || !projectId ||
+                (executionMode === 'run' && (!editAuthorization || !effectAcknowledged)) }}
+              disabled={disabled || savingGoal || advancingGoal || !projectId ||
+                (executionMode === 'run' && (!editAuthorization || !effectAcknowledged))}
+              onPress={() => { void saveGoal(); }}
               style={{ borderWidth: 1, borderColor: C.accent, backgroundColor: C.card,
                 opacity: disabled || savingGoal || !projectId ? 0.5 : 1,
                 borderRadius: 10, padding: 12, alignSelf: 'flex-start' }}>
               <Text style={{ color: C.text, fontWeight: '700' }}>
-                {savingGoal ? 'Saving reviewed plan…' : 'Save plan-only goal to project'}
+                {savingGoal ? 'Saving to project…' :
+                  executionMode === 'run' ? 'Create authorized project workflow' : 'Save plan-only goal'}
               </Text>
             </TouchableOpacity>
             {!!goalError && <Text accessibilityRole="alert" style={{ color: '#fca5a5' }}>{goalError}</Text>}
             {goalReceipt && <>
-              <Text accessibilityRole="status" style={{ color: '#86efac' }}>Studio goal recorded · {goalReceipt.id} · {goalReceipt.status}</Text>
-              {chip('Open real studio goal & receipts ↗', false, () => {
-                setVisible(false); onNavigate('/game-learning');
-              })}
+              <Text accessibilityRole="status" style={{ color: '#86efac' }}>
+                Persisted studio goal · {goalReceipt.goal_id} · {goalReceipt.status} ·
+                {' '}{goalReceipt.execution_mode} · revision {goalReceipt.version}
+              </Text>
+              <Text selectable style={{ color: C.subtle, fontSize: 12 }}>
+                Recorded steps: {goalReceipt.steps.length} / {goalReceipt.max_steps}
+                {' · '}model calls {goalReceipt.model_calls} / {goalReceipt.max_model_calls}
+                {' · '}jobs {goalReceipt.jobs_started} / {goalReceipt.max_jobs}
+                {' · '}integrity {goalReceipt.integrity?.status || 'not reported'}
+              </Text>
+              {goalReceipt.integrity?.history_digest &&
+                <Text selectable style={{ color: C.subtle, fontSize: 11 }}>
+                  History SHA-256: {goalReceipt.integrity.history_digest}
+                </Text>}
+              {goalReceipt.integrity?.state_digest &&
+                <Text selectable style={{ color: C.subtle, fontSize: 11 }}>
+                  State SHA-256: {goalReceipt.integrity.state_digest}
+                </Text>}
+              {goalReceipt.last_step &&
+                <Text selectable style={{ color: C.subtle, fontSize: 11 }}>
+                  Last server-observed step: {JSON.stringify(goalReceipt.last_step).slice(0, 2500)}
+                </Text>}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                {chip(advancingGoal ? 'Inspecting…' : 'Reload authoritative receipts', false,
+                  () => { void reloadGoal(); })}
+                {goalReceipt.execution_mode === 'run' && effectAcknowledged &&
+                  !['completed', 'failed', 'cancelled', 'succeeded'].includes(goalReceipt.status) &&
+                  chip(advancingGoal ? 'Working…' : 'Advance 2 authorized steps', true,
+                    () => { void advanceGoal(); })}
+                {chip('Open goal history in Game Learning ↗', false, () => {
+                  setVisible(false); onNavigate('/game-learning');
+                })}
+              </View>
             </>}
           </View>
           <Text style={{ color: C.subtle, fontSize: 12 }}>AI-generated proposals are not execution receipts. Runtime authorization and artifact evidence remain required for each effect.</Text>
