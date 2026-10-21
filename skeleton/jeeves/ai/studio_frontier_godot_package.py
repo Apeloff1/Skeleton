@@ -141,6 +141,9 @@ def compile_original_godot_candidate(
         for record in records.values()
     ):
         from .studio_sprite_forge import compile_sprite_collection
+        from .studio_sprite_godot_resources import (
+            compile_godot_sprite_resources, verify_godot_sprite_resources,
+        )
         artwork = compile_sprite_collection(records)
         for sprite in artwork["assets"]:
             info = sprite["metadata"]
@@ -156,7 +159,18 @@ def compile_original_godot_candidate(
             binary_assets[json_path] = metadata_bytes
             file_hashes[png_path] = sha256(sprite["png"]).hexdigest()
             file_hashes[json_path] = sha256(metadata_bytes).hexdigest()
+            engine_resources = compile_godot_sprite_resources(info)
+            resource_proof = verify_godot_sprite_resources(info, engine_resources)
+            if set(engine_resources) & set(files):
+                raise FrontierSourceError("sprite scene resource would replace native world file")
+            for path, content in engine_resources.items():
+                files[path] = content
+                file_hashes[path] = sha256(content.encode("utf-8")).hexdigest()
             authored_sprites.append({
+                "godot_spriteframes_resource_sha256": resource_proof["receipt_sha256"],
+                "godot_preview_scene_path": (
+                    "game/frontier/sprites/" + name + ".tscn"
+                ),
                 "asset_id": name, "source_record_id": info["record_id"],
                 "source_sha256": info["source_sha256"],
                 "frame_count": len(info["frames"]),
@@ -178,6 +192,7 @@ def compile_original_godot_candidate(
         "godot_file_hashes": file_hashes,
         "packaged_original_sprites": authored_sprites,
         "source_sprite_record_ids": sprite_names,
+        "animated_sprite2d_preview_scenes_authored": bool(authored_sprites),
         "native_sprite_scene_binding_verified": False,
         "gameplay_route_digest": route.digest,
         "gameplay_execution_head_sha256": playthrough["receipt_head"],
