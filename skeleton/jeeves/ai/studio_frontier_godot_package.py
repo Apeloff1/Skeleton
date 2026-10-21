@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from hashlib import sha256
+import json
 from typing import Any
 
 from skeleton.forge.game_frontier_studio import author_studio_expedition
