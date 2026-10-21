@@ -159,19 +159,17 @@ def search_final_actions(*, query: str="", domain: str="", system_layer: str="",
     finishes=tuple(i for i,s in enumerate(FINISHES) if not finish or s==finish)
     # Without full-text filtering, every page resolves at O(page-size), not
     # O(catalog-size). Rank order preserves exact virtual source ordering.
-    block_size=450*9*len(systems)*len(directors)*len(finishes)
+    block_size=450*len(systems)*len(directors)*len(finishes)
     total=len(domains)*block_size
     output=[]
     if not q:
         for position in range(offset,min(total,offset+limit)):
             d,remaining=divmod(position,block_size)
-            archetype,remaining=divmod(remaining,
-                9*len(systems)*len(directors)*len(finishes))
-            treatment,remaining=divmod(remaining,
+            source_recipe,remaining=divmod(remaining,
                 len(systems)*len(directors)*len(finishes))
             system,remaining=divmod(remaining,len(directors)*len(finishes))
             director_idx,finish_idx=divmod(remaining,len(finishes))
-            source_recipe_idx=domains[d]*450+archetype*9+treatment
+            source_recipe_idx=domains[d]*450+source_recipe
             source_idx=(source_recipe_idx*10+systems[system])*10+directors[director_idx]
             action_index=source_idx*10+finishes[finish_idx]
             output.append(describe_final_action(FINAL_PRODUCTION_ACTIONS[action_index]))
