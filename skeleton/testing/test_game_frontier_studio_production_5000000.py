@@ -195,8 +195,8 @@ class FiveMillionProductionAcceptance(unittest.TestCase):
         self.assertEqual(45000,summary["expanded_recipe_count"])
         self.assertEqual(450000,summary["directed_recipe_count"])
         self.assertEqual(4500000,summary["final_recipe_count"])
-        self.assertEqual(499999500,summary["recipe_catalog_count"])
-        self.assertEqual(500000000,summary["catalog_total"])
+        self.assertEqual(4999999500,summary["recipe_catalog_count"])
+        self.assertEqual(5000000000,summary["catalog_total"])
 
     def test_native_godot_compiles_final_authored_source(self):
         from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile
