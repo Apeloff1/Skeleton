@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import zipfile
+from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -167,6 +169,116 @@ class FrontierSourceCompileTests(unittest.TestCase):
                          "artifact_name": "bad-game"},
             ))
         self.assertEqual(list(self.export.iterdir()), [])
+
+
+
+class RealGodotSourceBuildTests(unittest.TestCase):
+    """Generate actual Godot source bytes from authored, revisioned local data."""
+
+    setUp = FrontierSourceCompileTests.setUp
+    create = FrontierSourceCompileTests.create
+
+    def populate_3d(self, *, traveler_modes=None):
+        self.create("config-3d", "engine", {
+            "kind": "studio_settings", "target_era": "sprite",
+            "projection": "3d", "world_family": "original",
+        })
+        self.create("islands-3d", "map", {
+            "kind": "map_layer", "layer_id": "islands",
+            "width": 2, "height": 2,
+            "palette": ["soil", "cloud"], "data": [0, 1, 0, 1],
+        }, depends=("config-3d",))
+        self.create("generated-islands", "world", {
+            "kind": "expedition_profile",
+            "seed": 42, "islands": 5, "spacing_m": 40.0,
+            "rise_m": 8.0, "branch_factor": 2,
+            "caverns": 1, "include_underwater": True,
+            "include_portals": True,
+        }, depends=("islands-3d",))
+        self.create("original-traveler", "movement", {
+            "kind": "traveler_profile",
+            "permitted_modes": traveler_modes if traveler_modes is not None else [
+                "walk", "rope_bridge", "updraft", "glide",
+                "airship", "portal", "climb", "dive", "swim",
+            ],
+            "flags": ["glider", "airship_license", "diving_gear", "portal_key"],
+            "equipment": ["instrument_navigation"],
+            "max_stamina": 1000, "carried_kg": 0.0,
+            "capacity_kg": 30.0, "skill": 0.8, "shelter": 0.0,
+        }, depends=("generated-islands",))
+
+    def export_godot(self):
+        return self.owner.export(build_creator_command(
+            "export", project_id="new-game",
+            payload={"format": "frontier-godot4-zip",
+                     "artifact_name": "original-archipelago"},
+        ))
+
+    def test_actual_godot_project_files_and_hash_receipts(self):
+        self.populate_3d()
+        report = self.export_godot()
+        path = self.export / report["artifact_name"]
+        self.assertEqual(path.suffix, ".zip")
+        self.assertTrue(path.is_file())
+        self.assertEqual(sha256(path.read_bytes()).hexdigest(),
+                         report["artifact_sha256"])
+        with zipfile.ZipFile(path) as artifact:
+            names = set(artifact.namelist())
+            self.assertIn("project.godot", names)
+            self.assertIn("game/frontier/expedition.gd", names)
+            self.assertIn("game/frontier/expedition.tscn", names)
+            self.assertIn("game/frontier/expedition.json", names)
+            self.assertIn("jeeves_source_receipt.json", names)
+            receipt = json.loads(artifact.read("jeeves_source_receipt.json"))
+            self.assertTrue(receipt["real_python_route_playtest_passed"])
+            self.assertFalse(receipt["godot_engine_launched"])
+            self.assertTrue(receipt["all_studio_facets_compiled"])
+            self.assertEqual(
+                receipt["source_head_sha256"], self.owner.head_identity(),
+            )
+            for name, expected in receipt["godot_file_hashes"].items():
+                self.assertEqual(sha256(artifact.read(name)).hexdigest(), expected)
+
+    def test_native_zip_reexport_is_identical_and_non_destructive(self):
+        self.populate_3d()
+        first = self.export_godot()
+        second = self.export_godot()
+        self.assertEqual(first["artifact_sha256"], second["artifact_sha256"])
+        self.assertTrue(second["already_exported"])
+        self.assertEqual(len(list(self.export.iterdir())), 1)
+
+    def test_missing_native_traveler_refuses_export(self):
+        self.create("config-3d", "engine", {
+            "kind": "studio_settings", "target_era": "sprite",
+            "projection": "3d", "world_family": "original",
+        })
+        self.create("islands-3d", "map", {
+            "kind": "map_layer", "layer_id": "islands",
+            "width": 1, "height": 1,
+            "palette": ["cloud"], "data": [0],
+        })
+        with self.assertRaises(FrontierSourceError):
+            self.export_godot()
+        self.assertFalse(any(self.export.iterdir()))
+
+    def test_runtime_capability_constraints_are_not_silently_bypassed(self):
+        self.populate_3d(traveler_modes=["walk"])
+        with self.assertRaises(FrontierSourceError):
+            self.export_godot()
+        self.assertFalse(any(self.export.iterdir()))
+
+    def test_existing_uncompiled_story_is_never_claimed_as_engine_content(self):
+        self.populate_3d()
+        self.create("uncompiled-acts", "story", {
+            "title": "Three alternate finale chapters",
+            "endings": ["airship", "hidden", "portals"],
+        }, depends=("islands-3d",))
+        report = self.export_godot()
+        with zipfile.ZipFile(self.export / report["artifact_name"]) as archive:
+            receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+        self.assertIn("uncompiled-acts", receipt["uncompiled_record_ids"])
+        self.assertFalse(receipt["all_studio_facets_compiled"])
+        self.assertFalse(receipt["native_godot_playthrough_verified"])
 
 
 if __name__ == "__main__":
