@@ -29,6 +29,7 @@ export type ForgeDocument = {
   chronicle_recipe_count: number;
   epoch_recipe_count: number;
   saga_recipe_count: number;
+  epic_recipe_count: number;
 };
 export type ForgeStep = { action: string; parameters: Record<string, unknown> };
 export type ForgePreview = {
@@ -64,9 +65,9 @@ function verifyDoc(doc: ForgeDocument): ForgeDocument {
   if (!doc || doc.schema !== 'skeleton.game.frontier_studio_document.v1'
       || !SHA.test(doc.source_sha256) || !Number.isSafeInteger(doc.expected_version)
       || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 500
-      || doc.recipe_catalog_count !== 4999999999500 || doc.catalog_total !== 5000000000000
+      || doc.recipe_catalog_count !== 49999999999500 || doc.catalog_total !== 50000000000000
       || doc.classic_recipe_count !== 4500 || doc.expanded_recipe_count !== 45000
-      || doc.directed_recipe_count !== 450000 || doc.final_recipe_count !== 4500000 || doc.worldline_recipe_count !== 45000000 || doc.phase_recipe_count !== 450000000 || doc.campaign_recipe_count !== 4500000000 || doc.chronicle_recipe_count !== 45000000000 || doc.epoch_recipe_count !== 450000000000 || doc.saga_recipe_count !== 4500000000000
+      || doc.directed_recipe_count !== 450000 || doc.final_recipe_count !== 4500000 || doc.worldline_recipe_count !== 45000000 || doc.phase_recipe_count !== 450000000 || doc.campaign_recipe_count !== 4500000000 || doc.chronicle_recipe_count !== 45000000000 || doc.epoch_recipe_count !== 450000000000 || doc.saga_recipe_count !== 4500000000000 || doc.epic_recipe_count !== 45000000000000
       || !Array.isArray(doc.layers) || doc.layers.length > 128
       || (doc.prefab_catalog !== undefined && !Array.isArray(doc.prefab_catalog))
       || (doc.actor_catalog !== undefined && !Array.isArray(doc.actor_catalog))
@@ -84,7 +85,7 @@ export async function inspectForge(projectId: string, signal?: AbortSignal): Pro
 export async function getForgeActions(signal?: AbortSignal): Promise<string[]> {
   const result = await data(api.get<{ actions: string[]; action_count: number }>(
     ROOT + '/actions', options(undefined, signal)), 'Forge tool catalogue unavailable.');
-  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 5000000000000)
+  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 50000000000000)
     throw new Error('Forge Studio action catalogue is incomplete.');
   return result.actions;
 }
@@ -99,6 +100,7 @@ export type ForgeRecipe = {
   chronicle?: string; chronicle_index?: number; chronicle_objective?: string;
   epoch?: string; epoch_index?: number; epoch_objective?: string;
   saga?: string; saga_index?: number; saga_objective?: string;
+  epic?: string; epic_index?: number; epic_objective?: string;
   treatment: string; recipe_steps: string[]; source_index: number;
   style_index: number; actual_project_mutation: boolean;
 };
@@ -107,12 +109,12 @@ export type ForgeRecipeResults = {
   total_catalog: number; matched: number; offset: number; limit: number;
   next_offset: number | null; domains: string[]; styles: string[];
   system_layers?: string[]; directors?: string[]; finishes?: string[];
-  worldlines?: string[]; campaigns?: string[]; chronicles?: string[]; epochs?: string[]; sagas?: string[];
+  worldlines?: string[]; campaigns?: string[]; chronicles?: string[]; epochs?: string[]; sagas?: string[]; epics?: string[];
   items: ForgeRecipe[];
 };
 export async function searchForgeRecipes(query = '', domain = '', offset = 0,
-                                         limit = 32, generation: 'classic' | 'expanded' | 'directed' | 'final' | 'worldline' | 'phase' | 'campaign' | 'chronicle' | 'epoch' | 'saga' = 'classic',
-                                         systemLayer = '', director = '', finish = '', worldline = '', phase = '', campaign = '', chronicle = '', epoch = '', saga = ''): Promise<ForgeRecipeResults> {
+                                         limit = 32, generation: 'classic' | 'expanded' | 'directed' | 'final' | 'worldline' | 'phase' | 'campaign' | 'chronicle' | 'epoch' | 'saga' | 'epic' = 'classic',
+                                         systemLayer = '', director = '', finish = '', worldline = '', phase = '', campaign = '', chronicle = '', epoch = '', saga = '', epic = ''): Promise<ForgeRecipeResults> {
   const params = [
     'query=' + encodeURIComponent(query),
     'generation=' + encodeURIComponent(generation),
@@ -125,6 +127,7 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
     'chronicle=' + encodeURIComponent(chronicle),
     'epoch=' + encodeURIComponent(epoch),
     'saga=' + encodeURIComponent(saga),
+    'epic=' + encodeURIComponent(epic),
     'domain=' + encodeURIComponent(domain),
     'offset=' + encodeURIComponent(String(offset)),
     'limit=' + encodeURIComponent(String(limit)),
@@ -132,7 +135,7 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
   const results = await data(api.get<ForgeRecipeResults>(
     ROOT + '/recipes?' + params, options()), 'Could not search original-game production recipes.');
   if (!results || results.schema !== 'skeleton.forge.production_recipe_search.v1'
-      || results.total_catalog !== (generation === 'saga' ? 4500000000000 : generation === 'epoch' ? 450000000000 : generation === 'chronicle' ? 45000000000 : generation === 'campaign' ? 4500000000 : generation === 'phase' ? 450000000 : generation === 'worldline' ? 45000000 : generation === 'final' ? 4500000 : generation === 'directed' ? 450000 : generation === 'expanded' ? 45000 : 4500)
+      || results.total_catalog !== (generation === 'epic' ? 45000000000000 : generation === 'saga' ? 4500000000000 : generation === 'epoch' ? 450000000000 : generation === 'chronicle' ? 45000000000 : generation === 'campaign' ? 4500000000 : generation === 'phase' ? 450000000 : generation === 'worldline' ? 45000000 : generation === 'final' ? 4500000 : generation === 'directed' ? 450000 : generation === 'expanded' ? 45000 : 4500)
       || !Array.isArray(results.items)
       || results.items.length > 64
       || results.items.some(recipe => !(generation === 'classic' ? /^produce_[a-z_]+__[a-z_]+$/.test(recipe.operation)
@@ -141,6 +144,7 @@ export async function searchForgeRecipes(query = '', domain = '', offset = 0,
           : generation === 'final' ? /^complete_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+$/.test(recipe.operation)
           : generation === 'worldline' ? /^worldline_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+$/.test(recipe.operation)
           : generation === 'phase' ? /^phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+$/.test(recipe.operation)
+          : generation === 'epic' ? /^epic_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+____________[a-z_]+$/.test(recipe.operation)
           : generation === 'saga' ? /^saga_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+$/.test(recipe.operation)
           : generation === 'epoch' ? /^epoch_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+$/.test(recipe.operation)
           : generation === 'chronicle' ? /^chronicle_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+$/.test(recipe.operation)
@@ -323,7 +327,9 @@ export async function editForge(projectId: string, doc: ForgeDocument, steps: Fo
         && !(doc.epoch_recipe_count === 450000000000
           && /^epoch_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+$/.test(step.action))
         && !(doc.saga_recipe_count === 4500000000000
-          && /^saga_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+$/.test(step.action)))) throw new Error(
+          && /^saga_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+$/.test(step.action))
+        && !(doc.epic_recipe_count === 45000000000000
+          && /^epic_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+____________[a-z_]+$/.test(step.action)))) throw new Error(
     'Select one or more supported editor operations.');
   const key = learningRequestKey('forge-author');
   const body = { expected_version: doc.expected_version,
@@ -556,4 +562,64 @@ export async function rankForgeSagaHandbooks(
         || item.words < 1))
     throw new Error('Saga manuscript ranking failed protocol validation.');
   return ranking;
+}
+
+export type ForgeEpicRank = {
+  rank: number; epic: string; path: string;
+  quality_score: number; quality_max: number; quality_kind: string;
+  words: number; characters: number; bytes: number; content_sha256: string;
+  criteria: Record<string, boolean>;
+};
+export type ForgeEpicRanking = {
+  schema: 'skeleton.forge.epic_handbook_ranking.v1';
+  sort: 'quality' | 'length';
+  scope: 'ten_actually_rendered_epic_variants_with_exact_saga_context';
+  compared: 10; items: ForgeEpicRank[];
+};
+
+export async function readForgeEpicHandbook(
+  domain: string, treatment: string, director: string, worldline: string,
+  phase: string, campaign: string, chronicle: string, epoch: string,
+  saga: string, epic: string,
+): Promise<{ markdown: string; score: number; words: number }> {
+  const parts = [domain, treatment, director, worldline, phase,
+    campaign, chronicle, epoch, saga, epic];
+  if (parts.some(p => !/^[a-z][a-z_]{0,40}$/.test(p)))
+    throw new Error('Exact registered Epic manual identity required.');
+  const doc = await data(api.get<{
+    schema: string; markdown: string; content_sha256: string;
+    quality_score: number; words: number; covered_commands: number;
+  }>(ROOT + '/epic-handbooks/' + parts.map(encodeURIComponent).join('/'),
+     options()), 'Unable to read Epic world-production handbook.');
+  if (!doc || doc.schema !== 'skeleton.forge.epic_handbook.v1'
+      || !SHA.test(doc.content_sha256) || doc.covered_commands !== 5000
+      || typeof doc.markdown !== 'string' || doc.markdown.length > 512000
+      || !Number.isFinite(doc.quality_score) || doc.quality_score < 0
+      || doc.quality_score > 100 || !Number.isSafeInteger(doc.words) || doc.words < 1)
+    throw new Error('Epic handbook failed typed integrity checks.');
+  return {markdown: doc.markdown, score: doc.quality_score, words: doc.words};
+}
+
+export async function rankForgeEpicHandbooks(
+  domain: string, treatment: string, director: string, worldline: string,
+  phase: string, campaign: string, chronicle: string, epoch: string,
+  saga: string, sort: 'quality' | 'length' = 'quality',
+): Promise<ForgeEpicRanking> {
+  const parts = [domain, treatment, director, worldline, phase,
+    campaign, chronicle, epoch, saga];
+  if (parts.some(p => !/^[a-z][a-z_]{0,40}$/.test(p)))
+    throw new Error('Exact context needed for Epic manual comparison.');
+  const response = await data(api.get<ForgeEpicRanking>(
+    ROOT + '/epic-handbooks/rank/' + parts.map(encodeURIComponent).join('/')
+      + '?sort=' + sort, options()), 'Unable to compare Epic manuals.');
+  if (!response || response.schema !== 'skeleton.forge.epic_handbook_ranking.v1'
+      || response.scope !== 'ten_actually_rendered_epic_variants_with_exact_saga_context'
+      || response.compared !== 10 || response.sort !== sort
+      || !Array.isArray(response.items) || response.items.length !== 10
+      || response.items.some(item => !SHA.test(item.content_sha256)
+        || !Number.isFinite(item.quality_score) || item.quality_score < 0
+        || item.quality_score > 100 || !Number.isSafeInteger(item.words)
+        || item.words < 1))
+    throw new Error('Epic handbook ranking violates strict source contract.');
+  return response;
 }
