@@ -2,8 +2,12 @@
  * by this component: each action is a reviewed draft or a real editor route.
  * The game-studio goal runner owns actual execution, authorization and receipts.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { createStudioGoal } from '../../product/gameStudioAgentClient';
+import {
+  getLearningProject, listLearningProjects, type LearningProjectSummary,
+} from '../../product/gameLearningClient';
 
 type Route = '/galaxy' | '/gameforge-studio' | '/forge-hub' | '/worldforge'
   | '/studio' | '/media-studio' | '/physics-studio' | '/game-learning'
@@ -67,11 +71,33 @@ export default function JeevesStudioPalette({
   const setReply = (value: string) => setAnswers(current => ({ ...current, [facet]: value }));
   const [source, setSource] = useState('');
   const [group, setGroup] = useState('All');
+  const [projects, setProjects] = useState<LearningProjectSummary[]>([]);
+  const [projectId, setProjectId] = useState('');
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [goalReceipt, setGoalReceipt] = useState<{ id: string; status: string } | null>(null);
+  const [goalError, setGoalError] = useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    setLoadingProjects(true);
+    setGoalError('');
+    void listLearningProjects().then(rows => {
+      if (!active) return;
+      setProjects(rows);
+      setProjectId(current => rows.some(row => row.project_id === current)
+        ? current : (rows[0]?.project_id || ''));
+    }).catch(error => {
+      if (active) setGoalError(error instanceof Error ? error.message : 'Cannot list studio projects.');
+    }).finally(() => { if (active) setLoadingProjects(false); });
+    return () => { active = false; };
+  }, [visible]);
   const domains = useMemo(() => JEEVES_STUDIO_DOMAINS.filter(item => group === 'All' || item.family === group), [group]);
   const chosen = JEEVES_STUDIO_DOMAINS.find(item => item.id === facet) || JEEVES_STUDIO_DOMAINS[0];
   const groups = ['All', ...Array.from(new Set(JEEVES_STUDIO_DOMAINS.map(item => item.family)))];
 
-  const prepare = () => {
+  const buildRequest = () => {
     const request = [
       'Jeeves: operate as the locally running game-studio AI, not an external API proxy.',
       `Studio facet: ${chosen.id} (${chosen.title}). Interaction mode: ${mode}.`,
@@ -84,8 +110,47 @@ export default function JeevesStudioPalette({
       'For every actual automated action require a durable hash-linked intent, host-issued receipt, validation, and independent review. Do not claim success without observed execution.',
       'Respect source licenses. Keep multimodal media under the app media/crawler workflows until ingestion and provenance are verified.',
     ].join('\n');
+    return request;
+  };
+
+  const prepare = () => {
+    const request = buildRequest();
+    if (request.length > 16000) {
+      setGoalError('Questionnaire is too long for chat. Split the request into smaller production steps.');
+      return;
+    }
     onCompose(request);
     setVisible(false);
+  };
+
+  const savePlanOnly = async () => {
+    if (disabled || savingGoal || !projectId) return;
+    const proposedGoal = buildRequest();
+    if (proposedGoal.length > 4096) {
+      setGoalError('Project goal exceeds the 4096-character admission limit. Use a smaller scoped plan.');
+      return;
+    }
+    setSavingGoal(true);
+    setGoalError('');
+    setGoalReceipt(null);
+    try {
+      const project = await getLearningProject(projectId);
+      const saved = await createStudioGoal(project, {
+        goal: proposedGoal,
+        maxSteps: 8,
+        executionMode: 'plan',
+        allowEdits: false,
+        authorizationSeconds: 600,
+        maxModelCalls: 4,
+        maxJobs: 0,
+        max_output_tokens: 1024,
+      });
+      setGoalReceipt({ id: saved.goal_id, status: saved.status });
+    } catch (error) {
+      setGoalError(error instanceof Error ? error.message : 'Studio goal was not saved.');
+    } finally {
+      setSavingGoal(false);
+    }
   };
   const chip = (label: string, selected: boolean, press: () => void) => (
     <TouchableOpacity key={label} onPress={press} accessibilityRole="button"
@@ -133,6 +198,36 @@ export default function JeevesStudioPalette({
             {chip(`Open ${chosen.title} editor ↗`, false, () => {
               setVisible(false); onNavigate(chosen.route);
             })}
+          </View>
+          <View style={{ gap: 9, borderTopWidth: 1, borderColor: C.border, paddingTop: 12 }}>
+            <Text style={{ color: C.text, fontWeight: '700' }}>Actual project planning · saved to studio</Text>
+            <Text style={{ color: C.subtle, fontSize: 12 }}>Create a plan-only, versioned studio goal for an existing project. This uses the app's existing authenticated goal runner and creates no editor mutation or high-impact grant.</Text>
+            {loadingProjects && <Text style={{ color: C.subtle }}>Loading available projects…</Text>}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+              {projects.map(project => chip(project.name, projectId === project.project_id,
+                () => { setProjectId(project.project_id); setGoalReceipt(null); }))}
+            </View>
+            {projects.length === 0 && !loadingProjects && <Text style={{ color: C.subtle }}>No studio projects were returned. Open Game Learning to create one.</Text>}
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Save plan-only studio goal with evidence in selected project"
+              accessibilityState={{ disabled: disabled || savingGoal || !projectId }}
+              disabled={disabled || savingGoal || !projectId}
+              onPress={() => { void savePlanOnly(); }}
+              style={{ borderWidth: 1, borderColor: C.accent, backgroundColor: C.card,
+                opacity: disabled || savingGoal || !projectId ? 0.5 : 1,
+                borderRadius: 10, padding: 12, alignSelf: 'flex-start' }}>
+              <Text style={{ color: C.text, fontWeight: '700' }}>
+                {savingGoal ? 'Saving reviewed plan…' : 'Save plan-only goal to project'}
+              </Text>
+            </TouchableOpacity>
+            {!!goalError && <Text accessibilityRole="alert" style={{ color: '#fca5a5' }}>{goalError}</Text>}
+            {goalReceipt && <>
+              <Text accessibilityRole="status" style={{ color: '#86efac' }}>Studio goal recorded · {goalReceipt.id} · {goalReceipt.status}</Text>
+              {chip('Open real studio goal & receipts ↗', false, () => {
+                setVisible(false); onNavigate('/game-learning');
+              })}
+            </>}
           </View>
           <Text style={{ color: C.subtle, fontSize: 12 }}>AI-generated proposals are not execution receipts. Runtime authorization and artifact evidence remain required for each effect.</Text>
         </ScrollView>
