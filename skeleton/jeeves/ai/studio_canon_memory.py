@@ -12,8 +12,7 @@ and check source receipts before passing them into this owner.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from hashlib import sha256
-import json
+ import json
 from pathlib import Path
 import re
 import sqlite3
@@ -293,6 +292,11 @@ class StudioCanonStore:
                 }
             self._head = head
             self._sequence += 1
+            # A caller who supplied an independently approved startup head
+            # may continue making explicit host-reviewed revisions. Advance
+            # only this in-process trusted pin after the SQLite CAS commits.
+            if self.expected_head_sha256 is not None:
+                self.expected_head_sha256 = head
             return {**receipt, "revision_sha256": head}
 
     def get(self, subject_id: str, attribute_id: str) -> dict[str, Any] | None:
