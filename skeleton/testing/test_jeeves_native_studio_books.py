@@ -134,6 +134,13 @@ class InteractionTests(unittest.TestCase):
         with self.assertRaises(StudioInteractionError):
             self.journal.read()
 
+    def test_model_cannot_fabricate_execution_receipt(self):
+        with self.assertRaises(StudioInteractionError):
+            self.journal.append("execution_succeeded", {
+                "step_id": "step-000", "receipt_digest": "f" * 64,
+            })
+        self.assertEqual(self.journal.read(), ())
+
     def test_unverified_media_rejected(self):
         with self.assertRaises(StudioInteractionError):
             self.jeeves.attach(
