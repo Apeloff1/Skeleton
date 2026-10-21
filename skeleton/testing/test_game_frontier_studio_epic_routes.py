@@ -57,8 +57,7 @@ class EpicInterlayerReferenceTests(unittest.TestCase):
         second = audit_epic_interlayer_routes(source, case)
         self.assertEqual(first, second)
         self.assertEqual(1, first["passed_count"])
-        self.assertEqual(3, len(first["layer_source_sha256"]) if False
-                         else len(source.layers))
+        self.assertEqual(2, len(first["layer_source_sha256"]))
         witness = first["journeys"][0]["primary"]
         self.assertTrue(witness["reachable"])
         self.assertEqual(1, witness["transfers"])
