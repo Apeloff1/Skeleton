@@ -6,6 +6,7 @@ import {
   buildForge, copyForgeTiles, editForge, exportForge, inspectForge,
   searchForgeRecipes, type ForgeRecipeResults, type ForgeRecipe,
   previewForgeGameplay, type ForgeGameplayProbe,
+  auditForgeRoutes, type ForgeRouteAudit, type ForgeRouteScenario,
   type ForgeDocument, type ForgeStep, type ForgeBuild,
 } from '../../product/gameFrontierAuthoringClient';
 import { getLearningProject, type LearningProject } from '../../product/gameLearningClient';
@@ -458,6 +459,8 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [gameplayProbe, setGameplayProbe] = useState<ForgeGameplayProbe | null>(null);
   const [probePosition, setProbePosition] = useState('[1,1,0]');
   const [probeSignals, setProbeSignals] = useState('{"altitude_m":0}');
+  const [routeScenarios, setRouteScenarios] = useState('[{"scenario_id":"VillageToPort","layer":"ground","start":[0,0],"goal":[15,15],"require_alternate":false}]');
+  const [routeAudit, setRouteAudit] = useState<ForgeRouteAudit | null>(null);
   const pending = disabled || busy;
   useEffect(() => { onDirtyChange?.(steps.length > 0); }, [steps.length, onDirtyChange]);
   const load = useCallback(async () => {
@@ -612,6 +615,21 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         signals as Record<string, number>);
       setGameplayProbe(result);
       setNotice('Real RPG/physics reference simulation evaluated from saved source.');
+    } catch (reason: any) { setError(String(reason?.message || reason)); }
+    finally { setBusy(false); }
+  };
+  const inspectWalkableRoutes = async () => {
+    if (!doc) return;
+    setBusy(true); setError(''); setRouteAudit(null);
+    try {
+      const cases: unknown = JSON.parse(routeScenarios);
+      if (!Array.isArray(cases)) throw new Error('Route scenarios require a JSON array.');
+      const result = await auditForgeRoutes(project.project_id, cases as ForgeRouteScenario[]);
+      if (doc.source_sha256 !== result.project_sha256 || doc.expected_version !== result.source_version)
+        throw new Error('Project source changed; refresh the editor before inspecting routes.');
+      setRouteAudit(result);
+      setNotice(result.passed_count + ' of ' + result.scenario_count +
+        ' source route replays passed; native execution requires separate evidence.');
     } catch (reason: any) { setError(String(reason?.message || reason)); }
     finally { setBusy(false); }
   };
@@ -834,6 +852,28 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     {steps.slice(-8).map((step, index) => <Text key={index} style={{ color: '#a5bdcc' }}>
       {steps.length - Math.min(steps.length, 8) + index + 1}. {label(step.action)}</Text>)}
 
+    <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Audit authored routes & alternatives</Text>
+    <Text style={{ color: '#a7bacf' }}>Source tile coordinates; traversability matches the canonical
+      movement bridge. Multiple scenarios and independent alternate paths are supported.
+      This is reference replay, not a native Godot playthrough.</Text>
+    <TextInput accessibilityLabel="Source route scenarios JSON"
+      value={routeScenarios} onChangeText={setRouteScenarios} editable={!pending}
+      multiline autoCorrect={false} autoCapitalize="none" maxLength={24000}
+      style={{ color: '#eef6ff', backgroundColor: '#202936', padding: 10,
+        borderRadius: 7, minHeight: 84, textAlignVertical: 'top', fontFamily: 'monospace' }} />
+    <Button title="Audit reachable & alternate source routes" disabled={pending || !doc}
+      press={() => { void inspectWalkableRoutes(); }} />
+    {routeAudit && <View style={{ gap: 4 }}>
+      <Text style={{ color: routeAudit.failed_count ? '#efc58c' : '#bce4d2' }}>
+        {routeAudit.passed_count}/{routeAudit.scenario_count} route scenarios passed ·
+        {routeAudit.failed_count} failed</Text>
+      {routeAudit.scenarios.map(item => <Text key={item.scenario_id}
+        style={{ color: item.passed ? '#b7d8e6' : '#efc58c' }}>
+        {item.scenario_id}: {item.primary.reachable ? item.primary.steps + ' moves' : 'blocked'}
+        {item.require_alternate ? (item.alternate?.reachable ? ' + independent alternate' : ' · no independent alternate') : ''}
+        {item.failure ? ' (' + item.failure + ')' : ''}</Text>)}
+      <Text selectable style={{ color: '#829db0', fontSize: 11 }}>{routeAudit.receipt_sha256}</Text>
+    </View>}
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Simulate authored 3D gameplay</Text>
     <Text style={{ color: '#a7bacf' }}>Probe a local game coordinate and available
       environment sensors. Results use real source-based equations; no native hardware
