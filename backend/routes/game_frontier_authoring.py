@@ -66,6 +66,60 @@ def _write_scope(user):
     return scope
 
 
+@router.get("/campaign-handbooks")
+async def search_campaign_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", phase: str = "", campaign: str = "",
+    offset: int = 0, limit: int = 32, user=Depends(get_current_user),
+):
+    """Bounded source-grounded discovery over 900K generated real game manuals."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_campaign_handbooks import list_books
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_books(domain=domain,treatment=treatment,director=director,
+                          worldline=worldline,phase=phase,campaign=campaign,
+                          offset=offset,limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422,detail={
+            "code":"invalid_campaign_handbook_search","message":str(exc)}) from exc
+
+
+@router.get("/campaign-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}")
+async def rank_campaign_handbooks(
+    domain: str,treatment: str,director: str,worldline: str,phase: str,
+    sort: str = "quality", user=Depends(get_current_user),
+):
+    """Rank ten actual rendered alternatives by objective quality or word length.
+
+    This comparison is scoped to one chosen game context; not a global top 900K.
+    """
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_campaign_handbooks import rank_variants
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return rank_variants(domain,treatment,director,worldline,phase,sort=sort)
+    except StudioError as exc:
+        raise HTTPException(422,detail={
+            "code":"invalid_campaign_handbook_ranking","message":str(exc)}) from exc
+
+
+@router.get("/campaign-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}")
+async def read_campaign_handbook(
+    domain: str,treatment: str,director: str,worldline: str,phase: str,
+    campaign: str,user=Depends(get_current_user),
+):
+    """Reconstruct one source-owned manual with deterministic score and SHA."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_campaign_handbooks import receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return receipt(domain,treatment,director,worldline,phase,campaign)
+    except StudioError as exc:
+        raise HTTPException(404,detail={
+            "code":"unknown_campaign_handbook","message":str(exc)}) from exc
+
+
 @router.get("/phase-handbooks")
 async def list_phase_game_handbooks(
     domain: str = "", treatment: str = "", director: str = "",
