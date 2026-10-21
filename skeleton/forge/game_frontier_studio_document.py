@@ -41,14 +41,14 @@ def authored_document(project: StudioProject) -> str:
                              separators=(",", ":"), allow_nan=False)
     except (TypeError, ValueError, RecursionError) as exc:
         raise StudioError("Forge Studio source must serialize into finite JSON") from exc
-    if len(content.encode("utf-8")) > 128000:
+    if len(content.encode("utf-8")) > 950000:
         raise StudioError("Forge Studio source exceeds canonical project file budget")
     return content
 
 
 def load_authored_document(source: str, *, project_id: str) -> StudioProject:
     """Reconstruct exact typed editable state, reject checksum drift and truncation."""
-    if type(source) is not str or not 1 <= len(source.encode("utf-8")) <= 128000:
+    if type(source) is not str or not 1 <= len(source.encode("utf-8")) <= 950000:
         raise StudioError("bounded original Studio JSON required")
     try:
         value = json.loads(source)
