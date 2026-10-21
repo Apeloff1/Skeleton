@@ -480,3 +480,130 @@ not a claim that every possible plot inconsistency has been detected.
 `skeleton/testing/test_jeeves_studio_canon_memory.py` contains 11 regression
 cases for mutation authority, optimistic concurrency, restart/replay, source
 identity, cross-project safety, and retirement.
+
+
+## Operational: actual creator source files, not just planning gates
+
+`skeleton.jeeves.ai.studio_creator_source.CreatorProjectSourceStore` is an
+original-game source authoring backend with genuine SQLite writes and a
+replayable SHA-linked edit journal. It is an optional host-owned source plane
+for `NativeStudioHost`:
+
+```python
+from pathlib import Path
+from skeleton.jeeves.agent.tools import ToolRegistry, ToolExecutor
+from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
+
+# engine: the actual loaded native transformer inference engine
+# The operator must create these private directories beforehand.
+with NativeStudioHost(
+    engine, project_id="original-game", session_id="authorized-session",
+    journal_path=Path("/private/jeeves/evidence.sqlite"),
+    runbook_directory=Path("/private/jeeves/runbooks"),
+    source_index=Path("/private/jeeves/game-sources.sqlite"),
+    source_export_root=Path("/private/jeeves/exports"),
+) as jeeves:
+    registry = ToolRegistry()
+
+    # This must call the REAL application permission owner. It cannot return
+    # True by default or let the model approve its own commands.
+    jeeves.register_native_creator_tools(
+        registry,
+        authorize=host_check_authenticated_exact_creator_command,
+    )
+    executor = ToolExecutor(registry)
+
+    # Actual model generation proposes a native type-checked creator plan.
+    plan = jeeves.plan(
+        "Author one original 2D world and three alternative paths."
+    )
+    jeeves.approve(plan, reviewer_id="independent-human-producer")
+
+    # The authenticated application, NOT Jeeves, issues fresh per-step
+    # ToolExecutionContext and ToolGrant for the exact creator command.
+    # grants = {"step-000": (context, exact_one_shot_high_impact_grant)}
+    # execution = jeeves.execute_authorized(
+    #     plan, executor=executor, host_grants=grants, max_steps=8
+    # )
+    snapshot = jeeves.audit()
+```
+
+The source owner implements actual `CreatorCommand` operations:
+
+- `create`: an `intent` object with exactly `record_id`, `facet`,
+  `document`, and `depends_on`. Saves new original game content into the
+  project SQLite database.
+- `edit`: `target_id`, exact `expected_revision`, and
+  `patch={"set": {...}, "remove": [...]}`. Commits only if the current
+  revision and source identity match.
+- `test`: reviews exact source scopes and verifies the dependency graph,
+  without falsely claiming an engine playthrough.
+- `preview`: returns the real selected documents in `static` mode.
+  `runtime` preview fails closed without a real engine adapter.
+- `export`: emits `game-source-json`, an immutable content-addressed
+  source bundle. No arbitrary filesystem path is allowed inside
+  `artifact_name`. Exporting source is not generating a runnable binary.
+
+### Real Frontier Studio compiler integration
+
+The `frontier-studio-json` export uses the existing
+`skeleton.forge.game_frontier_studio.StudioProject` and
+`compile_studio_project` to compile actual authored settings, tile maps,
+prefabs/sprite references, 3D placements, RPG events and native quest graphs.
+It is not a duplicate engine or a pretend asset generator.
+
+For example, two source records admitted via `create` can be:
+
+```json
+{
+  "record_id": "game-settings",
+  "facet": "engine",
+  "document": {
+    "kind": "studio_settings",
+    "target_era": "sprite",
+    "projection": "top_down",
+    "world_family": "original"
+  },
+  "depends_on": []
+}
+```
+
+```json
+{
+  "record_id": "island-map",
+  "facet": "map",
+  "document": {
+    "kind": "map_layer",
+    "layer_id": "main",
+    "width": 2,
+    "height": 2,
+    "palette": ["sky", "terrain"],
+    "data": [0, 1, 1, 0]
+  },
+  "depends_on": ["game-settings"]
+}
+```
+
+The compiler refuses to invent missing project settings, map layers,
+unregistered prefab assets or invalid quest transitions. Unsupported
+record kinds such as longform narrative outlines remain in the source bundle,
+and `non_compilable_record_ids` explicitly reports that those sources
+have **not** entered the typed Forge project.
+
+The native model now searches existing original game records (including their
+revision numbers, typed facets, dependencies and SHA digests) before
+proposing edits. The model's plan is tied to a host-only
+`plan_context_bound` evidence event containing the exact local checkpoint,
+rights-policy, book-admission, canon and original source generations.
+`execute_authorized` checks this evidence before dispatch and between
+consecutive real effects. When resuming, it accepts source revisions resulting
+*only* from the same verified, previously successful runbook commands.
+External source changes or book-rights/canon revisions require a fresh model
+proposal and review; they never trigger an automatic replay.
+
+New regressions are in
+`skeleton/testing/test_jeeves_studio_creator_source.py` and
+`skeleton/testing/test_jeeves_studio_frontier_source_compile.py`.
+This implementation is a real persistent game-design source compiler and
+controlled workflow, not proof of live Godot gameplay, final art/audio,
+complete playable world production or an installed native checkpoint.
