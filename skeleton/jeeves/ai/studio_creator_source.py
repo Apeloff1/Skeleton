@@ -29,7 +29,7 @@ from skeleton.jeeves.agent.tools import (
 )
 from skeleton.jeeves.agent.types import RiskTier
 
-from .studio_interaction_contract import FACETS, canonical, digest, identifier
+from .studio_interaction_contract import FACETS, digest, identifier
 
 SCHEMA = "skeleton.jeeves.creator_source_store.v1"
 MAX_RECORD_BYTES = 96 * 1024
@@ -62,7 +62,15 @@ class CreatorSourceError(ValueError):
 
 
 def _json(value: Any, *, limit: int = MAX_RECORD_BYTES) -> bytes:
-    raw = canonical(value)
+    # Do not inherit the studio *event* byte cap for whole project exports:
+    # 50k source records cannot fit within one audit-event envelope.
+    try:
+        raw = json.dumps(
+            value, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True, allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise CreatorSourceError("authored source must be finite JSON") from exc
     if len(raw) > limit:
         raise CreatorSourceError("authored source exceeds bounded JSON budget")
     return raw
