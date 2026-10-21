@@ -167,10 +167,10 @@ assert len(CASES) == 50
 
 class SecondFiftyFunctionalAcceptance(unittest.TestCase):
     def test_100_real_tools_exposed_after_second_pass(self):
-        self.assertEqual(100, len(AUTHORING_ACTIONS))
+        self.assertGreaterEqual(len(AUTHORING_ACTIONS), 150)
         self.assertEqual(50, len(NEW_ACTIONS))
         self.assertEqual(set(NEW_ACTIONS), set(CASES))
-        self.assertEqual(100, len(set(AUTHORING_ACTIONS)))
+        self.assertEqual(len(AUTHORING_ACTIONS), len(set(AUTHORING_ACTIONS)))
 
     def test_native_zone_exports_real_3d_positions(self):
         edited = execute_authoring(project(), "zone_translate", ZONE["zone_translate"])
