@@ -40,6 +40,7 @@ from .game_frontier_studio_phase_production import PHASE_ACTIONS, edit_phase
 from .game_frontier_studio_campaign_production import CAMPAIGN_ACTIONS, edit_campaign
 from .game_frontier_studio_chronicle_production import CHRONICLE_ACTIONS, edit_chronicle
 from .game_frontier_studio_epoch_production import EPOCH_ACTIONS, edit_epoch
+from .game_frontier_studio_saga_production import SAGA_ACTIONS, edit_saga
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
 )
@@ -63,7 +64,7 @@ class AuthoringCatalogue(Sequence[str]):
             raise RuntimeError("director namespace may not overwrite original commands")
 
     def __len__(self) -> int:
-        return len(self._legacy) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS) + len(PHASE_ACTIONS) + len(CAMPAIGN_ACTIONS) + len(CHRONICLE_ACTIONS) + len(EPOCH_ACTIONS)
+        return len(self._legacy) + len(DIRECTED_ACTIONS) + len(FINAL_PRODUCTION_ACTIONS) + len(WORLDLINE_ACTIONS) + len(PHASE_ACTIONS) + len(CAMPAIGN_ACTIONS) + len(CHRONICLE_ACTIONS) + len(EPOCH_ACTIONS) + len(SAGA_ACTIONS)
 
     def __getitem__(self, index):
         if isinstance(index, slice):
@@ -94,11 +95,16 @@ class AuthoringCatalogue(Sequence[str]):
         offset -= len(CAMPAIGN_ACTIONS)
         if offset < len(CHRONICLE_ACTIONS):
             return CHRONICLE_ACTIONS[offset]
-        return EPOCH_ACTIONS[offset - len(CHRONICLE_ACTIONS)]
+        offset -= len(CHRONICLE_ACTIONS)
+        if offset < len(EPOCH_ACTIONS):
+            return EPOCH_ACTIONS[offset]
+        return SAGA_ACTIONS[offset - len(EPOCH_ACTIONS)]
 
     def __contains__(self, action: object) -> bool:
         if type(action) is not str:
             return False
+        if action.startswith("saga_"):
+            return action in SAGA_ACTIONS
         if action.startswith("epoch_"):
             return action in EPOCH_ACTIONS
         if action.startswith("chronicle_"):
@@ -124,11 +130,12 @@ class AuthoringCatalogue(Sequence[str]):
         yield from CAMPAIGN_ACTIONS
         yield from CHRONICLE_ACTIONS
         yield from EPOCH_ACTIONS
+        yield from SAGA_ACTIONS
 
 
 AUTHORING_ACTIONS = AuthoringCatalogue()
-if len(AUTHORING_ACTIONS) != 500000000000:
-    raise RuntimeError("Forge Studio must expose 500000000000 composable source operations")
+if len(AUTHORING_ACTIONS) != 5000000000000:
+    raise RuntimeError("Forge Studio must expose 5000000000000 composable source operations")
 
 
 def _bytes(value: object, *, maximum: int = 512_000) -> bytes:
@@ -218,6 +225,8 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_chronicle(project, operation, payload, execute_authoring)
     if operation in EPOCH_ACTIONS:
         return edit_epoch(project, operation, payload, execute_authoring)
+    if operation in SAGA_ACTIONS:
+        return edit_saga(project, operation, payload, execute_authoring)
     raise StudioError("unknown executable Studio editor action")
 
 
@@ -314,6 +323,7 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "campaign_recipe_count": len(CAMPAIGN_ACTIONS),
         "chronicle_recipe_count": len(CHRONICLE_ACTIONS),
         "epoch_recipe_count": len(EPOCH_ACTIONS),
+        "saga_recipe_count": len(SAGA_ACTIONS),
         "catalog_total": len(AUTHORING_ACTIONS),
         "recipe_search_required": True,
         "candidate_only": True,
