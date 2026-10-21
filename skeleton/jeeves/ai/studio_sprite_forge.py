@@ -241,6 +241,8 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "generated_with_model_image_weights": False,
         "native_engine_sprite_binding_verified": False,
     }
+    from .studio_sprite_quality_metrics import sprite_quality_metrics
+    metadata["objective_quality"] = sprite_quality_metrics(metadata)
     metadata["receipt_sha256"] = digest(metadata)
     # An independent verifier samples source pixels from the actual decoded
     # PNG, reconstructs the complete atlas, and checks alpha masks and timing.
