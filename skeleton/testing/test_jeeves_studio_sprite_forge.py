@@ -48,6 +48,14 @@ def original_record() -> dict:
     }
 
 
+def reseal_original(record: dict) -> dict:
+    record["source_sha256"] = digest([
+        record["record_id"], record["facet"], record["revision"],
+        record["document"], record["depends_on"],
+    ])
+    return record
+
+
 class SpriteForgeTests(unittest.TestCase):
     def test_rgba_png_is_real_and_losslessly_matches_authored_frames(self):
         result = compile_authored_sprite(original_record())
@@ -82,30 +90,30 @@ class SpriteForgeTests(unittest.TestCase):
     def test_invalid_pixel_index_is_refused_not_imputed(self):
         record = original_record()
         record["document"]["frames"][0]["pixels"][0] = 256
-        with self.assertRaises(StudioSpriteError):
-            compile_authored_sprite(record)
+        with self.assertRaisesRegex(StudioSpriteError, "pixel data"):
+            compile_authored_sprite(reseal_original(record))
 
     def test_invalid_palette_requires_explicit_rgba(self):
         record = original_record()
         record["document"]["palette"][1] = "#1234"
-        with self.assertRaises(StudioSpriteError):
-            compile_authored_sprite(record)
+        with self.assertRaisesRegex(StudioSpriteError, "RGBA palette"):
+            compile_authored_sprite(reseal_original(record))
 
     def test_animation_must_reference_existent_frames(self):
         record = original_record()
         record["document"]["animations"][0]["frame_ids"] = ["invented-frame"]
-        with self.assertRaises(StudioSpriteError):
-            compile_authored_sprite(record)
+        with self.assertRaisesRegex(StudioSpriteError, "missing source frames"):
+            compile_authored_sprite(reseal_original(record))
 
     def test_duplicate_frame_and_animation_names_rejected(self):
         record = original_record()
         record["document"]["frames"][1]["frame_id"] = "idle-0"
-        with self.assertRaises(StudioSpriteError):
-            compile_authored_sprite(record)
+        with self.assertRaisesRegex(StudioSpriteError, "frame identity repeated"):
+            compile_authored_sprite(reseal_original(record))
         record = original_record()
         record["document"]["animations"][1]["name"] = "idle"
-        with self.assertRaises(StudioSpriteError):
-            compile_authored_sprite(record)
+        with self.assertRaisesRegex(StudioSpriteError, "state names"):
+            compile_authored_sprite(reseal_original(record))
 
     def test_generative_model_claims_not_added(self):
         result = compile_authored_sprite(original_record())
@@ -143,12 +151,16 @@ class SpriteForgeTests(unittest.TestCase):
         record["document"]["height"] = 64
         record["document"]["pixel_scale"] = 8
         record["document"]["frames"] = [
-            {"frame_id": "idle-0", "duration_ms": 120,
+            {"frame_id": f"large_{i}", "duration_ms": 120,
              "pixels": [0] * (64 * 64)}
-            for _ in range(64)
+            for i in range(10)
         ]
-        with self.assertRaises(StudioSpriteError):
-            compile_authored_sprite(record)
+        record["document"]["animations"] = [
+            {"name": "idle", "frame_ids": [f"large_{i}" for i in range(10)],
+             "loop": True},
+        ]
+        with self.assertRaisesRegex(StudioSpriteError, "GPU texture"):
+            compile_authored_sprite(reseal_original(record))
 
 
 class PersistentSpriteExportTests(unittest.TestCase):
