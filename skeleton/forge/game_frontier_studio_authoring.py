@@ -204,7 +204,10 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "native_zone_count": len(project.native_trigger_volumes),
         "native_force_field_count": len(project.native_gameplay_force_fields),
         "quest_stage_count": sum(len(q.stages) for q in project.native_quests),
-        "action_catalog": AUTHORING_ACTIONS,
+        "action_catalog": AUTHORING_ACTIONS[:500],
+        "recipe_catalog_count": len(RECIPE_ACTIONS),
+        "catalog_total": len(AUTHORING_ACTIONS),
+        "recipe_search_required": True,
         "candidate_only": True,
     }
     return {**output, "receipt_sha256": _digest(output)}
