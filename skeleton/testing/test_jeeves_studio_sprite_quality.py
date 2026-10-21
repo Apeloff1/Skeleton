@@ -141,6 +141,41 @@ class SpriteQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(StudioSpriteError, "content differs"):
             compile_authored_sprite(record)
 
+    def test_objective_art_grade_is_grounded_without_claiming_human_review(self):
+        out = compile_authored_sprite(advanced())
+        report = out["metadata"]["objective_quality"]
+        self.assertEqual(report["objective_quality_score_0_100"], 100)
+        self.assertEqual(report["visible_source_pixels"], 4)
+        self.assertEqual(report["total_source_pixels"], 8)
+        self.assertEqual(report["alpha_coverage_millionths"], 500000)
+        self.assertFalse(report["manual_art_review_complete"])
+        self.assertFalse(report["originality_and_copyright_review_complete"])
+        self.assertFalse(report["subjective_artistic_quality_proven"])
+
+    def test_weak_animation_creates_objective_warning_and_lower_grade(self):
+        record = advanced()
+        record["document"]["frames"][1]["pixels"] = [0, 1, 1, 0]
+        result = compile_authored_sprite(reseal(record))
+        report = result["metadata"]["objective_quality"]
+        self.assertIn("no_visible_animation_frame_variation",
+                      report["objective_risk_flags"])
+        self.assertLess(report["objective_quality_score_0_100"], 100)
+
+    def test_quality_score_forgery_is_rejected_even_if_receipt_is_rehashed(self):
+        out = compile_authored_sprite(advanced())
+        forged = deepcopy(out["metadata"])
+        forged["objective_quality"]["objective_quality_score_0_100"] = 999
+        forged["objective_quality"]["receipt_sha256"] = digest({
+            key: value for key, value in forged["objective_quality"].items()
+            if key != "receipt_sha256"
+        })
+        forged["receipt_sha256"] = digest({
+            key: value for key, value in forged.items()
+            if key != "receipt_sha256"
+        })
+        with self.assertRaisesRegex(SpriteVerificationError, "quality signals"):
+            verify_published_sprite(out["png"], forged)
+
     def test_godot_resource_is_live_engine_atlas_and_timed_animation(self):
         sprite = compile_authored_sprite(advanced())
         paths = compile_godot_sprite_resources(sprite["metadata"])
