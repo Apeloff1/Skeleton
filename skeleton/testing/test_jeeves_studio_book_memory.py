@@ -101,6 +101,24 @@ class BookMemoryTests(unittest.TestCase):
         self.assertFalse(result["model_weights_modified"])
         self.assertEqual(len(result["retrieval_receipt_sha256"]), 64)
 
+    def test_retrieval_cites_source_bytes_and_relevant_offset(self):
+        self.build()
+        memory = self.open_index()
+        result = memory.search(
+            "alternative endings", actor_id="jeeves", excerpt_chars=200,
+        )
+        self.assertTrue(result["results"])
+        matched = [row for row in result["results"]
+                   if row["book_id"] == "book-narrative"][0]
+        self.assertIn("endings", matched["excerpt"])
+        self.assertGreaterEqual(matched["excerpt_start"], 0)
+        self.assertEqual(
+            matched["excerpt_end"] - matched["excerpt_start"],
+            len(matched["excerpt"]),
+        )
+        self.assertEqual(matched["source_text_sha256"],
+                         sha256(self.original.encode("utf-8")).hexdigest())
+
     def test_negative_search_does_not_fabricate_a_source(self):
         self.build()
         result = self.open_index().search(
