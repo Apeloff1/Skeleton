@@ -66,6 +66,43 @@ def _write_scope(user):
     return scope
 
 
+@router.get("/handbooks")
+async def search_original_world_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", offset: int = 0, limit: int = 32,
+    user=Depends(get_current_user),
+):
+    """Browse 9,000 real source-linked game design books without huge responses."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_worldline_handbooks import list_volumes
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_volumes(domain=domain,treatment=treatment,
+                            director=director,worldline=worldline,
+                            offset=offset,limit=limit)
+    except StudioError as exc:
+        raise HTTPException(422,detail={
+            "code":"invalid_game_studio_handbook_search","message":str(exc),
+        }) from exc
+
+
+@router.get("/handbooks/{domain}/{treatment}/{director}/{worldline}")
+async def read_original_world_handbook(
+    domain: str,treatment: str,director: str,worldline: str,
+    user=Depends(get_current_user),
+):
+    """Render one source-verified full game-production manual plus SHA receipt."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_worldline_handbooks import handbook_receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return handbook_receipt(domain,treatment,director,worldline)
+    except StudioError as exc:
+        raise HTTPException(404,detail={
+            "code":"unknown_game_studio_handbook","message":str(exc),
+        }) from exc
+
+
 @router.get("/recipes")
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
