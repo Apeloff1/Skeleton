@@ -89,6 +89,11 @@ export type CurriculumToolResponse = {
     requires_explicit_operator_approval?: boolean;
     neural_training_complete?: false;
     trained_weights?: false;
+    practical_attestation?: {schema: string; evidence_sha256: string;
+      book: string; source_operation: string; source_sha256: string;
+      candidate_sha256: string; source_practice_verified: true;
+      project_saved: false; model_weights_trained: false;
+      native_engine_executed: false};
   };
 };
 
@@ -181,7 +186,8 @@ export async function assessCurriculumLesson(
 }
 
 export type BookRefRequest = {generation: BookGeneration; index: number};
-export type CurriculumAction = 'game.studio.curriculum.automation.plan' |
+export type CurriculumAction = 'game.studio.curriculum.practice' |
+  'game.studio.curriculum.automation.plan' |
   'game.studio.curriculum.automation.preview' |
   'game.studio.curriculum.automation.commit';
 
@@ -220,6 +226,16 @@ export async function executeCurriculumAction(
       || !SHA.test(response.result?.source_sha256)
       || !Array.isArray(response.result?.books)
       || response.result.books.length !== books.length
+      || (operation === 'game.studio.curriculum.practice'
+        && (!response.result.practical_attestation
+            || response.result.practical_attestation.schema !==
+              'skeleton.jeeves.forge_source_practice_verified.v1'
+            || response.result.practical_attestation.source_practice_verified !== true
+            || !SHA.test(response.result.practical_attestation.evidence_sha256)
+            || response.result.practical_attestation.book !==
+              'forgebook:' + books[0].generation + ':' + books[0].index
+            || response.result.practical_attestation.candidate_sha256 !==
+              response.result.candidate_sha256))
       || (operation === 'game.studio.curriculum.automation.commit'
         && (response.result.persisted !== true
             || response.result.saved_source_sha256 !== approvedCandidate))
