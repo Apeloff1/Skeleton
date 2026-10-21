@@ -23,14 +23,14 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
     try {
       if (recipe.chronicle && recipe.campaign && recipe.phase) {
         const doc = await readForgeChronicleHandbook(
-          recipe.domain, recipe.treatment, recipe.direction,
+          recipe.domain, recipe.treatment, recipe.direction!,
           recipe.worldline, recipe.phase, recipe.campaign, recipe.chronicle);
         setMarkdown(doc.markdown);
         setMetrics('Document completeness ' + doc.score + '/100 · ' +
           doc.words.toLocaleString() + ' measured words');
       } else if (recipe.campaign && recipe.phase) {
         const doc = await readForgeCampaignHandbook(
-          recipe.domain, recipe.treatment, recipe.direction,
+          recipe.domain, recipe.treatment, recipe.direction!,
           recipe.worldline, recipe.phase, recipe.campaign);
         setMarkdown(doc.markdown);
         setMetrics('Document completeness ' + doc.score + '/100 · ' +
@@ -38,9 +38,9 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
       } else {
         const body = recipe.phase
           ? await readForgePhaseHandbook(recipe.domain, recipe.treatment,
-              recipe.direction, recipe.worldline, recipe.phase)
+              recipe.direction!, recipe.worldline, recipe.phase)
           : await readForgeHandbook(recipe.domain, recipe.treatment,
-              recipe.direction, recipe.worldline);
+              recipe.direction!, recipe.worldline);
         setMarkdown(body); setMetrics('');
       }
     } catch (cause: unknown) {
@@ -53,11 +53,11 @@ export default function GameFrontierHandbookPanel({ recipe, disabled = false }: 
     try {
       if (recipe.chronicle && recipe.campaign) {
         setRanking(await rankForgeChronicleHandbooks(
-          recipe.domain, recipe.treatment, recipe.direction,
+          recipe.domain, recipe.treatment, recipe.direction!,
           recipe.worldline, recipe.phase, recipe.campaign, sort));
       } else {
         setRanking(await rankForgeCampaignHandbooks(
-          recipe.domain, recipe.treatment, recipe.direction,
+          recipe.domain, recipe.treatment, recipe.direction!,
           recipe.worldline, recipe.phase, sort));
       }
     } catch (cause: unknown) {
