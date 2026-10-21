@@ -664,7 +664,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Button disabled={pending} title={(recipeGeneration === 'classic' ? '✓ ' : '') + 'Original 4,500'}
-          press={() => { setRecipeGeneration('classic'); setSystemLayer(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('classic'); setSystemLayer(''); setDirector(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'expanded' ? '✓ ' : '') + 'Gameplay 45,000'}
           press={() => { setRecipeGeneration('expanded'); setDirector(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'directed' ? '✓ ' : '') + 'Directed 450,000'}
