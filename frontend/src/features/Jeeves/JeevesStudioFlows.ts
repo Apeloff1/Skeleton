@@ -68,21 +68,32 @@ export const JEEVES_STUDIO_FLOWS: readonly StudioFlow[] = [
 export function composeStudioFlow(
   flow: StudioFlow, answers: Readonly<Record<string, string>>,
   sourceReference: string, selectedFacet: string,
+  stageStart = 0, stageCount = 6, previousReceipt?: string,
 ): string {
-  if (!flow.stages.includes(selectedFacet)) {
-    throw new Error('The selected capability is outside this production flow.');
+  if (!Number.isSafeInteger(stageStart) || stageStart < 0 ||
+      stageStart >= flow.stages.length || !Number.isSafeInteger(stageCount) ||
+      stageCount < 1 || stageCount > 8) {
+    throw new Error('The production flow chunk is outside the bounded stage window.');
+  }
+  const activeStages = flow.stages.slice(stageStart, stageStart + stageCount);
+  if (!activeStages.includes(selectedFacet)) {
+    throw new Error('The selected capability is outside the current production slice.');
   }
   const sections = [
     'Jeeves standalone game-production flow: ' + flow.title,
     'Flow identity: ' + flow.id,
     'Production purpose: ' + flow.purpose,
     'Requested acceptance: ' + flow.finish,
+    'This slice: stages ' + (stageStart + 1) + ' through ' +
+      (stageStart + activeStages.length) + ' of ' + flow.stages.length,
+    'Previous slice receipt (reference only; verify server-side): ' +
+      (previousReceipt || 'first slice; no prior verified execution'),
     'Project canon and source revisions override any inferred detail.',
     'The following are authored production STAGES, not executed actions:',
   ];
-  flow.stages.forEach((facet, index) => {
+  activeStages.forEach((facet, index) => {
     const value = answers[facet]?.trim();
-    sections.push(String(index + 1) + '. ' + facet + ': ' +
+    sections.push(String(stageStart + index + 1) + '. ' + facet + ': ' +
       (value ? value : 'Propose choices or request the missing user decision'));
   });
   if (sourceReference.trim()) {
@@ -90,6 +101,9 @@ export function composeStudioFlow(
       sourceReference.trim());
   }
   sections.push('Current editing focus: ' + selectedFacet);
+  sections.push('Do not claim the remaining ' +
+    (flow.stages.length - stageStart - activeStages.length) +
+    ' downstream stages were executed. Preserve them as outstanding work.');
   sections.push('Use the installed local Jeeves model. Partition execution into bounded, ' +
     'dependency-ordered existing creator runbooks and saved studio goals. Preserve ' +
     'canon, project revision, identity, scope and the complete outstanding backlog.');
