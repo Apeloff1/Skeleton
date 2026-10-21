@@ -155,6 +155,36 @@ class CreatorSourceTests(unittest.TestCase):
             ))
         self.assertEqual(self.owner.snapshot()["event_count"], 1)
 
+    def test_native_source_search_uses_actual_record_and_revision(self):
+        original = self.create()
+        result = self.owner.search("Sky Islands skyship and updraft")
+        self.assertEqual(result["source_count"], 1)
+        self.assertEqual(result["source_head_sha256"],
+                         original["history_sha256"])
+        self.assertEqual(result["results"][0]["record_id"], "world-one")
+        self.assertEqual(result["results"][0]["revision"], 1)
+        self.assertEqual(result["results"][0]["source_sha256"],
+                         original["source_sha256"])
+        self.assertFalse(result["native_engine_compilation_performed"])
+
+    def test_unmatched_native_source_search_abstains(self):
+        self.create()
+        found = self.owner.search("incomprehensiblequarklevitation")
+        self.assertEqual(found["results"], [])
+        self.assertEqual(found["source_count"], 1)
+
+    def test_actual_edit_updates_retrieved_context_revision(self):
+        self.create()
+        self.owner.edit(self.command(
+            "edit", target_id="world-one", expected_revision=1,
+            patch={"set": {"river_system": "Volcanic sky streams"},
+                   "remove": []},
+        ))
+        hits = self.owner.search("Volcanic streams")
+        self.assertEqual(hits["results"][0]["revision"], 2)
+        self.assertEqual(hits["source_head_sha256"],
+                         self.owner.snapshot()["head_sha256"])
+
     def test_sqlite_record_tampering_is_detected(self):
         self.create()
         with sqlite3.connect(self.path) as external:
