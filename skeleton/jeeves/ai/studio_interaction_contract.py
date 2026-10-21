@@ -172,6 +172,7 @@ class StudioEvidenceJournal:
         self._head: str | None = None
         self._sequence = 0
         self._execution_token = object()
+        self._observation_token = object()
         self.read()
 
     def read(self) -> tuple[dict[str, Any], ...]:
@@ -212,6 +213,8 @@ class StudioEvidenceJournal:
             raise StudioInteractionError("unsupported studio event")
         if kind.startswith("execution_") and _authority is not self._execution_token:
             raise StudioInteractionError("execution evidence must come from the host runner")
+        if kind == "modality_observation_reviewed" and _authority is not self._observation_token:
+            raise StudioInteractionError("multimodal observations require reviewed host admission")
         body = dict(payload)
         canonical(body)
         with self._lock:
@@ -332,7 +335,7 @@ class JeevesStudioController:
             "decoder_id": decoder_id,
             "generated_image_embedding": False,
             "trained_weights": False,
-        })
+        }, _authority=self.journal._observation_token)
 
     def propose(self, proposals: Sequence[StudioProposal], *,
                 model_checkpoint_sha256: str, actor_id: str = "jeeves") -> dict[str, Any]:
