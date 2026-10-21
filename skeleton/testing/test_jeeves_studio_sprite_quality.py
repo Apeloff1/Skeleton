@@ -3,9 +3,21 @@ from __future__ import annotations
 
 from copy import deepcopy
 from hashlib import sha256
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
-from skeleton.jeeves.ai.studio_interaction_contract import digest
+from skeleton.forge.creator.command_surface import build_creator_command
+from skeleton.jeeves.ai.studio_creator_source import (
+    CreatorProjectSourceStore, CreatorSourceError,
+)
+from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
+from skeleton.jeeves.ai.studio_interaction_contract import (
+    StudioEvidenceJournal, StudioInteractionError, digest,
+)
+from skeleton.jeeves.ai.studio_sprite_native_import import (
+    NativeSpriteImportError, inspect_godot_sprite_import,
+)
 from skeleton.jeeves.ai.studio_sprite_forge import (
     StudioSpriteError, _decode_verified_png, compile_authored_sprite,
 )
@@ -214,6 +226,76 @@ class SpriteQualityTests(unittest.TestCase):
                 sprite["metadata"], sources, directory="sprites",
             )["source_resource_reproducible"]
         )
+
+    def test_installed_godot_is_required_for_native_import_evidence(self):
+        with self.assertRaises(NativeSpriteImportError):
+            inspect_godot_sprite_import(
+                original_record(),
+                godot_executable="/absent/jeeves/godot4",
+            )
+
+    def test_model_cannot_issue_fake_native_sprite_engine_receipt(self):
+        with TemporaryDirectory() as directory:
+            with StudioEvidenceJournal(
+                Path(directory) / "evidence.sqlite",
+                project_id="game-foo", session_id="producer-session",
+            ) as journal:
+                with self.assertRaises(StudioInteractionError):
+                    journal.append("native_sprite_import_verified", {
+                        "native_process_executed": True,
+                        "asset_id": "hero-idle",
+                    })
+                self.assertEqual(len(journal.read()), 0)
+
+    def test_host_denies_sprite_engine_before_any_process_launch(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            with CreatorProjectSourceStore(
+                root / "source.sqlite", project_id="game-foo",
+                export_root=root,
+            ) as owner:
+                source = original_record()
+                owner.create(build_creator_command(
+                    "create", project_id="game-foo",
+                    payload={"intent": {
+                        "record_id": "hero-source", "facet": "sprite_forge",
+                        "document": source["document"], "depends_on": [],
+                    }},
+                ))
+                with StudioEvidenceJournal(
+                    root / "events.sqlite",
+                    project_id="game-foo", session_id="producer-session",
+                ) as journal:
+                    host = NativeStudioHost.__new__(NativeStudioHost)
+                    host.journal = journal
+                    host.source_store = owner
+                    requests = []
+                    with self.assertRaises(StudioInteractionError):
+                        host.verify_real_sprite_import(
+                            record_id="hero-source",
+                            godot_executable="/absent/jeeves/godot4",
+                            actor_id="human-producer",
+                            authorize_sprite_import=lambda *identities: (
+                                requests.append(identities) or False
+                            ),
+                        )
+                    self.assertEqual(requests, [
+                        ("game-foo", "hero-source",
+                         "/absent/jeeves/godot4", "human-producer"),
+                    ])
+                    self.assertEqual(len(journal.read()), 0)
+
+    def test_source_owner_never_imports_nonexistent_sprite(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            with CreatorProjectSourceStore(
+                root / "source.sqlite", project_id="game-foo",
+                export_root=root,
+            ) as owner:
+                with self.assertRaises(CreatorSourceError):
+                    owner.verify_native_sprite_import(
+                        "not-authored", godot_executable="/absent/godot4",
+                    )
 
     def test_portability_refuses_illegal_windows_sprite_filename(self):
         record = original_record()
