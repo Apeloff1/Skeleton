@@ -51,6 +51,9 @@ def verify_published_sprite(
         raise SpriteVerificationError("atlas dimensions exceed verified GPU limits")
     if sha256(image).hexdigest() != metadata.get("png_sha256"):
         raise SpriteVerificationError("sprite file hash differs from the original receipt")
+    from .studio_sprite_quality_metrics import sprite_quality_metrics
+    if sprite_quality_metrics(metadata) != metadata.get("objective_quality"):
+        raise SpriteVerificationError("sprite quality signals or score differ from pixel evidence")
     try:
         pixels = _decode_verified_png(image, *dimensions)
     except (StudioSpriteError, ValueError, TypeError) as exc:
