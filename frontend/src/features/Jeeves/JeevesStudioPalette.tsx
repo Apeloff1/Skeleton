@@ -467,7 +467,7 @@ export default function JeevesStudioPalette({
             </TouchableOpacity>
             {!!goalError && <Text accessibilityRole="alert" style={{ color: '#fca5a5' }}>{goalError}</Text>}
             {goalReceipt && <>
-              <Text accessibilityRole="status" style={{ color: '#86efac' }}>
+              <Text accessibilityLiveRegion="polite" style={{ color: '#86efac' }}>
                 Persisted studio goal · {goalReceipt.goal_id} · {goalReceipt.status} ·
                 {' '}{goalReceipt.execution_mode} · revision {goalReceipt.version}
               </Text>
