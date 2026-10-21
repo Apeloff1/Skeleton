@@ -15,6 +15,9 @@ export type ForgeDocument = {
   project_id: string; expected_version: number; source_sha256: string;
   layers: ForgeLayer[]; prefab_count: number; placed_actor_count: number;
   authored_event_count: number; quest_count: number; music_cue_count: number;
+  prefab_catalog?: { id: string; kind: string; era: string; interaction: string }[];
+  actor_catalog?: { index: number; prefab_id: string; position: [number,number,number]; facing_deg: number }[];
+  quest_catalog?: { id: string; title: string; stage_count: number }[];
   action_catalog: string[]; already_saved: boolean;
 };
 export type ForgeStep = { action: string; parameters: Record<string, unknown> };
@@ -51,7 +54,10 @@ function verifyDoc(doc: ForgeDocument): ForgeDocument {
   if (!doc || doc.schema !== 'skeleton.game.frontier_studio_document.v1'
       || !SHA.test(doc.source_sha256) || !Number.isSafeInteger(doc.expected_version)
       || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 500
-      || !Array.isArray(doc.layers) || doc.layers.length > 128) {
+      || !Array.isArray(doc.layers) || doc.layers.length > 128
+      || (doc.prefab_catalog !== undefined && !Array.isArray(doc.prefab_catalog))
+      || (doc.actor_catalog !== undefined && !Array.isArray(doc.actor_catalog))
+      || (doc.quest_catalog !== undefined && !Array.isArray(doc.quest_catalog))) {
     throw new ChatClientError('Forge Studio returned invalid original game authoring source.',
       { kind: 'protocol', retryable: false });
   }
