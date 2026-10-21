@@ -172,6 +172,61 @@ export async function readForgePhaseHandbook(domain: string, treatment: string,
   return response.markdown;
 }
 
+export type ForgeCampaignRank = {
+  rank: number; campaign: string; path: string; quality_score: number;
+  quality_max: number; quality_kind: string; words: number; characters: number;
+  bytes: number; content_sha256: string; criteria: Record<string, boolean>;
+};
+export type ForgeCampaignRanking = {
+  schema: 'skeleton.forge.campaign_handbook_ranking.v1';
+  sort: 'quality' | 'length';
+  scope: 'ten_campaign_variants_for_one_exact_production_context';
+  compared: 10; items: ForgeCampaignRank[];
+};
+export async function rankForgeCampaignHandbooks(
+  domain: string, treatment: string, director: string, worldline: string,
+  phase: string, sort: 'quality' | 'length' = 'quality',
+): Promise<ForgeCampaignRanking> {
+  const parts = [domain,treatment,director,worldline,phase];
+  if (parts.some(part => !/^[a-z][a-z_]{0,40}$/.test(part)))
+    throw new Error('Invalid Forge game handbook comparison scope.');
+  const route = ROOT + '/campaign-handbooks/rank/' +
+    parts.map(encodeURIComponent).join('/')+'?sort='+sort;
+  const ranked = await data(api.get<ForgeCampaignRanking>(route,options()),
+    'Could not rank source-backed game production manuscripts.');
+  if (!ranked || ranked.schema !== 'skeleton.forge.campaign_handbook_ranking.v1'
+      || ranked.scope !== 'ten_campaign_variants_for_one_exact_production_context'
+      || ranked.sort !== sort || ranked.compared !== 10
+      || !Array.isArray(ranked.items) || ranked.items.length !== 10
+      || ranked.items.some(item => !SHA.test(item.content_sha256)
+        || !Number.isFinite(item.quality_score)
+        || item.quality_score < 0 || item.quality_score > 100
+        || !Number.isSafeInteger(item.words) || item.words < 1))
+    throw new Error('Forge manuscript comparison contract invalid.');
+  return ranked;
+}
+export async function readForgeCampaignHandbook(
+  domain: string, treatment: string, director: string, worldline: string,
+  phase: string, campaign: string,
+): Promise<{ markdown: string; score: number; words: number }> {
+  const parts = [domain,treatment,director,worldline,phase,campaign];
+  if (parts.some(part => !/^[a-z][a-z_]{0,40}$/.test(part)))
+    throw new Error('Invalid Forge campaign manuscript identity.');
+  const book = await data(api.get<{schema: string; markdown: string;
+    quality_score: number; content_sha256: string; words: number;
+    covered_commands: number}>(
+    ROOT+'/campaign-handbooks/'+parts.map(encodeURIComponent).join('/'),
+    options()), 'Unable to read the original game-production campaign manual.');
+  if (book.schema !== 'skeleton.forge.campaign_handbook.v1'
+      || !SHA.test(book.content_sha256)
+      || book.covered_commands !== 5000
+      || typeof book.markdown !== 'string' || book.markdown.length > 128000
+      || !Number.isSafeInteger(book.words) || book.words < 1
+      || !Number.isFinite(book.quality_score))
+    throw new Error('Invalid source-derived Forge campaign manual.');
+  return { markdown: book.markdown, score: book.quality_score, words: book.words };
+}
+
 export async function copyForgeTiles(projectId: string, layer: string, x: number, y: number,
                                      width: number, height: number) {
   return data(api.post<{ tiles: number[]; palette: string[]; receipt_sha256: string }>(
