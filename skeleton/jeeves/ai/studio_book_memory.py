@@ -8,6 +8,7 @@ digest, withdrawal history and per-query append-only evidence receipts.
 """
 from __future__ import annotations
 
+import argparse
 from hashlib import sha256
 import json
 import os
@@ -353,4 +354,62 @@ class ReviewedBookMemory:
         self.close()
 
 
-__all__ = ["ReviewedBookMemory", "BookMemoryError"]
+def main(argv: list[str] | None = None) -> int:
+    """Operator CLI for verified local Jeeves source admission and inspection."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    for command in ("build", "search", "revoke", "verify"):
+        run = sub.add_parser(command)
+        run.add_argument("--index", required=True, type=Path)
+        run.add_argument("--project-id", required=True)
+        run.add_argument("--admission-sha256", required=True)
+        if command == "build":
+            run.add_argument("--admission-receipt", required=True, type=Path)
+            run.add_argument("--admitted-dir", required=True, type=Path)
+        elif command == "search":
+            run.add_argument("--query", required=True)
+            run.add_argument("--actor-id", required=True)
+            run.add_argument("--family", default=None)
+            run.add_argument("--limit", type=int, default=4)
+        elif command == "revoke":
+            run.add_argument("--book-id", required=True)
+            run.add_argument("--reviewer-id", required=True)
+            run.add_argument("--reason", required=True)
+    args = parser.parse_args(argv)
+    if args.command == "build":
+        result = ReviewedBookMemory.build(
+            args.index, project_id=args.project_id,
+            admission_receipt=args.admission_receipt,
+            admitted_dir=args.admitted_dir,
+            expected_receipt_sha256=args.admission_sha256,
+        )
+    else:
+        with ReviewedBookMemory(
+            args.index, project_id=args.project_id,
+            admission_sha256=args.admission_sha256,
+        ) as memory:
+            if args.command == "verify":
+                result = memory.verify()
+            elif args.command == "search":
+                result = memory.search(
+                    args.query, actor_id=args.actor_id, family=args.family,
+                    limit=args.limit,
+                )
+            else:
+                result = {
+                    "schema_version": SCHEMA, "project_id": args.project_id,
+                    "withdrawn_book_id": args.book_id,
+                    "withdrawal_receipt_sha256": memory.revoke_book(
+                        args.book_id, reviewer_id=args.reviewer_id, reason=args.reason,
+                    ),
+                    "source_file_erased": False,
+                }
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+__all__ = ["ReviewedBookMemory", "BookMemoryError", "main"]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
