@@ -316,14 +316,21 @@ python -m skeleton.jeeves.ai.studio_book_memory search \
   --index /private/jeeves/book-index.sqlite \
   --project-id my-game \
   --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256 \
+  --source-root-sha256 INDEPENDENT_INDEX_SOURCE_ROOT_SHA256 \
   --query "How should alternate quests preserve world canon?" \
   --actor-id game-designer
 
 python -m skeleton.jeeves.ai.studio_book_memory verify \
   --index /private/jeeves/book-index.sqlite \
   --project-id my-game \
-  --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256
+  --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256 \
+  --source-root-sha256 INDEPENDENT_INDEX_SOURCE_ROOT_SHA256
 ```
+
+Retain the `source_root_sha256` value from the **build** JSON response outside
+this SQLite database. It is a second independent immutable binding against
+coordinated rewrites of source rows and database metadata. Each subsequent
+search, verification, revocation, and native-session load requires that pin.
 
 When a source must stop being used:
 
@@ -332,6 +339,7 @@ python -m skeleton.jeeves.ai.studio_book_memory revoke \
   --index /private/jeeves/book-index.sqlite \
   --project-id my-game \
   --admission-sha256 INDEPENDENT_RECEIPT_FILE_SHA256 \
+  --source-root-sha256 INDEPENDENT_INDEX_SOURCE_ROOT_SHA256 \
   --book-id original-design-volume-one \
   --reviewer-id authorized-human-reviewer \
   --reason "The original rights holder has withdrawn inference permission"
@@ -363,6 +371,7 @@ with NativeStudioHost(
     runbook_directory=Path("/private/jeeves/runbooks"),
     book_index=Path("/private/jeeves/book-index.sqlite"),
     book_admission_sha256="INDEPENDENT_RECEIPT_FILE_SHA256",
+    book_source_root_sha256="INDEPENDENT_INDEX_SOURCE_ROOT_SHA256",
 ) as studio:
     studio.answer(
         "world", "Author an original multi-island world with optional routes",
