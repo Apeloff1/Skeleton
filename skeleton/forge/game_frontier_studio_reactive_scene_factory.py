@@ -90,6 +90,9 @@ def edit_reactive_scene(project: StudioProject, action: str,
             type(k) is not str or not k or len(k)>128 or type(v) is not bool
             for k,v in required.items()):
         raise StudioError("RPG reaction needs a bounded typed source flag map")
+    repeat=args.get("repeat",True)
+    if type(repeat) is not bool:
+        raise StudioError("reactive gameplay repeat flag must be typed boolean")
     thresholds=args.get("thresholds",[t1,t2])
     if type(thresholds) is not list or len(thresholds)!=2:
         raise StudioError("reaction needs two numeric sensor thresholds")
@@ -111,6 +114,6 @@ def edit_reactive_scene(project: StudioProject, action: str,
         page_id,priority,conditions,(action_record,),
         required_flags=tuple(sorted(required.items())),
         cooldown_ms=cooldown,
-        enabled=True,repeat=bool(args.get("repeat",True)),
+        enabled=True,repeat=repeat,
     )
     return replace(project,environmental_pages=project.environmental_pages+(page,))
