@@ -308,5 +308,24 @@ class NativeStudioModel:
             "context_digest": digest(prompt),
         }
         controller.journal.append("model_inference_observed", evidence)
-        return controller.propose(actions, model_checkpoint_sha256=before,
-                                  actor_id=result.model_id)
+        plan = controller.propose(
+            actions, model_checkpoint_sha256=before, actor_id=result.model_id,
+        )
+        controller.journal.append("plan_context_bound", {
+            "plan_sha256": plan["plan_sha256"],
+            "model_checkpoint_sha256": before,
+            "book_admission_sha256": (
+                self.book_memory.admission_sha256
+                if self.book_memory is not None else None
+            ),
+            "book_source_root_sha256": (
+                self.book_memory.expected_source_root_sha256
+                if self.book_memory is not None else None
+            ),
+            "book_rights_head_sha256": book_rights_head,
+            "canon_head_sha256": canon_head,
+            "creator_source_head_sha256": source_head,
+            "context_sha256": digest(prompt),
+            "host_tool_authority_granted": False,
+        })
+        return plan
