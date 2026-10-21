@@ -151,6 +151,69 @@ class NativeStudioHost:
             registry, store=self.source_store, authorize=authorize,
         )
 
+    def _require_fresh_native_plan(self, plan: Mapping[str, Any],
+                                   restored: Mapping[str, Any] | None) -> None:
+        """Bind every real effect to the native plan's verified input generation.
+
+        A source changed by a PREVIOUS successful command in this SAME plan
+        remains permissible. Mutations by any other producer invalidate the
+        proposal and require a new local deliberation and approval. External
+        rights/canon changes always invalidate the proposal.
+        """
+        plan_sha = plan["plan_sha256"]
+        matches = [
+            event["payload"] for event in self.journal.read()
+            if event["kind"] == "plan_context_bound"
+            and event["payload"].get("plan_sha256") == plan_sha
+        ]
+        if len(matches) != 1:
+            raise StudioInteractionError(
+                "native proposal has no unique trusted source-generation binding"
+            )
+        pinned = matches[0]
+        if self.book_memory is not None:
+            if (pinned["book_admission_sha256"] != self.book_memory.admission_sha256
+                    or pinned["book_source_root_sha256"] !=
+                    self.book_memory.expected_source_root_sha256
+                    or pinned["book_rights_head_sha256"] !=
+                    self.book_memory.rights_policy_head()):
+                raise StudioInteractionError(
+                    "book admission or rights changed since this native model proposal"
+                )
+        elif pinned["book_admission_sha256"] is not None:
+            raise StudioInteractionError("native plan's reviewed book source is unavailable")
+        if self.canon_memory is not None:
+            if (pinned["canon_head_sha256"] !=
+                    self.canon_memory.verify()["history_sha256"]):
+                raise StudioInteractionError(
+                    "project canon changed since this native model proposal"
+                )
+        elif pinned["canon_head_sha256"] is not None:
+            raise StudioInteractionError("native plan's reviewed project canon is absent")
+        if self.source_store is None:
+            if pinned["creator_source_head_sha256"] is not None:
+                raise StudioInteractionError("native plan's creator source owner is absent")
+            return
+        # No independent project edits may appear, except commands whose
+        # real receipts were already durably marked succeeded by this runbook.
+        allowed: set[str] = set()
+        if restored is not None:
+            successful = {
+                item["step_id"] for item in restored["steps"]
+                if item["status"] == "succeeded"
+            }
+            allowed = {
+                step["command"]["digest"] for step in plan["steps"]
+                if step["step_id"] in successful
+            }
+        delta = self.source_store.mutations_after(
+            pinned["creator_source_head_sha256"], limit=32,
+        )
+        if any(item["command_sha256"] not in allowed for item in delta):
+            raise StudioInteractionError(
+                "another editor changed actual game source after native deliberation"
+            )
+
     def execute_authorized(
         self, plan: Mapping[str, Any], *,
         executor: ToolExecutor,
@@ -170,6 +233,7 @@ class NativeStudioHost:
         with CreatorRunbookStore(
             file, plan_sha256=contract.plan_sha256,
         ) as store:
+            self._require_fresh_native_plan(plan, store.load())
             return execute_approved_studio_batch(
                 self.controller, plan, executor=executor, store=store,
                 host_grants=host_grants, max_steps=max_steps,
