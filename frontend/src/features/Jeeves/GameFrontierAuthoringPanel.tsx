@@ -446,6 +446,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [epoch, setEpoch] = useState('');
   const [saga, setSaga] = useState('');
   const [epic, setEpic] = useState('');
+  const [epicLayers, setEpicLayers] = useState<string[]>([]);
   const [recipeResults, setRecipeResults] = useState<ForgeRecipeResults | null>(null);
   const [parameters, setParameters] = useState('{"layer":"ground","x":0,"y":0,"tile":1}');
   const [steps, setSteps] = useState<ForgeStep[]>([]);
@@ -527,6 +528,9 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       instance_id: "a",
       prefab_id: doc?.prefab_catalog?.[0]?.id || 'author_prefab_first',
       count: 4, z: 0, radius: 8, spacing: 2,
+      ...(recipe.epic ? {epic_layers: epicLayers.filter(
+        id => id !== layer?.id && doc?.layers.some(item => item.id === id)
+      ).slice(0,7)} : {}),
       ...(actor ? {target: actor.prefab_id + ':' + actor.index} : {}),
     };
     setAction(recipe.operation);
@@ -689,7 +693,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         <Button key={group.title} title={(toolFamily === group.title ? '✓ ' : '') + group.title}
           disabled={pending} press={() => { setToolFamily(group.title); setSearch(''); }} />)}</View>
     </ScrollView>
-    <Button title={(recipeView ? '✓ ' : '') + 'Browse 4,999,999,500 production recipes'}
+    <Button title={(recipeView ? '✓ ' : '') + 'Browse 49,999,999,999,500 source compositions'}
       disabled={pending || !doc} press={() => {
         setRecipeView(value => !value); setRecipeResults(null);
       }} />
@@ -717,7 +721,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         <Button disabled={pending} title={(recipeGeneration === 'epoch' ? '✓ ' : '') + 'Epochs 450B'}
           press={() => { setRecipeGeneration('epoch'); setEpic(''); setSaga(''); setRecipeQuery(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'saga' ? '✓ ' : '') + 'Sagas 4.5T'}
-          press={() => { setRecipeGeneration('saga'); setEpic(''); setEpic(''); setRecipeQuery(''); setRecipeResults(null); }}/>
+          press={() => { setRecipeGeneration('saga'); setEpic(''); setRecipeQuery(''); setRecipeResults(null); }}/>
         <Button disabled={pending} title={(recipeGeneration === 'epic' ? '✓ ' : '') + 'Epic 45T'}
           press={() => { setRecipeGeneration('epic'); setRecipeQuery(''); setRecipeResults(null); }}/>
       </View>
@@ -826,6 +830,19 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
             <Button key={name || 'all'} disabled={pending}
               title={(saga === name ? '✓ ' : '') + (name || 'All sagas')}
               press={() => { setSaga(name); setRecipeResults(null); }}/>)}
+        </View>
+      </ScrollView>}
+      {recipeGeneration === 'epic' && <Text style={{ color: '#b1cada', fontSize: 12 }}>
+        {'Epic multi-layer geometry · ' + epicLayers.length + '/7 additional existing layers selected · scroll to choose'}
+      </Text>}
+      {recipeGeneration === 'epic' && <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={{ flexDirection: 'row' }}>
+          {(doc?.layers || []).filter(item => item.id !== selectedLayer).slice(0,32).map(item =>
+            <Button key={item.id} disabled={pending}
+              title={(epicLayers.includes(item.id) ? '✓ ' : '') + item.id}
+              press={() => setEpicLayers(old => old.includes(item.id)
+                ? old.filter(value => value !== item.id)
+                : old.length < 7 ? [...old, item.id] : old)}/>) }
         </View>
       </ScrollView>}
       {recipeGeneration === 'epic' && <ScrollView horizontal showsHorizontalScrollIndicator>
