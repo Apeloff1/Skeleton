@@ -149,6 +149,21 @@ class BookMemoryTests(unittest.TestCase):
         self.assertEqual(len(memory.search("traction", actor_id="jeeves")["results"]) > 0,
                          True)
 
+    def test_rights_policy_head_changes_after_revocation(self):
+        self.build()
+        memory = self.open_index()
+        initial = memory.search("archipelago", actor_id="jeeves")
+        self.assertIsNone(initial["rights_policy_head_sha256"])
+        revoked = memory.revoke_book(
+            "book-narrative", reviewer_id="reviewer-one",
+            reason="Independently confirmed content rights withdrawal",
+        )
+        self.assertEqual(memory.rights_policy_head(), revoked)
+        self.assertEqual(memory.verify()["rights_policy_head_sha256"], revoked)
+        next_search = memory.search("archipelago", actor_id="jeeves")
+        self.assertEqual(next_search["rights_policy_head_sha256"], revoked)
+        self.assertEqual(next_search["results"], [])
+
     def test_wrong_project_and_mismatched_admission_refused(self):
         self.build()
         with self.assertRaises(BookMemoryError):
