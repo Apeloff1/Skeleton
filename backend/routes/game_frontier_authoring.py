@@ -107,7 +107,7 @@ async def read_original_world_handbook(
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "", worldline: str = "",
+    director: str = "", finish: str = "", worldline: str = "", phase: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -117,8 +117,15 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_directed_production import search_directions
     from skeleton.forge.game_frontier_studio_final_production import search_final_actions
     from skeleton.forge.game_frontier_studio_worldline_production import search_worldlines
+    from skeleton.forge.game_frontier_studio_phase_production import search_phases
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "phase":
+            return search_phases(query=query,domain=domain,system_layer=system_layer,
+                                 director=director,finish=finish,worldline=worldline,
+                                 phase=phase,offset=offset,limit=limit)
+        if phase:
+            raise StudioError("phase filtering requires phase generation")
         if generation == "worldline":
             return search_worldlines(query=query,domain=domain,
                                      system_layer=system_layer,director=director,
