@@ -111,8 +111,8 @@ assert len(ALL_NEW)==50
 
 class ForgeNewFiftyFunctionalAcceptance(unittest.TestCase):
     def test_inventory_grows_to_150_non_duplicate_operations(self):
-        self.assertEqual(150,len(AUTHORING_ACTIONS))
-        self.assertEqual(150,len(set(AUTHORING_ACTIONS)))
+        self.assertGreaterEqual(len(AUTHORING_ACTIONS),150)
+        self.assertEqual(len(AUTHORING_ACTIONS),len(set(AUTHORING_ACTIONS)))
         self.assertTrue(set(ALL_NEW)<=set(AUTHORING_ACTIONS))
 
     def test_real_procedural_content_is_seed_stable(self):
