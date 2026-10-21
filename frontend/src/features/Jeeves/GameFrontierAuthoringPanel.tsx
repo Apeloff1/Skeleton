@@ -1,5 +1,6 @@
 /** Interactive 500-operation Forge Studio editor over live authenticated project revisions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import GameFrontierHandbookPanel from './GameFrontierHandbookPanel';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   buildForge, copyForgeTiles, editForge, exportForge, inspectForge,
@@ -749,6 +750,8 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         <Button title="Previous recipes" disabled={pending}
           press={() => { void loadRecipes(Math.max(0, recipeResults.offset - 32)); }} />}
     </View>}
+    {recipeResults?.items.filter(item => item.operation === action && !!item.worldline)
+      .map(item => <GameFrontierHandbookPanel key={item.operation} recipe={item} disabled={pending} />)}
     {listed.map(group => <View key={group.title} style={{ gap: 4 }}>
       <Text style={{ color: '#a8c1d6', fontWeight: '600' }}>{group.title}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{group.actions.map(name =>
