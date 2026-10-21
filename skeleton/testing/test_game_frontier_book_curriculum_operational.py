@@ -272,12 +272,12 @@ class HostAuthorizedCurriculumOperation(unittest.IsolatedAsyncioTestCase):
 
         def command(mode, **payload):
             return StudioCommand("game.studio.curriculum.automation."+mode,
-                                 "owned", {"books": [{"generation": "epic", "index": 0}],
+                                 original.project_id, {"books": [{"generation": "epic", "index": 0}],
                                            "parameters": arguments(op), **payload})
 
         scope = {"tenant_id": "company", "owner_id": "owner"}
         with (patch.object(workspace, "_scope", side_effect=lambda *_: scope),
-              patch.object(workspace, "_project", new_callable=AsyncMock, return_value={"id": "owned"}),
+              patch.object(workspace, "_project", new_callable=AsyncMock, return_value={"id": original.project_id}),
               patch.object(workspace, "_input", new_callable=AsyncMock, return_value={"input": True}),
               patch.object(workspace, "_authority", new_callable=AsyncMock, return_value=True),
               patch.object(forge_author, "document", side_effect=fake_document),
@@ -291,7 +291,7 @@ class HostAuthorizedCurriculumOperation(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(preview["persisted"])
             self.assertTrue(preview["measured_changed"])
             practical = await execute_studio_command(scope, StudioCommand(
-                "game.studio.curriculum.practice", "owned", {
+                "game.studio.curriculum.practice", original.project_id, {
                     "books": [{"generation": "epic", "index": 0}],
                     "parameters": arguments(op),
                     "expected_revision": 7,
