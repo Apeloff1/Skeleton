@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from pydantic import Field, model_validator
 
@@ -36,6 +36,12 @@ async def catalog(user=Depends(get_current_user)):
 @router.post("/execute")
 async def execute(body: StudioToolRequest, user=Depends(get_current_user)):
     command = StudioCommand(body.operation, body.project_id, body.payload)
+    if (command.operation == "game.studio.curriculum.automation.commit"
+            and user.get("role") not in {"editor", "admin"}):
+        raise HTTPException(403, detail={
+            "code": "jeeves_training_write_denied",
+            "message": "A project editor must authorize this exact source change.",
+        })
     result = jsonable_encoder(await _call(execute_studio_command(_scope(user), command)))
     raw = json.dumps(
         result, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
