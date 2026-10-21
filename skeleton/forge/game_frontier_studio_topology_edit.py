@@ -202,10 +202,10 @@ def edit_topology(project: StudioProject, action: str,
         moat=max(1,min(w,h)//8)
         for x,y in region:
             distance=max(abs(x-cx),abs(y-cy))
-            paint((x,y),floor if core<=distance<=core+moat else wall)
+            paint((x,y),wall if core<=distance<=core+moat else floor)
         # A physical causeway through the moat.
         for x in range(cx,x0+w):
-            paint((x,cy),wall)
+            paint((x,cy),floor)
     elif action=="terrain_ruin_foundations":
         buildings=_integer(args,"buildings",1,128) if "buildings" in args else 8
         for _ in range(buildings):
@@ -262,7 +262,7 @@ def edit_topology(project: StudioProject, action: str,
         if len(region)>4096:
             raise StudioError("bridge connectivity operation is limited to 4096 authored tiles")
         # Detect separate traversable islands and connect nearest shoreline.
-        land={pt for pt in region if previous[pt]==wall}
+        land={pt for pt in region if previous[pt]==floor}
         groups=components_local(land,region)
         if len(groups)<2:
             raise StudioError("bridge requires disconnected authored landmasses")
@@ -271,7 +271,7 @@ def edit_topology(project: StudioProject, action: str,
             first,second=min(((p,q) for p in current for q in group),
                              key=lambda pq:(abs(pq[0][0]-pq[1][0])+
                                             abs(pq[0][1]-pq[1][1]),pq))
-            line(first,second,wall)
+            line(first,second,floor)
             groups[0]|=group
     else:
         raise StudioError("unknown level topology algorithm")
