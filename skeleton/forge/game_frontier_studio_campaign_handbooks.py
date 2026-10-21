@@ -126,7 +126,7 @@ def render(domain:str,treatment:str,director:str,worldline:str,
               f"______{worldline}_______{phase}________{campaign}")
         if name not in CAMPAIGN_ACTIONS:
             raise StudioError("campaign book has an unregistered game source producer")
-        rows.append(f"| {idx+1} | \`{blueprint}\` | \`{name}\` |")
+        rows.append(f"| {idx+1} | `{blueprint}` | `{name}` |")
     systems=[]
     for i,game in enumerate(GAMEPLAY_LAYERS):
         name=(f"campaign_{domain}_{_slug(archetypes[i])}__{treatment}___"
@@ -136,10 +136,10 @@ def render(domain:str,treatment:str,director:str,worldline:str,
             raise StudioError("campaign book gameplay example not implemented")
         systems.append(
             f"### Gameplay system {i+1}: {game}\n\n"
-            f"Exact executable source command: \`{name}\`.\n\n"
-            f"Run source producer \`{' + '.join(steps)}\`, the \`{game}\` gameplay "
-            f"overlay, the \`{director}\` director, the \`{FINISHES[i]}\` finisher, "
-            f"then \`{worldline}\`, \`{phase}\` and \`{campaign}\`. "
+            f"Exact executable source command: `{name}`.\n\n"
+            f"Run source producer `{' + '.join(steps)}`, the `{game}` gameplay "
+            f"overlay, the `{director}` director, the `{FINISHES[i]}` finisher, "
+            f"then `{worldline}`, `{phase}` and `{campaign}`. "
             "Verify actual changed cells, distinct observed event predicates, "
             "stable actor ID references and reachable chapter outcomes.\n"
         )
@@ -163,16 +163,16 @@ def render(domain:str,treatment:str,director:str,worldline:str,
         "a distinct deterministic map-mask and two-signal RPG action proposal. "
         "The editor cannot execute damage, commerce, travel, music or quest effects "
         "without approval from the native gameplay authority.\n\n"
-        f"**Observed signals:** \`{effects[0]}\` {effects[1]} {effects[2]} and "
-        f"\`{effects[3]}\` {effects[4]} {effects[5]}. "
-        f"**Proposed action:** \`{effects[6]}\` on \`{effects[7]}\` toward "
-        f"\`{effects[8]}\` with authored value \`{effects[9]}\`.\n\n"
+        f"**Observed signals:** `{effects[0]}` {effects[1]} {effects[2]} and "
+        f"`{effects[3]}` {effects[4]} {effects[5]}. "
+        f"**Proposed action:** `{effects[6]}` on `{effects[7]}` toward "
+        f"`{effects[8]}` with authored value `{effects[9]}`.\n\n"
     )
     parent=parent_render(domain,treatment,director,worldline,phase)
     output=(
         f"# Production volume {meta['volume']:,}/1,000,000 — "
         f"{domain} / {treatment} / {director} / {worldline} / {phase} / {campaign}\n\n"
-        f"**Reproducible source path:** \`{meta['path']}\` · "
+        f"**Reproducible source path:** `{meta['path']}` · "
         f"**Registered combinations in this volume:** {meta['covered_commands']:,}\n\n"
         "## Gameplay objective and limits\n\n"+detail+
         "## Fifty implemented source archetypes and exact commands\n\n"
@@ -209,7 +209,7 @@ def grade(markdown:str,meta:dict[str,Any])->dict[str,Any]:
               "native-world production", "thirty objective",
               "upstream source-grounded", "release boundary")
     source_rows=sum(1 for line in markdown.splitlines()
-                    if line.startswith("| ") and "| \`campaign_" in line)
+                    if line.startswith("| ") and "| `campaign_" in line)
     system_examples=sum(1 for line in markdown.splitlines()
                         if line.startswith("Exact executable source command:"))
     checks=tuple(re.findall(r"(?m)^\d+\. .+$",markdown))
