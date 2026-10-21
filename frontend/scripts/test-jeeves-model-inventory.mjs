@@ -7,11 +7,16 @@ const inventory = read('../app/ai-models.tsx');
 const readiness = read('../src/features/Jeeves/JeevesRuntimeStatus.tsx');
 const catalog = read('../src/product/productCatalog.ts');
 const client = read('../src/product/chatSessionClient.ts');
+const readinessHook = read('../src/product/useChatReadiness.ts');
 
 test('observed model inventory is a real authenticated Expo screen', () => {
   assert.equal(existsSync(new URL('../app/ai-models.tsx', import.meta.url)), true);
   assert.match(inventory, /StudioLoginGate[^>]*requireAuthenticated/);
-  assert.match(inventory, /getChatReadiness\(signal\)/);
+  // The real inventory now uses the shared account- and foreground-aware hook.
+  assert.match(inventory, /useChatReadiness\(\)/);
+  assert.match(readinessHook, /getChatReadiness\(controller\.signal\)/);
+  assert.match(readinessHook, /controller\.signal\.aborted/);
+  assert.match(readinessHook, /token === getAuthToken\(\)/);
   assert.match(inventory, /model\.readiness\.message/);
   assert.match(inventory, /readiness\.models\.models\.map\(/);
   assert.match(inventory, /No model has been reported/);
