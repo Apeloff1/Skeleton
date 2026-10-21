@@ -155,4 +155,64 @@ def compile_original_godot_candidate(
     return {"files": files, "receipt": metadata}
 
 
-__all__ = ["compile_original_godot_candidate", "FrontierSourceError"]
+def run_original_game_native_playthrough(
+    project_id: str,
+    records: Mapping[str, Mapping[str, Any]],
+    *, source_head_sha256: str | None,
+    godot_executable: str,
+    timeout_seconds: int = 90,
+) -> dict[str, Any]:
+    """Run REAL Godot 4 binary and cross-check its emitted gameplay against source.
+
+    This is explicitly a privileged host action, never callable from local
+    model-generated source or authorized merely by the existence of a plan.
+    """
+    if not isinstance(godot_executable, str) or not godot_executable.strip():
+        raise FrontierSourceError("host must specify a real Godot 4 executable")
+    if type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 300:
+        raise FrontierSourceError("native playthrough deadline outside reviewed bounds")
+    from skeleton.jeeves.game_frontier_expedition_native_runner import (
+        run_headless_expedition,
+    )
+
+    before = compile_original_godot_candidate(
+        project_id, records, source_head_sha256=source_head_sha256,
+    )
+    profile, traveler, _ = _profiles(records)
+    project, _ = materialize_persisted_frontier_source(
+        project_id, records, source_head_sha256=source_head_sha256,
+    )
+    try:
+        world = author_studio_expedition(project, profile)
+        result = run_headless_expedition(
+            world, traveler, godot_executable=godot_executable,
+            timeout_seconds=timeout_seconds,
+        )
+    except ExpeditionError as exc:
+        raise FrontierSourceError("real Godot 4 execution or independent replay failed") from exc
+    if (result.get("native_process_executed") is not True
+            or result.get("native_gameplay_consistent") is not True
+            or result.get("completed") is not True
+            or result.get("world_digest") != before["receipt"]["world_sha256"]):
+        raise FrontierSourceError("native engine failed to prove original world ownership")
+    receipt = {
+        "schema_version": "skeleton.jeeves.original_game_native_playthrough.v1",
+        "project_id": project_id,
+        "original_source_head_sha256": source_head_sha256,
+        "authored_godot_candidate_sha256": before["receipt"]["receipt_sha256"],
+        "native_engine_receipt_sha256": result["receipt_digest"],
+        "native_executable_sha256": result["native_executable_sha256"],
+        "native_log_sha256": result["native_log_sha256"],
+        "observed_replay_receipt_sha256": result["observed_replay_receipt"],
+        "real_godot4_process_executed": True,
+        "native_gameplay_consistent": True,
+        "complete_original_game_release_certified": False,
+    }
+    receipt["receipt_sha256"] = digest(receipt)
+    return receipt
+
+
+__all__ = [
+    "compile_original_godot_candidate", "run_original_game_native_playthrough",
+    "FrontierSourceError",
+]
