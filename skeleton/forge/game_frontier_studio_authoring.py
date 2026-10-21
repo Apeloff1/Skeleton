@@ -177,6 +177,20 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
              "palette_size": len(layer.palette), "elevation_m": layer.elevation_m}
             for layer in project.layers
         ],
+        "prefab_catalog": [
+            {"id": p.prefab_id, "kind": p.kind, "era": p.era,
+             "interaction": p.interaction_type}
+            for p in project.prefabs[:128]
+        ],
+        "actor_catalog": [
+            {"index": i, "prefab_id": p.prefab_id,
+             "position": [p.x, p.y, p.z], "facing_deg": p.facing_deg}
+            for i, p in enumerate(project.placements[:128])
+        ],
+        "quest_catalog": [
+            {"id": q.quest_id, "title": q.title, "stage_count": len(q.stages)}
+            for q in project.native_quests[:128]
+        ],
         "prefab_count": len(project.prefabs),
         "placed_actor_count": len(project.placements),
         "authored_event_count": len(project.events),
