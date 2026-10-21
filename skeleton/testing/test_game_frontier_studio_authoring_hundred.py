@@ -198,6 +198,32 @@ class HundredNewRealGameplayTools(unittest.TestCase):
             ])
         self.assertEqual(digest,project_digest(original))
 
+    def test_archipelago_bridges_connect_actually_walkable_floor(self):
+        authored=execute_authoring(
+            project(),"terrain_archipelago_bridges",
+            TOPOLOGY["terrain_archipelago_bridges"])
+        layer=authored.layers[0]
+        import collections
+        start=(0,0)
+        discovered={start}
+        queue=collections.deque([start])
+        while queue:
+            x,y=queue.popleft()
+            for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1)):
+                if (0<=nx<12 and 0<=ny<12
+                        and (nx,ny) not in discovered
+                        and layer.data[ny*layer.width+nx]==0):
+                    discovered.add((nx,ny))
+                    queue.append((nx,ny))
+        self.assertIn((9,0),discovered)
+
+    def test_castle_moat_has_blocked_moat_and_walkable_causeway(self):
+        authored=execute_authoring(
+            project(),"terrain_moat_castle",TOPOLOGY["terrain_moat_castle"])
+        layer=authored.layers[0]
+        self.assertEqual(0,layer.data[6*layer.width+10])
+        self.assertEqual(1,layer.data[7*layer.width+10])
+
     def test_actor_copies_preserve_source_index_bindings(self):
         changed=execute_authoring(project(),"actors_clone_selected",ACTORS["actors_clone_selected"])
         original=project()
