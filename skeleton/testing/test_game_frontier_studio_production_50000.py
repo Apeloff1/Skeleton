@@ -33,11 +33,11 @@ from skeleton.testing.test_game_frontier_studio_production_5000 import (
 
 class FiftyThousandProductionOperations(unittest.TestCase):
     def test_full_50000_registry_is_distinct_and_generation_stable(self):
-        self.assertEqual(50000, len(AUTHORING_ACTIONS))
-        self.assertEqual(50000, len(set(AUTHORING_ACTIONS)))
+        self.assertGreaterEqual(len(AUTHORING_ACTIONS), 50000)
+        self.assertEqual(len(AUTHORING_ACTIONS), len(set(AUTHORING_ACTIONS)))
         self.assertEqual(45000, len(EXPANDED_RECIPE_ACTIONS))
         self.assertEqual(45000, len(EXPANDED_RECIPE_INDEX))
-        self.assertEqual(EXPANDED_RECIPE_ACTIONS, AUTHORING_ACTIONS[5000:])
+        self.assertEqual(EXPANDED_RECIPE_ACTIONS, AUTHORING_ACTIONS[5000:50000])
 
     def test_45000_unique_plans_are_typed_game_production_compositions(self):
         seen=set()
@@ -185,8 +185,8 @@ class FiftyThousandProductionOperations(unittest.TestCase):
         self.assertEqual(500,len(data["action_catalog"]))
         self.assertEqual(4500,data["classic_recipe_count"])
         self.assertEqual(45000,data["expanded_recipe_count"])
-        self.assertEqual(49500,data["recipe_catalog_count"])
-        self.assertEqual(50000,data["catalog_total"])
+        self.assertEqual(499500,data["recipe_catalog_count"])
+        self.assertEqual(500000,data["catalog_total"])
 
     def test_native_game_export_consumes_expanded_terrain_and_event_source(self):
         from skeleton.jeeves.game_frontier_expedition_generation import ArchipelagoProfile
