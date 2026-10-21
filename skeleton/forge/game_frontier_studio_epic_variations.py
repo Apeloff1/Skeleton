@@ -275,6 +275,12 @@ def _paint_world(project: StudioProject, args: Mapping[str, Any],
             raise StudioError("Epic region must fit every selected original layer")
         if floor >= len(layer.palette) or wall >= len(layer.palette):
             raise StudioError("Epic terrain palettes must agree on tile indexes")
+        # A valid numeric tile index is not enough: different source layers
+        # may have distinct materials at the same index. Never silently
+        # paint stone as water or walls as walkable floors.
+        if any(index_value >= 0 and layer.palette[index_value] != selected.palette[index_value]
+               for index_value in (floor, wall)):
+            raise StudioError("Epic sibling layers must share semantic floor/wall tile identities")
         data = list(layer.data)
         for v in range(height):
             for u in range(width):
