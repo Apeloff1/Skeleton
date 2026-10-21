@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from hashlib import sha256
-from typing import Any
 import re
 
 from .studio_interaction_contract import digest
