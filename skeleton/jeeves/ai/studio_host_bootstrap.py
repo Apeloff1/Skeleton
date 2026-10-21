@@ -151,6 +151,38 @@ class NativeStudioHost:
             registry, store=self.source_store, authorize=authorize,
         )
 
+    def verify_real_native_gameplay(
+        self, *, godot_executable: str,
+        actor_id: str, authorize_native_execution: Callable[[str, str, str], bool],
+        timeout_seconds: int = 90,
+    ) -> dict[str, Any]:
+        """Run the ACTUAL Godot 4 engine after separate host authorization.
+
+        The model has no general process-launch tool here; a real producer
+        authenticates the actor and exact binary before this method is called.
+        """
+        identifier(actor_id, "native engine reviewer")
+        if self.source_store is None:
+            raise StudioInteractionError("original game source owner is unavailable")
+        if (not isinstance(godot_executable, str) or not godot_executable.strip()
+                or not callable(authorize_native_execution)
+                or authorize_native_execution(
+                    self.journal.project_id, godot_executable, actor_id,
+                ) is not True):
+            raise StudioInteractionError("host denied independently reviewed Godot execution")
+        result = self.source_store.run_native_playthrough(
+            godot_executable=godot_executable, timeout_seconds=timeout_seconds,
+        )
+        event = self.journal.append(
+            "native_gameplay_verified",
+            {**result, "actor_id": actor_id},
+            _authority=self.journal._native_execution_token,
+        )
+        return {
+            **result, "studio_event_sha256": event["digest"],
+            "host_permission_verified": True,
+        }
+
     def _require_fresh_native_plan(self, plan: Mapping[str, Any],
                                    restored: Mapping[str, Any] | None) -> None:
         """Bind every real effect to the native plan's verified input generation.
