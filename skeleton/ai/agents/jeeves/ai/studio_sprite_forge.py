@@ -260,9 +260,15 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
     # PNG, reconstructs the complete atlas, and checks alpha masks and timing.
     from .studio_sprite_verify import verify_published_sprite
     checked = verify_published_sprite(image, metadata)
+    from .studio_sprite_hitboxes import (
+        compile_exact_sprite_hitboxes, verify_exact_sprite_hitboxes,
+    )
+    collisions = compile_exact_sprite_hitboxes(metadata)
+    verify_exact_sprite_hitboxes(metadata, collisions)
     return {
         "png": image, "metadata": metadata,
         "independent_pixel_replay": checked,
+        "collision_rectangles": collisions,
     }
 
 
