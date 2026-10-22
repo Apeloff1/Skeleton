@@ -23,6 +23,8 @@ BINDING_KEYS = frozenset((
     "kind", "target", "asset_id", "animation",
     "pixel_size", "vertical_offset_m", "billboard", "hide_capsule",
 ))
+BINDING_OPTIONAL = frozenset(("movement_animations",))
+TRAVEL_STAMINA_ANCHOR = """    stamina -= int(costs["stamina"])"""
 
 
 class SpriteBindingError(ValueError):
@@ -50,7 +52,7 @@ def binding_from_source(
             continue
         if (record.get("record_id") != record_id
                 or record.get("facet") != "scene_forge"
-                or set(doc) != BINDING_KEYS):
+                or set(doc) not in (BINDING_KEYS, BINDING_KEYS | BINDING_OPTIONAL)):
             raise SpriteBindingError("sprite actor source lacks exact scene-owned fields")
         if doc["target"] != "player_actor":
             raise SpriteBindingError("only the actual Expedition player actor is supported")
@@ -73,8 +75,23 @@ def binding_from_source(
             raise SpriteBindingError("sprite actor binding must depend on its real source record")
         if animation not in selected["animation_names"]:
             raise SpriteBindingError("player avatar animation does not exist in original frames")
+        movement_animations = doc.get("movement_animations", {})
+        if (not isinstance(movement_animations, dict)
+                or len(movement_animations) > 32
+                or any(
+                    type(mode) is not str or ASSET.fullmatch(mode) is None
+                    or type(name) is not str or name not in selected["animation_names"]
+                    for mode, name in movement_animations.items()
+                )):
+            raise SpriteBindingError(
+                "movement state map must reference actual original animation names"
+            )
         candidates.append({
             "schema_version": "skeleton.jeeves.player_sprite_binding.v1",
+            "movement_animations": {
+                key: movement_animations[key]
+                for key in sorted(movement_animations)
+            },
             "record_id": record_id,
             "asset_id": asset, "animation": animation,
             "target": "player_actor",
@@ -187,7 +204,37 @@ def bind_sprite_to_expedition_script(
         # retains its original Node3D transform and animated child visibility.
         builder.append("    actor.mesh = null")
     builder.append("    _place_actor()")
-    return script.replace(ANCHOR, "\n".join(builder), 1)
+    compiled = script.replace(ANCHOR, "\n".join(builder), 1)
+    movement = binding.get("movement_animations", {})
+    if (not isinstance(movement, dict) or len(movement) > 32
+            or any(type(mode) is not str or ASSET.fullmatch(mode) is None
+                   or type(name) is not str or ASSET.fullmatch(name) is None
+                   for mode, name in movement.items())):
+        raise SpriteBindingError("native avatar movement map lost source identity")
+    if movement:
+        if compiled.count(TRAVEL_STAMINA_ANCHOR) != 1:
+            raise SpriteBindingError("trusted native travel transition anchor changed")
+        # This executes only after Godot's already authoritative travel budget
+        # and lock checks have succeeded, not when a blocked action is proposed.
+        entries = ", ".join(
+            f'"{mode}": "{movement[mode]}"' for mode in sorted(movement)
+        )
+        travel_logic = [
+            '    var jeeves_avatar_node := actor.get_node_or_null("OriginalAuthoredAvatar")',
+            "    if jeeves_avatar_node is AnimatedSprite3D:",
+            '        var jeeves_travel_animations: Dictionary = {' + entries + '}',
+            '        var jeeves_travel_mode := str(edge.get("mode", ""))',
+            '        var jeeves_animation := str(',
+            '            jeeves_travel_animations.get(jeeves_travel_mode, "' + animation + '")',
+            "        )",
+            "        if jeeves_avatar_node.sprite_frames.has_animation(jeeves_animation):",
+            "            jeeves_avatar_node.play(jeeves_animation)",
+            TRAVEL_STAMINA_ANCHOR,
+        ]
+        compiled = compiled.replace(
+            TRAVEL_STAMINA_ANCHOR, "\n".join(travel_logic), 1,
+        )
+    return compiled
 
 
 def verify_actor_sprite_binding(
