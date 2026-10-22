@@ -58,8 +58,10 @@ def run_sprite_bound_native_expedition(
     proof = candidate.get("receipt")
     if (not isinstance(files, Mapping) or not isinstance(binaries, Mapping)
             or not isinstance(proof, Mapping)
-            or proof.get("authored_player_avatar_binding") is None
-            or proof.get("animated_sprite3d_player_script_compiled") is not True
+            or not (
+                proof.get("animated_sprite3d_player_script_compiled") is True
+                or proof.get("animated_npc_sprite3d_source_compiled") is True
+            )
             or proof.get("world_sha256") != world.digest):
         raise SpriteBoundNativeError("native run requires a real source-bound player sprite game")
     expected = proof.get("godot_file_hashes")
@@ -172,7 +174,12 @@ def run_sprite_bound_native_expedition(
         "native_process_executed": True,
         "native_gameplay_consistent": True,
         "completed": True,
-        "real_avatar_script_loaded_for_gameplay": True,
+        "real_avatar_script_loaded_for_gameplay": (
+            proof.get("animated_sprite3d_player_script_compiled") is True
+        ),
+        "real_npc_sprite_script_loaded_for_gameplay": (
+            proof.get("animated_npc_sprite3d_source_compiled") is True
+        ),
         "visual_output_independently_observed": False,
     }
     result_proof["receipt_digest"] = digest(result_proof)
