@@ -199,6 +199,12 @@ def compile_original_godot_candidate(
             file_hashes[collision_path] = sha256(collision_bytes).hexdigest()
             engine_resources = compile_godot_sprite_resources(info)
             resource_proof = verify_godot_sprite_resources(info, engine_resources)
+            from .studio_sprite_frame_cues import (
+                emit_godot_frame_cue_files, verify_godot_frame_cue_files,
+            )
+            cue_resources = emit_godot_frame_cue_files(info)
+            cue_proof = verify_godot_frame_cue_files(info, cue_resources)
+            engine_resources.update(cue_resources)
             if set(engine_resources) & set(files):
                 raise FrontierSourceError("sprite scene resource would replace native world file")
             for path, content in engine_resources.items():
@@ -214,6 +220,11 @@ def compile_original_godot_candidate(
                 "frame_count": len(info["frames"]),
                 "animation_count": len(info["animations"]),
                 "animation_names": [state["name"] for state in info["animations"]],
+                "frame_cues_sha256": (
+                    info["frame_cues"]["receipt_sha256"]
+                    if info.get("frame_cues") else None
+                ),
+                "godot_frame_cue_resource_sha256": cue_proof["receipt_sha256"],
                 "png_sha256": info["png_sha256"],
                 "original_hitbox_receipt_sha256": hitboxes["receipt_sha256"],
             })
