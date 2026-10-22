@@ -299,6 +299,144 @@ class NativeWorldObservationTests(TestCase):
             self.verified(compiled, log)
 
 
+
+class NativeStreamingGameCertificationBoundaryTests(TestCase):
+    """The outer game receipt must refuse forged completed native playthroughs.
+
+    Mocking here tests orchestration only; no installed engine is represented
+    as having been observed.
+    """
+
+    from skeleton.testing.test_jeeves_studio_frontier_source_compile import (
+        RealGodotSourceBuildTests,
+    )
+    setUp = RealGodotSourceBuildTests.setUp
+    create = RealGodotSourceBuildTests.create
+    populate_3d = RealGodotSourceBuildTests.populate_3d
+
+    def create_original_streamed_world(self):
+        self.populate_3d()
+        self.create("runtime-mesh-source", "asset_forge", {
+            "kind": "procedural_mesh",
+            "asset_id": "runtime-stone", "primitive": "box",
+            "size_mm": [1100, 800, 500], "segments": 6,
+            "color_rgba": "#998877ff", "metallic_per_mille": 0,
+            "roughness_per_mille": 800,
+        }, depends=("config-3d",))
+        self.create("runtime-scene-placement", "scene_forge", {
+            "kind": "original_mesh_instance",
+            "instance_id": "runtime-stone-one",
+            "base_record_id": "runtime-mesh-source",
+            "asset_id": "runtime-stone",
+            "physics_record_id": None,
+            "position_mm": [3000, 900, -1500],
+            "rotation_deg": [0, 30, 0], "scale_per_mille": 1000,
+        }, depends=("runtime-mesh-source",))
+        self.create("runtime-streaming-source", "scene_forge", {
+            "kind": "original_world_streaming_policy",
+            "mode": "replace_static", "view_radius_m": 200,
+            "instantiate_per_frame": 3,
+        }, depends=("runtime-scene-placement",))
+
+    @staticmethod
+    def false_runner(candidate, world, player, **kwargs):
+        return {
+            "world_digest": world.digest,
+            "native_process_executed": True,
+            "native_gameplay_consistent": True,
+            "completed": True,
+            "receipt_digest": "a" * 64,
+            "native_executable_sha256": "b" * 64,
+            "native_log_sha256": "c" * 64,
+            "observed_replay_receipt": "d" * 64,
+        }
+
+    def test_outer_native_game_rejects_mocked_success_without_real_stream_evidence(self):
+        from unittest.mock import patch
+        from skeleton.jeeves.ai.studio_frontier_godot_package import (
+            FrontierSourceError, run_original_game_native_playthrough,
+        )
+        self.create_original_streamed_world()
+        with patch(
+            "skeleton.jeeves.ai.studio_sprite_bound_native_runner."
+            "run_exact_original_candidate_native_expedition",
+            side_effect=self.false_runner,
+        ):
+            with self.assertRaisesRegex(
+                FrontierSourceError, "active streaming game cannot be certified",
+            ):
+                run_original_game_native_playthrough(
+                    "new-game", self.owner._records,
+                    source_head_sha256=self.owner.head_identity(),
+                    godot_executable="/mock-not-installed",
+                )
+
+    def test_outer_native_game_rejects_malformed_stream_receipt_hash(self):
+        from unittest.mock import patch
+        from skeleton.jeeves.ai.studio_frontier_godot_package import (
+            FrontierSourceError, run_original_game_native_playthrough,
+        )
+        self.create_original_streamed_world()
+
+        def forged(candidate, world, player, **kwargs):
+            value = self.false_runner(candidate, world, player, **kwargs)
+            value.update({
+                "actual_camera_driven_streaming_observed": True,
+                "actual_streamed_objects_unloaded": True,
+                "native_streaming_probe_receipt_sha256": "not-a-sha",
+            })
+            return value
+
+        with patch(
+            "skeleton.jeeves.ai.studio_sprite_bound_native_runner."
+            "run_exact_original_candidate_native_expedition",
+            side_effect=forged,
+        ):
+            with self.assertRaises(FrontierSourceError):
+                run_original_game_native_playthrough(
+                    "new-game", self.owner._records,
+                    source_head_sha256=self.owner.head_identity(),
+                    godot_executable="/mock-not-installed",
+                )
+
+    def test_runner_receives_exact_compiled_streamer_not_baseline(self):
+        from unittest.mock import patch
+        from skeleton.jeeves.ai.studio_frontier_godot_package import (
+            FrontierSourceError, run_original_game_native_playthrough,
+        )
+        self.create_original_streamed_world()
+        captured = []
+
+        def blocked(candidate, world, player, **kwargs):
+            captured.append(candidate)
+            raise RuntimeError("mocked engine unavailable")
+
+        with (
+            patch(
+                "skeleton.jeeves.game_frontier_expedition_native_runner."
+                "run_headless_expedition",
+                side_effect=AssertionError("baseline substituted for streaming"),
+            ),
+            patch(
+                "skeleton.jeeves.ai.studio_sprite_bound_native_runner."
+                "run_exact_original_candidate_native_expedition",
+                side_effect=blocked,
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                run_original_game_native_playthrough(
+                    "new-game", self.owner._records,
+                    source_head_sha256=self.owner.head_identity(),
+                    godot_executable="/mock-not-installed",
+                )
+        self.assertEqual(len(captured), 1)
+        self.assertIn(
+            "game/frontier/assets/world_streamer.gd", captured[0]["files"],
+        )
+        self.assertTrue(
+            captured[0]["receipt"]["world_streaming_policy"]["enabled"],
+        )
+
 if __name__ == "__main__":
     import unittest
     unittest.main()
