@@ -580,6 +580,16 @@ def compile_original_godot_candidate(
         catalog=asset_catalog, placements=placements["metadata"],
     )
     world_index_raw = spatial_index_bytes(world_index)
+    from .studio_world_chunks import (
+        compile_world_chunk_catalog, world_chunk_catalog_bytes,
+    )
+    world_chunks = compile_world_chunk_catalog(world_index)
+    chunk_raw = world_chunk_catalog_bytes(world_chunks)
+    chunk_path = "game/frontier/assets/world-chunks.json"
+    if chunk_path in files or chunk_path in binary_assets:
+        raise FrontierSourceError("source chunk partition artifact collides")
+    binary_assets[chunk_path] = chunk_raw
+    file_hashes[chunk_path] = sha256(chunk_raw).hexdigest()
     index_path = "game/frontier/assets/world-index.json"
     if index_path in files or index_path in binary_assets:
         raise FrontierSourceError("spatial manifest path is already occupied")
@@ -610,6 +620,9 @@ def compile_original_godot_candidate(
         "asset_descriptor_count": asset_catalog["descriptor_count"],
         "world_spatial_index_sha256": sha256(world_index_raw).hexdigest(),
         "world_spatial_receipt_sha256": world_index["receipt_sha256"],
+        "world_chunk_catalog_sha256": sha256(chunk_raw).hexdigest(),
+        "world_chunk_receipt_sha256": world_chunks["receipt_sha256"],
+        "world_chunk_count": world_chunks["chunk_count"],
         "world_instance_descriptor_count": world_index["instance_count"],
         "packaged_original_sprites": authored_sprites,
         "packaged_original_audio": authored_audio,

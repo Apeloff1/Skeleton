@@ -194,8 +194,8 @@ def plan_chunk_resources(
         previously_loaded = []
     if (type(previously_loaded) is not list or len(previously_loaded) > 128
             or any(type(x) is not str or
-                   re.fullmatch(r"game/frontier/meshes/[a-z0-9_-]{1,64}\\."
-                                r"(?:tscn|lod\\.tscn|physics\\.tscn)", x)
+                   re.fullmatch(r"game/frontier/meshes/[a-z0-9_-]{1,64}\."
+                                r"(?:tscn|lod\.tscn|physics\.tscn)", x)
                    is None for x in previously_loaded)
             or len(set(previously_loaded)) != len(previously_loaded)):
         raise WorldChunkError("previously loaded resource keys are invalid")

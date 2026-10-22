@@ -841,6 +841,24 @@ def verify_published_godot_zip(
                     placements=proof["packaged_original_mesh_placements"],
                 )
                 spatial_data = json.loads(spatial_raw)
+                from .studio_world_chunks import (
+                    WorldChunkError, verify_world_chunk_catalog,
+                )
+                chunk_path = "game/frontier/assets/world-chunks.json"
+                if chunk_path not in expected:
+                    raise WorldChunkError("published spatial chunks omitted")
+                chunk_raw = archive.read(chunk_path)
+                chunk_proof = verify_world_chunk_catalog(
+                    chunk_raw, source_index=spatial_data,
+                )
+                chunk_data = json.loads(chunk_raw)
+                if (chunk_proof["source_chunk_sha256"] !=
+                        proof.get("world_chunk_catalog_sha256")
+                        or chunk_data["receipt_sha256"] !=
+                        proof.get("world_chunk_receipt_sha256")
+                        or chunk_proof["home_cells_replayed"] !=
+                        proof.get("world_chunk_count")):
+                    raise WorldChunkError("published chunk partition receipt differs")
                 if (spatial_proof["world_index_sha256"] !=
                         proof.get("world_spatial_index_sha256")
                         or spatial_data["receipt_sha256"] !=
@@ -852,7 +870,8 @@ def verify_published_godot_zip(
                     raise WorldSpatialIndexError(
                         "source world spatial receipts disagree with archive"
                     )
-            except (WorldSpatialIndexError, ValueError, KeyError, TypeError) as exc:
+            except (WorldSpatialIndexError, WorldChunkError,
+                    ValueError, KeyError, TypeError) as exc:
                 raise NativeSourceVerificationError(
                     "published 3D spatial instances/bounds do not match real scenes"
                 ) from exc
@@ -882,6 +901,8 @@ def verify_published_godot_zip(
         "world_spatial_instance_descriptors_replayed":
             spatial_proof["scene_instances_replayed"],
         "world_spatial_index_sha256": spatial_proof["world_index_sha256"],
+        "world_chunk_cells_replayed": chunk_proof["home_cells_replayed"],
+        "world_chunk_catalog_sha256": chunk_proof["source_chunk_sha256"],
         "original_3d_instanced_in_world_scene":
             placement_proof["real_scene_hierarchy_compiled"],
         "actual_collision_contact_observed": False,

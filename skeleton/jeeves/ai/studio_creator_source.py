@@ -617,6 +617,38 @@ class CreatorProjectSourceStore:
             ]),
         }
 
+    def compiled_world_chunk_catalog(self) -> dict[str, Any]:
+        """Revision-bound deterministic spatial partitions, no engine I/O."""
+        from .studio_world_chunks import compile_world_chunk_catalog
+        with self._lock:
+            return compile_world_chunk_catalog(
+                self.compiled_world_spatial_index()
+            )
+
+    def plan_world_scene_resources(
+        self, *, camera_mm: list[int], view_radius_mm: int,
+        previously_loaded: list[str] | None = None, limit: int = 64,
+    ) -> dict[str, Any]:
+        """Source-approved resource load plan, explicitly not a claim of streaming."""
+        from .studio_world_chunks import plan_chunk_resources
+        with self._lock:
+            spatial = self.compiled_world_spatial_index()
+            chunks = self.compiled_world_chunk_catalog()
+            if chunks["source_world_receipt_sha256"] != spatial["receipt_sha256"]:
+                raise CreatorSourceError("world source changed across spatial planner")
+            result = plan_chunk_resources(
+                chunks, spatial, camera_mm=camera_mm,
+                view_radius_mm=view_radius_mm, previously_loaded=previously_loaded,
+                limit=limit,
+            )
+            return {
+                **result, "project_id": self.project_id,
+                "source_head_sha256": self._head,
+                "resource_planning_receipt_sha256": digest([
+                    self.project_id, self._head, result["receipt_sha256"],
+                ]),
+            }
+
     def _mutate(self, command: CreatorCommand, *,
                 record_id: str, facet: str, document: dict[str, Any],
                 depends_on: list[str], old: dict[str, Any] | None) -> dict[str, Any]:
