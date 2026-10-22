@@ -17,8 +17,7 @@ from typing import Any, Mapping
 
 from .studio_frontier_godot_package import compile_original_godot_candidate
 from .studio_interaction_contract import digest
-from .studio_sprite_actor_binding import SpriteBindingError
-from .studio_sprite_native_import import NativeSpriteImportError, _file_sha256
+from .studio_sprite_native_import import _file_sha256
 
 PREFIX = "JEEVES_AVATAR_OBSERVED "
 MAX_ENGINE_LOG = 256 * 1024
