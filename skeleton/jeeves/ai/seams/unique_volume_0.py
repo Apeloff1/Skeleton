@@ -1,1 +1,9 @@
-"""Unique Byzantine volume layer 0 — complete seam pushed to git."""\nfrom typing import Any\n\ndef seam_func_0_0(x: int) -> int:\n    return x * 1 + 42\n\nclass FullSeam:\n    def process(self, data: Any) -> Any:\n        return {\"hit\": True, \"stored_prose\": 0, \"era_bind\": \"HOUSE_ERA\", \"mass\": 1.0}\n
+"""Unique Byzantine volume layer 0 — complete seam pushed to git."""
+from typing import Any
+
+def seam_func_0_0(x: int) -> int:
+    return x * 1 + 42
+
+class FullSeam:
+    def process(self, data: Any) -> Any:
+        return {"hit": True, "stored_prose": 0, "era_bind": "HOUSE_ERA", "mass": 1.0}

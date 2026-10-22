@@ -1,1 +1,5 @@
-"""Parse pointer splitter N-cap 8. Complete.\n"""\nclass PointerSplitter:\n    def split(self, stimulus: str) -> list:\n        return [stimulus[:8]]  # N-cap example\n
+"""Parse pointer splitter N-cap 8. Complete.
+"""
+class PointerSplitter:
+    def split(self, stimulus: str) -> list:
+        return [stimulus[:8]]  # N-cap example
