@@ -543,6 +543,20 @@ class CreatorProjectSourceStore:
         # Do not persist a structurally invalid image as a valid game asset.
         # Validate original pixel bytes and independent verification before
         # opening the SQLite write transaction (which stays short).
+        if facet == "asset_forge" and document.get("kind") in {
+            "procedural_mesh", "procedural_mesh_lod_set",
+        }:
+            from .studio_original_mesh_lod import (
+                compile_original_mesh_lod_collection,
+            )
+            prospective = dict(self._records)
+            prospective[record_id] = {
+                "record_id": record_id, "facet": facet,
+                "revision": version, "document": document,
+                "depends_on": depends_on, "source_sha256": content_sha,
+            }
+            # Reject dependent LOD invalidation before the SQLite write.
+            compile_original_mesh_lod_collection(prospective)
         if facet == "asset_forge" and document.get("kind") == "procedural_mesh":
             from .studio_original_mesh import compile_original_mesh
             compile_original_mesh({
