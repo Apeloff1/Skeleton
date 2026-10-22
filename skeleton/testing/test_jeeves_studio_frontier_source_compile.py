@@ -405,7 +405,8 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertEqual(self.owner.snapshot()["source_count"], 4)
         self.assertFalse(any(self.export.iterdir()))
 
-    def author_player_visual(self, *, animation="idle", source_dependency=True):
+    def author_player_visual(self, *, animation="idle", source_dependency=True,
+                             movement_map=None):
         self.create("hero-art", "sprite_forge", {
             "kind": "pixel_sprite", "asset_id": "hero-idle",
             "width": 2, "height": 2, "pixel_scale": 2,
@@ -419,15 +420,24 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             "animations": [
                 {"name": "idle", "frame_ids": ["first", "second"],
                  "loop": True},
+                {"name": "walk", "frame_ids": ["second", "first"],
+                 "loop": True},
+                {"name": "glide", "frame_ids": ["second"],
+                 "loop": True},
             ],
         }, depends=("config-3d",))
-        self.create("hero-visual-binding", "scene_forge", {
+        binding_document = {
             "kind": "sprite_actor_binding",
             "target": "player_actor", "asset_id": "hero-idle",
             "animation": animation, "pixel_size": 0.025,
             "vertical_offset_m": 1.5,
             "billboard": True, "hide_capsule": True,
-        }, depends=("hero-art",) if source_dependency else ("config-3d",))
+        }
+        if movement_map is not None:
+            binding_document["movement_animations"] = movement_map
+        self.create("hero-visual-binding", "scene_forge",
+                    binding_document, depends=("hero-art",)
+                    if source_dependency else ("config-3d",))
 
     def test_authored_sprite_is_bound_to_actual_moving_godot_player(self):
         self.populate_3d()
@@ -454,6 +464,43 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertTrue(exported["disk_verification"][
             "all_emitted_file_hashes_verified"
         ])
+
+    def test_real_game_moves_animated_player_between_authored_modes(self):
+        self.populate_3d()
+        self.author_player_visual(
+            movement_map={"walk": "walk", "glide": "glide"},
+        )
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as z:
+            script = z.read("game/frontier/expedition.gd").decode("utf-8")
+            proof = json.loads(z.read("jeeves_source_receipt.json"))
+        self.assertIn('"walk": "walk"', script)
+        self.assertIn('"glide": "glide"', script)
+        self.assertIn("jeeves_avatar_node.play(jeeves_animation)", script)
+        self.assertLess(
+            script.index('if stamina < int(costs["stamina"]):'),
+            script.index("var jeeves_travel_animations"),
+        )
+        self.assertEqual(
+            proof["authored_player_avatar_binding"]["movement_animations"],
+            {"walk": "walk", "glide": "glide"},
+        )
+        self.assertTrue(exported["disk_verification"][
+            "all_emitted_file_hashes_verified"
+        ])
+
+    def test_player_movement_rejects_nonexistent_original_animation(self):
+        self.populate_3d()
+        with self.assertRaisesRegex(SpriteBindingError, "movement state map"):
+            self.author_player_visual(movement_map={"walk": "nonexistent"})
+        self.assertEqual(self.owner.snapshot()["source_count"], 5)
+        self.assertEqual(list(self.export.iterdir()), [])
+
+    def test_avatar_movement_mode_must_have_safe_identifier(self):
+        self.populate_3d()
+        with self.assertRaisesRegex(SpriteBindingError, "movement state map"):
+            self.author_player_visual(movement_map={"walk\\";queue_free": "walk"})
+        self.assertEqual(list(self.export.iterdir()), [])
 
     def test_binding_requires_real_sprite_source_dependency(self):
         self.populate_3d()
