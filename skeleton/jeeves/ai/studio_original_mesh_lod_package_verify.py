@@ -44,6 +44,8 @@ def verify_original_mesh_archive_resources(
             raise OriginalMeshArchiveError("LOD asset is duplicated or malformed")
         lookup[item["asset_id"]] = item
     actual_scene_paths: set[str] = set()
+    expected_glbs: set[str] = set()
+    expected_authored_sources: set[str] = set()
     lod_levels = 0
     reconstructed_lod_sets: list[dict[str, Any]] = []
     for mesh in meshes:
@@ -55,10 +57,15 @@ def verify_original_mesh_archive_resources(
             raise OriginalMeshArchiveError("GLB mesh asset name missing")
         receipt = lookup.pop(asset, None)
         manifest = None
+        expected_glbs.add("game/frontier/meshes/" + asset + ".glb")
+        expected_authored_sources.add(
+            "game/frontier/meshes/" + asset + ".source.json"
+        )
         if receipt is not None:
             path = "game/frontier/meshes/" + asset + ".lods.source.json"
             if path not in names:
                 raise OriginalMeshArchiveError("LOD authored source file not published")
+            expected_authored_sources.add(path)
             try:
                 source = json.loads(archive.read(path))
                 if type(source) is not dict or set(source) != {
@@ -76,6 +83,7 @@ def verify_original_mesh_archive_resources(
                     )
                     if filename not in names or name in glbs:
                         raise OriginalMeshLodError("LOD binary file missing or duplicate")
+                    expected_glbs.add(filename)
                     glbs[name] = archive.read(filename)
                 replay = verify_original_mesh_lod_set(
                     source["base_record"], source["author_record"],
@@ -139,6 +147,19 @@ def verify_original_mesh_archive_resources(
     }
     if found != actual_scene_paths:
         raise OriginalMeshArchiveError("unattributed mesh behavior or scene source")
+    observed_glbs = {
+        name for name in names if name.startswith("game/frontier/meshes/")
+        and name.endswith(".glb")
+    }
+    observed_sources = {
+        name for name in names if name.startswith("game/frontier/meshes/")
+        and name.endswith(".source.json")
+    }
+    if (observed_glbs != expected_glbs
+            or observed_sources != expected_authored_sources):
+        raise OriginalMeshArchiveError(
+            "unattributed or missing published 3D model binary or source"
+        )
     return {
         "schema_version": "skeleton.jeeves.mesh_archive_lod_replay.v1",
         "mesh_scenes_replayed": len(meshes),
