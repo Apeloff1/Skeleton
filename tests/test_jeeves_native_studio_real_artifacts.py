@@ -4,6 +4,9 @@ Keep each specification at its owning skeleton/testing location, but expose
 it to the repository's root tests/ pytest job. Pytest discovers these imported
 unittest.TestCase classes under their Test* aliases and runs them normally.
 """
+from skeleton.testing.test_jeeves_studio_sprite_frame_cues import (
+    SpriteFrameCueTests as TestJeevesSpriteFrameCues,
+)
 from skeleton.testing.test_jeeves_studio_sprite_temporal_quality import (
     TestJeevesSpriteTemporalQuality,
 )
@@ -58,7 +61,7 @@ __all__ = [
     "TestJeevesDirectionalSprite",
     "TestJeevesSpriteDirectionCompiler", "TestJeevesSpriteDirectionGame",
     "TestJeevesCompassRouteEvidence",
-    "TestJeevesSpriteTemporalQuality",
+    "TestJeevesSpriteTemporalQuality", "TestJeevesSpriteFrameCues",
     "TestJeevesExactSpriteCollision", "TestJeevesOriginalPlayerAvatar",
     "TestJeevesFrontierSource", "TestJeevesRealGodotSource",
     "TestJeevesCreatorSource", "TestJeevesNativePlanFreshness",
