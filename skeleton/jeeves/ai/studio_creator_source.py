@@ -198,6 +198,11 @@ def _sprite_archive(
                 raw, normal, receipt,
                 width=proof["sheet_width_px"], height=proof["sheet_height_px"],
             )
+            if entry.get("normal_source") is None:
+                raise CreatorSourceError("reviewed heightfield source missing for normal output")
+            files["sprites/" + name + ".normal.source.json"] = _json(
+                entry["normal_source"], limit=MAX_RECORD_BYTES,
+            )
             files["sprites/" + name + ".normal.png"] = normal
         collision = verify_exact_sprite_hitboxes(
             proof, entry["collision_rectangles"],
