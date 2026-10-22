@@ -189,6 +189,10 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTHONPATH: "."
         run: |
+          python -m compileall -q \
+            skeleton/jeeves/ai/studio_world_chunks.py \
+            skeleton/jeeves/ai/studio_world_spatial_index.py \
+            skeleton/jeeves/ai/studio_world_streamer_godot.py
           python -m pytest -q --noconftest \
             skeleton/testing/test_jeeves_studio_asset_compilers_2026.py \
             skeleton/testing/test_jeeves_studio_mesh_lod_2026.py \

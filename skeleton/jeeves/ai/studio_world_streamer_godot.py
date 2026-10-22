@@ -103,7 +103,7 @@ def compile_godot_world_streamer(
         "    if camera == null:",
         "        return",
         "    var camera_mm := camera.global_position * 1000.0",
-        "    var max_extent := float(_chunks.get("max_instance_radius_mm", 0))",
+        '    var max_extent := float(_chunks.get("max_instance_radius_mm", 0))',
         "    var search_mm: float = view_radius_m * 1000.0 + max_extent",
         "    var low := Vector3i(",
         "        floori((camera_mm.x - search_mm) / CELL_MM),",
