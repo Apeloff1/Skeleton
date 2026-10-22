@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from skeleton.jeeves.ai.studio_interaction_contract import digest
 from skeleton.jeeves.ai.studio_original_mesh_native_probe import (
-    MeshEngineProbeError, PREFIX, SCRIPT_PATH,
+    MeshEngineProbeError, PREFIX,
     compile_native_mesh_probe, verify_native_mesh_probe_output,
 )
 from skeleton.jeeves.ai.studio_frontier_godot_package import (
@@ -218,8 +218,12 @@ class MeshEngineProbeCompilerTests(TestCase):
             verify(compiled, observed_log(compiled) + "x" * 2_000_000)
 
 
-class ExactGameSourceRunnerRoutingTests(RealGodotSourceBuildTests):
+class ExactGameSourceRunnerRoutingTests(TestCase):
     """Route tests use a fake runner only to inspect which candidate was sent."""
+
+    setUp = RealGodotSourceBuildTests.setUp
+    create = RealGodotSourceBuildTests.create
+    populate_3d = RealGodotSourceBuildTests.populate_3d
 
     def test_real_original_mesh_never_uses_baseline_native_game(self):
         self.populate_3d()
