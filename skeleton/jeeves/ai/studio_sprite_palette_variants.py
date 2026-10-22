@@ -14,7 +14,7 @@ import re
 from typing import Any
 
 from .studio_interaction_contract import digest
-from .studio_sprite_forge import compile_authored_sprite
+from .studio_sprite_forge import compile_authored_sprite, _decode_verified_png
 
 _ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _COLOR = re.compile(r"^#[0-9a-fA-F]{8}$")
@@ -139,9 +139,75 @@ def compile_original_palette_variant(
         "independent_creative_review_performed": False,
     }
     proof["receipt_sha256"] = digest(proof)
+    checked = verify_original_palette_variant(base, derived, proof)
     return {
         **derived, "palette_variant_receipt": proof,
+        "palette_variant_pixel_replay": checked,
     }
+
+
+def verify_original_palette_variant(
+    source: Mapping[str, Any], result: Mapping[str, Any],
+    proof: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Reconstruct every packed RGBA pixel independently from the base atlas.
+
+    Verifies the transformed transparent gutters as well as authored frames,
+    so a forged receipt cannot hide unrelated content in unused texture cells.
+    """
+    if not all(isinstance(x, Mapping) for x in (source, result, proof)):
+        raise SpritePaletteVariantError("palette verification needs typed source bytes")
+    claimed = dict(proof)
+    receipt = claimed.pop("receipt_sha256", None)
+    if (receipt != digest(claimed) or proof.get("schema_version") != SCHEMA):
+        raise SpritePaletteVariantError("color variant provenance digest differs")
+    original_meta, changed_meta = source["metadata"], result["metadata"]
+    src, new = source["png"], result["png"]
+    if (sha256(src).hexdigest() != proof["source_png_sha256"]
+            or sha256(new).hexdigest() != proof["derived_png_sha256"]
+            or original_meta["source_sha256"] != proof["original_source_revision_sha256"]
+            or changed_meta["source_sha256"] != proof["derived_compile_source_sha256"]
+            or original_meta["asset_id"] != proof["base_asset_id"]
+            or changed_meta["asset_id"] != proof["asset_id"]):
+        raise SpritePaletteVariantError("palette output differs from source-bound receipt")
+    w, h = original_meta["sheet_width_px"], original_meta["sheet_height_px"]
+    if (changed_meta["sheet_width_px"], changed_meta["sheet_height_px"]) != (w, h):
+        raise SpritePaletteVariantError("palette skin changed atlas geometry")
+    base = _decode_verified_png(src, w, h)
+    derived = _decode_verified_png(new, w, h)
+    mapping = {
+        bytes.fromhex(old[1:]): bytes.fromhex(new_rgba[1:])
+        for old, new_rgba in proof["explicit_color_map"].items()
+    }
+    if len(base) != len(derived):
+        raise SpritePaletteVariantError("source and skin RGBA surface sizes differ")
+    for offset in range(0, len(base), 4):
+        rgba = base[offset:offset + 4]
+        if derived[offset:offset + 4] != mapping.get(rgba, rgba):
+            raise SpritePaletteVariantError(
+                "palette skin altered a pixel outside declared explicit mapping"
+            )
+    for source_frame, derived_frame in zip(
+        original_meta["frames"], changed_meta["frames"], strict=True,
+    ):
+        if (source_frame["collision_mask_bits_hex"] != derived_frame["collision_mask_bits_hex"]
+                or source_frame["rect_px"] != derived_frame["rect_px"]
+                or source_frame["duration_ms"] != derived_frame["duration_ms"]):
+            raise SpritePaletteVariantError("variant cannot change original hitboxes/timings")
+    if original_meta["animations"] != changed_meta["animations"]:
+        raise SpritePaletteVariantError("palette variant altered source animation states")
+    verified = {
+        "schema_version": "skeleton.jeeves.palette_rgba_replay.v1",
+        "source_receipt_sha256": receipt,
+        "source_png_sha256": proof["source_png_sha256"],
+        "derived_png_sha256": proof["derived_png_sha256"],
+        "pixels_replayed": len(base) // 4,
+        "all_rgba_mapping_policies_satisfied": True,
+        "collision_and_timeline_preserved": True,
+        "native_renderer_executed": False,
+    }
+    verified["receipt_sha256"] = digest(verified)
+    return verified
 
 
 def compile_original_palette_collection(
@@ -185,5 +251,5 @@ def compile_original_palette_collection(
 
 __all__ = [
     "SpritePaletteVariantError", "compile_original_palette_variant",
-    "compile_original_palette_collection",
+    "compile_original_palette_collection", "verify_original_palette_variant",
 ]
