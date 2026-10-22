@@ -150,6 +150,60 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "original NPC character source failed independent replay"
                     )
+            original_audio = proof.get("packaged_original_audio", [])
+            if (type(original_audio) is not list or len(original_audio) > 64
+                    or proof.get("audio_engine_playback_verified") is not False):
+                raise NativeSourceVerificationError(
+                    "original audio count or playback-claim evidence is untrusted"
+                )
+            if original_audio:
+                from .studio_original_audio import (
+                    OriginalAudioError, verify_original_sound,
+                )
+                heard: set[str] = set()
+                for sound in original_audio:
+                    if type(sound) is not dict or set(sound) != {
+                        "asset_id", "source_record_id", "source_sha256",
+                        "wav_sha256", "metadata_receipt_sha256",
+                    }:
+                        raise NativeSourceVerificationError(
+                            "Godot original audio source proof is incomplete"
+                        )
+                    asset_id = sound["asset_id"]
+                    if type(asset_id) is not str or asset_id in heard:
+                        raise NativeSourceVerificationError(
+                            "Godot original audio identity is duplicated or invalid"
+                        )
+                    heard.add(asset_id)
+                    wav_path = "game/frontier/audio/" + asset_id + ".wav"
+                    src_path = "game/frontier/audio/" + asset_id + ".source.json"
+                    if wav_path not in expected or src_path not in expected:
+                        raise NativeSourceVerificationError(
+                            "authored original sound lacks its real WAV or source proof"
+                        )
+                    try:
+                        source = json.loads(archive.read(src_path))
+                        if type(source) is not dict or set(source) != {
+                            "record", "metadata",
+                        }:
+                            raise OriginalAudioError("authored original sound proof malformed")
+                        record, info = source["record"], source["metadata"]
+                        checked = verify_original_sound(
+                            record, archive.read(wav_path), info,
+                        )
+                    except (OriginalAudioError, KeyError, ValueError, TypeError) as exc:
+                        raise NativeSourceVerificationError(
+                            "Godot original WAV differs from independently reconstructed PCM"
+                        ) from exc
+                    if (checked["wav_sha256"] != sound["wav_sha256"]
+                            or checked["source_sha256"] != sound["source_sha256"]
+                            or info["receipt_sha256"]
+                            != sound["metadata_receipt_sha256"]
+                            or info["asset_id"] != asset_id
+                            or info["source_record_id"] != sound["source_record_id"]):
+                        raise NativeSourceVerificationError(
+                            "published original audio receipt loses source ownership"
+                        )
             original_sprites = proof.get("packaged_original_sprites", [])
             if (not isinstance(original_sprites, list)
                     or len(original_sprites) > 128
@@ -165,10 +219,12 @@ def verify_published_godot_zip(
                     if not isinstance(item, dict) or set(item) != {
                         "asset_id", "source_record_id", "source_sha256",
                         "frame_count", "animation_count", "animation_names",
-                        "png_sha256", "godot_spriteframes_resource_sha256",
+                        "png_sha256", "normal_png_sha256",
+                        "godot_spriteframes_resource_sha256",
                         "godot_preview_scene_path",
                         "original_hitbox_receipt_sha256",
                         "frame_cues_sha256", "godot_frame_cue_resource_sha256",
+                        "frame_cue_event_ids",
                     }:
                         raise NativeSourceVerificationError(
                             "compiled sprite record has incomplete source references"
@@ -201,10 +257,45 @@ def verify_published_godot_zip(
                             or len(sprite.get("frames", [])) != item["frame_count"]
                             or len(sprite.get("animations", [])) != item["animation_count"]
                             or [state["name"] for state in sprite["animations"]]
-                            != item["animation_names"]):
+                            != item["animation_names"]
+                            or (
+                                [cue["event_id"] for cue in sprite["frame_cues"]["cues"]]
+                                if sprite.get("frame_cues") else []
+                            ) != item["frame_cue_event_ids"]):
                         raise NativeSourceVerificationError(
                             "Godot sprite source identity or animation receipt differs"
                         )
+                    normal_id = item["normal_png_sha256"]
+                    if (normal_id is not None) != bool(sprite.get("normal_map")):
+                        raise NativeSourceVerificationError(
+                            "normal map metadata and published sprite disagree"
+                        )
+                    if normal_id is not None:
+                        from .studio_sprite_surface import (
+                            SpriteSurfaceError, verify_normal_texture_bytes,
+                        )
+                        normal_path = (
+                            "game/frontier/sprites/" + asset_name + ".normal.png"
+                        )
+                        if normal_path not in expected:
+                            raise NativeSourceVerificationError(
+                                "original sprite normal texture missing from Godot package"
+                            )
+                        try:
+                            verified_normal = verify_normal_texture_bytes(
+                                image, archive.read(normal_path),
+                                sprite["normal_map"],
+                                width=sprite["sheet_width_px"],
+                                height=sprite["sheet_height_px"],
+                            )
+                        except (SpriteSurfaceError, KeyError, TypeError) as exc:
+                            raise NativeSourceVerificationError(
+                                "normal texture failed independent pixel or source proof"
+                            ) from exc
+                        if verified_normal["normal_png_sha256"] != normal_id:
+                            raise NativeSourceVerificationError(
+                                "normal texture differs from its source review"
+                            )
                     try:
                         pixels = _decode_verified_png(
                             image, sprite["sheet_width_px"],
@@ -356,6 +447,10 @@ def verify_published_godot_zip(
             actor_script_proof = proof.get("player_avatar_game_script_receipt")
             reconstructed = _GODOT_SCRIPT
             if original_avatar is None:
+                if proof.get("original_player_audio_cue_routes_compiled") != 0:
+                    raise NativeSourceVerificationError(
+                        "unbound game claims generated live audio cue routes"
+                    )
                 if (actor_script_proof is not None
                         or proof.get("animated_sprite3d_player_script_compiled") is not False):
                     raise NativeSourceVerificationError(
@@ -395,6 +490,31 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "real player sprite binding lost its source or animation"
                     )
+                audio_routes = original_avatar.get("audio_cue_bindings", {})
+                audio_heads = original_avatar.get("audio_source_sha256_by_event", {})
+                if (type(audio_routes) is not dict
+                        or type(audio_heads) is not dict
+                        or set(audio_routes) != set(audio_heads)
+                        or proof.get("original_player_audio_cue_routes_compiled")
+                        != len(audio_routes)):
+                    raise NativeSourceVerificationError(
+                        "player audio frame-cue binding count or source claims differ"
+                    )
+                audio_catalog = {
+                    sound["asset_id"]: sound for sound in original_audio
+                }
+                if len(audio_catalog) != len(original_audio):
+                    raise NativeSourceVerificationError(
+                        "player sound routes are ambiguous across original WAV assets"
+                    )
+                for cue_id, sound_id in audio_routes.items():
+                    assigned = audio_catalog.get(sound_id)
+                    if (assigned is None
+                            or cue_id not in matches[0]["frame_cue_event_ids"]
+                            or audio_heads[cue_id] != assigned["source_sha256"]):
+                        raise NativeSourceVerificationError(
+                            "player audio event lost original sprite or WAV source identity"
+                        )
                 reconstructed = player_script
 
             from .studio_sprite_direction import (
