@@ -103,11 +103,42 @@ func _verify() -> void:
                 quit(18)
                 return
             checked += 1
+    var observed_cues: Array = []
+    if expected["cue_keys"].size() > 0:
+        var cue_script := load("res://game/frontier/sprites/ASSET_ID.cues.gd")
+        if not (cue_script is GDScript):
+            quit(24)
+            return
+        var live_cue_sprite := AnimatedSprite3D.new()
+        live_cue_sprite.set_script(cue_script)
+        live_cue_sprite.sprite_frames = atlas
+        live_cue_sprite.connect("cue_fired",
+            func(event_id, category, animation_name, frame_index):
+                observed_cues.append([
+                    str(event_id), str(category), str(animation_name), int(frame_index)
+                ])
+        )
+        # Probe the installed GDScript in a real Godot process for each
+        # reviewed frame marker. We do not claim a real-time animation clock,
+        # audio playback or visual rendering from this explicit signal probe.
+        for cue_key in expected["cue_keys"]:
+            var parts := str(cue_key).split(":")
+            if parts.size() != 2:
+                quit(25)
+                return
+            live_cue_sprite.animation = StringName(parts[0])
+            live_cue_sprite.frame = int(parts[1])
+            live_cue_sprite.call("_publish_frame_cues")
+        live_cue_sprite.free()
+    if observed_cues != expected["cue_observations"]:
+        quit(26)
+        return
     var report = {
         "schema_version": "skeleton.jeeves.native_sprite_import.v1",
         "asset_id": "ASSET_ID",
         "animation_states_checked": expected["animations"].size(),
         "texture_regions_checked": checked,
+        "frame_cue_signals_observed": observed_cues.size(),
         "decoded_rgba_sha256": decoded_sha256,
         "actual_rgba_pixel_bytes": image.get_data().size(),
         "engine_import_succeeded": true,
@@ -128,6 +159,55 @@ def _file_sha256(path: Path) -> str:
                 break
             result.update(buffer)
     return result.hexdigest()
+
+
+def _expected_original_frame_cue_observations(
+    metadata: dict[str, Any],
+) -> tuple[list[str], list[list[str | int]]]:
+    """Exact signal sequence expected from one real Godot signal probe.
+
+    The order is the original canonical sorted animation:frame key order,
+    followed by cue IDs within that frame. The engine must emit exactly
+    these (event_id, category, animation, frame_index) tuples.
+    """
+    from .studio_sprite_frame_cues import (
+        SpriteCueError, compile_frame_cues,
+    )
+
+    source = metadata.get("frame_cues")
+    if source is None:
+        return [], []
+    if not isinstance(source, dict) or not isinstance(source.get("cues"), list):
+        raise NativeSpriteImportError("original sprite cue evidence is malformed")
+    try:
+        reconstructed = compile_frame_cues(
+            {"cues": [
+                {
+                    key: cue[key] for key in (
+                        "animation", "frame_index", "event_id", "category",
+                    )
+                }
+                for cue in source["cues"]
+            ]},
+            metadata["animations"],
+        )
+    except (SpriteCueError, KeyError, TypeError, ValueError) as exc:
+        raise NativeSpriteImportError(
+            "original sprite cues cannot be independently reconstructed"
+        ) from exc
+    if reconstructed != source:
+        raise NativeSpriteImportError(
+            "source cue observations differ from independently reviewed timeline"
+        )
+    keys = sorted(source["by_animation_frame"])
+    expected: list[list[str | int]] = []
+    for cue_key in keys:
+        animation, frame = cue_key.split(":")
+        expected.extend(
+            [event_id, category, animation, int(frame)]
+            for category, event_id in source["by_animation_frame"][cue_key]
+        )
+    return keys, expected
 
 
 def inspect_godot_sprite_import(
@@ -158,6 +238,8 @@ def inspect_godot_sprite_import(
     candidate = compile_authored_sprite(record)
     meta = candidate["metadata"]
     resources = compile_godot_sprite_resources(meta)
+    from .studio_sprite_frame_cues import emit_godot_frame_cue_files
+    resources.update(emit_godot_frame_cue_files(meta))
     asset_id = meta["asset_id"]
     frame_by_id = {
         frame["frame_id"]: frame for frame in meta["frames"]
@@ -165,7 +247,12 @@ def inspect_godot_sprite_import(
     name_to_time = {
         frame_id: frame["duration_ms"] for frame_id, frame in frame_by_id.items()
     }
+    cue_keys, cue_observations = _expected_original_frame_cue_observations(
+        meta,
+    )
     expected = {
+        "cue_keys": cue_keys,
+        "cue_observations": cue_observations,
         "width": meta["frame_width_px"],
         "sheet_width": meta["sheet_width_px"],
         "sheet_height": meta["sheet_height_px"],
@@ -272,6 +359,7 @@ def inspect_godot_sprite_import(
         "texture_regions_checked": sum(
             item["count"] for item in expected["animations"]
         ),
+        "frame_cue_signals_observed": len(cue_observations),
         "decoded_rgba_sha256": meta["pixel_content_sha256"],
         "actual_rgba_pixel_bytes": (
             meta["sheet_width_px"] * meta["sheet_height_px"] * 4
@@ -290,6 +378,9 @@ def inspect_godot_sprite_import(
         "godot_version": version.stdout.decode("utf-8", "replace").strip()[:100],
         "native_log_sha256": sha256(log.encode("utf-8")).hexdigest(),
         "native_process_executed": True,
+        "original_frame_cue_signals_observed": len(cue_observations),
+        "frame_cue_signal_script_executed": bool(cue_keys),
+        "real_time_animation_clock_verified": False,
         "pixel_data_independently_verified": True,
         "godot_decoded_rgba_sha256": native["decoded_rgba_sha256"],
         "original_atlas_rectangles_verified": True,
