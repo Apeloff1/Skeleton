@@ -25,7 +25,8 @@ from skeleton.testing.test_jeeves_studio_frontier_source_compile import (
 
 
 def fake_candidate(*, mesh_ids: tuple[str, ...] = ("temple-stone",),
-                   physical: bool = True, placed: bool = True) -> dict:
+                   physical: bool = True, placed: bool = True,
+                   lod_levels: int = 0) -> dict:
     if physical and not mesh_ids:
         raise ValueError("a physics record requires a real mesh")
     receipt = {
@@ -35,7 +36,10 @@ def fake_candidate(*, mesh_ids: tuple[str, ...] = ("temple-stone",),
         "packaged_original_mesh_physics": (
             [{"asset_id": mesh_ids[0]}] if physical else []
         ),
-        "packaged_original_mesh_lods": [],
+        "packaged_original_mesh_lods": (
+            [{"asset_id": mesh_ids[0], "levels": lod_levels}]
+            if lod_levels else []
+        ),
         "packaged_original_mesh_placements": {
             "instances": [{
                 "asset_id": mesh_ids[0], "instance_id": "temple-entry",
@@ -55,10 +59,12 @@ def observed_log(compiled: dict) -> str:
         "candidate_sha256": expected["candidate_sha256"],
         "mesh_ids": expected["mesh_ids"],
         "physics_ids": expected["physics_ids"],
+        "lod_paths": expected["lod_paths"],
         "instance_ids": [
             entry["instance_id"] for entry in expected["instances"]
         ],
         "imported_mesh_count": len(expected["mesh_ids"]),
+        "imported_lod_mesh_count": len(expected["lod_paths"]),
         "active_physics_bodies": len(expected["physics_ids"]),
         "game_instances": len(expected["instances"]),
     }
@@ -168,6 +174,37 @@ class MeshEngineProbeCompilerTests(TestCase):
         self.assertEqual(result["imported_geometry_mesh_count"], 1)
         self.assertEqual(result["source_game_scene_instances"], 0)
         self.assertEqual(result["instanced_3d_physics_bodies"], 0)
+
+    def test_every_reviewed_lod_is_actually_loaded_not_assumed(self):
+        compiled = compile_native_mesh_probe(
+            fake_candidate(lod_levels=2, physical=False),
+        )
+        self.assertEqual(compiled["expected"]["lod_paths"], [
+            "game/frontier/meshes/temple-stone.lod1.glb",
+            "game/frontier/meshes/temple-stone.lod2.glb",
+        ])
+        self.assertIn("lod_scene.instantiate()", compiled["script"])
+        self.assertIn("lod_surfaces < 1", compiled["script"])
+        proof = verify(compiled, observed_log(compiled))
+        self.assertEqual(proof["imported_lod_geometry_count"], 2)
+        self.assertFalse(proof["native_physics_contacts_observed"])
+
+    def test_native_lod_missing_from_observation_is_rejected(self):
+        compiled = compile_native_mesh_probe(
+            fake_candidate(lod_levels=2, physical=False),
+        )
+        lines = observed_log(compiled)
+        wrong = lines.replace(
+            '"imported_lod_mesh_count": 2', '"imported_lod_mesh_count": 1',
+        )
+        with self.assertRaises(MeshEngineProbeError):
+            verify(compiled, wrong)
+
+    def test_native_lod_manifest_out_of_range_fails_closed(self):
+        with self.assertRaises(MeshEngineProbeError):
+            compile_native_mesh_probe(
+                fake_candidate(lod_levels=5, physical=False),
+            )
 
     def test_native_log_claiming_extra_mesh_is_rejected(self):
         compiled = compile_native_mesh_probe(fake_candidate())
