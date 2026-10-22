@@ -1,0 +1,1 @@
+"""Hive merkle gossip accelerator. Complete seam.\n"""\nimport hashlib\nfrom typing import List\n\nclass MerkleAccelerator:\n    def accelerate(self, roots: List[str]) -> str:\n        return hashlib.sha256(\"\".join(sorted(roots)).encode()).hexdigest()\n
