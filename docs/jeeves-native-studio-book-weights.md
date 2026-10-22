@@ -1749,3 +1749,37 @@ Validation targets: `test_jeeves_studio_world_chunks_2026.py`
 plus two Godot export round trips in
 `test_jeeves_studio_frontier_source_compile.py`, now included in
 the existing Backend Quality focused test suite.
+
+### Reusable Godot 4 large-world streamer (opt-in, October 2026)
+
+A real `Node3D` resource now ships in every compiled Godot original
+game source ZIP: `game/frontier/assets/world_streamer.tscn`, backed by
+`game/frontier/assets/world_streamer.gd`. This component parses the
+already independently verified `assets/world-index.json` and
+`assets/world-chunks.json` source catalogs. With a live 3D camera, it
+identifies relevant source-owned home cells, checks conservative source
+radius against actual camera distance, instantiates **real** imported
+`PackedScene` assets with the exact approved position/rotation/scale,
+and frees distant nodes. A maximum of four new scene instances are
+created per frame by default (bounded 1–32 setting in Godot); visible
+distance is adjustable. Reusable physics-bound `.physics.tscn` and
+authored 3D LOD `.lod.tscn` instances are loaded through the same
+typed resource route.
+
+**Crucial integration boundary:** the existing default world still
+instantiates its original static approved objects. This streaming scene
+is a **reusable opt-in alternative**, intentionally *not* autoattached
+alongside the static mesh instances: doing so would duplicate models,
+colliders and resource loads. An app/game controller may explicitly swap
+one for the other after deciding to use runtime streaming. Source
+generation is completed, but no actual engine-side streaming, memory
+budget, FPS or visual correctness is claimed without an installed
+Godot execution result.
+
+The published file SHA identities and an opt-in/runtime-status receipt
+are kept in the same source-hashed Godot export; independent ZIP
+verification reconstructs the exact `.gd` and `.tscn` bytes,
+rejecting substituted scripts even when an archive is self-consistently
+rehashed. Tests:
+`test_jeeves_studio_world_streamer_2026.py` and the native Godot
+ZIP replay cases in `test_jeeves_studio_frontier_source_compile.py`.

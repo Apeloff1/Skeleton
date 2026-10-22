@@ -548,6 +548,47 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertEqual(result["disk_verification"][
             "original_physics_bodies_replayed"], 0)
 
+    def test_real_godot_world_streamer_component_ships_as_verified_opt_in_source(self):
+        self.populate_3d()
+        self.create("streamer-mesh", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "streamer-rock",
+            "primitive": "box", "size_mm": [800, 900, 700],
+            "segments": 6, "color_rgba": "#998866ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 720,
+        }, depends=("config-3d",))
+        self.create("streamer-placed", "scene_forge", {
+            "kind": "original_mesh_instance", "instance_id": "streamer-placed",
+            "base_record_id": "streamer-mesh", "asset_id": "streamer-rock",
+            "physics_record_id": None, "position_mm": [2000, 500, 3000],
+            "rotation_deg": [0, 30, 0], "scale_per_mille": 1000,
+        }, depends=("streamer-mesh",))
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            script = archive.read(
+                "game/frontier/assets/world_streamer.gd"
+            ).decode("utf-8")
+            scene = archive.read(
+                "game/frontier/assets/world_streamer.tscn"
+            ).decode("utf-8")
+            proof = json.loads(archive.read("jeeves_source_receipt.json"))
+            self.assertIn("extends Node3D", script)
+            self.assertIn("get_camera_3d()", script)
+            self.assertIn("instantiate_per_frame", script)
+            self.assertIn('load("res://" + resource_path)', script)
+            self.assertIn("OriginalWorldStreamer", scene)
+            self.assertIn("res://game/frontier/assets/world_streamer.gd", scene)
+            self.assertTrue(
+                proof["world_streamer_source_receipt"][
+                    "streamer_requires_explicit_instantiation"],
+            )
+            self.assertFalse(proof["native_world_streaming_executed"])
+        self.assertTrue(
+            result["disk_verification"]["world_streamer_source_replayed"],
+        )
+        self.assertFalse(
+            result["disk_verification"]["native_world_streaming_executed"],
+        )
+
     def test_world_chunks_are_published_with_replayed_native_scene_resources(self):
         self.populate_3d()
         self.create("map-asset", "asset_forge", {

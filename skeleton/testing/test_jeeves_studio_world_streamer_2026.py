@@ -28,7 +28,7 @@ class GodotWorldStreamerTests(unittest.TestCase):
         self.assertIn("extends Node3D", script)
         self.assertIn("res://game/frontier/assets/world-index.json", script)
         self.assertIn("res://game/frontier/assets/world-chunks.json", script)
-        self.assertIn("Resource", script)
+        self.assertIn("PackedScene", script)
         self.assertIn("node.position = _vec_mm", script)
         self.assertIn("node.rotation_degrees = Vector3", script)
         self.assertIn("node.scale = Vector3.ONE", script)
