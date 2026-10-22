@@ -15,6 +15,8 @@ import JeevesRuntimeStatus from './JeevesRuntimeStatus';
 import ChatModelCapabilities from './ChatModelCapabilities';
 import ChatCooperationDetails from './ChatCooperationDetails';
 import ChatResponseReviewControl from './ChatResponseReviewControl';
+import WorkflowTemplatePicker from './WorkflowTemplatePicker';
+import type { WorkflowTemplate } from '../../product/aiWorkflowClient';
 import { cooperationConfigurationIssues, reviewedResponsePolicy } from '../../product/chatCooperation';
 import { useChatReadiness } from '../../product/useChatReadiness';
 import { chatProgressLabel } from '../../product/chatProgress';
@@ -192,6 +194,34 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
   const [showCompanion, setShowCompanion] = useState(false);
   const [composerHeight, setComposerHeight] = useState(168);
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const tail = conversation.messages.at(-1);
+  const workflowDraftReady = snapshot.ready && !busy && !conversation.archived
+    && !(tail?.role === 'user' && tail.status !== 'complete' && !tail.terminal);
+  const workflowContextKey = JSON.stringify([
+    conversation.id, model, modelReady, reviewAvailable, observedOutputLimit,
+    selectedModel?.activation ?? automaticRoutes.map(row => [row.id, row.activation]),
+  ]);
+  const workflowUnavailableReason = (value: WorkflowTemplate): string | null => {
+    if (value.surface !== 'chat') return 'Choose a chat template for this composer.';
+    const live = controller.getSnapshot();
+    const currentConversation = controller.active;
+    const currentTail = currentConversation.messages.at(-1);
+    if (!workflowDraftReady || !live.ready || live.busyId !== null || currentConversation.id !== conversation.id
+      || currentConversation.archived || currentTail?.role === 'user' && currentTail.status !== 'complete' && !currentTail.terminal) return 'Resolve the current turn before changing the next message settings.';
+    if (!modelReady || !Number.isSafeInteger(observedOutputLimit)) return 'Choose an available model and refresh its output limits before applying a template.';
+    if (value.settings.max_tokens > observedOutputLimit!) return `This template needs ${value.settings.max_tokens.toLocaleString()} answer tokens; the selected route permits ${observedOutputLimit!.toLocaleString()}.`;
+    if (value.settings.review_response) {
+      if (!reviewAvailable) return 'Cooperative response review is unavailable for the current account and engine.';
+      return reviewFieldError || cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], value.settings.max_tokens)[0] || null;
+    }
+    return null;
+  };
+  const applyWorkflowTemplate = (value: WorkflowTemplate) => {
+    const reason = workflowUnavailableReason(value);
+    if (reason || value.surface !== 'chat') throw new Error(reason || 'Choose a chat template.');
+    setOutputTokens(value.settings.max_tokens);
+    setReviewResponse(value.settings.review_response);
+  };
 
   useEffect(() => {
     void controller.initialize();
@@ -299,6 +329,8 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         <ChatResponseReviewControl enabled={reviewResponse} change={setReviewResponse} disabled={busy} available={reviewAvailable} answerTokenLimit={answerTokenLimit}
           policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={selectedModel}
           fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues} refreshModels={refreshModels} />
+        <WorkflowTemplatePicker surface="chat" contextKey={workflowContextKey} disabled={!workflowDraftReady}
+          unavailableReason={workflowUnavailableReason} onApply={applyWorkflowTemplate} />
         <Text style={s.composerHint}>{`${conversation.draft.length.toLocaleString()} / 16,000 · Text chat · Saved account history${Platform.OS === 'web' ? ' · Ctrl/Cmd+Enter to send' : ''}`}</Text>
       </View>
     </KeyboardAvoidingView>}

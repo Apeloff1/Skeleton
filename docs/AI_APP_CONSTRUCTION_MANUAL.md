@@ -3638,3 +3638,15 @@ tokenization without creating a cross-request token cache. See
 [studio refinement](ai/STUDIO_MEASURED_QUALITY.md) for the explicit controls.
 Source compilation and metadata synchronization grant no model promotion or
 enterprise acceptance.
+
+The subsequent studio foundation pass is declared under
+`cognitive_runtime_blueprint.adaptive_runtime_optimization.studio_foundation_pass`.
+It shares pure bounded draft templates across existing forms and adds local
+execution, learner and maintenance observations without creating another runtime
+owner or store. Its critical-gap hardening rejects ambiguous engine envelopes,
+foreign or contradictory terminal results, corrupt predictor recovery and malformed
+acknowledgements. Existing Galaxy build paths retain partial work and physical
+custody instead of inferring success from a clock. The operator guide is
+[AI workflow foundations and recovery](ai/AI_FOUNDATIONS_AND_RECOVERY.md).
+These consistency rules are not Byzantine quorum consensus or independent proof
+of generated-content correctness.

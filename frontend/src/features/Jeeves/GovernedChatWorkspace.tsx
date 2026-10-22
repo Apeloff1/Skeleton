@@ -17,6 +17,8 @@ import ChatModelCapabilities from './ChatModelCapabilities';
 import ChatAnswerDetails from './ChatAnswerDetails';
 import ChatCooperationDetails from './ChatCooperationDetails';
 import ChatResponseReviewControl from './ChatResponseReviewControl';
+import WorkflowTemplatePicker from './WorkflowTemplatePicker';
+import type { WorkflowTemplate } from '../../product/aiWorkflowClient';
 import { cooperationConfigurationIssues, reviewedResponsePolicy } from '../../product/chatCooperation';
 import { chatProgressLabel } from '../../product/chatProgress';
 import { useChatReadiness } from '../../product/useChatReadiness';
@@ -230,11 +232,37 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const observedModel = readiness?.models.models.find(model => model.id === selectedModel?.id);
   const modelReady = readiness?.available === true && !!selectedModel?.available && selectedModel.selectable
     && observedModel?.available === true && observedModel.selectable;
-  const answerTokenLimit = Math.min(outputTokens ?? selectedModel?.default_output_tokens ?? 1024, selectedModel?.max_output_tokens ?? 1024);
+  const observedOutputLimit = selectedModel && observedModel
+    ? Math.min(selectedModel.max_output_tokens ?? 0, observedModel.max_output_tokens) : undefined;
+  const answerTokenLimit = Math.min(outputTokens ?? selectedModel?.default_output_tokens ?? 1024, observedOutputLimit ?? 1024);
   const reviewAvailable = readiness?.capabilities.cooperative_review === true;
   const reviewIssues = cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], answerTokenLimit);
   const reviewBudgetReady = !reviewResponse || reviewAvailable && !reviewFieldError && reviewIssues.length === 0;
   const canSend = !!draft.trim() && !state.pending && !busy && !loading && !uploading && !creating && state.ready && modelReady && reviewBudgetReady && state.activeThread?.state !== 'archived';
+  const workflowDraftReady = !state.pending && !busy && !loading && !uploading && !creating && state.ready && state.activeThread?.state !== 'archived';
+  const workflowContextKey = JSON.stringify([
+    threadId, state.selectedModelId, modelReady, reviewAvailable, observedOutputLimit,
+    selectedModel?.activation, observedModel?.activation,
+  ]);
+  const workflowUnavailableReason = (value: WorkflowTemplate): string | null => {
+    if (value.surface !== 'chat') return 'Choose a chat template for this composer.';
+    const live = controller.getSnapshot();
+    if (!workflowDraftReady || !live.ready || live.pending || ['loading', 'submitting', 'streaming', 'reconnecting', 'cancelling'].includes(live.status)
+      || live.activeThread?.thread_id !== state.activeThread?.thread_id || live.activeThread?.state === 'archived') return 'Resolve the current turn before changing the next message settings.';
+    if (!modelReady || !Number.isSafeInteger(observedOutputLimit)) return 'Choose an available model and refresh its output limits before applying a template.';
+    if (value.settings.max_tokens > observedOutputLimit!) return `This template needs ${value.settings.max_tokens.toLocaleString()} answer tokens; the selected model permits ${observedOutputLimit!.toLocaleString()}.`;
+    if (value.settings.review_response) {
+      if (!reviewAvailable) return 'Cooperative response review is unavailable for the current account and engine.';
+      return reviewFieldError || cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], value.settings.max_tokens)[0] || null;
+    }
+    return null;
+  };
+  const applyWorkflowTemplate = (value: WorkflowTemplate) => {
+    const reason = workflowUnavailableReason(value);
+    if (reason || value.surface !== 'chat') throw new Error(reason || 'Choose a chat template.');
+    setOutputTokens(value.settings.max_tokens);
+    setReviewResponse(value.settings.review_response);
+  };
   const messages = state.messages.filter(message => message.author_type === 'user' || message.author_type === 'assistant');
   const pending = state.pending?.threadId === state.activeThread?.thread_id ? state.pending : null;
   const threadGroups = useMemo(() => groupThreads(state.threads.filter(thread =>
@@ -607,6 +635,8 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
               policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={observedModel}
               fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues}
               refreshModels={async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); }} />
+            <WorkflowTemplatePicker surface="chat" contextKey={workflowContextKey} disabled={!workflowDraftReady}
+              unavailableReason={workflowUnavailableReason} onApply={applyWorkflowTemplate} />
             <Text style={s.composerHint}>{reviewResponse && !reviewAvailable ? 'Response review is unavailable. Refresh readiness or turn off review to continue.' : !reviewBudgetReady ? reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.' : pending && !busy ? 'Retry or stop the interrupted reply to continue.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
           </>}
         </View></View>

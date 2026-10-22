@@ -130,7 +130,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "d8e92abad2f7c495bcd0706dd369f1b2b08e297d",
+      "source_git_object_sha": "d446e2aad835489c52076723da74cbee2aea0b27",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "c51f3a33539ca2680e8381312e10b1052c79ea3f",
+      "source_git_object_sha": "634e0576ce17dd2f3803f565e5f9b3587be0aa75",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -398,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "42bd498f2d860e86c182ead2fa2e62e7d0815d98",
+      "source_git_object_sha": "0f61808af4277691d9f8ad171e94d7c74cda6182",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "7e773e063d900533d7a293bbf51b8a49b1ebce5e",
+      "source_git_object_sha": "9e0288f0eff51a6702db9d250fcabdcb4b1a60b7",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -10350,20 +10350,27 @@
       "skeleton/api/engine_routes.py",
       "backend/core/dragon_crawler.py",
       "backend/core/dragon_runtime.py",
-      "backend/routes/ai.py"
+      "backend/routes/ai.py",
+      "skeleton/contracts/ai_workflows.py",
+      "backend/core/engine_client.py",
+      "backend/core/chat_turns.py",
+      "backend/core/build_watchdog.py",
+      "backend/routes/galaxy_studio.py",
+      "backend/routes/galaxy_studio_resilience.py",
+      "backend/routes/galaxy_studio_watchdog.py",
+      "frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx",
+      "frontend/src/product/aiWorkflowClient.ts",
+      "frontend/src/product/buildJobLifecycle.ts",
+      "frontend/src/product/runtimeOptimizationClient.ts"
     ],
     "source_metadata": "Affected current-branch canonical source-object identities reference the staged implementation tree. Historical signatures and qualification state are preserved; no import cutover or verification signature is created.",
     "refreshed_source_mappings": [
-      "AIFT-PROVIDER-RUNTIME",
-      "AIFT-PROVIDER-RUNTIME-LEGACY-ALIAS",
       "AIFT-CONTRACTS",
       "AIFT-PERSISTENCE",
       "AIFT-INTELLIGENCE",
-      "AIFT-JEEVES",
-      "AIFT-ENGINE-API",
-      "AIFT-LEARNING",
-      "AIFT-FORGE"
+      "AIFT-JEEVES"
     ],
-    "operator_and_learning_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation"
+    "operator_and_learning_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation",
+    "studio_foundation_pass": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.studio_foundation_pass"
   }
 }

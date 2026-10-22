@@ -225,6 +225,12 @@ The crawler source library supports individual withdrawal and capture-age limits
 Jeeves excludes withdrawn, expired and stale captures; changing source policy
 invalidates old reference pins until the source is reviewed again.
 
+**Workflow templates** now stage bounded settings in chat, studio goal creation
+and Dragon capture forms. They preserve your content and permissions and require
+ordinary submission before work starts. Runtime inspection adds activated local
+limits, scoped learner explanations and maintenance scheduling blockers. See
+[AI workflow foundations and recovery](docs/ai/AI_FOUNDATIONS_AND_RECOVERY.md).
+
 See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
 and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).
 The [creation capability index](docs/creation/CAPABILITY_INDEX.md) covers design

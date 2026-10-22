@@ -40,12 +40,54 @@ import { CodeFileView, CodeBrowseView, VaultView } from './GalaxyStudioFactoryMo
 import { useRouter } from 'expo-router';
 import { jeevesSpeak } from '../Academy/jeevesTts';
 import { shareResult } from '../../utils/shareResult';
+import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
 import { FALLBACK_GENRES } from './fallbackGenres';
 const BACKEND = CANONICAL_API_BASE;
 
 interface Props { visible: boolean; onClose: () => void; }
 type Step = 'pick' | 'building' | 'done';
+
+const BUILD_STOP_REASONS: Record<string, string> = {
+  artifact_storage_unavailable: 'Artifact storage is unavailable.', vault_write_failed: 'Generated files could not be saved.',
+  memory_limit_reached: 'The build reached its memory limit.', build_deadline_exceeded: 'The build reached its authorized time limit.',
+  worker_deadline_exceeded: 'A physical worker exceeded its deadline.', build_metadata_unavailable: 'Build metadata could not be saved.',
+  batch_generation_failed: 'A generation batch failed.', operator_stop_requested: 'The operator requested a stop.',
+};
+function statusStopReason(value: unknown): string {
+  return typeof value === 'string' && BUILD_STOP_REASONS[value] ? BUILD_STOP_REASONS[value] : 'Inspect the retained build state before retrying.';
+}
+function validGalaxyStatus(value: any, bid: string): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.build_id !== bid
+    || typeof value.status !== 'string' || value.status.length > 64
+    || !Number.isSafeInteger(value.completed_phases) || !Number.isSafeInteger(value.total_phases)
+    || value.completed_phases < 0 || value.total_phases < 1 || value.completed_phases > value.total_phases || value.total_phases > 10000
+    || !Number.isSafeInteger(value.file_count) || value.file_count < 0 || value.file_count > 10000000
+    || !Number.isSafeInteger(value.total_batches) || value.total_batches < 1 || value.total_batches > 100
+    || !Number.isSafeInteger(value.current_batch) || value.current_batch < 0 || value.current_batch > value.total_batches
+    || value.bg_current_batch !== undefined && (!Number.isSafeInteger(value.bg_current_batch) || value.bg_current_batch < 0 || value.bg_current_batch > value.total_batches)
+    || value.batch_name !== undefined && (typeof value.batch_name !== 'string' || value.batch_name.length > 160)) return false;
+  if (value.batch_names !== undefined && (!value.batch_names || typeof value.batch_names !== 'object' || Array.isArray(value.batch_names)
+    || Object.keys(value.batch_names).length > 100 || Object.entries(value.batch_names).some(([key, name]) => !/^[0-9]{1,3}$/.test(key) || typeof name !== 'string' || name.length > 160))) return false;
+  if (value.phase_log !== undefined && (!Array.isArray(value.phase_log) || value.phase_log.length > 10000
+    || value.phase_log.some((entry: any) => !entry || typeof entry !== 'object' || Array.isArray(entry)
+      || entry.batch !== undefined && (!Number.isSafeInteger(entry.batch) || entry.batch < 1 || entry.batch > value.total_batches)
+      || entry.status !== undefined && (typeof entry.status !== 'string' || entry.status.length > 64)))) return false;
+  if (value.recent_files !== undefined && (!Array.isArray(value.recent_files) || value.recent_files.length > 32
+    || value.recent_files.some((file: any) => !file || typeof file !== 'object' || Array.isArray(file)
+      || typeof file.path !== 'string' || file.path.length > 4096 || typeof file.ext !== 'string' || file.ext.length > 64
+      || !Number.isSafeInteger(file.size) || file.size < 0))) return false;
+  if (value.bg_progress != null && (typeof value.bg_progress !== 'object' || Array.isArray(value.bg_progress)
+    || ['elapsed_formatted', 'remaining_formatted'].some(key => value.bg_progress[key] !== undefined
+      && (typeof value.bg_progress[key] !== 'string' || value.bg_progress[key].length > 80)))) return false;
+  if (value.execution === undefined) return true; // Older owners remain observable; their completion is not inferred.
+  const execution = value.execution;
+  return !!execution && typeof execution === 'object' && !Array.isArray(execution)
+    && ['runner_live', 'stop_requested', 'drain_pending', 'partial_artifacts', 'storage_failed'].every(key => typeof execution[key] === 'boolean')
+    && Number.isSafeInteger(execution.physical_workers) && execution.physical_workers >= 0 && execution.physical_workers <= 4096
+    && Number.isSafeInteger(execution.unflushed_files) && execution.unflushed_files >= 0 && execution.unflushed_files <= 10000000
+    && (execution.stop_reason === null || typeof execution.stop_reason === 'string' && execution.stop_reason.length <= 64);
+}
 
 // Map the Studio's gameEras id → backend final-build era key (core/eras.py).
 const ERA_KEY_MAP: Record<string, string> = {
@@ -98,26 +140,6 @@ function ActiveJobRow({ kind, job, T, topBorder }: { kind: 'expand' | 'apk'; job
     </View>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════
-// FAILSAFE CONFIG — ZERO RECURSION polling, backoff via tick-skipping
-// ═══════════════════════════════════════════════════════════════════════
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const POLL_BASE_INTERVAL = 5000;   // 5s base interval (setInterval tick rate)
-
-// Batch name mapping for client-side estimates when server is unreachable
-const BATCH_NAME_BY_NUM: Record<number | string, string> = {
-  1: 'Vision & Concept',
-  2: 'Deep Design',
-  3: 'Quantum Core',
-  4: 'Game Factory',
-  5: 'Code Generation',
-  6: 'Art & Audio',
-  7: 'Narrative',
-  8: 'QA Gauntlet',
-  9: 'Marketing',
-  10: 'Production & Deploy',
-};
 
 // ═══ DESCRIPTION CARD ═══
 // eslint-disable-next-line react/display-name
@@ -632,6 +654,8 @@ export default function GalaxyStudioFactoryModal
   const router = useRouter();
   const [buildId, setBuildId] = useState<string | null>(null);
   const [buildStatus, setBuildStatus] = useState<any>(null);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const [buildLog, setBuildLog] = useState<string[]>([]);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const lastPhaseRef = useRef(0);
@@ -681,76 +705,52 @@ export default function GalaxyStudioFactoryModal
   const logScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   useEffect(() => {
+    let detached = false;
+    let restoreRequest: AbortController | null = null;
     if (visible) {
-      fetchManifest();
-      fetchGenres();
-      resetState();
-      // Auto-restore saved build on open — if user killed app mid-build, pick up where they left off.
-      // ★ PREFLIGHT CHECK: verify the saved build actually exists on the backend
-      //   BEFORE flipping to 'building' state. Prevents the stuck-on-launch
-      //   state when the previous build's pod was recycled or files got purged.
-      (async () => {
+      fetchManifest(); fetchGenres(); resetState();
+      void (async () => {
         try {
           const raw = await AsyncStorage.getItem(STORAGE_KEY);
-          if (!raw) return;
+          if (detached || !raw || raw.length > 4096) return;
           const saved = JSON.parse(raw);
-          if (!saved?.build_id || !saved?.start_ms) return;
-          // Ignore legacy temp local-ids — they don't exist on the server and cause 404s
-          if (typeof saved.build_id === 'string' && saved.build_id.startsWith('local-')) {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            return;
-          }
-          const elapsed = Date.now() - saved.start_ms;
-          const duration = saved.duration_ms || 15 * 60 * 1000;
-          // If the saved build is older than 30 minutes, discard — backend
-          // pods recycle aggressively and any older build_id is stale.
-          if (elapsed > 30 * 60 * 1000) {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            return;
-          }
-          // ── PREFLIGHT ── ping /status; if 404 or clearly dead → silently clear storage.
+          if (typeof saved?.build_id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(saved.build_id)
+            || saved.build_id.startsWith('local-') || !Number.isFinite(saved.start_ms) || saved.start_ms <= 0) return;
+          const bid = saved.build_id;
+          const duration = Number.isFinite(saved.duration_ms) && saved.duration_ms > 0 ? saved.duration_ms : 15 * 60 * 1000;
+          let snapshot: any = null;
+          restoreRequest = new AbortController();
+          const timer = setTimeout(() => restoreRequest?.abort(), 8000);
           try {
-            const controller = new AbortController();
-            const tm = setTimeout(() => controller.abort(), 8000);
-            const pre = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${saved.build_id}`, {
-              signal: controller.signal,
-              headers: { 'Cache-Control': 'no-cache', 'Accept': 'application/json' },
-              // @ts-ignore
-              cache: 'no-store',
+            const response = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${encodeURIComponent(bid)}`, {
+              signal: restoreRequest.signal, headers: { 'Cache-Control': 'no-cache', Accept: 'application/json' }, cache: 'no-store',
             });
-            clearTimeout(tm);
-            if (pre.status === 404) {
-              // Backend lost it — don't get stuck on a zombie restore.
-              await AsyncStorage.removeItem(STORAGE_KEY);
-              return;
+            if (detached) return;
+            if (response.status === 404) { await AsyncStorage.removeItem(STORAGE_KEY); return; }
+            if (response.ok) {
+              const value = await response.json();
+              if (validGalaxyStatus(value, bid)) snapshot = value;
             }
-            if (pre.ok) {
-              const pj = await pre.json();
-              // If already completed or failed, skip the automatic restore and
-              // present a fresh pick screen (the user can still retrieve the
-              // completed build via /vault).
-              if (pj.status === 'completed' || pj.status === 'failed' || pj._lost) {
-                await AsyncStorage.removeItem(STORAGE_KEY);
-                return;
-              }
-            }
-          } catch {
-            // Preflight failed (offline / slow network) — fall through and
-            // attempt a restore anyway; the existing polling logic will
-            // self-heal or give up after 3× 404.
+          } catch { /* A failed observation does not confirm that the job stopped. */ }
+          finally { clearTimeout(timer); }
+          if (detached) return;
+          setTitle(typeof saved.title === 'string' ? saved.title.slice(0, 160) : 'Retained Build');
+          setBuildId(bid); buildIdRef.current = bid;
+          buildStartMsRef.current = saved.start_ms; buildDurationMsRef.current = duration; lastPhaseRef.current = 0;
+          if (snapshot?.execution && classifyBuildJob(snapshot) !== 'pending') {
+            setBuildStatus(snapshot); setStep('done');
+            if (classifyBuildJob(snapshot) !== 'completed') setStatusMsg(`Retained build is ${snapshot.status}. ${statusStopReason(snapshot.execution.stop_reason)} Files are partial.`);
+            void refreshFiles(bid);
+            return;
           }
-          addLog(`♾ Restoring previous build — ${saved.title || saved.build_id}`);
-          setTitle(saved.title || 'Restored Build');
-          setBuildId(saved.build_id);
+          if (snapshot) setBuildStatus(snapshot);
+          addLog(`ℹ Restoring build observation — ${bid}`);
           setStep('building');
-          buildStartMsRef.current = saved.start_ms;
-          buildDurationMsRef.current = duration;
-          lastPhaseRef.current = 0;
-          startPolling(saved.build_id, { resumeStartMs: saved.start_ms, resumeDurationMs: duration });
-        } catch {}
+          startPolling(bid, { resumeStartMs: saved.start_ms, resumeDurationMs: duration });
+        } catch { /* Invalid local markers never authorize a new build or recovery. */ }
       })();
     }
-    return () => { stopPolling(); };
+    return () => { detached = true; restoreRequest?.abort(); stopPolling(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
@@ -759,8 +759,10 @@ export default function GalaxyStudioFactoryModal
     setExtraGenreIds([]); setExtraSubgenreIds([]); setMultiGenreMode(false);
     setGenreSearch(''); setExpandedGenre(null); setGameVision(''); setSystemArch('');
     setWorldLaws(''); setAgentInstructions(''); setShowDescriptions(false); setScaleCommand(''); setComplexity(10); setAgeTarget('ALL'); setGraphicsEra(7); setNpcDensity(7); setSoundEra(7); setWorldSize(7); setPhysicsRealism(7); setAiComplexity(7); setLightingEngine(7); setParticleEffects(7); setDestructionPhysics(7); setNarrativeBranching(7); setEconomyComplexity(7); setMultiplayerMax(7); setWeatherSystems(7); setDayNightCycle(7); setAnimationFluidity(7); setPostProcessing(7); setFoliageDensity(7); setWaterSimulation(7); setUiMinimalism(7); setLootVariety(7); setCraftingDepth(7); setDialogDepth(7); setStealthMechanics(7); setVehicleSimulation(7); setBiomeDiversity(7); setFactionReputation(7); setSkillSystem(7); setGoreSystem(7); setModdingSupport(7); setJuice(7); setTargetFiles(MAX_TARGET_FILES);
+    buildIdRef.current = null;
     setBuildId(null); setBuildStatus(null); setBuildLog([]); setFiles(null);
     setSelectedFile(null); setFileContent(''); setShowCode(false);
+    setLoading(false); setResumeLoading(false);
     setExpandLoading(null); setZipLoading(false); setApkLoading(false); setStatusMsg(null);
     setVaultData(null); setShowVault(false);
     setFinBusy(false); setFinStages([]); setFinResult(null); setFinError(null);
@@ -1079,12 +1081,13 @@ export default function GalaxyStudioFactoryModal
       try {
         const data = await safeFetch(`${BACKEND}/api/galaxy-studio/files/${bid}`);
         if (data) {
+          if (!visibleRef.current || buildIdRef.current !== bid) return null;
           setFiles(data);
           if (!silent) {
             if (data.total_files > 0) {
               addLog(`✓ Loaded ${data.total_files.toLocaleString()} files from ${data.source || 'server'}`);
             } else {
-              addLog(`⚠ /files returned 0 — vault may be empty or restarted. Trying recovery...`);
+              addLog('ℹ No retained files were reported for this build. No recovery was requested.');
             }
           }
           return data;
@@ -1100,340 +1103,187 @@ export default function GalaxyStudioFactoryModal
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ═══════════════════════════════════════════════════════════════════
-  // PERMANENT CONNECTION ENGINE v10 — CLIENT CLOCK IS SOURCE OF TRUTH
-  // ═══════════════════════════════════════════════════════════════════
-  // PHILOSOPHY: The UI NEVER disconnects because the UI NEVER depends on
-  // the network for progress. The 15-minute build clock runs 100% locally.
-  //   • A local `tickTimer` runs every 1s and drives ALL progress UI
-  //   • A silent `syncTimer` runs every 8s and quietly syncs real counts
-  //   • Sync failures are INVISIBLE — no error logs, no "reconnecting"
-  //   • State is persisted to AsyncStorage → survives reload/app-kill
-  //   • When sync succeeds, real file_count & batch data override estimates
-  // Net effect: the user never sees a disconnected state. The connection
-  // is "permanent" because the network is no longer on the critical path.
-  // ═══════════════════════════════════════════════════════════════════
+  // Server observations own work progress and terminal state. The local clock
+  // is elapsed-time display only; it never completes, resumes or cancels work.
   const buildIdRef = useRef<string | null>(null);
   const pollActiveRef = useRef(false);
   const pollDoneRef = useRef(false);
+  const pollEpochRef = useRef(0);
+  const syncRequestRef = useRef<AbortController | null>(null);
+  const buildControlBusyRef = useRef(false);
   const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const buildStartMsRef = useRef<number>(0);
-  const buildDurationMsRef = useRef<number>(15 * 60 * 1000); // 15 min default
+  const buildDurationMsRef = useRef<number>(15 * 60 * 1000);
   const lastSyncOkRef = useRef<number>(0);
+  const notFoundCountRef = useRef(0);
 
   const STORAGE_KEY = '@galaxy_studio_active_build_v1';
 
-  // Persist current build state to AsyncStorage
   const persistState = useCallback(async () => {
     try {
       const bid = buildIdRef.current;
       if (!bid) return;
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
-        build_id: bid,
-        start_ms: buildStartMsRef.current,
-        duration_ms: buildDurationMsRef.current,
-        title,
-        genre: selectedGenre?.id,
-        last_seen: Date.now(),
+        build_id: bid, start_ms: buildStartMsRef.current,
+        duration_ms: buildDurationMsRef.current, title,
+        genre: selectedGenre?.id, last_seen: Date.now(),
       }));
-    } catch {}
+    } catch { /* A local marker is not authoritative build persistence. */ }
   }, [title, selectedGenre]);
 
-  // Silent server sync — never surfaces errors, never retries inside, never logs failures.
-  // Runs in the background; only updates UI when it succeeds.
-  const notFoundCountRef = useRef<number>(0);
-  const staleCheckRef = useRef<{ lastPhase: number; lastPhaseTs: number }>({ lastPhase: 0, lastPhaseTs: 0 });
-  const resurrectInflightRef = useRef<boolean>(false);
-
-  // ═══ Self-healing resurrect — try to bring a lost/stuck build back ═══
-  const attemptResurrect = useCallback(async (bid: string, reason: string): Promise<boolean> => {
-    if (resurrectInflightRef.current) return false;
-    resurrectInflightRef.current = true;
-    try {
-      const res = await apiFetch(`${BACKEND}/api/galaxy-studio/resurrect/${bid}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store' },
-        // @ts-ignore
-        cache: 'no-store', credentials: 'omit',
-      });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        addLog(`🔄 Self-heal: resurrected build (${reason}) — resumed from batch ${data.resumed_from_batch || '?'}`);
-        return true;
-      }
-    } catch {}
-    finally {
-      setTimeout(() => { resurrectInflightRef.current = false; }, 5000);
-    }
-    return false;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const silentSync = useCallback(async (bid: string) => {
-    try {
-      const controller = new AbortController();
-      const tm = setTimeout(() => controller.abort(), 30000);
-      const res = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${bid}`, {
-        signal: controller.signal,
-        headers: { 'Cache-Control': 'no-cache, no-store', 'Accept': 'application/json' },
-        // @ts-ignore
-        cache: 'no-store',
-        credentials: 'omit',
-      });
-      clearTimeout(tm);
-      // ── 404 handling with self-heal attempt ──
-      // Try to resurrect on the first 404 before giving up. The backend
-      // watchdog may have already saved the build metadata to Mongo, so
-      // /resurrect can often bring it back even if Mongo lost the doc.
-      if (res.status === 404) {
-        notFoundCountRef.current += 1;
-        if (notFoundCountRef.current === 1) {
-          // First 404: try to resurrect
-          const resurrected = await attemptResurrect(bid, 'status 404');
-          if (resurrected) return null;
-        }
-        if (notFoundCountRef.current >= 3) {
-          // Three 404s in a row even after resurrect attempt = build really gone.
-          pollDoneRef.current = true;
-          pollActiveRef.current = false;
-          stopPolling();
-          addLog(`⚠ Server lost track of this build (3 consecutive 404s).`);
-          addLog(`Tap 'New Build' below to restart — your settings are preserved.`);
-          setBuildStatus((prev: any) => ({
-            ...(prev || {}),
-            status: 'lost',
-            _lost: true,
-          }));
-          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
-        }
-        return null;
-      }
-      if (!res.ok) return null;
-      notFoundCountRef.current = 0;
-      const data = await res.json();
-      lastSyncOkRef.current = Date.now();
-      // ── Stale-build detection — phase hasn't advanced in 90s? resurrect ──
-      try {
-        const nowMs = Date.now();
-        const curPhase = Number(data.current_phase) || 0;
-        const prev = staleCheckRef.current;
-        if (curPhase > prev.lastPhase) {
-          staleCheckRef.current = { lastPhase: curPhase, lastPhaseTs: nowMs };
-        } else if (
-          data.status === 'building'
-          && prev.lastPhaseTs > 0
-          && (nowMs - prev.lastPhaseTs) > 90_000
-          && curPhase < 100
-        ) {
-          // Stuck — try a resurrect and reset the stale timer
-          await attemptResurrect(bid, `stalled at phase ${curPhase}/100`);
-          staleCheckRef.current = { lastPhase: curPhase, lastPhaseTs: nowMs };
-        }
-      } catch {}
-
-      setBuildStatus((prev: any) => {
-        // Merge server data over client estimate, but preserve client's clock values
-        // so the timer NEVER goes backwards or gets stuck when server clock is behind.
-        const clientBg = prev?.bg_progress;
-        const serverBg = data?.bg_progress;
-        let mergedBg = serverBg || clientBg;
-        if (clientBg && serverBg) {
-          // Use whichever has more elapsed time (so client doesn't appear to rewind)
-          mergedBg = (clientBg.elapsed_seconds || 0) > (serverBg.elapsed_seconds || 0) ? clientBg : serverBg;
-        }
-        const merged = {
-          ...(prev || {}),
-          ...data,
-          // Preserve client clock if server didn't provide one or has smaller elapsed
-          bg_progress: mergedBg,
-          // Preserve the higher file_count if server responds with lower (transient during sync)
-          file_count: Math.max(prev?.file_count || 0, data?.file_count || 0),
-        };
-        return merged;
-      });
-
-      // Log new phases quietly
-      if (data.phase_log && data.phase_log.length > lastPhaseRef.current) {
-        const newEntries = data.phase_log.slice(lastPhaseRef.current);
-        for (const p of newEntries) {
-          const batchLabel = `Batch ${p.batch || '?'}: ${p.name || 'Unknown'}`;
-          if (p.status === 'fallback') addLog(`⚠ ${batchLabel} — recovered`);
-          else if (p.status === 'resumed') addLog(`▶ ${batchLabel} — resumed`);
-          else if (p.error) addLog(`⚠ ${batchLabel}`);
-          else addLog(`✓ ${batchLabel} — ${p.file_count?.toLocaleString() || 0} files`);
-        }
-        lastPhaseRef.current = data.phase_log.length;
-      }
-
-      // If server says completed, mark done
-      if (data.status === 'completed' || data.bg_status === 'completed') {
-        pollDoneRef.current = true;
-        pollActiveRef.current = false;
-        stopPolling();
-        addLog(`✓ Build complete — ${(data.file_count || 0).toLocaleString()} files`);
-        // Wave-3 — celebratory Jeeves chime on completion
-        try {
-          jeevesSpeak(
-            `Build complete. ${(data.file_count || 0).toLocaleString()} files generated.`,
-            { context: 'celebration', prependCatchphrase: true },
-          );
-        } catch {}
-        try { await refreshFiles(bid); } catch {}
-        setStep('done');
-        try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
-      }
-      return data;
-    } catch {
-      // Silent — network issues are invisible to the user
-      return null;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const startPolling = useCallback((bid: string, opts?: { resumeStartMs?: number; resumeDurationMs?: number }) => {
-    // Clear any previous timers
-    if (tickTimerRef.current) { clearInterval(tickTimerRef.current); tickTimerRef.current = null; }
-    if (syncTimerRef.current) { clearInterval(syncTimerRef.current); syncTimerRef.current = null; }
-
-    buildIdRef.current = bid;
-    pollActiveRef.current = true;
-    pollDoneRef.current = false;
-
-    // Initialize local clock (for fresh builds or resumed builds)
-    if (opts?.resumeStartMs) {
-      buildStartMsRef.current = opts.resumeStartMs;
-    } else if (!buildStartMsRef.current) {
-      buildStartMsRef.current = Date.now();
-    }
-    if (opts?.resumeDurationMs) buildDurationMsRef.current = opts.resumeDurationMs;
-
-    // ═══ TICK TIMER — drives all time-based UI every 1s, purely client-side ═══
-    tickTimerRef.current = setInterval(() => {
-      if (!pollActiveRef.current || pollDoneRef.current) return;
-      const elapsedMs = Date.now() - buildStartMsRef.current;
-      const totalMs = buildDurationMsRef.current;
-      const timePct = Math.min(100, (elapsedMs / totalMs) * 100);
-      const estBatch = Math.min(10, Math.floor((timePct / 100) * 10) + 1);
-
-      // Smooth local progress bar
-      Animated.timing(progressAnim, {
-        toValue: Math.min(1, elapsedMs / totalMs),
-        duration: 900,
-        useNativeDriver: false,
-      }).start();
-
-      // Update buildStatus with client-estimated values (server will override when sync lands)
-      setBuildStatus((prev: any) => {
-        const elapsedSec = Math.floor(elapsedMs / 1000);
-        const remainingSec = Math.max(0, Math.floor((totalMs - elapsedMs) / 1000));
-        return {
-          ...(prev || {}),
-          progress_pct: timePct,
-          bg_current_batch: Math.max(prev?.bg_current_batch || 0, estBatch),
-          current_batch: Math.max(prev?.current_batch || 0, estBatch),
-          total_batches: 10,
-          batch_name: BATCH_NAME_BY_NUM[estBatch] || prev?.batch_name || 'Generating',
-          batch_names: prev?.batch_names || BATCH_NAME_BY_NUM,
-          bg_progress: {
-            elapsed_seconds: elapsedSec,
-            target_seconds: Math.floor(totalMs / 1000),
-            elapsed_formatted: `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`,
-            remaining_formatted: `${Math.floor(remainingSec / 60)}m ${remainingSec % 60}s`,
-            time_pct: Math.round(timePct),
-          },
-          // If server hasn't returned yet, assume client-side running
-          status: prev?.status || 'building',
-        };
-      });
-
-      // Client-side completion — if we hit 100% and server never acked, force-complete then finish
-      if (elapsedMs >= totalMs && !pollDoneRef.current) {
-        silentSync(bid).then(async (data) => {
-          if (pollDoneRef.current) return;
-          if (data?.status === 'completed') return; // silentSync already handled it
-          // Force-complete on server so expand/vault flows work
-          try {
-            const ctrl = new AbortController();
-            const tm = setTimeout(() => ctrl.abort(), 30000);
-            await apiFetch(`${BACKEND}/api/galaxy-studio/force-complete/${bid}`, {
-              method: 'POST',
-              signal: ctrl.signal,
-              headers: { 'Cache-Control': 'no-cache, no-store' },
-              // @ts-ignore
-              cache: 'no-store',
-              credentials: 'omit',
-            });
-            clearTimeout(tm);
-            addLog(`✓ Server finalized — fetching files...`);
-          } catch {
-            addLog(`ℹ Server unreachable for finalize — files may be partial`);
-          }
-          pollDoneRef.current = true;
-          pollActiveRef.current = false;
-          stopPolling();
-          try { await refreshFiles(bid); } catch {}
-          setStep('done');
-          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
-        });
-      }
-
-      // Persist state every ~10s
-      if (Math.floor(elapsedMs / 1000) % 10 === 0) persistState();
-    }, 1000);
-
-    // ═══ SYNC TIMER — silent best-effort server sync every 8s ═══
-    syncTimerRef.current = setInterval(() => {
-      if (!pollActiveRef.current || pollDoneRef.current) return;
-      silentSync(bid);
-    }, 8000);
-
-    // Fire one immediate sync
-    silentSync(bid);
-    persistState();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [silentSync, progressAnim, persistState, refreshFiles]);
-
   const stopPolling = useCallback(() => {
-    pollActiveRef.current = false;
-    pollDoneRef.current = true;
+    pollEpochRef.current += 1;
+    pollActiveRef.current = false; pollDoneRef.current = true;
+    syncRequestRef.current?.abort(); syncRequestRef.current = null;
     if (tickTimerRef.current) { clearInterval(tickTimerRef.current); tickTimerRef.current = null; }
     if (syncTimerRef.current) { clearInterval(syncTimerRef.current); syncTimerRef.current = null; }
     if (easPollRef.current) { clearInterval(easPollRef.current); easPollRef.current = null; }
   }, []);
 
-  // ═══ CONTINUE — Resume an interrupted build from last saved batch ═══
+  const silentSync = useCallback(async (bid: string) => {
+    if (!visibleRef.current || !pollActiveRef.current || pollDoneRef.current || buildIdRef.current !== bid || syncRequestRef.current) return null;
+    const epoch = pollEpochRef.current;
+    const controller = new AbortController(); syncRequestRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const current = () => visibleRef.current && !controller.signal.aborted && pollEpochRef.current === epoch && buildIdRef.current === bid;
+    try {
+      const res = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${encodeURIComponent(bid)}`, {
+        signal: controller.signal, headers: { 'Cache-Control': 'no-cache, no-store', Accept: 'application/json' },
+        cache: 'no-store', credentials: 'omit',
+      });
+      if (!current()) return null;
+      if (res.status === 404) {
+        notFoundCountRef.current += 1;
+        setStatusMsg('The server cannot currently find this build. No completion or cancellation is confirmed.');
+        if (notFoundCountRef.current >= 3) {
+          setBuildStatus((previous: any) => ({ ...(previous || {}), status: 'lost', _lost: true, _observation_stale: true }));
+          addLog('⚠ Build status was not found after three observations. Inspect the retained artifacts or explicitly start another build.');
+          stopPolling();
+        }
+        return null;
+      }
+      if (!res.ok) throw new Error('Build status is unavailable.');
+      const data = await res.json();
+      if (!current()) return null;
+      if (!validGalaxyStatus(data, bid)) throw new Error('The server returned incompatible build state.');
+      notFoundCountRef.current = 0; lastSyncOkRef.current = Date.now();
+      setBuildStatus((previous: any) => ({ ...data,
+        _local_elapsed_formatted: previous?._local_elapsed_formatted,
+        _local_remaining_formatted: previous?._local_remaining_formatted,
+        _observation_stale: false,
+      }));
+      const ratio = data.completed_phases / data.total_phases;
+      Animated.timing(progressAnim, { toValue: ratio, duration: 500, useNativeDriver: false }).start();
+      if (Array.isArray(data.phase_log) && data.phase_log.length > lastPhaseRef.current) {
+        for (const phase of data.phase_log.slice(lastPhaseRef.current, lastPhaseRef.current + 100)) {
+          if (!phase || typeof phase !== 'object') continue;
+          const name = typeof phase.name === 'string' ? phase.name.slice(0, 160) : 'Generation batch';
+          if (phase.status === 'completed' || phase.status === 'success') addLog(`✓ ${name} — recorded complete`);
+          else if (phase.error || phase.status === 'failed') addLog(`⚠ ${name} — incomplete`);
+          else addLog(`ℹ ${name} — ${typeof phase.status === 'string' ? phase.status.slice(0, 32) : 'observed'}`);
+        }
+        lastPhaseRef.current = data.phase_log.length;
+      }
+      const outcome = data.execution ? classifyBuildJob(data) : 'pending';
+      const execution = data.execution;
+      if (execution?.stop_requested || execution?.storage_failed) {
+        setStatusMsg(`${statusStopReason(execution.stop_reason)} ${execution.drain_pending || execution.runner_live || execution.physical_workers > 0 ? 'Waiting for physical workers to drain. Retained files are partial.' : 'Retained files are partial.'}`);
+      } else if (!execution && data.status === 'completed') {
+        setStatusMsg('The server reports completion without compatible physical-work metadata. Refresh after updating the backend; completion is not confirmed here.');
+      } else setStatusMsg(null);
+      if (outcome !== 'pending') {
+        stopPolling();
+        setStep('done');
+        if (outcome === 'completed') {
+          addLog(`✓ Build complete — ${data.file_count.toLocaleString()} retained files`);
+          try { jeevesSpeak(`Build complete. ${data.file_count.toLocaleString()} files generated.`, { context: 'celebration', prependCatchphrase: true }); } catch {}
+          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
+        } else {
+          const detail = statusStopReason(execution?.stop_reason);
+          setStatusMsg(`${outcome === 'cancelled' ? 'Build stopped' : 'Build failed'}. ${detail} Retained files are partial.`);
+          addLog(`⚠ ${outcome === 'cancelled' ? 'Build stopped' : 'Build failed'} — retained artifacts are partial.`);
+        }
+        // The results screen loads retained files independently; a failed
+        // file read cannot hide the authoritative stopped/failed outcome.
+      }
+      return data;
+    } catch {
+      if (current()) {
+        setBuildStatus((previous: any) => previous ? { ...previous, _observation_stale: true } : previous);
+        setStatusMsg('Build status is unavailable. The last observed work is retained; no completion, failure or cancellation is inferred.');
+      }
+      return null;
+    } finally {
+      clearTimeout(timer);
+      if (syncRequestRef.current === controller) syncRequestRef.current = null;
+    }
+  }, [addLog, progressAnim, stopPolling]);
+
+  const startPolling = useCallback((bid: string, opts?: { resumeStartMs?: number; resumeDurationMs?: number }) => {
+    stopPolling();
+    buildIdRef.current = bid; pollActiveRef.current = true; pollDoneRef.current = false;
+    lastSyncOkRef.current = 0; notFoundCountRef.current = 0;
+    if (opts?.resumeStartMs) buildStartMsRef.current = opts.resumeStartMs;
+    else if (!buildStartMsRef.current) buildStartMsRef.current = Date.now();
+    if (opts?.resumeDurationMs) buildDurationMsRef.current = opts.resumeDurationMs;
+    tickTimerRef.current = setInterval(() => {
+      if (!pollActiveRef.current || pollDoneRef.current || !visibleRef.current) return;
+      const elapsedMs = Math.max(0, Date.now() - buildStartMsRef.current);
+      const elapsed = Math.floor(elapsedMs / 1000);
+      const remaining = Math.max(0, Math.floor((buildDurationMsRef.current - elapsedMs) / 1000));
+      setBuildStatus((previous: any) => ({ ...(previous || {}),
+        _local_elapsed_formatted: `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`,
+        _local_remaining_formatted: `${Math.floor(remaining / 60)}m ${remaining % 60}s`,
+        _observation_stale: !lastSyncOkRef.current || Date.now() - lastSyncOkRef.current > 30000,
+      }));
+      if (elapsed % 10 === 0) void persistState();
+    }, 1000);
+    syncTimerRef.current = setInterval(() => { void silentSync(bid); }, 8000);
+    void silentSync(bid); void persistState();
+  }, [persistState, silentSync, stopPolling]);
+
+  // Recovery and stopping are explicit owner commands. Their HTTP response is
+  // followed by a status read; it is never treated as a completion receipt.
   const resumeBuild = useCallback(async () => {
     const bid = buildIdRef.current || buildId;
-    if (!bid) { addLog('⚠ No build to resume'); return; }
-    setResumeLoading(true);
-    addLog(`▶ Requesting server to continue build from last saved batch...`);
+    if (!visibleRef.current || !bid || buildControlBusyRef.current) return;
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && buildIdRef.current === bid && pollEpochRef.current === epoch;
+    buildControlBusyRef.current = true; setResumeLoading(true);
     try {
-      const data = await safeFetch(`${BACKEND}/api/galaxy-studio/resume/${bid}`, { method: 'POST' }, 3);
-      if (data?.status === 'resumed') {
-        addLog(`✅ Resumed from batch ${data.resume_from_batch}/${data.total_batches} (${data.file_count?.toLocaleString() || 0} files preserved)`);
-      } else if (data?.status === 'completed') {
-        addLog(`✓ Build already completed`);
-        try { await refreshFiles(bid); } catch {}
-        setStep('done');
-        setResumeLoading(false);
-        return;
-      } else if (data?.status === 'already_running') {
-        addLog(`ℹ Build is already running — sync is active`);
-      } else {
-        addLog(`✓ Server response: ${data?.message || 'resumed'}`);
-      }
+      const data = await safeFetch(`${BACKEND}/api/galaxy-studio/resurrect/${encodeURIComponent(bid)}`, { method: 'POST' }, 1);
+      if (!current()) return;
+      addLog(data?.status === 'resurrected' ? '▶ Resume acknowledged. Waiting for actual worker progress.' : 'ℹ Resume response received. Refreshing authoritative build state.');
       startPolling(bid);
     } catch {
-      // Even on server error, keep local clock running — connection is permanent
-      addLog(`ℹ Server unreachable — local build continues offline`);
-    }
-    setResumeLoading(false);
-  }, [buildId, addLog, startPolling, refreshFiles]);
+      if (current()) setStatusMsg('Resume was not confirmed. Refresh status before explicitly trying again.');
+    } finally { buildControlBusyRef.current = false; if (visibleRef.current) setResumeLoading(false); }
+  }, [buildId, addLog, safeFetch, startPolling]);
+
+  const stopBuild = useCallback(async () => {
+    const bid = buildIdRef.current || buildId;
+    if (!visibleRef.current || !bid || buildControlBusyRef.current) return;
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && buildIdRef.current === bid && pollEpochRef.current === epoch;
+    buildControlBusyRef.current = true; setResumeLoading(true);
+    try {
+      await safeFetch(`${BACKEND}/api/galaxy-studio/force-complete/${encodeURIComponent(bid)}`, { method: 'POST' }, 1);
+      if (!current()) return;
+      addLog('ℹ Stop request acknowledged. Waiting for physical drain and the final retained-artifact status.');
+      startPolling(bid);
+    } catch {
+      if (current()) setStatusMsg('The stop request was not confirmed. Refresh status before deciding whether to retry.');
+    } finally { buildControlBusyRef.current = false; if (visibleRef.current) setResumeLoading(false); }
+  }, [buildId, addLog, safeFetch, startPolling]);
 
   // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
   const startBuild = async () => {
-    if (!title.trim() || !selectedGenre) return;
+    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
+    buildControlBusyRef.current = true;
+    stopPolling();
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && pollEpochRef.current === epoch;
     setStep('building'); setLoading(true);
     setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
 
@@ -1506,10 +1356,13 @@ export default function GalaxyStudioFactoryModal
       });
       createData = data;
       id = createData?.build_id || '';
-      if (!id) throw new Error('server returned no build_id');
-      setBuildId(id);
-      addLog(`✓ Server build created — ${createData.total_agents?.toLocaleString?.() || '1.4M'} agents`);
+      if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(id) || id.startsWith('local-')) throw new Error('server returned no compatible build_id');
+      if (!current()) { buildControlBusyRef.current = false; return; }
+      setBuildId(id); buildIdRef.current = id;
+      addLog(`✓ Server build created — ${id}`);
     } catch (e: any) {
+      buildControlBusyRef.current = false;
+      if (!current()) return;
       const msg = String(e?.message || e || 'unknown');
       // ★ NEW POLICY (2026-04-30): NEVER auto-revert to the questionnaire.
       //   Server creates are idempotent (X-Idempotency-Key) so the build may
@@ -1520,15 +1373,15 @@ export default function GalaxyStudioFactoryModal
       //   back if they really want to abandon).
       addLog(`⚠ Create endpoint error: ${msg.slice(0, 240)}`);
       if (/^4\d\d:/.test(msg) || msg.includes('422:') || msg.includes('400:')) {
-        addLog(`✦ Validation error from server. Tap "Build Another Game" below or use back to edit.`);
+        addLog('✦ The server rejected the request. Close this view and edit the build settings.');
       } else if (/^429:/.test(msg) || msg.includes('429:') || msg.includes('already running')) {
-        addLog(`✦ Server says a build is already running for this account — polling will pick it up.`);
+        addLog('✦ The server rejected another build. Inspect the account’s existing build before retrying.');
       } else if (/^503:/.test(msg)) {
-        addLog(`✦ Server back-pressure (memory). Retrying in background; build will sync when stable.`);
+        addLog('✦ The server could not admit the build. No background retry is running here.');
       } else {
-        addLog(`✦ Network/tunnel hiccup — your build is likely still running on the server.`);
+        addLog('✦ Creation was not confirmed. Check server build records before submitting another build.');
       }
-      addLog(`Staying on build screen — polling continues. Tap ←  to cancel.`);
+      setStatusMsg('No build identifier was confirmed, so progress cannot be observed here. Closing this view does not cancel server work.');
       setLoading(false);
       return;
     }
@@ -1547,7 +1400,8 @@ export default function GalaxyStudioFactoryModal
         timeoutMs: 15000,               // start-build is near-instant, no need for 30s
         headers: { 'X-Idempotency-Key': `gs-start-${id}` },
       });
-      addLog(`✓ Background workers dispatched — 1.4M+ agents active`);
+      if (!current()) { buildControlBusyRef.current = false; return; }
+      addLog('ℹ Start request acknowledged. Waiting for actual worker observations.');
       const nonDefault = Object.entries(phase_weights).filter(([_, v]) => v !== 1.0);
       if (nonDefault.length > 0) {
         addLog(`⚙ Applied ${nonDefault.length} phase_weight overrides from Settings`);
@@ -1577,13 +1431,14 @@ export default function GalaxyStudioFactoryModal
         }, 3000);
       }
     } catch (e: any) {
+      if (!current()) { buildControlBusyRef.current = false; return; }
       const msg = String(e?.message || e || 'unknown');
       if (msg.includes('429:') || msg.includes('already_running') || msg.includes('already running')) {
-        addLog(`ℹ Build is already running on server — sync is active`);
+        addLog('ℹ The server reported existing work. Reading its current status.');
       } else if (msg.includes('503:')) {
-        addLog(`ℹ Server busy (memory pressure) — build will auto-retry when stable`);
+        addLog('ℹ The server could not admit work. Status observation will show whether any runner is present.');
       } else {
-        addLog(`ℹ Start endpoint hiccup (${msg.slice(0, 60)}) — build will sync when server returns`);
+        addLog(`ℹ Start was not confirmed (${msg.slice(0, 60)}). Reading the retained build status.`);
       }
     }
 
@@ -1592,6 +1447,7 @@ export default function GalaxyStudioFactoryModal
     buildStartMsRef.current = startMs;
     buildDurationMsRef.current = 15 * 60 * 1000;
     startPolling(id, { resumeStartMs: startMs, resumeDurationMs: 15 * 60 * 1000 });
+    buildControlBusyRef.current = false;
     setLoading(false);
   };
 
@@ -2856,9 +2712,13 @@ export default function GalaxyStudioFactoryModal
     const batchNames = buildStatus?.batch_names || {};
     const bgCurrentBatch = buildStatus?.bg_current_batch || 0;
     const bg = buildStatus?.bg_progress;
-    const elapsed = bg?.elapsed_formatted || '0m 0s';
-    const remaining = bg?.remaining_formatted || '15m 0s';
-    const timePct = bg?.time_pct || 0;
+    const elapsed = buildStatus?._local_elapsed_formatted || bg?.elapsed_formatted || 'Not observed';
+    const remaining = buildStatus?._local_remaining_formatted || bg?.remaining_formatted || 'Not observed';
+    const phasePct = Math.max(0, Math.min(100, completedCount / Math.max(1, totalPhases) * 100));
+    const execution = buildStatus?.execution;
+    const stopping = execution?.stop_requested === true || execution?.drain_pending === true;
+    const observed = buildStatus?._observation_stale === false;
+    const canResume = observed && buildStatus?.status === 'building' && execution?.runner_live === false && execution.physical_workers === 0 && !stopping;
 
     return (
       <View style={{ flex: 1, paddingHorizontal: 14, paddingTop: 10 }}>
@@ -2903,7 +2763,7 @@ export default function GalaxyStudioFactoryModal
           </View>
           <View style={s.liveBadge}>
             <Animated.View style={[s.liveDot, { opacity: buildPulse }]} />
-            <Text style={s.liveBadgeText}>LIVE</Text>
+            <Text style={s.liveBadgeText}>{observed ? stopping ? 'STOPPING' : 'OBSERVED' : 'STATUS UNKNOWN'}</Text>
           </View>
         </View>
 
@@ -2912,12 +2772,12 @@ export default function GalaxyStudioFactoryModal
           <View style={s.timerBox}>
             <Ionicons name="time-outline" size={14} color={T.cyan} />
             <Text style={s.timerText}>{elapsed}</Text>
-            <Text style={s.timerLabel}>elapsed</Text>
+            <Text style={s.timerLabel}>local elapsed</Text>
           </View>
           <View style={[s.timerBox, { borderColor: T.gold + '30' }]}>
             <Ionicons name="hourglass-outline" size={14} color={T.gold} />
             <Text style={[s.timerText, { color: T.gold }]}>{remaining}</Text>
-            <Text style={s.timerLabel}>remaining</Text>
+            <Text style={s.timerLabel}>target window</Text>
           </View>
           <View style={[s.timerBox, { borderColor: T.success + '30' }]}>
             <Ionicons name="document-text-outline" size={14} color={T.success} />
@@ -2995,7 +2855,7 @@ export default function GalaxyStudioFactoryModal
               />
             </Animated.View>
           </View>
-          <Text style={s.progressPct}>{Math.round(timePct)}%</Text>
+          <Text style={s.progressPct}>{Math.round(phasePct)}% phases recorded</Text>
         </View>
 
         {/* Batch chips — 10 batches instead of 100 individual phases */}
@@ -3003,8 +2863,8 @@ export default function GalaxyStudioFactoryModal
           {Array.from({ length: totalBatches }, (_, i) => {
             const batchNum = i + 1;
             const bName = batchNames[String(batchNum)] || `Batch ${batchNum}`;
-            const done = batchNum < (bgCurrentBatch || currentBatch);
-            const current = batchNum === (bgCurrentBatch || currentBatch);
+            const done = Array.isArray(buildStatus?.phase_log) && buildStatus.phase_log.some((entry: any) => entry?.batch === batchNum && ['success', 'completed'].includes(entry.status));
+            const current = !done && observed && !stopping && batchNum === (bgCurrentBatch || currentBatch);
             return (
               <View key={batchNum} style={[s.batchChip, done && { backgroundColor: T.success + '20', borderColor: T.success + '40' }, current && { backgroundColor: T.accent + '20', borderColor: T.accent }]}>
                 {done ? <Ionicons name="checkmark-circle" size={14} color={T.success} /> : current ? <ActivityIndicator size={12} color={T.accent} /> : <View style={s.phaseDot} />}
@@ -3062,19 +2922,23 @@ export default function GalaxyStudioFactoryModal
           {buildLog.length > 0 && (
             <View style={s.logPulse}>
               <ActivityIndicator size={10} color={T.accent} />
-              <Text style={s.logPulseText}>Auto-polling active — never gives up</Text>
+              <Text style={s.logPulseText}>{pollActiveRef.current ? 'Reading owner status; the local clock grants no work.' : 'Observation paused. Refresh status to inspect the owner.'}</Text>
             </View>
           )}
         </ScrollView>
 
-        {/* Permanent-Connection Status: one unified Continue button */}
-        <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.success, marginTop: 8, marginHorizontal: 4 }]} onPress={resumeBuild} activeOpacity={0.7} disabled={resumeLoading}>
-          {resumeLoading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="infinite-outline" size={20} color="#fff" />}
-          <View style={{ flex: 1 }}>
-            <Text style={[s.actionBtnTitle, { color: '#fff' }]}>Continue / Sync</Text>
-            <Text style={[s.actionBtnSub, { color: '#fffa' }]}>Local build runs offline — tap to sync with server</Text>
-          </View>
-          <Ionicons name="chevron-forward-outline" size={16} color="#fffa" />
+        {statusMsg && <Text accessibilityLiveRegion="polite" style={{ color: T.warning, fontSize: 12, lineHeight: 18, marginHorizontal: 4, marginTop: 8 }}>{statusMsg}</Text>}
+        {execution && <Text style={{ color: T.textMuted, fontSize: 11, lineHeight: 17, marginHorizontal: 4, marginTop: 6 }}>
+          {execution.runner_live ? 'Runner present' : 'No live runner observed'} · {execution.physical_workers} physical workers · {execution.drain_pending ? 'drain pending' : 'drain not pending'} · {execution.unflushed_files} unsaved files{execution.storage_failed ? ' · storage failed' : ''}.
+        </Text>}
+        <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.accent, marginTop: 8, marginHorizontal: 4 }]} onPress={() => { const bid = buildIdRef.current; if (bid) startPolling(bid); }} activeOpacity={0.7} disabled={resumeLoading}>
+          <Ionicons name="refresh-outline" size={20} color="#fff" /><View style={{ flex: 1 }}><Text style={[s.actionBtnTitle, { color: '#fff' }]}>Refresh build status</Text><Text style={[s.actionBtnSub, { color: '#fffa' }]}>Read actual progress without restarting work</Text></View>
+        </TouchableOpacity>
+        {canResume && <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.success, marginTop: 8, marginHorizontal: 4 }]} onPress={resumeBuild} activeOpacity={0.7} disabled={resumeLoading}>
+          {resumeLoading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="play-outline" size={20} color="#fff" />}<View style={{ flex: 1 }}><Text style={[s.actionBtnTitle, { color: '#fff' }]}>Resume interrupted work</Text><Text style={[s.actionBtnSub, { color: '#fffa' }]}>Request recovery through the existing build owner</Text></View>
+        </TouchableOpacity>}
+        <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.danger, marginTop: 8, marginHorizontal: 4, opacity: stopping || resumeLoading ? .5 : 1 }]} onPress={stopBuild} activeOpacity={0.7} disabled={stopping || resumeLoading || !buildId}>
+          <Ionicons name="stop-outline" size={20} color="#fff" /><View style={{ flex: 1 }}><Text style={[s.actionBtnTitle, { color: '#fff' }]}>{stopping ? 'Waiting for physical drain' : 'Stop build'}</Text><Text style={[s.actionBtnSub, { color: '#fffa' }]}>Retain partial files; stopping never marks the build complete</Text></View>
         </TouchableOpacity>
       </View>
     );
@@ -3191,9 +3055,13 @@ export default function GalaxyStudioFactoryModal
       );
     }
 
+    const complete = !!buildStatus?.execution && classifyBuildJob(buildStatus) === 'completed';
     return (
       <ScrollView style={{ flex: 1, paddingHorizontal: 14 }} showsVerticalScrollIndicator={false}>
-        <View style={s.doneHero}><Ionicons name="checkmark-circle" size={48} color={T.success} /><Text style={s.doneTitle}>{title}</Text><Text style={s.doneSub}>{selectedGenre?.icon} {selectedGenre?.name}{selectedSubgenre ? ` / ${selectedSubgenre.replace(/_/g, ' ')}` : ''}</Text></View>
+        <View style={s.doneHero}><Ionicons name={complete ? 'checkmark-circle' : 'warning-outline'} size={48} color={complete ? T.success : T.warning} /><Text style={s.doneTitle}>{title}</Text><Text style={s.doneSub}>{complete ? 'Build complete' : buildStatus?.status === 'cancelled' ? 'Build stopped — retained files are partial' : buildStatus?.status === 'failed' ? 'Build failed — retained files are partial' : 'Retained artifacts — completion unverified'}</Text><Text style={s.doneSub}>{selectedGenre?.icon} {selectedGenre?.name}{selectedSubgenre ? ` / ${selectedSubgenre.replace(/_/g, ' ')}` : ''}</Text></View>
+        {!complete && buildStatus?.execution && <Text accessibilityLiveRegion="polite" style={{ color: T.warning, fontSize: 12, lineHeight: 18, marginBottom: 10 }}>
+          {statusStopReason(buildStatus.execution.stop_reason)} Only saved files can be reopened.{buildStatus.execution.unflushed_files > 0 ? ` ${buildStatus.execution.unflushed_files.toLocaleString()} generated files remain unsaved.` : ''}{buildStatus.execution.storage_failed ? ' Storage failed; do not assume the file count is durable.' : ''}
+        </Text>}
         {files && (<View style={s.statsBar}>
           <View style={s.statBox}><Text style={s.statNum}>{files.total_files?.toLocaleString()}</Text><Text style={s.statLabel}>files</Text></View>
           <View style={s.statDivider} /><View style={s.statBox}><Text style={s.statNum}>{files.total_lines?.toLocaleString()}</Text><Text style={s.statLabel}>lines</Text></View>
@@ -3508,7 +3376,7 @@ export default function GalaxyStudioFactoryModal
             <Text style={[s.gxBridgeText, { color: '#2563EB' }]}>Playground</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={s.newBuildBtn} onPress={resetState}><Ionicons name="refresh-outline" size={18} color={T.accent} /><Text style={s.newBuildText}>Build Another Game</Text></TouchableOpacity>
+        <TouchableOpacity style={s.newBuildBtn} onPress={() => { void AsyncStorage.removeItem(STORAGE_KEY); resetState(); }}><Ionicons name="refresh-outline" size={18} color={T.accent} /><Text style={s.newBuildText}>Build Another Game</Text></TouchableOpacity>
         {/* ✨ 2026-05 — extra-tall bottom safety margin so the home-indicator
             / soft-nav doesn't overlap the last button. User flagged it
             being clipped on devices with bottom safe-area. */}
@@ -3517,7 +3385,7 @@ export default function GalaxyStudioFactoryModal
     );
   };
 
-  const getTitle = () => step === 'pick' ? 'Galaxy Studio' : step === 'building' ? '' : title || 'Game Ready';
+  const getTitle = () => step === 'pick' ? 'Galaxy Studio' : step === 'building' ? '' : title || 'Retained build artifacts';
   const getSub = () => step === 'pick' ? `${genres.length} genres • ${manifest?.total_agents?.toLocaleString() || '28,894'} agents` : step === 'building' ? `Batch ${buildStatus?.bg_current_batch || buildStatus?.current_batch || 0}/${buildStatus?.total_batches || 10} • ${(buildStatus?.completed_phases || 0)}/${buildStatus?.total_phases || 100} phases • ${(buildStatus?.file_count || 0).toLocaleString()} files` : `${files?.total_files?.toLocaleString() || 0} files • ${files?.total_lines?.toLocaleString() || 0} lines`;
 
   return (
@@ -3529,7 +3397,7 @@ export default function GalaxyStudioFactoryModal
             if (showCode) { setShowCode(false); setSelectedFile(null); return; }
             if (showVault) { setShowVault(false); return; }
             if (step === 'done') { setStep('pick'); return; }
-            if (step === 'building') return;
+            if (step === 'building') { onClose(); return; }
             onClose();
           }} style={s.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name={step === 'pick' && !showCode && !showVault && !showMLConsole ? 'close-outline' : 'arrow-back-outline'} size={24} color={T.text} />

@@ -580,14 +580,28 @@ class StudioMaintenanceController:
                 raise
 
     def _owner_drained(self, owner_id: str | None) -> bool:
-        """Positive drain proof only; lease timeout and missing rows prove none."""
-        row = None if owner_id is None else self._executor._db.execute(
-            "SELECT owner_id,host_id,boot_id,process_id,process_start,process_namespace,state,physical_tasks "
-            "FROM jeeves_idle_maintenance_owner WHERE owner_id=?", (owner_id,),
-        ).fetchone()
-        keys = ("owner_id", "host_id", "boot_id", "process_id", "process_start", "process_namespace", "state", "physical_tasks")
-        info = {"owner_id": owner_id, "state": "unproven"} if row is None else dict(zip(keys, row))
-        return self._drain_proven(info)
+        """Consume only committed drain proof while a queue lock is held.
+
+        Process-table and supervisor probes belong to the bounded presence
+        repair before claim. Calling them here would hold the shared SQLite
+        lock across an arbitrary host callback and can block foreground work.
+        """
+        row = (
+            None
+            if owner_id is None
+            else self._executor._db.execute(
+                "SELECT owner_id,state,physical_tasks " "FROM jeeves_idle_maintenance_owner WHERE owner_id=?",
+                (owner_id,),
+            ).fetchone()
+        )
+        if row is None:
+            return False
+        if row[0] == self._identity["owner_id"]:
+            # This lifespan also knows when its own synchronous callback has
+            # drained after an interrupted finalization. No foreign process is
+            # inferred from a timeout, missing heartbeat or queue state.
+            return self._active_tasks == 0 and self._executor._active_workers == 0
+        return row[1:] == ("drained", 0)
 
     def _drain_proven(self, info: Mapping[str, Any]) -> bool:
         """Evaluate host proof without any persistence or controller lock."""
@@ -674,14 +688,21 @@ class StudioMaintenanceController:
         )
         with self._executor._lock:
             rows = self._executor._db.execute(
-                "SELECT owner_id,host_id,boot_id,process_id,process_start,process_namespace,state,"
-                "physical_tasks,heartbeat_ns FROM jeeves_idle_maintenance_owner "
-                "WHERE host_id=? AND owner_id!=? AND state!='drained' AND heartbeat_ns<? "
-                "ORDER BY last_probe_ns,heartbeat_ns,owner_id LIMIT 32",
+                "SELECT o.owner_id,o.host_id,o.boot_id,o.process_id,o.process_start,o.process_namespace,o.state,"
+                "o.physical_tasks,o.heartbeat_ns FROM jeeves_idle_maintenance_owner o "
+                "WHERE o.owner_id!=? AND o.state!='drained' AND ("
+                "(o.host_id=? AND o.heartbeat_ns<?) OR EXISTS "
+                "(SELECT 1 FROM jeeves_idle_maintenance_task t WHERE t.owner_id=o.owner_id "
+                "AND t.state='running' AND t.lease_until_ns<=?) OR EXISTS "
+                "(SELECT 1 FROM jeeves_idle_maintenance_lease l WHERE l.owner_id=o.owner_id "
+                "AND l.state='held' AND l.lease_until_ns<=?)) "
+                "ORDER BY o.last_probe_ns,o.heartbeat_ns,o.owner_id LIMIT 32",
                 (
-                    self._identity["host_id"],
                     self._identity["owner_id"],
+                    self._identity["host_id"],
                     self._last_logical_ns - policy.maximum_owner_heartbeat_ms * 1_000_000,
+                    self._last_logical_ns,
+                    self._last_logical_ns,
                 ),
             ).fetchall()
         # Host probes may read the process table or a trusted supervisor. Keep
@@ -706,7 +727,8 @@ class StudioMaintenanceController:
                     updated = db.execute(
                         "UPDATE jeeves_idle_maintenance_owner SET " + changed + "last_probe_ns=? "
                         "WHERE owner_id=? AND host_id=? AND boot_id=? AND process_id=? "
-                        "AND process_start=? AND process_namespace=? AND heartbeat_ns=? AND state=?",
+                        "AND process_start=? AND process_namespace=? AND heartbeat_ns=? AND state=? "
+                        "AND physical_tasks=?",
                         (
                             now,
                             info["owner_id"],
@@ -717,6 +739,7 @@ class StudioMaintenanceController:
                             info["process_namespace"],
                             info["heartbeat_ns"],
                             info["state"],
+                            info["physical_tasks"],
                         ),
                     ).rowcount
                     retired += int(proven and updated == 1)
@@ -1209,8 +1232,17 @@ class StudioMaintenanceController:
                 # Host callback is bounded, local and idempotent. It runs after
                 # commit with no persistence lock, foreground lock or worker.
                 acknowledgement = self._after_verified_chunk(task, result, receipt)
-                if isinstance(acknowledgement, Mapping) and acknowledgement.get("acknowledged") is False:
-                    raise IdleRuntimeError("host did not acknowledge verified maintenance")
+                if acknowledgement is not None:
+                    # Existing synchronous void hooks acknowledge by returning
+                    # normally. A hook that elects to return a result must say
+                    # so explicitly; arbitrary truthy values or malformed
+                    # mappings cannot retire durable pending receipts.
+                    if (
+                        not isinstance(acknowledgement, Mapping)
+                        or acknowledgement.get("acknowledged") is not True
+                    ):
+                        raise IdleRuntimeError("host did not acknowledge verified maintenance")
+                    _canonical(dict(acknowledgement), maximum_bytes=_MAX_OUTPUT_BYTES)
             except Exception as exc:
                 error = type(exc).__name__[:96]
             with self._executor._lock:
@@ -2097,6 +2129,241 @@ class StudioMaintenanceController:
             # unavailable after the chunk. No further work will be admitted.
             return self._last_logical_ns or prior_ns
 
+    def _handler_registry(self, policy: Mapping[str, Any]) -> dict[str, Any]:
+        """Expose host declarations, never callbacks or execution permission."""
+        entries = []
+        for kind in sorted(LOCAL_MAINTENANCE_KINDS, key=lambda item: item.value):
+            handler = self._handlers.get(kind)
+            augmentation = kind is IdleWorkKind.ELIGIBLE_AUGMENTATION
+            entries.append(
+                {
+                    "kind": kind.value,
+                    "registered": handler is not None,
+                    "handler_version": None if handler is None else handler.version,
+                    "retry_safe_declared": handler is not None and handler.retry_safe is True,
+                    "augmentation_required": augmentation,
+                    "policy_permits": bool(
+                        handler is not None
+                        and policy["enabled"]
+                        and (not augmentation or policy["augmentation_enabled"])
+                    ),
+                }
+            )
+        return {
+            "schema_version": "jeeves.maintenance_handler_registry.v1",
+            "entries": entries,
+            "registered_count": len(self._handlers),
+            "max_local_kinds": len(LOCAL_MAINTENANCE_KINDS),
+            "execution_authority": "none",
+        }
+
+    @staticmethod
+    def _unavailable_queue_summary(reason: str, scope_id: str | None) -> dict[str, Any]:
+        return {
+            "schema_version": "jeeves.maintenance_queue_summary.v1",
+            "available": False,
+            "reason": reason,
+            "scope_id": scope_id,
+            "host_admission_required": True,
+            "execution_authority": "none",
+        }
+
+    def _inspect_queue_locked(
+        self,
+        *,
+        tasks: list[dict[str, Any]],
+        policy: Mapping[str, Any],
+        status: Mapping[str, Any],
+        scope_id: str | None,
+        clock_ns: int | None,
+        host_foreground: int,
+        shared_chunks: int,
+    ) -> dict[str, Any]:
+        """Read bounded queue facts without reserving, probing or changing work.
+
+        A last-persisted logical clock makes backoff and priority arithmetic
+        inspectable across host wall-clock jumps. It is deliberately not a new
+        clock tick or an assertion that today's host can admit the work.
+        """
+        db = self._executor._db
+        kinds = tuple(sorted(kind.value for kind in LOCAL_MAINTENANCE_KINDS))
+        scope_clause = "" if scope_id is None else " WHERE scope_id=?"
+        scope_params = () if scope_id is None else (scope_id,)
+        groups = db.execute(
+            "SELECT CASE WHEN kind IN (" + ",".join("?" for _ in kinds) + ") THEN kind ELSE 'unknown' END,"
+            "CASE WHEN state IN ('ready','retry_wait','running','completed','failed') "
+            "THEN state ELSE 'unknown' END,COUNT(*),"
+            "MIN(CASE WHEN state IN ('ready','retry_wait','running') THEN created_at_ns END),"
+            "SUM(CASE WHEN state IN ('ready','retry_wait') AND next_run_ns>? THEN 1 ELSE 0 END),"
+            "SUM(CASE WHEN state IN ('ready','retry_wait') AND next_run_ns<=? THEN 1 ELSE 0 END) "
+            "FROM jeeves_idle_maintenance_task" + scope_clause + " GROUP BY 1,2",
+            (*kinds, clock_ns, clock_ns, *scope_params),
+        ).fetchall()
+        # Normalizing unknown keys in SQL caps the output at six kinds times
+        # six states, including corrupt/legacy enum values without echoing them.
+        state_counts = dict.fromkeys(("ready", "retry_wait", "running", "completed", "failed", "unknown"), 0)
+        by_kind = {
+            kind: {"kind": kind, "total": 0, "pending": 0, "running": 0, "failed": 0} for kind in kinds
+        }
+        oldest_pending: int | None = None
+        pending, backoff, due, retained, unknown_kinds = 0, 0, 0, 0, 0
+        for kind, state, count, oldest, waiting_count, due_count in groups:
+            state_counts[state] += count
+            retained += count
+            queued = state in {"ready", "retry_wait", "running"}
+            pending += count if queued else 0
+            backoff += waiting_count
+            due += due_count
+            if type(oldest) is int and oldest >= 0:
+                oldest_pending = oldest if oldest_pending is None else min(oldest_pending, oldest)
+            if kind in by_kind:
+                item = by_kind[kind]
+                item["total"] += count
+                item["pending"] += count if queued else 0
+                item["running"] += count if state == "running" else 0
+                item["failed"] += count if state == "failed" else 0
+            else:
+                unknown_kinds += count
+
+        auxiliary = {}
+        if tasks:
+            task_ids = tuple(task["task_id"] for task in tasks)
+            rows = db.execute(
+                "SELECT t.task_id,c.open_until_ns,"
+                "EXISTS(SELECT 1 FROM jeeves_idle_maintenance_lease l "
+                "WHERE l.resource_id='scope:'||t.scope_id AND l.state='held'),"
+                "EXISTS(SELECT 1 FROM jeeves_idle_maintenance_chunk p "
+                "WHERE p.continuation_id=t.continuation_id) "
+                "FROM jeeves_idle_maintenance_task t "
+                "LEFT JOIN jeeves_idle_maintenance_circuit c "
+                "ON c.scope_id=t.scope_id AND c.kind=t.kind "
+                "WHERE t.task_id IN (" + ",".join("?" for _ in task_ids) + ")",
+                task_ids,
+            ).fetchall()
+            auxiliary = {row[0]: row[1:] for row in rows}
+        host_custody = (
+            db.execute(
+                "SELECT 1 FROM jeeves_idle_maintenance_lease WHERE resource_id=? AND state='held'",
+                ("host:" + self._identity["host_id"],),
+            ).fetchone()
+            is not None
+        )
+
+        def age(timestamp: Any) -> int | None:
+            return (
+                clock_ns - timestamp
+                if clock_ns is not None and type(timestamp) is int and 0 <= timestamp <= clock_ns
+                else None
+            )
+
+        for task in tasks:
+            task_state = task["state"]
+            blockers = []
+            work_age = age(task["created_at_ns"])
+            waiting_age = age(task["updated_at_ns"])
+            remaining = None
+            priority = None
+            if task_state in {"completed", "failed"}:
+                schedule_state = "terminal"
+                blockers.append("task_" + task_state)
+            elif task_state == "running":
+                schedule_state = "running"
+                blockers.append("physical_custody_running")
+                if (
+                    clock_ns is not None
+                    and type(task["lease_until_ns"]) is int
+                    and task["lease_until_ns"] <= clock_ns
+                ):
+                    blockers.append("physical_drain_required")
+            elif task_state not in {"ready", "retry_wait"}:
+                schedule_state = "unknown"
+                blockers.append("unknown_task_state")
+            else:
+                if not policy["enabled"]:
+                    blockers.append("maintenance_disabled")
+                if status["coordination_state"] != "synchronized":
+                    blockers.append("coordination_unavailable")
+                if host_foreground or status["foreground_requests"]:
+                    blockers.append("host_foreground_pending")
+                try:
+                    kind = IdleWorkKind(task["kind"])
+                except ValueError:
+                    kind = None
+                handler = self._handlers.get(kind)
+                if handler is None:
+                    blockers.append("handler_unavailable")
+                elif task["handler_version"] not in ("", handler.version):
+                    blockers.append("handler_changed")
+                if kind is IdleWorkKind.ELIGIBLE_AUGMENTATION and not policy["augmentation_enabled"]:
+                    blockers.append("augmentation_disabled")
+                if clock_ns is None:
+                    blockers.append("logical_clock_unavailable")
+                elif type(task["next_run_ns"]) is not int or task["next_run_ns"] < 0:
+                    blockers.append("task_timing_unknown")
+                else:
+                    remaining = max(0, task["next_run_ns"] - clock_ns)
+                    if remaining:
+                        blockers.append("retry_backoff")
+                observed = auxiliary.get(task["task_id"])
+                if observed is None:
+                    blockers.append("task_observation_changed")
+                else:
+                    circuit_until, scope_custody, reusable_chunk = observed
+                    if clock_ns is not None and type(circuit_until) is int and circuit_until > clock_ns:
+                        blockers.append("circuit_open")
+                    if host_custody:
+                        blockers.append("host_custody_held")
+                    if scope_custody:
+                        blockers.append("scope_custody_held")
+                    if not reusable_chunk and shared_chunks >= policy["maximum_chunk_results"]:
+                        blockers.append("result_backpressure")
+                if waiting_age is not None and type(task["priority"]) is int and 0 <= task["priority"] <= 100:
+                    priority = (
+                        100
+                        if waiting_age >= policy["maximum_admission_wait_ms"] * 1_000_000
+                        else min(
+                            100, task["priority"] + waiting_age // (policy["priority_aging_ms"] * 1_000_000)
+                        )
+                    )
+                schedule_state = "blocked" if blockers else "awaiting_host_admission"
+            task["scheduling"] = {
+                "schema_version": "jeeves.maintenance_task_scheduling.v1",
+                "schedule_state": schedule_state,
+                "blockers": blockers,
+                "as_of_logical_ns": clock_ns,
+                "remaining_backoff_ns": remaining,
+                "effective_priority": priority,
+                "admission_wait_ns": waiting_age,
+                "work_age_ns": work_age,
+                "priority_age_basis": "last_progress_updated_at_ns",
+                "host_admission_required": True,
+                "execution_authority": "none",
+            }
+        return {
+            "schema_version": "jeeves.maintenance_queue_summary.v1",
+            "available": True,
+            "scope_id": scope_id,
+            "as_of_logical_ns": clock_ns,
+            "clock_basis": "last_persisted_host_logical_clock",
+            "state_counts": state_counts,
+            "kind_counts": list(by_kind.values()),
+            "retained_tasks": retained,
+            "pending_tasks": pending,
+            "unknown_kind_tasks": unknown_kinds,
+            "backoff_tasks": backoff if clock_ns is not None else None,
+            "due_queued_tasks": due if clock_ns is not None else None,
+            "oldest_pending_created_at_ns": oldest_pending,
+            "oldest_pending_age_ns": age(oldest_pending),
+            "returned_tasks": len(tasks),
+            "host_admission_required": True,
+            "execution_authority": "none",
+            "limitations": [
+                "Counts are scoped retained queue observations; they do not reconstruct compacted tasks.",
+                "Timing and priority use the last persisted host logical clock, which inspection does not advance.",
+                "Fresh telemetry, host presence, quiescence and fenced custody must be checked again at actual admission.",
+            ],
+        }
+
     def snapshot(self, *, limit: int = 20, scope_id: str | None = None) -> dict[str, Any]:
         if type(limit) is not int or not 1 <= limit <= 100:
             raise IdleRuntimeError("maintenance snapshot page must be 1..100")
@@ -2116,16 +2383,33 @@ class StudioMaintenanceController:
                 "coordination_error": self._coordination_fault,
             }
             closed = self._closed
+            handler_registry = self._handler_registry(policy)
         if closed:
-            return {"schema": "jeeves.studio_maintenance.v1", "policy": policy,
-                    "status": status, "queued_tasks": 0, "recent_tasks": [],
-                    "circuits": [], "execution_authority": "host-local-derived-only"}
+            return {
+                "schema": "jeeves.studio_maintenance.v1",
+                "policy": policy,
+                "status": status,
+                "queued_tasks": 0,
+                "recent_tasks": [],
+                "circuits": [],
+                "execution_authority": "host-local-derived-only",
+                "handler_registry": handler_registry,
+                "queue_summary": self._unavailable_queue_summary("controller_closed", scope_id),
+            }
         with self._executor._lock:
             if self._executor._closed:
                 status["state"] = "closed"
-                return {"schema": "jeeves.studio_maintenance.v1", "policy": policy,
-                        "status": status, "queued_tasks": 0, "recent_tasks": [],
-                        "circuits": [], "execution_authority": "host-local-derived-only"}
+                return {
+                    "schema": "jeeves.studio_maintenance.v1",
+                    "policy": policy,
+                    "status": status,
+                    "queued_tasks": 0,
+                    "recent_tasks": [],
+                    "circuits": [],
+                    "execution_authority": "host-local-derived-only",
+                    "handler_registry": handler_registry,
+                    "queue_summary": self._unavailable_queue_summary("executor_closed", scope_id),
+                }
             db = self._executor._db
             scope_clause = "" if scope_id is None else " WHERE scope_id=?"
             scope_params: tuple[Any, ...] = () if scope_id is None else (scope_id,)
@@ -2133,15 +2417,37 @@ class StudioMaintenanceController:
                 "SELECT task_id,scope_id,source_digest,kind,state,priority,attempts,failures,"
                 "next_run_ns,updated_at_ns,last_error,output_digest,owner_id,host_id,"
                 "scope_fence,host_fence,continuation_index,continuation_id,heartbeat_ns,"
-                "lease_until_ns,drained_at_ns,handler_version "
-                "FROM jeeves_idle_maintenance_task" + scope_clause
+                "lease_until_ns,drained_at_ns,handler_version,created_at_ns "
+                "FROM jeeves_idle_maintenance_task"
+                + scope_clause
                 + " ORDER BY updated_at_ns DESC,task_id LIMIT ?",
                 (*scope_params, limit),
             ).fetchall()
-            keys = ("task_id", "scope_id", "source_digest", "kind", "state", "priority", "attempts", "failures",
-                    "next_run_ns", "updated_at_ns", "last_error", "output_digest", "owner_id", "host_id",
-                    "fencing_token", "host_fencing_token", "continuation_index", "continuation_id",
-                    "heartbeat_ns", "lease_until_ns", "drained_at_ns", "handler_version")
+            keys = (
+                "task_id",
+                "scope_id",
+                "source_digest",
+                "kind",
+                "state",
+                "priority",
+                "attempts",
+                "failures",
+                "next_run_ns",
+                "updated_at_ns",
+                "last_error",
+                "output_digest",
+                "owner_id",
+                "host_id",
+                "fencing_token",
+                "host_fencing_token",
+                "continuation_index",
+                "continuation_id",
+                "heartbeat_ns",
+                "lease_until_ns",
+                "drained_at_ns",
+                "handler_version",
+                "created_at_ns",
+            )
             queued, next_run = db.execute(
                 "SELECT COUNT(*),MIN(next_run_ns) FROM jeeves_idle_maintenance_task "
                 "WHERE state IN ('ready','running','retry_wait')"
@@ -2288,6 +2594,15 @@ class StudioMaintenanceController:
                         reason = "queue_full"
                     task["retryable"] = reason is None
                     task["retry_reason"] = reason
+            queue_summary = self._inspect_queue_locked(
+                tasks=tasks,
+                policy=policy,
+                status=status,
+                scope_id=scope_id,
+                clock_ns=None if clock is None else clock[2],
+                host_foreground=host_foreground,
+                shared_chunks=shared_chunks,
+            )
         result = {
             "schema": "jeeves.studio_maintenance.v1",
             "policy": policy,
@@ -2295,6 +2610,8 @@ class StudioMaintenanceController:
             "queued_tasks": queued,
             "recent_tasks": tasks,
             "circuits": circuit_entries,
+            "handler_registry": handler_registry,
+            "queue_summary": queue_summary,
             "execution_authority": "host-local-derived-only",
         }
         for task in result["recent_tasks"]:

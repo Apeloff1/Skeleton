@@ -22,6 +22,8 @@ export type RuntimeLearningPartition = {
   rollback_count?: number; generation?: number;
   source_provenance?: { latest_source_digest?: string; recent_source_count?: number; source_switches?: number; latest_source_samples?: number };
   optimizer_cost?: { terminal_updates?: number; replay_updates?: number; maintenance_updates?: number; total_updates?: number };
+  /** Optional read-only projection; its renderer validates it independently. */
+  reference_explanation?: unknown;
 };
 export type RuntimeServingState = {
   available?: boolean;
@@ -32,10 +34,13 @@ export type RuntimeServingState = {
   cache?: { entries?: number; bytes?: number; max_bytes?: number; evictions?: number; expirations?: number; singleflight_active?: number; singleflight_hits?: number; singleflight_tenants?: number; largest_tenant_singleflight_waiters?: number };
   fairness?: { active_tenants?: number; queued_tenants?: number; largest_tenant_active?: number; largest_tenant_queued?: number; rotations?: number; aged_background_admissions?: number; tenant_limit_rejections?: number; memory_shed_rejections?: number; load_shed_rejections?: number; oldest_interactive_wait_ms?: number; oldest_background_wait_ms?: number; max_observed_queue_wait_ms?: number };
   draining?: boolean;
+  execution_contract?: unknown;
+  execution_contract_error?: unknown;
 };
 export type RuntimeMaintenanceTask = {
-  task_id?: string; kind?: string; state?: string; attempts?: number; failures?: number; updated_at_ns?: number;
+  task_id?: string; scope_id?: string; kind?: string; state?: string; attempts?: number; failures?: number; updated_at_ns?: number;
   source_digest?: string; retryable?: boolean; retry_reason?: string | null;
+  scheduling?: unknown;
 };
 export type RuntimeMaintenanceCircuit = { kind?: string; state?: 'open' | 'half_open' | 'closed'; failures?: number; open_until_ns?: number; generation?: number; last_failure_digest?: string; last_source_digest?: string; last_task_id?: string; last_failure_at_ns?: number; resettable?: boolean; reset_reason?: string | null };
 export type RuntimeControlState = {
@@ -70,6 +75,8 @@ export type RuntimeControlState = {
     telemetry?: { observed_at_ns?: number; host_now_ns?: number; age_ns?: number; quiet_ns?: number; serving_pressure_ppm?: number; cpu_free_ppm?: number; memory_free_ppm?: number; gpu_free_ppm?: number | null; pending_interactive_requests?: number; active_background_workers?: number; power_saving?: boolean; online?: boolean; telemetry_digest?: string; admission_reason?: string } | null;
     chunk_results?: { retained?: number; reserved?: number; reusable_unverified?: number; shared_retained?: number; maximum?: number; backpressure?: boolean };
     acknowledgements?: { pending?: number; failed_attempts?: number; next_retry_ns?: number | null; last_error?: string | null; callback_available?: boolean };
+    handler_registry?: unknown;
+    queue_summary?: unknown;
   };
   execution?: {
     available?: boolean; active_executions?: number; active_lifecycle_leases?: number; faulted?: boolean;
@@ -155,12 +162,22 @@ function state(value: unknown, scope: AccountScope): RuntimeControlState {
   if (!object(value) || value.schema_version !== 'skeleton.ai.runtime_control.v1' || !Number.isSafeInteger(value.policy_version) || Number(value.policy_version) < 1
     || !object(value.serving) || !object(value.learning) || !object(value.maintenance) || !object(value.ratchet) || typeof value.ratchet.available !== 'boolean') invalid('The runtime control response is incomplete or uses an unsupported version.');
   if (identity(value.actor_id) !== scope.principalId || identity(value.tenant_id) !== scope.tenantId) throw new ChatClientError('The runtime observation belongs to another account. Refresh the current session.', { kind: 'authorization', code: 'runtime_scope_mismatch', retryable: false });
+  // These optional projections never participate in control/authority checks.
+  // Their bounded renderers reject malformed metadata locally so a broken
+  // explanation cannot disable otherwise valid recovery or policy controls.
+  const displayOnly = new WeakMap<object, Set<string>>();
+  const diagnostics = (owner: unknown, keys: string[]) => { if (object(owner)) displayOnly.set(owner, new Set(keys)); };
+  diagnostics(value.serving, ['execution_contract', 'execution_contract_error']);
+  if (Array.isArray(value.serving.models)) value.serving.models.forEach(row => diagnostics(row, ['execution_contract', 'execution_contract_error']));
+  if (Array.isArray(value.learning.partitions)) value.learning.partitions.forEach(row => diagnostics(row, ['reference_explanation']));
+  diagnostics(value.maintenance, ['handler_registry', 'queue_summary']);
+  if (Array.isArray(value.maintenance.recent_tasks)) value.maintenance.recent_tasks.forEach(row => diagnostics(row, ['scheduling']));
   let nodes = 0;
   const bounded = (item: unknown, depth: number): void => {
     if (++nodes > 12000 || depth > 12) invalid('The runtime observation exceeds its supported bounds.');
     if (typeof item === 'number' && !Number.isFinite(item) || typeof item === 'string' && item.length > 4096) invalid('The runtime observation contains invalid telemetry.');
     if (Array.isArray(item)) { if (item.length > 256) invalid('The runtime observation contains too many records.'); item.forEach(child => bounded(child, depth + 1)); }
-    else if (object(item)) Object.values(item).forEach(child => bounded(child, depth + 1));
+    else if (object(item)) Object.entries(item).forEach(([key, child]) => { if (!displayOnly.get(item)?.has(key)) bounded(child, depth + 1); });
   };
   bounded(value, 0);
   for (const section of [value.serving, value.learning, value.maintenance]) {

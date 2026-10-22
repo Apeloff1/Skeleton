@@ -263,6 +263,10 @@ permitted context when a source has been withdrawn.
 
 ## Adaptive runtime and maintenance
 
+For bounded chat/studio/capture starters, local execution limits and recovery from
+conflicting or malformed component results, see
+[AI workflow foundations and recovery](AI_FOUNDATIONS_AND_RECOVERY.md).
+
 In Jeeves chat, expand the AI conversation status bar to open **Runtime
 optimization**. The panel reports current capacity, queue pressure, derived cache,
 tenant learning partitions and maintenance tasks. It refreshes while visible and

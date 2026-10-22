@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from skeleton.compat.datetime_utc import UTC
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from uuid import NAMESPACE_URL, uuid5
 
 from skeleton.contracts.ai_execution import (
@@ -2101,6 +2101,7 @@ class SQLiteExecutionRepository:
             return None
         state = None
         binding_differs = False
+        integrity_verified = False
         try:
             raw = row["state_json"]
             if not isinstance(raw, str) or len(raw) > learning.MAX_STATE_BYTES:
@@ -2120,12 +2121,17 @@ class SQLiteExecutionRepository:
                 raise learning.RuntimeLearningError("optimizer activation binding differs")
             if learning.digest(state) != row["state_digest"]:
                 raise learning.RuntimeLearningError("optimizer digest differs")
+            integrity_verified = True
             learning.validate_state(state)
             learning.upgrade_state(state)
             state["provenance"].update({"partition_id": row["partition_id"], "model_selection_digest": row["model_selection_digest"]})
             return state
         except (ExecutionRepositoryCorruption, ValueError, TypeError, RecursionError, OverflowError) as exc:
-            if not binding_differs:
+            # A checkpoint inside the same damaged JSON is not an independent
+            # trust anchor. Salvage numeric state only after the complete row
+            # passed its stored integrity binding; otherwise quarantine and
+            # recover later from canonical terminal feedback.
+            if integrity_verified and not binding_differs:
                 try:
                     recovered = learning.recover_last_healthy(state, seed=seed, policy=learning.normalize_policy(), reason=f"persisted_optimizer:{type(exc).__name__}")
                     recovered["provenance"].update({"partition_id": row["partition_id"], "model_selection_digest": row["model_selection_digest"]})
@@ -2188,6 +2194,53 @@ class SQLiteExecutionRepository:
                 return None
             return min(float(learning.MAX_COUNTER), max(0.0, (instant - observed).total_seconds()))
         except (ExecutionRepositoryError, ValueError, TypeError, ArithmeticError):
+            return None
+
+    @staticmethod
+    def _bind_learning_explanation(
+        explanation: object,
+        *,
+        identity: Mapping[str, Any],
+        row: sqlite3.Row | None,
+        configuration: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        """Attach actual persisted scope/version pins to an ephemeral diagnostic."""
+        if explanation is None or row is None:
+            return None
+        try:
+            if (
+                not isinstance(explanation, dict)
+                or explanation.get("schema_version") != learning.EXPLANATION_SCHEMA
+            ):
+                return None
+            body = dict(explanation)
+            body["binding"] = {
+                "tenant_id": identity["tenant_id"],
+                "scope_id": identity["scope_id"],
+                "partition_id": learning._sha(identity["partition_id"], "explanation partition"),
+                "model_selection_digest": learning._sha(
+                    identity["model_selection_digest"], "explanation model"
+                ),
+                "state_version": learning._integer(
+                    row["version"], "explanation state version", 1, learning.MAX_COUNTER
+                ),
+                "stored_state_digest": learning._sha(row["state_digest"], "explanation stored state digest"),
+                "learning_policy_version": learning._integer(
+                    configuration["version"], "explanation policy version", 1, learning.MAX_COUNTER
+                ),
+                "learning_policy_digest": learning.digest(configuration["policy"]),
+            }
+            if body.get("policy_digest") != body["binding"]["learning_policy_digest"]:
+                return None
+            body["explanation_digest"] = learning.digest(
+                {key: value for key, value in body.items() if key != "explanation_digest"}
+            )
+            if len(learning.canonical(body).encode("utf-8")) > learning.MAX_EXPLANATION_BYTES:
+                return None
+            return body
+        except (KeyError, TypeError, learning.RuntimeLearningError):
+            # An unavailable optional projection cannot grant confidence or
+            # change canonical state, and must not hide the owner diagnostics.
             return None
 
     @staticmethod
@@ -2627,8 +2680,13 @@ class SQLiteExecutionRepository:
                 if any(row[name] != identity[name] for name in ("tenant_id", "scope_id", "partition_id", "model_selection_digest")):
                     raise ExecutionRepositoryError("imported replay scope/activation differs")
                 observation = _json_object(row["observation_json"], "learning import outcome")
-                if learning.digest(observation) != row["observation_digest"] or observation.get("trainable") is not True or not bool(row["trained"]):
+                if (
+                    learning.digest(observation) != row["observation_digest"]
+                    or observation.get("trainable") is not True
+                    or row["trained"] != 1
+                ):
                     raise ExecutionRepositoryCorruption("imported replay canonical provenance differs")
+                self._validate_retained_learning_provenance_locked(row, observation, identity)
                 outcomes[row["outcome_id"]] = observation
             for missing in set(sample_ids) - set(outcomes):
                 marker = self._connection.execute(
@@ -2637,7 +2695,7 @@ class SQLiteExecutionRepository:
                 ).fetchone()
                 if marker is None or any(marker["learning_" + name] != identity[name] for name in ("tenant_id", "scope_id", "partition_id", "model_selection_digest")):
                     raise ExecutionRepositoryError("imported replay requires existing canonical feedback provenance")
-                if not bool(marker["learning_trained"]):
+                if marker["learning_trained"] != 1:
                     raise ExecutionRepositoryError("imported replay was not accepted by its original learning policy")
                 outcomes[missing] = self._observation_from_learning_marker_locked(marker)
             for sample in samples:
@@ -2665,6 +2723,60 @@ class SQLiteExecutionRepository:
                 ).fetchone()
                 if found is None:
                     raise ExecutionRepositoryError("imported source fingerprint has no canonical provenance")
+
+    def _validate_retained_learning_provenance_locked(
+        self, outcome: sqlite3.Row, observation: dict[str, Any], identity: sqlite3.Row
+    ) -> None:
+        """Bind retained diagnostic replay to canonical metadata, without payload reads.
+
+        Derived JSON and its neighboring digest are one projection. An import
+        must also match the canonical terminal feedback acceptance and original
+        execution identities. Only older rows without markers need the existing
+        bounded canonical backfill before they can establish this binding.
+        """
+        query = """SELECT r.result_digest, r.learning_outcome_id, r.learning_observation_digest,
+                          r.learning_trained, r.learning_status, r.learning_tenant_id,
+                          r.learning_scope_id, r.learning_partition_id,
+                          r.learning_model_selection_digest, r.learning_source_snapshot_digest,
+                          s.identity_digest AS canonical_request_digest
+                   FROM ai_execution_result r
+                   LEFT JOIN ai_execution_state s
+                     ON s.namespace = r.namespace AND s.execution_id = r.execution_id
+                   WHERE r.namespace = ? AND r.execution_id = ?"""
+        parameters = (self.namespace, outcome["execution_id"])
+        marker = self._connection.execute(query, parameters).fetchone()
+        if marker is not None and marker["learning_outcome_id"] is None:
+            if not self._backfill_learning_marker_locked(outcome):
+                raise ExecutionRepositoryCorruption("imported legacy replay lacks canonical feedback")
+            marker = self._connection.execute(query, parameters).fetchone()
+        if (
+            marker is None
+            or marker["learning_outcome_id"] != outcome["outcome_id"]
+            or observation.get("outcome_id") != outcome["outcome_id"]
+            or observation.get("execution_id") != outcome["execution_id"]
+            or marker["learning_trained"] != 1
+            or marker["learning_status"] != outcome["learning_status"]
+            or marker["canonical_request_digest"] != observation.get("request_digest")
+            or marker["canonical_request_digest"] != outcome["request_digest"]
+            or marker["result_digest"] != observation.get("result_digest")
+            or marker["result_digest"] != outcome["result_digest"]
+            or marker["learning_observation_digest"]
+            != learning.digest(self._learning_observation_base(observation))
+        ):
+            raise ExecutionRepositoryCorruption("retained replay differs from canonical feedback")
+        for name in ("tenant_id", "scope_id", "partition_id", "model_selection_digest"):
+            if observation.get(name) != identity[name] or marker["learning_" + name] != identity[name]:
+                raise ExecutionRepositoryCorruption("retained replay canonical scope/activation differs")
+        if (
+            observation.get("task_class") != identity["task_class"]
+            or outcome["task_class"] != identity["task_class"]
+        ):
+            raise ExecutionRepositoryCorruption("retained replay canonical task differs")
+        if (
+            observation.get("source_snapshot_digest") != outcome["source_snapshot_digest"]
+            or marker["learning_source_snapshot_digest"] != outcome["source_snapshot_digest"]
+        ):
+            raise ExecutionRepositoryCorruption("retained replay canonical source differs")
 
     def _mutate_learning_checkpoint(
         self, *, tenant_id: str, scope_id: str, partition_id: str, expected_version: int,
@@ -2810,6 +2922,18 @@ class SQLiteExecutionRepository:
             for row in rows:
                 seed = f"{self.namespace}:{tenant_id}:{scope_id}:{row['partition_id']}"
                 state = self._learning_state_locked(row, seed=seed)
+                readiness = learning.state_readiness(
+                    state,
+                    policy,
+                    observed_age_seconds=self._learning_observation_age(state, now=instant),
+                    include_reference_explanation=True,
+                )
+                readiness["reference_explanation"] = self._bind_learning_explanation(
+                    readiness.get("reference_explanation"),
+                    identity=dict(row),
+                    row=row,
+                    configuration=configuration,
+                )
                 partitions.append(
                     {
                         "partition_id": row["partition_id"],
@@ -2818,11 +2942,7 @@ class SQLiteExecutionRepository:
                         "state_version": int(row["version"]),
                         "last_observed_at": row["last_observed_at"] or row["updated_at"],
                         "last_updated_at": row["updated_at"],
-                        **learning.state_readiness(
-                            state,
-                            policy,
-                            observed_age_seconds=self._learning_observation_age(state, now=instant),
-                        ),
+                        **readiness,
                     }
                 )
             recent_rows = self._connection.execute(
@@ -3340,6 +3460,12 @@ class SQLiteExecutionRepository:
                     pressure=pressure,
                     source_snapshot_digest=identity["source_snapshot_digest"] or None,
                     observed_age_seconds=self._learning_observation_age(state),
+                )
+                result["explanation"] = self._bind_learning_explanation(
+                    result.get("explanation"),
+                    identity=identity,
+                    row=row,
+                    configuration=configuration,
                 )
                 return {**result, **identity, "policy_version": configuration["version"],
                     "state_version": 0 if row is None else int(row["version"])}

@@ -808,6 +808,7 @@
     },
     "session_adapter": "skeleton/app/local_ai.py",
     "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx mounts authenticated RuntimeOptimizationPanel: exact model controls, actual server policy field catalog, bounded tenant learner checkpoint and numeric dataset export, maintenance retry/circuit reset and worker coordination. Explicit admin mutations preserve CAS/failure/source pins and durable audit; frontend owns no provider execution or policy authority.",
-    "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred"
+    "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred",
+    "studio_foundation_surfaces": "Existing chat/studio/crawler forms consume authenticated bounded draft-only workflow templates; RuntimeOptimizationPanel projects activated local execution limits, scoped operational predictor explanations and observed maintenance queue/handler/task blockers. Existing owner validation, grants, canonical receipts and physical-custody recovery remain authoritative."
   }
 }

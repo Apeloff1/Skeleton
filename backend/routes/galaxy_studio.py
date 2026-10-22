@@ -40,9 +40,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, AliasChoices
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 from core.http_errors import internal_http_error
 from typing import Optional, Union
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import uuid, os, json, zipfile, tempfile, subprocess, shutil
+import time as _build_clock
 import asyncio  # module-level (used by background build + expansion launchers)
 
 load_dotenv()
@@ -227,8 +228,16 @@ async def _save_build(build):
         # `files` is the big blob; `_gen_cache` holds per-batch copies of the
         # same files; `_code_refs` holds 40 code snippets; `_nv_samples` and
         # `_gk_samples` are big narrative vault dumps. All regenerable.
-        _heavy = {"files", "_gen_cache", "_code_refs", "_nv_samples",
-                  "_gk_samples", "_swarm_transcript", "_swarm_discourse"}
+        _heavy = {
+            "files",
+            "_gen_cache",
+            "_code_refs",
+            "_nv_samples",
+            "_gk_samples",
+            "_swarm_transcript",
+            "_swarm_discourse",
+            "_bg_deadline_monotonic",
+        }
         save_doc = {k: v for k, v in build.items() if k not in _heavy}
         save_doc["_files_saved_separately"] = True
         save_doc["_file_count_at_save"] = len(build.get("files", {}))
@@ -252,8 +261,9 @@ async def _save_build(build):
             _cs.heat_touch("galaxy_builds", hydrate=False)
         except Exception:
             pass
+        return True
     except Exception as e:
-        # Log but don't raise — in-memory copy is still valid, watchdog will retry.
+        # Callers that dispatch physical work require an acknowledged metadata write.
         msg = str(e)
         if "too large" in msg.lower() or "bson" in msg.lower():
             # BSON size fallback: save a minimal metadata-only copy
@@ -271,17 +281,22 @@ async def _save_build(build):
                     "_bg_status": build.get("_bg_status"),
                     "_bg_started": build.get("_bg_started"),
                     "_bg_current_batch": build.get("_bg_current_batch", 0),
+                    "_bg_last_batch_completed": build.get("_bg_last_batch_completed", 0),
                     "_bg_target_duration": build.get("_bg_target_duration", 15),
                     "_bg_total_batches": build.get("_bg_total_batches", 10),
                     "completed_at": build.get("completed_at"),
                     # Preserve phase status list (just id + status) so /status
                     # after a reload still reports completed_phases correctly.
                     "phases": [
-                        {"id": p.get("id"), "name": p.get("name"),
-                         "batch": p.get("batch"), "agents": p.get("agents"),
-                         "status": p.get("status", "pending"),
-                         "completed_at": p.get("completed_at"),
-                         "pct": p.get("pct", 0)}
+                        {
+                            "id": p.get("id"),
+                            "name": p.get("name"),
+                            "batch": p.get("batch"),
+                            "agents": p.get("agents"),
+                            "status": p.get("status", "pending"),
+                            "completed_at": p.get("completed_at"),
+                            "pct": p.get("pct", 0),
+                        }
                         for p in (build.get("phases") or [])
                     ][:120],
                     "total_agents": build.get("total_agents", 0),
@@ -290,16 +305,23 @@ async def _save_build(build):
                     "_bg_errors": (build.get("_bg_errors") or [])[-10:],
                     "_bg_retries": build.get("_bg_retries", 0),
                     "_bg_fallbacks": build.get("_bg_fallbacks", 0),
+                    "_bg_stop_requested": build.get("_bg_stop_requested", False),
+                    "_bg_stop_reason": build.get("_bg_stop_reason"),
+                    "_bg_stop_target": build.get("_bg_stop_target"),
+                    "_bg_drain_pending": build.get("_bg_drain_pending", False),
+                    "_vault_write_failed": build.get("_vault_write_failed", False),
+                    "_bg_partial_artifacts": build.get("_bg_partial_artifacts", False),
                     "_minimal_save": True,
                 }
                 await _db.galaxy_builds.update_one(
                     {"build_id": build["build_id"]}, {"$set": minimal}, upsert=True,
                 )
                 print(f"[GALAXY _save_build] fell back to MINIMAL save for {build.get('build_id')}")
-                return
+                return True
             except Exception as e2:
                 print(f"[GALAXY _save_build] minimal save also failed: {e2}")
-        print(f"[GALAXY _save_build] WARN: {e}")
+        print(f"[GALAXY _save_build] WARN: {type(e).__name__}")
+        return False
 
 def _normalize_build(doc: dict) -> dict:
     """Backfill required lifecycle keys on a build dict so the build pipeline
@@ -388,45 +410,26 @@ async def _load_build(build_id: str):
 # Env-configurable — drop lower on constrained pods, raise on beefy ones.
 _VAULT_FLUSH_THRESHOLD = int(os.environ.get("GALAXY_FLUSH_EVERY", "300"))
 
-def _flush_to_vault(build: dict, force: bool = False,
-                    threshold: int = _VAULT_FLUSH_THRESHOLD) -> int:
-    """Move build['files'] out of RAM into the compressed build vault.
 
-    Returns number of files flushed. Safe to call from any thread
-    (build_vault uses a per-build lock). Non-fatal on failure.
+def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FLUSH_THRESHOLD) -> int:
+    """Persist a bounded pending file set; a failed write stops more generation.
 
-    ★ THREAD-SAFE SWAP (2026-04-21) ★
-    Multiple batches/threads may be producing files into the same
-    `build["files"]` dict simultaneously. We atomically swap in an empty
-    dict BEFORE iterating, so the snapshot we hand to append_files can't
-    be mutated by another thread mid-flight.
+    Keep the detached pending files available on failure. They are not silently
+    discarded or enlarged by an unbounded fallback after durable storage fails.
     """
+    files = build.get("files") or {}
+    if not files or not force and len(files) < threshold:
+        return 0
+    bid = build.get("build_id")
+    if not bid:
+        raise GalaxyBuildStopped("build_identity_missing")
+    if build.get("_vault_write_failed"):
+        raise GalaxyBuildStopped(str(build.get("_bg_stop_reason") or "vault_write_failed"))
+    snapshot = files
+    build["files"] = {}
     try:
-        files = build.get("files") or {}
-        if not files:
-            return 0
-        if not force and len(files) < threshold:
-            return 0
-        bid = build.get("build_id")
-        if not bid:
-            return 0
-        # Atomic swap — replace build["files"] with a fresh empty dict BEFORE
-        # we walk the old one. Other threads that were about to mutate now
-        # write into the new dict, leaving `snapshot` immutable from our POV.
-        snapshot = files
-        build["files"] = {}
-        # Copy once to a concrete list-backed dict so any lingering refs
-        # can't surface us the "dict changed size during iteration" error.
-        try:
-            stable = dict(snapshot)
-        except RuntimeError:
-            # Extremely rare race — rebuild from items iterator with guard
-            stable = {}
-            for k, v in list(snapshot.items()):
-                stable[k] = v
         from core import build_vault as _bv
-        res = _bv.append_files(bid, stable)
-        # file_count = authoritative vault total (prevents double-count)
+        res = _bv.append_files(bid, dict(snapshot))
         build["file_count"] = int(res.get("file_count", 0))
         build["_vault_active"] = True
         build["_vault_file_count"] = int(res.get("file_count", 0))
@@ -434,9 +437,12 @@ def _flush_to_vault(build: dict, force: bool = False,
             res.get("compressed_bytes", 0)
         )
         return int(res.get("appended", 0))
-    except Exception as _e:
-        print(f"[GALAXY][vault] flush failed (non-fatal): {_e}")
-        return 0
+    except Exception as exc:
+        snapshot.update(build.get("files") or {})
+        build["files"] = snapshot
+        build["_vault_write_failed"] = True
+        _mark_build_stop(build, "vault_write_failed")
+        raise GalaxyBuildStopped("vault_write_failed") from exc
 
 
 def _vault_total_files(build: dict) -> int:
@@ -449,7 +455,6 @@ def _vault_total_files(build: dict) -> int:
     except Exception:
         pass
     return len(build.get("files") or {})
-
 
 
 # Frontend ships humanised complexity values; map them to ints 0-10.
@@ -634,7 +639,7 @@ class AdvanceRequest(BaseModel):
 
 class StartBuildRequest(BaseModel):
     build_id: str
-    build_duration_minutes: int = 15  # Total build time target
+    build_duration_minutes: int = Field(default=15, ge=1, le=60, strict=True)
     # ═══ v7 Galaxy Studio Settings — per-category emphasis weights (0.0-3.0) ═══
     # Each weight scales file output for phases in that category.
     # 0.0 = skip category, 1.0 = default, 2.0 = double, 3.0 = triple.
@@ -663,8 +668,6 @@ class ZipToApkRequest(BaseModel):
 # /expand keep their original call sites.
 # ═══════════════════════════════════════════════════════════════════════
 from routes.galaxy_studio_scale import _parse_scale, _scale_label
-
-
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -756,6 +759,7 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
     print(f"[GALAXY] ═══ BATCH {batch_num}/10: {batch_name} — Processing {len(phase_ids)} phases ═══")
 
     for phase_id in phase_ids:
+        _check_build_resources(build)
         MAX_RETRIES = 3
         last_error = None
         phase_success = False
@@ -766,33 +770,23 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
                 _pt_start = _pt.time()
                 print(f"[GALAXY] B{batch_num} phase START: {phase_id} (attempt {attempt})", flush=True)
                 phase_files = _call_phase_func(phase_id, build)
+                _check_build_continuation(build)
                 _pt_dt = _pt.time() - _pt_start
                 print(f"[GALAXY] B{batch_num} phase DONE : {phase_id} in {_pt_dt:.2f}s files={len(phase_files) if phase_files else 0}", flush=True)
                 if phase_files and len(phase_files) > 0:
                     batch_files.update(phase_files)
-                    # Incrementally merge into build so /status shows live progress
-                    try:
-                        if "files" not in build or not isinstance(build.get("files"), dict):
-                            build["files"] = {}
-                        build["files"].update(phase_files)
-                        build["file_count"] = len(build["files"])
-                        # Mark this phase completed so the UI progress bar moves
-                        _pi = _PHASE_INDEX_MAP.get(phase_id, -1)
-                        if 0 <= _pi < len(build.get("phases", [])):
-                            build["phases"][_pi]["status"] = "completed"
-                            build["phases"][_pi]["completed_at"] = datetime.utcnow().isoformat()
-                            # Advance current_phase marker past this one
-                            build["current_phase"] = max(build.get("current_phase", 0), _pi + 1)
-                        # ── Vault flush (RAM-bounded): stream files to disk
-                        #    so we never hold more than ~1500 files in RAM.
-                        try:
-                            _flush_to_vault(build)
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
+                    # Keep partial output available for the owner to retain
+                    # on failure. Flush the batch once: vault counts describe
+                    # appended records, so re-appending each phase here would
+                    # double-count the same generated paths.
+                    if not isinstance(build.get("files"), dict):
+                        build["files"] = {}
+                    build["files"].update(phase_files)
+                    _check_build_resources(build)
                     phase_success = True
                     break
+            except GalaxyBuildStopped:
+                raise
             except Exception as e:
                 import traceback, time as _time
                 last_error = "phase_failed"
@@ -803,15 +797,12 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
                     _time.sleep(backoff)
 
         if not phase_success:
-            # Fallback for this specific phase
-            phase_name = phase_id
-            for p in BUILD_PHASES:
-                if p["id"] == phase_id:
-                    phase_name = p["name"]
-                    break
-            print(f"[GALAXY] Phase '{phase_id}' in batch {batch_num} ALL RETRIES FAILED. Fallback.")
-            fallback = _generate_fallback_files(batch_num, t, g, phase_name, last_error)
-            batch_files.update(fallback)
+            _check_build_continuation(build)
+            build.setdefault("_bg_errors", []).append(
+                {"batch": batch_num, "phase": phase_id, "error": "phase_generation_failed"}
+            )
+            build["_bg_errors"] = build["_bg_errors"][-100:]
+            raise GalaxyBuildStopped("phase_generation_failed")
 
         # Cooperative GIL release between phases — this batch runs CPU-bound in
         # a worker thread; handing the GIL back here keeps the asyncio event
@@ -859,6 +850,7 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         }
         build["_gen_cache"][cache_key] = marker
         return marker
+    _check_build_continuation(build)
     if batch_files:
         if len(batch_files) > BATCH_CAP:
             batch_files = dict(list(batch_files.items())[:BATCH_CAP])
@@ -875,11 +867,9 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         try:
             from datetime import datetime as _dt
             build["_bg_last_heartbeat"] = _dt.utcnow().isoformat()
-            build["_bg_last_batch_completed"] = batch_num
         except Exception:
             pass
     return batch_files
-
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1697,7 +1687,6 @@ def _build_description_block(title: str, genre: str, vision: str, systems: str, 
     return "\n".join(parts)
 
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # UNIVERSAL CODE AMPLIFIER — Ensures EVERY file reaches 30,000+ lines / 1MB+
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1842,87 +1831,100 @@ def _create_build(title: str, genre: str, subgenre: str, description: str, compl
 
 
 async def _advance_build(build_id: str) -> dict:
-    """Advance to next BATCH (10 phases at once). 
-    Each call processes one full batch (10 phases).
-    Only 10 advances needed to complete the entire 100-phase build."""
+    """Generate one durable batch under the same physical admission rules."""
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
-        
-
-
-
-    current_phase_idx = build.get("current_phase", 0)
-    total_phases = len(BUILD_PHASES)
-
-    if current_phase_idx >= total_phases:
-        build["status"] = "completed"
+    if _build_has_live_work(build_id):
+        raise HTTPException(409, "Build already owns live work; poll its status.")
+    if _any_build_has_live_work():
+        raise HTTPException(429, "Another build owns the generation slot.")
+    if build.get("_bg_stop_requested"):
+        raise HTTPException(409, "Build was stopped; explicitly start it to resume generation.")
+    current_phase_idx = max(0, int(build.get("current_phase", 0)))
+    phases = build.get("phases") or []
+    if current_phase_idx >= len(BUILD_PHASES):
+        if phases and all(phase.get("status") == "completed" for phase in phases):
+            return build
+        raise HTTPException(409, "Build progress has no verified completed phase set.")
+    current_batch = BUILD_PHASES[current_phase_idx]["batch"]
+    owner = asyncio.current_task()
+    _active_runners.add(build_id)
+    _background_tasks[build_id] = owner
+    build["status"] = "building"
+    build["_bg_status"] = "running"
+    build["_bg_current_batch"] = current_batch
+    build["_bg_started"] = datetime.utcnow().isoformat()
+    build["_bg_last_heartbeat"] = build["_bg_started"]
+    build["_bg_deadline_monotonic"] = _build_clock.monotonic() + 180.0
+    try:
+        await _await_build_io(build, _check_build_resources, build)
+        await _save_build_required(build)
+        future = _track_build_future(
+            build_id, _WORKER_POOL.submit(_safe_generate_batch, build_id, current_batch)
+        )
+        batch, files, error = await _await_build_future(build, future)
+        if batch != current_batch or error or not isinstance(files, dict) or not files:
+            raise GalaxyBuildStopped(error or "batch_empty_output")
+        build.setdefault("files", {}).update(files)
+        await _await_build_io(build, _flush_to_vault, build, True)
+        files.clear()
+        build.get("_gen_cache", {}).pop(f"batch_{current_batch}", None)
+        _check_build_continuation(build)
+        phase_ids = BUILD_BATCHES.get(current_batch, [])
+        for phase_id in phase_ids:
+            index = _PHASE_INDEX_MAP.get(phase_id, -1)
+            if 0 <= index < len(phases):
+                phases[index]["status"] = "completed"
+                phases[index]["completed_at"] = datetime.utcnow().isoformat()
+        build["current_phase"] = (
+            max((_PHASE_INDEX_MAP.get(pid, 0) for pid in phase_ids), default=current_phase_idx) + 1
+        )
+        build["_bg_last_batch_completed"] = current_batch
+        build.setdefault("_bg_phase_log", []).append(
+            {
+                "batch": current_batch,
+                "status": "success",
+                "source": "worker",
+                "completed_at": datetime.utcnow().isoformat(),
+                "file_count": build["file_count"],
+            }
+        )
+        if (
+            build["current_phase"] >= len(BUILD_PHASES)
+            and phases
+            and all(phase.get("status") == "completed" for phase in phases)
+        ):
+            build["status"] = "completed"
+            build["_bg_status"] = "completed"
+            build["completed_at"] = datetime.utcnow().isoformat()
+        else:
+            build["_bg_status"] = "manual"
+        await _save_build_required(build)
         return build
-
-    # Determine current batch number from the current phase
-    current_batch = BUILD_PHASES[current_phase_idx]["batch"] if current_phase_idx < total_phases else TOTAL_BATCHES
-    batch_name = BATCH_NAMES.get(current_batch, f"Batch {current_batch}")
-    batch_phase_ids = BUILD_BATCHES.get(current_batch, [])
-
-    print(f"[GALAXY] ═══ ADVANCING: Batch {current_batch}/10 ({batch_name}) — {len(batch_phase_ids)} phases ═══")
-
-    # Mark all phases in this batch as completed
-    for phase_id in batch_phase_ids:
-        idx = _PHASE_INDEX_MAP.get(phase_id, -1)
-        if 0 <= idx < len(build["phases"]):
-            build["phases"][idx]["status"] = "completed"
-            build["phases"][idx]["started_at"] = datetime.utcnow().isoformat()
-            build["phases"][idx]["completed_at"] = datetime.utcnow().isoformat()
-            # Track synergy activations
-            phase_synergies = _get_phase_synergies(phase_id)
-            build["synergy_activations"].append({
-                "phase": phase_id,
-                "links_activated": len(phase_synergies),
-                "synergies": phase_synergies,
-            })
-
-    # Sum agents for the batch
-    batch_agents = sum(p["agents"] for p in BUILD_PHASES if p["batch"] == current_batch)
-    build["agents_active"] = batch_agents
-
-    # ═══ GENERATE ALL FILES FOR THIS BATCH WITH REDUNDANCY ═══
-    MAX_BATCH_RETRIES = 3
-    batch_success = False
-    for batch_attempt in range(1, MAX_BATCH_RETRIES + 1):
+    except asyncio.CancelledError:
+        _mark_build_stop(build, "runner_cancelled", failed=False)
+        raise
+    except Exception as exc:
+        reason = exc.reason if isinstance(exc, GalaxyBuildStopped) else "batch_generation_failed"
+        _mark_build_stop(build, reason)
+        raise HTTPException(503, f"Build stopped: {reason}. Partial artifacts are retained.") from None
+    finally:
+        build["_bg_drain_pending"] = _physical_build_workers(build_id) > 0
+        await _drain_build_workers(build_id)
+        build["_bg_drain_pending"] = False
+        build.pop("_bg_deadline_monotonic", None)
+        if build.get("_bg_stop_requested"):
+            build["_gen_cache"] = {}
+            build["status"] = build.get("_bg_stop_target", "failed")
+            build["_bg_status"] = build["status"]
+            build["_bg_partial_artifacts"] = bool(build.get("_vault_active") or build.get("files"))
         try:
-            new_count = _run_batch_for_phase(build, current_batch)
-            batch_success = True
-            break
-        except Exception:
-            import traceback, time as _time
-            traceback.print_exc()
-            print(f"[GALAXY] Batch {current_batch} attempt {batch_attempt}/{MAX_BATCH_RETRIES} failed")
-            if batch_attempt < MAX_BATCH_RETRIES:
-                await asyncio.sleep(0.3 * batch_attempt)
-
-    if not batch_success:
-        print(f"[GALAXY] Batch {current_batch} ALL RETRIES FAILED, generating batch fallback")
-        for phase_id in batch_phase_ids:
-            phase_name = phase_id
-            for p in BUILD_PHASES:
-                if p["id"] == phase_id:
-                    phase_name = p["name"]
-                    break
-            fallback = _generate_fallback_files(current_batch, build["title"], build["genre"], phase_name, "batch_advance retry exhausted")
-            build["files"].update(fallback)
-        build["file_count"] = len(build["files"])
-
-    # Advance current_phase past ALL phases in this batch
-    # Find the last phase index in this batch
-    last_phase_idx = max((_PHASE_INDEX_MAP.get(pid, 0) for pid in batch_phase_ids), default=current_phase_idx) + 1
-    build["current_phase"] = last_phase_idx
-
-    if build.get("current_phase", 0) >= total_phases:
-        build["status"] = "completed"
-        build["completed_at"] = datetime.utcnow().isoformat()
-        build["file_count"] = len(build["files"])
-
-    return build
+            await _save_build(build)
+        finally:
+            _active_runners.discard(build_id)
+            if _background_tasks.get(build_id) is owner:
+                _background_tasks.pop(build_id, None)
 
 
 def _get_phase_synergies(phase_id: str) -> list:
@@ -2257,7 +2259,7 @@ async def advance_build(req: AdvanceRequest):
     idx = build.get("current_phase", 0)
     completed_phases = [p for p in build["phases"] if p["status"] == "completed"]
     current = build["phases"][idx] if idx < len(build["phases"]) else build["phases"][-1]
-    
+
     # Determine current batch
     current_batch = (idx // PHASES_PER_BATCH) + 1 if idx < len(BUILD_PHASES) else TOTAL_BATCHES
     batch_name = BATCH_NAMES.get(min(current_batch, TOTAL_BATCHES), "Complete")
@@ -2281,15 +2283,66 @@ async def advance_build(req: AdvanceRequest):
 
 # ═══════════════════════════════════════════════════════════════════════
 # BACKGROUND BUILD — 10-batch architecture (100 phases in 10 steps)
-# Each batch processes 10 phases. Triple-retry per batch with fallback.
+# Each batch processes 10 phases; only durable results advance completion.
 # Frontend polls GET /status/{build_id} on interval. No rapid POST calls.
 # ═══════════════════════════════════════════════════════════════════════
 _background_tasks: dict = {}
 
-# ═══ WORKER THREAD POOL — Multi-parsed parallel batch generation ═══
-# 8 CPU-bound workers pre-generate all 10 batches concurrently while the
-# serial timing loop drip-feeds progress to the UI. This cuts real compute
-# time by up to 8x while preserving the 15-min UX pacing.
+
+class GalaxyBuildStopped(RuntimeError):
+    """An actual build boundary stopped dispatch; partial artifacts are retained."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _mark_build_stop(build: dict, reason: str, *, failed: bool = True) -> None:
+    if not build.get("_bg_stop_requested"):
+        build["_bg_stop_reason"] = reason
+        build["_bg_stop_target"] = "failed" if failed else "cancelled"
+    build["_bg_stop_requested"] = True
+    build["_bg_status"] = "stopping"
+    build["_bg_error"] = build.get("_bg_stop_reason", reason)
+
+
+def _check_build_continuation(build: dict) -> None:
+    if build.get("_bg_stop_requested"):
+        raise GalaxyBuildStopped(str(build.get("_bg_stop_reason") or "build_stopped"))
+    deadline = build.get("_bg_deadline_monotonic")
+    if isinstance(deadline, (int, float)) and _build_clock.monotonic() >= deadline:
+        _mark_build_stop(build, "build_deadline_exceeded")
+        raise GalaxyBuildStopped("build_deadline_exceeded")
+
+
+def _check_build_resources(build: dict) -> None:
+    """Blocking resource probes run in workers, never on the async loop."""
+    _check_build_continuation(build)
+    if _memory_check("build admission") == "hard":
+        _mark_build_stop(build, "memory_limit_reached")
+        raise GalaxyBuildStopped("memory_limit_reached")
+    location = os.path.abspath(VAULT_DIR)
+    while not os.path.isdir(location) and location != os.path.dirname(location):
+        location = os.path.dirname(location)
+    try:
+        if shutil.disk_usage(location).free < 64 * 1024 * 1024:
+            raise OSError("artifact storage headroom exhausted")
+    except OSError:
+        _mark_build_stop(build, "artifact_storage_unavailable")
+        build["_vault_write_failed"] = True
+        raise GalaxyBuildStopped("artifact_storage_unavailable") from None
+    _check_build_continuation(build)
+
+
+async def _save_build_required(build: dict) -> None:
+    if await _save_build(build) is not True:
+        _mark_build_stop(build, "build_metadata_unavailable")
+        raise GalaxyBuildStopped("build_metadata_unavailable")
+
+
+# ═══ WORKER THREAD POOL — admitted physical generation and vault I/O ═══
+# The owner submits one generation result at a time and retains its native
+# future through cancellation. Extra pool capacity also serves vault I/O.
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, Future
 import threading
 
@@ -2306,6 +2359,104 @@ _worker_stats = {
     "max_workers": _MAX_WORKERS,
 }
 _worker_lock = threading.Lock()
+_build_worker_futures: dict[str, set[Future]] = {}
+
+
+def _track_build_future(build_id: str, future: Future) -> Future:
+    with _worker_lock:
+        _build_worker_futures.setdefault(build_id, set()).add(future)
+
+    def settled(done: Future) -> None:
+        with _worker_lock:
+            pending = _build_worker_futures.get(build_id)
+            if pending is not None:
+                pending.discard(done)
+                if not pending:
+                    _build_worker_futures.pop(build_id, None)
+
+    future.add_done_callback(settled)
+    return future
+
+
+def _physical_build_workers(build_id: str) -> int:
+    with _worker_lock:
+        return sum(not future.done() for future in _build_worker_futures.get(build_id, ()))
+
+
+def _build_has_live_work(build_id: str) -> bool:
+    task = _background_tasks.get(build_id)
+    return bool(
+        (task is not None and not task.done())
+        or _physical_build_workers(build_id)
+        or build_id in _active_runners
+    )
+
+
+def _any_build_has_live_work() -> bool:
+    if _active_runners or any(task is not None and not task.done() for task in _background_tasks.values()):
+        return True
+    with _worker_lock:
+        return any(not future.done() for pending in _build_worker_futures.values() for future in pending)
+
+
+async def _drain_build_workers(build_id: str) -> None:
+    """Cancellation cannot release a slot while native futures still execute."""
+    while True:
+        with _worker_lock:
+            pending = tuple(future for future in _build_worker_futures.get(build_id, ()) if not future.done())
+        if not pending:
+            return
+        for future in pending:
+            future.cancel()  # only queued work can be cancelled; running work drains
+        waiter = asyncio.gather(*(asyncio.wrap_future(future) for future in pending), return_exceptions=True)
+        while not waiter.done():
+            try:
+                await asyncio.shield(waiter)
+            except asyncio.CancelledError:
+                continue
+
+
+async def _await_build_future(build: dict, future: Future, *, maximum_seconds: float = 180.0):
+    _check_build_continuation(build)
+    remaining = max(
+        0.001,
+        float(build.get("_bg_deadline_monotonic", _build_clock.monotonic() + maximum_seconds))
+        - _build_clock.monotonic(),
+    )
+    wrapped = asyncio.wrap_future(future)
+    wrapped.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+    try:
+        result = await asyncio.wait_for(asyncio.shield(wrapped), timeout=min(maximum_seconds, remaining))
+    except asyncio.TimeoutError:
+        _mark_build_stop(build, "worker_deadline_exceeded")
+        raise GalaxyBuildStopped("worker_deadline_exceeded") from None
+    _check_build_continuation(build)
+    return result
+
+
+async def _await_build_io(build: dict, operation, *args):
+    """Vault mutations retain native custody even if their async waiter leaves."""
+    future = _track_build_future(build["build_id"], _WORKER_POOL.submit(operation, *args))
+    wrapped = asyncio.wrap_future(future)
+    wrapped.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+    return await asyncio.shield(wrapped)
+
+
+async def _request_build_stop(build_id: str, reason: str, *, failed: bool = True) -> dict | None:
+    build = await _load_build(build_id)
+    if not build:
+        return None
+    if build.get("status") == "completed" and not _build_has_live_work(build_id):
+        return build
+    _mark_build_stop(build, reason, failed=failed)
+    live = _build_has_live_work(build_id)
+    build["_bg_drain_pending"] = live
+    if not live:
+        build["status"] = build.get("_bg_stop_target", "failed")
+        build["_bg_status"] = build["status"]
+        build["_bg_stopped_at"] = datetime.utcnow().isoformat()
+    await _save_build(build)
+    return build
 
 
 # ── Process pool for the CPU-bound FLOOR PASS ────────────────────────────
@@ -2372,793 +2523,270 @@ from routes.galaxy_studio_resilience import (
 
 
 def _safe_generate_batch(build_id: str, batch_num: int) -> tuple:
-    """Thread-safe wrapper that generates a batch. Returns (batch_num, files_dict, error_str).
-    Runs in a worker thread; never raises — always returns tuple."""
+    """One tracked worker result. Resource failures are failures, not stubs."""
     with _worker_lock:
         _worker_stats["active"] += 1
         _worker_stats["total_submitted"] += 1
     try:
-        # ── Memory watchdog: if we're over the HARD RSS limit, skip heavy
-        # generation and return a tiny metadata stub instead. Build keeps
-        # progressing but stops ballooning RAM.
-        mem = _memory_check(f"batch {batch_num}")
-        if mem == "hard":
-            build = _builds.get(build_id, {})
-            # ── Countermeasure (2026-06): don't just freeze — actively reclaim.
-            # Flush whatever is already in RAM to the compressed vault, force a
-            # GC/malloc_trim, then RE-CHECK. If we dropped back under the hard
-            # limit, resume normal generation instead of emitting a skip-stub.
-            # This converts a permanent "freeze" into a transient back-pressure
-            # pause and recovers the most files possible on a constrained pod.
-            try:
-                if build:
-                    _flush_to_vault(build, force=True)
-                import gc as _gc
-                _gc.collect()
-                _malloc_trim()
-            except Exception:
-                pass
-            mem = _memory_check(f"batch {batch_num} (post-flush)")
-        if mem == "hard":
-            build = _builds.get(build_id, {})
-            stub = {
-                f"batch_{batch_num}/MEMORY_SKIPPED.md": (
-                    f"# Batch {batch_num} skipped — memory watchdog\n\n"
-                    f"Build `{build.get('title', '')}` ({build.get('genre', '')}) reached the "
-                    f"GALAXY_RSS_HARD_MB threshold ({_RSS_HARD_MB} MB RSS).\n"
-                    f"Further file generation for this batch was skipped to avoid OOM.\n"
-                    f"Tune GALAXY_RSS_HARD_MB up in /app/backend/.env if your pod has more RAM.\n"
-                ),
-            }
-            with _worker_lock:
-                _worker_stats["total_completed"] += 1
-            return (batch_num, stub, None)
-
         build = _builds.get(build_id)
         if not build:
-            raise RuntimeError("build missing from memory")
+            raise GalaxyBuildStopped("build_identity_missing")
+        _check_build_resources(build)
         files = _generate_batch(build, batch_num) or {}
+        _check_build_continuation(build)
         with _worker_lock:
             _worker_stats["total_completed"] += 1
-        return (batch_num, files, None)
-    except Exception:
-        import traceback
-        traceback.print_exc()
+        return batch_num, files, None
+    except Exception as exc:
         with _worker_lock:
             _worker_stats["total_failed"] += 1
-        # Fallback files so build never truly fails
-        try:
-            build = _builds.get(build_id, {})
-            fb = _generate_fallback_files(
-                batch_num,
-                build.get("title", "game"),
-                build.get("genre", "rpg"),
-                f"batch_{batch_num}",
-                "batch_failed",
-            ) or {}
-            return (batch_num, fb, "batch_failed")
-        except Exception:
-            return (batch_num, {}, "batch_failed")
+        return batch_num, {}, exc.reason if isinstance(exc, GalaxyBuildStopped) else "batch_generation_failed"
     finally:
         with _worker_lock:
             _worker_stats["active"] = max(0, _worker_stats["active"] - 1)
 
 
-def _prefetch_all_batches_parallel(build_id: str) -> dict:
-    """Submit ALL 10 batches to the worker pool concurrently and return a
-    dict mapping batch_num -> Future. The background runner can await results
-    as batches come due, so files are already cached when the timing tick hits."""
-    futures: dict = {}
-    for b in range(1, TOTAL_BATCHES + 1):
-        fut = _WORKER_POOL.submit(_safe_generate_batch, build_id, b)
-        futures[b] = fut
-    return futures
-
-
 async def _run_background_build(build_id: str, duration_minutes: int = 15, resume_from_batch: int = 1):
-    """Background coroutine: advances all 10 BATCHES with real delays, triple-retry,
-    fallback generation, and auto-recovery. Only 10 iterations, each processing 10 phases.
-    This NEVER crashes the build.
-    
-    If resume_from_batch > 1, the build continues from that batch, preserving prior logs/progress."""
-    import asyncio
+    """Retain task and physical worker ownership through stop and durable drain."""
+    current = asyncio.current_task()
+    previous = _background_tasks.get(build_id)
+    if previous is not None and previous is not current and not previous.done():
+        return
+    _background_tasks[build_id] = current
     _active_runners.add(build_id)
-    build = await _load_build(build_id)
-    if not build:
-        _active_runners.discard(build_id)
-        return
-    # Wrap the entire runner in try/finally so a crash (cancel, OOM
-    # predecessor, KeyboardInterrupt) ALWAYS preserves the on-disk vault.
-    # Without this, a failed build would lose every generated file.
+    build = None
+    cancelled = False
     try:
-        return await _run_background_build_inner(build, build_id, duration_minutes, resume_from_batch)
-    except asyncio.CancelledError:
-        try:
-            _flush_to_vault(build, force=True)
-            from core import build_vault as _bv
-            _bv.preserve_on_failure(build_id)
-            build["_bg_status"] = "cancelled"
-            build["_vault_preserved"] = True
-            await _save_build(build)
-        except Exception as _pfe:
-            print(f"[GALAXY BG] cancel-preserve failed: {_pfe}")
-        raise
-    except Exception as _runexc:
-        print(f"[GALAXY BG] UNCAUGHT in runner, preserving vault: {_runexc}")
-        try:
-            _flush_to_vault(build, force=True)
-            from core import build_vault as _bv
-            _bv.preserve_on_failure(build_id)
-            build["_bg_status"] = "failed"
-            build["status"] = "failed"
-            build["_bg_error"] = "background_runner_failed"
-            build["_vault_preserved"] = True
-            await _save_build(build)
-        except Exception as _pfe:
-            print(f"[GALAXY BG] failure-preserve failed: {_pfe}")
-    finally:
-        _active_runners.discard(build_id)
-        _background_tasks.pop(build_id, None)
-
-
-async def _run_background_build_inner(build: dict, build_id: str,
-                                      duration_minutes: int = 15,
-                                      resume_from_batch: int = 1):
-    """Inner runner — see _run_background_build for docs."""
-    import asyncio
-    if not build:
-        _active_runners.discard(build_id)
-        return
-    
-    batch_duration = (duration_minutes * 60) / TOTAL_BATCHES  # seconds per batch
-    
-    is_fresh = resume_from_batch <= 1
-    build["_bg_status"] = "running"
-    if is_fresh:
-        build["_bg_started"] = datetime.utcnow().isoformat()
-        build["_bg_target_duration"] = duration_minutes
-        build["_bg_phase_log"] = []
-        build["_bg_retries"] = 0
-        build["_bg_fallbacks"] = 0
-        build["_bg_errors"] = []
-        build["_bg_current_batch"] = 0
-        build["_bg_total_batches"] = TOTAL_BATCHES
-    else:
-        # RESUME path — keep prior phase_log/retries/fallbacks, reset elapsed clock for fair time-pct
-        build.setdefault("_bg_phase_log", [])
-        build.setdefault("_bg_retries", 0)
-        build.setdefault("_bg_fallbacks", 0)
-        build.setdefault("_bg_errors", [])
-        build["_bg_target_duration"] = duration_minutes
-        build["_bg_total_batches"] = TOTAL_BATCHES
-        # Virtually advance start time so time_pct accounts for already-completed batches
-        already_pct = (resume_from_batch - 1) / TOTAL_BATCHES
-        virtual_elapsed = already_pct * duration_minutes * 60
-        virtual_start = datetime.utcnow() - timedelta(seconds=virtual_elapsed)
-        build["_bg_started"] = virtual_start.isoformat()
-        build["_bg_phase_log"].append({
-            "batch": resume_from_batch,
-            "name": "RESUMED",
-            "phases_in_batch": 0,
-            "file_count": build.get("file_count", 0),
-            "completed_at": datetime.utcnow().isoformat(),
-            "attempts": 0,
-            "status": "resumed",
-        })
-        print(f"[GALAXY BG] RESUMING build {build_id} from batch {resume_from_batch}")
-    
-    # ═══ MULTI-WORKER PARALLEL PRE-FETCH ═══
-    # Submit all remaining batches to the thread pool IMMEDIATELY.
-    # ── Sequential pre-fetch so completed batch results don't pile up in the
-    # worker pool queue (each batch result can be 100+ MB).  We submit ONE
-    # batch ahead so there's always one ready when the serial timing tick
-    # harvests it, but we never queue more than that.
-    prefetch_futures: dict = {}
-    try:
-        first_batch = max(1, resume_from_batch)
-        prefetch_futures[first_batch] = _WORKER_POOL.submit(_safe_generate_batch, build_id, first_batch)
-        build["_bg_parallel"] = False
-        build["_bg_workers"] = _MAX_WORKERS
-        build["_bg_prefetch_mode"] = "sequential-single"
-        print(f"[GALAXY BG] Sequential pre-fetch: ONLY batch {first_batch} queued (memory-safe); "
-              f"next batches enqueued as each one is harvested ({_MAX_WORKERS} worker).")
-    except Exception as e:
-        print(f"[GALAXY BG] Pre-fetch failed to dispatch: {e}")
-        build["_bg_parallel"] = False
-    
-    for batch_num in range(max(1, resume_from_batch), TOTAL_BATCHES + 1):
-        if build.get("_bg_status") == "cancelled":
-            break
-        
-        batch_start = datetime.utcnow()
-        batch_name = BATCH_NAMES.get(batch_num, f"Batch {batch_num}")
-        build["_bg_current_batch"] = batch_num
-        
-        print(f"[GALAXY BG] ═══ Starting Batch {batch_num}/{TOTAL_BATCHES}: {batch_name} ═══")
-        
-        # ═══ TRIPLE RETRY WITH EXPONENTIAL BACKOFF PER BATCH ═══
-        MAX_BATCH_RETRIES = 3
-        batch_success = False
-        batch_error = None
-        
-        for attempt in range(1, MAX_BATCH_RETRIES + 1):
+        build = await _load_build(build_id)
+        if not build:
+            return
+        if type(duration_minutes) is not int or not 1 <= duration_minutes <= 60:
+            raise GalaxyBuildStopped("build_duration_invalid")
+        budget = duration_minutes * 60.0
+        started = build.get("_bg_started")
+        if started:
             try:
-                loop = asyncio.get_event_loop()
-                # ═══ PARALLEL PATH: Harvest pre-generated batch from worker pool ═══
-                used_worker = False
-                if batch_num in prefetch_futures:
+                original = datetime.fromisoformat(started)
+                if original.tzinfo is None:
+                    original = original.replace(tzinfo=timezone.utc)
+                elapsed = (datetime.now(timezone.utc) - original).total_seconds()
+                if elapsed < -5.0:
+                    raise ValueError("build clock moved backwards")
+                budget = max(0.0, budget - max(0.0, elapsed))
+            except (ValueError, TypeError):
+                raise GalaxyBuildStopped("build_clock_unavailable") from None
+        build["_bg_deadline_monotonic"] = _build_clock.monotonic() + budget
+        await _run_background_build_inner(build, build_id, duration_minutes, resume_from_batch)
+    except asyncio.CancelledError:
+        cancelled = True
+        if build is not None:
+            _mark_build_stop(build, "runner_cancelled", failed=False)
+    except Exception as exc:
+        if build is not None:
+            _mark_build_stop(
+                build, exc.reason if isinstance(exc, GalaxyBuildStopped) else "background_runner_failed"
+            )
+    finally:
+        if build is not None:
+            build["_bg_drain_pending"] = _physical_build_workers(build_id) > 0
+        await _drain_build_workers(build_id)
+        try:
+            if build is not None:
+                build.pop("_bg_deadline_monotonic", None)
+                build["_bg_floor_in_progress"] = False
+                if build.get("_bg_stop_requested"):
+                    build["_gen_cache"] = {}
                     try:
-                        fut: Future = prefetch_futures[batch_num]
-                        # CRITICAL FIX: wrap the concurrent.futures.Future into
-                        # an asyncio-awaitable future. Previously we used
-                        # loop.run_in_executor(None, lambda: f.result(timeout=90))
-                        # which parks a thread in the DEFAULT asyncio executor
-                        # pool (also used by FastAPI sync handlers) and
-                        # deadlocks under concurrent /status polls.
-                        _aio_fut = asyncio.wrap_future(fut, loop=loop)
-                        try:
-                            w_batch_num, w_files, w_err = await asyncio.wait_for(_aio_fut, timeout=180)
-                        except asyncio.TimeoutError:
-                            # Don't cancel the underlying worker — it may finish
-                            # in the background. Fall back to serial for now.
-                            raise TimeoutError(f"worker batch {batch_num} not ready within 180s")
-                        # ── Enqueue NEXT batch NOW so the worker stays busy while we
-                        # harvest+flush this one.  Memory-safe: we keep at most ONE
-                        # batch in-flight + one being processed.
-                        _next_batch = batch_num + 1
-                        if _next_batch <= TOTAL_BATCHES and _next_batch not in prefetch_futures:
-                            # ★ STAGGER / COOLDOWN (2026-02): let GC + malloc_trim
-                            # reclaim heap BEFORE the next batch allocates. Keeps
-                            # RSS flat across batches and unlocks 20k-file builds
-                            # on 1 GB pods without OOM. See GALAXY_WORKER_COOLDOWN_MS.
-                            try:
-                                await asyncio.to_thread(_worker_cooldown, context=f"before-batch-{_next_batch}")
-                            except Exception as _cde:
-                                print(f"[GALAXY BG] cooldown failed (non-fatal): {_cde}")
-                            try:
-                                prefetch_futures[_next_batch] = _WORKER_POOL.submit(_safe_generate_batch, build_id, _next_batch)
-                            except Exception as _nbe:
-                                print(f"[GALAXY BG] failed to enqueue next batch {_next_batch}: {_nbe}")
-                        # Drop the completed future so its result tuple can be GC'd.
-                        prefetch_futures.pop(batch_num, None)
-                        if w_files:
-                            # Re-bind to in-memory canonical reference if it diverged
-                            _mem_build = _builds.get(build_id)
-                            if _mem_build is not None and _mem_build is not build:
-                                build = _mem_build
-                            if not isinstance(build.get("files"), dict):
-                                build["files"] = {}
-                            build["files"].update(w_files)
-                            build["file_count"] = len(build["files"])
-                            # Stream this worker batch to vault immediately
-                            # (off the event loop so /status & /health stay snappy).
-                            try:
-                                await asyncio.to_thread(_flush_to_vault, build)
-                            except Exception as _flush_error:
-                                print(f"[GALAXY BG] vault flush failed: {_flush_error}", flush=True)
-                            _builds[build_id] = build
-                            print(f"[GALAXY BG] Batch {batch_num} harvested: +{len(w_files)} files → {build['file_count']} total", flush=True)
-                            # Mark phases in this batch as completed
-                            batch_phase_ids = BUILD_BATCHES.get(batch_num, [])
-                            for phase_id in batch_phase_ids:
-                                idx = _PHASE_INDEX_MAP.get(phase_id, -1)
-                                if 0 <= idx < len(build["phases"]):
-                                    build["phases"][idx]["status"] = "completed"
-                                    build["phases"][idx]["completed_at"] = datetime.utcnow().isoformat()
-                            # Advance pointer past this batch
-                            last_idx = max(
-                                (_PHASE_INDEX_MAP.get(pid, 0) for pid in batch_phase_ids),
-                                default=build.get("current_phase", 0),
-                            ) + 1
-                            build["current_phase"] = max(build.get("current_phase", 0), last_idx)
-                            used_worker = True
-                            if w_err:
-                                build["_bg_errors"].append({"batch": batch_num, "source": "worker_fallback", "error": w_err})
-                    except Exception as we:
-                        print(f"[GALAXY BG] Worker harvest failed for batch {batch_num}: {we} — falling back to serial _advance_build")
-                        used_worker = False
-                
-                if not used_worker:
-                    # Fallback to serial path (original behaviour). `_advance_build`
-                    # is async, so call it directly — NEVER via run_in_executor
-                    # (that raises "coroutines cannot be used with run_in_executor").
-                    await _advance_build(build_id)
-                
-                batch_success = True
-                build["_bg_phase_log"].append({
-                    "batch": batch_num,
-                    "name": batch_name,
-                    "phases_in_batch": len(BUILD_BATCHES.get(batch_num, [])),
-                    "file_count": build["file_count"],
-                    "completed_at": datetime.utcnow().isoformat(),
-                    "attempts": attempt,
-                    "status": "success",
-                    "source": "worker" if used_worker else "serial",
-                })
-                print(f"[GALAXY BG] Batch {batch_num} COMPLETE via {'worker-pool' if used_worker else 'serial'}: {build['file_count']} total files")
-                await _save_build(build)
-                break
-            except Exception as e:
-                import traceback
-                batch_error = "batch failed"
-                build["_bg_retries"] += 1
-                traceback.print_exc()
-                print(f"[GALAXY BG] Batch {batch_num}/{TOTAL_BATCHES} '{batch_name}' attempt {attempt}/{MAX_BATCH_RETRIES} FAILED: {batch_error}")
-                
-                if attempt < MAX_BATCH_RETRIES:
-                    backoff = 1.0 * (2 ** (attempt - 1))  # 1s, 2s, 4s
-                    await asyncio.sleep(backoff)
-        
-        if not batch_success:
-            # ═══ BATCH FAILED ALL RETRIES — Log and force-advance ═══
-            build["_bg_fallbacks"] += 1
-            build["_bg_errors"].append({
+                        if not build.get("_vault_write_failed"):
+                            await _await_build_io(build, _flush_to_vault, build, True)
+                        from core import build_vault as _bv
+
+                        preserved = await _await_build_io(build, _bv.preserve_on_failure, build_id)
+                        build["_vault_preserved"] = bool(preserved)
+                    except Exception:
+                        build["_vault_preserved"] = bool(build.get("_vault_active"))
+        except asyncio.CancelledError:
+            cancelled = True
+        finally:
+            # A second cancellation during a vault write still cannot free
+            # the build slot before that physical mutation finishes.
+            await _drain_build_workers(build_id)
+            try:
+                if build is not None:
+                    build["_bg_drain_pending"] = False
+                    if build.get("_bg_stop_requested"):
+                        build["status"] = build.get("_bg_stop_target", "failed")
+                        build["_bg_status"] = build["status"]
+                        build["_bg_stopped_at"] = datetime.utcnow().isoformat()
+                        build.pop("completed_at", None)
+                        build.pop("_bg_completed", None)
+                        build["_bg_partial_artifacts"] = bool(
+                            build.get("_vault_active") or build.get("files")
+                        )
+                    await _save_build(build)
+            finally:
+                _active_runners.discard(build_id)
+                if _background_tasks.get(build_id) is current:
+                    _background_tasks.pop(build_id, None)
+    if cancelled:
+        raise asyncio.CancelledError
+
+
+async def _run_background_build_inner(
+    build: dict, build_id: str, duration_minutes: int = 15, resume_from_batch: int = 1
+):
+    """Dispatch bounded serial work; completion follows actual durable results."""
+    _check_build_continuation(build)
+    build["_bg_status"] = "running"
+    build["status"] = "building"
+    build.setdefault("_bg_started", datetime.utcnow().isoformat())
+    build["_bg_target_duration"] = duration_minutes
+    build["_bg_total_batches"] = TOTAL_BATCHES
+    build.setdefault("_bg_phase_log", [])
+    build.setdefault("_bg_errors", [])
+    build.setdefault("_bg_retries", 0)
+    build.setdefault("_bg_fallbacks", 0)
+    build["_bg_prefetch_mode"] = "single-physical-worker"
+    await _save_build_required(build)
+    for batch_num in range(max(1, resume_from_batch), TOTAL_BATCHES + 1):
+        _check_build_continuation(build)
+        await _await_build_io(build, _check_build_resources, build)
+        build["_bg_current_batch"] = batch_num
+        build["_bg_last_heartbeat"] = datetime.utcnow().isoformat()
+        future = _track_build_future(build_id, _WORKER_POOL.submit(_safe_generate_batch, build_id, batch_num))
+        actual_batch, files, error = await _await_build_future(build, future)
+        if actual_batch != batch_num or error or not isinstance(files, dict) or not files:
+            raise GalaxyBuildStopped(error or "batch_empty_output")
+        build.setdefault("files", {}).update(files)
+        await _await_build_io(build, _flush_to_vault, build, True)
+        files.clear()
+        build.get("_gen_cache", {}).pop(f"batch_{batch_num}", None)
+        _check_build_continuation(build)
+        for phase_id in BUILD_BATCHES.get(batch_num, []):
+            index = _PHASE_INDEX_MAP.get(phase_id, -1)
+            if 0 <= index < len(build["phases"]):
+                build["phases"][index]["status"] = "completed"
+                build["phases"][index]["completed_at"] = datetime.utcnow().isoformat()
+        last_index = (
+            max(
+                (_PHASE_INDEX_MAP.get(phase, 0) for phase in BUILD_BATCHES.get(batch_num, [])),
+                default=build.get("current_phase", 0),
+            )
+            + 1
+        )
+        build["current_phase"] = max(build.get("current_phase", 0), last_index)
+        build["_bg_last_batch_completed"] = batch_num
+        build["_bg_phase_log"].append(
+            {
                 "batch": batch_num,
-                "name": batch_name,
-                "error": (batch_error or "unknown")[:500],
-                "timestamp": datetime.utcnow().isoformat(),
-            })
-            build["_bg_phase_log"].append({
-                "batch": batch_num,
-                "name": batch_name,
-                "phases_in_batch": len(BUILD_BATCHES.get(batch_num, [])),
+                "name": BATCH_NAMES.get(batch_num),
+                "status": "success",
                 "file_count": build["file_count"],
                 "completed_at": datetime.utcnow().isoformat(),
-                "attempts": MAX_BATCH_RETRIES,
-                "status": "fallback",
-                "error": (batch_error or "unknown")[:200],
-            })
-            print(f"[GALAXY BG] Batch {batch_num} '{batch_name}' FALLBACK USED. Continuing build...")
-            
-            # Force-advance past all phases in this batch
-            try:
-                batch_phase_ids = BUILD_BATCHES.get(batch_num, [])
-                for phase_id in batch_phase_ids:
-                    idx = _PHASE_INDEX_MAP.get(phase_id, -1)
-                    if 0 <= idx < len(build["phases"]):
-                        build["phases"][idx]["status"] = "completed"
-                        build["phases"][idx]["completed_at"] = datetime.utcnow().isoformat()
-                # Advance current_phase past this batch
-                last_idx = max((_PHASE_INDEX_MAP.get(pid, 0) for pid in batch_phase_ids), default=build.get("current_phase", 0)) + 1
-                build["current_phase"] = max(build.get("current_phase", 0), last_idx)
-            except Exception:
-                pass
-        
-        # Short cooperative yield between batches — no artificial sleep so
-        # the FLOOR PASS can start ASAP. Previous design spread 10 batches
-        # across the full duration, wasting 10s+ per batch on sleep.
-        await asyncio.sleep(0.05)
+                "attempts": 1,
+                "source": "worker",
+            }
+        )
+        await _save_build_required(build)
+        if build["file_count"] >= GLOBAL_FILE_BUDGET and batch_num < TOTAL_BATCHES:
+            raise GalaxyBuildStopped("artifact_file_budget_exhausted")
+        await asyncio.to_thread(_worker_cooldown, context=f"after-batch-{batch_num}")
 
-        # ★ GLOBAL BUDGET ENFORCEMENT (2026-02 hotfix) ★
-        # After each batch, compute total files (vault + in-memory). If we
-        # hit or exceed the 250k ceiling, short-circuit the remaining
-        # batches and the floor pass. This is the backstop that guarantees
-        # no amount of fusion / amplification can OOM the pod.
-        try:
-            _mem_files = len(build.get("files", {}) or {})
-            _vault_files = 0
-            try:
-                from core import build_vault as _bv
-                _vault_files = _bv.get_file_count(build_id)
-            except Exception:
-                pass
-            _total_now = _mem_files + _vault_files
-            if _total_now >= GLOBAL_FILE_BUDGET:
-                print(
-                    f"[GALAXY BG] ★ BUDGET HIT: {_total_now} ≥ {GLOBAL_FILE_BUDGET}. "
-                    f"Short-circuiting remaining batches; build will finalize cleanly.",
-                    flush=True,
-                )
-                build["_bg_budget_hit"] = True
-                build["_bg_budget_hit_at_batch"] = batch_num
-                # Mark all remaining phases as completed so UI progress matches.
-                for _remaining_b in range(batch_num + 1, TOTAL_BATCHES + 1):
-                    for _pid in BUILD_BATCHES.get(_remaining_b, []):
-                        _idx = _PHASE_INDEX_MAP.get(_pid, -1)
-                        if 0 <= _idx < len(build["phases"]):
-                            build["phases"][_idx]["status"] = "completed"
-                            build["phases"][_idx]["completed_at"] = datetime.utcnow().isoformat()
-                build["current_phase"] = len(BUILD_PHASES)
-                try:
-                    await _save_build(build)
-                except Exception as _save_error:
-                    print(f"[GALAXY BG] build save failed: {_save_error}", flush=True)
-                break
-        except Exception as _bge:
-            print(f"[GALAXY BG] budget enforcement check failed (non-fatal): {_bge}")
-    
-    # ═══ FINAL REDUNDANCY PASS — Only regenerate truly missing batches.
-    # After a resume, `_gen_cache` is stripped from the reloaded build but
-    # build["files"] may already have plenty of content. Only re-run a batch
-    # if the build has no file traces from it AND is clearly under-delivered.
-    try:
-        # Skip redundancy pass entirely if we already have a healthy file count;
-        # resumed runners don't need to re-run batches that already produced files.
-        if len(build.get("files", {})) >= 800 * TOTAL_BATCHES * 0.5:
-            print(f"[GALAXY BG] Skipping redundancy pass — build already has {len(build.get('files', {}))} files")
-        else:
-            for batch_i in range(1, TOTAL_BATCHES + 1):
-                cache_key = f"batch_{batch_i}"
-                cached = build.get("_gen_cache", {}).get(cache_key)
-                if cached is None or (isinstance(cached, dict) and len(cached) == 0):
-                    # Also check files don't already hold this batch's output
-                    has_batch_files = any(
-                        f"batch_{batch_i:02d}" in k or f"Batch {batch_i}" in k
-                        for k in list(build.get("files", {}).keys())[:500]
-                    )
-                    if has_batch_files:
-                        continue
-                    print(f"[GALAXY BG] Final pass: regenerating missing batch {batch_i}")
-                    try:
-                        # Off-loop so this fallback regeneration never freezes
-                        # the event loop (/status polling, hub data load).
-                        batch_files = await asyncio.to_thread(_generate_batch, build, batch_i)
-                        if batch_files:
-                            build["files"].update(batch_files)
-                    except Exception:
-                        pass
-        build["file_count"] = len(build["files"])
-    except Exception:
-        pass
+    # Preserve the existing requested delivery floor while keeping physical
+    # custody and at most one small unharvested result. No RAM fallback on I/O
+    # failure and no further submissions until a durable append is confirmed.
+    complexity = int(build.get("complexity", 60) or 60)
+    floor_target = max(50000, 50000 + (complexity - 50) * 2500)
+    sliders = [
+        build.get(key, 0)
+        for key in (
+            "graphics_era",
+            "world_size",
+            "ai_complexity",
+            "physics_realism",
+            "narrative_branching",
+            "multiplayer_max",
+        )
+    ]
+    if any(int(value or 0) >= 8 for value in sliders):
+        floor_target += 75000
+    if all(int(value or 0) >= 9 for value in sliders):
+        floor_target += 125000
+    fusion = max(1.0, min(1.6, float(build.get("fusion_multiplier", 1.0) or 1.0)))
+    floor_target = min(int(floor_target * fusion), GLOBAL_FILE_BUDGET)
+    from core import build_vault as _bv
 
-    # ═══ MASSIVE-DELIVERY FLOOR PASS ═══
-    # No build leaves the factory "small". Enforce a per-build minimum file
-    # count that scales with complexity + target sliders + fusion count so
-    # even a 5-min basic-slider arcade build still ships a meaty AAA-feeling
-    # package, and a fusion build scales up proportionally.
-    try:
-        complexity = int(build.get("complexity", 60) or 60)
-        # MAX SAFE baseline pushed to 250,000 files per user request
-        # 2026-04-20. At ~42 KB per compact file that is ~10.5 GB per build
-        # in memory, which fits in the 31 GB container with one concurrent
-        # build. We guard with a single-builder concurrency lock below so
-        # two builds can never accumulate 20+ GB and OOM.
-        floor_target = max(50000, 50000 + (complexity - 50) * 2500)
-        aaa_sliders = [
-            build.get("graphics_era", 0), build.get("world_size", 0),
-            build.get("ai_complexity", 0), build.get("physics_realism", 0),
-            build.get("narrative_branching", 0), build.get("multiplayer_max", 0),
-        ]
-        try:
-            if any(int(s or 0) >= 8 for s in aaa_sliders):
-                floor_target += 75000
-            if all(int(s or 0) >= 9 for s in aaa_sliders):
-                floor_target += 125000
-        except Exception:
-            pass
-        # HYPERSCALE CEILING — thanks to the per-chunk vault streaming that now
-        # happens inside the FLOOR harvest loop below, files no longer accumulate
-        # in Python memory. Each chunk of 2000 is zstd-compressed to disk
-        # (~14× ratio, ~4 MB per chunk) and dropped from RAM immediately.
-        # This lifts the hard cap from 100k back to 250k safely.
-        # ★ NOTE: the 250k clamp is applied AFTER fusion multiplier below ★
-        # Fusion boost — multi-genre builds need more per added genre. The
-        # multiplier itself is now capped to 1.6× at /create so this can only
-        # expand within the 250k envelope.
-        fusion_mult = float(build.get("fusion_multiplier", 1.0) or 1.0)
-        if fusion_mult > 1.0:
-            floor_target = int(floor_target * fusion_mult)
-        # ★ HARD CEILING — applied LAST so fusion can consume a LARGER share
-        #   of the 250k budget but can NEVER exceed it (prevents OOM→520/502
-        #   at "initializing" that the user reported 2026-02).
-        floor_target = min(floor_target, GLOBAL_FILE_BUDGET)
-        # Use max(in-memory, persisted file_count, vault total) so resume
-        # never re-generates files already streamed to disk.
-        _mem_count = len(build.get("files", {}))
-        _persisted_count = int(build.get("_file_count_at_save", 0) or 0)
-        _vault_count = 0
-        try:
-            from core import build_vault as _bv
-            _vault_count = _bv.get_file_count(build_id)
-        except Exception:
-            pass
-        current_files = max(_mem_count, _persisted_count, _vault_count)
-        if current_files < floor_target:
-            deficit = floor_target - current_files
-            print(f"[GALAXY BG] FLOOR PASS: {current_files} < {floor_target} (fusion x{fusion_mult:.2f}), generating {deficit} extra files")
-            title = build.get("title", "Game")
-            genres_list = build.get("genres") or [build.get("genre", "rpg")]
-            extra_all = {}
-            per_genre = max(1, deficit // len(genres_list))
-            remainder = deficit - per_genre * len(genres_list)
-            # Chunk generation dispatched to WORKER THREADS so the main async
-            # loop stays responsive for /status polls. Each chunk runs on
-            # _WORKER_POOL in parallel; we wrap each concurrent.futures.Future
-            # with asyncio.wrap_future so the loop can schedule the next chunk
-            # while the previous one is computing.
-            CHUNK = 2000
-            import concurrent.futures as _cf
-            # Build list of chunk parameter tuples (lightweight, just ints+strings).
-            chunk_params = []
-            for idx, g in enumerate(genres_list):
-                n = per_genre + (remainder if idx == len(genres_list) - 1 else 0)
-                remaining = n
-                sub_idx = 0
-                while remaining > 0:
-                    batch = min(CHUNK, remaining)
-                    chunk_params.append((
-                        99 + idx * 1000 + sub_idx,
-                        title, g, f"AAA_Delivery_Floor[{g}]#{sub_idx}", batch,
-                    ))
-                    remaining -= batch
-                    sub_idx += 1
-            total_tasks = len(chunk_params)
-            # ═══ BOUNDED-CONCURRENCY WAVES ═══
-            # Submitting ALL 100+ chunks upfront causes completed-but-unharvested
-            # futures to pile up in RAM (~180 MB each) faster than we can drain,
-            # which was the REAL cause of OOMs at 250k scale. Keeping in-flight
-            # capped at MAX_IN_FLIGHT = 8 bounds peak RAM to ~1.5 GB regardless
-            # of total file count, because we submit a fresh task ONLY after
-            # harvesting and freeing a completed one.
-            MAX_IN_FLIGHT = 8
-            params_iter = iter(chunk_params)
-            in_flight: set = set()
-            for _ in range(min(MAX_IN_FLIGHT, total_tasks)):
-                try:
-                    p = next(params_iter)
-                except StopIteration:
-                    break
-                in_flight.add(_submit_floor_chunk(p))
-
-            harvested = 0
-            last_save_ts = 0.0
-            import time as _t
-            from core import build_vault as _bv
-
-            # Bridge concurrent.futures → asyncio so the event loop stays responsive
-            # while padding workers run. Previously a blocking _cf.wait() here froze
-            # /health, /status & /once-over for the ENTIRE floor pass (gateway 502/504).
-            loop = asyncio.get_event_loop()
-            in_flight_aio = {asyncio.wrap_future(f, loop=loop) for f in in_flight}
-            in_flight = None
-
-            while in_flight_aio:
-                done, in_flight_aio = await asyncio.wait(
-                    in_flight_aio, return_when=asyncio.FIRST_COMPLETED, timeout=600,
-                )
-                for afut in done:
-                    try:
-                        extra = afut.result()
-                        # Stream this chunk to disk immediately (off-loop), free RAM.
-                        try:
-                            _res = await asyncio.to_thread(_bv.append_files, build_id, extra)
-                            build["_vault_active"] = True
-                            build["_vault_file_count"] = int(_res.get("file_count", 0))
-                            build["_vault_compressed_bytes"] = int(
-                                build.get("_vault_compressed_bytes", 0)
-                            ) + int(_res.get("compressed_bytes", 0))
-                            build["file_count"] = int(_res.get("file_count", 0)) + len(
-                                build.get("files", {}) or {}
-                            )
-                        except Exception as _vex:
-                            print(f"[GALAXY BG][vault] append failed, RAM fallback: {_vex}")
-                            build.setdefault("files", {}).update(extra)
-                            build["file_count"] = len(build["files"])
-                        extra = None
-                        harvested += 1
-                    except Exception as _fpe:
-                        print(f"[GALAXY BG] FLOOR chunk failed (non-fatal): {_fpe}")
-                    # Top up the pipeline — keeps in-flight at MAX_IN_FLIGHT
-                    try:
-                        p = next(params_iter)
-                        in_flight_aio.add(asyncio.wrap_future(_submit_floor_chunk(p), loop=loop))
-                    except StopIteration:
-                        pass
-                # Between waves: update heartbeat, persist (asyncio.wait already yielded).
-                build["_bg_last_heartbeat"] = datetime.utcnow().isoformat()
-                build["_bg_floor_in_progress"] = True
-                build["_bg_floor_target"] = floor_target
-                now = _t.time()
-                if now - last_save_ts > 3.0:
-                    try:
-                        await _save_build(build)
-                    except Exception as _save_error:
-                        print(f"[GALAXY BG] floor progress save failed: {_save_error}", flush=True)
-                    last_save_ts = now
-            build["_bg_floor_in_progress"] = False
-            print(f"[GALAXY BG] FLOOR PASS harvested {harvested}/{total_tasks} chunks, file_count={build['file_count']}")
-            build["file_count"] = len(build["files"])
-            build.setdefault("_bg_phase_log", []).append({
-                "batch": 11, "name": "MASSIVE_DELIVERY_PASS",
-                "phases_in_batch": 1, "file_count": build["file_count"],
-                "completed_at": datetime.utcnow().isoformat(),
-                "attempts": 1, "status": "success", "source": "floor_pass",
-                "files_added": len(extra_all),
-                "fusion_genres": genres_list,
-                "fusion_multiplier": fusion_mult,
-            })
-            print(f"[GALAXY BG] FLOOR PASS complete: {build['file_count']} total files")
-    except Exception as _fpe:
-        print(f"[GALAXY BG] floor pass failed (non-fatal): {_fpe}")
-
+    current_files = await asyncio.to_thread(_bv.get_file_count, build_id)
+    deficit = max(0, floor_target - current_files)
+    genres = build.get("genres") or [build.get("genre", "rpg")]
+    if not isinstance(genres, list) or not 1 <= len(genres) <= 16:
+        raise GalaxyBuildStopped("build_genres_invalid")
+    build["_bg_floor_target"] = floor_target
+    build["_bg_floor_in_progress"] = deficit > 0
+    serial = 0
+    while deficit > 0:
+        _check_build_continuation(build)
+        await _await_build_io(build, _check_build_resources, build)
+        count = min(128, deficit)
+        genre = genres[serial % len(genres)]
+        params = (
+            99 + serial,
+            build.get("title", "Game"),
+            genre,
+            f"AAA_Delivery_Floor[{genre}]#{serial}",
+            count,
+        )
+        future = _track_build_future(build_id, _submit_floor_chunk(params))
+        extra = await _await_build_future(build, future, maximum_seconds=180.0)
+        if not isinstance(extra, dict) or not extra:
+            raise GalaxyBuildStopped("floor_generation_failed")
+        # The one pending chunk remains owned by the build if its durable
+        # append fails; no further generation follows a storage failure.
+        build.setdefault("files", {}).update(extra)
+        previous_count = current_files
+        await _await_build_io(build, _flush_to_vault, build, True)
+        current_files = int(build.get("_vault_file_count", 0))
+        if current_files <= previous_count:
+            raise GalaxyBuildStopped("floor_no_durable_progress")
+        extra.clear()
+        deficit = max(0, floor_target - current_files)
+        serial += 1
+        build["_bg_last_heartbeat"] = datetime.utcnow().isoformat()
+        if serial % 4 == 0 or not deficit:
+            await _save_build_required(build)
+        await asyncio.sleep(0)
+    build["_bg_floor_in_progress"] = False
+    _check_build_continuation(build)
+    await _await_build_io(build, _flush_to_vault, build, True)
+    if not build.get("phases") or any(phase.get("status") != "completed" for phase in build["phases"]):
+        raise GalaxyBuildStopped("build_phases_incomplete")
+    build["file_count"] = await asyncio.to_thread(_bv.get_file_count, build_id)
+    build["status"] = "completed"
     build["_bg_status"] = "completed"
     build["_bg_completed"] = datetime.utcnow().isoformat()
-    build["_bg_current_batch"] = TOTAL_BATCHES
-    build["status"] = "completed"
-    build["completed_at"] = datetime.utcnow().isoformat()
-
-    # ═══ FINAL VAULT FLUSH — drain any remaining files to disk (off-loop) ═══
-    try:
-        await asyncio.to_thread(_flush_to_vault, build, True)
-    except Exception as _ffe:
-        print(f"[GALAXY BG] final vault flush failed (non-fatal): {_ffe}")
-    # Refresh authoritative file_count from vault (disk reads → off-loop)
-    try:
-        from core import build_vault as _bv
-        _fc, _stats = await asyncio.to_thread(
-            lambda: (_bv.get_file_count(build_id), _bv.get_stats(build_id))
-        )
-        build["file_count"] = _fc + len(build.get("files", {}) or {})
-        build["_vault_stats"] = _stats
-    except Exception:
-        pass
-
-    print(f"[GALAXY BG] Build COMPLETE: {build['file_count']} files, "
-          f"{build['_bg_retries']} retries, {build['_bg_fallbacks']} fallbacks, "
-          f"{len(build.get('_bg_errors', []))} errors across {TOTAL_BATCHES} batches")
-
-    # ═══ AUTO-PRUNE VAULT — bound disk usage (keep N most-recent builds) ═══
-    try:
-        from core import build_vault as _bv
-        _pr = await asyncio.to_thread(_bv.prune_old_builds, keep=12, protect={build_id})
-        if _pr.get("pruned"):
-            print(f"[GALAXY BG] vault auto-prune: {_pr}")
-    except Exception as _pe:
-        print(f"[GALAXY BG] vault auto-prune failed (non-fatal): {_pe}")
-    
-    # Clean up task reference
-    _background_tasks.pop(build_id, None)
-    
-    await _save_build(build)
-    _active_runners.discard(build_id)
-
-    # ═══ RAM RECLAIM — drop large in-memory per-build buffers after persistence ═══
-    # The `files` dict can hold tens of MB of generated source even after the
-    # vault flush (subsequent writers may have re-populated it). Clear it now
-    # that the vault + DB both have the final state. We keep the metadata
-    # (status, counts, timestamps) so /status polls and the UI still work.
-    try:
-        build["files"] = {}
-        # Any oversized arrays stashed during generation
-        for _k in ("_batches", "_phase_outputs", "_fusion_cache", "_raw_refs",
-                   "_generated_phase_data", "_agent_outputs",
-                   "_discourse_buffer", "_harvested"):
-            if _k in build:
-                build[_k] = None
-        # _bg_errors must stay a list so the /status endpoint can len() it.
-        build["_bg_errors"] = []
-        # ── Global eviction: keep only the N most-recent builds' full state
-        # in memory; older completed builds keep only minimal metadata.
-        try:
-            _MAX_RESIDENT = int(os.environ.get("GALAXY_MAX_RESIDENT_BUILDS", "25"))
-            if len(_builds) > _MAX_RESIDENT:
-                # Evict everything except the N most-recent `created_at` (or
-                # best-effort alphabetical fallback if created_at missing).
-                sortable = [
-                    (b.get("created_at") or "", bid) for bid, b in _builds.items()
-                ]
-                sortable.sort()
-                to_evict = [bid for _, bid in sortable[: len(_builds) - _MAX_RESIDENT]]
-                for _bid in to_evict:
-                    old = _builds.get(_bid)
-                    if old is None:
-                        continue
-                    # keep a tiny stub so /status still works
-                    _builds[_bid] = {
-                        "build_id": _bid,
-                        "title": old.get("title"),
-                        "genre": old.get("genre"),
-                        "era_id": old.get("era_id"),
-                        "_bg_status": old.get("_bg_status", "completed"),
-                        "status": old.get("status", "completed"),
-                        "file_count": old.get("file_count", 0),
-                        "created_at": old.get("created_at"),
-                        "completed_at": old.get("completed_at"),
-                        "_evicted": True,
-                    }
-        except Exception as _ee:
-            print(f"[GALAXY BG] resident-cache eviction non-fatal: {_ee}")
-        # GC + return freed pages to the OS — off the event loop (gc.collect
-        # holds the GIL; a large heap collect was part of the completion blip).
-        def _reclaim():
-            import gc as _gc
-            _gc.collect()
-            try:
-                import ctypes
-                ctypes.CDLL("libc.so.6").malloc_trim(0)
-            except Exception:
-                pass
-        await asyncio.to_thread(_reclaim)
-    except Exception as _ce:
-        print(f"[GALAXY BG] post-build cleanup non-fatal: {_ce}")
-    
-    # ═══ AUTO-VAULT: zip files and save to vault immediately after build completes ═══
-    try:
-        zip_path = await _package_build(build_id)
-        if zip_path and os.path.exists(zip_path):
-            entry = _vault_save(
-                build_id, "zip", build.get("title", "game"), zip_path,
-                {"auto_archived": True, "file_count": build.get("file_count", 0)},
-            )
-            await _save_vault_entry(entry)
-            print(f"[GALAXY BG] Auto-archived build to vault: {entry.get('vault_id')}")
-    except Exception as e:
-        print(f"[GALAXY BG] Auto-vault failed (non-fatal): {e}")
+    build["completed_at"] = build["_bg_completed"]
+    await _save_build_required(build)
+    build["_gen_cache"] = {}
+    # Packaging and pruning are separate owner actions. Completion does not
+    # silently allocate a second copy or delete another build's artifacts.
 
 
 @router.post("/force-complete/{build_id}")
 async def force_complete_build(build_id: str, background_tasks: BackgroundTasks):
-    """Mark a build as completed regardless of server batch progress.
-    Used when client-side clock determines completion to let expand/vault flows work.
-
-    Returns immediately after the fast finalisation; the heavier
-    auto-vault zip step runs in a background task so the request never
-    hits the 6s ingress timeout (was P1: first-call 502 → retry 200).
-    """
+    """Compatibility stop endpoint; client clocks cannot attest completed work."""
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
-    if build.get("status") == "completed":
-        return {"build_id": build_id, "status": "already_completed"}
-    build["status"] = "completed"
-    build["_bg_status"] = "completed"
-    build["completed_at"] = datetime.utcnow().isoformat()
-    # ── Stop the live runner so force-complete truly frees the build slot ──
-    # Without this the background runner keeps generating, so live_runners stays
-    # ≥1 and the next /start-build is rejected with 429, and the build keeps
-    # holding /jobs/active. Cancel it; the runner's CancelledError handler still
-    # flushes whatever it streamed, and vault reads are resilient to a shard
-    # that was mid-write (see core/build_vault._iter_shard).
-    try:
-        _tsk = _background_tasks.pop(build_id, None)
-        if _tsk is not None and not _tsk.done():
-            _tsk.cancel()
-    except Exception:
-        pass
-    _active_runners.discard(build_id)
-    # Mark all phases complete
-    for p in build.get("phases", []):
-        if p.get("status") != "completed":
-            p["status"] = "completed"
-            p["completed_at"] = datetime.utcnow().isoformat()
-    build["current_phase"] = len(build.get("phases", []))
-    build["completed_phases"] = build.get("current_phase", 0)
-    # Ensure at least some files exist
-    if not build.get("files") or build.get("file_count", 0) == 0:
-        try:
-            fb = _generate_fallback_files(
-                1, build.get("title", "game"), build.get("genre", "rpg"),
-                "force-completion", "client-clock-finalized",
-            ) or {}
-            build["files"] = fb
-            build["file_count"] = len(fb)
-        except Exception:
-            build["files"] = {}
-            build["file_count"] = 0
-    else:
-        build["file_count"] = len(build["files"])
-    await _save_build(build)
-
-    # ═══ AUTO-VAULT in background — never block the request ═══
-    async def _bg_vault():
-        try:
-            zip_path = await _package_build(build_id)
-            if zip_path and os.path.exists(zip_path):
-                entry = _vault_save(
-                    build_id, "zip", build.get("title", "game"), zip_path,
-                    {"auto_archived": True, "force_completed": True,
-                     "file_count": build.get("file_count", 0)},
-                )
-                await _save_vault_entry(entry)
-        except Exception as e:
-            print(f"[GALAXY force-complete] async vault save failed: {e}")
-
-    background_tasks.add_task(_bg_vault)
+    if build.get("status") == "completed" and not _build_has_live_work(build_id):
+        return {"build_id": build_id, "status": "already_completed", "file_count": build.get("file_count", 0)}
+    build = await _request_build_stop(build_id, "operator_stop_requested", failed=False)
     return {
         "build_id": build_id,
-        "status": "completed",
-        "file_count": build["file_count"],
-        "message": "Build force-completed & auto-archived.",
+        "status": build["_bg_status"],
+        "file_count": build.get("file_count", 0),
+        "partial_artifacts": bool(build.get("_vault_active") or build.get("files")),
+        "drain_pending": _build_has_live_work(build_id),
+        "message": "Stop requested. Completed artifacts are retained; the build slot remains held until physical work drains.",
     }
 
 
@@ -3282,10 +2910,6 @@ from routes.galaxy_studio_state import save_vault_entry as _save_vault_entry  # 
 #     (see include_router() block near end of file).
 
 
-
-
-
-
 # ─── Mega-DBs + db-status + bootstrap extracted → routes/galaxy_studio_mega_dbs.py
 #     (see include_router() block near end of file).
 
@@ -3294,7 +2918,7 @@ from routes.galaxy_studio_state import save_vault_entry as _save_vault_entry  # 
 #     routes/galaxy_studio_admin.py (see include_router() block near end).
 @router.post("/start-build")
 async def start_background_build(req: StartBuildRequest):
-    """Start a full background build with timed phase allocation.
+    """Start a full background build within a bounded execution budget.
     Frontend should poll GET /status/{build_id} every 5-10 seconds.
 
     ★ HARDENED INIT (2026-04-20) ★
@@ -3313,7 +2937,7 @@ async def start_background_build(req: StartBuildRequest):
         raise HTTPException(404, "Build not found")
 
     # Don't restart if already running (idempotent)
-    if req.build_id in _background_tasks and not _background_tasks[req.build_id].done():
+    if _build_has_live_work(req.build_id):
         return {
             "build_id": req.build_id,
             "status": "already_running",
@@ -3343,6 +2967,12 @@ async def start_background_build(req: StartBuildRequest):
                 _background_tasks.pop(_bid, None)
         except Exception:
             pass
+    live_runners = max(live_runners, len(_active_runners))
+    with _worker_lock:
+        live_runners = max(
+            live_runners,
+            sum(any(not future.done() for future in pending) for pending in _build_worker_futures.values()),
+        )
     # Also mark any in-memory build docs whose runner is gone as "lost" so
     # the UI can render them accurately, and they stop blocking new starts.
     stale_marked = 0
@@ -3373,16 +3003,50 @@ async def start_background_build(req: StartBuildRequest):
             detail=f"A build is already running ({live_runners} active). This pod runs one build at a time to stay within memory limits — wait for it to finish, then retry.",
         )
 
+    preflight = {
+        key: value
+        for key, value in build.items()
+        if key not in {"_bg_stop_requested", "_bg_deadline_monotonic"}
+    }
+    try:
+        await asyncio.to_thread(_check_build_resources, preflight)
+    except GalaxyBuildStopped as exc:
+        raise HTTPException(503, f"Build admission refused: {exc.reason}.") from None
+    # No await between the final custody check and reserving the slot.
+    if _build_has_live_work(req.build_id):
+        return {"build_id": req.build_id, "status": "already_running"}
+    if _any_build_has_live_work():
+        raise HTTPException(429, "Another build owns the generation slot.")
+    _active_runners.add(req.build_id)
     # ═══ STAMP INITIAL STATE ═══
     # This is the fix for "build doesn't initialize" — we pre-set the status
     # fields so the UI's first poll sees `_bg_status=running`, not None.
+    for key in (
+        "_bg_stop_requested",
+        "_bg_stop_reason",
+        "_bg_stop_target",
+        "_bg_drain_pending",
+        "_bg_deadline_monotonic",
+        "_vault_write_failed",
+        "_bg_error",
+        "completed_at",
+        "_bg_completed",
+    ):
+        build.pop(key, None)
     build["status"] = "building"
     build["_bg_status"] = "running"
     build["_bg_current_batch"] = 0
+    build["_bg_last_batch_completed"] = 0
+    build["current_phase"] = 0
+    for phase in build.get("phases", []):
+        phase["status"] = "pending"
+        phase["started_at"] = None
+        phase["completed_at"] = None
     build["_bg_total_batches"] = TOTAL_BATCHES
+    build["_bg_target_duration"] = req.build_duration_minutes
     build["_bg_started"] = datetime.utcnow().isoformat()
     build["_bg_last_heartbeat"] = datetime.utcnow().isoformat()
-    build["_bg_phase_log"] = build.get("_bg_phase_log", [])
+    build["_bg_phase_log"] = []
     build["_bg_errors"] = build.get("_bg_errors", [])
     build["_bg_retries"] = build.get("_bg_retries", 0)
     build["_bg_fallbacks"] = build.get("_bg_fallbacks", 0)
@@ -3390,9 +3054,18 @@ async def start_background_build(req: StartBuildRequest):
     if not isinstance(build.get("files"), dict):
         build["files"] = {}
     try:
-        await _save_build(build)
-    except Exception as _sve:
-        print(f"[GALAXY start-build] initial-save failed (non-fatal): {_sve}")
+        await _save_build_required(build)
+    except asyncio.CancelledError:
+        _mark_build_stop(build, "admission_cancelled", failed=False)
+        build["status"] = "cancelled"
+        build["_bg_status"] = "cancelled"
+        _active_runners.discard(req.build_id)
+        raise
+    except GalaxyBuildStopped:
+        build["status"] = "failed"
+        build["_bg_status"] = "failed"
+        _active_runners.discard(req.build_id)
+        raise HTTPException(503, "Durable build metadata is unavailable; no worker was started.") from None
 
     # ═══ LAUNCH BACKGROUND RUNNER ═══
     # Stash user-supplied phase_weights on the build doc so the generator
@@ -3409,10 +3082,6 @@ async def start_background_build(req: StartBuildRequest):
         if clean_weights:
             build["phase_weights"] = clean_weights
             print(f"[GALAXY start-build] applied phase_weights for {req.build_id}: {clean_weights}")
-            try:
-                await _save_build(build)
-            except Exception as _save_error:
-                print(f"[GALAXY] phase weight save failed: {_save_error}", flush=True)
 
     # Wrap the create_task itself in try/except so even a catastrophic
     # asyncio failure doesn't leave the user staring at a dead UI.
@@ -3422,6 +3091,7 @@ async def start_background_build(req: StartBuildRequest):
         )
         _background_tasks[req.build_id] = task
     except Exception as _tke:
+        _active_runners.discard(req.build_id)
         # Restore status so frontend knows something went wrong
         build["_bg_status"] = "failed"
         build["status"] = "failed"
@@ -3449,15 +3119,14 @@ async def start_background_build(req: StartBuildRequest):
         "status": "started",
         "bg_status": "running",
         "swarm_job_id": swarm_job_id,
-        "swarm_poll_url": (f"/api/galaxy-studio/swarm/planner/job/{swarm_job_id}"
-                           if swarm_job_id else None),
+        "swarm_poll_url": (f"/api/galaxy-studio/swarm/planner/job/{swarm_job_id}" if swarm_job_id else None),
         "duration_minutes": req.build_duration_minutes,
         "total_phases": len(BUILD_PHASES),
         "total_batches": TOTAL_BATCHES,
         "batch_names": BATCH_NAMES,
         "poll_url": f"/api/galaxy-studio/status/{req.build_id}",
         "poll_interval_seconds": 5,
-        "message": f"Build started. {len(BUILD_PHASES)} phases in {TOTAL_BATCHES} batches over {req.build_duration_minutes} minutes. Poll status for progress.",
+        "message": f"Build started. {len(BUILD_PHASES)} phases in {TOTAL_BATCHES} batches within a {req.build_duration_minutes}-minute execution budget. Poll status for progress.",
     }
 
 
@@ -3467,46 +3136,15 @@ async def get_status(build_id: str):
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
-        
-    # Self-healing background runner restart — ONLY if there's truly no
-    # runner alive. Guard against: (1) in-flight task that hasn't registered
-    # yet in _active_runners (tiny race at startup), (2) a completed runner
-    # lingering in _background_tasks, (3) a stale MINIMAL-save that still
-    # shows status=building while the real runner finished. We also now
-    # gate on a short heartbeat grace period so we don't double-launch.
-    if (
-        build.get("status") == "building"
-        and build_id not in _active_runners
-        and build_id not in _background_tasks
-    ):
-        # Heartbeat grace — if the last known heartbeat was within the last
-        # 30 seconds, trust the existing runner and don't spawn a duplicate.
-        from datetime import datetime as _dt, timedelta as _td
-        hb_iso = build.get("_bg_last_heartbeat") or build.get("_bg_started")
-        stale = True
-        try:
-            if hb_iso:
-                last = _dt.fromisoformat(hb_iso)
-                if _dt.utcnow() - last < _td(seconds=45):
-                    stale = False
-        except Exception:
-            pass
-        if stale:
-            import asyncio
-            _active_runners.add(build_id)
-            resume_from = max(1, int(build.get("_bg_current_batch", 0)) + 1)
-            task = asyncio.create_task(
-                _run_background_build(
-                    build_id,
-                    int(build.get("_bg_target_duration", 15)),
-                    resume_from_batch=resume_from,
-                )
-            )
-            _background_tasks[build_id] = task
-            print(f"[GALAXY] self-heal: spawned runner for {build_id} from batch {resume_from} (heartbeat stale)", flush=True)
 
-    phase_idx = min(build.get("current_phase", 0), len(BUILD_PHASES) - 1)
-    completed_phases = [p for p in build["phases"] if p["status"] == "completed"]
+    # Inspection does not create/release work. The bounded watchdog owns
+    # orphan admission; live futures remain authoritative through physical drain.
+    runner_live = _build_has_live_work(build_id)
+
+    phase_idx = max(0, min(int(build.get("current_phase", 0)), len(BUILD_PHASES) - 1))
+    completed_phases = [
+        p for p in build.get("phases", []) if isinstance(p, dict) and p.get("status") == "completed"
+    ]
 
     # ── AUTHORITATIVE FILE COUNT (cached 2s) ──
     # build["file_count"] is set in many places to len(build["files"]) which
@@ -3521,28 +3159,33 @@ async def get_status(build_id: str):
         now = _t.time()
         last_check = build.get("_file_count_last_check", 0)
         if now - last_check > 2.0:
-            authoritative_count = _vault_total_files(build)
+            build["_file_count_last_check"] = now
+            authoritative_count = await asyncio.to_thread(_vault_total_files, build)
             if authoritative_count > 0:
                 build["file_count"] = authoritative_count
             build["_file_count_last_check"] = now
     except Exception:
         pass
-    
-    # Calculate time-based progress for background builds
+
+    # Time is a budget display only; actual durable phases determine progress.
     bg_progress = None
     if build.get("_bg_started"):
-        from datetime import datetime as dt
-        started = dt.fromisoformat(build["_bg_started"])
-        elapsed = (dt.utcnow() - started).total_seconds()
-        target = build.get("_bg_target_duration", 15) * 60
-        bg_progress = {
-            "elapsed_seconds": round(elapsed),
-            "target_seconds": target,
-            "elapsed_formatted": f"{int(elapsed // 60)}m {int(elapsed % 60)}s",
-            "remaining_formatted": f"{max(0, int((target - elapsed) // 60))}m {max(0, int((target - elapsed) % 60))}s",
-            "time_pct": min(100, round(elapsed / target * 100)),
-        }
-    
+        try:
+            started = datetime.fromisoformat(build["_bg_started"])
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            elapsed = max(0.0, (datetime.now(timezone.utc) - started).total_seconds())
+            target = max(1, int(build.get("_bg_target_duration", 15))) * 60
+            bg_progress = {
+                "elapsed_seconds": round(elapsed),
+                "target_seconds": target,
+                "elapsed_formatted": f"{int(elapsed // 60)}m {int(elapsed % 60)}s",
+                "remaining_formatted": f"{max(0, int((target - elapsed) // 60))}m {max(0, int((target - elapsed) % 60))}s",
+                "time_pct": min(100, round(elapsed / target * 100)),
+            }
+        except (ValueError, TypeError, OverflowError):
+            pass
+
     # Determine current batch
     current_batch = (build.get("current_phase", 0) // PHASES_PER_BATCH) + 1 if build.get("current_phase", 0) < len(BUILD_PHASES) else TOTAL_BATCHES
     batch_name = BATCH_NAMES.get(min(current_batch, TOTAL_BATCHES), "Complete")
@@ -3571,9 +3214,10 @@ async def get_status(build_id: str):
     # The triage test expected several conventional fields (`progress_percent`,
     # `target_files`, `phase_label`, `eta_seconds`, `errors`). Provide them
     # as first-class keys without breaking the existing payload shape.
-    progress_pct = build["phases"][phase_idx].get("pct", 0)
-    bg_time_pct = bg_progress["time_pct"] if bg_progress else 0
-    progress_percent = max(progress_pct, bg_time_pct)
+    progress_percent = round(len(completed_phases) * 100 / max(1, len(build.get("phases") or [])))
+    if build.get("status") != "completed":
+        progress_percent = min(99, progress_percent)
+    progress_pct = progress_percent
     eta_seconds = None
     if bg_progress:
         eta_seconds = max(0, bg_progress["target_seconds"] - bg_progress["elapsed_seconds"])
@@ -3585,6 +3229,16 @@ async def get_status(build_id: str):
         "genre": build["genre"],
         "status": build["status"],
         "bg_status": build.get("_bg_status", "manual"),
+        "execution": {
+            "runner_live": runner_live,
+            "physical_workers": _physical_build_workers(build_id),
+            "stop_requested": bool(build.get("_bg_stop_requested")),
+            "stop_reason": build.get("_bg_stop_reason"),
+            "drain_pending": bool(build.get("_bg_drain_pending")),
+            "partial_artifacts": bool(build.get("_vault_active") or build.get("files")),
+            "unflushed_files": len(build.get("files") or {}),
+            "storage_failed": bool(build.get("_vault_write_failed")),
+        },
         "current_phase": build.get("current_phase", 0),
         "total_phases": len(BUILD_PHASES),
         "current_batch": min(current_batch, TOTAL_BATCHES),
@@ -3592,12 +3246,12 @@ async def get_status(build_id: str):
         "batch_name": batch_name,
         "batch_names": BATCH_NAMES,
         "progress_pct": progress_pct,
-        "progress_percent": progress_percent,        # 0-100 overall
-        "phase_label": phase_label,                  # e.g. "Codegen", "Polish"
-        "phase": phase_idx,                          # alias for current_phase
+        "progress_percent": progress_percent,  # 0-100 overall
+        "phase_label": phase_label,  # e.g. "Codegen", "Polish"
+        "phase": phase_idx,  # alias for current_phase
         "target_files": build.get("target_files", build.get("file_count", 0)),
-        "eta_seconds": eta_seconds,                  # null if not background
-        "errors": build.get("_bg_errors", []),       # alias of redundancy.error_details (full list)
+        "eta_seconds": eta_seconds,  # null if not background
+        "errors": build.get("_bg_errors", []),  # alias of redundancy.error_details (full list)
         "total_agents": build["total_agents"],
         "agents_active": build["agents_active"],
         "phases": build["phases"],
@@ -3614,7 +3268,11 @@ async def get_status(build_id: str):
             "fallbacks": build.get("_bg_fallbacks", 0),
             "errors": len(build.get("_bg_errors", [])),
             "error_details": build.get("_bg_errors", [])[-3:],  # Last 3 errors
-            "health": "excellent" if build.get("_bg_fallbacks", 0) == 0 else "recovered" if build.get("_bg_fallbacks", 0) < 5 else "degraded",
+            "health": (
+                "excellent"
+                if build.get("_bg_fallbacks", 0) == 0
+                else "recovered" if build.get("_bg_fallbacks", 0) < 5 else "degraded"
+            ),
         },
     }
 
@@ -4954,8 +4612,8 @@ async def galaxy_active_jobs():
         # so surface it on the home badge + banner.
         for bid in list(_active_runners):
             _tsk = _background_tasks.get(bid)
-            if _tsk is not None and _tsk.done():
-                continue  # finished but not yet discarded — skip
+            if _tsk is not None and _tsk.done() and not _physical_build_workers(bid):
+                continue
             b = {}
             try:
                 _cand = _builds.get(bid)
@@ -4966,15 +4624,23 @@ async def galaxy_active_jobs():
             # Skip builds already finalized (e.g. via force-complete) even if
             # the runner is still winding down — they must not keep /jobs/active
             # (and the hub banner) lit or hold the single-build slot.
-            if (b.get("status") or "").lower() in ("completed", "failed", "cancelled", "archived"):
+            if not _build_has_live_work(bid):
                 continue
             phases = b.get("phases") or []
             done = sum(1 for p in phases if isinstance(p, dict) and p.get("status") == "completed")
-            jobs.append({
-                "build_id": bid, "title": b.get("title") or str(bid)[:8], "kind": "build",
-                "stage": f"phase {done}/{len(phases) or 100}",
-                "files": b.get("file_count", 0),
-            })
+            jobs.append(
+                {
+                    "build_id": bid,
+                    "title": b.get("title") or str(bid)[:8],
+                    "kind": "build",
+                    "stage": (
+                        "stopping; draining physical work"
+                        if b.get("_bg_stop_requested")
+                        else f"phase {done}/{len(phases) or 100}"
+                    ),
+                    "files": b.get("file_count", 0),
+                }
+            )
 
         # ── POST-BUILD EXPANSION / APK PACKAGING JOBS (in-memory state) ──
         for bid, b in list(_builds.items()):
@@ -5234,8 +4900,10 @@ def _evict_stale_builds_loop():
             for bid in list(_builds.keys()):
                 b = _builds.get(bid) or {}
                 status = b.get("status", "")
-                if status not in ("completed", "failed", "aborted"):
+                if status not in ("completed", "failed", "aborted", "cancelled"):
                     continue
+                if _build_has_live_work(bid) or b.get("_vault_write_failed") or b.get("files"):
+                    continue  # never evict live custody or the only copy of unflushed artifacts
                 touch = b.get("_last_touch") or b.get("completed_at") or b.get("_bg_started")
                 try:
                     if isinstance(touch, str):

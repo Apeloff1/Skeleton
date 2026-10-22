@@ -5446,6 +5446,95 @@
           "inference_preparation": "Existing local/native owners add immutable per-request LocalPreparedInput plus prepare_input/validate_prepared_input/infer_prepared: exact request/model/runtime/profile/tokenizer/source/issuer/trusted-scope bindings; reused count/estimate/token sequence, no cross-request cache or new store. Resource telemetry uses fresh CPU deltas and actual platform/cgroup/process memory; missing signals remain unknown.",
           "qualification": "Build/source compilation only. Existing ownership, review floors, consent, grants and enterprise qualification state are unchanged."
         }
+      },
+      "studio_foundation_pass": {
+        "status": "implementation_candidate",
+        "workflow_templates": {
+          "contract_owner": "skeleton/contracts/ai_workflows.py",
+          "interface": "GET /api/ai/workflow-templates; authenticated actor/tenant-bound wrapper around a pure bounded catalog",
+          "consumer_surfaces": [
+            "chat composers",
+            "game studio goal form",
+            "Dragon capture form"
+          ],
+          "authority": "Draft form settings only, explicit apply, no execution or durable state. Whitelisted finite per-surface budgets and digests. Templates never fill content/credentials/URLs/consent/edit grants, alter live goals, enable automation or imply runtime readiness. Existing owners validate actual submitted commands.",
+          "wire": {
+            "catalog_schema": "skeleton.ai.workflow_catalog.v1",
+            "template_schema": "skeleton.ai.workflow_template.v1",
+            "wrapper_schema": "skeleton.ai.workflow_templates.v1",
+            "max_catalog_bytes": 65536,
+            "max_templates": 16,
+            "surfaces": [
+              "chat",
+              "studio",
+              "crawler"
+            ],
+            "template_fields": [
+              "schema_version",
+              "template_id",
+              "revision",
+              "surface",
+              "title",
+              "description",
+              "settings",
+              "requirements",
+              "scope",
+              "execution_authorized",
+              "template_digest"
+            ]
+          }
+        },
+        "inference_execution_contract": {
+          "owner": "skeleton/ai/runtime/inference/local.py with existing native owners",
+          "schema": "skeleton.local_inference.execution_contract.v1",
+          "projection": "existing adapter status and engine snapshot only",
+          "authority": "Side-effect-free activated identity/protocol/accounting/generation/static capacity metadata, deterministic digest and shared finite input-budget validator. No tokenizer execution, credential/provider activation, new cache/store or capability promotion."
+        },
+        "learning_explanations": {
+          "owners": [
+            "skeleton/intelligence/runtime_learning.py",
+            "skeleton/persistence/execution_repository.py"
+          ],
+          "schema": "skeleton.runtime.learning.explanation.v1",
+          "projection": "optional partition.reference_explanation and actual request recommendation.explanation, never a nested replacement of the existing readiness string",
+          "authority": "Bounded analytic local sensitivity of the existing 12->16->8->3 operational MLP; top4 input contributions per output, validated retained numeric replay reference when ready, current state/policy/sample/predictor digests. State latest source pin is not falsely attributed to older replay samples. No causal/creative/correctness explanation or model training. Unknown/stale/not-ready evidence withholds learned explanations."
+        },
+        "maintenance_inspection": {
+          "owner": "skeleton/jeeves/ai/studio_maintenance.py",
+          "projection": "existing scoped snapshot adds handler_registry, queue_summary and per-returned-task scheduling",
+          "authority": "Bounded existing same-DB reads only, actual registered handler versions/retry/ack availability, at most100 task projections and known bounded kind/state counts. Scheduling explains observed blockers against persisted host logical clock; execution_authority none and host_admission_required true. No readiness grant, reservation, handler code/path disclosure, new store or mutation from inspection."
+        },
+        "storage": "Existing canonical stores and authorities only. Templates/explanations/contracts are derived ephemeral data. No new runtime service/provider boundary.",
+        "validation": "Source compilation only under user no-tests instruction; no closure/signoff/promotion changes.",
+        "critical_gap_hardening": {
+          "engine_transport": {
+            "owner": "backend/core/engine_client.py",
+            "contract": "Bound streamed response bytes before allocation of the whole payload, finite duplicate-free UTF-8 JSON, bounded nesting/node count, absolute request deadline, identity content encoding only; preserve existing authenticated one-shot methods and error classes. No new provider/network authority."
+          },
+          "local_stream_consistency": {
+            "owners": [
+              "skeleton/ai/runtime/inference/local.py",
+              "skeleton/ai/runtime/inference/native_runtime.py",
+              "skeleton/ai/runtime/inference/native_transformer.py"
+            ],
+            "contract": "Validate shared activated input/output budgets, bounded native event order, actual streamed token IDs vs terminal result and replay request/model/config/output identities before cache/result publication. Consistency checks do not establish model correctness or independent verification."
+          },
+          "learning_integrity": "Only integrity-verified persisted predictor payloads may salvage embedded checkpoints; numeric checkpoint replay admission checks canonical feedback/request/result scope and digests rather than trusting retained diagnostic JSON alone.",
+          "chat_recovery": "Strict persisted turn/event schema and scalar identity checks; renewed Mongo lease must remain future-valid on database clock within the same CAS.",
+          "maintenance_ack": "Void hook success remains compatible; non-None host acknowledgement must be bounded finite mapping with explicit acknowledged true before pending receipt retirement.",
+          "operator_forms": "Draft templates remain explicit and bounded; submit paths recheck fresh account, role, consent/rights and original owner readiness instead of relying solely on disabled buttons.",
+          "qualification": "Fault consistency and source compilation only, no claim of Byzantine quorum consensus, independent model correctness or production qualification.",
+          "maintenance_drain_proofs": "Existing bounded drain proof collection executes host callbacks/process probes outside SQLite/state locks; exact identity/heartbeat/physical-count CAS persists positive drained facts. Locked claim/retry paths consume only durable/self-drain proofs. Unknown or expired ownership remains blocked; no new authority.",
+          "galaxy_build_backpressure": {
+            "owners": [
+              "backend/core/build_watchdog.py",
+              "backend/routes/galaxy_studio.py",
+              "backend/routes/galaxy_studio_resilience.py",
+              "backend/routes/galaxy_studio_watchdog.py"
+            ],
+            "contract": "Existing Galaxy build owner must preserve partial artifacts and report actual failure/stop when deadlines or durable artifact writes fail; timeout/heartbeat/client clock cannot fabricate completed phases. Retain live task handles and do not start overlapping workers based only on stale heartbeats. Stop further floor submissions on storage pressure, avoid unbounded RAM fallback and keep blocking resource checks off the async event loop. No new store/service or artifact deletion authority."
+          }
+        }
       }
     }
   },

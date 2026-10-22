@@ -122,23 +122,42 @@ def _operation_doc(turn: PersistedChatTurn) -> dict[str, Any]:
 
 def _turn_from_doc(doc: Mapping[str, Any]) -> PersistedChatTurn:
     try:
+        if (
+            isinstance(doc.get("schema_version"), bool)
+            or not isinstance(doc.get("schema_version"), int)
+            or doc.get("schema_version") != CHAT_TURN_SCHEMA_VERSION
+        ):
+            raise ChatTurnCorruption("unsupported Mongo AI-chat operation schema")
+        for key in ("admitted_thread_version", "next_sequence"):
+            value = doc.get(key)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ChatTurnCorruption("Mongo turn materialized counters must be positive integers")
         snapshot_raw = doc["snapshot"]
         if not isinstance(snapshot_raw, Mapping):
             raise ChatTurnCorruption("Mongo turn snapshot must be an object")
+        if (
+            isinstance(snapshot_raw.get("schema_version"), bool)
+            or not isinstance(snapshot_raw.get("schema_version"), int)
+            or (
+                "external_effect_started" in snapshot_raw
+                and not isinstance(snapshot_raw["external_effect_started"], bool)
+            )
+        ):
+            raise ChatTurnCorruption("Mongo turn snapshot scalar types are invalid")
         snapshot = turn_snapshot_from_dict(snapshot_raw)
         binding = ChatTurnBinding(
-            tenant_id=str(doc["tenant_id"]),
-            owner_id=str(doc["owner_id"]),
-            thread_id=str(doc["thread_id"]),
-            causal_user_message_id=str(doc["causal_user_message_id"]),
-            admitted_thread_version=int(doc["admitted_thread_version"]),
+            tenant_id=doc["tenant_id"],
+            owner_id=doc["owner_id"],
+            thread_id=doc["thread_id"],
+            causal_user_message_id=doc["causal_user_message_id"],
+            admitted_thread_version=doc["admitted_thread_version"],
         )
         turn = PersistedChatTurn(
             snapshot=snapshot,
             binding=binding,
             created_at=_stored_utc(doc["created_at"], "created_at"),
             updated_at=_stored_utc(doc["updated_at"], "updated_at"),
-            snapshot_digest=str(doc["snapshot_digest"]),
+            snapshot_digest=doc["snapshot_digest"],
         )
     except (
         KeyError,
@@ -151,13 +170,13 @@ def _turn_from_doc(doc: Mapping[str, Any]) -> PersistedChatTurn:
             raise
         raise ChatTurnCorruption("persisted Mongo AI-chat operation is invalid") from exc
 
-    if doc.get("operation_id") != snapshot.operation_id:
+    if doc.get("_id") != snapshot.operation_id or doc.get("operation_id") != snapshot.operation_id:
         raise ChatTurnCorruption("Mongo operation identity drifted")
     if doc.get("request_digest") != snapshot.request_digest:
         raise ChatTurnCorruption("Mongo request digest drifted")
     if doc.get("state") != snapshot.state.value:
         raise ChatTurnCorruption("Mongo materialized state drifted")
-    if int(doc.get("next_sequence", -1)) != snapshot.next_sequence:
+    if doc["next_sequence"] != snapshot.next_sequence:
         raise ChatTurnCorruption("Mongo materialized sequence drifted")
     if doc.get("last_event_digest") != snapshot.last_event_digest:
         raise ChatTurnCorruption("Mongo materialized digest chain drifted")
@@ -167,6 +186,8 @@ def _turn_from_doc(doc: Mapping[str, Any]) -> PersistedChatTurn:
 def _lease_from_doc(doc: Mapping[str, Any]) -> TurnLeaseToken | None:
     holder = doc.get("lease_holder_id")
     if holder is None:
+        if any(doc.get(key) is not None for key in ("lease_token", "lease_granted_at", "lease_expires_at")):
+            raise ChatTurnCorruption("Mongo unowned lease retains active ownership materialization")
         return None
     for field in ("lease_epoch", "lease_heartbeat_sequence"):
         if isinstance(doc.get(field), bool) or not isinstance(doc.get(field), int):
@@ -317,9 +338,15 @@ def _event_doc(
 
 def _event_from_doc(doc: Mapping[str, Any]) -> TurnEvent:
     try:
+        if isinstance(doc.get("sequence"), bool) or not isinstance(doc.get("sequence"), int):
+            raise ChatTurnCorruption("Mongo event sequence must be an integer")
         raw = doc["event"]
         if not isinstance(raw, Mapping):
             raise ChatTurnCorruption("Mongo turn event must be an object")
+        if isinstance(raw.get("schema_version"), bool) or not isinstance(raw.get("schema_version"), int):
+            raise ChatTurnCorruption("Mongo turn event schema must be an integer version")
+        if "external_effect_started" in raw and not isinstance(raw["external_effect_started"], bool):
+            raise ChatTurnCorruption("Mongo turn event external-effect flag must be boolean")
         event = turn_event_from_dict(raw)
     except (
         KeyError,
@@ -330,9 +357,12 @@ def _event_from_doc(doc: Mapping[str, Any]) -> TurnEvent:
         if isinstance(exc, ChatTurnCorruption):
             raise
         raise ChatTurnCorruption("persisted Mongo turn event is invalid") from exc
-    if doc.get("operation_id") != event.operation_id:
+    if (
+        doc.get("_id") != f"{event.operation_id}:{event.sequence}"
+        or doc.get("operation_id") != event.operation_id
+    ):
         raise ChatTurnCorruption("Mongo event operation identity drifted")
-    if int(doc.get("sequence", -1)) != event.sequence:
+    if doc["sequence"] != event.sequence:
         raise ChatTurnCorruption("Mongo event sequence drifted")
     if doc.get("event_digest") != event.digest:
         raise ChatTurnCorruption("Mongo event digest drifted")
@@ -872,6 +902,9 @@ class MongoChatTurnAuthority:
         }
         if now is None:
             query.update(_live_lease_query(current))
+            # A slow or skewed process clock must not replace a currently live
+            # lease with an already-expired token on the database clock.
+            query["$expr"] = {"$and": [query["$expr"], {"$gt": [renewed.expires_at, "$$NOW"]}]}
         try:
             advanced = await self.operations.find_one_and_update(
                 query,
