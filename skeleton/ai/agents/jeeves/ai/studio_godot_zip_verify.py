@@ -852,6 +852,27 @@ def verify_published_godot_zip(
                     chunk_raw, source_index=spatial_data,
                 )
                 chunk_data = json.loads(chunk_raw)
+                from .studio_world_streamer_godot import (
+                    WorldGodotStreamingError, verify_godot_world_streamer,
+                    GD_PATH, SCENE_PATH,
+                )
+                if GD_PATH not in expected or SCENE_PATH not in expected:
+                    raise WorldGodotStreamingError(
+                        "source-owned Godot 4 scene streamer missing"
+                    )
+                streamer_proof = verify_godot_world_streamer(
+                    spatial_data, chunk_data,
+                    {
+                        GD_PATH: archive.read(GD_PATH).decode("utf-8"),
+                        SCENE_PATH: archive.read(SCENE_PATH).decode("utf-8"),
+                    },
+                    proof["world_streamer_source_receipt"],
+                )
+                if (proof.get("native_world_streaming_executed") is not False
+                        or streamer_proof["source_text_reproduced"] is not True):
+                    raise WorldGodotStreamingError(
+                        "streaming scene cannot claim unobserved Godot execution"
+                    )
                 if (chunk_proof["source_chunk_sha256"] !=
                         proof.get("world_chunk_catalog_sha256")
                         or chunk_data["receipt_sha256"] !=
@@ -871,6 +892,7 @@ def verify_published_godot_zip(
                         "source world spatial receipts disagree with archive"
                     )
             except (WorldSpatialIndexError, WorldChunkError,
+                    WorldGodotStreamingError, UnicodeDecodeError,
                     ValueError, KeyError, TypeError) as exc:
                 raise NativeSourceVerificationError(
                     "published 3D spatial instances/bounds do not match real scenes"
@@ -903,6 +925,8 @@ def verify_published_godot_zip(
         "world_spatial_index_sha256": spatial_proof["world_index_sha256"],
         "world_chunk_cells_replayed": chunk_proof["home_cells_replayed"],
         "world_chunk_catalog_sha256": chunk_proof["source_chunk_sha256"],
+        "world_streamer_source_replayed": streamer_proof["source_text_reproduced"],
+        "native_world_streaming_executed": False,
         "original_3d_instanced_in_world_scene":
             placement_proof["real_scene_hierarchy_compiled"],
         "actual_collision_contact_observed": False,

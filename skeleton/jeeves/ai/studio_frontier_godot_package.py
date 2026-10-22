@@ -590,6 +590,18 @@ def compile_original_godot_candidate(
         raise FrontierSourceError("source chunk partition artifact collides")
     binary_assets[chunk_path] = chunk_raw
     file_hashes[chunk_path] = sha256(chunk_raw).hexdigest()
+    from .studio_world_streamer_godot import (
+        compile_godot_world_streamer, verify_godot_world_streamer,
+    )
+    streamer = compile_godot_world_streamer(world_index, world_chunks)
+    verify_godot_world_streamer(
+        world_index, world_chunks, streamer["files"], streamer["receipt"],
+    )
+    for path, content in streamer["files"].items():
+        if path in files or path in binary_assets:
+            raise FrontierSourceError("Godot streaming asset file collides")
+        files[path] = content
+        file_hashes[path] = sha256(content.encode("utf-8")).hexdigest()
     index_path = "game/frontier/assets/world-index.json"
     if index_path in files or index_path in binary_assets:
         raise FrontierSourceError("spatial manifest path is already occupied")
@@ -623,6 +635,8 @@ def compile_original_godot_candidate(
         "world_chunk_catalog_sha256": sha256(chunk_raw).hexdigest(),
         "world_chunk_receipt_sha256": world_chunks["receipt_sha256"],
         "world_chunk_count": world_chunks["chunk_count"],
+        "world_streamer_source_receipt": streamer["receipt"],
+        "native_world_streaming_executed": False,
         "world_instance_descriptor_count": world_index["instance_count"],
         "packaged_original_sprites": authored_sprites,
         "packaged_original_audio": authored_audio,
