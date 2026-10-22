@@ -233,6 +233,12 @@ def plan_chunk_resources(
     else:
         truncated = False
     desired = sorted({item["scene_resource_path"] for item in selected})
+    # Budgeting new loads must never evict a resource still required by a
+    # visible scene omitted solely because the per-query load limit filled.
+    # Multiple distinct world instances can share one PackedScene asset.
+    visible_resources = {
+        entry["scene_resource_path"] for _, _, entry in weighted
+    }
     loaded = set(previously_loaded)
     plan = {
         "schema_version": PLAN_SCHEMA,
@@ -247,7 +253,7 @@ def plan_chunk_resources(
         ],
         "required_scene_resources": desired,
         "resources_to_load": sorted(set(desired) - loaded),
-        "resources_to_release": sorted(loaded - set(desired)),
+        "resources_to_release": sorted(loaded - visible_resources),
         "selection_truncated": truncated,
         "actual_resources_loaded": False,
         "actual_native_gpu_residency_observed": False,
