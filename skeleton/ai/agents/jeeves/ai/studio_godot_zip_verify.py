@@ -266,6 +266,18 @@ def verify_published_godot_zip(
                 raise NativeSourceVerificationError(
                     "published original mesh scenes and LOD binaries failed replay"
                 ) from exc
+            from .studio_original_mesh_physics_package_verify import (
+                OriginalMeshPhysicsArchiveError,
+                verify_original_mesh_physics_archive,
+            )
+            try:
+                physics_proof = verify_original_mesh_physics_archive(
+                    archive, expected, proof, descriptor_meshes,
+                )
+            except OriginalMeshPhysicsArchiveError as exc:
+                raise NativeSourceVerificationError(
+                    "published Godot collider or physical-body source cannot replay"
+                ) from exc
             original_sprites = proof.get("packaged_original_sprites", [])
             if (not isinstance(original_sprites, list)
                     or len(original_sprites) > 128
@@ -818,6 +830,8 @@ def verify_published_godot_zip(
         "asset_catalog_sha256": catalog_proof["catalog_sha256"],
         "original_glb_scenes_replayed": mesh_scene_proof["mesh_scenes_replayed"],
         "original_lod_levels_replayed": mesh_scene_proof["lod_levels_replayed"],
+        "original_physics_bodies_replayed": physics_proof["bodies_replayed"],
+        "actual_collision_contact_observed": False,
         "embedded_evidence_sha256": receipt_digest,
         "all_emitted_file_hashes_verified": True,
         "actual_godot_execution_verified": False,

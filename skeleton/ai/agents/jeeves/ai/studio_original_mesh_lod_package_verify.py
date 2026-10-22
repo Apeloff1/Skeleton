@@ -140,6 +140,19 @@ def verify_original_mesh_archive_resources(
         raise OriginalMeshArchiveError("LOD refers to unshipped GLB base asset")
     # Forbid orphan/unattributed behavior-bearing .gd/.tscn resources in the
     # original mesh directory, even with a self-consistent manifest hash.
+    published_bodies = proof.get("packaged_original_mesh_physics")
+    if not isinstance(published_bodies, list) or len(published_bodies) > 64:
+        raise OriginalMeshArchiveError("original physics manifest missing or oversized")
+    for body in published_bodies:
+        name = body.get("asset_id") if isinstance(body, Mapping) else None
+        if type(name) is not str:
+            raise OriginalMeshArchiveError("original physics scene lacks asset name")
+        actual_scene_paths.add(
+            "game/frontier/meshes/" + name + ".physics.tscn"
+        )
+        expected_authored_sources.add(
+            "game/frontier/meshes/" + name + ".physics.source.json"
+        )
     found = {
         path for path in names
         if path.startswith("game/frontier/meshes/")
