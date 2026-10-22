@@ -893,3 +893,60 @@ for all newly created Jeeves studio modules and move the owned
 `runtime_learning` contracts into their required governed mirror. Existing
 canonical runtime/owner modules are not deleted or rewritten to bypass a
 quality gate.
+
+
+## Lossless directional animations and exact collision topology
+
+Two more concrete sprite-production steps now compile from the SAME
+approved, revisioned `sprite_forge` document:
+
+**Authored directional variants.** Add an optional `variants` list:
+
+```json
+{
+  "frame_id": "hero-face-left",
+  "source_frame_id": "hero-face-right",
+  "transform": "flip_horizontal",
+  "duration_ms": 120
+}
+```
+
+The explicit transforms are `flip_horizontal`, `flip_vertical`,
+`rotate_180`, `rotate_90_cw` and `rotate_90_ccw`. Quarter-turns
+require square frames; otherwise the compiler rejects the operation instead
+of cropping or implicitly changing the approved sprite dimensions. Each
+variant references one **original** authored frame (never another variant),
+has its own authored duration, is bounded by the same 64-frame limit, and may
+be named in normal animation timelines or Godot player travel-mode animation
+maps. Frame pixels are rearranged losslessly with no interpolation or
+machine-invented artwork. The compiled sprite receipt includes signed
+source- and destination-RGBA hashes and transform parameters. The independent
+PNG verifier decodes the final atlas, reconstructs the original source
+frames, replays every directional transform on actual RGBA pixels and refuses
+an invented, retargeted, repeated or altered frame. This is a reproducible
+game-art transformation, not model image generation or a claim of training.
+
+**Pixel-exact collision topology.** The `studio_sprite_hitboxes.py` compiler
+turns each frame's already reviewed alpha-threshold mask into nonoverlapping,
+maximally vertical-merged source rectangles. It independently rasterizes the
+whole rectangle collection, requiring **exactly one** collision hit on
+every solid pixel and no hit on any clear pixel. Geometry is expressed both
+in original source pixels and scaled sprite-local coordinates relative to the
+authored pivot. The output includes each mask SHA, source revision identity,
+frame timing, shape count and a content-addressed receipt. Per-frame and
+whole-atlas budgets protect consumers against pathological masks.
+
+Every `sprite-atlas-zip` now includes
+`sprites/<asset_id>.hitboxes.json`; the Godot game ZIP similarly includes
+`game/frontier/sprites/<asset_id>.hitboxes.json`. The Godot ZIP verifier
+rebuilds the collision geometry from the PNG's reviewed alpha-mask evidence
+and compares every rectangle and hash. The files are ready for a native
+physics adapter, but **collision nodes are not yet instantiated in Godot**;
+the manifest explicitly states that and does not award gameplay collision
+certification.
+
+Dedicated regression suites cover frame reflection, rotation,
+non-square refusal, animation state references, forged transform receipts,
+source revisions, exact sparse/opaque alpha masks, geometric reconstruction,
+collision sidecar export and independent Godot package verification. These
+are imported by the repository's root backend test collection.
