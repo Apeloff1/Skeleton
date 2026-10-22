@@ -105,6 +105,51 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "published native game source does not match build proof"
                     )
+            # Verify the genuinely authored NPC cast, not just its ZIP hash.
+            from .studio_npc_cast_source import (
+                OriginalNpcCastError, verify_original_npc_cast,
+            )
+            npc_cast_receipt = proof.get("original_npc_cast_receipt")
+            npc_native_path = "game/frontier/npcs.json"
+            if npc_cast_receipt is None:
+                if npc_native_path in expected:
+                    raise NativeSourceVerificationError(
+                        "NPC cast exists without authored source receipts"
+                    )
+            else:
+                if not isinstance(npc_cast_receipt, dict) or npc_native_path not in expected:
+                    raise NativeSourceVerificationError(
+                        "authored native NPC cast requires its exact project bytes"
+                    )
+                try:
+                    native_cast_text = archive.read(npc_native_path).decode("utf-8")
+                    npc_cast_check = verify_original_npc_cast(
+                        native_cast_text, npc_cast_receipt,
+                        world_digest=proof["world_sha256"],
+                    )
+                    world_source = json.loads(
+                        archive.read("game/frontier/expedition.json")
+                    )
+                    world_waypoints = {
+                        item["waypoint_id"]
+                        for item in world_source["waypoints"]
+                    }
+                except (OriginalNpcCastError, KeyError, TypeError,
+                        UnicodeDecodeError, ValueError) as exc:
+                    raise NativeSourceVerificationError(
+                        "NPC cast or native world topology source is invalid"
+                    ) from exc
+                for spawn in npc_cast_receipt["npc_source_records"]:
+                    if (spawn["home_waypoint_id"] not in world_waypoints
+                            or any(point not in world_waypoints
+                                   for point in spawn["patrol_waypoint_ids"])):
+                        raise NativeSourceVerificationError(
+                            "NPC source patrol references missing native world waypoint"
+                        )
+                if not npc_cast_check["all_character_source_receipts_replayed"]:
+                    raise NativeSourceVerificationError(
+                        "original NPC character source failed independent replay"
+                    )
             original_sprites = proof.get("packaged_original_sprites", [])
             if (not isinstance(original_sprites, list)
                     or len(original_sprites) > 128
