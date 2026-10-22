@@ -18,6 +18,10 @@ from typing import Any, Mapping
 from .studio_frontier_godot_package import compile_original_godot_candidate
 from .studio_interaction_contract import digest
 from .studio_sprite_native_import import _file_sha256
+from .studio_frontier_godot_package import _profiles
+from .studio_frontier_source_compile import materialize_persisted_frontier_source
+from skeleton.forge.game_frontier_studio import author_studio_expedition
+from skeleton.jeeves.game_frontier_expedition_godot import make_expedition_autoplay
 
 PREFIX = "JEEVES_AVATAR_OBSERVED "
 MAX_ENGINE_LOG = 256 * 1024
@@ -73,6 +77,53 @@ func _inspect() -> void:
     if not avatar.is_playing():
         quit(18)
         return
+    # Replay only previously validated, genuinely traversable original edges.
+    # Animation changes must be observed AFTER _travel's own eligibility and
+    # stamina checks, with the original actor and child node still alive.
+    var checked_modes: Array[String] = []
+    var checked_transitions: int = 0
+    for step in expected["route"]:
+        if not (step is Dictionary):
+            quit(19)
+            return
+        var edge = game.edge_by_id.get(str(step["edge_id"]), {})
+        if not (edge is Dictionary) or edge.is_empty():
+            quit(20)
+            return
+        if str(edge.get("source", "")) != str(game.current_id):
+            quit(21)
+            return
+        if not game._can_travel(edge):
+            quit(22)
+            return
+        var cost = game._edge_cost(edge)
+        if game.stamina < int(cost["stamina"]):
+            quit(23)
+            return
+        game._travel(edge)
+        if str(game.current_id) != str(step["target"]):
+            quit(24)
+            return
+        if avatar.get_parent() != actor:
+            quit(25)
+            return
+        var mode: String = str(edge.get("mode", ""))
+        if expected["movement_map"].has(mode):
+            var selected: String = str(expected["movement_map"][mode])
+            if not frames.has_animation(selected) or avatar.animation != selected:
+                quit(26)
+                return
+            if not avatar.is_playing():
+                quit(27)
+                return
+            checked_transitions += 1
+            if not checked_modes.has(mode):
+                checked_modes.append(mode)
+    checked_modes.sort()
+    if (checked_modes != expected["expected_modes"]
+            or checked_transitions != int(expected["expected_transitions"])):
+        quit(28)
+        return
     var result = {
         "schema_version": "skeleton.jeeves.godot4_actor_avatar_observed.v1",
         "asset_id": expected["asset_id"],
@@ -80,6 +131,9 @@ func _inspect() -> void:
         "actor_instantiated": true,
         "animated_sprite_child_bound": true,
         "frame_count_observed": frames.get_frame_count(animation),
+        "travel_steps_executed": expected["route"].size(),
+        "mapped_movement_transitions_observed": checked_transitions,
+        "observed_movement_modes": checked_modes,
         "real_godot_process_executed": true,
         "rendered_frame_pixels_verified": false,
         "gameplay_route_completed": false
@@ -139,7 +193,43 @@ def inspect_native_expedition_avatar(
     if (version.returncode or len(version.stdout) > 1000
             or not version.stdout.decode("utf-8", "replace").strip().startswith("4.")):
         raise NativeAvatarError("verified Godot4 executable required for native actor import")
+    movement_map = binding.get("movement_animations", {})
+    if not isinstance(movement_map, dict):
+        raise NativeAvatarError("reviewed movement animations must be a typed map")
+    steps: list[dict[str, str]] = []
+    expected_modes: list[str] = []
+    expected_transitions = 0
+    if movement_map:
+        profile, traveler, _ = _profiles(records)
+        project, _ = materialize_persisted_frontier_source(
+            project_id, records, source_head_sha256=source_head_sha256,
+        )
+        world = author_studio_expedition(project, profile)
+        recipe = make_expedition_autoplay(world, traveler)
+        # A very large long-form world is sampled only through a bounded
+        # prefix. Never claim an unexecuted movement mode was verified.
+        route = recipe["steps"][:256]
+        observed_modes = []
+        for step in route:
+            mode = world.by_edge[step["edge_id"]].mode
+            if mode in movement_map:
+                observed_modes.append(mode)
+        if not observed_modes:
+            raise NativeAvatarError(
+                "original playable route did not exercise an authored movement animation"
+            )
+        last = max(
+            i for i, step in enumerate(route)
+            if world.by_edge[step["edge_id"]].mode in movement_map
+        )
+        steps = route[:last + 1]
+        expected_modes = sorted(set(observed_modes))
+        expected_transitions = len(observed_modes)
     expected = {
+        "route": steps,
+        "movement_map": movement_map,
+        "expected_modes": expected_modes,
+        "expected_transitions": expected_transitions,
         "asset_id": binding["asset_id"],
         "animation": binding["animation"],
         "pixel_size": binding["pixel_size"],
@@ -204,6 +294,9 @@ def inspect_native_expedition_avatar(
         "actor_instantiated": True,
         "animated_sprite_child_bound": True,
         "frame_count_observed": frame_count,
+        "travel_steps_executed": len(steps),
+        "mapped_movement_transitions_observed": expected_transitions,
+        "observed_movement_modes": expected_modes,
         "real_godot_process_executed": True,
         "rendered_frame_pixels_verified": False,
         "gameplay_route_completed": False,
@@ -219,6 +312,9 @@ def inspect_native_expedition_avatar(
         "godot_executable_sha256": before,
         "native_log_sha256": sha256(log.encode("utf-8")).hexdigest(),
         "native_engine_avatar_verified": True,
+        "authored_movement_modes_verified": expected_modes,
+        "native_movement_animation_transitions_verified": expected_transitions > 0,
+        "unexecuted_movement_modes": sorted(set(movement_map) - set(expected_modes)),
         "visual_art_grade_certified": False,
     }
     evidence["receipt_sha256"] = digest(evidence)
