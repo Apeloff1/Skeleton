@@ -59,6 +59,19 @@ def verify_published_sprite(
         raise SpriteVerificationError("published PNG image is not an exact readable RGBA image") from exc
     if sha256(pixels).hexdigest() != metadata.get("pixel_content_sha256"):
         raise SpriteVerificationError("actual RGBA bytes differ from original receipt")
+    from .studio_sprite_temporal_quality import (
+        SpriteTemporalError, temporal_sprite_report,
+    )
+    try:
+        replay_temporal = temporal_sprite_report(pixels, dict(metadata))
+    except SpriteTemporalError as exc:
+        raise SpriteVerificationError(
+            "source sprite temporal metrics cannot be independently measured"
+        ) from exc
+    if replay_temporal != metadata.get("temporal_quality"):
+        raise SpriteVerificationError(
+            "sprite temporal quality signals do not agree with actual decoded PNG"
+        )
     frames = metadata.get("frames")
     animations = metadata.get("animations")
     geom = metadata.get("atlas_geometry")
