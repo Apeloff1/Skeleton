@@ -286,6 +286,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
     verify_exact_sprite_hitboxes(metadata, collisions)
     return {
         "png": image, "metadata": metadata, "normal_png": normal_png,
+        "normal_source": doc["lighting"] if normal_png is not None else None,
         "independent_pixel_replay": checked,
         "collision_rectangles": collisions,
     }
