@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Apeloff1/Skeleton/blob/main/docs/schemas/jeeves-original-mesh-2026.schema.json",
+  "title": "Jeeves reviewed parametric mesh source",
+  "description": "Source authoring contract; glTF 2.0 output is produced and verified by the native mesh compiler.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "asset_id",
+    "primitive",
+    "size_mm",
+    "segments",
+    "color_rgba",
+    "metallic_per_mille",
+    "roughness_per_mille"
+  ],
+  "properties": {
+    "kind": {
+      "const": "procedural_mesh"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "primitive": {
+      "enum": [
+        "box",
+        "plane",
+        "cylinder",
+        "uv_sphere"
+      ]
+    },
+    "size_mm": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      ],
+      "items": false,
+      "minItems": 3
+    },
+    "segments": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 64
+    },
+    "color_rgba": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{8}$"
+    },
+    "metallic_per_mille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "roughness_per_mille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    }
+  }
+}

@@ -1314,3 +1314,135 @@ lighting quality was artistically approved, or 3D normal shading was added.
 
 Engine compatibility: Godot 4 CanvasTexture is documented as 2D-only:
 https://docs.godotengine.org/en/stable/classes/class_canvastexture.html
+
+### October 2026 — real asset descriptors and multi-format compiler expansion
+
+The `studio_asset_descriptors.py` module now compiles searchable, versioned,
+source-owned asset descriptors for original PNG sprites, PCM WAV sounds and
+parametric glTF 2.0 GLB meshes. These are actual compiled media bytes, not
+declarations of nonexistent models or automatic visual understanding. Every
+descriptor includes stable content SHA-256, compiler receipt, source record and
+revision, media type, exact measured technical properties, applicability and
+explicitly **uncertified** rendering/legal claims.
+
+#### New original parametric 3D meshes
+
+Create a host-authorized source record `facet=asset_forge` with
+`document.kind=procedural_mesh` and exactly:
+
+```json
+{
+  "kind": "procedural_mesh",
+  "asset_id": "temple-pedestal",
+  "primitive": "box",
+  "size_mm": [1200, 700, 900],
+  "segments": 12,
+  "color_rgba": "#aabbccff",
+  "metallic_per_mille": 100,
+  "roughness_per_mille": 850
+}
+```
+
+Supported primitives are box, plane, cylinder and UV sphere. Box faces
+preserve hard-edged normals; ellipsoids and elliptical cylinders use
+inverse-scale-corrected normals. The model produces a real glTF 2.0 GLB:
+interleaving is not assumed, attributes are POSITION/NORMAL/TEXCOORD_0,
+indexed triangles use unsigned 16-bit indices, PBR metallic-roughness
+parameters are source-authored, and binary views are aligned. The 3D
+coordinate system is Y-up and measured in meters, converted from the
+integer millimeter source units. Source bounds, triangle/index counts,
+separate binary SHA and full GLB hash are in the compilation receipt.
+An independent GLB verifier parses all chunks and reconstructs the full
+source vertex/index buffer. Triangle and byte budgets are explicit; an
+oversized scene cannot be silently simplified.
+
+The Godot export writes
+`game/frontier/meshes/<asset>.glb` and
+`game/frontier/meshes/<asset>.source.json`. The post-publication verifier
+reconstructs actual model bytes against the archived source. Godot's importer
+may consume the .glb when installed; **no installed Godot renderer/importer or
+3D gameplay is certified by source export alone.** Animation/skin/complex
+scene-graph authoring remain distinct later capabilities.
+
+#### User-authored asset descriptors
+
+Create a second **approved** `asset_forge` source with
+`kind=asset_descriptor`. It must depend on the specific target source
+record, use the actual compiled asset ID and provide exactly the fields below.
+
+```json
+{
+  "kind": "asset_descriptor",
+  "target_record_id": "temple-source",
+  "target_asset_id": "temple-pedestal",
+  "title": "Temple pedestal",
+  "description": "Original rectangular stone pedestal for the ruins.",
+  "alt_text": "Short rectangular pedestal made for a temple scene.",
+  "tags": ["temple", "stone", "original"],
+  "roles": ["environment", "prop"],
+  "locale": "en",
+  "rights_status": "self_authored_asserted",
+  "attribution": ""
+}
+```
+
+The source owner validates the record's revision, dependency and typed
+contract **before committing** it to SQLite. Compiled assets without a human
+semantic source get **structural-only** descriptors: file identities, dimensions,
+palette, RGBA occupancy, exact animation timelines/holds, image-alpha bounding
+rectangles, collision availability, normal-atlas reference, PCM audio amplitude,
+duration and sample rate, or real triangle/vertex/PBR metrics. They do NOT get
+imagined appearance, characters, dialogue or semantic roles. The rights field
+records an assertion, not verified ownership; the compiler makes no copyright
+clearance claim. External rights assertions require attribution.
+
+Original sprites have diffuse-only 3D SpriteFrames resources, with separate
+2D CanvasTexture normal-lit previews. Descriptors preserve that distinction.
+The JSON Schema Draft 2020-12 author contracts are in
+`docs/schemas/jeeves-original-mesh-2026.schema.json` and
+`docs/schemas/jeeves-reviewed-asset-descriptor-2026.schema.json`.
+Runtime Python validation remains authoritative and also pins the real
+source revision hashes and exported content bytes. The schema does not
+purport to implement an unpublished newer JSON Schema draft.
+
+#### Search, caching, binary authority and studio use
+
+`CreatorProjectSourceStore.compiled_asset_catalog()` compiles all supported
+original assets, seals descriptors and builds a deterministic token inverted
+index. The cache is scoped by the independently reread SQLite source head.
+Call `search_original_assets(query, kind=None, limit=6)` to retrieve actual
+descriptor records with a search-result hash. A constructed
+`NativeStudioHost.search_original_assets` provides the same read-only API.
+Jeeves native deliberation reads at most four relevant source-reviewed
+descriptors and writes a distinct `asset_catalog_context_retrieved` journal
+receipt bound to the same project source head; this confers **zero** creator
+permissions or model weight updates.
+
+Standalone sprites ship `assets/catalog.json`, while Godot ZIPs ship
+`game/frontier/assets/catalog.json`. The original full-book/rights and
+SQLite creator journal workflows are preserved. Catalog replay **after
+archive publication** decodes original RGBA/WAV/GLB bytes, reconstructs
+technical descriptors, rechecks any semantic source, and exactly reproduces
+its inverted index. It refuses extra or omitted descriptors, metadata swaps,
+duplicate overlays, changed source receipts and missing/foreign source
+records. Palette variants are tied to their explicit source-color derivation
+proofs rather than receiving guessed parent authorship.
+
+Interoperability is via JSON Schema Draft 2020-12 plus optional glTF 2.0
+`asset.extras` projection using `gltf_extras_for_asset`, not a fabricated
+extension registration or claim that a 2D sprite is suddenly a 3D glTF mesh.
+`SPDX 3.0` and `C2PA` are **not** emitted by this work: stored human
+rights assertions and unhashed human-authored alt text are not substitutes
+for those complete credential/signing mechanisms.
+
+References:
+- https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+- https://json-schema.org/draft/2020-12/
+- https://spdx.dev/use/specifications/
+- https://docs.godotengine.org/en/stable/classes/class_canvastexture.html
+
+Validation source: `skeleton/testing/test_jeeves_studio_asset_compilers_2026.py`
+and the extended native ZIP tests. Source commits are not themselves
+proof of completed engine imports, 3D framebuffer images, final-game
+playthrough or certified legal rights. Review the **exact-head** CI jobs
+before merge.
