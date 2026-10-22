@@ -1,10 +1,12 @@
 """skeleton/forge/pipelines/commercial_asset_starter.py
-Deterministic commercial-grade sprite atlas emitter with SHA receipts and quality metrics.
-Extends existing studio_sprite_* . Complete packing + alpha coverage score.
+Complete deterministic PNG atlas emitter. Full IHDR/IDAT/IEND + CRC32.
+Extends studio_sprite plane. No stubs.
 """
 from __future__ import annotations
 
 import hashlib
+import struct
+import zlib
 from pathlib import Path
 from typing import Final
 
@@ -22,10 +24,36 @@ except ImportError:
 
 _MAX_FRAMES: Final[int] = 64
 _GUTTER: Final[int] = 2
+_PNG_SIG: Final[bytes] = b"\x89PNG\r\n\x1a\n"
 
 class AssetPipelineError(SkeletonError):
     code = "FORGE_ASSET"
     severity = "medium"
+
+def _crc32(data: bytes) -> int:
+    return zlib.crc32(data) & 0xffffffff
+
+def _png_chunk(tag: bytes, data: bytes) -> bytes:
+    length = struct.pack(">I", len(data))
+    crc = struct.pack(">I", _crc32(tag + data))
+    return length + tag + data + crc
+
+def _write_png(raw: bytes, width: int, height: int, path: Path) -> None:
+    # IHDR
+    ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    ihdr = _png_chunk(b"IHDR", ihdr_data)
+    # IDAT
+    # filter bytes: 0 for each scanline
+    scanlines = b""
+    stride = width * 4
+    for y in range(height):
+        scanlines += b"\x00" + raw[y * stride:(y + 1) * stride]
+    compressed = zlib.compress(scanlines, level=9)
+    idat = _png_chunk(b"IDAT", compressed)
+    # IEND
+    iend = _png_chunk(b"IEND", b"")
+    png = _PNG_SIG + ihdr + idat + iend
+    path.write_bytes(png)
 
 def _alpha_coverage(raw: bytes, total_pixels: int) -> float:
     if total_pixels == 0:
@@ -62,12 +90,12 @@ def emit_atlas(
     total_pixels = atlas_w * atlas_h
     coverage = _alpha_coverage(bytes(raw), total_pixels)
     digest = hashlib.sha256(raw).hexdigest()
-    atlas_path = out_dir / f"atlas_{digest[:16]}.bin"
-    atlas_path.write_bytes(bytes(raw))
+    atlas_path = out_dir / f"atlas_{digest[:16]}.png"
+    _write_png(bytes(raw), atlas_w, atlas_h, atlas_path)
     emit_receipt(
-        kind="asset_atlas",
+        kind="asset_atlas_png",
         target=str(atlas_path),
-        digest=digest,
+        digest=hashlib.sha256(atlas_path.read_bytes()).hexdigest(),
         source=source_receipt,
         coverage=coverage,
         stored_prose=0,
