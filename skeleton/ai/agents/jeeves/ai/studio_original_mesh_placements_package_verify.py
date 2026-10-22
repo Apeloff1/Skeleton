@@ -44,6 +44,29 @@ def verify_original_mesh_placement_archive(
             "mesh instance count is not bounded or consistent"
         )
     root = archive.read(ROOT_SCENE).decode("utf-8")
+    from .studio_world_streaming_activation import (
+        SOURCE_PATH as STREAMING_POLICY_PATH,
+        WorldStreamingActivationError,
+        verify_streaming_policy_archive,
+    )
+    try:
+        streaming = verify_streaming_policy_archive(
+            archive.read(STREAMING_POLICY_PATH)
+            if STREAMING_POLICY_PATH in file_hashes else None,
+            proof.get("world_streaming_policy"), metadata, root,
+        )
+    except (WorldStreamingActivationError, KeyError, TypeError, ValueError) as exc:
+        raise OriginalMeshPlacementArchiveError(
+            "source-owned game root streaming mode is not reproducible"
+        ) from exc
+    source_streaming_sha = (
+        streaming.get("source_sha256") if streaming["enabled"] else None
+    )
+    if source_streaming_sha != proof.get("world_streaming_policy_source_sha256"):
+        raise OriginalMeshPlacementArchiveError(
+            "published streaming policy source hash differs from manifest"
+        )
+    static_root = streaming["static_root"]
     present_scene = PLACEMENT_SCENE in file_hashes
     present_source = PLACEMENT_SOURCE in file_hashes
     if present_scene != present_source or present_scene != bool(entries):
@@ -51,7 +74,7 @@ def verify_original_mesh_placement_archive(
             "source-owned mesh placement scene or original source is absent"
         )
     if not entries:
-        if root != _GODOT_SCENE:
+        if static_root != _GODOT_SCENE:
             raise OriginalMeshPlacementArchiveError(
                 "unreviewed replacement to the real game world scene"
             )
@@ -74,7 +97,7 @@ def verify_original_mesh_placement_archive(
         verified = verify_original_mesh_placement_source_bundle(
             archive.read(PLACEMENT_SOURCE),
             published_scene=archive.read(PLACEMENT_SCENE).decode("utf-8"),
-            published_root=root,
+            published_root=static_root,
             expected_lod_asset_ids=expected_lod,
             expected_physics_asset_ids=expected_physics,
         )
@@ -91,8 +114,9 @@ def verify_original_mesh_placement_archive(
     return {
         "schema_version": "skeleton.jeeves.original_mesh_placement_archive.v1",
         "instances_replayed": verified["instances_replayed"],
-        "root_scene_sha256": verified["root_sha256"],
+        "root_scene_sha256": sha256(root.encode("utf-8")).hexdigest(),
         "real_scene_hierarchy_compiled": True,
+        "streaming_replaces_static_instances": streaming["enabled"],
         "native_gameplay_observed": False,
     }
 

@@ -759,10 +759,16 @@ class CreatorProjectSourceStore:
                 if (isinstance(item.get("document"), dict)
                     and item["document"].get("kind") == "procedural_mesh_physics")
             }
-            compile_original_mesh_placements(
+            future_placements = compile_original_mesh_placements(
                 future, lod_assets=frozenset(
                     item["manifest"]["asset_id"] for item in future_lods
                 ), physics_assets=frozenset(future_bodies),
+            )
+            from .studio_world_streaming_activation import (
+                compile_world_streaming_activation,
+            )
+            compile_world_streaming_activation(
+                future, future_placements["metadata"],
             )
         if facet in ("sprite_forge", "scene_forge"):
             from .studio_sprite_actor_binding import (

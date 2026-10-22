@@ -602,6 +602,27 @@ def compile_original_godot_candidate(
             raise FrontierSourceError("Godot streaming asset file collides")
         files[path] = content
         file_hashes[path] = sha256(content.encode("utf-8")).hexdigest()
+    from .studio_world_streaming_activation import (
+        SOURCE_PATH as STREAMING_POLICY_PATH,
+        compile_world_streaming_activation,
+        replace_static_meshes_with_streaming,
+        streaming_policy_source_bytes,
+    )
+    streaming_policy = compile_world_streaming_activation(
+        records, placements["metadata"],
+    )
+    streaming_raw = streaming_policy_source_bytes(streaming_policy)
+    if streaming_raw is not None:
+        if STREAMING_POLICY_PATH in files or STREAMING_POLICY_PATH in binary_assets:
+            raise FrontierSourceError("streaming policy would overwrite game source")
+        binary_assets[STREAMING_POLICY_PATH] = streaming_raw
+        file_hashes[STREAMING_POLICY_PATH] = sha256(streaming_raw).hexdigest()
+        root_scene_path = "game/frontier/expedition.tscn"
+        new_root = replace_static_meshes_with_streaming(
+            files[root_scene_path], streaming_policy["receipt"],
+        )
+        files[root_scene_path] = new_root
+        file_hashes[root_scene_path] = sha256(new_root.encode("utf-8")).hexdigest()
     index_path = "game/frontier/assets/world-index.json"
     if index_path in files or index_path in binary_assets:
         raise FrontierSourceError("spatial manifest path is already occupied")
@@ -636,6 +657,10 @@ def compile_original_godot_candidate(
         "world_chunk_receipt_sha256": world_chunks["receipt_sha256"],
         "world_chunk_count": world_chunks["chunk_count"],
         "world_streamer_source_receipt": streamer["receipt"],
+        "world_streaming_policy": streaming_policy["receipt"],
+        "world_streaming_policy_source_sha256": (
+            sha256(streaming_raw).hexdigest() if streaming_raw else None
+        ),
         "native_world_streaming_executed": False,
         "world_instance_descriptor_count": world_index["instance_count"],
         "packaged_original_sprites": authored_sprites,
