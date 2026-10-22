@@ -1715,3 +1715,37 @@ transforms nor treats approximate broad-phase bounds as physics contacts.
 Covered by `skeleton/testing/test_jeeves_studio_world_spatial_index_2026.py`
 and source-to-ZIP integration tests in
 `skeleton/testing/test_jeeves_studio_frontier_source_compile.py`.
+
+### October 22, 2026 — deterministic large-world chunk compilation
+
+The original-game compiler now ships a separate
+`game/frontier/assets/world-chunks.json` alongside the existing
+`assets/world-index.json` and original sprite/WAV/GLB/LOD/physics
+catalogs. `studio_world_chunks.py` hashes and groups every source-owned
+3D placement into deterministic 64-meter **home cells**, preserving the
+exact source-world SHA-256, placement membership, instance count, and
+maximum compiled broadphase radius. Home-cell partitioning is intentionally
+small and portable; it does not substitute a physics collision grid.
+
+Jeeves source owner exposes `compiled_world_chunk_catalog()` and
+`plan_world_scene_resources(camera_mm, view_radius_mm, previously_loaded,
+limit)`. A plan expands the camera's candidate cell set by the largest
+real compiled mesh radius and then rechecks original conservative AABBs;
+it emits deduplicated, original Godot `.tscn` asset resources to load or
+release, ordered by instance proximity. Plans are source-hash linked,
+bounded, deterministic and check the previous resource inventory to
+prevent accidental foreign paths or model-authored script execution.
+
+The published ZIP's independent verifier rebuilds chunk memberships
+from its already verified, immutable 3D world-instance catalog, and
+compares both canonical JSON content and SHA-bound source receipt
+against the original game source manifest. Unplaced assets do not
+appear as fabricated scene instances; projects with no 3D scene placements
+produce empty but valid spatial/chunk indexes. Neither the source
+catalog nor loading plan alone claims native engine streaming, resource
+residency, on-screen rendering or collision contacts.
+
+Validation targets: `test_jeeves_studio_world_chunks_2026.py`
+plus two Godot export round trips in
+`test_jeeves_studio_frontier_source_compile.py`, now included in
+the existing Backend Quality focused test suite.

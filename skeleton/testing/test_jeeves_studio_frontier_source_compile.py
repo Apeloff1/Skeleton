@@ -548,6 +548,60 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertEqual(result["disk_verification"][
             "original_physics_bodies_replayed"], 0)
 
+    def test_world_chunks_are_published_with_replayed_native_scene_resources(self):
+        self.populate_3d()
+        self.create("map-asset", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "map-stone",
+            "primitive": "box", "size_mm": [1000, 700, 900],
+            "segments": 6, "color_rgba": "#778899ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 980,
+        }, depends=("config-3d",))
+        self.create("map-instance", "scene_forge", {
+            "kind": "original_mesh_instance", "instance_id": "map-stone-one",
+            "base_record_id": "map-asset", "asset_id": "map-stone",
+            "physics_record_id": None, "position_mm": [-4000, 200, 9000],
+            "rotation_deg": [0, 45, 0], "scale_per_mille": 1000,
+        }, depends=("map-asset",))
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            chunk_raw = archive.read("game/frontier/assets/world-chunks.json")
+            chunked = json.loads(chunk_raw)
+            source = json.loads(archive.read("jeeves_source_receipt.json"))
+            self.assertEqual(chunked["chunk_count"], 1)
+            self.assertEqual(chunked["chunks"][0]["cell"], "-1,0,0")
+            self.assertEqual(
+                chunked["chunks"][0]["instance_ids"], ["map-stone-one"],
+            )
+            self.assertEqual(
+                source["world_chunk_catalog_sha256"],
+                sha256(chunk_raw).hexdigest(),
+            )
+            self.assertEqual(
+                source["world_chunk_receipt_sha256"],
+                chunked["receipt_sha256"],
+            )
+            self.assertFalse(chunked["native_chunk_streaming_observed"])
+        disk = result["disk_verification"]
+        self.assertEqual(disk["world_chunk_cells_replayed"], 1)
+        self.assertEqual(disk["world_spatial_instance_descriptors_replayed"], 1)
+
+    def test_no_spatial_instances_publish_empty_chunk_manifest(self):
+        self.populate_3d()
+        self.create("map-unused", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "not-placed",
+            "primitive": "box", "size_mm": [500, 700, 800],
+            "segments": 6, "color_rgba": "#778899ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 700,
+        }, depends=("config-3d",))
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            index = json.loads(archive.read("game/frontier/assets/world-chunks.json"))
+            self.assertEqual(index["chunk_count"], 0)
+            self.assertEqual(index["chunks"], [])
+        self.assertEqual(
+            exported["disk_verification"]["world_chunk_cells_replayed"], 0,
+        )
+
     def test_real_world_instance_descriptors_publish_with_persistent_godot_scene(self):
         self.populate_3d()
         self.create("rock-mesh", "asset_forge", {
