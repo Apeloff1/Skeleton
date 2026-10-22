@@ -72,6 +72,7 @@ async def registry_report() -> dict[str, Any]:
     that no optional router got silently skipped during a deploy."""
     return {
         **_LAST_REPORT,
+        "critical_routes": critical_router_readiness(),
         "now": time.time(),
         "age_s": (time.time() - _LAST_REPORT.get("at", 0.0)) if _LAST_REPORT.get("at") else None,
         "env": "production" if os.environ.get("EMERGENT_DEPLOY") else "dev",

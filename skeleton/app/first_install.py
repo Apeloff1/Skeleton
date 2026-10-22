@@ -107,6 +107,14 @@ def first_install_report(
         )
         ai["catalog_configured"] = bool(local_paths[2])
     services_ready = None
+    # A responding backend is not installation-ready when required API routers failed
+    # to mount. The registry itself must be observed, not inferred from liveness.
+    route_registry: dict[str, object] = {
+        "observed": False,
+        "ready": False,
+        "missing": [],
+        "scope": "Critical first-party route registration must be observed from the live backend.",
+    }
     live_checks: list[dict[str, object]] = []
     if live:
         from skeleton.app.health import probe_application, probes_ok
@@ -114,7 +122,24 @@ def first_install_report(
         probes = probe_application(manifest=manifest, timeout=timeout)
         services_ready = probes_ok(probes)
         live_checks = [probe.to_dict() for probe in probes]
-        status_url = manifest.service("backend").public_url.rstrip("/") + "/api/ai/providers"
+        backend_base = manifest.service("backend").public_url.rstrip("/")
+        route_status = _bounded_json(backend_base + "/api/health/registry", timeout=timeout)
+        critical = route_status.get("critical_routes") if isinstance(route_status, dict) else None
+        if (
+            isinstance(critical, dict)
+            and type(critical.get("ok")) is bool
+            and type(critical.get("report_available")) is bool
+            and isinstance(critical.get("missing"), list)
+            and all(isinstance(item, str) and len(item) <= 128 for item in critical["missing"])
+            and len(critical["missing"]) <= 32
+        ):
+            route_registry.update(
+                observed=critical["report_available"],
+                ready=critical["ok"] and critical["report_available"],
+                missing=critical["missing"],
+            )
+        services_ready = bool(services_ready) and route_registry["ready"] is True
+        status_url = backend_base + "/api/ai/providers"
         status = _bounded_json(status_url, timeout=timeout)
         if (
             status is not None
@@ -152,6 +177,10 @@ def first_install_report(
         next_steps.append(
             "Inspect python -m skeleton app ps and app logs <service>; service startup has not converged."
         )
+    if live and route_registry["ready"] is not True:
+        next_steps.append(
+            "Inspect backend /api/health/registry critical_routes and backend boot logs; required application routes are missing or unverified."
+        )
     if not configured or ai["available"] is False:
         next_steps.append(
             "Configure genuine trained local weights or the engine-owned hosted provider in .env; see docs/APP_ASSEMBLY.md. Restart the engine after changes."
@@ -165,6 +194,7 @@ def first_install_report(
         "platform_ready": host.ready,
         "configuration_ready": checks_ok(checks),
         "services_ready": services_ready,
+        "critical_routes": route_registry,
         "ai": ai,
         "crawler": {
             "available": None,
