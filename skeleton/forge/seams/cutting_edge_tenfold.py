@@ -1,1 +1,4 @@
-"""Cutting-edge tenfold."""\nclass CuttingEdgeTenfold:\n    def upgrade(self) -> dict:\n        return {\"tenfold_sota\": True, \"stored_prose\": 0}\n
+"""Cutting-edge tenfold."""
+class CuttingEdgeTenfold:
+    def upgrade(self) -> dict:
+        return {"tenfold_sota": True, "stored_prose": 0}

@@ -1,1 +1,4 @@
-"""Final tenfold confirmation."""\nclass Tenfold:\n    def confirm(self) -> dict:\n        return {\"tenfold\": True, \"stored_prose\": 0}\n
+"""Final tenfold confirmation."""
+class Tenfold:
+    def confirm(self) -> dict:
+        return {"tenfold": True, "stored_prose": 0}
