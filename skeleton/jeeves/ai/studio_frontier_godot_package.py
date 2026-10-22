@@ -399,6 +399,15 @@ def run_original_game_native_playthrough(
         "observed_replay_receipt_sha256": result["observed_replay_receipt"],
         "real_godot4_process_executed": True,
         "native_gameplay_consistent": True,
+        "native_compass_route_replay_receipt_sha256": result.get(
+            "compass_replay_receipt_sha256",
+        ),
+        "native_compass_direction_transitions_observed": result.get(
+            "observed_compass_transitions", 0,
+        ),
+        "native_compass_animation_observed": result.get(
+            "native_player_heading_observed", False,
+        ),
         "native_player_avatar_script_executed": (
             before["receipt"]["authored_player_avatar_binding"] is not None
         ),
