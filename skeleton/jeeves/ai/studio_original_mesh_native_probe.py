@@ -104,8 +104,19 @@ def _bounded_claim(candidate: Mapping[str, Any]) -> dict[str, Any]:
             "position_mm": entry.get("position_mm"),
             "scale_per_mille": entry.get("scale_per_mille"),
         })
+    active_policy = receipt.get("world_streaming_policy")
+    streaming = (
+        isinstance(active_policy, Mapping)
+        and active_policy.get("enabled") is True
+    )
+    # Static scene placement checks cannot test a dynamically streamed root.
+    # Keep real GLB and physics import checks, then hand the runtime instance
+    # lifecycle to the independent live-camera streaming observation plane.
+    if streaming:
+        expected_placements = []
     return {
         "candidate_sha256": seal,
+        "streaming_world_requires_live_probe": streaming,
         "mesh_ids": sorted(expected_meshes),
         "physics_ids": sorted(expected_bodies),
         "lod_ids": sorted(lod_names),

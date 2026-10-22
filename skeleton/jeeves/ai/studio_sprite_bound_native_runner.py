@@ -67,14 +67,17 @@ def run_exact_original_candidate_native_expedition(
     has_real_assets = (
         has_sprite or has_mesh or bool(proof.get("packaged_original_audio"))
     ) if isinstance(proof, Mapping) else False
-    # A static-scene 3D probe cannot attest a frame-budgeted dynamic streamer.
-    # Dynamic release requires a separate live-camera streaming observation.
-    if (isinstance(proof, Mapping)
-            and isinstance(proof.get("world_streaming_policy"), Mapping)
-            and proof["world_streaming_policy"].get("enabled") is True):
+    active_policy = (
+        proof.get("world_streaming_policy")
+        if isinstance(proof, Mapping) else None
+    )
+    streaming = (
+        isinstance(active_policy, Mapping)
+        and active_policy.get("enabled") is True
+    )
+    if streaming and not has_mesh:
         raise SpriteBoundNativeError(
-            "dynamic world streaming requires actual camera-driven Godot "
-            "instance/load/unload observations; static native proof is insufficient"
+            "camera-driven streamed world requires reviewed 3D mesh geometry"
         )
     if (not isinstance(files, Mapping) or not isinstance(binaries, Mapping)
             or not isinstance(proof, Mapping)
@@ -112,8 +115,11 @@ def run_exact_original_candidate_native_expedition(
                               allow_nan=False).encode("utf-8")
     if "game/frontier/autoplay.json" in contents:
         raise SpriteBoundNativeError("candidate attempted to override authorized autoplay")
-    if "_jeeves_authored_asset_probe.gd" in contents:
-        raise SpriteBoundNativeError("candidate cannot shadow trusted native probe")
+    if ("_jeeves_authored_asset_probe.gd" in contents
+            or "_jeeves_world_stream_probe.gd" in contents):
+        raise SpriteBoundNativeError(
+            "candidate cannot shadow host-owned real Godot verification scripts"
+        )
     contents["game/frontier/autoplay.json"] = recipe_bytes
     baseline = _sha(binary)
     try:
@@ -144,6 +150,22 @@ def run_exact_original_candidate_native_expedition(
             except MeshEngineProbeError as exc:
                 raise SpriteBoundNativeError(
                     "actual authored GLBs, body or game instances did not import"
+                ) from exc
+        stream_probe = None
+        if streaming:
+            from .studio_world_streaming_native_probe import (
+                NativeWorldStreamError, run_host_world_stream_probe,
+            )
+            try:
+                stream_probe = run_host_world_stream_probe(
+                    root, binary, candidate,
+                    timeout_seconds=timeout_seconds,
+                    executable_sha256=baseline,
+                )
+            except NativeWorldStreamError as exc:
+                raise SpriteBoundNativeError(
+                    "live camera-driven Godot spawn/unload/persistent-state "
+                    "observations failed; static scene evidence is not enough"
                 ) from exc
         with tempfile.TemporaryFile() as logfile:
             try:
@@ -270,6 +292,21 @@ def run_exact_original_candidate_native_expedition(
             mesh_probe["source_game_scene_instances"] if mesh_probe else 0
         ),
         "actual_physics_contacts_observed": False,
+        "native_streaming_probe_receipt_sha256": (
+            stream_probe["receipt_sha256"] if stream_probe else None
+        ),
+        "actual_camera_driven_streaming_observed": bool(stream_probe),
+        "actual_streamed_objects_spawned": (
+            stream_probe["near_instantiated_count"] if stream_probe else 0
+        ),
+        "actual_streamed_objects_unloaded": (
+            stream_probe["observed_camera_driven_unloading"]
+            if stream_probe else False
+        ),
+        "actual_stateful_objects_retained": (
+            stream_probe["pinned_physics_instances_retained"]
+            if stream_probe else 0
+        ),
         "visual_output_independently_observed": False,
     }
     result_proof["receipt_digest"] = digest(result_proof)

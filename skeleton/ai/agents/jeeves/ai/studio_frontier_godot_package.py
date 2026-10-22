@@ -810,6 +810,21 @@ def run_original_game_native_playthrough(
             "actual_godot_scene_mesh_instances", 0
         ),
         "native_collision_events_observed": False,
+        "native_streaming_probe_receipt_sha256": result.get(
+            "native_streaming_probe_receipt_sha256"
+        ),
+        "native_camera_streaming_observed": result.get(
+            "actual_camera_driven_streaming_observed", False,
+        ),
+        "native_streamed_objects_spawned": result.get(
+            "actual_streamed_objects_spawned", 0,
+        ),
+        "native_streamed_objects_unloaded": result.get(
+            "actual_streamed_objects_unloaded", False,
+        ),
+        "native_stateful_objects_retained": result.get(
+            "actual_stateful_objects_retained", 0,
+        ),
         "native_visual_output_independently_observed": False,
         "complete_original_game_release_certified": False,
     }
