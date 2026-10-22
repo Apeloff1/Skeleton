@@ -48,7 +48,9 @@ def _source(record: Mapping[str, Any]) -> dict[str, Any]:
     doc = record.get("document")
     if not isinstance(doc, dict) or set(doc) != DOC_KEYS:
         raise OriginalMeshError("parametric 3D mesh source has incomplete schema")
-    if doc["kind"] != "procedural_mesh" or doc["primitive"] not in PRIMITIVES:
+    if (doc["kind"] != "procedural_mesh"
+            or type(doc["primitive"]) is not str
+            or doc["primitive"] not in PRIMITIVES):
         raise OriginalMeshError("3D primitive is not supported")
     asset = doc["asset_id"]
     if type(asset) is not str or not ID.fullmatch(asset):
@@ -97,7 +99,7 @@ def _geometry(doc: Mapping[str, Any]) -> tuple[list[tuple[float, ...]], list[int
         cross = (ab[1] * ac[2] - ab[2] * ac[1],
                  ab[2] * ac[0] - ab[0] * ac[2],
                  ab[0] * ac[1] - ab[1] * ac[0])
-        if sum(x * x for x in cross) <= 1e-16:
+        if sum(x * x for x in cross) <= 1e-30:
             return  # Exact lathe poles deliberately omit degenerate triangles.
         expected = tuple(sum(vertices[v][axis + 3] for v in (a, b, c))
                          for axis in range(3))
@@ -140,9 +142,11 @@ def _geometry(doc: Mapping[str, Any]) -> tuple[list[tuple[float, ...]], list[int
         for side in range(n + 1):
             angle = 2 * pi * side / n
             x, z = cos(angle), sin(angle)
+            inv = sqrt((x / sx) ** 2 + (z / sz) ** 2)
+            normal = (x / sx / inv, 0.0, z / sz / inv)
             for yy, uv_y in ((-sy / 2, 0.0), (sy / 2, 1.0)):
                 vertex((sx * x / 2, yy, sz * z / 2),
-                       (x, 0, z), (side / n, uv_y))
+                       normal, (side / n, uv_y))
         for side in range(n):
             a = side * 2
             triangle(a, a + 2, a + 1)
@@ -169,8 +173,13 @@ def _geometry(doc: Mapping[str, Any]) -> tuple[list[tuple[float, ...]], list[int
             for longitude in range(n + 1):
                 theta = 2 * pi * longitude / n
                 x, y, z = sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta)
+                # Inverse transpose of scale is required for ellipsoid
+                # normals. Naively using unit-sphere vectors is incorrect
+                # when the three authored axes are different.
+                inv = sqrt((x / sx) ** 2 + (y / sy) ** 2 + (z / sz) ** 2)
+                normal = (x / sx / inv, y / sy / inv, z / sz / inv)
                 vertex((sx * x / 2, sy * y / 2, sz * z / 2),
-                       (x, y, z), (longitude / n, latitude / rings))
+                       normal, (longitude / n, latitude / rings))
         cols = n + 1
         for row in range(rings):
             for col in range(n):
