@@ -55,7 +55,7 @@ def compile_frame_cues(
         state = _id(entry["animation"], "cue animation")
         event_id = _id(entry["event_id"], "cue event")
         category = entry["category"]
-        if category not in CATEGORIES or type(category) is not str:
+        if type(category) is not str or category not in CATEGORIES:
             raise SpriteCueError("cue category is outside the non-executing signal vocabulary")
         index = entry["frame_index"]
         if (state not in states or type(index) is not int
