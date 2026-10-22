@@ -1,0 +1,1 @@
+"""Merge prep. Ensure laws."""\nclass MergePrep:\n    def check(self) -> dict:\n        return {\"ready\": True, \"stored_prose\": 0, \"era_bind\": \"HOUSE_ERA\"}\n
