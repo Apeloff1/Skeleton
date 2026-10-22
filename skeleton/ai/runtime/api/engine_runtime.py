@@ -178,8 +178,10 @@ class EngineExecutionCoordinator:
             self._tasks: dict[str, asyncio.Task[None]] = {}
             self._foreground_requests: dict[asyncio.Task[None], AIExecutionRequest] = {}
             self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
+            self._pending_lifecycle_leases: dict[str, WorkLease] = {}
             self._supervision_faults: list[str] = []
             self._closed = False
+            self._physical_shutdown_complete = False
             self.runtime_control = RuntimeOptimizationControl(
                 self.service.repository,
                 self.provider_registry,
@@ -187,6 +189,7 @@ class EngineExecutionCoordinator:
             )
             self._maintenance_stop = asyncio.Event()
             self._maintenance_task: asyncio.Task[None] | None = None
+            self._shutdown_task: asyncio.Task[None] | None = None
             self._recovery_cursor: tuple[datetime, str] | None = None
             self._recovery_lock = asyncio.Lock()
             self._recovery_scanned = 0
@@ -232,6 +235,7 @@ class EngineExecutionCoordinator:
                         "engine-execution:" + execution_id,
                         allow_starting=allow_starting,
                     )
+                    self._pending_lifecycle_leases[lease.work_id] = lease
                 except RuntimeSupervisionError as exc:
                     raise EngineExecutionCoordinatorError(
                         "engine lifecycle denied execution admission"
@@ -246,13 +250,14 @@ class EngineExecutionCoordinator:
             except BaseException:
                 self.runtime_control.foreground_finished(command.execution_request)
                 if lease is not None:
-                    self.lifecycle.release_work(lease)
+                    self._release_pending_lifecycle_lease(lease)
                 raise
 
             self._tasks[execution_id] = task
             self._foreground_requests[task] = command.execution_request
             if lease is not None:
                 self._lifecycle_leases[task] = lease
+                self._pending_lifecycle_leases.pop(lease.work_id, None)
             task.add_done_callback(
                 lambda completed, eid=execution_id: self._task_done(
                     eid,
@@ -276,20 +281,36 @@ class EngineExecutionCoordinator:
         self,
         task: asyncio.Task[None],
     ) -> None:
-        lease = self._lifecycle_leases.pop(task, None)
-        if lease is None or self.lifecycle is None:
+        lease = self._lifecycle_leases.get(task)
+        if lease is None:
             return
+        if self._acknowledge_lifecycle_release(lease):
+            self._lifecycle_leases.pop(task, None)
+
+    def _release_pending_lifecycle_lease(self, lease: WorkLease) -> None:
+        if self._acknowledge_lifecycle_release(lease):
+            if self._pending_lifecycle_leases.get(lease.work_id) is lease:
+                self._pending_lifecycle_leases.pop(lease.work_id, None)
+
+    def _acknowledge_lifecycle_release(self, lease: WorkLease) -> bool:
+        if self.lifecycle is None:
+            self._record_supervision_fault(
+                "lifecycle owner unavailable for retained work lease: " + lease.work_id
+            )
+            return False
         try:
             released = self.lifecycle.release_work(lease)
         except RuntimeSupervisionError as exc:
             self._record_supervision_fault(
                 "lifecycle lease release failed for " + lease.work_id + ": " + str(exc)
             )
-            return
-        if not released:
+            return False
+        if released is not True:
             self._record_supervision_fault(
                 "lifecycle lease disappeared before task retirement: " + lease.work_id
             )
+            return False
+        return True
 
     def _task_done(
         self,
@@ -322,7 +343,12 @@ class EngineExecutionCoordinator:
         """Return identity-safe local supervision state for health/evidence."""
 
         tasks = tuple(sorted(execution_id for execution_id, task in self._tasks.items() if not task.done()))
-        lease_ids = tuple(sorted(lease.work_id for lease in self._lifecycle_leases.values()))
+        lease_ids = tuple(
+            sorted(
+                lease.work_id
+                for lease in (*self._lifecycle_leases.values(), *self._pending_lifecycle_leases.values())
+            )
+        )
         return {
             "closed": self._closed,
             "active_execution_ids": tasks,
@@ -478,6 +504,31 @@ class EngineExecutionCoordinator:
         return tuple(recovered)
 
     async def shutdown(self) -> None:
+        """Retain shutdown custody through repeated caller cancellation."""
+        if self._shutdown_task is None or (
+            self._shutdown_task.done() and not self._physical_shutdown_complete
+        ):
+            self._shutdown_task = asyncio.create_task(self._shutdown_owned())
+        cancelled = False
+        while not self._shutdown_task.done():
+            try:
+                await asyncio.shield(self._shutdown_task)
+            except asyncio.CancelledError:
+                cancelled = True
+        self._shutdown_task.result()
+        if cancelled:
+            raise asyncio.CancelledError
+
+    @property
+    def shutdown_started(self) -> bool:
+        return self._closed
+
+    @property
+    def physical_shutdown_complete(self) -> bool:
+        """True only after all owned workers/leases and database custody drain."""
+        return self._physical_shutdown_complete
+
+    async def _shutdown_owned(self) -> None:
         self._closed = True
         self._maintenance_stop.set()
         async with self._lock:
@@ -500,10 +551,45 @@ class EngineExecutionCoordinator:
         # A maintenance callback is bounded and cooperative. Keep custody of
         # the worker until it physically drains before closing its database.
         if self._maintenance_task is not None:
-            await self._maintenance_task
+            maintenance = await asyncio.gather(self._maintenance_task, return_exceptions=True)
+            if isinstance(maintenance[0], BaseException):
+                self._record_supervision_fault("runtime maintenance stopped with a shutdown error")
             self._maintenance_task = None
-        self.runtime_control.close()
 
+        # Done callbacks may have failed to discharge an exact lease. Retain
+        # and retry those identities after physical completion; a failed
+        # release must never disappear merely because its task was retired.
+        for task in tuple(self._lifecycle_leases):
+            if task.done():
+                self._release_lifecycle_lease(task)
+        for lease in tuple(self._pending_lifecycle_leases.values()):
+            self._release_pending_lifecycle_lease(lease)
+
+        # The registry is the existing activation owner and deduplicates
+        # aliases/verifiers that share a serving engine. Close those owners
+        # before releasing persistent execution custody, including physical
+        # preflight or local work not represented by a coordinator driver.
+        # A scheduler facade never closes an engine shared by other adapters.
+        local_closers = [
+            closer
+            for engine in self.provider_registry.runtime_serving_engines()
+            if callable(closer := getattr(engine, "close", None))
+        ]
+        local_drain_errors = []
+        if local_closers:
+
+            async def close_local_owner(closer) -> None:
+                # Evaluate the callback inside a gathered task so one faulty
+                # closer cannot detach another owner's physical drain.
+                await closer()
+
+            local_drains = await asyncio.gather(
+                *(close_local_owner(closer) for closer in local_closers),
+                return_exceptions=True,
+            )
+            local_drain_errors = [result for result in local_drains if isinstance(result, BaseException)]
+            if local_drain_errors:
+                self._record_supervision_fault("local serving shutdown did not establish physical drain")
         async with self._lock:
             stranded_tasks = tuple(
                 execution_id for execution_id, task in self._tasks.items() if not task.done()
@@ -514,12 +600,27 @@ class EngineExecutionCoordinator:
 
         if stranded_tasks:
             self._record_supervision_fault("shutdown left active tasks: " + ",".join(sorted(stranded_tasks)))
-        if self._lifecycle_leases:
-            leaked = tuple(sorted(lease.work_id for lease in self._lifecycle_leases.values()))
+        if self._lifecycle_leases or self._pending_lifecycle_leases:
+            leaked = tuple(
+                sorted(
+                    lease.work_id
+                    for lease in (*self._lifecycle_leases.values(), *self._pending_lifecycle_leases.values())
+                )
+            )
             self._record_supervision_fault("shutdown left lifecycle leases: " + ",".join(leaked))
 
-        if not stranded_tasks and not self._lifecycle_leases:
+        if (
+            not stranded_tasks
+            and not self._lifecycle_leases
+            and not self._pending_lifecycle_leases
+            and not local_drain_errors
+        ):
+            # Maintenance close publishes durable host-presence drain and
+            # zero physical-task counts. Keep that owner live until serving
+            # workers and retained lifecycle custody have actually drained.
+            self.runtime_control.close()
             self._database_owner.close()
+            self._physical_shutdown_complete = True
 
         if self._supervision_faults:
             raise EngineExecutionCoordinatorError(
@@ -533,6 +634,7 @@ class EngineExecutionCoordinator:
             try:
                 if self.lifecycle is not None:
                     lease = self.lifecycle.acquire_work("engine-maintenance:runtime")
+                    self._pending_lifecycle_leases[lease.work_id] = lease
                 worker = asyncio.create_task(asyncio.to_thread(self.runtime_control.tick))
                 try:
                     await asyncio.shield(worker)
@@ -554,10 +656,9 @@ class EngineExecutionCoordinator:
                 )
             finally:
                 if lease is not None and self.lifecycle is not None:
-                    try:
-                        self.lifecycle.release_work(lease)
-                    except RuntimeSupervisionError:
-                        self._record_supervision_fault("runtime maintenance lease release failed")
+                    self._release_pending_lifecycle_lease(lease)
+                    if lease.work_id in self._pending_lifecycle_leases:
+                        self._maintenance_stop.set()
             if not self._maintenance_stop.is_set():
                 try:
                     await self._recover_pending()

@@ -1769,6 +1769,7 @@ class LocalInferenceEngine:
         self._memory_headroom_waits = 0
         self._next_ticket = 0
         self._draining = False
+        self._closed = False
         self._preemptions = 0
         self._queue_expired = 0
         self._cache_bytes = 0
@@ -1776,7 +1777,10 @@ class LocalInferenceEngine:
         self._cache_expirations = 0
         self._identity_invalidations = 0
         self._cache_identity: str | None = None
-        self._singleflight: dict[tuple[str, asyncio.AbstractEventLoop], asyncio.Future[LocalInferenceResult]] = {}
+        self._singleflight: dict[
+            tuple[str, asyncio.AbstractEventLoop, int | None, int | None],
+            asyncio.Future[LocalInferenceResult],
+        ] = {}
         self._singleflight_hits = 0
         self._singleflight_waiters = 0
         self._singleflight_tenants: Counter[str] = Counter()
@@ -1788,6 +1792,9 @@ class LocalInferenceEngine:
         self._cancelled = 0
         self._overloaded = 0
         self._cache_hits = 0
+        self._preflight_active = 0
+        self._preflight_completed = 0
+        self._preflight_elapsed_ms = 0.0
 
     def _sample_pressure_locked(self, now: float) -> None:
         if self._serving.sample_due(now):
@@ -2156,6 +2163,10 @@ class LocalInferenceEngine:
                 "deadline_includes_preparation": True,
                 "worker_slot_released_on_physical_drain": True,
                 "cache_is_scope_bound": True,
+                "preparation_admission_owner": "local_inference_engine",
+                "preparation_runs_off_event_loop": True,
+                "coalescing_pins_resource_ceilings": True,
+                "permanent_close_waits_for_physical_drain": True,
             },
         }
         contract["contract_digest"] = _digest(contract)
@@ -2204,7 +2215,9 @@ class LocalInferenceEngine:
                     "per_operation_queue_limit": self._operation_queue_limit_locked(),
                     "effective_queue_limit": self._effective_queue_limit_locked(),
                     "reserved_memory_bytes": self._reserved_memory_bytes,
-                    "memory_estimated_active": sum(bool(item.estimated_memory_bytes) for item in self._running.values()),
+                    "memory_estimated_active": sum(
+                        bool(item.estimated_memory_bytes) for item in self._running.values()
+                    ),
                     "effective_max_batch_size": batch_limits["max_batch_size"],
                     "effective_max_batch_tokens": batch_limits["max_batch_tokens"],
                 },
@@ -2226,11 +2239,13 @@ class LocalInferenceEngine:
                     "load_shed_rejections": self._load_shed_rejections,
                     "oldest_interactive_wait_ms": (
                         (now - next(iter(self._interactive_tickets.values())).enqueued_at) * 1000.0
-                        if self._interactive_tickets else 0.0
+                        if self._interactive_tickets
+                        else 0.0
                     ),
                     "oldest_background_wait_ms": (
                         (now - next(iter(self._background_tickets.values())).enqueued_at) * 1000.0
-                        if self._background_tickets else 0.0
+                        if self._background_tickets
+                        else 0.0
                     ),
                     "max_observed_queue_wait_ms": self._max_queue_wait_ms,
                     "memory_shedding": self._memory_shedding_locked(),
@@ -2240,6 +2255,13 @@ class LocalInferenceEngine:
                     "foreground_grants_between_background": 3,
                 },
                 "draining": self._draining,
+                "closed": self._closed,
+                "preflight": {
+                    "active": self._preflight_active,
+                    "completed": self._preflight_completed,
+                    "elapsed_ms": self._preflight_elapsed_ms,
+                    "admission_owner": "local_inference_engine",
+                },
             }
         with self._cache_lock:
             snapshot["cache_entries"] = len(self._cache)
@@ -2314,6 +2336,8 @@ class LocalInferenceEngine:
             self._trim_cache()
         else:
             with self._capacity_lock:
+                if self._closed and action == "resume":
+                    raise LocalInferenceOverloaded("closed local inference cannot resume")
                 self._draining = action == "drain"
                 if self._draining:
                     for ticket in tuple(self._tickets.values()):
@@ -2322,6 +2346,47 @@ class LocalInferenceEngine:
                     # ownership until their own finally block completes.
                 self._schedule_version += 1
         return self.snapshot()
+
+    async def close(self, *, cancel_running: bool = True) -> None:
+        """Permanently stop admissions and retain custody until workers drain.
+
+        A noncooperative backend keeps its reservation until it actually
+        exits. Cancelling this close requests cancellation of active work and
+        defers propagation until physical drain; it cannot unload a live model.
+        """
+        if type(cancel_running) is not bool:
+            raise TypeError("cancel_running must be boolean")
+        with self._capacity_lock:
+            self._closed = self._draining = True
+            for ticket in tuple(self._tickets.values()):
+                self._retire_queued_locked(ticket, "closed")
+            if cancel_running:
+                for ticket in self._running.values():
+                    ticket.cancel.set()
+            self._schedule_version += 1
+        # Do not hold both locks across an await or invalidate model weights.
+        # Epoch fencing prevents an already returned worker from repopulating
+        # the disposable cache while its coroutine finishes publication.
+        with self._cache_lock:
+            self._cache_evictions += len(self._cache)
+            self._cache.clear()
+            self._cache_bytes = 0
+            self._cache_epoch += 1
+        cancelled = False
+        while True:
+            with self._capacity_lock:
+                active = self._active
+                if cancelled:
+                    for ticket in self._running.values():
+                        ticket.cancel.set()
+            if not active:
+                break
+            try:
+                await asyncio.sleep(0.01)
+            except asyncio.CancelledError:
+                cancelled = True
+        if cancelled:
+            raise asyncio.CancelledError
 
     def _reserve(
         self,
@@ -2636,19 +2701,25 @@ class LocalInferenceEngine:
                 worker.exception()
             raise
 
-    def _assert_cached_admitted(
+    def _preflight_admitted(
         self,
         check: Callable[[], Any],
         ticket: _ServingTicket,
         started: threading.Event,
-    ) -> None:
+    ) -> Any:
         started.set()
+        admitted_at = time.monotonic()
+        with self._capacity_lock:
+            self._preflight_active += 1
         try:
             if ticket.cancel.is_set():
-                raise LocalInferenceCancelled("local cache identity admission cancelled")
-            check()
+                raise LocalInferenceCancelled("local input preflight cancelled")
+            result = check()
             if ticket.cancel.is_set():
-                raise LocalInferenceCancelled("local cache identity admission cancelled")
+                raise LocalInferenceCancelled("local input preflight cancelled")
+            with self._capacity_lock:
+                self._preflight_completed += 1
+            return result
         except LocalInferenceCancelled:
             with self._capacity_lock:
                 self._cancelled += 1
@@ -2659,10 +2730,12 @@ class LocalInferenceEngine:
             raise
         finally:
             with self._capacity_lock:
+                self._preflight_active -= 1
+                self._preflight_elapsed_ms += (time.monotonic() - admitted_at) * 1000.0
                 self._release_running_locked(ticket)
             self._execution_slots.release()
 
-    async def _admit_cached_identity(
+    async def _run_admitted_preflight(
         self,
         check: Callable[[], Any],
         *,
@@ -2671,19 +2744,25 @@ class LocalInferenceEngine:
         preemption_scope_id: str,
         tenant_scope_id: str,
         deadline: float | None,
-    ) -> None:
+    ) -> Any:
+        """Own identity/token preparation in the same fair physical worker pool.
+
+        Tokenizers and weight snapshots are synchronous and may be expensive.
+        Moving them off the event loop must not create an unbounded executor
+        queue or release a cancelled worker's reservation before it stops.
+        """
         cancel = threading.Event()
         ticket = self._reserve(work_class, scope_id, preemption_scope_id, tenant_scope_id, deadline, cancel)
         await self._acquire_execution_slot(ticket)
         started = threading.Event()
         timeout = None
         try:
-            worker = asyncio.create_task(asyncio.to_thread(self._assert_cached_admitted, check, ticket, started))
+            worker = asyncio.create_task(asyncio.to_thread(self._preflight_admitted, check, ticket, started))
             if deadline is not None:
                 timeout = asyncio.get_running_loop().call_later(
                     max(0.0, deadline - time.monotonic()), cancel.set,
                 )
-            await self._await_worker(worker, cancel)
+            result = await self._await_worker(worker, cancel)
         except BaseException:
             if not started.is_set():
                 with self._capacity_lock:
@@ -2695,12 +2774,57 @@ class LocalInferenceEngine:
             if timeout is not None:
                 timeout.cancel()
         if deadline is not None and time.monotonic() >= deadline:
-            raise LocalInferenceCancelled("local cache identity admission deadline exceeded")
+            raise LocalInferenceCancelled("local input preflight deadline exceeded")
+        return result
 
-    def _model_identity(self) -> str:
-        # Native runtime identities include tokenizer, architecture and policy.
-        # Read before cache lookup so model drift invalidates old cached output.
-        runtime_digest = getattr(self.model, "runtime_digest", None)
+    def _prepare_admitted_request(
+        self,
+        request: LocalInferenceRequest,
+        *,
+        key: str,
+        scope: str,
+        scope_id: str | None,
+        tenant_scope_id: str | None,
+        prepared_input: LocalPreparedInput | None,
+        resource_max_input_tokens: int | None = None,
+        resource_max_output_tokens: int | None = None,
+    ) -> tuple[LocalPreparedInput | None, int, int]:
+        check = getattr(self.model, "check_readiness", None)
+        if callable(check):
+            check()
+        if prepared_input is None:
+            prepared_input = self.prepare_input(
+                request,
+                scope_id=scope_id,
+                tenant_scope_id=tenant_scope_id,
+            )
+        else:
+            self._validate_prepared_input(request, prepared_input, scope)
+        input_tokens = self._validate_input_budget(
+            request,
+            prepared_input,
+            resource_max_input_tokens=resource_max_input_tokens,
+            resource_max_output_tokens=resource_max_output_tokens,
+        )
+        estimated_memory = self._request_memory_estimate(
+            request,
+            prepared_input,
+            admitted_input_tokens=input_tokens,
+        )
+        if self._key(request, scope) != key:
+            raise ProviderPolicyError("local execution identity changed during preparation")
+        return prepared_input, input_tokens, estimated_memory
+
+    def _model_identity(self, *, verify_identity: bool = True) -> str:
+        # Native keys include admitted tokenizer, architecture and policy.
+        # Full mutable-weight validation belongs to physical admission, never
+        # to key derivation on the event loop or inside the cache lock.
+        declared = getattr(self.model, "_declared_generation_limits", None)
+        runtime_digest = (
+            getattr(self.model, "_runtime_digest", None)
+            if not verify_identity and callable(declared)
+            else getattr(self.model, "runtime_digest", None)
+        )
         if runtime_digest is not None and (
             not isinstance(runtime_digest, str)
             or len(runtime_digest) != 64
@@ -2723,7 +2847,16 @@ class LocalInferenceEngine:
         return _digest(identity)
 
     def _key(self, request: LocalInferenceRequest, scope_id: str = "local") -> str:
-        return _digest({"identity": self._model_identity(), "request": request.digest, "scope": scope_id})
+        # This derives a key only. Admitted preflight/cache-hit workers perform
+        # full identity checks before a result may use it; deriving a key must
+        # not serialize a native model on the event loop or under a cache lock.
+        return _digest(
+            {
+                "identity": self._model_identity(verify_identity=False),
+                "request": request.digest,
+                "scope": scope_id,
+            }
+        )
 
     def _trim_cache(self) -> None:
         with self._capacity_lock:
@@ -2841,6 +2974,8 @@ class LocalInferenceEngine:
         self,
         request: LocalInferenceRequest,
         prepared_input: LocalPreparedInput | None = None,
+        *,
+        admitted_input_tokens: int | None = None,
     ) -> int:
         declared = getattr(self.model, "estimate_memory_bytes", None)
         if callable(declared):
@@ -2855,12 +2990,16 @@ class LocalInferenceEngine:
         count = getattr(self.model, "count_input_tokens", None)
         if (
             not callable(estimate)
-            or (prepared_input is None and not callable(count))
+            or (prepared_input is None and admitted_input_tokens is None and not callable(count))
             or type(context) is not int
             or context < 1
         ):
             return 0
-        input_tokens = count(request) if prepared_input is None else prepared_input.input_tokens
+        input_tokens = (
+            prepared_input.input_tokens
+            if prepared_input is not None
+            else admitted_input_tokens if admitted_input_tokens is not None else count(request)
+        )
         if type(input_tokens) is not int or input_tokens < 0:
             raise ProviderPolicyError("local native memory admission received invalid token count")
         tokens = min(context, input_tokens + request.max_output_tokens)
@@ -2932,6 +3071,8 @@ class LocalInferenceEngine:
         tenant_scope_id: str | None = None,
         deadline: float | None = None,
         prepared_input: LocalPreparedInput | None = None,
+        resource_max_input_tokens: int | None = None,
+        resource_max_output_tokens: int | None = None,
     ) -> LocalInferenceResult:
         """Generate within trusted tenant, cache and monotonic deadline scopes.
 
@@ -2957,7 +3098,15 @@ class LocalInferenceEngine:
             raise LocalInferenceCancelled("local inference deadline exceeded")
         # Size and output checks are cheap and precede cache hashing or any
         # tokenizer callback. Cache hits retain their native preparation win.
-        LocalInputBudget.from_limits(_local_generation_limits(self.model)).validate_request(request, 0)
+        declared_budget = LocalInputBudget.from_limits(
+            _local_generation_limits(self.model, verify_identity=False)
+        )
+        declared_budget.validate_request(
+            request,
+            0,
+            resource_max_input_tokens=resource_max_input_tokens,
+            resource_max_output_tokens=resource_max_output_tokens,
+        )
         with self._capacity_lock:
             if self._draining:
                 self._overloaded += 1
@@ -2969,9 +3118,13 @@ class LocalInferenceEngine:
         tenant_scope = tenant_scope_id or _ANONYMOUS_TENANT_SCOPE
         preemption_scope = preemption_scope_id or scope_id or "local"
         scope = _digest({"cache_scope": scope_id or "local", "tenant_scope": tenant_scope})
-        if prepared_input is not None:
-            self._validate_prepared_input(request, prepared_input, scope)
-        identity = self._model_identity()
+        if prepared_input is not None and (
+            not isinstance(prepared_input, LocalPreparedInput)
+            or prepared_input.request_digest != request.digest
+            or prepared_input.scope_digest != scope
+        ):
+            raise ProviderPolicyError("prepared local input authority or request mismatch")
+        identity = self._model_identity(verify_identity=False)
         key = self._key(request, scope)
         self._trim_cache()
         with self._cache_lock:
@@ -2989,10 +3142,13 @@ class LocalInferenceEngine:
             if cached is not None:
                 admit_cached = getattr(self.model, "assert_identity", None)
                 if callable(admit_cached):
-                    await self._admit_cached_identity(
-                        admit_cached, work_class=work_class, scope_id=scope,
+                    await self._run_admitted_preflight(
+                        admit_cached,
+                        work_class=work_class,
+                        scope_id=scope,
                         preemption_scope_id=preemption_scope,
-                        tenant_scope_id=tenant_scope, deadline=deadline,
+                        tenant_scope_id=tenant_scope,
+                        deadline=deadline,
                     )
                 if self._key(request, scope) != key:
                     raise ValueError("local runtime identity changed before cache hit")
@@ -3007,9 +3163,11 @@ class LocalInferenceEngine:
                     if valid:
                         self._cache.move_to_end(key)
                 if valid:
-                    LocalInputBudget.from_limits(_local_generation_limits(self.model)).validate_tokens(
+                    declared_budget.validate_tokens(
                         cached.result.input_tokens,
                         request.max_output_tokens,
+                        resource_max_input_tokens=resource_max_input_tokens,
+                        resource_max_output_tokens=resource_max_output_tokens,
                     )
                     if deadline is not None and time.monotonic() >= deadline:
                         raise LocalInferenceCancelled("local cache result exceeded its request deadline")
@@ -3018,7 +3176,10 @@ class LocalInferenceEngine:
                     return replace(cached.result, cached=True)
 
         loop = asyncio.get_running_loop()
-        flight_key = (key, loop)
+        # An underfunded leader must not make an otherwise admissible request
+        # fail merely because they share content. Cache entries remain content
+        # scoped; in-flight failure sharing also pins the caller's ceilings.
+        flight_key = (key, loop, resource_max_input_tokens, resource_max_output_tokens)
         with self._cache_lock:
             future = self._singleflight.get(flight_key)
             leader = future is None
@@ -3042,19 +3203,41 @@ class LocalInferenceEngine:
         assert future is not None
         try:
             if not leader:
-                return await self._wait_coalesced(
-                    future, work_class=work_class, scope_id=scope,
+                result = await self._wait_coalesced(
+                    future,
+                    work_class=work_class,
+                    scope_id=scope,
                     preemption_scope_id=preemption_scope,
-                    tenant_scope_id=tenant_scope, deadline=deadline,
+                    tenant_scope_id=tenant_scope,
+                    deadline=deadline,
                 )
+                declared_budget.validate_tokens(
+                    result.input_tokens,
+                    request.max_output_tokens,
+                    resource_max_input_tokens=resource_max_input_tokens,
+                    resource_max_output_tokens=resource_max_output_tokens,
+                )
+                return result
             try:
-                if prepared_input is None:
-                    # Prepare after coalescing so cache hits and followers do
-                    # not tokenize or inherit a leader's private token value.
-                    prepared_input = self.prepare_input(
-                        request, scope_id=scope_id, tenant_scope_id=tenant_scope_id
-                    )
-                admitted_input_tokens = self._validate_input_budget(request, prepared_input)
+                # Only the leader prepares; cache hits and followers retain
+                # their own grants without creating private token snapshots.
+                prepared_input, admitted_input_tokens, estimated_memory = await self._run_admitted_preflight(
+                    lambda: self._prepare_admitted_request(
+                        request,
+                        key=key,
+                        scope=scope,
+                        scope_id=scope_id,
+                        tenant_scope_id=tenant_scope_id,
+                        prepared_input=prepared_input,
+                        resource_max_input_tokens=resource_max_input_tokens,
+                        resource_max_output_tokens=resource_max_output_tokens,
+                    ),
+                    work_class=work_class,
+                    scope_id=scope,
+                    preemption_scope_id=preemption_scope,
+                    tenant_scope_id=tenant_scope,
+                    deadline=deadline,
+                )
                 if deadline is not None and time.monotonic() >= deadline:
                     raise LocalInferenceCancelled("local inference deadline exceeded during preparation")
                 result = await self._generate_uncached(
@@ -3068,6 +3251,7 @@ class LocalInferenceEngine:
                     cache_epoch=epoch,
                     prepared_input=prepared_input,
                     admitted_input_tokens=admitted_input_tokens,
+                    estimated_memory_bytes=estimated_memory,
                 )
             except BaseException as exc:
                 if not future.done():
@@ -3102,12 +3286,17 @@ class LocalInferenceEngine:
         cache_epoch: int,
         prepared_input: LocalPreparedInput | None,
         admitted_input_tokens: int,
+        estimated_memory_bytes: int,
     ) -> LocalInferenceResult:
         cancel = threading.Event()
-        estimated_memory = self._request_memory_estimate(request, prepared_input)
         ticket = self._reserve(
-            work_class, scope_id, preemption_scope_id, tenant_scope_id, deadline, cancel,
-            estimated_memory_bytes=estimated_memory,
+            work_class,
+            scope_id,
+            preemption_scope_id,
+            tenant_scope_id,
+            deadline,
+            cancel,
+            estimated_memory_bytes=estimated_memory_bytes,
         )
         await self._acquire_execution_slot(ticket)
         started = threading.Event()
@@ -3219,20 +3408,43 @@ class LocalInferenceEngine:
             count = getattr(self.model, "count_input_tokens", None)
             if not callable(count):
                 raise ProviderPolicyError("native batch admission requires its activated tokenizer")
+            with self._capacity_lock:
+                if work_class == "background" and deadline is None:
+                    deadline = time.monotonic() + min(
+                        3600.0,
+                        max(30.0, self._serving.policy.target_latency_ms / 1000.0 * 4),
+                    )
+            tenant_scope = tenant_scope_id or _ANONYMOUS_TENANT_SCOPE
+            preemption_scope = preemption_scope_id or scope_id or "local"
+            scope = _digest({"cache_scope": scope_id or "local", "tenant_scope": tenant_scope})
+            declared_budget = LocalInputBudget.from_limits(
+                _local_generation_limits(self.model, verify_identity=False)
+            )
             reserved_tokens = 0
             for index, request in enumerate(requests):
                 if deadline is not None and time.monotonic() >= deadline:
                     raise LocalInferenceCancelled("local batch deadline exceeded before execution")
-                prepared = self.prepare_input(request, scope_id=scope_id, tenant_scope_id=tenant_scope_id)
+                declared_budget.validate_request(request, 0)
+                key = self._key(request, scope)
+                prepared, tokens, _estimated_memory = await self._run_admitted_preflight(
+                    lambda: self._prepare_admitted_request(
+                        request,
+                        key=key,
+                        scope=scope,
+                        scope_id=scope_id,
+                        tenant_scope_id=tenant_scope_id,
+                        prepared_input=None,
+                    ),
+                    work_class=work_class,
+                    scope_id=scope,
+                    preemption_scope_id=preemption_scope,
+                    tenant_scope_id=tenant_scope,
+                    deadline=deadline,
+                )
                 prepared_inputs[index] = prepared
-                tokens = count(request) if prepared is None else prepared.input_tokens
-                if type(tokens) is not int or tokens < 0:
-                    raise ProviderPolicyError("native batch tokenizer returned an invalid count")
                 reserved_tokens += tokens + request.max_output_tokens
                 if reserved_tokens > maximum_tokens:
                     raise ProviderPolicyError("native batch exceeds its admitted aggregate token limit")
-                # Tokenization is local preflight, before any OS model worker.
-                await asyncio.sleep(0)
         with self._capacity_lock:
             self._sample_pressure_locked(time.monotonic())
             workers = min(
@@ -3459,6 +3671,9 @@ class LocalModelAdapter(ProviderAdapter):
     @property
     def available(self) -> bool:
         try:
+            with self.engine._capacity_lock:
+                if self.engine._draining:
+                    return False
             if self.engine.model.model_digest != self._activated_model_digest:
                 return False
             self.generation_limits()
@@ -3477,13 +3692,17 @@ class LocalModelAdapter(ProviderAdapter):
     def supports_cooperative_cancellation(self) -> bool:
         return True
 
+    async def close(self, *, cancel_running: bool = True) -> None:
+        """Unload this activated owner only after its physical workers stop."""
+        await self.engine.close(cancel_running=cancel_running)
+
     @property
     def protocol_capabilities(self) -> tuple[str, ...]:
         return _local_protocol_capabilities(self.engine.model)
 
     def generation_limits(self) -> dict[str, Any]:
-        """Resolve limits from the activated backend, rather than a catalog guess."""
-        return _local_generation_limits(self.engine.model)
+        """Describe activated limits; physical admission verifies native identity."""
+        return _local_generation_limits(self.engine.model, verify_identity=False)
 
     def execution_contract(self) -> dict[str, Any]:
         """Return the exact configured route's bounded input/execution contract."""
@@ -3516,7 +3735,12 @@ class LocalModelAdapter(ProviderAdapter):
 
     @property
     def runtime_digest(self) -> str | None:
-        value = getattr(self.engine.model, "runtime_digest", None)
+        declared = getattr(self.engine.model, "_declared_generation_limits", None)
+        value = (
+            getattr(self.engine.model, "_runtime_digest", None)
+            if callable(declared)
+            else getattr(self.engine.model, "runtime_digest", None)
+        )
         if value is None:
             return None
         if (
@@ -3637,21 +3861,6 @@ class LocalModelAdapter(ProviderAdapter):
             "self-augmentation", "training", "simulation_training",
             "ratchet-learning", "idle-maintenance",
         } else "interactive"
-        prepared_input = self.engine.prepare_input(
-            local_request,
-            scope_id=cache_scope,
-            tenant_scope_id=tenant_scope,
-        )
-        try:
-            input_tokens = self.engine._validate_input_budget(
-                local_request,
-                prepared_input,
-                limits=limits,
-                resource_max_input_tokens=budget.max_input_tokens,
-                resource_max_output_tokens=budget.max_output_tokens,
-            )
-        except LocalInputBudgetError as exc:
-            raise ProviderPolicyError(str(exc)) from exc
         remaining = serving_deadline - time.monotonic()
         if remaining <= 0:
             raise LocalInferenceCancelled("local inference deadline exceeded during preparation")
@@ -3664,22 +3873,21 @@ class LocalModelAdapter(ProviderAdapter):
                     preemption_scope_id=preemption_scope,
                     tenant_scope_id=tenant_scope,
                     deadline=serving_deadline,
-                    prepared_input=prepared_input,
+                    resource_max_input_tokens=budget.max_input_tokens,
+                    resource_max_output_tokens=budget.max_output_tokens,
                 ),
                 timeout=remaining,
             )
         except TimeoutError as exc:
             raise LocalInferenceCancelled("local inference deadline exceeded") from exc
+        except LocalInputBudgetError as exc:
+            raise ProviderPolicyError(str(exc)) from exc
         if time.monotonic() - started > budget.max_wall_seconds or (
             request.deadline is not None and datetime.now(UTC) >= request.deadline.astimezone(UTC)
         ):
             raise LocalInferenceCancelled("local inference completed after its admitted deadline")
         if result.input_tokens > budget.max_input_tokens:
             raise ProviderPolicyError("local result exceeded admitted input-token budget")
-        if result.input_tokens > input_tokens:
-            raise ProviderProtocolViolationError(
-                "local terminal input usage differs from admitted accounting"
-            )
         if result.output_tokens > max_tokens:
             raise ProviderProtocolViolationError("local result exceeded admitted output-token budget")
         if len(result.tool_calls) > budget.max_tool_calls:

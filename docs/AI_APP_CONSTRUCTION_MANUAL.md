@@ -3650,3 +3650,18 @@ custody instead of inferring success from a clock. The operator guide is
 [AI workflow foundations and recovery](ai/AI_FOUNDATIONS_AND_RECOVERY.md).
 These consistency rules are not Byzantine quorum consensus or independent proof
 of generated-content correctness.
+
+The operational continuation is declared under
+`cognitive_runtime_blueprint.adaptive_runtime_optimization.operational_gap_continuation`.
+It keeps local preparation off the async event loop under existing physical
+admission, closes actual serving owners before releasing execution custody,
+preserves exact failed lifecycle leases and teardown dependencies, and fences
+Mongo chat preparation recovery against concurrent writers. Dragon storage
+receipts bind the exact write and uncertain dispatch retains custody. Artifact
+jobs share the existing build slot, bounded vault emission and atomic publication;
+manifest repair cannot race append or replace a newer manifest with stale
+compressed metadata. Readiness separates public infrastructure, authenticated
+capability checks, role eligibility and unobserved model state. Public observation
+does not grant execution or certify model quality. This continuation adds no
+service, provider boundary, durable store or model promotion authority; source
+compilation under the user's no-tests instruction is not closure evidence.

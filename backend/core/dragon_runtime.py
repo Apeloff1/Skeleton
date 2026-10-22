@@ -197,7 +197,7 @@ def _error(exc: Exception) -> GameLearningError:
     return GameLearningError("dragon_reference_rejected", "Dragon reference is not admissible.", 422)
 
 
-async def runtime_readiness() -> dict:
+def _runtime_readiness_sync() -> dict:
     checks = {}
     admitted_paths = {}
     for kind, variable, required in [
@@ -288,6 +288,22 @@ async def runtime_readiness() -> dict:
     }
 
 
+async def runtime_readiness() -> dict:
+    # SQLite busy timeouts must not block the loop that owns crawler lease
+    # checks, checkpoint publication and cooperative worker cancellation.
+    return await asyncio.to_thread(_runtime_readiness_sync)
+
+
+def _candidate(owner: str, identifier: str) -> dict:
+    with _library() as (_, reviews):
+        return reviews.get(owner, _identifier(identifier))
+
+
+def _bindings(owner: str) -> list[dict]:
+    with _library() as (_, reviews):
+        return reviews.bindings(owner)
+
+
 async def create_candidate(scope: dict, request: dict) -> dict:
     owner = _scope(scope)
     try:
@@ -296,8 +312,12 @@ async def create_candidate(scope: dict, request: dict) -> dict:
         evidence = await crawler_application.source_evidence(
             scope, request["session_id"], request["source_id"]
         )
-        with _library() as (_, reviews):
-            value = reviews.create(owner, request, evidence)
+
+        def persist():
+            with _library() as (_, reviews):
+                return reviews.create(owner, request, evidence)
+
+        value = await asyncio.to_thread(persist)
         await crawler_application.assert_context(scope, [value["source_ref"]])
         return {"candidate": {**_public(value), "current_source_usable": True, "current_source_error": None}}
     except (CrawlerError, KnowledgeError, LookupError, sqlite3.Error) as exc:
@@ -307,8 +327,7 @@ async def create_candidate(scope: dict, request: dict) -> dict:
 async def get_candidate(scope: dict, identifier: str) -> dict:
     owner = _scope(scope)
     try:
-        with _library() as (_, reviews):
-            value = reviews.get(owner, _identifier(identifier))
+        value = await asyncio.to_thread(_candidate, owner, identifier)
         return {"candidate": await _annotated_candidate(scope, value)}
     except (KnowledgeError, LookupError, sqlite3.Error) as exc:
         raise _error(exc) from exc
@@ -321,8 +340,12 @@ async def list_candidates(
     if cursor is not None:
         _identifier(cursor)
     try:
-        with _library() as (_, reviews):
-            values, following = reviews.list(owner, state=state, after=cursor or "", limit=limit)
+
+        def read():
+            with _library() as (_, reviews):
+                return reviews.list(owner, state=state, after=cursor or "", limit=limit)
+
+        values, following = await asyncio.to_thread(read)
         return {
             "candidates": [await _annotated_candidate(scope, value) for value in values],
             "next_cursor": following,
@@ -416,8 +439,12 @@ async def _annotated_candidate(scope: dict, candidate: dict) -> dict:
         status = {"current_source_usable": False, "current_source_error": exc.code}
     prepared = None
     if candidate["state"] == "pending_review":
-        with _library() as (_, reviews):
-            intent = reviews.review_intent(_scope(scope), candidate["candidate_id"])
+
+        def read_intent():
+            with _library() as (_, reviews):
+                return reviews.review_intent(_scope(scope), candidate["candidate_id"])
+
+        intent = await asyncio.to_thread(read_intent)
         if intent is not None:
             prepared = {
                 key: value
@@ -435,18 +462,21 @@ async def review_candidate(scope: dict, identifier: str, request: dict) -> dict:
             or not _RIGHT.fullmatch(request.get("rights_reference") or "")
         ):
             raise KnowledgeError("explicit design/research rights attestation is required")
-        with _library() as (_, reviews):
-            candidate = reviews.get(owner, _identifier(identifier))
+        candidate = await asyncio.to_thread(_candidate, owner, identifier)
         await _assert_candidate(scope, candidate)
         evidence = await crawler_application.source_evidence(
             scope, candidate["session_id"], candidate["source_id"]
         )
         if not _same_review_source_reference(evidence["reference"], candidate["source_ref"]):
             raise KnowledgeError("source identity changed")
-        with _library() as (_, reviews):
-            reviews.validate_approval(owner, identifier, request, evidence["source"]["text"])
-            intent = reviews.begin_review(owner, identifier, request, owner)
-            value = reviews.finish_review(owner, identifier, intent, evidence["source"]["text"])
+
+        def persist():
+            with _library() as (_, reviews):
+                reviews.validate_approval(owner, identifier, request, evidence["source"]["text"])
+                intent = reviews.begin_review(owner, identifier, request, owner)
+                return reviews.finish_review(owner, identifier, intent, evidence["source"]["text"])
+
+        value = await asyncio.to_thread(persist)
         await _assert_candidate(scope, value)
         return {"candidate": {**_public(value), "current_source_usable": True, "current_source_error": None}}
     except (CrawlerError, KnowledgeError, LookupError, sqlite3.Error) as exc:
@@ -458,9 +488,12 @@ async def resume_review(scope: dict, identifier: str, review_id: str) -> dict:
     _identifier(identifier)
     _identifier(review_id)
     try:
-        with _library() as (_, reviews):
-            candidate = reviews.get(owner, identifier)
-            intent = reviews.review_intent(owner, identifier, review_id)
+
+        def read():
+            with _library() as (_, reviews):
+                return reviews.get(owner, identifier), reviews.review_intent(owner, identifier, review_id)
+
+        candidate, intent = await asyncio.to_thread(read)
         if intent is None:
             raise KnowledgeError("exact prepared review intent is unavailable")
         await _assert_candidate(scope, candidate)
@@ -469,8 +502,12 @@ async def resume_review(scope: dict, identifier: str, review_id: str) -> dict:
         )
         if not _same_review_source_reference(evidence["reference"], candidate["source_ref"]):
             raise KnowledgeError("source identity changed")
-        with _library() as (_, reviews):
-            value = reviews.finish_review(owner, identifier, intent, evidence["source"]["text"])
+
+        def persist():
+            with _library() as (_, reviews):
+                return reviews.finish_review(owner, identifier, intent, evidence["source"]["text"])
+
+        value = await asyncio.to_thread(persist)
         await _assert_candidate(scope, value, approved=value["state"] == "approved")
         return {
             "candidate": {
@@ -486,8 +523,7 @@ async def resume_review(scope: dict, identifier: str, review_id: str) -> dict:
 
 async def _live_bindings(scope: dict) -> tuple[list[dict], dict[str, dict]]:
     owner = _scope(scope)
-    with _library() as (_, reviews):
-        bindings = reviews.bindings(owner)
+    bindings = await asyncio.to_thread(_bindings, owner)
     live = []
     for binding in bindings:
         if not CapturedSourceReviews.unexpired(binding):
@@ -543,24 +579,30 @@ async def search_reviewed_references(scope: dict, query: str, limit: int = 8) ->
         raise GameLearningError("dragon_query_bounds", "Reference limit must be between 1 and 8.")
     try:
         _, by_source = await _live_bindings(scope)
-        with _library() as (store, _):
-            store.source_verifier = (
-                lambda source: source["source_id"] in by_source
-                and source["revision_digest"] == by_source[source["source_id"]]["revision_digest"]
-            )
-            hits = store.search(
-                owner,
-                query,
-                limit=limit,
-                authorized=True,
-                diversify=False,
-                allowed_revisions={
-                    source_id: binding["revision_digest"] for source_id, binding in by_source.items()
-                },
-            )
-            # This application helper exposes only its explicitly source-bound
-            # annotations. Legacy separately-reviewed libraries keep their owner API.
-            pairs = [_projection(hit, by_source[hit.source_id]) for hit in hits if hit.source_id in by_source]
+
+        def read():
+            with _library() as (store, _):
+                store.source_verifier = (
+                    lambda source: source["source_id"] in by_source
+                    and source["revision_digest"] == by_source[source["source_id"]]["revision_digest"]
+                )
+                hits = store.search(
+                    owner,
+                    query,
+                    limit=limit,
+                    authorized=True,
+                    diversify=False,
+                    allowed_revisions={
+                        source_id: binding["revision_digest"] for source_id, binding in by_source.items()
+                    },
+                )
+                # Expose only explicitly source-bound annotations; separately
+                # reviewed legacy libraries retain their existing owner API.
+                return [
+                    _projection(hit, by_source[hit.source_id]) for hit in hits if hit.source_id in by_source
+                ]
+
+        pairs = await asyncio.to_thread(read)
         for reference, pin in pairs:
             reference["practice_receipts"] = await _practice_discovery(scope, owner, pin["candidate_id"])
         pins = [pin for _, pin in pairs]
@@ -584,7 +626,8 @@ async def assert_reviewed_references(scope: dict, pins: list[dict]) -> None:
         )
     if not pins:
         return
-    try:
+
+    def read():
         with _library() as (store, reviews):
             bindings = {row["source_id"]: row for row in reviews.bindings(owner)}
             current = {row["source_id"]: row for row in store._rows(owner)}
@@ -638,6 +681,10 @@ async def assert_reviewed_references(scope: dict, pins: list[dict]) -> None:
                 if pin != expected:
                     raise KnowledgeError("reviewed-reference identity changed")
                 sources.append(binding["source_ref"])
+            return sources
+
+    try:
+        sources = await asyncio.to_thread(read)
         for source in sources:
             await crawler_application.assert_context(scope, [source])
     except (CrawlerError, KnowledgeError, LookupError, sqlite3.Error) as exc:
@@ -650,8 +697,7 @@ async def assert_reviewed_references(scope: dict, pins: list[dict]) -> None:
 
 async def practice_candidate(scope: dict, identifier: str, request: dict) -> dict:
     owner = _scope(scope)
-    with _library() as (_, reviews):
-        candidate = reviews.get(owner, _identifier(identifier))
+    candidate = await asyncio.to_thread(_candidate, owner, identifier)
     if candidate["mechanic"] not in PRACTICE_MECHANICS:
         raise GameLearningError(
             "dragon_practice_unsupported", "This mechanic has no supported local reference exercise.", 409
@@ -660,9 +706,11 @@ async def practice_candidate(scope: dict, identifier: str, request: dict) -> dic
         raise GameLearningError("dragon_review_conflict", "Source candidate version changed.", 409)
 
     async def authorize():
-        with _library() as (_, reviews):
-            current = reviews.get(owner, identifier)
-            bindings = reviews.bindings(owner)
+        def read():
+            with _library() as (_, reviews):
+                return reviews.get(owner, identifier), reviews.bindings(owner)
+
+        current, bindings = await asyncio.to_thread(read)
         if current != candidate or not any(row["candidate_id"] == identifier for row in bindings):
             raise GameLearningError("dragon_review_conflict", "Reviewed reference changed.", 409)
         await _assert_candidate(scope, current, approved=True)
@@ -681,8 +729,7 @@ async def practice_candidate(scope: dict, identifier: str, request: dict) -> dic
 
 async def practice_history(scope: dict, identifier: str, limit: int = 20) -> dict:
     owner = _scope(scope)
-    with _library() as (_, reviews):
-        candidate = reviews.get(owner, _identifier(identifier))
+    candidate = await asyncio.to_thread(_candidate, owner, identifier)
     await _assert_candidate(scope, candidate, approved=True)
     from core.dragon_reference_practice import list_reference_practice
 
@@ -697,8 +744,7 @@ async def _inspect_reference_practice(scope: dict, candidate_id: str, practice_i
     owner = _scope(scope)
     _identifier(candidate_id)
     _identifier(practice_id)
-    with _library() as (_, reviews):
-        candidate = reviews.get(owner, candidate_id)
+    candidate = await asyncio.to_thread(_candidate, owner, candidate_id)
     await _assert_candidate(scope, candidate, approved=True)
     from core.dragon_reference_practice import read_reference_practice
 

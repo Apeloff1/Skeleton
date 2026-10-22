@@ -22,11 +22,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
 from bson.codec_options import CodecOptions
-from pymongo import ASCENDING, ReturnDocument
+from pymongo import ASCENDING, ReadPreference, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
 from skeleton.ai.assistant.turn_ownership import (
+    TURN_OWNERSHIP_SCHEMA_VERSION,
     TurnLeaseBusy,
     TurnLeaseExpired,
     TurnLeasePolicy,
@@ -62,6 +63,20 @@ from skeleton.persistence.chat_turn_repository import (
 
 class ChatTurnStorageUnavailable(ChatTurnRepositoryError):
     """Mongo turn state cannot currently be used safely."""
+
+
+_OWNERSHIP_HEADER_FIELDS = (
+    "lease_epoch",
+    "lease_holder_id",
+    "lease_granted_at",
+    "lease_expires_at",
+    "lease_heartbeat_sequence",
+    "lease_previous_digest",
+    "lease_digest",
+    "lease_token",
+    "ownership_receipt_digest",
+    "ownership_audit_sequence",
+)
 
 
 def _mongo_time(value: datetime) -> datetime:
@@ -180,18 +195,43 @@ def _turn_from_doc(doc: Mapping[str, Any]) -> PersistedChatTurn:
         raise ChatTurnCorruption("Mongo materialized sequence drifted")
     if doc.get("last_event_digest") != snapshot.last_event_digest:
         raise ChatTurnCorruption("Mongo materialized digest chain drifted")
+    _validate_ownership_header(doc)
     return turn
 
 
+def _validate_ownership_header(doc: Mapping[str, Any]) -> bool:
+    """Distinguish a wholly legacy row from damaged materialized fencing."""
+
+    if not any(field in doc for field in _OWNERSHIP_HEADER_FIELDS):
+        return False
+    # The exact token envelope was added after materialized ownership fields;
+    # valid older owned rows still use the lossless legacy decoder below.
+    if any(field not in doc for field in _OWNERSHIP_HEADER_FIELDS if field != "lease_token"):
+        raise ChatTurnCorruption("Mongo turn ownership header is partially materialized")
+    for field in ("lease_epoch", "lease_heartbeat_sequence", "ownership_audit_sequence"):
+        value = doc[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ChatTurnCorruption("Mongo ownership counters must be non-negative integers")
+    if doc["ownership_audit_sequence"] < doc["lease_epoch"]:
+        raise ChatTurnCorruption("Mongo ownership audit counter precedes its fencing epoch")
+    for field in ("lease_previous_digest", "lease_digest", "ownership_receipt_digest"):
+        value = doc[field]
+        if value is not None and (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise ChatTurnCorruption("Mongo ownership digest must be lowercase sha256")
+    return True
+
+
 def _lease_from_doc(doc: Mapping[str, Any]) -> TurnLeaseToken | None:
+    _validate_ownership_header(doc)
     holder = doc.get("lease_holder_id")
     if holder is None:
         if any(doc.get(key) is not None for key in ("lease_token", "lease_granted_at", "lease_expires_at")):
             raise ChatTurnCorruption("Mongo unowned lease retains active ownership materialization")
         return None
-    for field in ("lease_epoch", "lease_heartbeat_sequence"):
-        if isinstance(doc.get(field), bool) or not isinstance(doc.get(field), int):
-            raise ChatTurnCorruption("Mongo lease counters must be integers")
     if doc.get("lease_token") is not None:
         # BSON dates have millisecond precision. The existing canonical token
         # envelope preserves the exact instants bound by its digest; materialized
@@ -245,6 +285,12 @@ def _lease_from_payload(raw: object) -> TurnLeaseToken | None:
         return None
     if not isinstance(raw, Mapping):
         raise ChatTurnCorruption("prepared event lease binding is invalid")
+    if (
+        isinstance(raw.get("schema_version"), bool)
+        or not isinstance(raw.get("schema_version"), int)
+        or raw["schema_version"] != TURN_OWNERSHIP_SCHEMA_VERSION
+    ):
+        raise ChatTurnCorruption("prepared event lease schema is unsupported")
     try:
         token = TurnLeaseToken(
             operation_id=raw["operation_id"],
@@ -336,6 +382,25 @@ def _event_doc(
     }
 
 
+def _prepared_event_filter(prepared: Mapping[str, Any]) -> dict[str, Any]:
+    """Mutate only the preparation that the recovery reader actually saw.
+
+    A discarded sequence can be reused by a later fenced writer. The stable
+    operation/sequence identity alone therefore cannot identify a preparation,
+    even when the replacement contains the same transition under a new lease.
+    Keep the stored lease envelope intact rather than reserializing BSON.
+    """
+
+    return {
+        "_id": prepared["_id"],
+        "operation_id": prepared["operation_id"],
+        "sequence": prepared["sequence"],
+        "event_digest": prepared["event_digest"],
+        "lease": prepared.get("lease"),
+        "_commit_state": "prepared",
+    }
+
+
 def _event_from_doc(doc: Mapping[str, Any]) -> TurnEvent:
     try:
         if isinstance(doc.get("sequence"), bool) or not isinstance(doc.get("sequence"), int):
@@ -374,7 +439,13 @@ class MongoChatTurnAuthority:
 
     def __init__(self, database=core_db) -> None:
         if callable(getattr(database, "with_options", None)):
-            database = database.with_options(codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc))
+            # Recovery proves a lease cannot still commit, then refreshes the
+            # snapshot before discarding its preparation. Replica-lagged reads
+            # cannot establish either fact, even if the URL prefers secondaries.
+            database = database.with_options(
+                codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc),
+                read_preference=ReadPreference.PRIMARY,
+            )
         self.database = database
         self.operations = database["ai_chat_turn_operations"]
         self.events = database["ai_chat_turn_events"]
@@ -467,7 +538,7 @@ class MongoChatTurnAuthority:
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
-        if "lease_epoch" in raw and "ownership_audit_sequence" in raw:
+        if _validate_ownership_header(raw):
             return raw
 
         query = {
@@ -476,7 +547,9 @@ class MongoChatTurnAuthority:
                 tenant_id=tenant_id,
                 owner_id=owner_id,
             ),
-            "lease_epoch": {"$exists": False},
+            # Initialization is legal only for a wholly absent legacy header.
+            # Another writer introducing any ownership field fences this CAS.
+            **{field: {"$exists": False} for field in _OWNERSHIP_HEADER_FIELDS},
         }
         defaults = {
             "lease_epoch": 0,
@@ -508,7 +581,7 @@ class MongoChatTurnAuthority:
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
-        if "lease_epoch" not in refreshed:
+        if not _validate_ownership_header(refreshed):
             raise ChatTurnStorageUnavailable("AI chat ownership schema initialization did not converge")
         return refreshed
 
@@ -569,65 +642,85 @@ class MongoChatTurnAuthority:
             return current
 
         event = _event_from_doc(prepared)
+        prepared_filter = _prepared_event_filter(prepared)
+        # A writer may have advanced the snapshot and prepared the following
+        # sequence after our first read. Never discard it using that stale
+        # snapshot, or the writer could commit a transition with no journal row.
+        raw = await self._raw_operation(
+            operation_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        current = _turn_from_doc(raw)
         if event.sequence < current.snapshot.next_sequence:
             try:
                 await self.events.update_one(
-                    {
-                        "_id": prepared["_id"],
-                        "_commit_state": "prepared",
-                    },
+                    prepared_filter,
                     {"$set": {"_commit_state": "committed"}},
                 )
             except PyMongoError:
                 pass
             return current
 
-        prepared_lease = _lease_from_payload(prepared.get("lease"))
-        if prepared_lease is not None:
-            try:
-                _assert_lease_doc(
-                    raw,
-                    prepared_lease,
-                    now=_utcnow(),
-                )
-            except (TurnLeaseStale, TurnLeaseExpired):
-                try:
-                    await self.events.delete_one(
-                        {
-                            "_id": prepared["_id"],
-                            "_commit_state": "prepared",
-                        }
-                    )
-                except PyMongoError as exc:
-                    raise ChatTurnStorageUnavailable(
-                        "stale prepared AI chat event could not be discarded"
-                    ) from exc
-                return current
-        else:
-            owner = _lease_from_doc(raw)
-            if owner is not None and owner.is_live(_utcnow()):
-                # This transition never reached its snapshot commit point.
-                # Discard it like an expired-lease preparation, leaving the
-                # current holder free to issue the next fenced transition.
-                try:
-                    await self.events.delete_one({"_id": prepared["_id"], "_commit_state": "prepared"})
-                except PyMongoError as exc:
-                    raise ChatTurnStorageUnavailable(
-                        "unowned prepared AI chat event could not be discarded"
-                    ) from exc
-                return current
+        if event.sequence > current.snapshot.next_sequence:
+            raise ChatTurnCorruption("prepared AI chat turn event has a sequence gap")
 
-        if (
-            event.sequence != current.snapshot.next_sequence
-            or event.previous_event_digest != current.snapshot.last_event_digest
+        prepared_lease = _lease_from_payload(prepared.get("lease"))
+        if prepared_lease is not None and (
+            prepared_lease.operation_id != operation_id
+            or prepared_lease.tenant_id != tenant_id
+            or prepared_lease.owner_id != owner_id
         ):
+            raise ChatTurnCorruption("prepared AI chat event lease scope drifted")
+        # Validate materialization even though Mongo's clock, rather than the
+        # reader's process clock, decides whether recovery owns this transition.
+        _lease_from_doc(raw)
+        ownership_query = {
+            **self._authorized_filter(
+                operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            ),
+            **(_live_lease_query(prepared_lease) if prepared_lease is not None else _unowned_query(raw)),
+        }
+        try:
+            ownership = await self.operations.find_one(ownership_query, {"_id": 1})
+        except PyMongoError as exc:
+            raise ChatTurnStorageUnavailable("prepared AI chat event ownership is unavailable") from exc
+        if ownership is None:
+            # A writer could have reached the commit point just before expiry
+            # made the ownership probe fail. Observe that commit before deleting
+            # anything. An expired/replaced lease can never regain its token;
+            # an unowned transition, however, can become admissible when a live
+            # holder expires, so retain it rather than erase a still-usable intent.
+            refreshed_raw = await self._raw_operation(
+                operation_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            refreshed = _turn_from_doc(refreshed_raw)
+            if refreshed.snapshot.next_sequence > event.sequence:
+                try:
+                    await self.events.update_one(
+                        prepared_filter,
+                        {"$set": {"_commit_state": "committed"}},
+                    )
+                except PyMongoError:
+                    pass
+                return refreshed
+            if prepared_lease is None:
+                raise ChatTurnConflict("unowned prepared AI chat event is blocked by changed ownership")
             try:
-                await self.events.delete_one(
-                    {
-                        "_id": prepared["_id"],
-                        "_commit_state": "prepared",
-                    }
-                )
+                await self.events.delete_one(prepared_filter)
+            except PyMongoError as exc:
+                raise ChatTurnStorageUnavailable(
+                    "stale prepared AI chat event could not be discarded"
+                ) from exc
+            return refreshed
+
+        if event.previous_event_digest != current.snapshot.last_event_digest:
+            try:
+                await self.events.delete_one(prepared_filter)
             except PyMongoError as exc:
                 raise ChatTurnStorageUnavailable("stale AI chat turn event could not be discarded") from exc
             return current
@@ -671,10 +764,7 @@ class MongoChatTurnAuthority:
             if refreshed.snapshot.next_sequence > event.sequence:
                 try:
                     await self.events.update_one(
-                        {
-                            "_id": prepared["_id"],
-                            "_commit_state": "prepared",
-                        },
+                        prepared_filter,
                         {"$set": {"_commit_state": "committed"}},
                     )
                 except PyMongoError:
@@ -684,10 +774,7 @@ class MongoChatTurnAuthority:
 
         try:
             await self.events.update_one(
-                {
-                    "_id": prepared["_id"],
-                    "_commit_state": "prepared",
-                },
+                prepared_filter,
                 {"$set": {"_commit_state": "committed"}},
             )
         except PyMongoError:
@@ -770,7 +857,7 @@ class MongoChatTurnAuthority:
                 return current
             raise TurnLeaseBusy("turn already has a live execution owner")
 
-        epoch = int(raw.get("lease_epoch") or 0) + 1
+        epoch = raw["lease_epoch"] + 1
         token = TurnLeaseToken(
             operation_id=operation_id,
             tenant_id=tenant_id,
@@ -791,7 +878,7 @@ class MongoChatTurnAuthority:
             lease_digest=token.digest,
             previous_receipt_digest=raw.get("ownership_receipt_digest"),
         )
-        sequence = int(raw.get("ownership_audit_sequence") or 0) + 1
+        sequence = raw["ownership_audit_sequence"] + 1
         await self._record_ownership_receipt(receipt, sequence=sequence)
 
         query = {
@@ -800,10 +887,10 @@ class MongoChatTurnAuthority:
                 tenant_id=tenant_id,
                 owner_id=owner_id,
             ),
-            "lease_epoch": int(raw.get("lease_epoch") or 0),
+            "lease_epoch": raw["lease_epoch"],
             "lease_holder_id": raw.get("lease_holder_id"),
             "lease_digest": raw.get("lease_digest"),
-            "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
+            "ownership_audit_sequence": raw["ownership_audit_sequence"],
         }
         if now is None:
             # A takeover must also observe expiry on the database clock. The
@@ -886,7 +973,7 @@ class MongoChatTurnAuthority:
             lease_digest=renewed.digest,
             previous_receipt_digest=raw.get("ownership_receipt_digest"),
         )
-        sequence = int(raw.get("ownership_audit_sequence") or 0) + 1
+        sequence = raw["ownership_audit_sequence"] + 1
         await self._record_ownership_receipt(receipt, sequence=sequence)
 
         query = {
@@ -898,7 +985,7 @@ class MongoChatTurnAuthority:
             "lease_epoch": current.epoch,
             "lease_holder_id": current.holder_id,
             "lease_digest": current.digest,
-            "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
+            "ownership_audit_sequence": raw["ownership_audit_sequence"],
         }
         if now is None:
             query.update(_live_lease_query(current))
@@ -952,7 +1039,7 @@ class MongoChatTurnAuthority:
             lease_digest=current.digest,
             previous_receipt_digest=raw.get("ownership_receipt_digest"),
         )
-        sequence = int(raw.get("ownership_audit_sequence") or 0) + 1
+        sequence = raw["ownership_audit_sequence"] + 1
         await self._record_ownership_receipt(receipt, sequence=sequence)
 
         query = {
@@ -964,7 +1051,7 @@ class MongoChatTurnAuthority:
             "lease_epoch": current.epoch,
             "lease_holder_id": current.holder_id,
             "lease_digest": current.digest,
-            "ownership_audit_sequence": int(raw.get("ownership_audit_sequence") or 0),
+            "ownership_audit_sequence": raw["ownership_audit_sequence"],
         }
         if now is None:
             query.update(_live_lease_query(current))
@@ -1142,10 +1229,7 @@ class MongoChatTurnAuthority:
 
         try:
             await self.events.update_one(
-                {
-                    "_id": prepared["_id"],
-                    "_commit_state": "prepared",
-                },
+                _prepared_event_filter(prepared),
                 {"$set": {"_commit_state": "committed"}},
             )
         except PyMongoError:

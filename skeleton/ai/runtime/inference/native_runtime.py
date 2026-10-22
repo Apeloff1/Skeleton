@@ -310,6 +310,23 @@ class NativeRuntimeLocalModel:
         if self.runtime.model_identity.identity_digest != self._runtime_digest:
             raise NativeRuntimeBackendError("native runtime identity drift")
 
+    def check_readiness(self) -> None:
+        """Read admitted metadata/device availability without scanning weights.
+
+        Full weight/tokenizer integrity remains mandatory in the admitted
+        preparation and inference worker. This probe cannot attest those bytes.
+        """
+        device = self.runtime.device
+        if (
+            self.model_id != self._admitted_model_id
+            or self.runtime.model_digest != self._model_digest
+            or self.runtime.tokenizer.digest != self._tokenizer_digest
+            or self.runtime.model_identity.identity_digest != self._runtime_digest
+            or str(getattr(self.runtime.model, "device", "cpu") or "cpu") != device.actual
+            or bool(getattr(self.runtime.model, "resident", False)) != device.resident
+        ):
+            raise NativeRuntimeBackendError("native runtime is no longer admitted on its execution device")
+
     def to_dict(self) -> dict[str, Any]:
         """Return the canonical integrity-checked native runtime checkpoint."""
         self.assert_identity()

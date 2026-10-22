@@ -53,6 +53,15 @@ configured account to manage roles through the existing administrator authority.
 There is no shared default administrator password or automatic first-user
 elevation.
 
+New password, OAuth and bootstrap accounts explicitly belong to the existing
+`default` tenant, matching the initial engine service grant. Upgrades preserve
+existing user tenants and legacy email-scoped Dragon captures. If a legacy account
+receives `crawler_admission_scope_denied`, explicitly include its existing tenant
+in the engine attester configuration; do not reassign its stored captures. The
+configuration helper supports repeated `--tenant` flags; include `default` too
+when retaining access for new default-tenant accounts. Reconfiguration still
+requires the helper's original model input and credential-preservation rules.
+
 The first-install continuation has been exercised with fresh Mongo, engine,
 production backend and Nginx containers, including actual local-model inference,
 account restart recovery and crawler controls. Desktop and mobile browser

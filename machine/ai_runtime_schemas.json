@@ -2817,10 +2817,12 @@
       },
       "invariants": [
         "Side-effect-free projection from activated model/protocol/operator limits, not a new provider activation or readiness authority.",
-        "Generation/input budgets are enforced by the same owner-local finite validator before worker dispatch and native preparation; runtime tokenization never occurs merely to read status.",
+        "Generation/input budgets are enforced by the same owner-local finite validator before generation; identity/token preparation uses fair admitted physical workers, and status inspection never performs runtime tokenization.",
         "Source model identity may differ from a configured route alias; the activated model digest pins the contract.",
         "Native event sequence, streamed token IDs and terminal/replay identity consistency are checked before output/cache publication; these are not independent semantic correctness proofs.",
-        "Cancellation, absolute deadlines and physical worker custody remain authoritative."
+        "Cancellation, absolute deadlines and physical worker custody remain authoritative.",
+        "Cache/coalescing identities pin each original provider resource ceiling; a low-budget leader cannot poison another independently valid request.",
+        "Permanent close denies replacement admission and awaits native preflight/generation drain. Coordinator shutdown includes deduplicated verifier engines and retains host/database/finalization dependencies until exact physical custody is discharged."
       ]
     },
     "RuntimeLearningExplanation": {
@@ -2899,6 +2901,65 @@
         "execution_authority=none and host_admission_required=true; awaiting_host_admission never asserts that work is currently eligible.",
         "Inspection never invokes host callbacks, probes workers, advances clocks, reserves work or writes state.",
         "Malformed optional display diagnostics remain explicitly unavailable while existing policy CAS and scope checks remain authoritative."
+      ]
+    },
+    "GalaxyArtifactExecutionObservation": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "operation": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 32
+        },
+        "operation_status": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "running",
+            "stopping",
+            "completed",
+            "failed",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "runner_live": {
+          "type": "boolean"
+        },
+        "physical_workers": {
+          "type": "integer",
+          "min": 0
+        },
+        "stop_requested": {
+          "type": "boolean"
+        },
+        "stop_reason": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 128
+        },
+        "drain_pending": {
+          "type": "boolean"
+        },
+        "partial_artifacts": {
+          "type": "boolean"
+        },
+        "unflushed_files": {
+          "type": "integer",
+          "min": 0
+        },
+        "storage_failed": {
+          "type": "boolean"
+        }
+      },
+      "invariants": [
+        "Additive fields of the existing Galaxy status execution projection; no independent command or grant.",
+        "Main game phase completion is independent of later ZIP, expansion and APK operation completion.",
+        "Persisted active metadata without actual local custody projects unknown; stale heartbeat and elapsed time never establish drain.",
+        "Current operation stop/failure and partial artifacts retain physical custody until native work settles; no successful output is inferred from elapsed time or HTTP command acknowledgement.",
+        "Queued APK preparation is not remote submission. Durable submission intent and a service-acknowledged remote build ID distinguish preparation, acknowledged work and unresolved side effects.",
+        "Artifact admission is the existing process-local build owner; this does not establish distributed consensus or multi-host fencing."
       ]
     }
   },

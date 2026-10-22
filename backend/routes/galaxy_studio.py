@@ -45,6 +45,7 @@ from dotenv import load_dotenv
 import uuid, os, json, zipfile, tempfile, subprocess, shutil
 import time as _build_clock
 import asyncio  # module-level (used by background build + expansion launchers)
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -239,6 +240,14 @@ async def _save_build(build):
             "_bg_deadline_monotonic",
         }
         save_doc = {k: v for k, v in build.items() if k not in _heavy}
+        if isinstance(save_doc.get("_artifact_job"), dict):
+            save_doc["_artifact_job"] = {
+                key: value for key, value in save_doc["_artifact_job"].items() if not key.startswith("_")
+            }
+        if isinstance(save_doc.get("_apk"), dict):
+            save_doc["_apk"] = {
+                key: value for key, value in save_doc["_apk"].items() if not key.startswith("_")
+            }
         save_doc["_files_saved_separately"] = True
         save_doc["_file_count_at_save"] = len(build.get("files", {}))
         # Trim log arrays — preserve full arrays in RAM but store bounded versions to Mongo
@@ -254,7 +263,11 @@ async def _save_build(build):
                 {k: v for k, v in p.items() if k not in ("files_generated", "output", "raw_output")}
                 for p in phases
             ]
-        await _db.galaxy_builds.update_one({"build_id": build["build_id"]}, {"$set": save_doc}, upsert=True)
+        receipt = await _db.galaxy_builds.update_one(
+            {"build_id": build["build_id"]}, {"$set": save_doc}, upsert=True
+        )
+        if not receipt.acknowledged:
+            raise RuntimeError("unacknowledged build metadata")
         # Keep galaxy_builds marked HOT so the cold-storage evictor never targets it.
         try:
             from core import cold_storage as _cs
@@ -311,11 +324,42 @@ async def _save_build(build):
                     "_bg_drain_pending": build.get("_bg_drain_pending", False),
                     "_vault_write_failed": build.get("_vault_write_failed", False),
                     "_bg_partial_artifacts": build.get("_bg_partial_artifacts", False),
+                    "_artifact_job": {
+                        key: value
+                        for key, value in (build.get("_artifact_job") or {}).items()
+                        if not key.startswith("_")
+                    },
+                    "_apk": {
+                        key: value
+                        for key, value in (build.get("_apk") or {}).items()
+                        if not key.startswith("_")
+                    },
+                    "_expansion": {
+                        key: value
+                        for key, value in (build.get("_expansion") or {}).items()
+                        if key
+                        in {
+                            "status",
+                            "error",
+                            "files_added",
+                            "files_before",
+                            "total_files",
+                            "started_at",
+                            "completed_at",
+                            "unflushed_files",
+                        }
+                    },
+                    "eas_build_id": build.get("eas_build_id"),
+                    "eas_build_status": build.get("eas_build_status"),
                     "_minimal_save": True,
                 }
-                await _db.galaxy_builds.update_one(
-                    {"build_id": build["build_id"]}, {"$set": minimal}, upsert=True,
+                receipt = await _db.galaxy_builds.update_one(
+                    {"build_id": build["build_id"]},
+                    {"$set": minimal},
+                    upsert=True,
                 )
+                if not receipt.acknowledged:
+                    raise RuntimeError("unacknowledged build metadata")
                 print(f"[GALAXY _save_build] fell back to MINIMAL save for {build.get('build_id')}")
                 return True
             except Exception as e2:
@@ -446,15 +490,16 @@ def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FL
 
 
 def _vault_total_files(build: dict) -> int:
-    """file_count that reflects vault + in-memory pending (for /status)."""
+    """Count unique vaulted and pending paths, including pending replacements."""
+    pending_paths = tuple((build.get("files") or {}).keys())
     try:
         from core import build_vault as _bv
         bid = build.get("build_id")
         if bid:
-            return _bv.get_file_count(bid) + len(build.get("files") or {})
+            return _bv.get_file_count(bid, pending_paths=pending_paths)
     except Exception:
         pass
-    return len(build.get("files") or {})
+    return len(pending_paths)
 
 
 # Frontend ships humanised complexity values; map them to ints 0-10.
@@ -1957,48 +2002,146 @@ def _get_phase_synergies(phase_id: str) -> list:
     return activated
 
 
+def _iter_artifact_files(build: dict):
+    """Stream pending overrides first, then the newest vaulted content."""
+    from core import build_vault as _bv
+
+    seen = set()
+    count = 0
+    for source in ((build.get("files") or {}).items(), _bv.iter_files(build["build_id"])):
+        for path, content in source:
+            _check_build_continuation(build)
+            normalized = str(path).replace("\\", "/")
+            if (
+                normalized.startswith("/")
+                or any(part in {"", ".", ".."} for part in normalized.split("/"))
+                or ":" in normalized
+                or "\x00" in normalized
+            ):
+                raise GalaxyBuildStopped("artifact_path_invalid")
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            if count % 64 == 0:
+                _check_build_resources(build)
+            count += 1
+            yield normalized, content
+
+
+def _write_package_zip_sync(build: dict, directory: str, slug: str) -> tuple[str, int]:
+    """Publish a unique ZIP only after every file and the ZIP footer succeeds."""
+    safe_id = _safe_segment(build["build_id"], what="build_id")
+    slug = _safe_slug(slug)
+    os.makedirs(directory, exist_ok=True)
+    path = _resolve_under_dir(directory, f"{slug}-{safe_id}-{uuid.uuid4().hex[:12]}.zip")
+    partial = path + ".partial"
+    count = 0
+    published = False
+    try:
+        with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+            for name, content in _iter_artifact_files(build):
+                if count % 64 == 0 and shutil.disk_usage(directory).free < 64 * 1024 * 1024:
+                    raise GalaxyBuildStopped("artifact_storage_unavailable")
+                _zip_write_file(zf, f"{slug}/{name}", content)
+                count += 1
+        if not count:
+            raise GalaxyBuildStopped("artifact_empty_source")
+        _check_build_continuation(build)
+        os.replace(partial, path)
+        published = True
+        return path, count
+    except GalaxyBuildStopped:
+        raise
+    except OSError as exc:
+        import errno
+
+        reason = (
+            "artifact_storage_unavailable"
+            if exc.errno in {errno.ENOSPC, errno.EDQUOT}
+            else "artifact_packaging_failed"
+        )
+        raise GalaxyBuildStopped(reason) from exc
+    except Exception as exc:
+        raise GalaxyBuildStopped("artifact_packaging_failed") from exc
+    finally:
+        if not published:
+            try:
+                os.unlink(partial)  # only this attempt's unpublished temporary output
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass  # retain the original packaging failure
+
+
+async def _save_artifact_entry_required(entry: dict) -> None:
+    from services.database import db as _db
+
+    try:
+        receipt = await _db.galaxy_vault.update_one(
+            {"vault_id": entry["vault_id"]}, {"$set": entry}, upsert=True
+        )
+        if not receipt.acknowledged:
+            raise RuntimeError("unacknowledged vault metadata")
+    except Exception as exc:
+        raise GalaxyBuildStopped("artifact_metadata_unavailable") from exc
+
+
 async def _package_build(build_id: str) -> str:
-    """Package build files into downloadable ZIP.
-    Reads directly from the on-disk build-vault shards (streaming, no
-    full-RAM copy) so we can package 250k-file builds without OOM."""
     build = await _load_build(build_id)
     if not build:
-        raise HTTPException(400, "Build not found")
-
+        raise HTTPException(404, "Build not found")
     safe_id = _safe_segment(build_id, what="build_id")
-    slug = _safe_slug(build.get("title") or "game")
-    zip_dir = _resolve_under_dir("/tmp/galaxy_studio", safe_id)
-    os.makedirs(zip_dir, exist_ok=True)
-    zip_path = _resolve_under_dir(zip_dir, f"{slug}-game.zip")
+    directory = _resolve_under_dir("/tmp/galaxy_studio", safe_id)
+    async with _artifact_operation(build, "zip"):
+        path, _ = await _await_build_io(
+            build, _write_package_zip_sync, build, directory, build.get("title") or "game"
+        )
+        return path
 
-    # Prefer streaming from the vault when present — this is the ONLY path
-    # that works for massive builds (files no longer in RAM).
-    from core import build_vault as _bv
-    vault_count = _bv.get_file_count(build_id)
-    mem_files = build.get("files") or {}
-    if vault_count == 0 and not mem_files:
-        raise HTTPException(400, "No files to package")
 
-    # Compress on a worker thread — zipping 10k+ files with DEFLATE is CPU-heavy
-    # and previously blocked the event loop at build completion (the last blip).
-    def _build_zip():
-        written = set()
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
-            # 1) stream vault shards (newest wins on duplicates)
-            for path, content in _bv.iter_files(build_id):
-                if path in written:
-                    continue
-                _zip_write_file(zf, f"{slug}/{path}", content)
-                written.add(path)
-            # 2) any in-memory files not yet flushed
-            for path, content in mem_files.items():
-                if path in written:
-                    continue
-                _zip_write_file(zf, f"{slug}/{path}", content)
-                written.add(path)
-    await asyncio.to_thread(_build_zip)
+async def _create_vault_zip(build: dict) -> dict:
+    async with _artifact_operation(build, "vault_zip"):
+        path, count = await _await_build_io(
+            build,
+            _write_package_zip_sync,
+            build,
+            _resolve_under_dir(VAULT_DIR, "zips"),
+            build.get("title") or "game",
+        )
+        entry = _vault_save(
+            build["build_id"],
+            "zip",
+            build.get("title", "game"),
+            path,
+            {"file_count": count, "genre": build.get("genre", "unknown")},
+        )
+        await _save_artifact_entry_required(entry)
+        return entry
 
-    return zip_path
+
+async def _build_native_apk(build: dict) -> dict:
+    from services import binary_builder
+    import base64
+
+    def files():
+        for path, content in _iter_artifact_files(build):
+            if isinstance(content, str) and content.startswith(_BINARY_PREFIX):
+                content = base64.b64decode(content[len(_BINARY_PREFIX) :], validate=True)
+            yield path, content
+
+    async with _artifact_operation(build, "native_apk"):
+        if not await _await_build_io(build, binary_builder._have_full_apk_toolchain):
+            raise GalaxyBuildStopped("apk_toolchain_unavailable")
+        request = {
+            "build_id": build["build_id"],
+            "title": build.get("title") or "Galaxy Game",
+            "generated_files_factory": files,
+            "artifact_output_token": uuid.uuid4().hex[:12],
+        }
+        artifact = await _await_build_io(build, binary_builder.build_apk, request)
+        if not artifact.get("is_installable"):
+            raise GalaxyBuildStopped("apk_toolchain_unavailable")
+        return artifact
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2010,7 +2153,7 @@ def _zip_write_file(zf, archive_path: str, content: str):
     """Write a file to a ZipFile, handling binary base64-encoded content."""
     import base64
     if isinstance(content, str) and content.startswith(_BINARY_PREFIX):
-        zf.writestr(archive_path, base64.b64decode(content[len(_BINARY_PREFIX):]))
+        zf.writestr(archive_path, base64.b64decode(content[len(_BINARY_PREFIX) :], validate=True))
     else:
         zf.writestr(archive_path, content)
 
@@ -2018,12 +2161,15 @@ def _disk_write_file(full_path: str, content: str):
     """Write a file to disk, handling binary base64-encoded content."""
     import base64
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
-    if isinstance(content, str) and content.startswith(_BINARY_PREFIX):
-        with open(full_path, 'wb') as f:
-            f.write(base64.b64decode(content[len(_BINARY_PREFIX):]))
+    if isinstance(content, (bytes, bytearray)):
+        with open(full_path, "wb") as handle:
+            handle.write(content)
+    elif isinstance(content, str) and content.startswith(_BINARY_PREFIX):
+        with open(full_path, "wb") as handle:
+            handle.write(base64.b64decode(content[len(_BINARY_PREFIX) :], validate=True))
     else:
-        with open(full_path, 'w') as f:
-            f.write(content)
+        with open(full_path, "w", encoding="utf-8") as handle:
+            handle.write(content)
 
 # ═══════════════════════════════════════════════════════════════════════
 # API ENDPOINTS
@@ -2297,7 +2443,31 @@ class GalaxyBuildStopped(RuntimeError):
         super().__init__(reason)
 
 
+def _active_artifact_job(build: dict) -> dict | None:
+    job = build.get("_artifact_job")
+    return (
+        job
+        if isinstance(job, dict)
+        and (job.get("status") in {"running", "stopping"} or job.get("_owned") is True)
+        else None
+    )
+
+
 def _mark_build_stop(build: dict, reason: str, *, failed: bool = True) -> None:
+    job = _active_artifact_job(build)
+    if job is not None:
+        if not job.get("stop_requested"):
+            job["stop_reason"] = reason
+            job["stop_target"] = "failed" if failed else "cancelled"
+        job["stop_requested"] = True
+        job["status"] = "stopping"
+        job["error"] = job.get("stop_reason", reason)
+        state = build.get(
+            "_expansion" if job.get("kind") == "expansion" else "_apk" if job.get("kind") == "apk" else ""
+        )
+        if isinstance(state, dict):
+            state.update({"status": "stopping", "error": job["error"]})
+        return
     if not build.get("_bg_stop_requested"):
         build["_bg_stop_reason"] = reason
         build["_bg_stop_target"] = "failed" if failed else "cancelled"
@@ -2307,7 +2477,11 @@ def _mark_build_stop(build: dict, reason: str, *, failed: bool = True) -> None:
 
 
 def _check_build_continuation(build: dict) -> None:
-    if build.get("_bg_stop_requested"):
+    job = _active_artifact_job(build)
+    if job is not None:
+        if job.get("stop_requested"):
+            raise GalaxyBuildStopped(str(job.get("stop_reason") or "artifact_job_stopped"))
+    elif build.get("_bg_stop_requested"):
         raise GalaxyBuildStopped(str(build.get("_bg_stop_reason") or "build_stopped"))
     deadline = build.get("_bg_deadline_monotonic")
     if isinstance(deadline, (int, float)) and _build_clock.monotonic() >= deadline:
@@ -2442,19 +2616,160 @@ async def _await_build_io(build: dict, operation, *args):
     return await asyncio.shield(wrapped)
 
 
+def _claim_artifact_operation(build: dict, kind: str, owner) -> dict:
+    """A synchronous handoff uses the existing single physical build slot."""
+    if _any_build_has_live_work():
+        raise HTTPException(409, "A build or artifact job still owns physical work. Wait for it to drain.")
+    job = {
+        "kind": kind,
+        "status": "running",
+        "error": None,
+        "_owned": True,
+        "started_at": datetime.utcnow().isoformat(),
+        "stop_requested": False,
+        "stop_reason": None,
+        "drain_pending": False,
+    }
+    build["_artifact_job"] = job
+    build["_bg_deadline_monotonic"] = _build_clock.monotonic() + 1800.0
+    _active_runners.add(build["build_id"])
+    if owner is not None:
+        _background_tasks[build["build_id"]] = owner
+    return job
+
+
+def _project_artifact_terminal(build: dict, job: dict) -> None:
+    state = build.get(
+        "_expansion" if job.get("kind") == "expansion" else "_apk" if job.get("kind") == "apk" else ""
+    )
+    if isinstance(state, dict):
+        if job.get("status") in {"failed", "cancelled"}:
+            state.update(
+                {"status": job["status"], "error": job.get("error"), "completed_at": job["completed_at"]}
+            )
+        state["partial_artifacts"] = bool(build.get("_vault_active") or build.get("files"))
+        state["unflushed_files"] = len(build.get("files") or {})
+
+
+@asynccontextmanager
+async def _artifact_operation(build: dict, kind: str):
+    """Own artifact work until all native mutations have physically settled."""
+    build_id = build["build_id"]
+    owner = asyncio.current_task()
+    job = _active_artifact_job(build)
+    if not (job is not None and job.get("kind") == kind and _background_tasks.get(build_id) is owner):
+        job = _claim_artifact_operation(build, kind, owner)
+    try:
+        await _save_build_required(build)
+        await _await_build_io(build, _check_build_resources, build)
+        yield job
+        _check_build_continuation(build)
+    except asyncio.CancelledError:
+        _mark_build_stop(build, "artifact_waiter_cancelled", failed=False)
+        raise
+    except Exception as exc:
+        reason = exc.reason if isinstance(exc, GalaxyBuildStopped) else "artifact_job_failed"
+        _mark_build_stop(build, reason)
+        if isinstance(exc, HTTPException):
+            raise
+        raise HTTPException(
+            503, f"Artifact operation stopped: {reason}. Retained artifacts remain available."
+        ) from None
+    finally:
+        job["drain_pending"] = _physical_build_workers(build_id) > 0
+        await _drain_build_workers(build_id)
+        job["drain_pending"] = False
+        job["status"] = job.get("stop_target", "failed") if job.get("stop_requested") else "completed"
+        job["completed_at"] = datetime.utcnow().isoformat()
+        build.pop("_bg_deadline_monotonic", None)
+        _project_artifact_terminal(build, job)
+        try:
+            if await _save_build(build) is not True:
+                job.update(
+                    {
+                        "status": "failed",
+                        "error": "build_metadata_unavailable",
+                        "stop_requested": True,
+                        "stop_reason": "build_metadata_unavailable",
+                    }
+                )
+                _project_artifact_terminal(build, job)
+                raise HTTPException(503, "Artifact metadata is unavailable; retained files remain on disk.")
+            if job.get("stop_requested") and job.get("status") == "stopping":
+                job["status"] = job.get("stop_target", "failed")
+                _project_artifact_terminal(build, job)
+                await _save_build(build)
+        finally:
+            job.pop("_owned", None)
+            _active_runners.discard(build_id)
+            if _background_tasks.get(build_id) is owner:
+                _background_tasks.pop(build_id, None)
+
+
+def _launch_artifact_job(build: dict, kind: str, runner, *args) -> None:
+    """Reserve before scheduling, so concurrent HTTP requests cannot overlap."""
+    job = _claim_artifact_operation(build, kind, None)
+    try:
+        task = asyncio.create_task(runner(build["build_id"], *args))
+        _background_tasks[build["build_id"]] = task
+        # Background errors are also recorded on the existing operation state.
+        task.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+    except Exception:
+        job.update(
+            {
+                "status": "failed",
+                "error": "artifact_task_creation_failed",
+                "completed_at": datetime.utcnow().isoformat(),
+            }
+        )
+        _project_artifact_terminal(build, job)
+        job.pop("_owned", None)
+        _active_runners.discard(build["build_id"])
+        build.pop("_bg_deadline_monotonic", None)
+        raise
+
+
+_VAULT_ADMIN_SLOT = "__galaxy_vault_admin__"
+
+
+async def _run_vault_admin_operation(operation):
+    """Fence explicit vault maintenance without creating a synthetic build."""
+    if _any_build_has_live_work():
+        raise HTTPException(409, "Vault maintenance must wait for build and artifact work to drain.")
+    owner = asyncio.current_task()
+    _active_runners.add(_VAULT_ADMIN_SLOT)
+    _background_tasks[_VAULT_ADMIN_SLOT] = owner
+    try:
+        # Reclaim remains available when generation admission is closed by
+        # storage pressure. Only this explicit operator route may prune.
+        return await _await_build_io({"build_id": _VAULT_ADMIN_SLOT}, operation)
+    finally:
+        await _drain_build_workers(_VAULT_ADMIN_SLOT)
+        _active_runners.discard(_VAULT_ADMIN_SLOT)
+        if _background_tasks.get(_VAULT_ADMIN_SLOT) is owner:
+            _background_tasks.pop(_VAULT_ADMIN_SLOT, None)
+
+
 async def _request_build_stop(build_id: str, reason: str, *, failed: bool = True) -> dict | None:
     build = await _load_build(build_id)
     if not build:
         return None
-    if build.get("status") == "completed" and not _build_has_live_work(build_id):
+    job = _active_artifact_job(build)
+    if build.get("status") == "completed" and not _build_has_live_work(build_id) and job is None:
         return build
     _mark_build_stop(build, reason, failed=failed)
     live = _build_has_live_work(build_id)
-    build["_bg_drain_pending"] = live
-    if not live:
-        build["status"] = build.get("_bg_stop_target", "failed")
-        build["_bg_status"] = build["status"]
-        build["_bg_stopped_at"] = datetime.utcnow().isoformat()
+    if job is not None:
+        job["drain_pending"] = live
+        if not live:
+            job["status"] = job.get("stop_target", "failed")
+            job["completed_at"] = datetime.utcnow().isoformat()
+    else:
+        build["_bg_drain_pending"] = live
+        if not live:
+            build["status"] = build.get("_bg_stop_target", "failed")
+            build["_bg_status"] = build["status"]
+            build["_bg_stopped_at"] = datetime.utcnow().isoformat()
     await _save_build(build)
     return build
 
@@ -2777,12 +3092,16 @@ async def force_complete_build(build_id: str, background_tasks: BackgroundTasks)
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
-    if build.get("status") == "completed" and not _build_has_live_work(build_id):
+    if (
+        build.get("status") == "completed"
+        and not _build_has_live_work(build_id)
+        and _active_artifact_job(build) is None
+    ):
         return {"build_id": build_id, "status": "already_completed", "file_count": build.get("file_count", 0)}
     build = await _request_build_stop(build_id, "operator_stop_requested", failed=False)
     return {
         "build_id": build_id,
-        "status": build["_bg_status"],
+        "status": (build.get("_artifact_job") or {}).get("status", build["_bg_status"]),
         "file_count": build.get("file_count", 0),
         "partial_artifacts": bool(build.get("_vault_active") or build.get("files")),
         "drain_pending": _build_has_live_work(build_id),
@@ -3006,7 +3325,7 @@ async def start_background_build(req: StartBuildRequest):
     preflight = {
         key: value
         for key, value in build.items()
-        if key not in {"_bg_stop_requested", "_bg_deadline_monotonic"}
+        if key not in {"_bg_stop_requested", "_bg_deadline_monotonic", "_artifact_job"}
     }
     try:
         await asyncio.to_thread(_check_build_resources, preflight)
@@ -3033,6 +3352,7 @@ async def start_background_build(req: StartBuildRequest):
         "_bg_completed",
     ):
         build.pop(key, None)
+    build.pop("_artifact_job", None)
     build["status"] = "building"
     build["_bg_status"] = "running"
     build["_bg_current_batch"] = 0
@@ -3140,6 +3460,13 @@ async def get_status(build_id: str):
     # Inspection does not create/release work. The bounded watchdog owns
     # orphan admission; live futures remain authoritative through physical drain.
     runner_live = _build_has_live_work(build_id)
+    artifact_job = build.get("_artifact_job") if isinstance(build.get("_artifact_job"), dict) else {}
+    operation_status = artifact_job.get("status")
+    if operation_status in {"running", "stopping"} and not runner_live:
+        operation_status = "unknown"
+    active_operation = (
+        artifact_job if artifact_job.get("status") in {"running", "stopping"} and runner_live else {}
+    )
 
     phase_idx = max(0, min(int(build.get("current_phase", 0)), len(BUILD_PHASES) - 1))
     completed_phases = [
@@ -3232,9 +3559,19 @@ async def get_status(build_id: str):
         "execution": {
             "runner_live": runner_live,
             "physical_workers": _physical_build_workers(build_id),
-            "stop_requested": bool(build.get("_bg_stop_requested")),
-            "stop_reason": build.get("_bg_stop_reason"),
-            "drain_pending": bool(build.get("_bg_drain_pending")),
+            "stop_requested": (
+                bool(active_operation.get("stop_requested"))
+                if active_operation
+                else bool(build.get("_bg_stop_requested"))
+            ),
+            "stop_reason": artifact_job.get("stop_reason") or build.get("_bg_stop_reason"),
+            "drain_pending": (
+                bool(active_operation.get("drain_pending"))
+                if active_operation
+                else bool(build.get("_bg_drain_pending"))
+            ),
+            "operation": artifact_job.get("kind"),
+            "operation_status": operation_status,
             "partial_artifacts": bool(build.get("_vault_active") or build.get("files")),
             "unflushed_files": len(build.get("files") or {}),
             "storage_failed": bool(build.get("_vault_write_failed")),
@@ -3281,128 +3618,16 @@ async def get_status(build_id: str):
 #     (see include_router() block near end of file).
 @router.post("/deploy/{build_id}")
 async def deploy_build(build_id: str, expo_token: Optional[str] = None):
-    """Deploy game — triggers EAS build or provides ZIP."""
     if not code_execution_enabled():
         return execution_disabled_response("Galaxy Studio deployment")
-
-    build = await _load_build(build_id)
-    if not build:
-        raise HTTPException(404, "Build not found")
-        
-
-
-    if not build["files"]:
-        raise HTTPException(400, "No code files. Complete build first.")
-
-    # Package to disk
-    safe_id = _safe_segment(build_id, what="build_id")
-    zip_path = _package_build(safe_id)
-    slug = _safe_slug(build["title"])
-    project_dir = _resolve_under_dir("/tmp/galaxy_studio_projects", safe_id)
-    os.makedirs(project_dir, exist_ok=True)
-
-    with zipfile.ZipFile(zip_path, 'r') as zf:
-        zf.extractall(project_dir)
-
-    subdirs = [d for d in os.listdir(project_dir) if d not in {".", ".."}]
-    actual_dir = _resolve_under_dir(project_dir, subdirs[0]) if subdirs else project_dir
-
-    token = expo_token or os.environ.get("EXPO_TOKEN", "")
-    if not token:
-        return {
-            "build_id": build_id,
-            "status": "zip_ready",
-            "message": "ZIP package ready for download. Provide EXPO_TOKEN for APK compilation.",
-            "zip_url": f"/api/galaxy-studio/download/{build_id}",
-            "file_count": build["file_count"],
-            "instructions": [
-                "1. Download the ZIP from the download URL",
-                "2. Extract and cd into the project",
-                "3. Run: npm install",
-                "4. Run: npx expo start",
-                "5. For APK: npx eas-cli build --platform android --profile preview",
-            ],
-        }
-
-    # Trigger EAS Build
-    env = os.environ.copy()
-    env["EXPO_TOKEN"] = token
-    try:
-        # Initialize git repo (required by EAS)
-        subprocess.run(["git", "init"], cwd=actual_dir, capture_output=True, timeout=10)
-        subprocess.run(["git", "add", "."], cwd=actual_dir, capture_output=True, timeout=10)
-        subprocess.run(["git", "commit", "-m", "Galaxy Studio Factory build"], cwd=actual_dir, capture_output=True, env={**env, "GIT_AUTHOR_NAME": "Galaxy Studio", "GIT_AUTHOR_EMAIL": "build@galaxy.studio", "GIT_COMMITTER_NAME": "Galaxy Studio", "GIT_COMMITTER_EMAIL": "build@galaxy.studio"}, timeout=15)
-
-        # Install dependencies
-        subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=actual_dir, capture_output=True, timeout=120)
-
-        # Fix app.json — remove invalid projectId so eas init can set a real one
-        app_json_path = _resolve_under_dir(actual_dir, "app.json")
-        if os.path.exists(app_json_path):
-            with open(app_json_path, 'r') as f:
-                app_config = json.load(f)
-            # Remove the invalid "auto" projectId
-            if "expo" in app_config and "extra" in app_config["expo"]:
-                if "eas" in app_config["expo"]["extra"]:
-                    app_config["expo"]["extra"]["eas"].pop("projectId", None)
-            with open(app_json_path, 'w') as f:
-                json.dump(app_config, f, indent=2)
-
-        # Initialize EAS project (--force creates new project if needed)
-        subprocess.run(
-            ["eas", "init", "--non-interactive", "--force"],
-            cwd=actual_dir, env=env, capture_output=True, text=True, timeout=60,
-        )
-
-        # Git commit after eas init updates app.json with projectId
-        subprocess.run(["git", "add", "."], cwd=actual_dir, capture_output=True, timeout=10)
-        subprocess.run(
-            ["git", "commit", "-m", "eas init"],
-            cwd=actual_dir, capture_output=True,
-            env={**env, "GIT_AUTHOR_NAME": "Galaxy Studio", "GIT_AUTHOR_EMAIL": "build@galaxy.studio", "GIT_COMMITTER_NAME": "Galaxy Studio", "GIT_COMMITTER_EMAIL": "build@galaxy.studio"},
-            timeout=15,
-        )
-
-        result = subprocess.run(
-            ["eas", "build", "--platform", "android", "--profile", "preview", "--non-interactive", "--no-wait", "--json"],
-            cwd=actual_dir, env=env, capture_output=True, text=True, timeout=180,
-        )
-        if result.returncode == 0:
-            try:
-                eas_output = json.loads(result.stdout)
-                eas_build_id = eas_output[0].get("id", "") if isinstance(eas_output, list) else eas_output.get("id", "")
-                build["eas_build_id"] = eas_build_id
-                build["eas_build_status"] = "building"
-                return {
-                    "build_id": build_id,
-                    "eas_build_id": eas_build_id,
-                    "status": "building",
-                    "message": "EAS Build triggered! APK compiling in the cloud.",
-                }
-            except json.JSONDecodeError:
-                return {"build_id": build_id, "status": "submitted", "message": "Build submitted to EAS."}
-        else:
-            return {
-                "build_id": build_id,
-                "status": "zip_ready",
-                "message": "EAS Build failed. ZIP download available.",
-                "error": result.stderr[:500],
-                "zip_url": f"/api/galaxy-studio/download/{build_id}",
-            }
-    except Exception:
-        return {
-            "build_id": build_id,
-            "status": "zip_ready",
-            "message": "EAS build failed",
-            "zip_url": f"/api/galaxy-studio/download/{build_id}",
-        }
+    return await vault_zip_to_apk(build_id, ZipToApkRequest(build_id=build_id, expo_token=expo_token or ""))
 
 
 # ─── /domains extracted → routes/galaxy_studio_meta.py
 def _vault_save(build_id: str, vault_type: str, title: str, file_path: str, extra: dict = {}) -> dict:
     """Save a file to the vault."""
     safe_id = _safe_segment(build_id, what="build_id")
-    vault_id = f"{vault_type}_{safe_id}_{int(datetime.utcnow().timestamp())}"
+    vault_id = f"{vault_type}_{safe_id}_{uuid.uuid4().hex[:12]}"
     # Constrain vault artifact paths to known sandboxes (CodeQL path-injection).
     real = os.path.realpath(file_path)
     allowed = (
@@ -3552,9 +3777,9 @@ def _get_total_file_count(build: dict) -> int:
     scale_info = build.get("scale_info", {})
     multiplier = scale_info.get("multiplier", 10)
     target = scale_info.get("target_files", 0)
-    
+
     base_count = len(build.get("files", {}))
-    
+
     # Must match _generate_batch_files exactly:
     # enemy entity_types(56) × max_tiers
     max_tiers = min(multiplier // 10 + 1, 200)
@@ -3576,9 +3801,9 @@ def _get_total_file_count(build: dict) -> int:
         asset_cats = 10  # matches _generate_batch_files
         manifests_per_cat = min(multiplier // 500 + 1, 200)
         asset_count = asset_cats * manifests_per_cat
-    
+
     total = base_count + entity_count + weapon_count + zone_count + item_count + skill_count + asset_count
-    
+
     # If user requested a target, report that
     if target > 0:
         return max(total, target)
@@ -3589,17 +3814,36 @@ def _get_total_file_count(build: dict) -> int:
 # PIPELINE BATCH RETRIEVAL ENDPOINT
 # ═══════════════════════════════════════════════════════════════════════
 
+
 # ─── Pipeline endpoints extracted → routes/galaxy_studio_pipeline.py
 #     (see include_router() block near end of file).
-def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_multiplier: int) -> dict:
+class _ExpansionTargetReached(Exception):
+    """The existing expansion generator has emitted its admitted file budget."""
+
+
+def _generate_expansion_files(
+    build: dict, exp_type: str, exp_desc: str, exp_multiplier: int, emit_file, target_expansion_files: int
+) -> None:
     """Generate REAL expansion files through the agent code generators.
     Uses the same AAA generators as the main build — screens, components, logic, AI, data, shaders, procgen, networking."""
     title = build["title"]
     genre = build["genre"]
     genre_info = build.get("genre_info", GALAXY_GENRES.get(genre, GALAXY_GENRES["rpg"]))
     vision = build.get("game_vision", "")
-    existing_files = set(build.get("files", {}).keys())
-    new_files = {}
+    from core import build_vault as _bv
+
+    existing_files = {item["path"] for item in _bv.list_file_paths(build["build_id"], limit=300000)}
+    existing_files.update((build.get("files") or {}).keys())
+    generated_count = 0
+
+    def _add(path, content):
+        nonlocal generated_count
+        if generated_count >= target_expansion_files:
+            raise _ExpansionTargetReached
+        _check_build_continuation(build)
+        emit_file(path, content)
+        generated_count += 1
+        existing_files.add(path)
 
     # ═══ EXPANSION SCREENS — new areas, dungeons, game modes ═══
     expansion_screens = {
@@ -3639,7 +3883,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
     for scr in target_screens:
         path = f"expansions/screens/{scr}.tsx"
         if path not in existing_files:
-            new_files[path] = _gen_screen_aaa(scr, f"{title} — {exp_desc}", genre)
+            _add(path, _gen_screen_aaa(scr, f"{title} — {exp_desc}", genre))
 
     # ═══ EXPANSION COMPONENTS — new UI elements ═══
     expansion_components = {
@@ -3688,7 +3932,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
     for comp_name, comp_desc in target_components:
         path = f"expansions/components/{comp_name}.tsx"
         if path not in existing_files:
-            new_files[path] = _gen_component_aaa(comp_name, comp_desc, title, genre)
+            _add(path, _gen_component_aaa(comp_name, comp_desc, title, genre))
 
     # ═══ EXPANSION LOGIC SYSTEMS — real game logic through agent generators ═══
     expansion_logic = {
@@ -3736,7 +3980,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
     for logic_name, logic_desc in target_logic:
         path = f"expansions/logic/{logic_name}.ts"
         if path not in existing_files:
-            new_files[path] = _gen_logic_aaa(logic_name, logic_desc, title, genre)
+            _add(path, _gen_logic_aaa(logic_name, logic_desc, title, genre))
 
     # ═══ EXPANSION AI BEHAVIOR TREES — new enemy/NPC behaviors ═══
     expansion_ai = {
@@ -3768,7 +4012,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
     for ai_name, ai_desc in target_ai:
         path = f"expansions/ai/{ai_name}.ts"
         if path not in existing_files:
-            new_files[path] = _gen_ai_behavior_tree(ai_name, ai_desc, title, genre)
+            _add(path, _gen_ai_behavior_tree(ai_name, ai_desc, title, genre))
 
     # ═══ EXPANSION DATA FILES — new databases ═══
     expansion_data = {
@@ -3800,7 +4044,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
     for data_name, data_desc in target_data:
         path = f"expansions/data/{data_name}.ts"
         if path not in existing_files:
-            new_files[path] = _gen_data_file(data_name, data_desc, title, genre)
+            _add(path, _gen_data_file(data_name, data_desc, title, genre))
 
     # ═══ EXPANSION SHADERS — new visual effects ═══
     if exp_type in ("all", "zones", "content"):
@@ -3814,7 +4058,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for shader_name, shader_desc in expansion_shaders:
             path = f"expansions/shaders/{shader_name}.glsl"
             if path not in existing_files:
-                new_files[path] = _gen_shader_code(shader_name, shader_desc, title, genre)
+                _add(path, _gen_shader_code(shader_name, shader_desc, title, genre))
 
     # ═══ EXPANSION PROCGEN — new procedural content ═══
     if exp_type in ("all", "zones", "content"):
@@ -3826,7 +4070,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for pg_name, pg_desc in expansion_procgen:
             path = f"expansions/procgen/{pg_name}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_procgen_code(pg_name, pg_desc, title, genre)
+                _add(path, _gen_procgen_code(pg_name, pg_desc, title, genre))
 
     # ═══ EXPANSION NETWORKING — multiplayer expansion content ═══
     if exp_type in ("all", "systems", "content"):
@@ -3837,13 +4081,11 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for net_name, net_desc in expansion_net:
             path = f"expansions/networking/{net_name}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_networking_code(net_name, net_desc, title, genre)
+                _add(path, _gen_networking_code(net_name, net_desc, title, genre))
 
     # ═══ 4X CODEBASE EXPANSION — Scale entities/zones/weapons/items to 4X base ═══
     # The expansion MUST add at least 4X the base file count
-    base_file_count = len(build.get("files", {}))
-    target_expansion_files = base_file_count * 4
-    handcrafted_count = len(new_files)  # Files already generated above
+    handcrafted_count = generated_count  # Files already generated above
 
     # ─── TIER CALCULATION: ensure enough tiers to hit 4X ───
     # With default multiplier 10: tiers = max(16, 10) = 16
@@ -3868,7 +4110,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for tier in range(1, tier_base + 1):
             path = f"expansions/entities/{enemy.lower()}/{enemy}Tier{tier}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_entity_file(f"{enemy}Tier{tier}", "enemy", title, genre)
+                _add(path, _gen_entity_file(f"{enemy}Tier{tier}", "enemy", title, genre))
 
     # ═══ CATEGORY 2: Expansion biomes — 50 zones × tier_base tiers ═══
     exp_biomes = [
@@ -3887,7 +4129,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for tier in range(1, tier_base + 1):
             path = f"expansions/zones/{biome.lower()}/{biome}Tier{tier}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_biome_file(f"{biome}Tier{tier}", title, genre)
+                _add(path, _gen_biome_file(f"{biome}Tier{tier}", title, genre))
 
     # ═══ CATEGORY 3: Expansion weapons — 32 types × 10 qualities ═══
     exp_weapons = [
@@ -3905,7 +4147,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for quality in exp_qualities:
             path = f"expansions/data/weapons/{quality.lower()}_{weapon.lower()}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_weapon_data(f"{quality}{weapon}", title, genre)
+                _add(path, _gen_weapon_data(f"{quality}{weapon}", title, genre))
 
     # ═══ CATEGORY 4: Expansion item sets — 30 sets × 12 pieces ═══
     exp_sets = [
@@ -3921,7 +4163,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for piece in exp_pieces:
             path = f"expansions/data/sets/{set_name.lower()}/{set_name}{piece}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_weapon_data(f"{set_name}{piece}", title, genre)
+                _add(path, _gen_weapon_data(f"{set_name}{piece}", title, genre))
 
     # ═══ CATEGORY 5: Expansion classes/skills — 16 classes × tier_base tiers ═══
     exp_classes = ["Warrior", "Mage", "Ranger", "Rogue", "Cleric", "Paladin", "Necromancer", "Druid",
@@ -3930,7 +4172,15 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for tier in range(1, tier_base + 1):
             path = f"expansions/data/skills/{cls.lower()}/{cls}SkillTier{tier}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"{cls.lower()}_exp_skills_tier_{tier}", f"Expansion {cls} skills tier {tier}", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"{cls.lower()}_exp_skills_tier_{tier}",
+                        f"Expansion {cls} skills tier {tier}",
+                        title,
+                        genre,
+                    ),
+                )
 
     # ═══ CATEGORY 6: Expansion armor — 32 types × 10 materials ═══
     exp_armors = [
@@ -3948,7 +4198,7 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for material in exp_materials:
             path = f"expansions/data/armors/{material.lower()}_{armor.lower()}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_weapon_data(f"{material}{armor}", title, genre)
+                _add(path, _gen_weapon_data(f"{material}{armor}", title, genre))
 
     # ═══ CATEGORY 7: Expansion abilities — 60 abilities × 8 ranks ═══
     exp_abilities = [
@@ -3970,7 +4220,15 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for rank in exp_ranks:
             path = f"expansions/data/abilities/{ability.lower()}/{rank.lower()}_{ability.lower()}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"{rank}_{ability}", f"{rank}-rank {ability} ability with scaling damage, cooldown, mana cost, special effects, synergies, and combo chains", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"{rank}_{ability}",
+                        f"{rank}-rank {ability} ability with scaling damage, cooldown, mana cost, special effects, synergies, and combo chains",
+                        title,
+                        genre,
+                    ),
+                )
 
     # ═══ CATEGORY 8: NPC profiles — 50 NPCs × 5 role variants ═══
     exp_npcs = [
@@ -3993,7 +4251,15 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for role in exp_npc_roles:
             path = f"expansions/data/npcs/{npc.lower()}/{npc}{role}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"{npc}_{role}", f"NPC {npc} as {role} with dialogue trees, schedules, relationships, quest hooks, and merchant inventories", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"{npc}_{role}",
+                        f"NPC {npc} as {role} with dialogue trees, schedules, relationships, quest hooks, and merchant inventories",
+                        title,
+                        genre,
+                    ),
+                )
 
     # ═══ CATEGORY 9: Quest scripts — 40 quest chains × 6 stages ═══
     exp_quest_chains = [
@@ -4011,7 +4277,15 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for stage in exp_quest_stages:
             path = f"expansions/data/quests/{quest.lower()}/{quest}{stage}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"{quest}_{stage}", f"Quest chain '{quest}' stage '{stage}' with objectives, dialogue triggers, reward tables, branching outcomes, and world-state changes", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"{quest}_{stage}",
+                        f"Quest chain '{quest}' stage '{stage}' with objectives, dialogue triggers, reward tables, branching outcomes, and world-state changes",
+                        title,
+                        genre,
+                    ),
+                )
 
     # ═══ CATEGORY 10: Level designs — 30 levels × 5 difficulty modes ═══
     exp_levels = [
@@ -4027,7 +4301,15 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for diff in exp_difficulties:
             path = f"expansions/data/levels/{level.lower()}/{level}{diff}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"{level}_{diff}", f"Level '{level}' at {diff} difficulty with enemy placements, traps, rewards, secrets, boss encounters, and environment hazards", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"{level}_{diff}",
+                        f"Level '{level}' at {diff} difficulty with enemy placements, traps, rewards, secrets, boss encounters, and environment hazards",
+                        title,
+                        genre,
+                    ),
+                )
 
     # ═══ CATEGORY 11: Sound design — 30 categories × 8 variants ═══
     exp_sound_categories = [
@@ -4043,7 +4325,15 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for variant in exp_sound_variants:
             path = f"expansions/data/sounds/{sound.lower()}/{sound}{variant}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"{sound}_{variant}", f"Sound design specification for {sound} {variant} with waveform, frequency, duration, envelope, spatial settings, and mix parameters", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"{sound}_{variant}",
+                        f"Sound design specification for {sound} {variant} with waveform, frequency, duration, envelope, spatial settings, and mix parameters",
+                        title,
+                        genre,
+                    ),
+                )
 
     # ═══ CATEGORY 12: Particle effects — 20 effects × 8 variants ═══
     exp_particles = [
@@ -4056,11 +4346,19 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
         for variant in exp_sound_variants:
             path = f"expansions/data/particles/{particle.lower()}/{particle}{variant}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"{particle}_{variant}", f"Particle effect {particle} {variant} with emitter config, physics, color gradient, lifetime, spawn rate, collision, and LOD settings", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"{particle}_{variant}",
+                        f"Particle effect {particle} {variant} with emitter config, physics, color gradient, lifetime, spawn rate, collision, and LOD settings",
+                        title,
+                        genre,
+                    ),
+                )
 
     # ═══ SAFEGUARD: Guarantee 4X target is met ═══
     # If we're still short, generate additional procedural filler files
-    current_count = len(new_files)
+    current_count = generated_count
     if current_count < target_expansion_files:
         deficit = target_expansion_files - current_count
         filler_categories = [
@@ -4072,193 +4370,170 @@ def _generate_expansion_files(build: dict, exp_type: str, exp_desc: str, exp_mul
             ("tutorials", "tutorial step with highlight targets, instruction text, validation, skip logic"),
         ]
         filler_idx = 0
-        while len(new_files) < target_expansion_files:
+        while generated_count < target_expansion_files:
             cat_name, cat_desc = filler_categories[filler_idx % len(filler_categories)]
             path = f"expansions/{cat_name}/generated_{filler_idx:05d}.ts"
             if path not in existing_files:
-                new_files[path] = _gen_data_file(f"gen_{cat_name}_{filler_idx}", f"{cat_desc} — procedurally generated expansion file #{filler_idx}", title, genre)
+                _add(
+                    path,
+                    _gen_data_file(
+                        f"gen_{cat_name}_{filler_idx}",
+                        f"{cat_desc} — procedurally generated expansion file #{filler_idx}",
+                        title,
+                        genre,
+                    ),
+                )
             filler_idx += 1
-            if filler_idx > target_expansion_files * 2:
+            if filler_idx > len(existing_files) + target_expansion_files * 2:
                 break  # Safety valve
 
-    return new_files
+    return None
+
+
+def _stream_expansion_sync(build: dict, exp_type: str, exp_desc: str, multiplier: int, target: int) -> dict:
+    stats = {"files_added": 0, "total_new_lines": 0, "total_new_bytes": 0, "file_categories": {}}
+    exp = build["_expansion"]
+    pending_files = 0
+
+    def emit(path, content):
+        nonlocal pending_files
+        _check_build_resources(build)
+        build.setdefault("files", {})[path] = content
+        pending_files += 1
+        stats["files_added"] += 1
+        stats["total_new_lines"] += content.count("\n") + 1 if isinstance(content, str) else 0
+        stats["total_new_bytes"] += len(content.encode("utf-8")) if isinstance(content, str) else len(content)
+        parts = path.split("/")
+        category = parts[1] if len(parts) > 1 else "root"
+        stats["file_categories"][category] = stats["file_categories"].get(category, 0) + 1
+        if pending_files >= 64:
+            _flush_to_vault(build, True)
+            pending_files = 0
+            exp["files_added"] = stats["files_added"]
+            exp["total_files"] = build["file_count"]
+
+    try:
+        _generate_expansion_files(build, exp_type, exp_desc, multiplier, emit, target)
+    except _ExpansionTargetReached:
+        pass
+    _check_build_continuation(build)
+    _flush_to_vault(build, True)
+    if not stats["files_added"]:
+        raise GalaxyBuildStopped("expansion_empty_output")
+    return stats
 
 
 @router.post("/expand")
 async def expand_game(req: ExpandRequest):
-    """Expand a completed game in the BACKGROUND (4X codebase multiplier).
-
-    Re-queries the agent expansion pipeline and generates 4X the base game's
-    files. The heavy generation used to run synchronously (~50s) and tripped the
-    30s request-duration cap → client 504 even though the server finished. It is
-    now a background job: this returns immediately with status 'running'; poll
-    GET /expand/status/{build_id} for progress + the final result."""
     build = await _load_build(req.build_id)
     if not build:
         raise HTTPException(404, "Build not found")
-
-    if build["status"] != "completed":
+    if build.get("status") != "completed":
         raise HTTPException(400, "Build must be completed before expansion")
-
-    # Don't double-launch if an expansion is already in flight for this build.
-    existing = build.get("_expansion")
-    if existing and existing.get("status") == "running":
-        return {
-            "build_id": req.build_id,
-            "expansion_status": "running",
-            "poll_url": f"/api/galaxy-studio/expand/status/{req.build_id}",
-            "phases_total": existing.get("phases_total", len(EXPANSION_PHASES)),
-            "files_before": existing.get("files_before", 0),
-            "message": "An expansion is already running for this build.",
-        }
-
-    # Use the build's own scale multiplier so expansion matches scale (fast).
-    build_multiplier = build.get("scale_info", {}).get("multiplier", 10)
-    expansion_scale = _parse_scale(req.scale, req.target_new_files, 0)
-    exp_multiplier = max(expansion_scale.get("multiplier", 1), build_multiplier)
-    exp_type = req.expansion_type
-    exp_desc = req.description or f"Expansion pack for {build['title']}"
-    pre_count = _vault_total_files(build)
-
-    # Seed expansion job state so a poll right after launch sees "running".
+    existing = build.get("_expansion") or {}
+    if _build_has_live_work(req.build_id):
+        if _active_artifact_job(build) and build["_artifact_job"].get("kind") == "expansion":
+            return {
+                "build_id": req.build_id,
+                "expansion_status": existing.get("status", "running"),
+                "poll_url": f"/api/galaxy-studio/expand/status/{req.build_id}",
+                "message": "Expansion still owns physical work.",
+            }
+        raise HTTPException(409, "Build or artifact work is still active.")
+    if build.get("files") or build.get("_vault_write_failed"):
+        raise HTTPException(
+            409,
+            "Retained unsaved artifacts require recovery before another expansion; ZIP export includes them.",
+        )
+    scale = _parse_scale(req.scale, req.target_new_files, 0)
+    multiplier = max(
+        1, min(64, int(max(scale.get("multiplier", 1), build.get("scale_info", {}).get("multiplier", 1))))
+    )
+    description = req.description or f"Expansion pack for {build['title']}"
+    if _any_build_has_live_work():
+        raise HTTPException(409, "Another build or artifact job is active.")
     build["_expansion"] = {
         "status": "running",
-        "expansion_type": exp_type,
-        "description": exp_desc,
-        "scale": expansion_scale,
-        "multiplier": exp_multiplier,
+        "expansion_type": req.expansion_type,
+        "description": description,
+        "scale": scale,
+        "multiplier": multiplier,
         "started_at": datetime.utcnow().isoformat(),
         "phases_total": len(EXPANSION_PHASES),
         "phases_completed": 0,
         "files_added": 0,
-        "files_before": pre_count,
-        "total_files": pre_count,
+        "files_before": build.get("file_count", 0),
+        "total_files": build.get("file_count", 0),
         "error": None,
     }
-    await _save_build(build)
-
-    # Launch the heavy work in the background; return immediately.
-    asyncio.create_task(
-        _run_expansion_bg(req.build_id, exp_type, exp_desc, exp_multiplier, expansion_scale)
+    _launch_artifact_job(
+        build, "expansion", _run_expansion_bg, req.expansion_type, description, multiplier, scale
     )
-
     return {
         "build_id": req.build_id,
         "expansion_status": "running",
         "poll_url": f"/api/galaxy-studio/expand/status/{req.build_id}",
         "phases_total": len(EXPANSION_PHASES),
-        "files_before": pre_count,
-        "message": (
-            f"Expansion '{exp_desc}' started — generating files across "
-            f"{len(EXPANSION_PHASES)} phases in the background. "
-            f"Poll /expand/status/{req.build_id} for progress."
-        ),
+        "files_before": build.get("file_count", 0),
+        "message": "Expansion queued; completed phases follow durable generation.",
     }
 
 
-async def _run_expansion_bg(build_id: str, exp_type: str, exp_desc: str,
-                            exp_multiplier: int, expansion_scale: dict):
-    """Background worker for /expand. Runs the synergy pipeline, then the heavy
-    (sync, CPU-bound) file generation in a thread executor so the event loop
-    stays responsive, and records the result on build['_expansion']."""
+async def _run_expansion_bg(build_id: str, exp_type: str, description: str, multiplier: int, scale: dict):
+    build = _builds.get(build_id)
+    if build is None:
+        return
+    exp = build["_expansion"]
     try:
-        build = await _load_build(build_id)
-        if not build:
-            return
-        exp = build.get("_expansion") or {}
-
-        # ═══ RUN EXPANSION THROUGH AGENT PIPELINE (fast) ═══
-        synergy_activations = []
-        expansion_phases_log = []
-        agents_mobilized = 0
-        for phase in EXPANSION_PHASES:
-            phase_synergies = _get_phase_synergies(phase["id"].replace("exp_", ""))
-            synergy_activations.append({
-                "phase": phase["id"], "name": phase["name"], "agents": phase["agents"],
-                "links_activated": len(phase_synergies), "synergies": phase_synergies[:5],
-            })
-            agents_mobilized += phase["agents"]
-            expansion_phases_log.append({
-                "id": phase["id"], "name": phase["name"], "agents": phase["agents"],
-                "pct": phase["pct"], "status": "completed",
-                "timestamp": datetime.utcnow().isoformat(),
-            })
-            exp["phases_completed"] = exp.get("phases_completed", 0) + 1
-
-        # ═══ GENERATE EXPANSION FILES — offload sync CPU work to a thread ═══
-        loop = asyncio.get_event_loop()
-        new_files = await loop.run_in_executor(
-            None, _generate_expansion_files, build, exp_type, exp_desc, exp_multiplier,
-        )
-
-        # ═══ PERSIST EXPANSION FILES TO VAULT (survives restarts) ═══
-        pre_count = exp.get("files_before", _vault_total_files(build))
-        try:
-            from core import build_vault as _bv
-            _bv.append_files(build_id, new_files)
-        except Exception as _ve:
-            print(f"[GALAXY expand-bg] vault append failed (memory-only): {_ve}")
-            if not isinstance(build.get("files"), dict):
-                build["files"] = {}
-            build["files"].update(new_files)
-        build["file_count"] = _vault_total_files(build)
-
-        total_new_lines = sum(c.count('\n') + 1 for c in new_files.values() if isinstance(c, str))
-        total_new_bytes = sum(len(c.encode('utf-8')) if isinstance(c, str) else len(c) for c in new_files.values())
-
-        # Track expansion history
-        if "expansions" not in build:
-            build["expansions"] = []
-        build["expansions"].append({
-            "type": exp_type, "description": exp_desc, "scale": expansion_scale,
-            "files_added": len(new_files), "files_before": pre_count,
-            "files_after": build["file_count"], "phases_completed": len(EXPANSION_PHASES),
-            "agents_mobilized": agents_mobilized, "synergy_activations": len(synergy_activations),
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-
-        # Categorize new files
-        categories = {}
-        for fpath in new_files.keys():
-            parts = fpath.split("/")
-            cat = parts[1] if len(parts) > 1 else "root"
-            categories[cat] = categories.get(cat, 0) + 1
-
-        exp.update({
-            "status": "completed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "files_added": len(new_files),
-            "total_files": build["file_count"],
-            "total_new_lines": total_new_lines,
-            "total_new_bytes": total_new_bytes,
-            "total_new_size_human": _format_bytes(total_new_bytes),
-            "agents_mobilized": agents_mobilized,
-            "synergy_activations": len(synergy_activations),
-            "file_categories": categories,
-            "phases": expansion_phases_log,
-            "total_expansions": len(build["expansions"]),
-            "message": (
-                f"Expansion '{exp_desc}' completed — {len(new_files)} new files "
-                f"({_format_bytes(total_new_bytes)}, {total_new_lines} lines) generated by "
-                f"{agents_mobilized:,} agents across {len(EXPANSION_PHASES)} phases. "
-                f"Total: {build['file_count']} files."
-            ),
-        })
-        build["_expansion"] = exp
-        await _save_build(build)
-        print(f"[GALAXY expand-bg] DONE {build_id}: +{len(new_files)} files → {build['file_count']} total")
-    except Exception as e:
-        try:
-            b = await _load_build(build_id)
-            if b is not None:
-                ex = b.get("_expansion") or {}
-                ex.update({"status": "failed", "error": "expansion failed",
-                           "completed_at": datetime.utcnow().isoformat()})
-                b["_expansion"] = ex
-                await _save_build(b)
-        except Exception:
-            pass
-        print(f"[GALAXY expand-bg] FAILED for {build_id}: {e}")
+        async with _artifact_operation(build, "expansion"):
+            before = await _await_build_io(build, _vault_total_files, build)
+            target = max(1, min(GLOBAL_FILE_BUDGET, int(scale.get("target_files") or before * 4 or 800)))
+            exp["files_before"] = before
+            exp["target_files"] = target
+            stats = await _await_build_io(
+                build, _stream_expansion_sync, build, exp_type, description, multiplier, target
+            )
+            _check_build_continuation(build)
+            phases = [
+                {
+                    "id": phase["id"],
+                    "name": phase["name"],
+                    "agents": phase["agents"],
+                    "pct": phase["pct"],
+                    "status": "completed",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+                for phase in EXPANSION_PHASES
+            ]
+            exp.update(stats)
+            exp.update(
+                {
+                    "status": "completed",
+                    "completed_at": datetime.utcnow().isoformat(),
+                    "phases_completed": len(phases),
+                    "phases": phases,
+                    "total_files": build["file_count"],
+                    "total_new_size_human": _format_bytes(stats["total_new_bytes"]),
+                    "message": f"Expansion retained {stats['files_added']} generated files in the vault.",
+                }
+            )
+            history = build.setdefault("expansions", [])
+            history.append(
+                {
+                    "type": exp_type,
+                    "description": description,
+                    "files_added": stats["files_added"],
+                    "files_before": before,
+                    "files_after": build["file_count"],
+                    "timestamp": exp["completed_at"],
+                }
+            )
+            build["expansions"] = history[-100:]
+            exp["total_expansions"] = len(history)
+            await _save_build_required(build)
+    except (Exception, asyncio.CancelledError) as exc:
+        if isinstance(exc, asyncio.CancelledError):
+            raise
 
 
 @router.get("/expand/status/{build_id}")
@@ -4307,44 +4582,43 @@ except Exception as _vt_err:  # pragma: no cover — defensive
 
 @router.post("/vault/zip-to-apk/{build_id}")
 async def vault_zip_to_apk(build_id: str, req: ZipToApkRequest):
-    """Package game files + trigger an EAS APK build — as a BACKGROUND job.
-
-    The packaging pipeline (ZIP all files → npm install → eas init → eas build)
-    can take several MINUTES and used to run synchronously, tripping the 30s
-    request-duration cap (client 504 while the server kept working). It now
-    returns immediately with apk_status 'running'; poll
-    GET /vault/apk-status/{build_id} for stage progress + the final result
-    (download_url, eas_build_id). Once packaging finishes, the existing
-    /eas-status/{build_id} endpoint tracks the EAS cloud build.
-    """
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
-
-    from core import build_vault as _bv
-    vault_count = _bv.get_file_count(build_id)
-    mem_files = build.get("files") or {}
-    if vault_count == 0 and not mem_files:
-        raise HTTPException(400, "No files. Complete build first.")
-
-    # Don't double-launch if packaging is already in flight.
-    existing = build.get("_apk")
-    if existing and existing.get("status") == "running":
+    existing = build.get("_apk") or {}
+    job = _active_artifact_job(build)
+    if _build_has_live_work(build_id):
+        if job and job.get("kind") == "apk":
+            return {
+                "build_id": build_id,
+                "status": "running",
+                "apk_status": existing.get("status", "running"),
+                "stage": existing.get("stage"),
+                "poll_url": f"/api/galaxy-studio/vault/apk-status/{build_id}",
+            }
+        raise HTTPException(409, "Build or artifact work remains active.")
+    # A persisted remote ID remains authoritative after process restart.
+    if build.get("eas_build_id") and build.get("eas_build_status") == "building":
         return {
             "build_id": build_id,
-            "apk_status": "running",
-            "poll_url": f"/api/galaxy-studio/vault/apk-status/{build_id}",
-            "stage": existing.get("stage"),
-            "message": "Packaging is already running for this build.",
+            "status": "apk_building",
+            "apk_status": "building",
+            "eas_build_id": build["eas_build_id"],
+            "message": "An EAS build has already been submitted.",
         }
-
+    if existing.get("stage") in {
+        "eas_build",
+        "eas_submission_pending",
+        "eas_submission_unknown",
+    } and not build.get("eas_build_id"):
+        raise HTTPException(
+            409, "Previous EAS submission is unresolved. Inspect its remote state before submitting again."
+        )
     token = req.expo_token or os.environ.get("EXPO_TOKEN", "")
-    if not token:
-        from dotenv import load_dotenv
-        load_dotenv()
-        token = os.environ.get("EXPO_TOKEN", "")
-    slug = _safe_slug(build.get("title") or "build", fallback="build")
-
+    if token and not code_execution_enabled():
+        return execution_disabled_response("Galaxy Studio EAS compilation")
+    if _any_build_has_live_work():
+        raise HTTPException(409, "Another build or artifact job is active.")
     build["_apk"] = {
         "status": "running",
         "stage": "queued",
@@ -4353,230 +4627,291 @@ async def vault_zip_to_apk(build_id: str, req: ZipToApkRequest):
         "error": None,
         "result": None,
     }
-    await _save_build(build)
-
-    asyncio.create_task(_run_apk_bg(build_id, token, slug))
-
+    slug = _safe_slug(build.get("title") or "build")
+    _launch_artifact_job(build, "apk", _run_apk_bg, token, slug)
     return {
         "build_id": build_id,
+        "status": "running",
         "apk_status": "running",
-        "poll_url": f"/api/galaxy-studio/vault/apk-status/{build_id}",
         "stage": "queued",
+        "poll_url": f"/api/galaxy-studio/vault/apk-status/{build_id}",
         "message": (
-            "APK packaging started in the background"
-            + (" (EAS cloud compile)." if token else " — ZIP only (no EXPO_TOKEN).")
-            + f" Poll /vault/apk-status/{build_id} for progress."
+            "Packaging queued. Remote submission is reported only after EAS acknowledges it."
+            if token
+            else "ZIP packaging queued; no EAS token configured."
         ),
     }
 
 
-def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, prog: dict):
-    """Pure-sync packaging pipeline (ZIP + EAS subprocess chain). Runs inside a
-    thread executor so the event loop stays free. Mutates `prog['stage']` as it
-    advances and collects vault entries into prog['_entries'] for the async
-    wrapper to persist. Returns the result dict."""
-    from core import build_vault as _bv
-    mem_files = build.get("files") or {}
-    entries = prog.setdefault("_entries", [])
+def _run_artifact_command(build: dict, arguments: list[str], cwd: str, env: dict, timeout: float, stage: str):
+    """Bound output while the existing native future owns the child process."""
+    import signal
 
-    # ─── Stream the ZIP from vault ────────────────────────────────────
-    prog["stage"] = "zipping"
-    safe_id = _safe_segment(build_id, what="build_id")
-    safe_slug = _safe_slug(slug, fallback="build")
-    zip_filename = f"{safe_slug}-{safe_id[:8]}.zip"
-    zip_path = _resolve_under_dir(VAULT_DIR, "zips", zip_filename)
-    os.makedirs(os.path.dirname(zip_path), exist_ok=True)
-    written_paths: set[str] = set()
-    total_files = 0
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
-        for vp, vc in _bv.iter_files(build_id):
-            if vp in written_paths:
-                continue
+    _check_build_resources(build)
+    if not code_execution_enabled():
+        raise GalaxyBuildStopped("code_execution_disabled")
+    deadline = min(
+        _build_clock.monotonic() + timeout, float(build.get("_bg_deadline_monotonic", float("inf")))
+    )
+    options = (
+        {"start_new_session": True}
+        if os.name == "posix"
+        else {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
+    )
+    process = subprocess.Popen(
+        arguments, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options
+    )
+    stdout = bytearray()
+    stderr = bytearray()
+    reader_errors = []
+
+    def drain(pipe, retained, limit):
+        try:
+            with pipe:
+                while True:
+                    chunk = pipe.read(8192)
+                    if not chunk:
+                        break
+                    available = max(0, limit - len(retained))
+                    if available:
+                        retained.extend(chunk[:available])
+        except Exception:
+            reader_errors.append(True)
+
+    readers = [
+        threading.Thread(
+            target=drain, args=(process.stdout, stdout, 256 * 1024), daemon=True, name="galaxy-command-stdout"
+        ),
+        threading.Thread(
+            target=drain, args=(process.stderr, stderr, 32 * 1024), daemon=True, name="galaxy-command-stderr"
+        ),
+    ]
+
+    def stop_owned_processes():
+        if os.name == "posix":
             try:
-                _zip_write_file(zf, f"{slug}/{vp}", vc)
-                written_paths.add(vp); total_files += 1
-            except Exception:
-                continue
-        for vp, vc in mem_files.items():
-            if vp in written_paths:
-                continue
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        elif process.poll() is None:
             try:
-                _zip_write_file(zf, f"{slug}/{vp}", vc)
-                written_paths.add(vp); total_files += 1
-            except Exception:
-                continue
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                process.terminate()
+        if process.poll() is None:
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        if os.name == "posix":
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        process.wait()
 
-    zip_entry = _vault_save(safe_id, "zip", build.get("title", "game"), zip_path, {
-        "file_count": total_files, "genre": build.get("genre", "unknown"),
-    })
-    entries.append(zip_entry)
-    prog["stage"] = "zip_ready"
+    try:
+        for reader in readers:
+            reader.start()
+        while process.poll() is None or any(reader.is_alive() for reader in readers):
+            _check_build_continuation(build)
+            if _build_clock.monotonic() >= deadline:
+                raise GalaxyBuildStopped(stage + "_timeout")
+            _build_clock.sleep(0.1)
+        if reader_errors:
+            raise GalaxyBuildStopped("artifact_command_output_failed")
+        return subprocess.CompletedProcess(
+            arguments,
+            process.returncode,
+            stdout.decode("utf-8", errors="replace"),
+            stderr.decode("utf-8", errors="replace"),
+        )
+    finally:
+        # Kill remaining members of the owned process group, reap the direct
+        # child, then drain both pipes before this physical future can settle.
+        stop_owned_processes()
+        for index, reader in enumerate(readers):
+            if reader.ident is not None:
+                reader.join()
+            else:
+                (process.stdout if index == 0 else process.stderr).close()
 
+
+def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, progress: dict):
+    """Tracked worker; durable ZIP first, then the explicitly requested EAS chain."""
+    entries = progress.setdefault("_entries", [])
+    progress["stage"] = "zipping"
+    path, count = _write_package_zip_sync(build, _resolve_under_dir(VAULT_DIR, "zips"), slug)
+    entry = _vault_save(
+        build_id,
+        "zip",
+        build.get("title", "game"),
+        path,
+        {"file_count": count, "genre": build.get("genre", "unknown")},
+    )
+    entries.append(entry)
     result = {
         "build_id": build_id,
-        "vault_id": zip_entry["vault_id"],
+        "vault_id": entry["vault_id"],
         "status": "zip_ready",
-        "filename": zip_filename,
-        "size": zip_entry["size_human"],
-        "size_bytes": zip_entry["size_bytes"],
-        "file_count": total_files,
-        "download_url": f"/api/galaxy-studio/vault/download/{zip_entry['vault_id']}",
-        "message": f"ZIP ready: {zip_filename} ({zip_entry['size_human']})",
+        "filename": entry["filename"],
+        "size": entry["size_human"],
+        "size_bytes": entry["size_bytes"],
+        "file_count": count,
+        "download_url": f"/api/galaxy-studio/vault/download/{entry['vault_id']}",
+    }
+    progress["stage"] = "zip_ready"
+    progress["result"] = result
+    if not token:
+        result.update(
+            {
+                "apk_status": "no_token",
+                "message": "ZIP ready for manual compilation; no APK has been submitted.",
+            }
+        )
+        return result
+    if not code_execution_enabled():
+        raise GalaxyBuildStopped("code_execution_disabled")
+    safe_id = _safe_segment(build_id, what="build_id")
+    project_root = _resolve_under_dir("/tmp/galaxy_studio_projects", safe_id, uuid.uuid4().hex[:12])
+    actual_dir = _resolve_under_dir(project_root, _safe_slug(slug))
+    os.makedirs(actual_dir, exist_ok=True)
+    progress["stage"] = "materializing"
+    for index, (name, content) in enumerate(_iter_artifact_files(build)):
+        if index % 64 == 0 and shutil.disk_usage(actual_dir).free < 64 * 1024 * 1024:
+            raise GalaxyBuildStopped("artifact_storage_unavailable")
+        destination = _resolve_under_dir(actual_dir, *name.split("/"))
+        _disk_write_file(destination, content)
+    if count < 5:
+        raise GalaxyBuildStopped("apk_project_incomplete")
+    env = os.environ.copy()
+    env["EXPO_TOKEN"] = token
+    git_env = {
+        **env,
+        "GIT_AUTHOR_NAME": "Galaxy Studio",
+        "GIT_AUTHOR_EMAIL": "build@galaxy.studio",
+        "GIT_COMMITTER_NAME": "Galaxy Studio",
+        "GIT_COMMITTER_EMAIL": "build@galaxy.studio",
     }
 
-    if token:
-        try:
-            project_dir = _resolve_under_dir("/tmp/galaxy_studio_projects", safe_id)
-            actual_dir = _resolve_under_dir(project_dir, safe_slug)
-            os.makedirs(actual_dir, exist_ok=True)
+    def command(arguments, stage, timeout, command_env=None, required=True):
+        _check_build_resources(build)
+        if not code_execution_enabled():
+            raise GalaxyBuildStopped("code_execution_disabled")
+        progress["stage"] = stage
+        receipt = _run_artifact_command(build, arguments, actual_dir, command_env or env, timeout, stage)
+        if required and receipt.returncode != 0:
+            raise GalaxyBuildStopped(stage + "_failed")
+        return receipt
 
-            prog["stage"] = "materializing"
-            files_written = 0
-            try:
-                for vpath, vcontent in _bv.iter_files(build_id):
-                    if not isinstance(vcontent, str):
-                        continue
-                    full_path = os.path.join(actual_dir, vpath)
-                    try:
-                        _disk_write_file(full_path, vcontent); files_written += 1
-                    except Exception:
-                        continue
-            except Exception as _ve:
-                print(f"[APK] vault stream failed ({_ve}); falling back to memory")
-            for path, content in (build.get("files") or {}).items():
-                full_path = os.path.join(actual_dir, path)
-                if os.path.exists(full_path):
-                    continue
-                try:
-                    _disk_write_file(full_path, content); files_written += 1
-                except Exception:
-                    continue
-            print(f"[APK] materialised {files_written} files into {actual_dir}")
-            if files_written < 5:
-                raise RuntimeError(
-                    f"APK packaging aborted: only {files_written} files materialised from vault. "
-                    f"Build may have failed silently. Re-run /vault/zip to verify file count first."
-                )
+    command(["git", "init"], "git_init", 10)
+    command(["git", "add", "."], "git_add", 10)
+    command(["git", "commit", "-m", "Galaxy Studio Factory build"], "git_commit", 15, git_env)
+    command(["npm", "install", "--legacy-peer-deps"], "npm_install", 120)
+    config_path = _resolve_under_dir(actual_dir, "app.json")
+    if os.path.exists(config_path):
+        with open(config_path) as handle:
+            config = json.load(handle)
+        eas = ((config.get("expo") or {}).get("extra") or {}).get("eas")
+        if isinstance(eas, dict):
+            eas.pop("projectId", None)
+        with open(config_path, "w") as handle:
+            json.dump(config, handle, indent=2)
+    command(["eas", "init", "--non-interactive", "--force"], "eas_init", 60)
+    command(["git", "add", "."], "git_add", 10)
+    command(["git", "commit", "-m", "eas init"], "git_commit", 15, git_env, required=False)
+    progress["_project_dir"] = actual_dir
+    progress["stage"] = "prepared"
+    return result
 
-            env = os.environ.copy(); env["EXPO_TOKEN"] = token
-            git_env = {**env, "GIT_AUTHOR_NAME": "Galaxy Studio", "GIT_AUTHOR_EMAIL": "build@galaxy.studio", "GIT_COMMITTER_NAME": "Galaxy Studio", "GIT_COMMITTER_EMAIL": "build@galaxy.studio"}
 
-            subprocess.run(["git", "init"], cwd=actual_dir, capture_output=True, timeout=10)
-            subprocess.run(["git", "add", "."], cwd=actual_dir, capture_output=True, timeout=10)
-            subprocess.run(["git", "commit", "-m", "Galaxy Studio Factory build"], cwd=actual_dir, capture_output=True, env=git_env, timeout=15)
-
-            prog["stage"] = "npm_install"
-            subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=actual_dir, capture_output=True, timeout=120)
-
-            app_json_path = _resolve_under_dir(actual_dir, "app.json")
-            if os.path.exists(app_json_path):
-                with open(app_json_path, 'r') as f:
-                    app_config = json.load(f)
-                if "expo" in app_config:
-                    if "extra" in app_config["expo"] and "eas" in app_config["expo"]["extra"]:
-                        app_config["expo"]["extra"]["eas"].pop("projectId", None)
-                with open(app_json_path, 'w') as f:
-                    json.dump(app_config, f, indent=2)
-
-            prog["stage"] = "eas_init"
-            subprocess.run(["eas", "init", "--non-interactive", "--force"], cwd=actual_dir, env=env, capture_output=True, text=True, timeout=60)
-            subprocess.run(["git", "add", "."], cwd=actual_dir, capture_output=True, timeout=10)
-            subprocess.run(["git", "commit", "-m", "eas init"], cwd=actual_dir, capture_output=True, env=git_env, timeout=15)
-
-            prog["stage"] = "eas_build"
-            eas_result = subprocess.run(
-                ["eas", "build", "--platform", "android", "--profile", "preview", "--non-interactive", "--no-wait", "--json"],
-                cwd=actual_dir, env=env, capture_output=True, text=True, timeout=180,
-            )
-
-            if eas_result.returncode == 0:
-                try:
-                    eas_output = json.loads(eas_result.stdout)
-                    eas_build_id = eas_output[0].get("id", "") if isinstance(eas_output, list) else eas_output.get("id", "")
-                    apk_entry = _vault_save(build_id, "apk", build["title"], "", {
-                        "eas_build_id": eas_build_id, "status": "building",
-                        "genre": build["genre"], "file_count": len(build.get("files") or {}),
-                        "era_id": build.get("era_id"), "era_label": build.get("era_label"),
-                    })
-                    entries.append(apk_entry)
-                    build["eas_build_id"] = eas_build_id
-                    build["eas_build_status"] = "building"
-                    result["apk_status"] = "building"
-                    result["apk_vault_id"] = apk_entry.get("vault_id")
-                    result["eas_build_id"] = eas_build_id
-                    result["apk_message"] = f"APK build triggered on EAS! Track at expo.dev. Build ID: {eas_build_id}"
-                    result["status"] = "apk_building"
-                except json.JSONDecodeError:
-                    result["apk_status"] = "submitted"
-                    result["apk_message"] = "Build submitted to EAS."
-            else:
-                result["apk_status"] = "eas_error"
-                result["apk_error"] = eas_result.stderr[:500] if eas_result.stderr else "EAS build failed"
-                result["apk_message"] = "EAS build failed. ZIP is available for download."
-        except Exception:
-            result["apk_status"] = "error"
-            result["apk_error"] = "apk_build_failed"
-            result["apk_message"] = "APK build error. ZIP available."
-    else:
-        try:
-            apk_entry = _vault_save(build_id, "apk", build["title"], "", {
-                "status": "no_token", "genre": build["genre"],
-                "file_count": len(build.get("files") or {}),
-                "era_id": build.get("era_id"), "era_label": build.get("era_label"),
-                "note": "Fallback placeholder — set EXPO_TOKEN in backend/.env to enable real EAS cloud compile.",
-            })
-            entries.append(apk_entry)
-            result["apk_status"] = "no_token"
-            result["apk_vault_id"] = apk_entry.get("vault_id")
-            result["apk_message"] = "No EXPO_TOKEN configured. Add token in backend/.env and restart backend for real EAS cloud compile."
-        except Exception:
-            result["apk_status"] = "no_token"
-            result["apk_message"] = "No EXPO_TOKEN available. ZIP created for manual APK build."
-
+def _submit_eas_sync(build: dict, token: str, progress: dict, result: dict):
+    actual_dir = progress["_project_dir"]
+    try:
+        _check_build_resources(build)
+        if not code_execution_enabled():
+            raise GalaxyBuildStopped("code_execution_disabled")
+        progress["stage"] = "eas_build"
+        receipt = _run_artifact_command(
+            build,
+            [
+                "eas",
+                "build",
+                "--platform",
+                "android",
+                "--profile",
+                "preview",
+                "--non-interactive",
+                "--no-wait",
+                "--json",
+            ],
+            actual_dir,
+            {**os.environ, "EXPO_TOKEN": token},
+            180,
+            "eas_build",
+        )
+        if receipt.returncode != 0:
+            raise GalaxyBuildStopped("eas_submission_unknown")
+    except Exception:
+        progress["stage"] = "eas_submission_unknown"
+        raise
+    try:
+        response = json.loads(receipt.stdout)
+        remote = response[0] if isinstance(response, list) and response else response
+        remote_id = remote.get("id") if isinstance(remote, dict) else None
+        if not isinstance(remote_id, str) or not remote_id or len(remote_id) > 128:
+            raise ValueError("missing acknowledged build identity")
+    except (ValueError, TypeError):
+        progress["stage"] = "eas_submission_unknown"
+        raise GalaxyBuildStopped("eas_submission_unknown") from None
+    build["eas_build_id"] = remote_id
+    build["eas_build_status"] = "building"
+    result.update(
+        {
+            "status": "apk_building",
+            "apk_status": "building",
+            "eas_build_id": remote_id,
+            "message": "EAS acknowledged the build submission.",
+        }
+    )
+    progress["stage"] = "submitted"
     return result
 
 
 async def _run_apk_bg(build_id: str, token: str, slug: str):
-    """Background worker for /vault/zip-to-apk. Offloads the blocking ZIP + EAS
-    subprocess pipeline to a thread, persists vault entries, and records the
-    final result on build['_apk']."""
+    build = _builds.get(build_id)
+    if build is None:
+        return
+    state = build["_apk"]
     try:
-        build = await _load_build(build_id)
-        if not build:
-            return
-        apk_state = build.get("_apk") or {}
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None, _apk_pipeline_sync, build, build_id, token, slug, apk_state,
-        )
-        # Persist collected vault entries (zip + apk) to Mongo.
-        for ent in apk_state.pop("_entries", []) or []:
-            try:
-                await _save_vault_entry(ent)
-            except Exception as se:
-                print(f"[APK vault save] {se}")
-        apk_state.update({
-            "status": "completed",
-            "stage": "done",
-            "completed_at": datetime.utcnow().isoformat(),
-            "result": result,
-        })
-        build["_apk"] = apk_state
-        await _save_build(build)
-        print(f"[GALAXY apk-bg] DONE {build_id}: {result.get('apk_status')} ({result.get('file_count')} files)")
-    except Exception as e:
-        try:
-            b = await _load_build(build_id)
-            if b is not None:
-                st = b.get("_apk") or {}
-                st.update({"status": "failed", "error": "apk_packaging_failed",
-                           "completed_at": datetime.utcnow().isoformat()})
-                st.pop("_entries", None)
-                b["_apk"] = st
-                await _save_build(b)
-        except Exception:
-            pass
-        print(f"[GALAXY apk-bg] FAILED for {build_id}: {e}")
+        async with _artifact_operation(build, "apk"):
+            result = await _await_build_io(build, _apk_pipeline_sync, build, build_id, token, slug, state)
+            for entry in state.pop("_entries", []) or []:
+                await _save_artifact_entry_required(entry)
+            if token:
+                _check_build_continuation(build)
+                state["stage"] = "eas_submission_pending"
+                await _save_build_required(build)
+                result = await _await_build_io(build, _submit_eas_sync, build, token, state, result)
+                await _save_build_required(build)
+            _check_build_continuation(build)
+            state.update(
+                {
+                    "status": "completed",
+                    "stage": "submitted" if result.get("eas_build_id") else "zip_ready",
+                    "completed_at": datetime.utcnow().isoformat(),
+                    "result": result,
+                }
+            )
+            await _save_build_required(build)
+    except (Exception, asyncio.CancelledError) as exc:
+        if isinstance(exc, asyncio.CancelledError):
+            raise
 
 
 @router.get("/vault/apk-status/{build_id}")
@@ -4590,7 +4925,7 @@ async def vault_apk_status(build_id: str):
     apk = build.get("_apk")
     if not apk:
         return {"build_id": build_id, "status": "none"}
-    out = {k: v for k, v in apk.items() if k != "_entries"}
+    out = {k: v for k, v in apk.items() if not k.startswith("_")}
     out["build_id"] = build_id
     return out
 
@@ -4602,65 +4937,52 @@ async def galaxy_active_jobs():
     badge so progress is visible without opening the modal. In-memory only —
     running jobs keep their build hot, so this reliably reflects live work."""
     jobs = []
-    try:
-        # ── LIVE FILE-GENERATION BUILDS ──
-        # _active_runners is the AUTHORITATIVE set of builds whose runner is
-        # currently generating files (the runner adds its id on start, removes
-        # it on finish). This is independent of whether the in-memory _builds
-        # cache happens to hold the doc, so it never misses a live build nor
-        # counts a post-restart zombie. This is the long phase users wait on,
-        # so surface it on the home badge + banner.
-        for bid in list(_active_runners):
-            _tsk = _background_tasks.get(bid)
-            if _tsk is not None and _tsk.done() and not _physical_build_workers(bid):
-                continue
-            b = {}
-            try:
-                _cand = _builds.get(bid)
-                if isinstance(_cand, dict):
-                    b = _cand
-            except Exception:
-                b = {}
-            # Skip builds already finalized (e.g. via force-complete) even if
-            # the runner is still winding down — they must not keep /jobs/active
-            # (and the hub banner) lit or hold the single-build slot.
-            if not _build_has_live_work(bid):
-                continue
-            phases = b.get("phases") or []
-            done = sum(1 for p in phases if isinstance(p, dict) and p.get("status") == "completed")
+    with _worker_lock:
+        physical_ids = set(_build_worker_futures)
+    identities = set(_active_runners) | set(_background_tasks) | physical_ids
+    for build_id in identities:
+        if not _build_has_live_work(build_id):
+            continue
+        if build_id == _VAULT_ADMIN_SLOT:
             jobs.append(
                 {
-                    "build_id": bid,
-                    "title": b.get("title") or str(bid)[:8],
-                    "kind": "build",
-                    "stage": (
-                        "stopping; draining physical work"
-                        if b.get("_bg_stop_requested")
-                        else f"phase {done}/{len(phases) or 100}"
-                    ),
-                    "files": b.get("file_count", 0),
+                    "build_id": build_id,
+                    "title": "Vault maintenance",
+                    "kind": "maintenance",
+                    "stage": "inspecting or reclaiming storage",
                 }
             )
-
-        # ── POST-BUILD EXPANSION / APK PACKAGING JOBS (in-memory state) ──
-        for bid, b in list(_builds.items()):
-            if not isinstance(b, dict):
-                continue
-            title = b.get("title") or str(bid)[:8]
-            exp = b.get("_expansion")
-            if isinstance(exp, dict) and exp.get("status") == "running":
-                jobs.append({
-                    "build_id": bid, "title": title, "kind": "expand",
-                    "stage": f"pipeline {exp.get('phases_completed', 0)}/{exp.get('phases_total', 7)}",
-                })
-            apk = b.get("_apk")
-            if isinstance(apk, dict) and apk.get("status") == "running":
-                jobs.append({
-                    "build_id": bid, "title": title, "kind": "apk",
-                    "stage": apk.get("stage") or "packaging",
-                })
-    except Exception as e:
-        print(f"[GALAXY jobs/active] WARN: {e}")
+            continue
+        build = _builds.get(build_id) or {}
+        operation = _active_artifact_job(build)
+        if operation:
+            kind = {"expansion": "expand", "native_apk": "apk"}.get(
+                operation.get("kind"), operation.get("kind")
+            )
+            state = build.get("_expansion" if kind == "expand" else "_apk" if kind == "apk" else "") or {}
+            stage = (
+                "stopping; draining physical work"
+                if operation.get("stop_requested")
+                else state.get("stage") or operation.get("kind")
+            )
+        else:
+            kind = "build"
+            phases = build.get("phases") or []
+            done = sum(isinstance(phase, dict) and phase.get("status") == "completed" for phase in phases)
+            stage = (
+                "stopping; draining physical work"
+                if build.get("_bg_stop_requested")
+                else f"phase {done}/{len(phases) or 100}"
+            )
+        jobs.append(
+            {
+                "build_id": build_id,
+                "title": build.get("title") or str(build_id)[:8],
+                "kind": kind,
+                "stage": stage,
+                "files": build.get("file_count", 0),
+            }
+        )
     return {"ok": True, "count": len(jobs), "jobs": jobs}
 
 
@@ -4738,124 +5060,8 @@ except Exception as _va_err:  # pragma: no cover — defensive
 
 @router.post("/compile/{build_id}")
 async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
-    """Real EAS cloud compile for a Galaxy Studio build.
-
-    Replaces /api/jeeves-master/compile/{build_id}. Uses the same real
-    (non-mocked) flow: git init → npm install → eas init → eas build
-    --platform android --profile preview --non-interactive --no-wait.
-    """
-    if not code_execution_enabled():
-        return execution_disabled_response("Galaxy Studio EAS compilation")
-
-    build = await _load_build(build_id)
-    if not build:
-        raise HTTPException(404, "Build not found")
-    if not build.get("files"):
-        raise HTTPException(400, "No code files generated yet. Complete build first.")
-
-    # Lazy import so we don't pull subprocess/zipfile unless needed
-    import subprocess as _sp, json as _json, os as _os, zipfile as _zf
-    from datetime import datetime as _dt
-    from dotenv import load_dotenv as _ld
-    try:
-        _ld()
-    except Exception as _dotenv_error:
-        print(f"[GALAXY] dotenv load failed: {_dotenv_error}", flush=True)
-
-    token = expo_token or _os.environ.get("EXPO_TOKEN", "")
-    if not token:
-        return {
-            "build_id": build_id,
-            "status": "no_token",
-            "message": "EXPO_TOKEN missing. Set it in /app/backend/.env and restart.",
-        }
-
-    # Package the build into a ZIP + extract to /tmp project dir
-    safe_id = _safe_segment(build_id, what="build_id")
-    project_dir = _resolve_under_dir("/tmp/galaxy_projects", safe_id)
-    _os.makedirs(project_dir, exist_ok=True)
-    try:
-        zip_path = _resolve_under_dir("/tmp/galaxy_projects", f"{safe_id}.zip")
-        with _zf.ZipFile(zip_path, "w", _zf.ZIP_DEFLATED) as zf:
-            for path, content in (build.get("files") or {}).items():
-                if isinstance(content, str):
-                    zf.writestr(path, content)
-        with _zf.ZipFile(zip_path, "r") as zf:
-            zf.extractall(project_dir)
-        subdirs = [d for d in _os.listdir(project_dir) if _os.path.isdir(_os.path.join(project_dir, d)) and d not in {".", ".."}]
-        actual_dir = _resolve_under_dir(project_dir, subdirs[0]) if subdirs else project_dir
-    except Exception as pe:
-        print(f"[GALAXY] ZIP extract failed: {type(pe).__name__}", flush=True)
-        return {"build_id": build_id, "status": "package_error", "message": "zip_extract_failed"}
-
-    env = _os.environ.copy()
-    env["EXPO_TOKEN"] = token
-    git_env = {
-        **env,
-        "GIT_AUTHOR_NAME": "Galaxy Studio",
-        "GIT_AUTHOR_EMAIL": "build@galaxy.studio",
-        "GIT_COMMITTER_NAME": "Galaxy Studio",
-        "GIT_COMMITTER_EMAIL": "build@galaxy.studio",
-    }
-    try:
-        _sp.run(["git", "init"], cwd=actual_dir, capture_output=True, timeout=10)
-        _sp.run(["git", "add", "."], cwd=actual_dir, capture_output=True, timeout=15)
-        _sp.run(["git", "commit", "-m", "Galaxy Studio build"],
-                cwd=actual_dir, capture_output=True, env=git_env, timeout=20)
-        npm_res = _sp.run(
-            ["npm", "install", "--legacy-peer-deps", "--no-audit", "--no-fund"],
-            cwd=actual_dir, capture_output=True, text=True, timeout=240,
-        )
-        # Sanitise app.json (strip placeholder projectId)
-        app_json_path = _resolve_under_dir(actual_dir, "app.json")
-        if _os.path.exists(app_json_path):
-            try:
-                with open(app_json_path) as f:
-                    app_config = _json.load(f)
-                if "expo" in app_config and "extra" in app_config["expo"]:
-                    app_config["expo"]["extra"].get("eas", {}).pop("projectId", None)
-                with open(app_json_path, "w") as f:
-                    _json.dump(app_config, f, indent=2)
-            except Exception as _app_config_error:
-                print(f"[GALAXY] app.json update failed: {_app_config_error}", flush=True)
-        _sp.run(["eas", "init", "--non-interactive", "--force"],
-                cwd=actual_dir, env=env, capture_output=True, text=True, timeout=90)
-        _sp.run(["git", "add", "."], cwd=actual_dir, capture_output=True, timeout=15)
-        _sp.run(["git", "commit", "-m", "eas init"],
-                cwd=actual_dir, capture_output=True, env=git_env, timeout=20)
-        eas_res = _sp.run(
-            ["eas", "build", "--platform", "android", "--profile", "preview",
-             "--non-interactive", "--no-wait", "--json"],
-            cwd=actual_dir, env=env, capture_output=True, text=True, timeout=300,
-        )
-        if eas_res.returncode != 0:
-            return {
-                "build_id": build_id, "status": "eas_error",
-                "message": "EAS build submit failed.",
-                "eas_stderr": (eas_res.stderr or "")[-600:],
-                "npm_stderr": (npm_res.stderr or "")[-400:] if npm_res.returncode != 0 else "",
-            }
-        eas_build_id = ""
-        try:
-            out = _json.loads(eas_res.stdout)
-            eas_build_id = (out[0] if isinstance(out, list) else out).get("id", "")
-        except _json.JSONDecodeError:
-            pass
-        build["eas_build_id"] = eas_build_id
-        build["eas_build_status"] = "building"
-        build["eas_started_at"] = _dt.utcnow().isoformat()
-        await _save_build(build)
-        return {
-            "build_id": build_id,
-            "eas_build_id": eas_build_id,
-            "status": "building",
-            "message": "Galaxy Studio cloud compile triggered on Expo EAS.",
-            "expo_dashboard": f"https://expo.dev/accounts/galaxystudio/builds/{eas_build_id}" if eas_build_id else None,
-        }
-    except _sp.TimeoutExpired:
-        return {"build_id": build_id, "status": "timeout", "message": "EAS step timed out"}
-    except Exception:
-        return {"build_id": build_id, "status": "error", "message": "EAS build failed"}
+    """Explicit compatibility route for the retained APK packaging owner."""
+    return await deploy_build(build_id, expo_token)
 
 
 @router.get("/eas-status/{build_id}")

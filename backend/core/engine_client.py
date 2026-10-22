@@ -1057,6 +1057,7 @@ class EngineClient:
     """Bounded async HTTP client for the canonical engine API."""
 
     _TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
+    _MAX_CANCEL_CLEANUPS = 64
 
     def __init__(
         self,
@@ -1068,6 +1069,7 @@ class EngineClient:
             raise TypeError("config must be EngineClientConfig")
         self.config = config
         self._transport = transport
+        self._cancel_cleanups: dict[tuple[str, str, str], asyncio.Task[Any]] = {}
 
     @classmethod
     def from_env(
@@ -2716,7 +2718,18 @@ class EngineClient:
     ) -> None:
         """Best-effort bounded durable cancellation after caller interruption."""
 
-        try:
+        identity = (
+            command.operation.tenant_id,
+            command.operation.actor_id,
+            command.execution_request.execution_id,
+        )
+        cleanup = self._cancel_cleanups.get(identity)
+        if cleanup is None:
+            # Each request has its own absolute transport deadline. Retain and
+            # observe cleanup until that deadline, without allowing repeated
+            # disconnects to create unlimited detached requests.
+            if len(self._cancel_cleanups) >= self._MAX_CANCEL_CLEANUPS:
+                return
             cleanup = asyncio.create_task(
                 self.cancel(
                     command.execution_request.execution_id,
@@ -2726,15 +2739,27 @@ class EngineClient:
                     trace_id=command.operation.trace_id,
                 )
             )
+            self._cancel_cleanups[identity] = cleanup
+
+            def observe_cleanup(finished: asyncio.Task[Any]) -> None:
+                if self._cancel_cleanups.get(identity) is finished:
+                    self._cancel_cleanups.pop(identity, None)
+                if not finished.cancelled():
+                    finished.exception()
+
+            cleanup.add_done_callback(observe_cleanup)
+
+        # A client can outlive an application-loop restart. An already admitted
+        # cleanup on another loop is never a reason to issue another cancel or
+        # to await a foreign-loop task during caller cancellation.
+        if cleanup.get_loop() is not asyncio.get_running_loop():
+            return
+        try:
             await asyncio.wait_for(
                 asyncio.shield(cleanup),
                 timeout=min(self.config.request_timeout_s, 5.0),
             )
-        except (
-            asyncio.TimeoutError,
-            EngineClientError,
-            httpx.HTTPError,
-        ):
+        except (asyncio.CancelledError, Exception):
             # The caller cancellation remains primary. The engine execution is
             # durable, so a failed cleanup request can still be reconciled by
             # explicit status/cancel or server-side deadline/recovery policy.

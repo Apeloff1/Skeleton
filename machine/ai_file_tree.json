@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "715acad6429a17aae4c3d0befe9b7b4a81df2e73",
+      "source_git_object_sha": "3bccbf621812efe99ddb8751f0d57becab54bf7b",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "715acad6429a17aae4c3d0befe9b7b4a81df2e73",
+      "source_git_object_sha": "3bccbf621812efe99ddb8751f0d57becab54bf7b",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -398,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "0f61808af4277691d9f8ad171e94d7c74cda6182",
+      "source_git_object_sha": "17668ff8c973a8f2757e40882d3b3fc853742fb4",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "9e0288f0eff51a6702db9d250fcabdcb4b1a60b7",
+      "source_git_object_sha": "95418edf06d51d12a271aafefa678513f6865dfa",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "7eaedb3fc89660983a9c3fd1cac4d30af8a70fd0",
+      "source_git_object_sha": "6e36106685bf581a8967480c415318a3c4dd6465",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -10361,16 +10361,39 @@
       "frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx",
       "frontend/src/product/aiWorkflowClient.ts",
       "frontend/src/product/buildJobLifecycle.ts",
-      "frontend/src/product/runtimeOptimizationClient.ts"
+      "frontend/src/product/runtimeOptimizationClient.ts",
+      "skeleton/api/engine_runtime.py",
+      "skeleton/api/server.py",
+      "skeleton/provider_runtime.py",
+      "backend/core/build_vault.py",
+      "backend/routes/galaxy_studio_files.py",
+      "backend/routes/galaxy_studio_vault.py",
+      "backend/routes/galaxy_studio_vault_admin.py",
+      "backend/services/binary_builder.py",
+      "backend/routes/app_runtime.py",
+      "backend/routes/gameforge_auth.py",
+      "frontend/src/features/Setup",
+      "frontend/src/product/appBootstrapClient.ts",
+      "frontend/src/product/appHealthClient.ts",
+      "frontend/src/product/appReadinessClient.ts",
+      "frontend/src/product/chatController.ts",
+      "frontend/src/product/useChatController.ts",
+      "frontend/src/auth/gameforgeAuth.ts",
+      "frontend/src/utils/apiClient.ts",
+      "skeleton/app/first_install.py"
     ],
     "source_metadata": "Affected current-branch canonical source-object identities reference the staged implementation tree. Historical signatures and qualification state are preserved; no import cutover or verification signature is created.",
     "refreshed_source_mappings": [
+      "AIFT-PROVIDER-RUNTIME",
+      "AIFT-PROVIDER-RUNTIME-LEGACY-ALIAS",
       "AIFT-CONTRACTS",
       "AIFT-PERSISTENCE",
       "AIFT-INTELLIGENCE",
-      "AIFT-JEEVES"
+      "AIFT-JEEVES",
+      "AIFT-ENGINE-API"
     ],
     "operator_and_learning_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation",
-    "studio_foundation_pass": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.studio_foundation_pass"
+    "studio_foundation_pass": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.studio_foundation_pass",
+    "operational_gap_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.operational_gap_continuation"
   }
 }

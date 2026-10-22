@@ -72,12 +72,18 @@ async def _restart_runner(build_id: str, duration_min: int) -> bool:
         _background_tasks,
         _any_build_has_live_work,
         _request_build_stop,
+        _active_artifact_job,
     )
 
     if type(duration_min) is not int or not 1 <= duration_min <= 60:
         return False
     build = await _load_build(build_id)
-    if not build or build.get("status") != "building" or build.get("_bg_stop_requested"):
+    if (
+        not build
+        or build.get("status") != "building"
+        or build.get("_bg_stop_requested")
+        or _active_artifact_job(build) is not None
+    ):
         return False
     elapsed = _age_seconds(build.get("_bg_started"))
     if elapsed is None or elapsed < -5:
@@ -152,7 +158,13 @@ async def _scan_once() -> dict:
     restarts_this_tick = 0
 
     try:
-        from routes.galaxy_studio import _builds, _load_build, _build_has_live_work, _request_build_stop
+        from routes.galaxy_studio import (
+            _builds,
+            _load_build,
+            _build_has_live_work,
+            _request_build_stop,
+            _active_artifact_job,
+        )
         from services.database import db as _db
 
         # Collect ids from both in-memory and Mongo
@@ -177,7 +189,11 @@ async def _scan_once() -> dict:
                 b = _builds.get(bid) or await _load_build(bid)
                 if not b:
                     continue
-                if b.get("status") != "building" or b.get("_bg_status") == "manual":
+                if (
+                    b.get("status") != "building"
+                    or b.get("_bg_status") == "manual"
+                    or _active_artifact_job(b) is not None
+                ):
                     continue
 
                 target_min = b.get("_bg_target_duration", 15)

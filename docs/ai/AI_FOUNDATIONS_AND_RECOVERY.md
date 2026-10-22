@@ -78,6 +78,40 @@ for recovery and does not re-execute already committed optimizer work. Existing
 failed-task retry and circuit-reset controls preserve their exact source and
 failure bindings.
 
+Maintenance startup remains non-admitting until its owner has synchronized the
+actual foreground count. Controller initialization and foreground transitions
+share the existing activity lock, and maintenance opens the literal foreground
+execution database path. Callback results are detached and bounded before
+serialization. Failed tasks with unverified completed chunks remain available
+as retry targets instead of disappearing during history compaction.
+
+## Reconnect and shut down without losing ownership
+
+Foreground reconnect and **Check status** inspect the existing chat operation.
+They do not resubmit a request. **Resume** is an explicit action with the retained
+request identity. Stop intent remains attached to that identity, including an
+ambiguous first submission. Failed conversation loading can be retried, and local
+drafts and attachments remain associated with their actual thread and verified
+account. The conversation file view contains actual authorized attachments.
+
+If a saved key is unknown after process loss and the original request settings
+are unavailable, the UI retains the unresolved key. A 404 does not prove that a
+late request cannot arrive. Inspect it again or explicitly start another
+conversation; the app does not invent successful cancellation or reconstruct
+unknown execution settings. Mongo preparation recovery uses primary reads,
+database-clock ownership and exact event/lease comparisons so a stale reader
+cannot delete a newer writer's journal entry.
+
+Local model identity checks, token preparation and generation share fair physical
+worker admission. They run off the async event loop and retain the original
+input/output ceilings through cache hits and shared requests. A closed engine
+cannot be resumed as if it were an ordinary reversible maintenance drain.
+
+Engine shutdown closes each actual serving engine once, including a separately
+configured local verifier. Native work and lifecycle leases must drain before
+database custody and Mongo finalization dependencies are released. Failed
+cleanup retains its exact handles for retry and blocks replacement startup.
+
 ## Keep builds truthful under pressure
 
 Galaxy's existing build owner retains task handles and physical-worker custody
@@ -87,6 +121,46 @@ memory and deadline failures stop further production and preserve known partial
 artifacts rather than manufacturing completed phases or accumulating an
 unbounded in-memory fallback. Inspect the actual failure and restore capacity
 before starting replacement work.
+
+Expansion, ZIP and APK preparation share that same physical slot in the backend
+process. This is not a distributed multi-host lease. Expansions
+save small chunks; packaging streams vault files in workers instead of loading
+the whole game on the API event loop. A packaging job has its own result and
+cannot retroactively mark the original game phases complete. Inspect the current
+artifact operation and its actual stop/drain state before submitting another.
+
+ZIP publication uses a unique staged file and an atomic final replacement.
+Vault reads and corruption repair serialize with append, compressed manifests
+cannot shadow a newer manifest, and only complete shards enter publication.
+File counts describe unique current paths; replacing a path is not another file.
+Explicit vault pruning cannot run while another operation owns the artifact slot.
+
+Cloud APK commands remain explicit and subject to the existing execution switch.
+The owner records submission intent before requesting an EAS build and reports
+remote submission only after an acknowledged build ID. An uncertain response
+retains its unresolved state and blocks automatic resubmission. Inspect the
+remote service with the installation operator before attempting recovery.
+
+## Interpret first-install readiness
+
+The setup page observes public backend, engine and Mongo health separately from
+authenticated storage admission, AI chat and Dragon prerequisites. It clears
+account-specific observations on an account change. A viewer can inspect sources
+but needs the existing owner to assign an editor/admin role before running web
+captures. Capturing pages does not require a chat model.
+
+Health responses must match the actual service protocol; HTML or a redirected
+login page is not a healthy AI engine. Public status readers share one retained
+bounded observation, including off-loop control-plane I/O, and a one-second
+completed cache preserves its original observation timestamp. A deadline reports
+unobserved state while that same work retains custody. Model configuration and
+service liveness remain separate from actual model availability.
+
+Frontend JSON requests bound streaming response buffering where the platform
+exposes a readable stream. Native adapters exposing only `text()` retain their
+platform buffering, followed by size rejection before parsing; absolute caller
+deadlines and cancellation still apply. Credential-bearing requests do not use
+the account-blind public session cache.
 
 This pass was checked through source compilation and bounded static build checks.
 No tests, inference, training, crawler or simulation workloads were executed.

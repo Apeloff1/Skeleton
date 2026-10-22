@@ -74,6 +74,19 @@ class NativeTransformerModel:
     def assert_identity(self) -> None:
         self._assert_identity()
 
+    def check_readiness(self) -> None:
+        """Inspect admitted identity/device metadata; workers verify weights."""
+        device = self.runtime.device
+        if (
+            self.model_id != self._admitted_model_id
+            or self.runtime.model_digest != self._model_digest
+            or self.runtime.tokenizer.digest != self._tokenizer_digest
+            or self._compute_runtime_digest() != self._runtime_digest
+            or str(getattr(self.runtime.model, "device", "cpu") or "cpu") != device.actual
+            or bool(getattr(self.runtime.model, "resident", False)) != device.resident
+        ):
+            raise RuntimeContractError("native transformer is no longer admitted on its execution device")
+
     def count_input_tokens(self, request: LocalInferenceRequest) -> int:
         return self.prepare_input(request).input_tokens
 

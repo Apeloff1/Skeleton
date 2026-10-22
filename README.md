@@ -195,6 +195,14 @@ now accepts artifacts, GGUF deployments and catalogs, prepares read-only contain
 bindings, supplies required startup secrets and supports explicit administrator
 bootstrap. Runtime status reports model draining, bounded restart recovery,
 learner retention and failed-maintenance retry eligibility.
+Local identity/token preparation shares admitted worker capacity with generation.
+Shutdown retains native workers, lifecycle leases and finalization dependencies
+until drain is established. Reconnect inspects existing chat work; ambiguous
+requests keep their identity and explicit Stop intent. Setup shows database health
+before sign-in and clears account-specific observations when the account changes.
+See [failure recovery and artifact operations](docs/ai/AI_FOUNDATIONS_AND_RECOVERY.md)
+for partial expansion/package results, interrupted cleanup and uncertain remote
+submissions. These source changes remain unqualified for runtime reliability.
 The advanced policy form uses the server's actual editable fields and installed
 capacity limits. Administrators can also preview and download bounded pages of
 retained numeric learning data, and reset an eligible maintenance circuit against

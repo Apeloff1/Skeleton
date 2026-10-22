@@ -21,7 +21,7 @@ from pymongo import ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
-from core.engine_client import EngineClient, EngineClientError
+from core.engine_client import EngineAuthorizationError, EngineClient, EngineClientError
 
 log = logging.getLogger(__name__)
 MAX_SNAPSHOT = 4 * 1024 * 1024
@@ -227,30 +227,109 @@ class DragonCrawlerApplication:
                 "crawler_admission_unconfigured", "Canonical storage admission is not configured.", 503
             )
         raw = _encoded(payload)
+        write_id = identifier + ":" + hashlib.sha256(raw).hexdigest()
+        # Use the canonical engine's external-storage operation identity so a
+        # receipt for another attester/write cannot be relabelled as this one.
+        operation_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                "\x1f".join(
+                    (
+                        "skeleton-external-storage",
+                        self.engine.config.service_principal,
+                        scope["tenant_id"],
+                        "dragon-crawler-persistence",
+                        identifier,
+                        write_id,
+                    )
+                ),
+            )
+        )
         try:
             receipt = await self.engine.admit_storage_write(
                 tenant_id=scope["tenant_id"],
                 capability="dragon-crawler-persistence",
                 resource_id=identifier,
-                write_id=identifier + ":" + hashlib.sha256(raw).hexdigest(),
+                write_id=write_id,
                 storage_bytes=len(raw),
             )
+        except EngineAuthorizationError as exc:
+            raise CrawlerError(
+                "crawler_admission_scope_denied",
+                "The engine storage grant does not admit this account scope. Configure the attester's tenant and crawler-persistence grant; existing captures keep their original scope.",
+                503,
+            ) from exc
         except Exception as exc:
             raise CrawlerError(
                 "crawler_admission_unavailable",
                 "Canonical storage admission rejected the crawler write.",
                 503,
             ) from exc
+        invalid = CrawlerError(
+            "crawler_admission_invalid", "Storage admission did not bind the exact crawler write.", 503
+        )
+        if not isinstance(receipt, Mapping):
+            raise invalid
+        receipt = dict(receipt)
+        _encoded(receipt, 64 * 1024)
+        fields = {
+            "schema_version",
+            "receipt_id",
+            "operation_id",
+            "tenant_id",
+            "capability",
+            "resource_id",
+            "write_id",
+            "storage_bytes",
+            "admitted_at",
+            "quota_reservation_id",
+            "admission_decision_id",
+            "replayed",
+        }
+
+        def identifier_text(value: object) -> bool:
+            return (
+                isinstance(value, str)
+                and 1 <= len(value) <= 512
+                and value == value.strip()
+                and all(ord(char) >= 32 and ord(char) != 127 for char in value)
+            )
+
         if (
-            not isinstance(receipt, Mapping)
+            set(receipt) != fields
+            or type(receipt.get("schema_version")) is not int
+            or receipt["schema_version"] != 1
+            or receipt.get("tenant_id") != scope["tenant_id"]
+            or receipt.get("capability") != "dragon-crawler-persistence"
+            or receipt.get("resource_id") != identifier
+            or receipt.get("write_id") != write_id
             or type(receipt.get("storage_bytes")) is not int
-            or receipt["storage_bytes"] < len(raw)
+            or receipt["storage_bytes"] != len(raw)
+            or type(receipt.get("replayed")) is not bool
+            or receipt.get("operation_id") != operation_id
+            or not identifier_text(receipt.get("receipt_id"))
+            or any(
+                receipt.get(key) is not None and not identifier_text(receipt[key])
+                for key in ("quota_reservation_id", "admission_decision_id")
+            )
+        ):
+            raise invalid
+        try:
+            admitted_at = receipt["admitted_at"]
+            if not isinstance(admitted_at, str) or not 1 <= len(admitted_at) <= 64 or "T" not in admitted_at:
+                raise ValueError("invalid admission timestamp")
+            admitted = datetime.fromisoformat(admitted_at.replace("Z", "+00:00"))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise invalid from exc
+        if (
+            receipt["receipt_id"] != "storage-admission:" + hashlib.sha256(operation_id.encode()).hexdigest()
+            or admitted.tzinfo is None
+            or admitted.utcoffset() is None
         ):
             raise CrawlerError(
-                "crawler_admission_invalid", "Storage admission did not cover the crawler snapshot.", 503
+                "crawler_admission_invalid", "Storage admission identity or timestamp is invalid.", 503
             )
-        _encoded(dict(receipt), 64 * 1024)
-        return dict(receipt)
+        return receipt
 
     async def _owned(self, scope: dict[str, str], identifier: str) -> dict:
         if not isinstance(identifier, str) or not 1 <= len(identifier) <= 128:
@@ -804,6 +883,145 @@ class DragonCrawlerApplication:
             await self._grant_principal(scope, grant)
         return row
 
+    async def _settle_unstarted(
+        self,
+        scope: dict[str, str],
+        row: dict,
+        token: str,
+        epoch: int,
+        operation: str,
+        digest: str,
+        code: str,
+        automation_epoch: int | None,
+    ) -> None:
+        """Fence a claim before dispatch or after a rejected runner drained.
+
+        A cancelled Mongo await can still commit. Fence the original revision
+        first, so a late claim cannot resurrect running state after cleanup.
+        If that claim already won, settle only its exact token and epoch.
+        A submission exception alone never authorizes this settlement.
+        """
+        receipt = {
+            "request_digest": digest,
+            "action": "run",
+            "state": "interrupted",
+            "error_code": code,
+        }
+        unset = {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""}
+        interrupted = {
+            "status": "interrupted",
+            "worker_epoch": epoch,
+            "updated_at": _now(),
+            "operations." + operation: receipt,
+            "last_worker_exit_confirmed": True,
+            "error": {
+                "code": code,
+                "message": "The slice did not start. Its accepted checkpoint is unchanged; reload before starting a new slice.",
+            },
+        }
+        original = {"_id": row["_id"], **scope, "version": row["version"], "status": row["status"]}
+        if automation_epoch is not None:
+            original.update(
+                {
+                    "automation.enabled": True,
+                    "automation.epoch": automation_epoch,
+                    "automation.slices_started": row["automation"]["slices_started"],
+                }
+            )
+            interrupted.update(
+                {"automation.state": "waiting", "automation.next_run_at": _now() + timedelta(seconds=10)}
+            )
+        fenced = await self.sessions.update_one(
+            original,
+            {
+                "$set": interrupted,
+                "$inc": {
+                    "version": 1,
+                    # The unresolved original claim may still be in flight.
+                    # Reserve this attempted automatic key exactly once; an
+                    # already committed claim has consumed this credit itself.
+                    **(
+                        {"automation.slices_started": 1, "automation_slices_total": 1}
+                        if automation_epoch is not None
+                        else {}
+                    ),
+                },
+                "$unset": unset,
+            },
+        )
+        if fenced.matched_count:
+            return
+        owned_worker = {"_id": row["_id"], **scope, "worker_token": token, "worker_epoch": epoch}
+        settled = await self.sessions.update_one(
+            {**owned_worker, "status": "running"},
+            {"$set": interrupted, "$inc": {"version": 1}, "$unset": unset},
+        )
+        if settled.matched_count:
+            return
+        # Pause/cancel may have won the revision race. Keep their status and
+        # grants; only discharge the claim that never started a physical worker.
+        await self.sessions.update_one(
+            {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+            {
+                "$set": {
+                    "updated_at": _now(),
+                    "operations." + operation: receipt,
+                    "last_worker_exit_confirmed": True,
+                },
+                "$inc": {"version": 1},
+                "$unset": unset,
+            },
+        )
+        await self.sessions.update_one(
+            {**owned_worker, "status": "deleted"},
+            {"$set": {"last_worker_exit_confirmed": True}, "$unset": unset},
+        )
+
+    async def _abort_dispatch(
+        self,
+        scope: dict[str, str],
+        row: dict,
+        token: str,
+        epoch: int,
+        operation: str,
+        digest: str,
+        failure: BaseException,
+        automation_epoch: int | None,
+        *,
+        claim_pending: bool,
+    ) -> None:
+        async def cleanup():
+            try:
+                if claim_pending:
+                    await self._settle_unstarted(
+                        scope, row, token, epoch, operation, digest, _safe_error(failure), automation_epoch
+                    )
+            finally:
+                # Callers prove either dispatch was never attempted, or the
+                # rejected runner actually exited without entering the crawl.
+                # Other tokens' capacity is never released.
+                await self.limits.update_many(
+                    {"worker_token": token},
+                    {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
+                )
+
+        finishing = asyncio.create_task(cleanup())
+        while not finishing.done():
+            try:
+                await asyncio.shield(finishing)
+            except asyncio.CancelledError:
+                # Request cancellation cannot cancel an uncertain database
+                # claim's fence; retain custody until bounded driver completion.
+                continue
+            except Exception:
+                break
+        try:
+            finishing.result()
+        except (Exception, asyncio.CancelledError):
+            # Preserve the initiating failure. Database outages retain the
+            # existing finite lease rather than claiming settlement succeeded.
+            log.warning("Crawler pre-dispatch settlement unavailable", exc_info=False)
+
     async def run(
         self, scope: dict[str, str], identifier: str, body: dict, *, automation_epoch: int | None = None
     ) -> dict:
@@ -811,7 +1029,11 @@ class DragonCrawlerApplication:
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         previous = self._prior(row, operation, digest)
         if previous:
-            return {"ok": True, "session": self._projection(row), "run": previous}
+            return {
+                "ok": previous.get("state") == "completed",
+                "session": self._projection(row),
+                "run": previous,
+            }
         if row["version"] != body["expected_version"]:
             raise CrawlerError("crawler_conflict", "Reload the current crawler revision before running.", 409)
         if row["status"] not in {"queued", "interrupted"}:
@@ -850,27 +1072,28 @@ class DragonCrawlerApplication:
         if sum(not handle[1].done() for handle in self._workers.values()) >= MAX_CONCURRENT_SLICES:
             raise CrawlerError("crawler_capacity", "Local physical crawler capacity is occupied.", 429)
         now, epoch = _now(), int(row["worker_epoch"]) + 1
-        credit = await self.limits.find_one_and_update(
-            {
-                "_id": quota_id,
-                **scope,
-                "$or": [{"lease_until": {"$exists": False}}, {"lease_until": {"$lt": now}}],
-            },
-            {
-                "$set": {
-                    "worker_token": token,
-                    "active_session_id": identifier,
-                    "lease_until": now + timedelta(seconds=LEASE_SECONDS),
-                }
-            },
-            return_document=ReturnDocument.AFTER,
-        )
-        if credit is None:
-            raise CrawlerError(
-                "crawler_capacity", "This account already has an active bounded crawler slice.", 429
-            )
-        global_credit = None
+        claim_pending = False
         try:
+            credit = await self.limits.find_one_and_update(
+                {
+                    "_id": quota_id,
+                    **scope,
+                    "$or": [{"lease_until": {"$exists": False}}, {"lease_until": {"$lt": now}}],
+                },
+                {
+                    "$set": {
+                        "worker_token": token,
+                        "active_session_id": identifier,
+                        "lease_until": now + timedelta(seconds=LEASE_SECONDS),
+                    }
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+            if credit is None:
+                raise CrawlerError(
+                    "crawler_capacity", "This account already has an active bounded crawler slice.", 429
+                )
+            global_credit = None
             for index in range(MAX_CONCURRENT_SLICES):
                 slot = "crawler-slice:" + str(index)
                 await self.limits.update_one(
@@ -912,59 +1135,64 @@ class DragonCrawlerApplication:
                     "The bounded crawler worker capacity is occupied; retry after a slice drains.",
                     429,
                 )
-        except BaseException:
-            await self.limits.update_many(
-                {"worker_token": token},
-                {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
+            claim = {"_id": identifier, **scope, "version": row["version"], "status": row["status"]}
+            if automation_epoch is not None:
+                claim.update(
+                    {
+                        "automation.enabled": True,
+                        "automation.epoch": automation_epoch,
+                        "automation.slices_started": grant["slices_started"],
+                        "$expr": {"$gt": ["$automation.expires_at", {"$add": ["$$NOW", 15000]}]},
+                    }
+                )
+            claim_pending = True
+            changed = await self.sessions.update_one(
+                claim,
+                {
+                    "$set": {
+                        "status": "running",
+                        "worker_token": token,
+                        "worker_epoch": epoch,
+                        "lease_until": now + timedelta(seconds=LEASE_SECONDS),
+                        "updated_at": now,
+                        "operations."
+                        + operation: {"request_digest": digest, "action": "run", "state": "running"},
+                        **(
+                            {"worker_automation_epoch": automation_epoch, "automation.state": "running"}
+                            if automation_epoch is not None
+                            else {}
+                        ),
+                    },
+                    "$inc": {
+                        "version": 1,
+                        **(
+                            {"automation.slices_started": 1, "automation_slices_total": 1}
+                            if automation_epoch is not None
+                            else {}
+                        ),
+                    },
+                    "$unset": {
+                        "error": "",
+                        **({"worker_automation_epoch": ""} if automation_epoch is None else {}),
+                    },
+                },
+            )
+            if not changed.modified_count:
+                claim_pending = False
+                raise CrawlerError("crawler_conflict", "Crawler changed before the worker was claimed.", 409)
+        except BaseException as exc:
+            await self._abort_dispatch(
+                scope,
+                row,
+                token,
+                epoch,
+                operation,
+                digest,
+                exc,
+                automation_epoch,
+                claim_pending=claim_pending,
             )
             raise
-        claim = {"_id": identifier, **scope, "version": row["version"], "status": row["status"]}
-        if automation_epoch is not None:
-            claim.update(
-                {
-                    "automation.enabled": True,
-                    "automation.epoch": automation_epoch,
-                    "automation.slices_started": grant["slices_started"],
-                    "$expr": {"$gt": ["$automation.expires_at", {"$add": ["$$NOW", 15000]}]},
-                }
-            )
-        changed = await self.sessions.update_one(
-            claim,
-            {
-                "$set": {
-                    "status": "running",
-                    "worker_token": token,
-                    "worker_epoch": epoch,
-                    "lease_until": now + timedelta(seconds=LEASE_SECONDS),
-                    "updated_at": now,
-                    "operations."
-                    + operation: {"request_digest": digest, "action": "run", "state": "running"},
-                    **(
-                        {"worker_automation_epoch": automation_epoch, "automation.state": "running"}
-                        if automation_epoch is not None
-                        else {}
-                    ),
-                },
-                "$inc": {
-                    "version": 1,
-                    **(
-                        {"automation.slices_started": 1, "automation_slices_total": 1}
-                        if automation_epoch is not None
-                        else {}
-                    ),
-                },
-                "$unset": {
-                    "error": "",
-                    **({"worker_automation_epoch": ""} if automation_epoch is None else {}),
-                },
-            },
-        )
-        if not changed.modified_count:
-            await self.limits.update_many(
-                {"worker_token": token},
-                {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
-            )
-            raise CrawlerError("crawler_conflict", "Crawler changed before the worker was claimed.", 409)
         loop, cancelled = asyncio.get_running_loop(), threading.Event()
 
         def bridge(coroutine):
@@ -1032,16 +1260,163 @@ class DragonCrawlerApplication:
             )
             return runtime.snapshot(), _plain(summary)
 
-        # Keep the executor Future rather than wrapping it in a child Task:
-        # shutdown cancels all Tasks, including a shielded to_thread Task.
-        # The Future remains joinable while the actual HTTP thread drains.
-        worker = loop.run_in_executor(None, work)
+        # Own custody before calling the executor. ThreadPoolExecutor.submit
+        # queues work before starting a thread, so a raised submission can
+        # leave runnable work behind without returning its executor Future.
+        # Only our runner may complete this Future; executor acknowledgement
+        # is neither evidence of entry nor proof that physical work drained.
+        worker = loop.create_future()
+        dispatch_ready, dispatch_accepted, runner_exited = (
+            threading.Event(),
+            threading.Event(),
+            threading.Event(),
+        )
         self._workers[token] = (cancelled, worker)
+
+        def complete(result, error):
+            if not worker.done():
+                if error is None:
+                    worker.set_result(result)
+                else:
+                    worker.set_exception(error)
+
+        def runner():
+            result, error = None, None
+            try:
+                # Never enter the crawl body until submit returns positively.
+                # An orphan queued before a submission failure can only drain
+                # this rejected gate; it cannot fetch or publish checkpoints.
+                dispatch_ready.wait()
+                if not dispatch_accepted.is_set():
+                    raise CrawlerError(
+                        "crawler_dispatch_uncertain", "Crawler executor submission was not acknowledged.", 503
+                    )
+                result = work()
+            except BaseException as exc:
+                error = exc
+            finally:
+                runner_exited.set()
+                try:
+                    loop.call_soon_threadsafe(complete, result, error)
+                except RuntimeError:
+                    # A closed event loop cannot publish physical-exit proof;
+                    # durable recovery retains the existing finite lease.
+                    pass
+
+        def discard_executor_result(future):
+            if not future.cancelled():
+                future.exception()
+
+        def rejected_runner_drained(future):
+            if future.cancelled() or not runner_exited.is_set():
+                return
+            future.exception()
+            finishing = loop.create_task(
+                self._abort_dispatch(
+                    scope,
+                    row,
+                    token,
+                    epoch,
+                    operation,
+                    digest,
+                    CrawlerError(
+                        "crawler_dispatch_uncertain", "Crawler submission was not acknowledged.", 503
+                    ),
+                    automation_epoch,
+                    claim_pending=True,
+                )
+            )
+            # Keep the same token in custody until its bounded durable cleanup
+            # finishes. The physical runner has now actually exited.
+            self._workers[token] = (cancelled, finishing)
+
+            def settled(done):
+                if self._workers.get(token, (None, None))[1] is done:
+                    self._workers.pop(token, None)
+                if not done.cancelled():
+                    done.exception()
+
+            finishing.add_done_callback(settled)
+
+        async def retain_uncertain():
+            cancelled.set()
+            dispatch_accepted.clear()
+            dispatch_ready.set()
+            worker.add_done_callback(rejected_runner_drained)
+            # Unknown submission keeps its physical token/lease and local
+            # handle. A queued runner may enter later; absent actual runner
+            # exit, neither request failure nor lease expiry proves quiescence.
+            owned_worker = {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch}
+            receipt = {
+                "request_digest": digest,
+                "action": "run",
+                "state": "interrupted",
+                "error_code": "crawler_dispatch_uncertain",
+            }
+            metadata = {
+                "updated_at": _now(),
+                "last_worker_exit_confirmed": False,
+                "operations." + operation: receipt,
+            }
+            try:
+                changed = await self.sessions.update_one(
+                    {**owned_worker, "status": "running"},
+                    {
+                        "$set": {
+                            **metadata,
+                            "status": "interrupted",
+                            "error": {
+                                "code": "crawler_dispatch_uncertain",
+                                "message": "Executor submission failed without physical-exit proof. Capacity remains held until the rejected runner drains or the backend is restarted.",
+                            },
+                        },
+                        "$inc": {"version": 1},
+                    },
+                )
+                if not changed.matched_count:
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+                        {"$set": metadata, "$inc": {"version": 1}},
+                    )
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": "deleted"},
+                        {"$set": {"last_worker_exit_confirmed": False}},
+                    )
+            except (PyMongoError, asyncio.CancelledError):
+                log.warning("Crawler uncertain-dispatch publication unavailable", exc_info=False)
+            return receipt
+
+        try:
+            submitted = loop.run_in_executor(None, runner)
+        except BaseException as exc:
+            await retain_uncertain()
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+            raise CrawlerError(
+                "crawler_dispatch_uncertain",
+                "Crawler executor submission was not acknowledged; physical capacity remains held until runner exit is observed. Reload the session before retrying.",
+                503,
+            ) from exc
+        else:
+            submitted.add_done_callback(discard_executor_result)
+            dispatch_accepted.set()
+            dispatch_ready.set()
         failure: BaseException | None = None
         interrupted = False
         try:
             while True:
                 try:
+                    # A pool initializer can reject the queued item before
+                    # calling runner. Observe that acknowledgement separately
+                    # from physical custody so it cannot hang this request or
+                    # fabricate runner-exit evidence.
+                    await asyncio.wait({worker, submitted}, return_when=asyncio.FIRST_COMPLETED)
+                    if submitted.done() and not runner_exited.is_set():
+                        raise CrawlerError(
+                            "crawler_dispatch_uncertain",
+                            "The executor stopped before runner exit was observed.",
+                            503,
+                        )
                     snapshot, summary = await asyncio.shield(worker)
                     break
                 except asyncio.CancelledError:
@@ -1149,72 +1524,75 @@ class DragonCrawlerApplication:
         except BaseException as exc:
             failure = exc
             cancelled.set()
-            while not worker.done():
-                try:
-                    await asyncio.shield(worker)
-                except asyncio.CancelledError:
-                    cancelled.set()
-                except BaseException:
-                    break
-            if worker.done() and not worker.cancelled():
-                # Retrieve an exception even when another control command won.
-                worker.exception()
-            code = _safe_error(exc)
-            operation_receipt = {
-                "request_digest": digest,
-                "action": "run",
-                "state": "interrupted",
-                "error_code": code,
-            }
-            owned_worker = {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch}
-            settled = await self.sessions.update_one(
-                {**owned_worker, "status": "running"},
-                {
-                    "$set": {
-                        "status": "interrupted",
-                        "updated_at": _now(),
-                        "operations." + operation: operation_receipt,
-                        "last_worker_exit_confirmed": True,
-                        "error": {
-                            "code": code,
-                            "message": "The slice stopped; only accepted checkpoints remain.",
-                        },
-                    },
-                    "$inc": {"version": 1},
-                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
-                },
-            )
-            if not settled.matched_count:
-                # A safety control may have won while this real worker drained.
-                # Preserve its status and grant while settling the old receipt.
-                await self.sessions.update_one(
-                    {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+            if submitted.done() and not runner_exited.is_set():
+                operation_receipt = await retain_uncertain()
+            else:
+                while not worker.done():
+                    try:
+                        await asyncio.shield(worker)
+                    except asyncio.CancelledError:
+                        cancelled.set()
+                    except BaseException:
+                        break
+                if worker.done() and not worker.cancelled():
+                    # Retrieve an exception even when another control command won.
+                    worker.exception()
+                code = _safe_error(exc)
+                operation_receipt = {
+                    "request_digest": digest,
+                    "action": "run",
+                    "state": "interrupted",
+                    "error_code": code,
+                }
+                owned_worker = {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch}
+                settled = await self.sessions.update_one(
+                    {**owned_worker, "status": "running"},
                     {
                         "$set": {
+                            "status": "interrupted",
                             "updated_at": _now(),
                             "operations." + operation: operation_receipt,
                             "last_worker_exit_confirmed": True,
+                            "error": {
+                                "code": code,
+                                "message": "The slice stopped; only accepted checkpoints remain.",
+                            },
                         },
                         "$inc": {"version": 1},
                         "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
                     },
                 )
-                # Erasure keeps only its tombstone and physical-exit metadata;
-                # never recreate an operations journal after source deletion.
-                await self.sessions.update_one(
-                    {**owned_worker, "status": "deleted"},
-                    {
-                        "$set": {"last_worker_exit_confirmed": True},
-                        "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
-                    },
-                )
+                if not settled.matched_count:
+                    # A safety control may have won while this real worker drained.
+                    # Preserve its status and grant while settling the old receipt.
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+                        {
+                            "$set": {
+                                "updated_at": _now(),
+                                "operations." + operation: operation_receipt,
+                                "last_worker_exit_confirmed": True,
+                            },
+                            "$inc": {"version": 1},
+                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                        },
+                    )
+                    # Erasure keeps only its tombstone and physical-exit metadata;
+                    # never recreate an operations journal after source deletion.
+                    await self.sessions.update_one(
+                        {**owned_worker, "status": "deleted"},
+                        {
+                            "$set": {"last_worker_exit_confirmed": True},
+                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                        },
+                    )
         finally:
-            if worker.done():
+            if runner_exited.is_set() and worker.done():
                 self._workers.pop(token, None)
-            await self.limits.update_many(
-                {"worker_token": token},
-                {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
-            )
+                await self.limits.update_many(
+                    {"worker_token": token},
+                    {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
+                )
         if isinstance(failure, asyncio.CancelledError):
             raise failure
         current = await self.get(scope, identifier)

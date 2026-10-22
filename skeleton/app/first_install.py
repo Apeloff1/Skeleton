@@ -156,6 +156,10 @@ def first_install_report(
         next_steps.append(
             "Configure genuine trained local weights or the engine-owned hosted provider in .env; see docs/APP_ASSEMBLY.md. Restart the engine after changes."
         )
+    elif live and ai["observed"] is not True:
+        next_steps.append(
+            "AI configuration is present but canonical readiness was not observed. Inspect app logs backend and app logs skeleton, then rerun app doctor --live; do not treat configuration alone as model availability."
+        )
     report = {
         "schema_version": "skeleton.application.first_install_report.v1",
         "platform_ready": host.ready,

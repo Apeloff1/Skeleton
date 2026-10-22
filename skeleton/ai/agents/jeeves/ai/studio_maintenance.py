@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 import json
+import math
 import os
 import sqlite3
 import sys
@@ -44,6 +45,7 @@ _MAX_PAYLOAD_BYTES = 16_384
 _MAX_OUTPUT_BYTES = 32_768
 _MAX_RETAINED_EVENTS = 4096
 _MAX_CHUNK_BYTES = 65_536
+_MAX_METADATA_DEPTH = 64
 _TASK_COLUMNS = (
     "task_id,scope_id,kind,source_digest,payload_digest,payload_json,priority,"
     "state,attempts,failures,next_run_ns,created_at_ns,updated_at_ns,"
@@ -156,6 +158,8 @@ CREATE INDEX IF NOT EXISTS jeeves_idle_maintenance_chunk_ack
     ON jeeves_idle_maintenance_chunk(ack_state,next_ack_ns);
 CREATE INDEX IF NOT EXISTS jeeves_idle_maintenance_chunk_scope
     ON jeeves_idle_maintenance_chunk(scope_id,ack_state);
+CREATE INDEX IF NOT EXISTS jeeves_idle_maintenance_chunk_task
+    ON jeeves_idle_maintenance_chunk(task_id,ack_state);
 """
 
 
@@ -243,15 +247,97 @@ def _local_identity(*, owner_id: str | None = None, host_id: str | None = None) 
     }
 
 
-def _canonical(value: Any, *, maximum_bytes: int = _MAX_PAYLOAD_BYTES) -> str:
+def _canonical_snapshot(value: Any, *, maximum_bytes: int) -> tuple[Any, str]:
+    """Detach bounded JSON before encoding a host callback's metadata.
+
+    Checking the final string alone lets an invalid result allocate an
+    arbitrarily large encoder buffer first. The structural pass bounds depth,
+    elements and unescaped text before copying containers; incremental ASCII
+    encoding then enforces the exact existing byte budget and digest format.
+    """
+    remaining = maximum_bytes
+    ancestors: set[int] = set()
+
+    def consume(size: int) -> None:
+        nonlocal remaining
+        remaining -= size
+        if remaining < 0:
+            raise IdleRuntimeError("maintenance metadata exceeds its chunk budget")
+
+    def detach(item: Any, depth: int = 0) -> Any:
+        if depth > _MAX_METADATA_DEPTH:
+            raise IdleRuntimeError("maintenance metadata exceeds its nesting budget")
+        if isinstance(item, str):
+            consume(len(item) + 2)
+            return item
+        if item is None or isinstance(item, bool):
+            consume(4 if item is None or item is True else 5)
+            return item
+        if isinstance(item, int):
+            # Decimal conversion must itself remain bounded, even when the
+            # interpreter's optional integer-string limit is disabled.
+            if item.bit_length() > maximum_bytes * 4:
+                raise IdleRuntimeError("maintenance metadata exceeds its chunk budget")
+            consume(1)
+            return item
+        if isinstance(item, float):
+            if not math.isfinite(item):
+                raise IdleRuntimeError("maintenance metadata must be finite JSON")
+            consume(1)
+            return item
+        if not isinstance(item, (Mapping, list, tuple)):
+            raise IdleRuntimeError("maintenance metadata must be finite JSON")
+        identity = id(item)
+        if identity in ancestors:
+            raise IdleRuntimeError("maintenance metadata must be finite JSON")
+        consume(2)
+        # Each child needs at least one byte. Avoid copying a very wide
+        # container before discovering that its contents cannot fit.
+        if len(item) > remaining:
+            raise IdleRuntimeError("maintenance metadata exceeds its chunk budget")
+        ancestors.add(identity)
+        try:
+            if isinstance(item, Mapping):
+                copied: dict[str, Any] = {}
+                for key, child in item.items():
+                    # JSON round trips must preserve both object identity and
+                    # canonical ordering. Coerced numeric keys can change the
+                    # replay digest or collapse into duplicate string keys.
+                    if not isinstance(key, str):
+                        raise IdleRuntimeError("maintenance metadata object keys must be strings")
+                    detached_key = detach(key, depth + 1)
+                    consume(1 + bool(copied))  # colon and any comma
+                    copied[detached_key] = detach(child, depth + 1)
+                return copied
+            children = []
+            for child in item:
+                consume(bool(children))
+                children.append(detach(child, depth + 1))
+            return children
+        finally:
+            ancestors.remove(identity)
+
     try:
-        raw = json.dumps(value, sort_keys=True, separators=(",", ":"),
-                         ensure_ascii=True, allow_nan=False)
-    except (ValueError, TypeError, RecursionError) as exc:
+        snapshot = detach(value)
+        encoder = json.JSONEncoder(sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+        pieces = []
+        length = 0
+        for piece in encoder.iterencode(snapshot):
+            # ensure_ascii preserves the canonical digest and makes this
+            # character count the exact UTF-8 byte count without another copy.
+            length += len(piece)
+            if length > maximum_bytes:
+                raise IdleRuntimeError("maintenance metadata exceeds its chunk budget")
+            pieces.append(piece)
+        return snapshot, "".join(pieces)
+    except IdleRuntimeError:
+        raise
+    except (ValueError, TypeError, RecursionError, OverflowError, RuntimeError) as exc:
         raise IdleRuntimeError("maintenance metadata must be finite JSON") from exc
-    if len(raw.encode("utf-8")) > maximum_bytes:
-        raise IdleRuntimeError("maintenance metadata exceeds its chunk budget")
-    return raw
+
+
+def _canonical(value: Any, *, maximum_bytes: int = _MAX_PAYLOAD_BYTES) -> str:
+    return _canonical_snapshot(value, maximum_bytes=maximum_bytes)[1]
 
 
 def _digest(value: Any, *, maximum_bytes: int = _MAX_OUTPUT_BYTES) -> str:
@@ -373,13 +459,19 @@ class MaintenanceResult:
     def __post_init__(self) -> None:
         if not isinstance(self.output, Mapping) or type(self.complete) is not bool:
             raise IdleRuntimeError("maintenance result must be a typed finite mapping")
-        _canonical(dict(self.output), maximum_bytes=_MAX_OUTPUT_BYTES)
+        output, _ = _canonical_snapshot(self.output, maximum_bytes=_MAX_OUTPUT_BYTES)
+        continuation = None
         if self.continuation is not None:
             if not isinstance(self.continuation, Mapping):
                 raise IdleRuntimeError("maintenance continuation must be a finite object")
-            _canonical(dict(self.continuation))
+            continuation, _ = _canonical_snapshot(self.continuation, maximum_bytes=_MAX_PAYLOAD_BYTES)
         if self.complete and self.continuation is not None:
             raise IdleRuntimeError("completed maintenance may not install a continuation")
+        # A callback may keep references to its original dictionaries/lists.
+        # Receipts and retries must describe the detached completed snapshot.
+        object.__setattr__(self, "output", MappingProxyType(output))
+        if continuation is not None:
+            object.__setattr__(self, "continuation", MappingProxyType(continuation))
 
 
 @dataclass(frozen=True, slots=True)
@@ -517,10 +609,19 @@ class StudioMaintenanceController:
                     "INSERT INTO jeeves_idle_maintenance_owner "
                     "(owner_id,host_id,boot_id,process_id,process_start,process_namespace,"
                     "state,heartbeat_ns,foreground_requests,physical_tasks,last_foreground_ns) "
-                    "VALUES (?,?,?,?,?,?,'live',?,0,0,?)",
-                    (self._identity["owner_id"], self._identity["host_id"], self._identity["boot_id"],
-                     self._identity["process_id"], self._identity["process_start"],
-                     self._identity["process_namespace"], now, now),
+                    # Until the first host synchronization/heartbeat, other
+                    # owners must not infer quiescence from the initial zero.
+                    "VALUES (?,?,?,?,?,?,'initializing',?,0,0,?)",
+                    (
+                        self._identity["owner_id"],
+                        self._identity["host_id"],
+                        self._identity["boot_id"],
+                        self._identity["process_id"],
+                        self._identity["process_start"],
+                        self._identity["process_namespace"],
+                        now,
+                        now,
+                    ),
                 )
                 db.execute("COMMIT")
             except BaseException:
@@ -1242,7 +1343,7 @@ class StudioMaintenanceController:
                         or acknowledgement.get("acknowledged") is not True
                     ):
                         raise IdleRuntimeError("host did not acknowledge verified maintenance")
-                    _canonical(dict(acknowledgement), maximum_bytes=_MAX_OUTPUT_BYTES)
+                    _canonical(acknowledgement, maximum_bytes=_MAX_OUTPUT_BYTES)
             except Exception as exc:
                 error = type(exc).__name__[:96]
             with self._executor._lock:
@@ -1291,7 +1392,7 @@ class StudioMaintenanceController:
             raise IdleRuntimeError("maintenance priority must be 0..100")
         if payload is not None and not isinstance(payload, Mapping):
             raise IdleRuntimeError("maintenance payload must be an object")
-        raw = _canonical(dict(payload or {}))
+        raw = _canonical({} if payload is None else payload)
         payload_digest = sha256(raw.encode("utf-8")).hexdigest()
         task_id = _digest({"scope_id": scope_id, "kind": kind.value,
                            "idempotency_key": idempotency_key})
@@ -1580,11 +1681,16 @@ class StudioMaintenanceController:
         # a handler keeps its first authoritative effect claim as a permanent
         # replay fence. Denied tasks have no effect to replay. No authoritative
         # jeeves_idle_effect/event row is ever compacted here.
+        # A completed but unverified chunk also needs its existing task as the
+        # host retry target. Its bounded result slot may exert backpressure;
+        # deleting the task would make that retained custody unrecoverable.
         self._executor._db.execute(
             "DELETE FROM jeeves_idle_maintenance_task WHERE task_id IN "
             "(SELECT t.task_id FROM jeeves_idle_maintenance_task t "
             "WHERE t.state IN ('completed','failed') AND NOT EXISTS "
             "(SELECT 1 FROM jeeves_idle_maintenance_lease l WHERE l.task_id=t.task_id AND l.state='held') "
+            "AND NOT EXISTS (SELECT 1 FROM jeeves_idle_maintenance_chunk c "
+            "WHERE c.task_id=t.task_id AND c.result_json IS NOT NULL AND c.ack_state='unverified') "
             "ORDER BY t.updated_at_ns DESC,t.task_id LIMIT -1 OFFSET ?)",
             (retained,),
         )
