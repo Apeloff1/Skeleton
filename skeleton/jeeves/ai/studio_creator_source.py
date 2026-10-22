@@ -464,6 +464,8 @@ class CreatorProjectSourceStore:
                 "document": document, "depends_on": depends_on,
             }
             validate_original_avatar_source_graph(next_records)
+            from .studio_sprite_npc_binding import preflight_original_npc_sprite_graph
+            preflight_original_npc_sprite_graph(next_records)
         if self._event_count >= MAX_EVENTS:
             raise CreatorSourceError("source event journal needs archival")
         self._db.execute("BEGIN IMMEDIATE")
