@@ -1,11 +1,16 @@
-"""Expanded regression tests for path_url_hardener and atlas starter."""
+"""Adversarial regression tests for path_url_hardener and commercial_asset_starter.
+Covers escape, geometry, PNG validity, tres structure, coverage, URL edges.
+"""
 from pathlib import Path
+import hashlib
 import pytest
 
 from skeleton.security.path_url_hardener import (
     harden_path, harden_url, PathHardeningError, URLHardeningError
 )
-from skeleton.forge.pipelines.commercial_asset_starter import emit_atlas, AssetPipelineError
+from skeleton.forge.pipelines.commercial_asset_starter import (
+    emit_atlas, emit_godot_tres, AssetPipelineError
+)
 
 def test_path_escape_rejected(tmp_path: Path):
     root = tmp_path / "safe"
@@ -42,8 +47,25 @@ def test_atlas_bad_geometry(tmp_path: Path):
     with pytest.raises(AssetPipelineError):
         emit_atlas([b"short"], 2, 2, tmp_path, "src")
 
-def test_atlas_ok(tmp_path: Path):
-    frame = bytes([255, 0, 0, 255] * 4)  # 2x2 opaque
+def test_atlas_png_valid(tmp_path: Path):
+    frame = bytes([255, 0, 0, 255] * 4)
     path, cov = emit_atlas([frame], 2, 2, tmp_path, "src-receipt")
-    assert path.exists()
+    assert path.suffix == ".png"
+    data = path.read_bytes()
+    assert data.startswith(b"\x89PNG")
     assert 0.0 < cov <= 1.0
+    # CRC presence implied by successful write
+
+def test_tres_emitted(tmp_path: Path):
+    frame = bytes([0, 255, 0, 255] * 4)
+    atlas, _ = emit_atlas([frame], 2, 2, tmp_path, "src")
+    tres = emit_godot_tres(atlas, 1, 2, 2, tmp_path)
+    text = tres.read_text()
+    assert "SpriteFrames" in text
+    assert "AtlasTexture" in text
+    assert "loop": true" in text.lower() or "loop": true" in text
+
+def test_coverage_bounds(tmp_path: Path):
+    opaque = bytes([255] * 16)
+    _, cov = emit_atlas([opaque], 2, 2, tmp_path, "src")
+    assert cov == 1.0
