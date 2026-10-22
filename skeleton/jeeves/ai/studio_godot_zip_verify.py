@@ -150,6 +150,60 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "original NPC character source failed independent replay"
                     )
+            original_audio = proof.get("packaged_original_audio", [])
+            if (type(original_audio) is not list or len(original_audio) > 64
+                    or proof.get("audio_engine_playback_verified") is not False):
+                raise NativeSourceVerificationError(
+                    "original audio count or playback-claim evidence is untrusted"
+                )
+            if original_audio:
+                from .studio_original_audio import (
+                    OriginalAudioError, verify_original_sound,
+                )
+                heard: set[str] = set()
+                for sound in original_audio:
+                    if type(sound) is not dict or set(sound) != {
+                        "asset_id", "source_record_id", "source_sha256",
+                        "wav_sha256", "metadata_receipt_sha256",
+                    }:
+                        raise NativeSourceVerificationError(
+                            "Godot original audio source proof is incomplete"
+                        )
+                    asset_id = sound["asset_id"]
+                    if type(asset_id) is not str or asset_id in heard:
+                        raise NativeSourceVerificationError(
+                            "Godot original audio identity is duplicated or invalid"
+                        )
+                    heard.add(asset_id)
+                    wav_path = "game/frontier/audio/" + asset_id + ".wav"
+                    src_path = "game/frontier/audio/" + asset_id + ".source.json"
+                    if wav_path not in expected or src_path not in expected:
+                        raise NativeSourceVerificationError(
+                            "authored original sound lacks its real WAV or source proof"
+                        )
+                    try:
+                        source = json.loads(archive.read(src_path))
+                        if type(source) is not dict or set(source) != {
+                            "record", "metadata",
+                        }:
+                            raise OriginalAudioError("authored original sound proof malformed")
+                        record, info = source["record"], source["metadata"]
+                        checked = verify_original_sound(
+                            record, archive.read(wav_path), info,
+                        )
+                    except (OriginalAudioError, KeyError, ValueError, TypeError) as exc:
+                        raise NativeSourceVerificationError(
+                            "Godot original WAV differs from independently reconstructed PCM"
+                        ) from exc
+                    if (checked["wav_sha256"] != sound["wav_sha256"]
+                            or checked["source_sha256"] != sound["source_sha256"]
+                            or info["receipt_sha256"]
+                            != sound["metadata_receipt_sha256"]
+                            or info["asset_id"] != asset_id
+                            or info["source_record_id"] != sound["source_record_id"]):
+                        raise NativeSourceVerificationError(
+                            "published original audio receipt loses source ownership"
+                        )
             original_sprites = proof.get("packaged_original_sprites", [])
             if (not isinstance(original_sprites, list)
                     or len(original_sprites) > 128
