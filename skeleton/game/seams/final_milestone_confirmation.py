@@ -1,1 +1,4 @@
-"""Final milestone confirmation."""\nclass MilestoneConfirm:\n    def confirm(self) -> dict:\n        return {\"milestone\": 13, \"stored_prose\": 0}\n
+"""Final milestone confirmation."""
+class MilestoneConfirm:
+    def confirm(self) -> dict:
+        return {"milestone": 13, "stored_prose": 0}
