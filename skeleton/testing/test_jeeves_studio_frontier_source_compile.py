@@ -504,6 +504,43 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             self.export_godot()
         self.assertFalse(any(self.export.iterdir()))
 
+    def test_original_palette_skin_is_real_verified_godot_sprite_resource(self):
+        self.populate_3d()
+        self.author_player_visual()
+        self.create("hero-night-palette", "sprite_forge", {
+            "kind": "sprite_palette_variant",
+            "asset_id": "hero-night",
+            "parent_record_id": "hero-art",
+            "color_map": {"#3366ffff": "#ff3366ff"},
+        }, depends=("hero-art",))
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            base = archive.read("game/frontier/sprites/hero-idle.png")
+            night = archive.read("game/frontier/sprites/hero-night.png")
+            frames = archive.read("game/frontier/sprites/hero-night.tres")
+            source = json.loads(archive.read("jeeves_source_receipt.json"))
+            original = json.loads(archive.read("game/frontier/sprites/hero-idle.json"))
+            derived = json.loads(archive.read("game/frontier/sprites/hero-night.json"))
+        self.assertNotEqual(base, night)
+        self.assertIn(b"SpriteFrames", frames)
+        self.assertEqual(
+            [frame["collision_mask_bits_hex"] for frame in original["frames"]],
+            [frame["collision_mask_bits_hex"] for frame in derived["frames"]],
+        )
+        self.assertEqual(
+            [frame["duration_ms"] for frame in original["frames"]],
+            [frame["duration_ms"] for frame in derived["frames"]],
+        )
+        self.assertEqual(len(source["original_palette_variant_receipts"]), 1)
+        receipt = source["original_palette_variant_receipts"][0]
+        self.assertEqual(receipt["variant_source_record_id"], "hero-night-palette")
+        self.assertEqual(receipt["source_png_sha256"], sha256(base).hexdigest())
+        self.assertEqual(receipt["derived_png_sha256"], sha256(night).hexdigest())
+        self.assertTrue(exported["disk_verification"][
+            "all_emitted_file_hashes_verified"
+        ])
+        self.assertFalse(source["native_sprite_scene_binding_verified"])
+
     def test_authored_sprite_is_bound_to_actual_moving_godot_player(self):
         self.populate_3d()
         self.author_player_visual()
