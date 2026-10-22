@@ -1625,3 +1625,55 @@ engine run and separate observation prove them. No model-generated code
 gets executable rights merely because it appears in this source.
 Coverage: 16 detailed unit/source-store placement cases and two full
 native project ZIP roundtrips.
+
+### October 22, 2026 — actual 3D runtime import and exact-candidate evidence
+
+The host-authorized native runner now uses the **exact content-hashed
+source-assembled Godot project** whenever original sprites, authored GLB
+models or original WAV audio exist. It may not substitute a successful baseline
+expedition run for a model-rich project that it never loaded. The older
+sprite-only runner entrypoint is retained as a typed wrapper.
+
+The original-3D native verification plane
+(`studio_original_mesh_native_probe.py`) installs a trusted,
+non-model-authored GDScript into an isolated candidate copy and performs:
+
+1. Godot 4 editor `--headless --import` with real GLB import and strict
+   exit/error checks, followed by a separate SceneTree-based engine probe.
+2. Loading and instantiation of every approved original `.glb` PackedScene,
+   inspection of real `MeshInstance3D` descendants and geometry surfaces,
+   and independent import of **each authored LOD GLB**, not only the parent.
+3. Real instantiation of each approved Godot physical body/area resource
+   with an active `CollisionShape3D`.
+4. Loading of the **actual exported game scene**
+   `res://game/frontier/expedition.tscn`; inspection of approved
+   source-named world mesh instances, numeric positions and authored scale,
+   including independently present physics shapes on physical instances.
+5. Parsing a single, bounded native `JEEVES_MESH_PROBE` observation.
+   Every expected asset/LOD/physics/placement identifier and count must
+   match the signed source candidate. A forged extra observation, absent
+   model, native import/parse error or timeout fails without a success
+   receipt.
+
+Both actual editor import and native probe outputs are directed into
+bounded local temporary files, not unbounded subprocess memory buffers.
+The installed native binary itself is SHA-256 hashed with streamed reads.
+When the Godot process runs successfully, the final original-game native
+receipt references the independent mesh-probe receipt and explicitly
+records measured counts of imported GLBs, derived LOD meshes, physical
+bodies and game-scene instances.
+
+These are **runtime verification capabilities**. Merely committing their
+Python source does not mean any installed Godot binary, game window,
+screen pixels or collision contacts have been observed in this session.
+A source-only ZIP is not proof of Godot execution. The probe intentionally
+keeps `native_physics_contacts_observed=false` and
+`native_rendered_pixels_observed=false`. Release requires a separate
+engine-installed playback result.
+
+**Focused CI:** `backend-quality.yml` now runs the five existing
+Jeeves asset compiler test suites as one step in the existing Backend
+Quality workflow. It does not add a new workflow or specialized CI gate.
+The new adversarial runtime-probe suite contains 24 tests, including
+strict exact-candidate routing checks that deliberately mock the Godot
+process. Those mocking tests prove routing logic only, not real execution.
