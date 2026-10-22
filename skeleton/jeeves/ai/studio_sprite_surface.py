@@ -156,6 +156,59 @@ def verify_authored_normals(
     }
 
 
+def verify_normal_texture_bytes(
+    color_png: bytes, normal_png: bytes,
+    receipt: Mapping[str, Any], *, width: int, height: int,
+) -> dict[str, Any]:
+    """Verify real published normal bytes and color alpha without source access.
+
+    This is a structural post-publication attestation. Heightfield source
+    equivalence is separately established by verify_authored_normals.
+    """
+    from .studio_sprite_forge import _decode_verified_png
+
+    if not isinstance(receipt, Mapping):
+        raise SpriteSurfaceError("normal image lacks reviewed source evidence")
+    prior = dict(receipt)
+    recorded = prior.pop("receipt_sha256", None)
+    if (not isinstance(recorded, str) or recorded != digest(prior)
+            or prior.get("schema_version") !=
+            "skeleton.jeeves.authored_sprite_normal_atlas.v1"):
+        raise SpriteSurfaceError("normal texture source proof was altered")
+    if (prior.get("color_png_sha256") != sha256(color_png).hexdigest()
+            or prior.get("normal_png_sha256") != sha256(normal_png).hexdigest()
+            or prior.get("normal_image_width_px") != width
+            or prior.get("normal_image_height_px") != height
+            or prior.get("normal_map_loaded_in_native_engine") is not False):
+        raise SpriteSurfaceError("published normal image identity or capabilities differ")
+    color = _decode_verified_png(color_png, width, height)
+    normals = _decode_verified_png(normal_png, width, height)
+    if sha256(normals).hexdigest() != prior.get("normal_rgba_sha256"):
+        raise SpriteSurfaceError("published normal pixel content changed")
+    for pos in range(0, len(normals), 4):
+        alpha = color[pos + 3]
+        if normals[pos + 3] != alpha:
+            raise SpriteSurfaceError("normal lighting must preserve exact authored alpha")
+        if alpha:
+            r, g, b = normals[pos:pos + 3]
+            nx = (r / 127.5) - 1.0
+            ny = (g / 127.5) - 1.0
+            nz = (b / 127.5) - 1.0
+            if nz < 0 or not 0.95 <= nx * nx + ny * ny + nz * nz <= 1.05:
+                raise SpriteSurfaceError("normal texel is not a normalized tangent vector")
+        elif normals[pos:pos + 3] != bytes(3):
+            raise SpriteSurfaceError("transparent normal texels must remain empty")
+    return {
+        "schema_version": "skeleton.jeeves.published_normal_texture.v1",
+        "normal_png_sha256": sha256(normal_png).hexdigest(),
+        "pixel_alpha_preserved": True,
+        "normalized_visible_vectors_verified": True,
+        "original_heightfield_reconstruction_claimed": False,
+        "engine_lighting_executed": False,
+    }
+
+
 __all__ = [
-    "SpriteSurfaceError", "compile_authored_normals", "verify_authored_normals",
+    "SpriteSurfaceError", "compile_authored_normals",
+    "verify_authored_normals", "verify_normal_texture_bytes",
 ]
