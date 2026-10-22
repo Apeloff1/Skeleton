@@ -14,7 +14,10 @@ from typing import Any
 
 from .studio_interaction_contract import digest
 
-TRANSFORMS = frozenset({"flip_horizontal", "flip_vertical", "rotate_180"})
+TRANSFORMS = frozenset({
+    "flip_horizontal", "flip_vertical", "rotate_180",
+    "rotate_90_cw", "rotate_90_ccw",
+})
 MAX_VARIANTS = 64
 
 
@@ -31,12 +34,20 @@ def _transform_indices(
 ) -> list[int]:
     if mode not in TRANSFORMS:
         raise SpriteVariantError("unapproved directional frame transformation")
+    if mode in ("rotate_90_cw", "rotate_90_ccw") and width != height:
+        raise SpriteVariantError(
+            "lossless quarter-turns require square original sprite frames"
+        )
+    def original_index(x: int, y: int) -> int:
+        if mode == "rotate_90_cw":
+            return (height - 1 - x) * width + y
+        if mode == "rotate_90_ccw":
+            return x * width + (width - 1 - y)
+        original_y = height - 1 - y if mode in ("flip_vertical", "rotate_180") else y
+        original_x = width - 1 - x if mode in ("flip_horizontal", "rotate_180") else x
+        return original_y * width + original_x
     return [
-        indices[(
-            (height - y - 1 if mode in ("flip_vertical", "rotate_180") else y)
-            * width
-            + (width - x - 1 if mode in ("flip_horizontal", "rotate_180") else x)
-        )]
+        indices[original_index(x, y)]
         for y in range(height) for x in range(width)
     ]
 
