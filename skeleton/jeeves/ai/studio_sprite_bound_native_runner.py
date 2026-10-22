@@ -67,6 +67,15 @@ def run_exact_original_candidate_native_expedition(
     has_real_assets = (
         has_sprite or has_mesh or bool(proof.get("packaged_original_audio"))
     ) if isinstance(proof, Mapping) else False
+    # A static-scene 3D probe cannot attest a frame-budgeted dynamic streamer.
+    # Dynamic release requires a separate live-camera streaming observation.
+    if (isinstance(proof, Mapping)
+            and isinstance(proof.get("world_streaming_policy"), Mapping)
+            and proof["world_streaming_policy"].get("enabled") is True):
+        raise SpriteBoundNativeError(
+            "dynamic world streaming requires actual camera-driven Godot "
+            "instance/load/unload observations; static native proof is insufficient"
+        )
     if (not isinstance(files, Mapping) or not isinstance(binaries, Mapping)
             or not isinstance(proof, Mapping)
             or type(require_sprite) is not bool
