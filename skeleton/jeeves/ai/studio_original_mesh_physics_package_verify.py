@@ -6,6 +6,8 @@ author source and the actual previously-validated GLB and LOD inventory.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from collections.abc import Mapping, Sequence
 import json
 from zipfile import ZipFile

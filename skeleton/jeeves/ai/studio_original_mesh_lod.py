@@ -6,6 +6,8 @@ unreviewed decimations nor a claim that a target engine switched them.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from collections.abc import Mapping
 from hashlib import sha256
 

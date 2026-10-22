@@ -7,6 +7,8 @@ and independently byte-compared, never confused with a native import receipt.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from collections.abc import Mapping
 from hashlib import sha256
 import re

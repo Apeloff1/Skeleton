@@ -7,6 +7,8 @@ mass and physical materials are source-verified and SHA-replayable.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from collections.abc import Mapping
 from hashlib import sha256
 from math import pi

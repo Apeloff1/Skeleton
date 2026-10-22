@@ -6,6 +6,8 @@ PackedScene entries to the reviewed GLB, LOD or physics scene.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from collections.abc import Mapping
 from hashlib import sha256
 from zipfile import ZipFile
