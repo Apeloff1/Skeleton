@@ -245,6 +245,9 @@ def run_exact_original_candidate_native_expedition(
         "actual_godot_meshes_imported": (
             mesh_probe["imported_geometry_mesh_count"] if mesh_probe else 0
         ),
+        "actual_godot_lod_meshes_imported": (
+            mesh_probe["imported_lod_geometry_count"] if mesh_probe else 0
+        ),
         "actual_godot_physics_bodies_instantiated": (
             mesh_probe["instanced_3d_physics_bodies"] if mesh_probe else 0
         ),

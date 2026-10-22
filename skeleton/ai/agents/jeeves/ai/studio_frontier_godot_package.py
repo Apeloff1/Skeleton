@@ -732,6 +732,9 @@ def run_original_game_native_playthrough(
         "native_meshes_imported_observed": result.get(
             "actual_godot_meshes_imported", 0
         ),
+        "native_lod_meshes_imported_observed": result.get(
+            "actual_godot_lod_meshes_imported", 0
+        ),
         "native_mesh_physics_bodies_observed": result.get(
             "actual_godot_physics_bodies_instantiated", 0
         ),

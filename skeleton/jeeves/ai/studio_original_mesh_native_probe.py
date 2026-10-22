@@ -66,11 +66,19 @@ def _bounded_claim(candidate: Mapping[str, Any]) -> dict[str, Any]:
         physics_names.add(name)
         expected_bodies.append(name)
     lod_names = set()
+    expected_lod_paths: list[str] = []
     for item in lods:
         name = item.get("asset_id") if isinstance(item, Mapping) else None
         if type(name) is not str or name not in names or name in lod_names:
             raise MeshEngineProbeError("native LOD asset lacks original imported GLB")
         lod_names.add(name)
+        levels = item.get("levels")
+        if type(levels) is not int or not 1 <= levels <= 4:
+            raise MeshEngineProbeError("native LOD manifest has no finite levels")
+        for index in range(1, levels + 1):
+            expected_lod_paths.append(
+                "game/frontier/meshes/" + name + ".lod" + str(index) + ".glb"
+            )
     expected_placements = []
     instance_names = set()
     for entry in placements["instances"]:
@@ -100,6 +108,7 @@ def _bounded_claim(candidate: Mapping[str, Any]) -> dict[str, Any]:
         "mesh_ids": sorted(expected_meshes),
         "physics_ids": sorted(expected_bodies),
         "lod_ids": sorted(lod_names),
+        "lod_paths": sorted(expected_lod_paths),
         "instances": sorted(expected_placements, key=lambda x: x["instance_id"]),
     }
 
@@ -153,6 +162,26 @@ def compile_native_mesh_probe(candidate: Mapping[str, Any]) -> dict[str, Any]:
         '            _fail("GLB has no imported geometry " + str(mesh_id))',
         "            return",
         "        imported.append(str(mesh_id))",
+        "    var imported_lods: Array[String] = []",
+        "    for lod_path in expected[\\"lod_paths\\"]:",
+        '        var lod_scene = load("res://" + str(lod_path))',
+        "        if not (lod_scene is PackedScene):",
+        '            _fail("authored LOD GLB importer refused " + str(lod_path))',
+        "            return",
+        "        var lod_node = lod_scene.instantiate()",
+        "        if not (lod_node is Node3D):",
+        '            _fail("authored LOD has no 3D root")',
+        "            return",
+        "        get_root().add_child(lod_node)",
+        "        var lod_surfaces := 0",
+        '        for visual in lod_node.find_children("*", "MeshInstance3D", true, false):',
+        "            if visual.mesh != null:",
+        "                lod_surfaces += visual.mesh.get_surface_count()",
+        "        lod_node.queue_free()",
+        "        if lod_surfaces < 1:",
+        '            _fail("authored LOD contains no imported mesh surfaces")',
+        "            return",
+        "        imported_lods.append(str(lod_path))",
         "    var inspected_bodies: Array[String] = []",
         "    for mesh_id in expected[\"physics_ids\"]:",
         '        var resource_path = "res://game/frontier/meshes/" + str(mesh_id) + ".physics.tscn"',
@@ -215,8 +244,10 @@ def compile_native_mesh_probe(candidate: Mapping[str, Any]) -> dict[str, Any]:
         '        "candidate_sha256": expected["candidate_sha256"],',
         '        "mesh_ids": imported,',
         '        "physics_ids": inspected_bodies,',
+        '        "lod_paths": imported_lods,',
         '        "instance_ids": placed,',
         '        "imported_mesh_count": imported.size(),',
+        '        "imported_lod_mesh_count": imported_lods.size(),',
         '        "active_physics_bodies": inspected_bodies.size(),',
         '        "game_instances": placed.size(),',
         "    }",
@@ -259,13 +290,15 @@ def verify_native_mesh_probe_output(
     except (ValueError, UnicodeDecodeError) as exc:
         raise MeshEngineProbeError("Godot probe returned malformed evidence") from exc
     if not isinstance(observed, dict) or set(observed) != {
-        "candidate_sha256", "mesh_ids", "physics_ids", "instance_ids",
-        "imported_mesh_count", "active_physics_bodies", "game_instances",
+        "candidate_sha256", "mesh_ids", "physics_ids", "lod_paths",
+        "instance_ids", "imported_mesh_count", "imported_lod_mesh_count",
+        "active_physics_bodies", "game_instances",
     }:
         raise MeshEngineProbeError("runtime probe returned incomplete measurements")
     tests = (
         ("mesh_ids", expected["mesh_ids"]),
         ("physics_ids", expected["physics_ids"]),
+        ("lod_paths", expected["lod_paths"]),
         ("instance_ids", [i["instance_id"] for i in expected["instances"]]),
     )
     for field, required in tests:
@@ -273,6 +306,7 @@ def verify_native_mesh_probe_output(
             raise MeshEngineProbeError("native observed " + field + " differs from source")
     for count_field, labels in (
         ("imported_mesh_count", "mesh_ids"),
+        ("imported_lod_mesh_count", "lod_paths"),
         ("active_physics_bodies", "physics_ids"),
         ("game_instances", "instance_ids"),
     ):
@@ -287,6 +321,7 @@ def verify_native_mesh_probe_output(
         "editor_import_log_sha256": import_log_sha256,
         "probe_stdout_sha256": sha256(output.encode("utf-8")).hexdigest(),
         "imported_geometry_mesh_count": observed["imported_mesh_count"],
+        "imported_lod_geometry_count": observed["imported_lod_mesh_count"],
         "instanced_3d_physics_bodies": observed["active_physics_bodies"],
         "source_game_scene_instances": observed["game_instances"],
         "source_meshes_imported_in_godot": True,
