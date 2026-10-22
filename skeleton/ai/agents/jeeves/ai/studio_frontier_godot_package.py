@@ -768,6 +768,16 @@ def run_original_game_native_playthrough(
             or result.get("completed") is not True
             or result.get("world_digest") != before["receipt"]["world_sha256"]):
         raise FrontierSourceError("native engine failed to prove original world ownership")
+    streaming_policy = before["receipt"].get("world_streaming_policy")
+    if (isinstance(streaming_policy, Mapping)
+            and streaming_policy.get("enabled") is True
+            and (result.get("actual_camera_driven_streaming_observed") is not True
+                 or type(result.get("native_streaming_probe_receipt_sha256")) is not str
+                 or len(result["native_streaming_probe_receipt_sha256"]) != 64
+                 or result.get("actual_streamed_objects_unloaded") is not True)):
+        raise FrontierSourceError(
+            "active streaming game cannot be certified by baseline native replay"
+        )
     receipt = {
         "schema_version": "skeleton.jeeves.original_game_native_playthrough.v1",
         "project_id": project_id,

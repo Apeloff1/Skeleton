@@ -71,10 +71,11 @@ def _source(candidate: Mapping[str, Any]) -> dict[str, Any]:
     try:
         world = json.loads(raw_world)
         chunks = json.loads(raw_chunks)
-        canonical = lambda x: json.dumps(
-            x, sort_keys=True, ensure_ascii=True, separators=(",", ":"),
-            allow_nan=False,
-        ).encode("utf-8")
+        def canonical(value: Any) -> bytes:
+            return json.dumps(
+                value, sort_keys=True, ensure_ascii=True,
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
         if (canonical(world) != raw_world or canonical(chunks) != raw_chunks
                 or type(world) is not dict or type(chunks) is not dict):
             raise NativeWorldStreamError("world catalogs are not canonical")
@@ -265,6 +266,9 @@ def verify_native_world_stream_output(
                 "JEEVES_WORLD_STREAM_FAILURE",
             ))):
         raise NativeWorldStreamError("Godot streaming failed or emitted engine errors")
+    if (type(executable_sha256) is not str or len(executable_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in executable_sha256)):
+        raise NativeWorldStreamError("native executable lacks trusted SHA-256")
     lines = [
         line[len(PREFIX):] for line in output.splitlines()
         if line.startswith(PREFIX)
@@ -296,6 +300,7 @@ def verify_native_world_stream_output(
             or any(type(v) is not str for v in near + far)
             or not set(near) <= set(expected["source_instance_ids"])
             or far != expected["pinned_instance_ids"]
+            or not set(far) <= set(near)
             or expected["target_id"] not in near
             or expected["target_id"] in far
             or not all(actual[key] is True for key in (
