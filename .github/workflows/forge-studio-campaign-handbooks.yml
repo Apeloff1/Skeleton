@@ -1,0 +1,75 @@
+name: Forge Studio Ranked Campaign Handbook Export
+on:
+  workflow_dispatch:
+    inputs:
+      offset:
+        description: First campaign book index (0 to 899999)
+        required: true
+        default: '0'
+        type: string
+      limit:
+        description: Exact count (1 to 1000) to materialize and rank
+        required: true
+        default: '20'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ranked-forge-manuals-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      BOOK_OFFSET: ${{ inputs.offset }}
+      BOOK_LIMIT: ${{ inputs.limit }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate bounded inputs
+        run: |
+          python - <<'PY'
+          import os
+          start=int(os.environ["BOOK_OFFSET"])
+          count=int(os.environ["BOOK_LIMIT"])
+          if not (0<=start<900000 and 1<=count<=1000 and start+count<=900000):
+              raise SystemExit("Invalid export: use indices 0–899999, 1–1000 books")
+          PY
+      - name: Generate exact Markdown, source receipts and two rankings
+        run: |
+          python -m scripts.export_game_studio_campaign_handbooks \
+            --out build/forge-campaign-books \
+            --offset "$BOOK_OFFSET" --limit "$BOOK_LIMIT"
+      - name: Verify materialized books and ranked manifests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, os
+          root=Path("build/forge-campaign-books")
+          count=int(os.environ["BOOK_LIMIT"])
+          start=int(os.environ["BOOK_OFFSET"])
+          assert len(list(root.rglob("*.md")))==count
+          data=json.loads((root/f"campaign_ranking_{start}_{start+count}.json").read_text())
+          assert data["evaluated"]==count
+          assert len(data["ranking"]["quality"])==count
+          assert len(data["ranking"]["length"])==count
+          assert data["scope"]=="rendered_export_batch_only"
+          print(f"Verified {count} real ranked campaign handbooks")
+          PY
+      - name: Upload authored manuals and rankings
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-ranked-campaign-manuals-${{ inputs.offset }}-${{ inputs.limit }}
+          path: build/forge-campaign-books/
+          if-no-files-found: error
+          retention-days: 30

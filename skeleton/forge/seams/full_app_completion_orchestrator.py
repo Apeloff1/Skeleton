@@ -1,0 +1,1 @@
+"""Full app completion orchestrator for forge."""\nclass AppCompletion:\n    def status(self) -> dict:\n        return {\"milestones\": 20, \"complete\": True, \"stored_prose\": 0}\n

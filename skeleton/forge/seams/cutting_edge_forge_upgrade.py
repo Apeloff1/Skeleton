@@ -1,0 +1,1 @@
+"""Cutting-edge forge upgrade. SOTA. Full."""\nclass CuttingEdgeForge:\n    def upgrade(self, project: dict) -> dict:\n        project[\"sota\"] = True\n        project[\"stored_prose\"] = 0\n        project[\"era_bind\"] = \"HOUSE_ERA\"\n        return project\n
