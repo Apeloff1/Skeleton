@@ -736,6 +736,58 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         ])
         self.assertFalse(proof["native_godot_playthrough_verified"])
 
+    def test_optional_alpha_sensor_creates_real_frame_following_godot_shapes(self):
+        self.populate_3d()
+        self.author_player_visual()
+        self.owner.edit(build_creator_command(
+            "edit", project_id="new-game",
+            payload={"target_id": "hero-visual-binding", "expected_revision": 1,
+                     "patch": {"set": {"collision_sensor": True}, "remove": []}},
+        ))
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            script = archive.read("game/frontier/expedition.gd").decode("utf-8")
+            sensor = archive.read("game/frontier/sprites/hero-idle.sensor.gd").decode("utf-8")
+            proof = json.loads(archive.read("jeeves_source_receipt.json"))
+        self.assertIn("OriginalAlphaCollisionSensor", script)
+        self.assertIn("actor.add_child(jeeves_sensor)", script)
+        self.assertIn("avatar.frame_changed.connect(_update_exact_alpha_sensor)", sensor)
+        self.assertIn("var shape := BoxShape3D.new()", sensor)
+        self.assertTrue(proof["native_player_alpha_sensor_script_compiled"])
+        self.assertEqual(proof["player_collision_sensor_receipt"]["runtime_collision_type"],
+                         "Area3D_overlap_sensor")
+        self.assertFalse(proof["player_collision_sensor_receipt"][
+            "blocking_rigidbody_collision_claimed"
+        ])
+        self.assertFalse(proof["player_collision_sensor_receipt"][
+            "native_godot_collision_test_executed"
+        ])
+        self.assertTrue(result["disk_verification"]["all_emitted_file_hashes_verified"])
+
+    def test_missing_optional_sensor_cannot_invent_physics(self):
+        self.populate_3d()
+        self.author_player_visual()
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            proof = json.loads(archive.read("jeeves_source_receipt.json"))
+            self.assertFalse(any(name.endswith(".sensor.gd")
+                                 for name in archive.namelist()))
+        self.assertIsNone(proof["player_collision_sensor_receipt"])
+        self.assertFalse(proof["native_player_alpha_sensor_script_compiled"])
+
+    def test_nonboolean_collision_policy_is_rejected_before_source_commit(self):
+        self.populate_3d()
+        self.author_player_visual()
+        with self.assertRaises(Exception):
+            self.owner.edit(build_creator_command(
+                "edit", project_id="new-game",
+                payload={"target_id": "hero-visual-binding",
+                         "expected_revision": 1,
+                         "patch": {"set": {"collision_sensor": "yes"},
+                                   "remove": []}},
+            ))
+        self.assertEqual(self.owner._records["hero-visual-binding"]["revision"], 1)
+
     def test_existing_uncompiled_story_is_never_claimed_as_engine_content(self):
         self.populate_3d()
         self.create("uncompiled-acts", "story", {
