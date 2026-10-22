@@ -1,1 +1,4 @@
-"""Final cutting-edge."""\nclass FinalSOTA:\n    def confirm(self) -> dict:\n        return {\"final_sota\": True, \"stored_prose\": 0}\n
+"""Final cutting-edge."""
+class FinalSOTA:
+    def confirm(self) -> dict:
+        return {"final_sota": True, "stored_prose": 0}

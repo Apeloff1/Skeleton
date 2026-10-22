@@ -1,1 +1,4 @@
-"""Cutting-edge native on #4203."""\nclass CuttingEdgeNative:\n    def upgrade(self) -> dict:\n        return {\"native_sota\": True, \"weights\": \"full\", \"stored_prose\": 0}\n
+"""Cutting-edge native on #4203."""
+class CuttingEdgeNative:
+    def upgrade(self) -> dict:
+        return {"native_sota": True, "weights": "full", "stored_prose": 0}

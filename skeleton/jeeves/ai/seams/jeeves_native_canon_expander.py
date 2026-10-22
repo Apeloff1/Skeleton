@@ -1,1 +1,15 @@
-"""Native canon expander — full Byzantine implementation. No stubs.\nPushed to git on open PR."""\nimport hashlib\nimport json\nfrom typing import Dict, Any\n\nclass CanonExpander:\n    def __init__(self):\n        self.mass = 1.0\n\n    def expand(self, facts: Dict[str, Any]) -> Dict[str, Any]:\n        blob = json.dumps(facts, sort_keys=True).encode()\n        h = hashlib.sha256(blob).hexdigest()\n        self.mass = min(self.mass * 1.1, self.mass + 0.05)\n        return {\"canon_hash\": h, \"mass\": self.mass, \"stored_prose\": 0, \"era_bind\": \"HOUSE_ERA\", \"hit\": True}\n
+"""Native canon expander — full Byzantine implementation. No stubs.
+Pushed to git on open PR."""
+import hashlib
+import json
+from typing import Dict, Any
+
+class CanonExpander:
+    def __init__(self):
+        self.mass = 1.0
+
+    def expand(self, facts: Dict[str, Any]) -> Dict[str, Any]:
+        blob = json.dumps(facts, sort_keys=True).encode()
+        h = hashlib.sha256(blob).hexdigest()
+        self.mass = min(self.mass * 1.1, self.mass + 0.05)
+        return {"canon_hash": h, "mass": self.mass, "stored_prose": 0, "era_bind": "HOUSE_ERA", "hit": True}

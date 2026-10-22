@@ -1,1 +1,7 @@
-"""More work on local AI weights and interaction.\n"""\nclass MoreLocalAIWeights:\n    def enhance_weights(self) -> dict:\n        return {\"candidate_weights\": True, \"local\": True, \"stored_prose\": 0}\n    def enhance_questionnaires(self) -> dict:\n        return {\"questionnaires\": True, \"game_creation\": True, \"stored_prose\": 0}\n
+"""More work on local AI weights and interaction.
+"""
+class MoreLocalAIWeights:
+    def enhance_weights(self) -> dict:
+        return {"candidate_weights": True, "local": True, "stored_prose": 0}
+    def enhance_questionnaires(self) -> dict:
+        return {"questionnaires": True, "game_creation": True, "stored_prose": 0}

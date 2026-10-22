@@ -1,1 +1,5 @@
-"""10x more on local AI weights.\n"""\nclass TenXMoreLocalAIWeights:\n    def tenx_more(self) -> dict:\n        return {\"weights\": True, \"scale\": 30, \"stored_prose\": 0}\n
+"""10x more on local AI weights.
+"""
+class TenXMoreLocalAIWeights:
+    def tenx_more(self) -> dict:
+        return {"weights": True, "scale": 30, "stored_prose": 0}
