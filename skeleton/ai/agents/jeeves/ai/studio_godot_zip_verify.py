@@ -822,6 +822,40 @@ def verify_published_godot_zip(
                 raise NativeSourceVerificationError(
                     "original asset descriptors cannot be replayed from native bytes"
                 ) from exc
+            # Reconstruct the spatial manifest from separately replayed
+            # authored game-scene transforms and the byte-verified GLB catalog.
+            from .studio_world_spatial_index import (
+                WorldSpatialIndexError, verify_world_spatial_index,
+            )
+            world_index_path = "game/frontier/assets/world-index.json"
+            if world_index_path not in expected:
+                raise NativeSourceVerificationError(
+                    "source-owned world placements lack spatial descriptors"
+                )
+            try:
+                spatial_raw = archive.read(world_index_path)
+                spatial_proof = verify_world_spatial_index(
+                    spatial_raw, project_id=project_id,
+                    source_head_sha256=source_head_sha256,
+                    catalog=metadata_catalog,
+                    placements=proof["packaged_original_mesh_placements"],
+                )
+                spatial_data = json.loads(spatial_raw)
+                if (spatial_proof["world_index_sha256"] !=
+                        proof.get("world_spatial_index_sha256")
+                        or spatial_data["receipt_sha256"] !=
+                        proof.get("world_spatial_receipt_sha256")
+                        or spatial_proof["scene_instances_replayed"] !=
+                        proof.get("world_instance_descriptor_count")
+                        or spatial_proof["scene_instances_replayed"] !=
+                        placement_proof["instances_replayed"]):
+                    raise WorldSpatialIndexError(
+                        "source world spatial receipts disagree with archive"
+                    )
+            except (WorldSpatialIndexError, ValueError, KeyError, TypeError) as exc:
+                raise NativeSourceVerificationError(
+                    "published 3D spatial instances/bounds do not match real scenes"
+                ) from exc
             try:
                 actual_script = archive.read("game/frontier/expedition.gd").decode("utf-8")
             except UnicodeDecodeError as exc:
@@ -845,6 +879,9 @@ def verify_published_godot_zip(
         "original_lod_levels_replayed": mesh_scene_proof["lod_levels_replayed"],
         "original_physics_bodies_replayed": physics_proof["bodies_replayed"],
         "original_3d_scene_instances_replayed": placement_proof["instances_replayed"],
+        "world_spatial_instance_descriptors_replayed":
+            spatial_proof["scene_instances_replayed"],
+        "world_spatial_index_sha256": spatial_proof["world_index_sha256"],
         "original_3d_instanced_in_world_scene":
             placement_proof["real_scene_hierarchy_compiled"],
         "actual_collision_contact_observed": False,
