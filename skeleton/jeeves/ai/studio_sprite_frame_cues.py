@@ -37,9 +37,9 @@ def compile_frame_cues(
     source: Mapping[str, Any], animations: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     """Compile explicit authored frame triggers, never infer missing events."""
-    authored = source.get("cues")
-    if authored is None:
+    if "cues" not in source:
         return None
+    authored = source["cues"]
     if type(authored) is not list or not 1 <= len(authored) <= MAX_CUES:
         raise SpriteCueError("frame cues require 1..128 original authored entries")
     states = {item["name"]: item for item in animations}
