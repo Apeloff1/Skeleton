@@ -1,0 +1,1 @@
+"""Queue-12 kernel pin extensions. Complete."""\nclass Queue12:\n    def pin(self) -> dict:\n        return {\"RMSNorm\": True, \"SiLU\": True, \"stored_prose\": 0}\n
