@@ -162,6 +162,19 @@ def compile_original_godot_candidate(
             binary_assets[json_path] = metadata_bytes
             file_hashes[png_path] = sha256(sprite["png"]).hexdigest()
             file_hashes[json_path] = sha256(metadata_bytes).hexdigest()
+            from .studio_sprite_hitboxes import verify_exact_sprite_hitboxes
+            hitboxes = verify_exact_sprite_hitboxes(
+                info, sprite["collision_rectangles"],
+            )
+            collision_path = (
+                "game/frontier/sprites/" + name + ".hitboxes.json"
+            )
+            collision_bytes = json.dumps(
+                hitboxes, ensure_ascii=True, sort_keys=True,
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
+            binary_assets[collision_path] = collision_bytes
+            file_hashes[collision_path] = sha256(collision_bytes).hexdigest()
             engine_resources = compile_godot_sprite_resources(info)
             resource_proof = verify_godot_sprite_resources(info, engine_resources)
             if set(engine_resources) & set(files):
@@ -180,6 +193,7 @@ def compile_original_godot_candidate(
                 "animation_count": len(info["animations"]),
                 "animation_names": [state["name"] for state in info["animations"]],
                 "png_sha256": info["png_sha256"],
+                "original_hitbox_receipt_sha256": hitboxes["receipt_sha256"],
             })
     from .studio_sprite_actor_binding import (
         binding_from_source, bind_sprite_to_expedition_script,
