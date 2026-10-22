@@ -283,6 +283,8 @@ class CreatorProjectSourceStore:
                 or not self.export_root.is_dir()):
             raise CreatorSourceError("preexisting private non-symlink export root required")
         self._lock = RLock()
+        self._asset_cache_head: str | None = None
+        self._asset_cache_bytes: bytes | None = None
         self._db = sqlite3.connect(str(path), timeout=10, isolation_level=None,
                                    check_same_thread=False)
         try:
@@ -470,6 +472,67 @@ class CreatorProjectSourceStore:
                 "results_sha256": digest(excerpts),
                 "native_engine_compilation_performed": False,
             }
+
+    def compiled_asset_catalog(self) -> dict[str, Any]:
+        """Read-only source-revision cache of REAL sprite, WAV, GLB descriptors.
+
+        Cache use cannot bypass SQLite external-writer verification; every
+        caller receives a fresh JSON tree, not mutable shared metadata.
+        """
+        from .studio_asset_descriptors import compile_asset_catalog, catalog_bytes
+        from .studio_sprite_palette_variants import compile_original_palette_collection
+        from .studio_original_audio import compile_original_sound_collection
+        from .studio_original_mesh import compile_original_mesh_collection
+
+        with self._lock:
+            self._refresh()
+            generation = self._head
+            if self._asset_cache_head != generation or self._asset_cache_bytes is None:
+                source = self._records
+                has_sprites = any(
+                    isinstance(item.get("document"), dict)
+                    and item["document"].get("kind") == "pixel_sprite"
+                    for item in source.values()
+                )
+                sprites = (
+                    compile_original_palette_collection(source)["assets"]
+                    if has_sprites else []
+                )
+                sounds = compile_original_sound_collection(source)["assets"]
+                meshes = compile_original_mesh_collection(source)["assets"]
+                catalog = compile_asset_catalog(
+                    project_id=self.project_id, source_head_sha256=generation,
+                    records=source, sprites=sprites, sounds=sounds, meshes=meshes,
+                )
+                raw = catalog_bytes(catalog)
+                # An unrelated external SQLite writer may have changed the
+                # real source while its expensive pixels were compiling.
+                self._refresh()
+                if self._head != generation:
+                    raise CreatorSourceError("source changed during descriptor compilation")
+                self._asset_cache_head = generation
+                self._asset_cache_bytes = raw
+            return json.loads(self._asset_cache_bytes)
+
+    def search_original_assets(
+        self, query: str, *, kind: str | None = None, limit: int = 6,
+    ) -> dict[str, Any]:
+        """Expose reviewed asset descriptors directly to Jeeves and the UI."""
+        from .studio_asset_descriptors import search_asset_catalog
+        catalog = self.compiled_asset_catalog()
+        selected = search_asset_catalog(
+            catalog, query, kind=kind, limit=limit,
+        )
+        return {
+            **selected, "project_id": self.project_id,
+            "source_head_sha256": catalog["source_head_sha256"],
+            "asset_count": catalog["descriptor_count"],
+            "catalog_sha256": catalog["receipt_sha256"],
+            "retrieval_receipt_sha256": digest([
+                self.project_id, catalog["receipt_sha256"], query,
+                kind, selected["result_receipts"],
+            ]),
+        }
 
     def _mutate(self, command: CreatorCommand, *,
                 record_id: str, facet: str, document: dict[str, Any],

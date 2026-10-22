@@ -151,6 +151,7 @@ class StudioEvidenceJournal:
         "question_answered", "modality_registered", "modality_observation_reviewed",
         "model_inference_observed", "model_proposed", "book_memory_retrieved",
         "canon_context_retrieved", "source_context_retrieved",
+        "asset_catalog_context_retrieved",
         "plan_context_bound", "native_gameplay_verified",
         "native_sprite_import_verified", "native_player_avatar_verified",
         "plan_compiled", "plan_approved", "execution_succeeded",

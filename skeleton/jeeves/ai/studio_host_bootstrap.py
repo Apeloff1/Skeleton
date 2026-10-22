@@ -125,6 +125,17 @@ class NativeStudioHost:
             source_receipt_sha256=source_receipt_sha256, fact=fact,
         )
 
+    def search_original_assets(
+        self, query: str, *, kind: str | None = None,
+        limit: int = 12,
+    ) -> dict[str, Any]:
+        """Project-owned read-only asset search; never issues a creator grant."""
+        if self.source_store is None:
+            raise StudioInteractionError("real project source store is unavailable")
+        return self.source_store.search_original_assets(
+            query, kind=kind, limit=limit,
+        )
+
     def plan(self, instruction: str, *, max_output_tokens: int = 2048,
              seed: int = 0) -> dict[str, Any]:
         return self.model.plan(

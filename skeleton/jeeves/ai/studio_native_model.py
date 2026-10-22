@@ -148,6 +148,8 @@ class NativeStudioModel:
                 "model_weights_modified": False,
             })
         existing_sources: list[dict[str, Any]] = []
+        asset_sources: list[dict[str, Any]] = []
+        asset_catalog_receipt: str | None = None
         source_head: str | None = None
         if self.source_store is not None:
             if self.source_store.project_id != controller.journal.project_id:
@@ -164,6 +166,24 @@ class NativeStudioModel:
                 "record_ids": [item["record_id"] for item in existing_sources],
                 "source_writing_claimed": False,
             })
+            original_assets = self.source_store.search_original_assets(
+                instruction.strip()[:512], limit=4,
+            )
+            asset_sources = original_assets["results"]
+            asset_catalog_receipt = original_assets["catalog_sha256"]
+            if original_assets["source_head_sha256"] != source_head:
+                raise StudioInteractionError(
+                    "game asset catalog and source context belong to different revisions"
+                )
+            controller.journal.append("asset_catalog_context_retrieved", {
+                "asset_catalog_sha256": asset_catalog_receipt,
+                "source_head_sha256": source_head,
+                "retrieval_receipt_sha256": original_assets["retrieval_receipt_sha256"],
+                "descriptor_receipts": original_assets["result_receipts"],
+                "descriptor_matches": original_assets["total_matches"],
+                "model_saw_only_source_reviewed_content": True,
+                "model_weights_modified": False,
+            })
         prompt = {
             "task": instruction.strip(),
             "project_id": controller.journal.project_id,
@@ -175,6 +195,8 @@ class NativeStudioModel:
             "rights_reviewed_book_context": book_sources,
             "reviewed_project_canon": canon_facts,
             "existing_project_source": existing_sources,
+            "reviewed_and_byte_measured_assets": asset_sources,
+            "asset_catalog_receipt_sha256": asset_catalog_receipt,
             "existing_source_history_sha256": source_head,
             "canon_head_sha256": canon_head,
             "book_memory_retrieval_receipt_sha256": book_memory_receipt,
@@ -214,6 +236,26 @@ class NativeStudioModel:
                 "game-source-json, frontier-studio-json, frontier-godot4-zip "
                 "and sprite-atlas-zip; every export requires artifact_name. "
                 "Only a host-authorized exporter may claim an on-disk file. "
+                "Asset creation is followed by source-bound asset descriptors. "
+                "For reviewed asset metadata, create facet=asset_forge with "
+                "document.kind=asset_descriptor and exactly target_record_id, "
+                "target_asset_id, title, description, alt_text, tags, roles, "
+                "locale, rights_status, attribution and kind. The descriptor "
+                "depends_on MUST include target_record_id. User descriptions "
+                "and accessibility text must be grounded in reviewed author "
+                "intent; automatic pixel statistics do not recognize objects. "
+                "rights_status is one of not_reviewed, self_authored_asserted, "
+                "third_party_permission_asserted, public_domain_asserted; "
+                "assertions are not legal clearance or copyright certificates. "
+                "For real 3D meshes use facet=asset_forge and "
+                "document.kind=procedural_mesh with exactly asset_id, primitive "
+                "(box, plane, cylinder, uv_sphere), size_mm (three positive "
+                "integer millimeter dimensions), segments (3..64), color_rgba "
+                "(#RRGGBBAA), metallic_per_mille and roughness_per_mille (0..1000). "
+                "The game exporter writes indexed glTF 2.0 GLB vertices, normals, "
+                "UVs and PBR material source, not automatically a rendered scene. "
+                "Asset catalog search gives real compiled byte identities, "
+                "not permission to invent missing artwork. "
                 "For an ORIGINAL 2D pixel sprite create with facet=sprite_forge, "
                 "document.kind=pixel_sprite and supply exactly asset_id, width, "
                 "height, pixel_scale, palette, frames, animations, kind. "
