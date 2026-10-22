@@ -218,7 +218,7 @@ class OriginalAudioForgeTests(unittest.TestCase):
                 project_id="audio-game", export_root=export,
             )
             try:
-                exported = compile_original_sound_collection(reopened.records())
+                exported = compile_original_sound_collection(reopened._records)
                 self.assertEqual(exported["count"], 1)
                 self.assertEqual(exported["assets"][0]["metadata"]["asset_id"],
                                  "original-footstep")
