@@ -199,7 +199,18 @@ def compile_original_godot_candidate(
         compile_original_mesh_collection, verify_original_mesh,
     )
     meshes = compile_original_mesh_collection(records)
+    from .studio_original_mesh_lod import (
+        compile_original_mesh_lod_collection, verify_original_mesh_lod_set,
+    )
+    from .studio_original_mesh_godot import (
+        compile_mesh_godot_resources, verify_mesh_godot_resources,
+    )
+    lod_collection = compile_original_mesh_lod_collection(records)
+    lod_by_asset = {
+        item["manifest"]["asset_id"]: item for item in lod_collection["sets"]
+    }
     authored_meshes: list[dict[str, Any]] = []
+    authored_mesh_lods: list[dict[str, Any]] = []
     for mesh in meshes["assets"]:
         info = mesh["metadata"]
         name = info["asset_id"]
@@ -220,6 +231,64 @@ def compile_original_godot_candidate(
         binary_assets[source_path] = source_raw
         file_hashes[glb_path] = sha256(mesh["glb"]).hexdigest()
         file_hashes[source_path] = sha256(source_raw).hexdigest()
+        lod = lod_by_asset.get(name)
+        resources = compile_mesh_godot_resources(
+            info, lod_manifest=lod["manifest"] if lod is not None else None,
+        )
+        resources_receipt = verify_mesh_godot_resources(
+            info, resources,
+            lod_manifest=lod["manifest"] if lod is not None else None,
+        )
+        for resource_path, resource_body in resources.items():
+            if resource_path in files or resource_path in binary_assets:
+                raise FrontierSourceError("Godot original mesh resource collides")
+            files[resource_path] = resource_body
+            file_hashes[resource_path] = sha256(
+                resource_body.encode("utf-8")
+            ).hexdigest()
+        if lod is not None:
+            authored_lod = records[lod["manifest"]["author_record_id"]]
+            proof_lod = verify_original_mesh_lod_set(
+                original, authored_lod, lod["manifest"], {
+                    level["metadata"]["asset_id"]: level["glb"]
+                    for level in lod["levels"]
+                },
+            )
+            if proof_lod["levels_replayed"] != len(lod["levels"]):
+                raise FrontierSourceError("3D LOD source replay is incomplete")
+            source_lod_path = (
+                "game/frontier/meshes/" + name + ".lods.source.json"
+            )
+            source_lod_raw = json.dumps(
+                {
+                    "base_record": original, "author_record": authored_lod,
+                    "manifest": lod["manifest"],
+                },
+                ensure_ascii=True, sort_keys=True, separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+            if source_lod_path in files or source_lod_path in binary_assets:
+                raise FrontierSourceError("3D LOD source path collides")
+            binary_assets[source_lod_path] = source_lod_raw
+            file_hashes[source_lod_path] = sha256(source_lod_raw).hexdigest()
+            for level in lod["levels"]:
+                level_path = (
+                    "game/frontier/meshes/" + name + ".lod"
+                    + str(level["level"]) + ".glb"
+                )
+                if level_path in files or level_path in binary_assets:
+                    raise FrontierSourceError("LOD output collides with game source")
+                binary_assets[level_path] = level["glb"]
+                file_hashes[level_path] = sha256(level["glb"]).hexdigest()
+            authored_mesh_lods.append({
+                "asset_id": name,
+                "source_record_id": authored_lod["record_id"],
+                "source_sha256": authored_lod["source_sha256"],
+                "base_glb_sha256": info["glb_sha256"],
+                "lod_manifest_sha256": lod["manifest"]["receipt_sha256"],
+                "levels": len(lod["levels"]),
+                "godot_source_receipt_sha256": resources_receipt["receipt_sha256"],
+            })
         authored_meshes.append({
             "asset_id": name, "source_record_id": info["source_record_id"],
             "source_sha256": info["source_sha256"],
@@ -444,7 +513,9 @@ def compile_original_godot_candidate(
         "packaged_original_sprites": authored_sprites,
         "packaged_original_audio": authored_audio,
         "packaged_original_meshes": authored_meshes,
+        "packaged_original_mesh_lods": authored_mesh_lods,
         "native_mesh_import_verified": False,
+        "native_mesh_lod_switching_verified": False,
         "audio_engine_playback_verified": False,
         "original_player_audio_cue_routes_compiled": (
             len(avatar.get("audio_cue_bindings", {})) if avatar is not None

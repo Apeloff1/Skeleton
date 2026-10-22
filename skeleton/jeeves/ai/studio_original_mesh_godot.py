@@ -88,12 +88,11 @@ def compile_mesh_godot_resources(
         gdscript = "\n".join([
             "extends Node3D",
             "",
-            "const ORIGINAL_MESH_PATHS: PackedStringArray = PackedStringArray(["
-            + ", ".join('"' + "res://" + path + '"' for path in paths) + "])",
-            "const ORIGINAL_SWITCH_METERS: PackedFloat32Array = "
-            + "PackedFloat32Array([" + ", ".join(
+            "const ORIGINAL_MESH_PATHS = ["
+            + ", ".join('"' + "res://" + path + '"' for path in paths) + "]",
+            "const ORIGINAL_SWITCH_METERS = [" + ", ".join(
                 format(value, ".3f") for value in distances
-            ) + "])",
+            ) + "]",
             "",
             "var _sources: Array[PackedScene] = []",
             "var _active_level: int = -1",
