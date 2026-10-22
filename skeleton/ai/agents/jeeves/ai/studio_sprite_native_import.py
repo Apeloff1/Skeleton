@@ -53,6 +53,24 @@ func _verify() -> void:
     if atlas.get_animation_names().size() != expected["animations"].size():
         quit(11)
         return
+    var image := Image.load_from_file("res://game/frontier/sprites/ASSET_ID.png")
+    if image == null or image.is_empty() or image.get_format() != Image.FORMAT_RGBA8:
+        quit(19)
+        return
+    if image.get_width() != expected["sheet_width"] or image.get_height() != expected["sheet_height"]:
+        quit(20)
+        return
+    var pixel_digest := HashingContext.new()
+    if pixel_digest.start(HashingContext.HASH_SHA256) != OK:
+        quit(21)
+        return
+    if pixel_digest.update(image.get_data()) != OK:
+        quit(22)
+        return
+    var decoded_sha256 := pixel_digest.finish().hex_encode()
+    if decoded_sha256 != expected["pixel_content_sha256"]:
+        quit(23)
+        return
     var checked = 0
     for state in expected["animations"]:
         var name = StringName(state["name"])
@@ -74,7 +92,11 @@ func _verify() -> void:
                 quit(16)
                 return
             var rect = tex.region
-            if abs(rect.size.x - expected["width"]) > 0.001 or abs(rect.size.y - expected["height"]) > 0.001:
+            var frame_rect = state["rectangles"][i]
+            if (abs(rect.position.x - frame_rect[0]) > 0.001
+                    or abs(rect.position.y - frame_rect[1]) > 0.001
+                    or abs(rect.size.x - frame_rect[2]) > 0.001
+                    or abs(rect.size.y - frame_rect[3]) > 0.001):
                 quit(17)
                 return
             if abs(atlas.get_frame_duration(name, i) * 100.0 - state["durations_ms"][i]) > 0.01:
@@ -86,6 +108,8 @@ func _verify() -> void:
         "asset_id": "ASSET_ID",
         "animation_states_checked": expected["animations"].size(),
         "texture_regions_checked": checked,
+        "decoded_rgba_sha256": decoded_sha256,
+        "actual_rgba_pixel_bytes": image.get_data().size(),
         "engine_import_succeeded": true,
         "native_gameplay_playthrough_verified": false
     }
@@ -135,9 +159,17 @@ def inspect_godot_sprite_import(
     meta = candidate["metadata"]
     resources = compile_godot_sprite_resources(meta)
     asset_id = meta["asset_id"]
-    name_to_time = {frame["frame_id"]: frame["duration_ms"] for frame in meta["frames"]}
+    frame_by_id = {
+        frame["frame_id"]: frame for frame in meta["frames"]
+    }
+    name_to_time = {
+        frame_id: frame["duration_ms"] for frame_id, frame in frame_by_id.items()
+    }
     expected = {
         "width": meta["frame_width_px"],
+        "sheet_width": meta["sheet_width_px"],
+        "sheet_height": meta["sheet_height_px"],
+        "pixel_content_sha256": meta["pixel_content_sha256"],
         "height": meta["frame_height_px"],
         "animations": [
             {
@@ -146,6 +178,9 @@ def inspect_godot_sprite_import(
                 "loop": state["loop"],
                 "durations_ms": [
                     name_to_time[key] for key in state["frame_ids"]
+                ],
+                "rectangles": [
+                    frame_by_id[key]["rect_px"] for key in state["frame_ids"]
                 ],
             }
             for state in meta["animations"]
@@ -166,6 +201,36 @@ def inspect_godot_sprite_import(
             target = root / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
+        # Godot 4 normally imports source PNG textures and editor resources
+        # into a per-project cache before headless scripts can load SpriteFrames.
+        # Force real, bounded editor import instead of treating missing cache as
+        # a valid engine rendering or sprite verification result.
+        with tempfile.TemporaryFile() as imported:
+            try:
+                preparation = subprocess.run(
+                    [str(binary), "--headless", "--path", str(root),
+                     "--editor", "--import"],
+                    cwd=root, stdin=subprocess.DEVNULL,
+                    stdout=imported, stderr=subprocess.STDOUT,
+                    timeout=timeout_seconds, check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                raise NativeSpriteImportError(
+                    "native Godot 4 resource import did not complete"
+                ) from exc
+            if imported.tell() > MAX_LOG_BYTES:
+                raise NativeSpriteImportError("native sprite import exceeded evidence budget")
+            imported.seek(0)
+            import_log = imported.read()
+            if preparation.returncode != 0:
+                raise NativeSpriteImportError(
+                    "Godot refused actual PNG/SpriteFrames import with code "
+                    + str(preparation.returncode)
+                )
+        if _file_sha256(binary) != before_executable_sha256:
+            raise NativeSpriteImportError(
+                "Godot binary content changed during original resource import"
+            )
         with tempfile.TemporaryFile() as output:
             try:
                 execution = subprocess.run(
@@ -207,6 +272,10 @@ def inspect_godot_sprite_import(
         "texture_regions_checked": sum(
             item["count"] for item in expected["animations"]
         ),
+        "decoded_rgba_sha256": meta["pixel_content_sha256"],
+        "actual_rgba_pixel_bytes": (
+            meta["sheet_width_px"] * meta["sheet_height_px"] * 4
+        ),
         "engine_import_succeeded": True,
         "native_gameplay_playthrough_verified": False,
     }
@@ -222,6 +291,11 @@ def inspect_godot_sprite_import(
         "native_log_sha256": sha256(log.encode("utf-8")).hexdigest(),
         "native_process_executed": True,
         "pixel_data_independently_verified": True,
+        "godot_decoded_rgba_sha256": native["decoded_rgba_sha256"],
+        "original_atlas_rectangles_verified": True,
+        "godot_png_resource_loaded": True,
+        "real_godot_editor_import_executed": True,
+        "editor_import_log_sha256": sha256(import_log).hexdigest(),
         "visual_rendering_verified": False,
     }
     result["receipt_sha256"] = digest(result)
