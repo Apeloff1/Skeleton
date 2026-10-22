@@ -415,7 +415,8 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertFalse(any(self.export.iterdir()))
 
     def author_player_visual(self, *, animation="idle", source_dependency=True,
-                             movement_map=None, directional_map=None, cues=None):
+                             movement_map=None, directional_map=None, cues=None,
+                             audio_bindings=None):
         hero_document = {
             "kind": "pixel_sprite", "asset_id": "hero-idle",
             "width": 2, "height": 2, "pixel_scale": 2,
@@ -450,9 +451,13 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             binding_document["movement_animations"] = movement_map
         if directional_map is not None:
             binding_document["directional_animations"] = directional_map
+        dependencies = ("hero-art",) if source_dependency else ("config-3d",)
+        if audio_bindings is not None:
+            binding_document["audio_cue_bindings"] = dict(audio_bindings)
+            if audio_bindings:
+                dependencies = dependencies + ("footstep-source",)
         self.create("hero-visual-binding", "scene_forge",
-                    binding_document, depends=("hero-art",)
-                    if source_dependency else ("config-3d",))
+                    binding_document, depends=dependencies)
 
     def author_original_world_npc(self):
         self.create("captain-spawn", "npc", {
@@ -607,6 +612,52 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertFalse(
             source["native_godot_playthrough_verified"],
         )
+
+    def test_original_pcm_footstep_plays_from_godot_player_frame_cue_source(self):
+        from skeleton.testing.test_jeeves_original_audio import original_sound
+        from skeleton.jeeves.ai.studio_original_audio import verify_original_sound
+        self.populate_3d()
+        self.create("footstep-source", "audio_forge", original_sound(),
+                    depends=("config-3d",))
+        self.author_player_visual(
+            cues=[{"animation": "walk", "frame_index": 0,
+                   "event_id": "step-left", "category": "footstep"}],
+            audio_bindings={"step-left": "original-footstep"},
+        )
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            audio = archive.read("game/frontier/audio/original-footstep.wav")
+            source = json.loads(archive.read(
+                "game/frontier/audio/original-footstep.source.json",
+            ))
+            engine = archive.read("game/frontier/expedition.gd").decode("utf-8")
+            receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+        self.assertTrue(
+            verify_original_sound(
+                source["record"], audio, source["metadata"],
+            )["reconstructed_all_pcm_samples"]
+        )
+        self.assertIn("AudioStreamPlayer3D.new()", engine)
+        self.assertIn('jeeves_avatar.connect("cue_fired"', engine)
+        self.assertIn("original-footstep", engine)
+        self.assertEqual(receipt["original_player_audio_cue_routes_compiled"], 1)
+        self.assertEqual(len(receipt["packaged_original_audio"]), 1)
+        self.assertFalse(receipt["audio_engine_playback_verified"])
+        self.assertTrue(exported["disk_verification"][
+            "all_emitted_file_hashes_verified"
+        ])
+
+    def test_audio_cue_cannot_reference_uncreated_sound(self):
+        from skeleton.jeeves.ai.studio_sprite_actor_binding import SpriteBindingError
+        self.populate_3d()
+        self.author_player_visual(
+            cues=[{"animation": "idle", "frame_index": 0,
+                   "event_id": "step-left", "category": "footstep"}],
+            audio_bindings={"step-left": "missing-original-sound"},
+        )
+        # Creating a dependency on missing footstep-source fails at the
+        # source-store boundary before a sound could be invented.
+        self.assertFalse(any(self.export.iterdir()))
 
     def test_authored_sprite_is_bound_to_actual_moving_godot_player(self):
         self.populate_3d()
