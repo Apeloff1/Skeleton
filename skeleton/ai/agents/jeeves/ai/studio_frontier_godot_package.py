@@ -295,6 +295,53 @@ def compile_original_godot_candidate(
             "glb_sha256": info["glb_sha256"],
             "metadata_receipt_sha256": info["receipt_sha256"],
         })
+    # Actual 3D rigid/static/area physics components are opt-in,
+    # source-owned and generated from the original GLB mesh geometry.
+    from .studio_original_mesh_physics import (
+        compile_original_mesh_physics_collection,
+        verify_original_mesh_physics,
+    )
+    physics = compile_original_mesh_physics_collection(
+        records, lod_asset_ids=frozenset(lod_by_asset),
+    )
+    authored_physics: list[dict[str, Any]] = []
+    for body in physics["assets"]:
+        info = body["metadata"]
+        name = info["asset_id"]
+        result = verify_original_mesh_physics(
+            body["base_record"], body["source_record"],
+            body["scene"], info, has_lod=info["lod_bound"],
+        )
+        if not result["collision_shape_replayed_from_original_mesh"]:
+            raise FrontierSourceError("original collision geometry did not replay")
+        root = "game/frontier/meshes/" + name
+        scene_path = root + ".physics.tscn"
+        source_path = root + ".physics.source.json"
+        source_body = json.dumps(
+            {
+                "base_record": body["base_record"],
+                "author_record": body["source_record"],
+                "metadata": info,
+            }, sort_keys=True, ensure_ascii=True, allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        for resource_path, value in (
+            (scene_path, body["scene"].encode("utf-8")),
+            (source_path, source_body),
+        ):
+            if resource_path in files or resource_path in binary_assets:
+                raise FrontierSourceError("source-owned Godot physics resource collides")
+            binary_assets[resource_path] = value
+            file_hashes[resource_path] = sha256(value).hexdigest()
+        authored_physics.append({
+            "asset_id": name,
+            "base_glb_sha256": info["mesh_glb_sha256"],
+            "source_record_id": info["physics_source_record_id"],
+            "source_sha256": info["physics_source_sha256"],
+            "scene_sha256": info["scene_sha256"],
+            "metadata_receipt_sha256": info["receipt_sha256"],
+            "lod_bound": info["lod_bound"],
+        })
     authored_sprites: list[dict[str, Any]] = []
     sprite_names: list[str] = []
     compiled_sprites: list[dict[str, Any]] = []
@@ -514,6 +561,8 @@ def compile_original_godot_candidate(
         "packaged_original_audio": authored_audio,
         "packaged_original_meshes": authored_meshes,
         "packaged_original_mesh_lods": authored_mesh_lods,
+        "packaged_original_mesh_physics": authored_physics,
+        "native_collision_physics_verified": False,
         "native_mesh_import_verified": False,
         "native_mesh_lod_switching_verified": False,
         "audio_engine_playback_verified": False,
