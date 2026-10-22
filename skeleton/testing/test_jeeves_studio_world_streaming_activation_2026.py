@@ -158,13 +158,28 @@ class StreamerActivationSourceTests(unittest.TestCase):
         from pathlib import Path
         from unittest.mock import patch
         compiled, _ = self.compile()
+        from skeleton.jeeves.game_frontier_expedition import (
+            ExpeditionWorld, Traveler, Waypoint, TravelEdge,
+        )
+        world = ExpeditionWorld(
+            project_id="native-test", source_digest="a" * 64,
+            waypoints=(
+                Waypoint("start", 0.0, 0.0, 0.0, "ground"),
+                Waypoint("destination", 1.0, 0.0, 0.0, "ground"),
+            ),
+            edges=(
+                TravelEdge("forward", "start", "destination",
+                           "walk", 1.0, 1.0, 1),
+            ),
+            arrival="start", destinations=("destination",),
+        )
         candidate = {
             "receipt": {"world_streaming_policy": compiled["receipt"]},
         }
         with patch.object(Path, "is_file", return_value=True):
             with self.assertRaises(SpriteBoundNativeError) as error:
                 run_exact_original_candidate_native_expedition(
-                    candidate, None, None,
+                    candidate, world, Traveler(),
                     godot_executable="/usr/bin/godot",
                 )
         self.assertIn("camera-driven", str(error.exception))
