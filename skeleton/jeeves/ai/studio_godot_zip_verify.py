@@ -219,7 +219,8 @@ def verify_published_godot_zip(
                     if not isinstance(item, dict) or set(item) != {
                         "asset_id", "source_record_id", "source_sha256",
                         "frame_count", "animation_count", "animation_names",
-                        "png_sha256", "godot_spriteframes_resource_sha256",
+                        "png_sha256", "normal_png_sha256",
+                        "godot_spriteframes_resource_sha256",
                         "godot_preview_scene_path",
                         "original_hitbox_receipt_sha256",
                         "frame_cues_sha256", "godot_frame_cue_resource_sha256",
@@ -264,6 +265,37 @@ def verify_published_godot_zip(
                         raise NativeSourceVerificationError(
                             "Godot sprite source identity or animation receipt differs"
                         )
+                    normal_id = item["normal_png_sha256"]
+                    if (normal_id is not None) != bool(sprite.get("normal_map")):
+                        raise NativeSourceVerificationError(
+                            "normal map metadata and published sprite disagree"
+                        )
+                    if normal_id is not None:
+                        from .studio_sprite_surface import (
+                            SpriteSurfaceError, verify_normal_texture_bytes,
+                        )
+                        normal_path = (
+                            "game/frontier/sprites/" + asset_name + ".normal.png"
+                        )
+                        if normal_path not in expected:
+                            raise NativeSourceVerificationError(
+                                "original sprite normal texture missing from Godot package"
+                            )
+                        try:
+                            verified_normal = verify_normal_texture_bytes(
+                                image, archive.read(normal_path),
+                                sprite["normal_map"],
+                                width=sprite["sheet_width_px"],
+                                height=sprite["sheet_height_px"],
+                            )
+                        except (SpriteSurfaceError, KeyError, TypeError) as exc:
+                            raise NativeSourceVerificationError(
+                                "normal texture failed independent pixel or source proof"
+                            ) from exc
+                        if verified_normal["normal_png_sha256"] != normal_id:
+                            raise NativeSourceVerificationError(
+                                "normal texture differs from its source review"
+                            )
                     try:
                         pixels = _decode_verified_png(
                             image, sprite["sheet_width_px"],
