@@ -222,6 +222,19 @@ def compile_original_godot_candidate(
             binary_assets[json_path] = metadata_bytes
             file_hashes[png_path] = sha256(sprite["png"]).hexdigest()
             file_hashes[json_path] = sha256(metadata_bytes).hexdigest()
+            normal_png = sprite.get("normal_png")
+            if normal_png is not None:
+                from .studio_sprite_surface import verify_normal_texture_bytes
+                verify_normal_texture_bytes(
+                    sprite["png"], normal_png, info.get("normal_map"),
+                    width=info["sheet_width_px"],
+                    height=info["sheet_height_px"],
+                )
+                normal_path = "game/frontier/sprites/" + name + ".normal.png"
+                if normal_path in binary_assets or normal_path in files:
+                    raise FrontierSourceError("authored sprite normal map path collides")
+                binary_assets[normal_path] = normal_png
+                file_hashes[normal_path] = sha256(normal_png).hexdigest()
             from .studio_sprite_hitboxes import verify_exact_sprite_hitboxes
             hitboxes = verify_exact_sprite_hitboxes(
                 info, sprite["collision_rectangles"],
@@ -269,6 +282,10 @@ def compile_original_godot_candidate(
                 ] if info.get("frame_cues") else [],
                 "godot_frame_cue_resource_sha256": cue_proof["receipt_sha256"],
                 "png_sha256": info["png_sha256"],
+                "normal_png_sha256": (
+                    info["normal_map"]["normal_png_sha256"]
+                    if info.get("normal_map") else None
+                ),
                 "original_hitbox_receipt_sha256": hitboxes["receipt_sha256"],
             })
     from .studio_sprite_actor_binding import (
