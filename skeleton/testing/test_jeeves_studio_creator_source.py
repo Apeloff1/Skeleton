@@ -103,6 +103,43 @@ class CreatorSourceTests(unittest.TestCase):
         self.assertEqual(verified["dependency_assurance"]["sources_checked"], 3)
         self.assertFalse(verified["engine_playthrough_performed"])
 
+    def test_diamond_game_source_dependencies_are_not_false_cycles(self):
+        self.create(record="origin")
+        self.create(record="left", deps=["origin"])
+        self.create(record="right", deps=["origin"])
+        self.create(record="join", deps=["left", "right"])
+        self.create(record="finale", deps=["join", "origin"])
+        result = self.owner.test(self.command(
+            "test", scopes=["finale"], profile="full",
+        ))
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["dependency_assurance"]["cyclic_dependencies"], [])
+        self.assertEqual(result["dependency_assurance"]["sources_checked"], 5)
+
+    def test_very_deep_game_source_chain_avoids_python_recursion(self):
+        documents = {
+            "step-" + str(i): {
+                "depends_on": ["step-" + str(i - 1)] if i > 0 else [],
+            }
+            for i in range(3500)
+        }
+        report = self.owner._validate_graph(documents)
+        self.assertTrue(report["valid"])
+        self.assertEqual(report["sources_checked"], 3500)
+
+    def test_real_dependency_cycle_is_detected_after_shared_branches(self):
+        documents = {
+            "origin": {"depends_on": ["finale"]},
+            "left": {"depends_on": ["origin"]},
+            "right": {"depends_on": ["origin"]},
+            "finale": {"depends_on": ["left", "right"]},
+            "missing": {"depends_on": ["unknown"]},
+        }
+        report = self.owner._validate_graph(documents)
+        self.assertFalse(report["valid"])
+        self.assertTrue(report["cyclic_dependencies"])
+        self.assertEqual(report["missing_dependencies"], ["unknown"])
+
     def test_static_preview_returns_actual_stored_source_not_rendered_frames(self):
         self.create()
         preview = self.owner.preview(self.command(
