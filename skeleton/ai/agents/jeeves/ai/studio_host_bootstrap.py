@@ -186,6 +186,40 @@ class NativeStudioHost:
             "host_permission_verified": True,
         }
 
+    def verify_real_player_avatar(
+        self, *, binding_record_id: str, godot_executable: str,
+        actor_id: str,
+        authorize_avatar_execution: Callable[[str, str, str, str], bool],
+        timeout_seconds: int = 90,
+    ) -> dict[str, Any]:
+        """Observe real animated player actor, never mint model tool authority."""
+        identifier(actor_id, "original game avatar reviewer")
+        record_id = identifier(binding_record_id, "player avatar source record")
+        if self.source_store is None:
+            raise StudioInteractionError("original game's source owner is unavailable")
+        if (not isinstance(godot_executable, str) or not godot_executable.strip()
+                or not callable(authorize_avatar_execution)
+                or authorize_avatar_execution(
+                    self.journal.project_id, record_id, godot_executable, actor_id,
+                ) is not True):
+            raise StudioInteractionError(
+                "host denied independent real-engine player avatar observation"
+            )
+        evidence = self.source_store.verify_native_player_avatar(
+            godot_executable=godot_executable,
+            expected_binding_record_id=record_id,
+            timeout_seconds=timeout_seconds,
+        )
+        event = self.journal.append(
+            "native_player_avatar_verified",
+            {**evidence, "actor_id": actor_id},
+            _authority=self.journal._native_execution_token,
+        )
+        return {
+            **evidence, "studio_event_sha256": event["digest"],
+            "host_permission_verified": True,
+        }
+
     def verify_real_native_gameplay(
         self, *, godot_executable: str,
         actor_id: str, authorize_native_execution: Callable[[str, str, str], bool],
