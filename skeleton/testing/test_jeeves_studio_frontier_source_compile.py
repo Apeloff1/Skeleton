@@ -14,6 +14,7 @@ from skeleton.jeeves.ai.studio_creator_source import (
 )
 from skeleton.jeeves.ai.studio_sprite_forge import StudioSpriteError
 from skeleton.jeeves.ai.studio_sprite_actor_binding import SpriteBindingError
+from skeleton.jeeves.ai.studio_sprite_actor_native import NativeAvatarError
 from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
 from skeleton.jeeves.ai.studio_interaction_contract import (
     StudioEvidenceJournal, StudioInteractionError,
@@ -467,6 +468,62 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         with self.assertRaisesRegex(SpriteBindingError, "animation"):
             self.export_godot()
         self.assertEqual(list(self.export.iterdir()), [])
+
+    def test_native_engine_actor_review_requires_installed_godot4(self):
+        self.populate_3d()
+        self.author_player_visual()
+        with self.assertRaises(NativeAvatarError):
+            self.owner.verify_native_player_avatar(
+                godot_executable=str(self.root / "not-installed-godot4"),
+                expected_binding_record_id="hero-visual-binding",
+                timeout_seconds=2,
+            )
+
+    def test_host_permission_denies_game_avatar_before_native_launch(self):
+        self.populate_3d()
+        self.author_player_visual()
+        with StudioEvidenceJournal(
+            self.root / "avatar-journal.sqlite",
+            project_id="new-game", session_id="reviewer-session",
+        ) as journal:
+            host = NativeStudioHost.__new__(NativeStudioHost)
+            host.journal = journal
+            host.source_store = self.owner
+            authority_calls = []
+            with self.assertRaises(StudioInteractionError):
+                host.verify_real_player_avatar(
+                    binding_record_id="hero-visual-binding",
+                    godot_executable=str(self.root / "not-installed-godot4"),
+                    actor_id="human-producer",
+                    authorize_avatar_execution=lambda *args: (
+                        authority_calls.append(args) or False
+                    ),
+                )
+            self.assertEqual(authority_calls, [
+                ("new-game", "hero-visual-binding",
+                 str(self.root / "not-installed-godot4"), "human-producer"),
+            ])
+            self.assertEqual(journal.read(), ())
+
+    def test_model_cannot_self_certify_game_avatar_visual_observation(self):
+        with StudioEvidenceJournal(
+            self.root / "avatar-journal.sqlite",
+            project_id="new-game", session_id="reviewer-session",
+        ) as journal:
+            with self.assertRaises(StudioInteractionError):
+                journal.append("native_player_avatar_verified", {
+                    "real_godot_process_executed": True,
+                    "animated_sprite_child_bound": True,
+                })
+            self.assertEqual(journal.read(), ())
+
+    def test_native_avatar_does_not_resolve_foreign_scene_binding(self):
+        self.populate_3d()
+        with self.assertRaises(CreatorSourceError):
+            self.owner.verify_native_player_avatar(
+                godot_executable=str(self.root / "not-installed-godot4"),
+                expected_binding_record_id="other-game-avatar",
+            )
 
     def test_native_player_visual_does_not_self_certify_engine_render(self):
         self.populate_3d()
