@@ -108,6 +108,12 @@ def compile_eight_way_actor_facing(
         "                    jeeves_animation_name",
         "                ):",
         "                    jeeves_heading_avatar.play(jeeves_animation_name)",
+        "                    # Actual game movement observation, not frame rendering proof.",
+        '                    print("JEEVES_COMPASS " + JSON.stringify({',
+        '                        "waypoint_id": current_id,',
+        '                        "heading": jeeves_current_heading,',
+        '                        "animation": jeeves_animation_name',
+        "                    }))",
     ])
     return original_script.replace(PLACE_ANCHOR, injected, 1)
 
