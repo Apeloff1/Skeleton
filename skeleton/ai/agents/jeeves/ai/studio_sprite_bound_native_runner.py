@@ -20,7 +20,7 @@ from typing import Any
 from skeleton.jeeves.game_frontier_expedition import ExpeditionError, ExpeditionWorld, Traveler
 from skeleton.jeeves.game_frontier_expedition_godot import make_expedition_autoplay
 from skeleton.jeeves.game_frontier_expedition_native_verify import (
-    inspect_native_expedition_trace,
+    NativeExpeditionError, inspect_native_expedition_trace,
 )
 from .studio_interaction_contract import digest
 
@@ -153,7 +153,7 @@ def run_sprite_bound_native_expedition(
         replay = inspect_native_expedition_trace(
             output, world, player, expected_complete=True,
         )
-    except ExpeditionError as exc:
+    except (ExpeditionError, NativeExpeditionError) as exc:
         raise SpriteBoundNativeError("Godot sprite game observations contradict Python replay") from exc
     if (replay["native_candidate_receipt_head"] != observed["candidate_receipt_head"]
             or replay["executed_actions"] != len(recipe["steps"])):
