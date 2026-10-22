@@ -121,7 +121,7 @@ class DirectionalSpriteTests(unittest.TestCase):
     def test_tampered_variant_proof_rejected_even_if_metadata_resealed(self):
         output = compile_authored_sprite(authored_variants())
         forged = deepcopy(output["metadata"])
-        forged["derived_frame_proofs"][0]["transform"] = "flip_vertical"
+        forged["derived_frame_proofs"][0]["transform"] = "rotate_180"
         internal = dict(forged["derived_frame_proofs"][0])
         internal.pop("receipt_sha256")
         forged["derived_frame_proofs"][0]["receipt_sha256"] = digest(internal)
