@@ -357,25 +357,28 @@ class CreatorProjectSourceStore:
         done: set[str] = set()
         visiting: set[str] = set()
         for key in sorted(documents):
-            stack: list[tuple[str, bool]] = [(key, False)]
+            if key in done:
+                continue
+            # Each stack item owns an iterator over its own edges. This
+            # guarantees that siblings in a diamond DAG never revisit a
+            # node that is merely scheduled but not an ancestor.
+            visiting.add(key)
+            stack = [(key, iter(documents[key]["depends_on"]))]
             while stack:
-                node, leaving = stack.pop()
-                if leaving:
-                    visiting.discard(node)
+                node, edges = stack[-1]
+                child = next(edges, None)
+                if child is None:
+                    visiting.remove(node)
                     done.add(node)
+                    stack.pop()
                     continue
-                if node in done:
-                    continue
-                if node in visiting:
-                    cycles.add(node)
-                    continue
-                if node not in documents:
-                    missing.add(node)
-                    continue
-                visiting.add(node)
-                stack.append((node, True))
-                stack.extend((dep, False) for dep in
-                             reversed(documents[node]["depends_on"]))
+                if child not in documents:
+                    missing.add(child)
+                elif child in visiting:
+                    cycles.add(child)
+                elif child not in done:
+                    visiting.add(child)
+                    stack.append((child, iter(documents[child]["depends_on"])))
         return {
             "sources_checked": len(documents),
             "missing_dependencies": sorted(missing),
