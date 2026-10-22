@@ -128,6 +128,37 @@ class HeightfieldNormalTests(unittest.TestCase):
         with self.assertRaises(SpriteSurfaceError):
             compile_authored_sprite(reseal(source))
 
+    def test_pixel_scale_preserves_identical_source_normals(self):
+        result = compile_authored_sprite(lit_original())
+        pixels = _decode_verified_png(result["normal_png"], 8, 4)
+        def texel(x, y):
+            return pixels[(y * 8 + x) * 4:(y * 8 + x + 1) * 4]
+        self.assertEqual(texel(2, 0), texel(3, 0))
+        self.assertEqual(texel(2, 0), texel(2, 1))
+        self.assertNotEqual(texel(2, 0), texel(4, 0))
+
+    def test_power_two_atlas_gutters_replay_exact_authored_normals(self):
+        record = lit_original()
+        record["document"]["atlas"] = {
+            "columns": 1, "padding_px": 1, "extrude_edges": True,
+            "power_of_two": True, "alpha_threshold": 1,
+            "pivot_px": [1, 1],
+        }
+        result = compile_authored_sprite(reseal(record))
+        meta = result["metadata"]
+        self.assertEqual(
+            [meta["sheet_width_px"], meta["sheet_height_px"]], [8, 16],
+        )
+        self.assertTrue(verify_authored_normals(
+            record["document"]["lighting"], metadata=meta,
+            color_png=result["png"], normal_png=result["normal_png"],
+            normal_receipt=meta["normal_map"],
+        )["height_map_replayed"])
+        self.assertTrue(verify_normal_texture_bytes(
+            result["png"], result["normal_png"], meta["normal_map"],
+            width=8, height=16,
+        )["normalized_visible_vectors_verified"])
+
     def test_normal_png_tampering_cannot_repass_published_verification(self):
         result = compile_authored_sprite(lit_original())
         corrupted = bytearray(result["normal_png"])
