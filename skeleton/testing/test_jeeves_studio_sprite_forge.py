@@ -211,6 +211,7 @@ class PersistentSpriteExportTests(unittest.TestCase):
             self.assertEqual(names, {
                 "sprites/hero-idle.png",
                 "sprites/hero-idle.json",
+                "sprites/hero-idle.hitboxes.json",
                 "sprites/hero-idle.tres",
                 "sprites/hero-idle.tscn",
                 "jeeves_sprite_receipt.json",
