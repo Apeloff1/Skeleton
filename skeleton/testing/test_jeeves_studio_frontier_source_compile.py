@@ -555,6 +555,52 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertEqual(binding["sprite_png_sha256"], sprite["png_sha256"])
         self.assertFalse(binding["engine_actor_visual_execution_verified"])
 
+    def test_real_avatar_inspector_is_bound_to_native_route_observations(self):
+        from skeleton.jeeves.ai.studio_sprite_actor_native import _INSPECT
+        self.assertIn('for step in expected["route"]:', _INSPECT)
+        self.assertIn("game._can_travel(edge)", _INSPECT)
+        self.assertIn("game._travel(edge)", _INSPECT)
+        self.assertIn('if str(game.current_id) != str(step["target"]):', _INSPECT)
+        self.assertIn('if avatar.get_parent() != actor:', _INSPECT)
+        self.assertIn("avatar.animation != selected", _INSPECT)
+        self.assertIn('"mapped_movement_transitions_observed"', _INSPECT)
+        self.assertIn('"observed_movement_modes"', _INSPECT)
+
+    def test_native_sprite_state_compiler_preserves_real_travel_gates(self):
+        from skeleton.jeeves.ai.studio_sprite_actor_binding import (
+            bind_sprite_to_expedition_script, binding_from_source,
+        )
+        from skeleton.jeeves.game_frontier_expedition_godot import _GODOT_SCRIPT
+        self.populate_3d()
+        self.author_player_visual(
+            movement_map={"walk": "walk", "glide": "glide"},
+        )
+        authored = self.owner._records["hero-art"]
+        from skeleton.jeeves.ai.studio_sprite_forge import compile_authored_sprite
+        from skeleton.jeeves.ai.studio_sprite_godot_resources import (
+            compile_godot_sprite_resources, verify_godot_sprite_resources,
+        )
+        asset = compile_authored_sprite(authored)["metadata"]
+        proof = verify_godot_sprite_resources(
+            asset, compile_godot_sprite_resources(asset),
+        )
+        binding = binding_from_source(self.owner._records, [{
+            "asset_id": asset["asset_id"],
+            "source_record_id": authored["record_id"],
+            "png_sha256": asset["png_sha256"],
+            "godot_spriteframes_resource_sha256": proof["receipt_sha256"],
+            "animation_names": [entry["name"] for entry in asset["animations"]],
+        }])
+        native = bind_sprite_to_expedition_script(_GODOT_SCRIPT, binding)
+        self.assertIn('if won or failed or not _can_travel(edge):', native)
+        self.assertIn('if stamina < int(costs["stamina"]):', native)
+        self.assertLess(
+            native.index('if stamina < int(costs["stamina"]):'),
+            native.index('var jeeves_travel_animations: Dictionary'),
+        )
+        self.assertEqual(native.count('stamina -= int(costs["stamina"])'), 1)
+        self.assertEqual(native.count('actor.add_child(jeeves_avatar)'), 1)
+
     def test_native_engine_actor_review_requires_installed_godot4(self):
         self.populate_3d()
         self.author_player_visual()
