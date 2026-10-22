@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from hashlib import sha256
-from typing import Any
 from zipfile import ZipFile
 
 from .studio_original_mesh_placements import (

@@ -278,6 +278,18 @@ def verify_published_godot_zip(
                 raise NativeSourceVerificationError(
                     "published Godot collider or physical-body source cannot replay"
                 ) from exc
+            from .studio_original_mesh_placements_package_verify import (
+                OriginalMeshPlacementArchiveError,
+                verify_original_mesh_placement_archive,
+            )
+            try:
+                placement_proof = verify_original_mesh_placement_archive(
+                    archive, expected, proof,
+                )
+            except OriginalMeshPlacementArchiveError as exc:
+                raise NativeSourceVerificationError(
+                    "authored original GLB actors are not in the real Godot scene"
+                ) from exc
             original_sprites = proof.get("packaged_original_sprites", [])
             if (not isinstance(original_sprites, list)
                     or len(original_sprites) > 128
@@ -832,6 +844,9 @@ def verify_published_godot_zip(
         "original_glb_scenes_replayed": mesh_scene_proof["mesh_scenes_replayed"],
         "original_lod_levels_replayed": mesh_scene_proof["lod_levels_replayed"],
         "original_physics_bodies_replayed": physics_proof["bodies_replayed"],
+        "original_3d_scene_instances_replayed": placement_proof["instances_replayed"],
+        "original_3d_instanced_in_world_scene":
+            placement_proof["real_scene_hierarchy_compiled"],
         "actual_collision_contact_observed": False,
         "embedded_evidence_sha256": receipt_digest,
         "all_emitted_file_hashes_verified": True,

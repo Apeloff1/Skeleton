@@ -319,17 +319,31 @@ def verify_original_mesh_placement_source_bundle(
             "records", "lod_asset_ids", "physics_asset_ids", "metadata",
     } or _source_json(payload) != raw):
         raise OriginalMeshPlacementError("placement source not exact canonical JSON")
-    if (frozenset(payload["lod_asset_ids"]) !=
-            (expected_lod_asset_ids & frozenset(
-                item["asset_id"] for item in payload["metadata"]["instances"]
-            )) or frozenset(payload["physics_asset_ids"]) !=
-            (expected_physics_asset_ids & frozenset(
-                item["asset_id"] for item in payload["metadata"]["instances"]
-                if item["physics_record_id"] is not None
-            ))):
-        raise OriginalMeshPlacementError(
-            "authored mesh placement references unshipped physics or LOD"
-        )
+    try:
+        referenced = payload["metadata"]["instances"]
+        if (type(referenced) is not list
+                or type(payload["lod_asset_ids"]) is not list
+                or type(payload["physics_asset_ids"]) is not list
+                or any(type(x) is not str for x in (
+                    payload["lod_asset_ids"] + payload["physics_asset_ids"]
+                ))):
+            raise OriginalMeshPlacementError("placement reference types invalid")
+        actual_lod = frozenset(payload["lod_asset_ids"])
+        actual_physics = frozenset(payload["physics_asset_ids"])
+        if (len(actual_lod) != len(payload["lod_asset_ids"])
+                or len(actual_physics) != len(payload["physics_asset_ids"])
+                or actual_lod != (expected_lod_asset_ids & frozenset(
+                    item["asset_id"] for item in referenced
+                ))
+                or actual_physics != (expected_physics_asset_ids & frozenset(
+                    item["asset_id"] for item in referenced
+                    if item["physics_record_id"] is not None
+                ))):
+            raise OriginalMeshPlacementError(
+                "authored mesh placement references unshipped physics or LOD"
+            )
+    except (KeyError, TypeError) as exc:
+        raise OriginalMeshPlacementError("invalid authored mesh scene references") from exc
     try:
         compiled = compile_original_mesh_placements(
             payload["records"],
