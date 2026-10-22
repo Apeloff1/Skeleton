@@ -20,6 +20,10 @@ from skeleton.testing.test_jeeves_studio_sprite_npc_binding import (
     OriginalNpcSpriteBindingTests as TestJeevesOriginalNpcSprites,
     NpcSpriteGraphPreflightTests as TestJeevesNpcSpritePreflight,
 )
+from skeleton.testing.test_jeeves_studio_sprite_palette_variants import (
+    OriginalPaletteVariantTests as TestJeevesOriginalPaletteVariants,
+    PersistentPaletteSkinTests as TestJeevesPersistedPaletteSkins,
+)
 from skeleton.testing.test_jeeves_studio_sprite_quality import (
     SpriteQualityTests as TestJeevesSpriteQuality,
 )
@@ -39,6 +43,7 @@ from skeleton.testing.test_jeeves_studio_creator_source import (
 __all__ = [
     "TestJeevesSpriteForge", "TestJeevesPersistedSprites",
     "TestJeevesSpriteQuality",
+    "TestJeevesOriginalPaletteVariants", "TestJeevesPersistedPaletteSkins",
     "TestJeevesOriginalNpcCast", "TestJeevesOriginalNpcSprites",
     "TestJeevesNpcSpritePreflight",
     "TestJeevesDirectionalSprite",
