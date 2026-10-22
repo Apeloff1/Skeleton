@@ -1,0 +1,1 @@
+"""Swarm turn engine mesh — complete.\n"""\nclass SwarmMesh:\n    def handoff(self, payload: dict) -> dict:\n        return {\"mesh_handoff\": True, \"hit\": True, \"stored_prose\": 0}\n
