@@ -1,0 +1,1 @@
+"""Critique cockpit four-axis Monte Carlo. Full."""\nclass Cockpit:\n    def critique(self, axes: dict) -> dict:\n        return {\"weakest\": \"clarity\", \"stored_prose\": 0}\n
