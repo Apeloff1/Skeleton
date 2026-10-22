@@ -24,6 +24,9 @@ from .studio_frontier_source_compile import (
     FrontierSourceError, materialize_persisted_frontier_source,
 )
 from .studio_interaction_contract import digest
+from .studio_sprite_bound_native_runner import (
+    SpriteBoundNativeError, run_sprite_bound_native_expedition,
+)
 
 SCHEMA = "skeleton.jeeves.frontier_godot_source.v1"
 PROFILE_KEYS = frozenset((
@@ -264,9 +267,6 @@ def run_original_game_native_playthrough(
             # The legacy runner regenerates baseline Godot files, so using it
             # here would falsely attest a game whose ACTUAL avatar never ran.
             # Execute the exact generated sprite-bound project instead.
-            from .studio_sprite_bound_native_runner import (
-                run_sprite_bound_native_expedition, SpriteBoundNativeError,
-            )
             result = run_sprite_bound_native_expedition(
                 before, world, traveler, godot_executable=godot_executable,
                 timeout_seconds=timeout_seconds,
