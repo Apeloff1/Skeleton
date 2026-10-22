@@ -233,6 +233,20 @@ def compile_original_godot_candidate(
                 normal_path = "game/frontier/sprites/" + name + ".normal.png"
                 if normal_path in binary_assets or normal_path in files:
                     raise FrontierSourceError("authored sprite normal map path collides")
+                original_heights = sprite.get("normal_source")
+                if original_heights is None:
+                    raise FrontierSourceError("authored sprite lighting lacks heightfield source")
+                source_bytes = json.dumps(
+                    original_heights, ensure_ascii=True, sort_keys=True,
+                    separators=(",", ":"), allow_nan=False,
+                ).encode("utf-8")
+                source_path = (
+                    "game/frontier/sprites/" + name + ".normal.source.json"
+                )
+                if source_path in binary_assets or source_path in files:
+                    raise FrontierSourceError("original normal source path collides")
+                binary_assets[source_path] = source_bytes
+                file_hashes[source_path] = sha256(source_bytes).hexdigest()
                 binary_assets[normal_path] = normal_png
                 file_hashes[normal_path] = sha256(normal_png).hexdigest()
             from .studio_sprite_hitboxes import verify_exact_sprite_hitboxes
