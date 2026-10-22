@@ -233,11 +233,21 @@ def verify_published_godot_zip(
                         raise NativeSourceVerificationError(
                             "original source SpriteFrames resource hash differs"
                         )
+            # Rebuild the FULL Godot game entrypoint from the trusted
+            # exporter script, then replay exact player and NPC source edits.
+            # Hashes alone cannot authorize injected script contents.
+            from skeleton.jeeves.game_frontier_expedition_godot import _GODOT_SCRIPT
             from .studio_sprite_actor_binding import (
-                SpriteBindingError, verify_actor_sprite_binding,
+                SpriteBindingError, bind_sprite_to_expedition_script,
+                verify_actor_sprite_binding,
+            )
+            from .studio_sprite_npc_binding import (
+                NpcSpriteBindingError, bind_npc_sprites_to_expedition_script,
+                verify_native_npc_binding_script, _npc_cast_names,
             )
             original_avatar = proof.get("authored_player_avatar_binding")
             actor_script_proof = proof.get("player_avatar_game_script_receipt")
+            reconstructed = _GODOT_SCRIPT
             if original_avatar is None:
                 if (actor_script_proof is not None
                         or proof.get("animated_sprite3d_player_script_compiled") is not False):
@@ -251,13 +261,14 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "player avatar lacks exact approved actor script proof"
                     )
-                from skeleton.jeeves.game_frontier_expedition_godot import _GODOT_SCRIPT
                 try:
-                    script = archive.read("game/frontier/expedition.gd").decode("utf-8")
-                    recomputed = verify_actor_sprite_binding(
-                        _GODOT_SCRIPT, script, original_avatar,
+                    player_script = bind_sprite_to_expedition_script(
+                        reconstructed, original_avatar,
                     )
-                except (SpriteBindingError, UnicodeDecodeError) as exc:
+                    recomputed = verify_actor_sprite_binding(
+                        reconstructed, player_script, original_avatar,
+                    )
+                except SpriteBindingError as exc:
                     raise NativeSourceVerificationError(
                         "player avatar game script deviates from compiled source"
                     ) from exc
@@ -277,6 +288,77 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "real player sprite binding lost its source or animation"
                     )
+                reconstructed = player_script
+
+            npc_bindings = proof.get("authored_npc_sprite_bindings", [])
+            npc_receipt = proof.get("npc_sprite_game_script_receipt")
+            if (type(npc_bindings) is not list or len(npc_bindings) > 64):
+                raise NativeSourceVerificationError(
+                    "NPC visual source receipts exceed the reviewed cast limits"
+                )
+            if not npc_bindings:
+                if (npc_receipt is not None
+                        or proof.get("animated_npc_sprite3d_source_compiled") is not False):
+                    raise NativeSourceVerificationError(
+                        "game claims NPC sprite execution without original source"
+                    )
+            else:
+                if (not isinstance(npc_receipt, dict)
+                        or proof.get("animated_npc_sprite3d_source_compiled") is not True):
+                    raise NativeSourceVerificationError(
+                        "compiled NPC visuals lack independent game-script provenance"
+                    )
+                try:
+                    source_cast = {
+                        "game/frontier/npcs.json":
+                        archive.read("game/frontier/npcs.json").decode("utf-8")
+                    }
+                    allowed_cast = _npc_cast_names(source_cast)
+                    npc_script = bind_npc_sprites_to_expedition_script(
+                        reconstructed, npc_bindings,
+                    )
+                    replay = verify_native_npc_binding_script(
+                        reconstructed, npc_script, npc_bindings,
+                    )
+                except (NpcSpriteBindingError, UnicodeDecodeError, KeyError) as exc:
+                    raise NativeSourceVerificationError(
+                        "NPC game sprite source or cast cannot be reproduced"
+                    ) from exc
+                if replay != npc_receipt:
+                    raise NativeSourceVerificationError(
+                        "NPC native Godot script certificate differs"
+                    )
+                seen_npcs: set[str] = set()
+                for npc in npc_bindings:
+                    npc_id = npc.get("npc_id")
+                    if npc_id not in allowed_cast or npc_id in seen_npcs:
+                        raise NativeSourceVerificationError(
+                            "NPC sprite source refers to duplicate or absent real character"
+                        )
+                    seen_npcs.add(npc_id)
+                    matches = [
+                        sprite for sprite in original_sprites
+                        if sprite["asset_id"] == npc.get("asset_id")
+                    ]
+                    if (len(matches) != 1
+                            or npc.get("sprite_source_record_id")
+                            != matches[0]["source_record_id"]
+                            or npc.get("sprite_png_sha256") != matches[0]["png_sha256"]
+                            or npc.get("sprite_frames_resource_sha256")
+                            != matches[0]["godot_spriteframes_resource_sha256"]
+                            or npc.get("animation") not in matches[0]["animation_names"]):
+                        raise NativeSourceVerificationError(
+                            "NPC visual lost its original sprite or animation lineage"
+                        )
+                reconstructed = npc_script
+            try:
+                actual_script = archive.read("game/frontier/expedition.gd").decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise NativeSourceVerificationError("native game script is not UTF-8") from exc
+            if actual_script != reconstructed:
+                raise NativeSourceVerificationError(
+                    "published native Godot player/NPC script differs from trusted source"
+                )
     except (zipfile.BadZipFile, RuntimeError, OSError, UnicodeError) as exc:
         raise NativeSourceVerificationError("published Godot archive is unreadable") from exc
     return {
