@@ -67,7 +67,7 @@ def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) ->
     ):
         report.update(
             observed=critical["report_available"],
-            ready=critical["ok"] and critical["report_available"],
+            ready=critical["ok"] and critical["report_available"] and not critical["missing"],
             missing=critical["missing"],
         )
     return report
