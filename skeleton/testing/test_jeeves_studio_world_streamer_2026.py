@@ -126,6 +126,15 @@ class GodotWorldStreamerTests(unittest.TestCase):
         self.assertNotIn("StaticBody3D", emitted["files"]["game/frontier/assets/world_streamer.gd"])
         self.assertTrue(emitted["receipt"]["static_world_scene_preserved"])
 
+    def test_source_streamer_keeps_rigid_and_area_state_alive_offscreen(self):
+        _, _, generated = self.actual()
+        script = generated["files"]["game/frontier/assets/world_streamer.gd"]
+        self.assertIn("Stateful rigid bodies and trigger areas", script)
+        self.assertIn("relevant[key] = pinned_item", script)
+        self.assertIn("if a_pin != b_pin", script)
+        self.assertTrue(generated["receipt"][
+            "stateful_rigid_and_area_instance_pinning"])
+
     def test_empty_world_streamer_is_valid_but_not_a_fake_gameplay_proof(self):
         from skeleton.jeeves.ai.studio_original_mesh_placements import compile_original_mesh_placements
         from skeleton.jeeves.ai.studio_original_mesh import compile_original_mesh

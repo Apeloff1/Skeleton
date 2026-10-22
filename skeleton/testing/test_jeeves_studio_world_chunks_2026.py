@@ -145,6 +145,56 @@ class WorldChunkCompilerTests(unittest.TestCase):
             "game/frontier/meshes/trial-mesh.tscn",
         ])
 
+    def test_pinned_stateful_body_survives_distant_camera(self):
+        world, _ = setup_world(physical=True)
+        body = world["instances"][0]
+        self.assertEqual(body["physics_body_type"], "static")
+        body["physics_body_type"] = "rigid"
+        body["receipt_sha256"] = digest({
+            k: v for k, v in body.items() if k != "receipt_sha256"
+        })
+        world["receipt_sha256"] = digest({
+            k: v for k, v in world.items() if k != "receipt_sha256"
+        })
+        cells = compile_world_chunk_catalog(world)
+        file = body["scene_resource_path"]
+        plan = plan_chunk_resources(
+            cells, world, camera_mm=[9_000_000, 0, 9_000_000],
+            view_radius_mm=0, previously_loaded=[file], limit=1,
+        )
+        self.assertEqual(plan["selected_instances"], [body["instance_id"]])
+        self.assertEqual(plan["stateful_instances_pinned"], [body["instance_id"]])
+        self.assertEqual(plan["resources_to_release"], [])
+        self.assertEqual(plan["resources_to_load"], [])
+        self.assertFalse(plan["actual_resources_loaded"])
+
+    def test_stateful_pins_cannot_be_evicted_by_underprovisioned_query(self):
+        world, _ = setup_world(physical=True)
+        body = world["instances"][0]
+        body["physics_body_type"] = "area"
+        body["receipt_sha256"] = digest({
+            k: v for k, v in body.items() if k != "receipt_sha256"
+        })
+        clone = deepcopy(body)
+        clone["instance_id"] = "another-persistent-trigger"
+        clone["position_mm"][0] += 150000
+        clone["broadphase_aabb_min_mm"][0] += 150000
+        clone["broadphase_aabb_max_mm"][0] += 150000
+        clone["receipt_sha256"] = digest({
+            k: v for k, v in clone.items() if k != "receipt_sha256"
+        })
+        world["instances"].append(clone)
+        world["instance_count"] = 2
+        world["receipt_sha256"] = digest({
+            k: v for k, v in world.items() if k != "receipt_sha256"
+        })
+        chunks = compile_world_chunk_catalog(world)
+        with self.assertRaises(WorldChunkError):
+            plan_chunk_resources(
+                chunks, world, camera_mm=[0, 0, 0],
+                view_radius_mm=0, limit=1,
+            )
+
     def test_source_glb_with_lod_selects_importable_lod_scene(self):
         spatial, chunks = setup_world(lod=True)
         plan = plan_chunk_resources(

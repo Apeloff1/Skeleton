@@ -212,8 +212,19 @@ def plan_chunk_resources(
         if all(low[i] <= coord[i] <= high[i] for i in range(3)):
             cells.update(home["instance_ids"])
     weighted = []
+    pinned = {
+        item["instance_id"]
+        for item in spatial_index["instances"]
+        if item.get("kind") == "physics"
+        and item.get("physics_body_type") in ("rigid", "area")
+    }
+    if len(pinned) > limit:
+        raise WorldChunkError(
+            "stateful physics objects exceed safe per-query retention budget"
+        )
     for item in spatial_index["instances"]:
-        if item["instance_id"] not in cells:
+        keep = item["instance_id"] in pinned
+        if item["instance_id"] not in cells and not keep:
             continue
         lo = item["broadphase_aabb_min_mm"]
         hi = item["broadphase_aabb_max_mm"]
@@ -221,13 +232,15 @@ def plan_chunk_resources(
             max(lo[i] - camera[i], camera[i] - hi[i], 0) ** 2
             for i in range(3)
         )
-        if distance_sq <= view_radius_mm * view_radius_mm:
+        if distance_sq <= view_radius_mm * view_radius_mm or keep:
             center_distance = sum(
                 (item["position_mm"][i] - camera[i]) ** 2 for i in range(3)
             )
-            weighted.append((center_distance, item["instance_id"], item))
-    weighted.sort(key=lambda entry: (entry[0], entry[1]))
-    selected = [item for _, _, item in weighted[:limit]]
+            weighted.append((
+                0 if keep else 1, center_distance, item["instance_id"], item,
+            ))
+    weighted.sort(key=lambda entry: (entry[0], entry[1], entry[2]))
+    selected = [item for _, _, _, item in weighted[:limit]]
     if len(weighted) > limit:
         truncated = True
     else:
@@ -237,7 +250,7 @@ def plan_chunk_resources(
     # visible scene omitted solely because the per-query load limit filled.
     # Multiple distinct world instances can share one PackedScene asset.
     visible_resources = {
-        entry["scene_resource_path"] for _, _, entry in weighted
+        entry["scene_resource_path"] for _, _, _, entry in weighted
     }
     loaded = set(previously_loaded)
     plan = {
@@ -248,6 +261,7 @@ def plan_chunk_resources(
         "view_radius_mm": view_radius_mm,
         "candidate_instances_in_view": len(weighted),
         "selected_instances": [entry["instance_id"] for entry in selected],
+        "stateful_instances_pinned": sorted(pinned),
         "selected_instance_receipts": [
             entry["receipt_sha256"] for entry in selected
         ],
