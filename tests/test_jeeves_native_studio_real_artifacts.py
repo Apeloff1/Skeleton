@@ -13,6 +13,13 @@ from skeleton.testing.test_jeeves_studio_sprite_hitboxes import (
 from skeleton.testing.test_jeeves_studio_sprite_variants import (
     DirectionalSpriteTests as TestJeevesDirectionalSprite,
 )
+from skeleton.testing.test_jeeves_studio_npc_cast_source import (
+    OriginalNpcCastTests as TestJeevesOriginalNpcCast,
+)
+from skeleton.testing.test_jeeves_studio_sprite_npc_binding import (
+    OriginalNpcSpriteBindingTests as TestJeevesOriginalNpcSprites,
+    NpcSpriteGraphPreflightTests as TestJeevesNpcSpritePreflight,
+)
 from skeleton.testing.test_jeeves_studio_sprite_quality import (
     SpriteQualityTests as TestJeevesSpriteQuality,
 )
@@ -32,6 +39,8 @@ from skeleton.testing.test_jeeves_studio_creator_source import (
 __all__ = [
     "TestJeevesSpriteForge", "TestJeevesPersistedSprites",
     "TestJeevesSpriteQuality",
+    "TestJeevesOriginalNpcCast", "TestJeevesOriginalNpcSprites",
+    "TestJeevesNpcSpritePreflight",
     "TestJeevesDirectionalSprite",
     "TestJeevesExactSpriteCollision", "TestJeevesOriginalPlayerAvatar",
     "TestJeevesFrontierSource", "TestJeevesRealGodotSource",
