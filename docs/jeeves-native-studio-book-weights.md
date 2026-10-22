@@ -1233,3 +1233,58 @@ The root CI collector now runs
 `skeleton/testing/test_jeeves_studio_sprite_frame_cues.py`, including
 malformed source, unsafe-event, duplicate-frame, tamper, persistence
 and full Godot player/NPC packaging regressions.
+
+
+## Explicit-heightfield sprite normal maps (additive production milestone)
+
+The local pixel sprite forge now optionally accepts an original `lighting`
+field with `kind="heightfield_normals"`, a reviewed `strength` (integer
+1..32), and one exact `height_frames` record per compiled animation frame.
+Each frame supplies its existing `frame_id` and an explicit row-major list
+of 8-bit grayscale heights. A 2×2 original frame uses four values; there is
+no hidden depth inference, image-model claim or invented scene geometry.
+
+```json
+{
+  "lighting": {
+    "kind": "heightfield_normals",
+    "strength": 8,
+    "height_frames": [
+      {"frame_id": "idle-0", "heights": [0, 90, 140, 255]},
+      {"frame_id": "idle-1", "heights": [255, 140, 90, 0]}
+    ]
+  }
+}
+```
+
+`studio_sprite_surface.py` computes deterministic clamped central
+heightfield derivatives and encodes normalized tangent-space vectors in
+a real lossless RGBA PNG. It preserves the source color atlas alpha
+exactly, uses the identical frame rectangle, pixel scaling, atlas padding
+and gutter-extrusion policy, and refuses missing/ambiguous frame height
+records, non-integer/boolean samples, or out-of-range values. It does
+not recolor the original diffuse sprite.
+
+Outputs appear as `sprites/<asset>.normal.png` in the sprite-only ZIP
+and `game/frontier/sprites/<asset>.normal.png` in the Godot project ZIP.
+Both packages also include `<asset>.normal.source.json` containing the
+actual approved author-provided heightfield. The regular sprite receipt
+binds original frame height SHA-256 hashes, the normal-map RGBA SHA,
+diffuse PNG SHA, output dimensions and compilation policies. The
+published Godot ZIP verifier rereads both files and independently
+regenerates **every normal PNG byte from the original heightfield**, in
+addition to checking tangent-vector normalization and perfect alpha
+equivalence. Heightfield records are subject to normal source revision
+and pre-persistence checks, so changes require a new explicit edit and
+revised source hash.
+
+There are **12 new regression cases** in
+`skeleton/testing/test_jeeves_studio_sprite_surface.py`, collected into
+root CI, and a game ZIP round-trip test in
+`test_jeeves_studio_frontier_source_compile.py`. These cover real PNG
+content, flat/upward and non-flat normals, alpha preservation, explicit
+source replay, altered height pixels, invalid types/frame IDs, tampered
+receipts, missing heightfield output, and actual ZIP export. The
+native renderer has **not** yet been demonstrated as using these
+normal maps to shade actors. The receipts explicitly distinguish
+source-compiled normal textures from actual Godot lighting.
