@@ -168,6 +168,7 @@ def _sprite_archive(
         "project_id": project_id, "source_head_sha256": source_head_sha256,
         "asset_count": compiled["count"],
         "atlas_hashes": compiled["atlas_hashes"],
+        "palette_variant_receipts": compiled["palette_variant_receipts"],
         "collision_receipts": {
             item["metadata"]["asset_id"]: item["collision_rectangles"]["receipt_sha256"]
             for item in atlas
@@ -469,6 +470,15 @@ class CreatorProjectSourceStore:
             validate_original_avatar_source_graph(next_records)
             from .studio_sprite_npc_binding import preflight_original_npc_sprite_graph
             preflight_original_npc_sprite_graph(next_records)
+            if any(
+                isinstance(item.get("document"), dict)
+                and item["document"].get("kind") == "sprite_palette_variant"
+                for item in next_records.values()
+            ):
+                from .studio_sprite_palette_variants import (
+                    compile_original_palette_collection,
+                )
+                compile_original_palette_collection(next_records)
         if self._event_count >= MAX_EVENTS:
             raise CreatorSourceError("source event journal needs archival")
         self._db.execute("BEGIN IMMEDIATE")
@@ -642,8 +652,8 @@ class CreatorProjectSourceStore:
             if not self._records or not report["valid"]:
                 raise CreatorSourceError("unresolved sources or dependencies block export")
             if export_format == "sprite-atlas-zip":
-                from .studio_sprite_forge import compile_sprite_collection
-                compiled = compile_sprite_collection(self._records)
+                from .studio_sprite_palette_variants import compile_original_palette_collection
+                compiled = compile_original_palette_collection(self._records)
                 raw = _sprite_archive(
                     compiled, project_id=self.project_id,
                     source_head_sha256=self._head,
