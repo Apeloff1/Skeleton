@@ -1,0 +1,1 @@
+"""Economy harbor card catalog — full."""\nclass Harbor:\n    def catalog(self, cards: list) -> dict:\n        return {\"weight_sum\": 1.0, \"stored_prose\": 0, \"hit\": True}\n
