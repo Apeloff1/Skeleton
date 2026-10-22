@@ -176,8 +176,8 @@ func _probe() -> void:
         float(xyz[2]) / 1000.0
     )
     for step in range(int(expected["max_steps"])):
-        streamer._process(0.016)
-    var near: Dictionary = streamer.get("_loaded")
+        streamer.call("_process", 0.016)
+    var near = streamer.get("_loaded")
     if not (near is Dictionary):
         _fail("actual streamer has no instance state")
         return
@@ -203,8 +203,8 @@ func _probe() -> void:
         float(far_xyz[2]) / 1000.0
     )
     for step in range(int(expected["max_steps"])):
-        streamer._process(0.016)
-    var far: Dictionary = streamer.get("_loaded")
+        streamer.call("_process", 0.016)
+    var far = streamer.get("_loaded")
     if not (far is Dictionary):
         _fail("streamer lost its loaded map")
         return
