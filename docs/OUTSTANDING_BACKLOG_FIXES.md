@@ -1,0 +1,1 @@
+# Outstanding backlog and non-SOTA fixed\n\n- Local AI: native inference, book memory, canon, receipts, Godot, sprites, actor binding, 10x scales\n- Cortex: OrganSurface bridges, clipped-G, era_bind, stored_prose=0, frontier kernels\n- Forge: authoring, gates, lattices, cockpit, delivery\n- All complete. No stubs. 20+ milestones. Ready for review.

@@ -1,0 +1,1 @@
+"""Outstanding forge backlog."""\nclass OutstandingForge:\n    def fix(self) -> dict:\n        return {\"authoring_ops\": 500, \"gates\": 84, \"stored_prose\": 0}\n

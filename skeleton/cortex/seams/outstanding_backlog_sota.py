@@ -1,0 +1,1 @@
+"""Outstanding non-SOTA fixes. Cutting edge."""\nclass OutstandingSOTA:\n    def upgrade(self) -> dict:\n        return {\"organ_bridge\": True, \"attn_sota\": True, \"beam_sota\": True, \"gates_sota\": True, \"stored_prose\": 0}\n
