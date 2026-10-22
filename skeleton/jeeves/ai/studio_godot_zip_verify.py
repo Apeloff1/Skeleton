@@ -119,8 +119,8 @@ def verify_published_godot_zip(
                 for item in original_sprites:
                     if not isinstance(item, dict) or set(item) != {
                         "asset_id", "source_record_id", "source_sha256",
-                        "frame_count", "animation_count", "png_sha256",
-                        "godot_spriteframes_resource_sha256",
+                        "frame_count", "animation_count", "animation_names",
+                        "png_sha256", "godot_spriteframes_resource_sha256",
                         "godot_preview_scene_path",
                     }:
                         raise NativeSourceVerificationError(
@@ -152,7 +152,9 @@ def verify_published_godot_zip(
                             or sprite.get("record_id") != item["source_record_id"]
                             or sprite.get("png_sha256") != item["png_sha256"]
                             or len(sprite.get("frames", [])) != item["frame_count"]
-                            or len(sprite.get("animations", [])) != item["animation_count"]):
+                            or len(sprite.get("animations", [])) != item["animation_count"]
+                            or [state["name"] for state in sprite["animations"]]
+                            != item["animation_names"]):
                         raise NativeSourceVerificationError(
                             "Godot sprite source identity or animation receipt differs"
                         )
@@ -208,6 +210,50 @@ def verify_published_godot_zip(
                         raise NativeSourceVerificationError(
                             "original source SpriteFrames resource hash differs"
                         )
+            from .studio_sprite_actor_binding import (
+                SpriteBindingError, verify_actor_sprite_binding,
+            )
+            original_avatar = proof.get("authored_player_avatar_binding")
+            actor_script_proof = proof.get("player_avatar_game_script_receipt")
+            if original_avatar is None:
+                if (actor_script_proof is not None
+                        or proof.get("animated_sprite3d_player_script_compiled") is not False):
+                    raise NativeSourceVerificationError(
+                        "Godot archive claims a compiled actor visual without source"
+                    )
+            else:
+                if (not isinstance(original_avatar, dict)
+                        or not isinstance(actor_script_proof, dict)
+                        or proof.get("animated_sprite3d_player_script_compiled") is not True):
+                    raise NativeSourceVerificationError(
+                        "player avatar lacks exact approved actor script proof"
+                    )
+                from skeleton.jeeves.game_frontier_expedition_godot import _GODOT_SCRIPT
+                try:
+                    script = archive.read("game/frontier/expedition.gd").decode("utf-8")
+                    recomputed = verify_actor_sprite_binding(
+                        _GODOT_SCRIPT, script, original_avatar,
+                    )
+                except (SpriteBindingError, UnicodeDecodeError) as exc:
+                    raise NativeSourceVerificationError(
+                        "player avatar game script deviates from compiled source"
+                    ) from exc
+                if recomputed != actor_script_proof:
+                    raise NativeSourceVerificationError(
+                        "player visual game script certificate differs"
+                    )
+                matches = [
+                    sprite for sprite in original_sprites
+                    if sprite["asset_id"] == original_avatar.get("asset_id")
+                ]
+                if (len(matches) != 1
+                        or original_avatar.get("sprite_source_record_id")
+                        != matches[0]["source_record_id"]
+                        or original_avatar.get("animation")
+                        not in matches[0]["animation_names"]):
+                    raise NativeSourceVerificationError(
+                        "real player sprite binding lost its source or animation"
+                    )
     except (zipfile.BadZipFile, RuntimeError, OSError, UnicodeError) as exc:
         raise NativeSourceVerificationError("published Godot archive is unreadable") from exc
     return {
