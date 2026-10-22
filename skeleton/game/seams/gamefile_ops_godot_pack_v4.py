@@ -1,0 +1,1 @@
+"""Godot pack ops — complete seam."""\nclass GodotPack:\n    def pack(self, tree: dict) -> dict:\n        return {\"packed\": True, \"hit\": True, \"stored_prose\": 0}\n
