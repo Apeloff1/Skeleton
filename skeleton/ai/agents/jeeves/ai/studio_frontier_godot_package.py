@@ -150,10 +150,50 @@ def compile_original_godot_candidate(
         )
         files[native_cast_path] = native_cast
         file_hashes[native_cast_path] = sha256(native_cast.encode("utf-8")).hexdigest()
+    # The authored original PCM samples become genuine bounded WAV resources.
+    # A native sound event is only possible after separate reviewed cue routing.
+    from .studio_original_audio import (
+        compile_original_sound_collection, verify_original_sound,
+    )
+    audio = compile_original_sound_collection(records)
+    authored_audio: list[dict[str, Any]] = []
     # Keep original image resources in the REAL Godot project directory.
     # They are explicitly marked not yet bound to engine actor render nodes:
     # a PNG present on disk does not prove animated asset presentation.
     binary_assets: dict[str, bytes] = {}
+    for sound in audio["assets"]:
+        proof = sound["metadata"]
+        asset_id = proof["asset_id"]
+        original = next(
+            (record for record in records.values()
+             if record.get("record_id") == proof["source_record_id"]),
+            None,
+        )
+        if original is None:
+            raise FrontierSourceError("published sound lost original source record")
+        replay = verify_original_sound(original, sound["wav"], proof)
+        if not replay["reconstructed_all_pcm_samples"]:
+            raise FrontierSourceError("WAV sound cannot be replayed from authored source")
+        path = "game/frontier/audio/" + asset_id + ".wav"
+        source_path = "game/frontier/audio/" + asset_id + ".source.json"
+        if path in files or source_path in files:
+            raise FrontierSourceError("authored original sound collides with engine source")
+        source_bytes = json.dumps(
+            {"record": original, "metadata": proof},
+            ensure_ascii=True, sort_keys=True, allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        binary_assets[path] = sound["wav"]
+        binary_assets[source_path] = source_bytes
+        file_hashes[path] = sha256(sound["wav"]).hexdigest()
+        file_hashes[source_path] = sha256(source_bytes).hexdigest()
+        authored_audio.append({
+            "asset_id": asset_id,
+            "source_record_id": proof["source_record_id"],
+            "source_sha256": proof["source_sha256"],
+            "wav_sha256": proof["wav_sha256"],
+            "metadata_receipt_sha256": proof["receipt_sha256"],
+        })
     authored_sprites: list[dict[str, Any]] = []
     sprite_names: list[str] = []
     original_hitboxes: dict[str, dict[str, Any]] = {}
@@ -182,6 +222,19 @@ def compile_original_godot_candidate(
             binary_assets[json_path] = metadata_bytes
             file_hashes[png_path] = sha256(sprite["png"]).hexdigest()
             file_hashes[json_path] = sha256(metadata_bytes).hexdigest()
+            normal_png = sprite.get("normal_png")
+            if normal_png is not None:
+                from .studio_sprite_surface import verify_normal_texture_bytes
+                verify_normal_texture_bytes(
+                    sprite["png"], normal_png, info.get("normal_map"),
+                    width=info["sheet_width_px"],
+                    height=info["sheet_height_px"],
+                )
+                normal_path = "game/frontier/sprites/" + name + ".normal.png"
+                if normal_path in binary_assets or normal_path in files:
+                    raise FrontierSourceError("authored sprite normal map path collides")
+                binary_assets[normal_path] = normal_png
+                file_hashes[normal_path] = sha256(normal_png).hexdigest()
             from .studio_sprite_hitboxes import verify_exact_sprite_hitboxes
             hitboxes = verify_exact_sprite_hitboxes(
                 info, sprite["collision_rectangles"],
@@ -224,15 +277,22 @@ def compile_original_godot_candidate(
                     info["frame_cues"]["receipt_sha256"]
                     if info.get("frame_cues") else None
                 ),
+                "frame_cue_event_ids": [
+                    cue["event_id"] for cue in info["frame_cues"]["cues"]
+                ] if info.get("frame_cues") else [],
                 "godot_frame_cue_resource_sha256": cue_proof["receipt_sha256"],
                 "png_sha256": info["png_sha256"],
+                "normal_png_sha256": (
+                    info["normal_map"]["normal_png_sha256"]
+                    if info.get("normal_map") else None
+                ),
                 "original_hitbox_receipt_sha256": hitboxes["receipt_sha256"],
             })
     from .studio_sprite_actor_binding import (
         binding_from_source, bind_sprite_to_expedition_script,
         verify_actor_sprite_binding,
     )
-    avatar = binding_from_source(records, authored_sprites)
+    avatar = binding_from_source(records, authored_sprites, authored_audio)
     actor_script_receipt = None
     player_sensor_receipt = None
     if avatar is not None and avatar.get("collision_sensor") is True:
@@ -315,6 +375,12 @@ def compile_original_godot_candidate(
         "godot_verification_sha256": godot_proof["receipt_digest"],
         "godot_file_hashes": file_hashes,
         "packaged_original_sprites": authored_sprites,
+        "packaged_original_audio": authored_audio,
+        "audio_engine_playback_verified": False,
+        "original_player_audio_cue_routes_compiled": (
+            len(avatar.get("audio_cue_bindings", {})) if avatar is not None
+            else 0
+        ),
         "original_palette_variant_receipts": (
             artwork["palette_variant_receipts"]
             if authored_sprites else []
