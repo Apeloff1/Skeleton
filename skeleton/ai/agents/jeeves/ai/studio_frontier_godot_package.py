@@ -572,6 +572,19 @@ def compile_original_godot_candidate(
         meshes=meshes["assets"], lod_sets=lod_collection["sets"],
         physics_assets=physics["assets"],
     )
+    from .studio_world_spatial_index import (
+        compile_world_spatial_index, spatial_index_bytes,
+    )
+    world_index = compile_world_spatial_index(
+        project_id=project_id, source_head_sha256=source_head_sha256,
+        catalog=asset_catalog, placements=placements["metadata"],
+    )
+    world_index_raw = spatial_index_bytes(world_index)
+    index_path = "game/frontier/assets/world-index.json"
+    if index_path in files or index_path in binary_assets:
+        raise FrontierSourceError("spatial manifest path is already occupied")
+    binary_assets[index_path] = world_index_raw
+    file_hashes[index_path] = sha256(world_index_raw).hexdigest()
     catalog_raw = catalog_bytes(asset_catalog)
     catalog_path = "game/frontier/assets/catalog.json"
     if catalog_path in files or catalog_path in binary_assets:
@@ -595,6 +608,9 @@ def compile_original_godot_candidate(
         "asset_catalog_sha256": sha256(catalog_raw).hexdigest(),
         "asset_catalog_receipt_sha256": asset_catalog["receipt_sha256"],
         "asset_descriptor_count": asset_catalog["descriptor_count"],
+        "world_spatial_index_sha256": sha256(world_index_raw).hexdigest(),
+        "world_spatial_receipt_sha256": world_index["receipt_sha256"],
+        "world_instance_descriptor_count": world_index["instance_count"],
         "packaged_original_sprites": authored_sprites,
         "packaged_original_audio": authored_audio,
         "packaged_original_meshes": authored_meshes,

@@ -93,7 +93,12 @@ def compile_world_spatial_index(
         raise WorldSpatialIndexError("asset catalog source head differs from scene")
     unsealed = dict(catalog)
     seal = unsealed.pop("receipt_sha256", None)
-    if seal != sha256(_json(unsealed)).hexdigest():
+    catalog_bytes(catalog)  # The catalog has its own (larger) byte budget.
+    canonical_body = json.dumps(
+        unsealed, sort_keys=True, ensure_ascii=True,
+        separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    if seal != sha256(canonical_body).hexdigest():
         raise WorldSpatialIndexError("catalog was not content-addressed")
     asset_hash = sha256(catalog_bytes(catalog)).hexdigest()
     parts = dict(placements)
