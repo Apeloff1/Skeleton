@@ -356,6 +356,109 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(journal.read()), 0)
 
+    def test_authored_static_collision_is_actual_godot_scene_in_native_zip(self):
+        self.populate_3d()
+        self.create("collision-mesh", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "collision-cube",
+            "primitive": "box", "size_mm": [1700, 1200, 850],
+            "segments": 6, "color_rgba": "#778899ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 790,
+        }, depends=("config-3d",))
+        self.create("collision-body", "physics", {
+            "kind": "procedural_mesh_physics",
+            "base_record_id": "collision-mesh", "asset_id": "collision-cube",
+            "body_type": "static", "density_kg_m3": 2200,
+            "friction_per_mille": 820, "restitution_per_mille": 140,
+            "collision_layer": 7, "collision_mask": 13,
+        }, depends=("collision-mesh",))
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            physics_scene = "game/frontier/meshes/collision-cube.physics.tscn"
+            physics_source = "game/frontier/meshes/collision-cube.physics.source.json"
+            self.assertIn(physics_scene, archive.namelist())
+            self.assertIn(physics_source, archive.namelist())
+            script = archive.read(physics_scene).decode("utf-8")
+            self.assertIn('type="StaticBody3D"', script)
+            self.assertIn('type="BoxShape3D"', script)
+            self.assertIn("friction = 0.82000000", script)
+            self.assertIn("collision_layer = 7", script)
+            compiled = json.loads(archive.read(physics_source))
+            manifest = json.loads(archive.read("jeeves_source_receipt.json"))
+            catalog = json.loads(archive.read("game/frontier/assets/catalog.json"))
+            self.assertEqual(manifest["packaged_original_mesh_physics"][0][
+                "scene_sha256"], sha256(script.encode("utf-8")).hexdigest())
+            self.assertEqual(compiled["metadata"]["body_type"], "static")
+            self.assertEqual(catalog["descriptors"][0]["metrics"][
+                "physics"]["shape_type"], "BoxShape3D")
+            self.assertFalse(manifest["native_collision_physics_verified"])
+        proof = verify_published_godot_zip(
+            self.export / result["artifact_name"], project_id="new-game",
+            source_head_sha256=self.owner.head_identity(),
+            expected_archive_sha256=result["artifact_sha256"],
+        )
+        self.assertEqual(proof["original_physics_bodies_replayed"], 1)
+        self.assertFalse(proof["actual_collision_contact_observed"])
+
+    def test_authored_lod_and_physics_bind_same_rendered_visual_scene(self):
+        self.populate_3d()
+        self.create("statue-source", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "statue",
+            "primitive": "cylinder", "size_mm": [900, 2700, 900],
+            "segments": 32, "color_rgba": "#bb9999ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 850,
+        }, depends=("config-3d",))
+        self.create("statue-lods", "asset_forge", {
+            "kind": "procedural_mesh_lod_set",
+            "base_record_id": "statue-source", "asset_id": "statue",
+            "levels": [
+                {"level": 1, "segments": 16, "switch_distance_mm": 10000},
+                {"level": 2, "segments": 8, "switch_distance_mm": 29000},
+            ],
+        }, depends=("statue-source",))
+        self.create("statue-physics", "physics", {
+            "kind": "procedural_mesh_physics",
+            "base_record_id": "statue-source", "asset_id": "statue",
+            "body_type": "rigid", "density_kg_m3": 800,
+            "friction_per_mille": 600, "restitution_per_mille": 100,
+            "collision_layer": 1, "collision_mask": 31,
+        }, depends=("statue-source",))
+        export = self.export_godot()
+        with zipfile.ZipFile(self.export / export["artifact_name"]) as archive:
+            scene = archive.read(
+                "game/frontier/meshes/statue.physics.tscn"
+            ).decode("utf-8")
+            self.assertIn('type="RigidBody3D"', scene)
+            self.assertIn("res://game/frontier/meshes/statue.lod.tscn", scene)
+            self.assertIn("continuous_cd = true", scene)
+            physics = json.loads(archive.read(
+                "game/frontier/meshes/statue.physics.source.json"
+            ))
+            self.assertTrue(physics["metadata"]["lod_bound"])
+            self.assertGreater(physics["metadata"]["rigid_mass_kg"], 0)
+        self.assertEqual(export["disk_verification"][
+            "original_lod_levels_replayed"], 2)
+        self.assertEqual(export["disk_verification"][
+            "original_physics_bodies_replayed"], 1)
+        self.assertFalse(export["disk_verification"][
+            "actual_collision_contact_observed"])
+
+    def test_mesh_without_authored_physics_has_no_invented_collider(self):
+        self.populate_3d()
+        self.create("naked-cube", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "naked-cube",
+            "primitive": "box", "size_mm": [500, 700, 400],
+            "segments": 6, "color_rgba": "#123456ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 900,
+        }, depends=("config-3d",))
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            self.assertNotIn("game/frontier/meshes/naked-cube.physics.tscn",
+                             archive.namelist())
+            manifest = json.loads(archive.read("jeeves_source_receipt.json"))
+            self.assertEqual(manifest["packaged_original_mesh_physics"], [])
+        self.assertEqual(result["disk_verification"][
+            "original_physics_bodies_replayed"], 0)
+
     def test_actual_source_authored_lod_scenes_and_meshes_ship_in_godot_zip(self):
         self.populate_3d()
         self.create("beacon-base", "asset_forge", {
