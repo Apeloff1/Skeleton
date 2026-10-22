@@ -180,6 +180,14 @@ class HeightfieldNormalTests(unittest.TestCase):
                     normal = z.read("sprites/hero-idle.normal.png")
                     color = z.read("sprites/hero-idle.png")
                     metadata = json.loads(z.read("sprites/hero-idle.json"))
+                    original_heights = json.loads(
+                        z.read("sprites/hero-idle.normal.source.json")
+                    )
+                self.assertTrue(verify_authored_normals(
+                    original_heights, metadata=metadata,
+                    color_png=color, normal_png=normal,
+                    normal_receipt=metadata["normal_map"],
+                )["height_map_replayed"])
                 self.assertTrue(verify_normal_texture_bytes(
                     color, normal, metadata["normal_map"],
                     width=metadata["sheet_width_px"],
