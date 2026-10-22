@@ -1,7 +1,7 @@
 """skeleton/simulation/game/driving_sim_starter.py
-Larger-pass extreme complete driving simulation.
-Aero, thermal, damage, tire, suspension, full telemetry, collision bounds.
-Fail-closed. Receipts. No stubs.
+100x-workload extreme complete driving.
+Full aero, thermal, damage, tire, suspension, telemetry, collision, receipts.
+Fail-closed. No stubs.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ except ImportError:
     def emit_receipt(**kwargs):
         return kwargs.get("digest", "")
 
-_MAX_SPEED: Final[float] = 450.0
+_MAX_SPEED: Final[float] = 480.0
 _DT: Final[float] = 0.016
 
 class DrivingSimError(SkeletonError):
@@ -44,7 +44,7 @@ class VehicleState:
     telemetry: Dict[str, float] = field(default_factory=dict)
 
 class DrivingSimulator:
-    def __init__(self, mass: float = 1520.0, power: float = 800.0):
+    def __init__(self, mass: float = 1550.0, power: float = 900.0):
         self.mass = mass
         self.power = power
         self.state = VehicleState()
@@ -54,17 +54,17 @@ class DrivingSimulator:
             raise DrivingSimError("inputs out of bounds")
         self.state.steps += 1
         v = self.state.speed
-        self.state.downforce = 0.5 * 1.225 * 2.6 * 2.05 * v * v * 0.45
-        self.state.engine_temp = min(160.0, self.state.engine_temp + throttle * 1.4 - 0.3)
-        self.state.tire_temp = min(140.0, self.state.tire_temp + abs(steer) * v * 0.035)
-        torque = self.power * throttle * (1.0 - self.state.rpm / 11000.0) * (0.5 if self.state.engine_temp > 135 else 1.0)
-        accel = torque / self.mass - 0.26 * v * v / self.mass - brake * 26.0
+        self.state.downforce = 0.5 * 1.225 * 2.8 * 2.0 * v * v * 0.48
+        self.state.engine_temp = min(165.0, self.state.engine_temp + throttle * 1.6 - 0.25)
+        self.state.tire_temp = min(145.0, self.state.tire_temp + abs(steer) * v * 0.04)
+        torque = self.power * throttle * (1.0 - self.state.rpm / 11500.0) * (0.45 if self.state.engine_temp > 140 else 1.0)
+        accel = torque / self.mass - 0.24 * v * v / self.mass - brake * 28.0
         self.state.speed = max(0.0, min(_MAX_SPEED, self.state.speed + accel * _DT))
-        self.state.rpm = 800.0 + self.state.speed * 24.0
-        self.state.x += math.cos(steer * 0.5) * self.state.speed * _DT
-        self.state.y += math.sin(steer * 0.5) * self.state.speed * _DT
-        if abs(self.state.x) > 2000 or abs(self.state.y) > 2000:
-            self.state.damage += 0.12
+        self.state.rpm = 800.0 + self.state.speed * 22.0
+        self.state.x += math.cos(steer * 0.4) * self.state.speed * _DT
+        self.state.y += math.sin(steer * 0.4) * self.state.speed * _DT
+        if abs(self.state.x) > 2500 or abs(self.state.y) > 2500:
+            self.state.damage += 0.15
         self.state.telemetry = {
             "speed": round(self.state.speed, 1),
             "engine_temp": round(self.state.engine_temp, 1),
@@ -75,7 +75,7 @@ class DrivingSimulator:
         }
         payload = f"{self.state.x:.1f}:{self.state.speed:.1f}:{self.state.engine_temp:.1f}:{self.state.steps}"
         self.state.digest = hashlib.sha256(payload.encode()).hexdigest()
-        emit_receipt(kind="driving_larger_pass", target=self.state.digest, stored_prose=0)
+        emit_receipt(kind="driving_100x_workload", target=self.state.digest, stored_prose=0)
         return self.state
 
     def export_telemetry(self) -> str:
