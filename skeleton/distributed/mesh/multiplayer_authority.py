@@ -1,4 +1,4 @@
-"""More-pass-13 multiplayer. Full interest mesh, predictive, distributed, 256 players.
+"""More-pass-14 multiplayer. Full interest mesh, predictive, distributed, 256 players.
 Fail-closed. Receipts."""
 from __future__ import annotations
 import hashlib, time, math
@@ -36,7 +36,7 @@ class SessionAuthority:
         if len(self.grants) >= self.max_players:
             raise MultiplayerError("full")
         g = PlayerGrant(player_id=player_id, session_id=self.session_id)
-        g.digest = hashlib.sha256(f"{player_id}:{self.session_id}:more13".encode()).hexdigest()
+        g.digest = hashlib.sha256(f"{player_id}:{self.session_id}:more14".encode()).hexdigest()
         self.grants[player_id] = g
         return g
 
@@ -47,13 +47,13 @@ class SessionAuthority:
         peer = g.peers.setdefault(peer_id, PeerState(peer_id))
         peer.position = pos
         peer.lag = lag
-        peer.interested = math.hypot(pos[0], pos[1]) < 15000
+        peer.interested = math.hypot(pos[0], pos[1]) < 20000
         if peer.interested and peer_id not in g.interest_set:
             g.interest_set.append(peer_id)
         self.tick += 1
         g.rollback.append({"tick": self.tick, "pos": pos, "lag": lag})
-        peer.cheat_score += 10.0
+        peer.cheat_score += 15.0
 
     def verify(self, player_id: str, digest: str) -> bool:
         g = self.grants.get(player_id)
-        return bool(g and g.digest == digest and all(p.cheat_score < 100.0 for p in g.peers.values()))
+        return bool(g and g.digest == digest and all(p.cheat_score < 150.0 for p in g.peers.values()))
