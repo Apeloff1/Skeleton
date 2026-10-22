@@ -827,3 +827,69 @@ original-asset tests, and real game ZIP packaging checks. Root backend CI
 imports these suites from `tests/test_jeeves_native_studio_real_artifacts.py`.
 **Passing exact-head CI remains required** before calling this production
 pipeline verified.
+
+
+## Source-authored avatar binding to the actual Expedition player
+
+The original sprite forge now has a **real main-game integration path**, not
+only an isolated preview. After creating a `sprite_forge` source record,
+create a reviewed `scene_forge` record referencing it as an explicit
+dependency:
+
+```json
+{
+  "kind": "sprite_actor_binding",
+  "target": "player_actor",
+  "asset_id": "original-hero",
+  "animation": "idle",
+  "pixel_size": 0.025,
+  "vertical_offset_m": 1.5,
+  "billboard": true,
+  "hide_capsule": true
+}
+```
+
+The record's `depends_on` must include the original sprite's **record ID**.
+The compiler rejects unknown sprites, nonexistent animation states, competing
+player bindings, arbitrary targets, unsafe resource identifiers, nonfinite or
+out-of-range pixel/position scales and any undeclared fields. In particular,
+the model can never contribute GDScript text; only the trusted fixed native
+generator can create the actual binding.
+
+With a valid reviewed source, `frontier-godot4-zip` patches the genuine
+`game/frontier/expedition.gd` player spawn anchor. The game now creates an
+`AnimatedSprite3D` from the authored `SpriteFrames` `.tres`, attaches it
+to the actual moving actor node, sets its typed animation and billboard
+configuration and optionally removes the original capsule mesh **without
+hiding the child**. It preserves actor coordinates and the original game
+routing logic. An independent verifier recreates the entire patched script
+from the canonical Expedition source, checks byte equivalence, validates the
+bound sprite and animation references against archived resources, and
+hashes the original and rewritten script.
+
+### Native playback must test the exact modified project
+
+The prior headless native runner regenerated the baseline Expedition world;
+a successful baseline route would **not** demonstrate that this animated
+player binding loaded. To prevent false attribution, the host now selects
+`studio_sprite_bound_native_runner.run_sprite_bound_native_expedition`
+when an avatar is authored. This runner writes and runs the **exact
+content-hashed generated files including PNGs, SpriteFrames and the modified
+game script**, adds independently planned autoplay input and executes an
+installed Godot 4 binary. It checks the executable hash before/after,
+the engine's unique gameplay completion output, world identity and
+independent per-action replay against the typed Python state machine.
+
+`NativeStudioHost.verify_real_native_gameplay(...)` remains a separately
+authorized host operation and emits evidence only after success. The result
+distinguishes `native_player_avatar_script_executed` from
+`native_visual_output_independently_observed=false`: a headless game run
+does not prove subjective appearance, screenshot fidelity or finished art
+direction. Game exports alone continue to declare
+`native_sprite_scene_binding_verified=false`.
+
+These milestones also synchronize the strict canonical AI file-tree mirrors
+for all newly created Jeeves studio modules and move the owned
+`runtime_learning` contracts into their required governed mirror. Existing
+canonical runtime/owner modules are not deleted or rewritten to bypass a
+quality gate.
