@@ -69,6 +69,18 @@ def test_first_install_accepts_observed_required_routes(monkeypatch, tmp_path):
     assert report["critical_routes"]["ready"] is True
 
 
+def test_first_install_rejects_contradictory_ready_with_missing_routes(monkeypatch, tmp_path):
+    report = _doctor(monkeypatch, tmp_path, {
+        "critical_routes": {
+            "ok": True, "report_available": True,
+            "missing": ["routes.marketplace"],
+        },
+    })
+    assert report["critical_routes"]["observed"] is True
+    assert report["critical_routes"]["ready"] is False
+    assert report["services_ready"] is False
+
+
 def test_first_install_does_not_trust_malformed_route_report(monkeypatch, tmp_path):
     report = _doctor(monkeypatch, tmp_path, {
         "critical_routes": {
