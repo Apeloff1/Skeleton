@@ -296,6 +296,31 @@ def verify_published_godot_zip(
                             raise NativeSourceVerificationError(
                                 "normal texture differs from its source review"
                             )
+                        source_path = (
+                            "game/frontier/sprites/"
+                            + asset_name + ".normal.source.json"
+                        )
+                        if source_path not in expected:
+                            raise NativeSourceVerificationError(
+                                "original lighting heightfield source absent"
+                            )
+                        try:
+                            from .studio_sprite_surface import verify_authored_normals
+                            original_heights = json.loads(archive.read(source_path))
+                            replay = verify_authored_normals(
+                                original_heights, metadata=sprite,
+                                color_png=image,
+                                normal_png=archive.read(normal_path),
+                                normal_receipt=sprite["normal_map"],
+                            )
+                        except (SpriteSurfaceError, ValueError, TypeError, KeyError) as exc:
+                            raise NativeSourceVerificationError(
+                                "original authored normal heights cannot reproduce Godot image"
+                            ) from exc
+                        if replay["height_map_replayed"] is not True:
+                            raise NativeSourceVerificationError(
+                                "original normal map fails source reconstruction"
+                            )
                     try:
                         pixels = _decode_verified_png(
                             image, sprite["sheet_width_px"],
