@@ -110,6 +110,7 @@ def verify_published_godot_zip(
             )
             descriptor_sprites: list[dict[str, Any]] = []
             descriptor_audio: list[dict[str, Any]] = []
+            descriptor_meshes: list[dict[str, Any]] = []
             # Verify the genuinely authored NPC cast, not just its ZIP hash.
             from .studio_npc_cast_source import (
                 OriginalNpcCastError, verify_original_npc_cast,
@@ -212,6 +213,48 @@ def verify_published_godot_zip(
                         raise NativeSourceVerificationError(
                             "published original audio receipt loses source ownership"
                         )
+            # Reconstruct every published indexed glTF 2.0 binary from its
+            # reviewed original parametric source, not just the archive SHA.
+            from .studio_original_mesh import OriginalMeshError, verify_original_mesh
+            original_meshes = proof.get("packaged_original_meshes", [])
+            if (type(original_meshes) is not list or len(original_meshes) > 64
+                    or proof.get("native_mesh_import_verified") is not False):
+                raise NativeSourceVerificationError(
+                    "original 3D mesh inventory or execution claim is invalid"
+                )
+            seen_meshes: set[str] = set()
+            for model in original_meshes:
+                if type(model) is not dict or set(model) != {
+                    "asset_id", "source_record_id", "source_sha256",
+                    "glb_sha256", "metadata_receipt_sha256",
+                }:
+                    raise NativeSourceVerificationError("incomplete original GLB lineage")
+                name = model["asset_id"]
+                if type(name) is not str or name in seen_meshes:
+                    raise NativeSourceVerificationError("duplicate original GLB asset")
+                seen_meshes.add(name)
+                model_path = "game/frontier/meshes/" + name + ".glb"
+                source_path = "game/frontier/meshes/" + name + ".source.json"
+                if model_path not in expected or source_path not in expected:
+                    raise NativeSourceVerificationError("3D model source or GLB omitted")
+                try:
+                    source = json.loads(archive.read(source_path))
+                    record, info = source["record"], source["metadata"]
+                    replay = verify_original_mesh(record, archive.read(model_path), info)
+                except (OriginalMeshError, KeyError, ValueError, TypeError) as exc:
+                    raise NativeSourceVerificationError(
+                        "indexed GLB differs from independently rebuilt mesh"
+                    ) from exc
+                if (replay["glb_sha256"] != model["glb_sha256"]
+                        or info["receipt_sha256"] != model["metadata_receipt_sha256"]
+                        or info["source_sha256"] != model["source_sha256"]
+                        or record["record_id"] != model["source_record_id"]):
+                    raise NativeSourceVerificationError(
+                        "3D mesh evidence loses original source identity"
+                    )
+                descriptor_meshes.append({
+                    "glb": archive.read(model_path), "metadata": info,
+                })
             original_sprites = proof.get("packaged_original_sprites", [])
             if (not isinstance(original_sprites, list)
                     or len(original_sprites) > 128
@@ -726,6 +769,7 @@ def verify_published_godot_zip(
                     raw_catalog, project_id=project_id,
                     source_head_sha256=source_head_sha256,
                     sprites=descriptor_sprites, sounds=descriptor_audio,
+                    meshes=descriptor_meshes,
                 )
                 metadata_catalog = json.loads(raw_catalog)
                 if (catalog_proof["catalog_sha256"]

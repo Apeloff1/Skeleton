@@ -194,6 +194,38 @@ def compile_original_godot_candidate(
             "wav_sha256": proof["wav_sha256"],
             "metadata_receipt_sha256": proof["receipt_sha256"],
         })
+    # Compile real PBR indexed source meshes into glTF 2.0 binary artifacts.
+    from .studio_original_mesh import (
+        compile_original_mesh_collection, verify_original_mesh,
+    )
+    meshes = compile_original_mesh_collection(records)
+    authored_meshes: list[dict[str, Any]] = []
+    for mesh in meshes["assets"]:
+        info = mesh["metadata"]
+        name = info["asset_id"]
+        original = records[info["source_record_id"]]
+        replay = verify_original_mesh(original, mesh["glb"], info)
+        if replay["glb_buffer_and_index_geometry_replayed"] is not True:
+            raise FrontierSourceError("original GLB geometry did not replay")
+        glb_path = "game/frontier/meshes/" + name + ".glb"
+        source_path = "game/frontier/meshes/" + name + ".source.json"
+        if glb_path in binary_assets or source_path in binary_assets:
+            raise FrontierSourceError("two authored 3D meshes share a source path")
+        source_raw = json.dumps(
+            {"record": original, "metadata": info},
+            ensure_ascii=True, sort_keys=True, separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        binary_assets[glb_path] = mesh["glb"]
+        binary_assets[source_path] = source_raw
+        file_hashes[glb_path] = sha256(mesh["glb"]).hexdigest()
+        file_hashes[source_path] = sha256(source_raw).hexdigest()
+        authored_meshes.append({
+            "asset_id": name, "source_record_id": info["source_record_id"],
+            "source_sha256": info["source_sha256"],
+            "glb_sha256": info["glb_sha256"],
+            "metadata_receipt_sha256": info["receipt_sha256"],
+        })
     authored_sprites: list[dict[str, Any]] = []
     sprite_names: list[str] = []
     compiled_sprites: list[dict[str, Any]] = []
@@ -384,6 +416,7 @@ def compile_original_godot_candidate(
     asset_catalog = compile_asset_catalog(
         project_id=project_id, source_head_sha256=source_head_sha256,
         records=records, sprites=compiled_sprites, sounds=audio["assets"],
+        meshes=meshes["assets"],
     )
     catalog_raw = catalog_bytes(asset_catalog)
     catalog_path = "game/frontier/assets/catalog.json"
@@ -410,6 +443,8 @@ def compile_original_godot_candidate(
         "asset_descriptor_count": asset_catalog["descriptor_count"],
         "packaged_original_sprites": authored_sprites,
         "packaged_original_audio": authored_audio,
+        "packaged_original_meshes": authored_meshes,
+        "native_mesh_import_verified": False,
         "audio_engine_playback_verified": False,
         "original_player_audio_cue_routes_compiled": (
             len(avatar.get("audio_cue_bindings", {})) if avatar is not None

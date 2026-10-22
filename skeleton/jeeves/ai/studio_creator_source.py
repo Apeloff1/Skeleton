@@ -480,6 +480,30 @@ class CreatorProjectSourceStore:
         # Do not persist a structurally invalid image as a valid game asset.
         # Validate original pixel bytes and independent verification before
         # opening the SQLite write transaction (which stays short).
+        if facet == "asset_forge" and document.get("kind") == "procedural_mesh":
+            from .studio_original_mesh import compile_original_mesh
+            compile_original_mesh({
+                "record_id": record_id, "facet": facet, "revision": version,
+                "document": document, "depends_on": depends_on,
+                "source_sha256": content_sha,
+            })
+        if facet == "asset_forge" and document.get("kind") == "asset_descriptor":
+            from .studio_asset_descriptors import _review_overlay
+            _review_overlay({
+                "record_id": record_id, "facet": facet, "revision": version,
+                "document": document, "depends_on": depends_on,
+                "source_sha256": content_sha,
+            })
+            target = self._records.get(document["target_record_id"])
+            if target is None or document["target_record_id"] not in depends_on:
+                raise CreatorSourceError(
+                    "authored descriptor must depend on existing source"
+                )
+            if target["document"].get("kind") not in {
+                "pixel_sprite", "sprite_palette_variant",
+                "procedural_pcm_sound", "procedural_mesh",
+            }:
+                raise CreatorSourceError("descriptor targets unsupported modality")
         if facet == "audio_forge" and document.get("kind") == "procedural_pcm_sound":
             from .studio_original_audio import compile_original_sound
             compile_original_sound({
