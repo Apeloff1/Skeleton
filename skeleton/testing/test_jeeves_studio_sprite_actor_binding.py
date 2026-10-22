@@ -7,8 +7,6 @@ game files instead of claiming runtime completion.
 """
 from __future__ import annotations
 
-from copy import deepcopy
-from pathlib import Path
 import unittest
 
 from skeleton.jeeves.ai.studio_sprite_actor_binding import (
