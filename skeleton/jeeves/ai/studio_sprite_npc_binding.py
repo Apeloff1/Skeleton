@@ -120,6 +120,70 @@ def authored_npc_sprite_bindings(
     return [selected[name] for name in sorted(selected)]
 
 
+def preflight_original_npc_sprite_graph(
+    records: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Validate source references before persisting a creator edit.
+
+    The real NPC cast is checked later against the emitted world. This stage
+    instead guarantees edits cannot break already-authored sprite/animation
+    references or silently lose their original dependency.
+    """
+    from .studio_sprite_forge import compile_authored_sprite
+
+    bindings: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
+    for record_id, record in records.items():
+        doc = record.get("document")
+        if not isinstance(doc, Mapping) or doc.get("kind") != "sprite_npc_binding":
+            continue
+        if (record.get("record_id") != record_id or record.get("facet") != "scene_forge"
+                or set(doc) != DOCUMENT_KEYS):
+            raise NpcSpriteBindingError("NPC sprite source requires exact scene-owned fields")
+        if (type(doc.get("npc_id")) is not str
+                or NPC_ID.fullmatch(doc["npc_id"]) is None):
+            raise NpcSpriteBindingError("NPC visual identity is not portable")
+        bindings.append((record_id, record, doc))
+    if len(bindings) > 64:
+        raise NpcSpriteBindingError("NPC visual bindings exceed original cast capacity")
+    ids = [doc["npc_id"] for _, _, doc in bindings]
+    if len(ids) != len(set(ids)):
+        raise NpcSpriteBindingError("NPC visual identity is authored twice")
+    resolved: list[str] = []
+    for record_id, record, doc in bindings:
+        asset_id = doc["asset_id"]
+        if type(asset_id) is not str or NAME.fullmatch(asset_id) is None:
+            raise NpcSpriteBindingError("NPC visual references invalid sprite name")
+        candidates = [
+            item for item in records.values()
+            if isinstance(item.get("document"), Mapping)
+            and item["document"].get("kind") == "pixel_sprite"
+            and item["document"].get("asset_id") == asset_id
+        ]
+        if len(candidates) != 1:
+            raise NpcSpriteBindingError("NPC visual references absent or ambiguous sprite source")
+        chosen = candidates[0]
+        if (type(record.get("depends_on")) is not list
+                or chosen["record_id"] not in record["depends_on"]):
+            raise NpcSpriteBindingError("NPC visual must depend on its exact original sprite record")
+        source = compile_authored_sprite(chosen)["metadata"]
+        animations = [state["name"] for state in source["animations"]]
+        if doc["animation"] not in animations:
+            raise NpcSpriteBindingError("NPC visual animation missing from original source frames")
+        _float(doc["pixel_size"], "NPC pixel size", 0.001, 0.25)
+        _float(doc["vertical_offset_m"], "NPC vertical offset", -10, 30)
+        if type(doc["billboard"]) is not bool or type(doc["hide_capsule"]) is not bool:
+            raise NpcSpriteBindingError("NPC visual policies must be reviewed booleans")
+        resolved.append(record_id)
+    report = {
+        "schema_version": "skeleton.jeeves.npc_source_graph_preflight.v1",
+        "checked_record_ids": sorted(resolved),
+        "sprite_dependencies_valid": True,
+        "world_npc_identity_verified": False,
+    }
+    report["receipt_sha256"] = digest(report)
+    return report
+
+
 def bind_npc_sprites_to_expedition_script(
     script: str, bindings: list[dict[str, Any]],
 ) -> str:
@@ -220,5 +284,6 @@ def verify_native_npc_binding_script(
 
 __all__ = [
     "NpcSpriteBindingError", "authored_npc_sprite_bindings",
+    "preflight_original_npc_sprite_graph",
     "bind_npc_sprites_to_expedition_script", "verify_native_npc_binding_script",
 ]
