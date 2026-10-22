@@ -1,0 +1,70 @@
+name: Forge Studio Phase Handbook Export
+on:
+  workflow_dispatch:
+    inputs:
+      offset:
+        description: First handbook index (0 to 89999)
+        required: true
+        default: '0'
+        type: string
+      limit:
+        description: Number of books to export (1 to 1000)
+        required: true
+        default: '100'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-studio-phase-docs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  phase-manuals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BOOK_OFFSET: ${{ inputs.offset }}
+      BOOK_LIMIT: ${{ inputs.limit }}
+    steps:
+      - name: Checkout exact code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Configure Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate bounded export request
+        run: |
+          python - <<'PY'
+          import os
+          start=int(os.environ['BOOK_OFFSET'])
+          count=int(os.environ['BOOK_LIMIT'])
+          if not (0<=start<90000 and 1<=count<=1000 and start+count<=90000):
+              raise SystemExit("Export must fit the 90000-book catalog and 1000-book batch limit")
+          PY
+      - name: Render exact game construction manuals and SHA receipts
+        run: |
+          python -m scripts.export_game_studio_phase_handbooks \
+            --out build/forge-phase-manuals \
+            --offset "$BOOK_OFFSET" --limit "$BOOK_LIMIT"
+      - name: Verify requested Markdown count
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          files=list(Path('build/forge-phase-manuals').rglob('*.md'))
+          expected=int(os.environ['BOOK_LIMIT'])
+          if len(files)!=expected:
+              raise SystemExit(f"Expected {expected} books but found {len(files)}")
+          print(f"Verified {len(files)} generated original-game technical books")
+          PY
+      - name: Publish manual batch and hash manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-phase-manuals-${{ inputs.offset }}-${{ inputs.limit }}
+          path: build/forge-phase-manuals/
+          if-no-files-found: error
+          retention-days: 30

@@ -49,6 +49,16 @@ class VehicleState:
     telemetry: Dict[str, float] = field(default_factory=dict)
     digest: str = ""
     collision: bool = False
+    steps: int = 0
+    damage: float = 0.0
+
+    @property
+    def engine_temp(self) -> float:
+        return self.thermal.engine_temp
+
+    @property
+    def tire_temp(self) -> float:
+        return self.thermal.tire_temp
 
 class DrivingSimulator:
     def __init__(self, mass: float = 1450.0, drag_coeff: float = 0.30, frontal_area: float = 2.15, power: float = 520.0):
@@ -63,6 +73,7 @@ class DrivingSimulator:
     def step(self, throttle: float, steer: float, brake: float = 0.0) -> VehicleState:
         if not (-1.0 <= throttle <= 1.0) or not (-1.0 <= steer <= 1.0) or not (0.0 <= brake <= 1.0):
             raise DrivingSimError("inputs out of bounds")
+        self.state.steps += 1
         v = self.state.speed
         drag_force = 0.5 * _AIR_DENSITY * self.drag_coeff * self.frontal_area * v * v
         self.state.downforce = 0.5 * _AIR_DENSITY * 2.1 * self.frontal_area * v * v * 0.35
