@@ -1878,3 +1878,18 @@ The focused regression suite
 contains 21 source and adversarial observation tests. These tests use
 simulated stdout to check verification logic; only an actual host-authorized
 Godot 4 executable run can produce a real streaming-observation receipt.
+
+### Bounded native scene-release work (October 2026)
+
+The source-owned Godot streamer now has an independent, bounded
+`release_per_frame` budget of 8 (the source-authored instantiate budget
+remains adjustable 1–32). It maintains per-frame and cumulative counters for
+real Godot scene-instantiation and queued-release operations. A camera
+transition cannot cause unlimited `queue_free()` calls in one frame.
+
+The trusted native observation script checks that the installed Godot
+streamer loaded the **authored instantiation budget** and original bounded
+release setting and that no observed frame exceeds either value.
+This is protection against workload spikes, not a benchmark: emitting the
+counters does **not** prove FPS, memory reclamation, collision stability or
+rendering quality without actual native execution.

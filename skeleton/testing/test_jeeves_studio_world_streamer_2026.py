@@ -126,6 +126,24 @@ class GodotWorldStreamerTests(unittest.TestCase):
         self.assertNotIn("StaticBody3D", emitted["files"]["game/frontier/assets/world_streamer.gd"])
         self.assertTrue(emitted["receipt"]["static_world_scene_preserved"])
 
+    def test_streamer_bounds_bulk_eviction_and_tracks_real_frame_resource_events(self):
+        _, _, generated = self.actual()
+        script = generated["files"]["game/frontier/assets/world_streamer.gd"]
+        self.assertIn("var release_per_frame: int = 8", script)
+        self.assertIn("var pending_release := release_per_frame", script)
+        self.assertIn("if pending_release <= 0:", script)
+        self.assertIn("_last_frame_instantiated += 1", script)
+        self.assertIn("_last_frame_released += 1", script)
+        self.assertIn("_total_instantiated += 1", script)
+        self.assertIn("_total_released += 1", script)
+        self.assertEqual(
+            generated["receipt"]["per_frame_scene_release_budget"], 8,
+        )
+        self.assertTrue(
+            generated["receipt"]["native_frame_counters_available"],
+        )
+        self.assertFalse(generated["receipt"]["resource_residency_observed"])
+
     def test_source_streamer_keeps_rigid_and_area_state_alive_offscreen(self):
         _, _, generated = self.actual()
         script = generated["files"]["game/frontier/assets/world_streamer.gd"]

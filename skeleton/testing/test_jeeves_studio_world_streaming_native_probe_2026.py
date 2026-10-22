@@ -167,6 +167,9 @@ class NativeWorldSourceTests(TestCase):
         self.assertIn("pinned physics body was never instantiated", script)
         self.assertIn("stateful body was evicted or rebuilt", script)
         self.assertIn("offscreen static mesh was not unloaded", script)
+        self.assertIn("authored per-frame instantiation budget", script)
+        self.assertIn("bounded per-frame eviction budget", script)
+        self.assertEqual(result["expected"]["instantiation_budget"], 7)
         self.assertFalse(result["native_executed"])
         self.assertEqual(result["script_sha256"], sha256(script.encode()).hexdigest())
 
