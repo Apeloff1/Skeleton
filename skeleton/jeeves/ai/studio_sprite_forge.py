@@ -125,7 +125,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "frames", "animations", "pixel_scale",
     }
     doc = record.get("document")
-    optional = {"atlas", "variants", "cues"}
+    optional = {"atlas", "variants", "cues", "lighting"}
     if (not isinstance(doc, dict)
             or not base_fields <= set(doc)
             or not set(doc) <= base_fields | optional):
@@ -260,6 +260,20 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
     from .studio_sprite_temporal_quality import temporal_sprite_report
     metadata["objective_quality"] = sprite_quality_metrics(metadata)
     metadata["temporal_quality"] = temporal_sprite_report(surface, metadata)
+    normal_png = None
+    if "lighting" in doc:
+        from .studio_sprite_surface import (
+            compile_authored_normals, verify_authored_normals,
+        )
+        surface_result = compile_authored_normals(
+            doc["lighting"], metadata=metadata, color_png=image,
+        )
+        normal_png = surface_result["png"]
+        verify_authored_normals(
+            doc["lighting"], metadata=metadata, color_png=image,
+            normal_png=normal_png, normal_receipt=surface_result["receipt"],
+        )
+        metadata["normal_map"] = surface_result["receipt"]
     metadata["receipt_sha256"] = digest(metadata)
     # An independent verifier samples source pixels from the actual decoded
     # PNG, reconstructs the complete atlas, and checks alpha masks and timing.
@@ -271,7 +285,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
     collisions = compile_exact_sprite_hitboxes(metadata)
     verify_exact_sprite_hitboxes(metadata, collisions)
     return {
-        "png": image, "metadata": metadata,
+        "png": image, "metadata": metadata, "normal_png": normal_png,
         "independent_pixel_replay": checked,
         "collision_rectangles": collisions,
     }
