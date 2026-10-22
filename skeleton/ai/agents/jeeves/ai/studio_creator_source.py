@@ -806,7 +806,7 @@ class CreatorProjectSourceStore:
         export_format = command.payload["format"]
         if export_format not in (
             "game-source-json", "frontier-studio-json", "frontier-godot4-zip",
-            "sprite-atlas-zip",
+            "sprite-atlas-zip", "asset-catalog-json",
         ):
             raise CreatorSourceError("unsupported typed game source export format")
         artifact = identifier(command.payload["artifact_name"], "artifact")
@@ -837,6 +837,12 @@ class CreatorProjectSourceStore:
                     binary_assets=candidate["binary_assets"],
                 )
                 extension = ".zip"
+            elif export_format == "asset-catalog-json":
+                # A usable asset-only deliverable: native Jeeves may export its
+                # real compiled sprite/WAV/GLB descriptors without first
+                # authoring a complete playable world. Source revision stays
+                # pinned and the published JSON is content addressed.
+                bundle = self.compiled_asset_catalog()
             elif export_format == "frontier-studio-json":
                 from .studio_frontier_source_compile import (
                     compile_persisted_frontier_source,

@@ -1446,3 +1446,14 @@ and the extended native ZIP tests. Source commits are not themselves
 proof of completed engine imports, 3D framebuffer images, final-game
 playthrough or certified legal rights. Review the **exact-head** CI jobs
 before merge.
+
+#### Standalone descriptor-only artifact
+
+The creator exporter also accepts `format=asset-catalog-json`, writing a
+content-addressed `<artifact>-<sha>.json` containing reviewed descriptors and
+real byte-derived metrics for every current original sprite, WAV and GLB.
+Unlike `frontier-godot4-zip`, it does not require a completed playable
+world or Godot runtime. Each export is pinned to the current Creator
+SQLite source head, deterministically hashed, and refuses overwriting a
+conflicting target. The source owner also exposes a read-only searchable
+catalog to the authenticated studio host and the standalone Jeeves model.

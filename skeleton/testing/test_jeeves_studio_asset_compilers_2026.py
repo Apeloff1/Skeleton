@@ -383,6 +383,33 @@ class SourceOwnedDescriptorExportTests(unittest.TestCase):
             self.create(descriptor_record())
         self.assertEqual(self.store.snapshot()["source_count"], 0)
 
+    def test_standalone_descriptor_catalog_json_is_content_addressed(self):
+        self.create(mesh_record())
+        self.create(descriptor_record())
+        exported = self.store.export(build_creator_command(
+            "export", project_id="original-game",
+            payload={"format": "asset-catalog-json",
+                     "artifact_name": "temple-descriptors"},
+        ))
+        path = self.export_root / exported["artifact_name"]
+        self.assertEqual(exported["export_format"], "asset-catalog-json")
+        self.assertEqual(path.suffix, ".json")
+        self.assertEqual(sha256(path.read_bytes()).hexdigest(),
+                         exported["artifact_sha256"])
+        catalog = json.loads(path.read_bytes())
+        self.assertEqual(catalog["descriptor_count"], 1)
+        self.assertEqual(catalog["descriptors"][0]["title"],
+                         "Original temple pedestal")
+        self.assertEqual(catalog["source_head_sha256"],
+                         self.store.head_identity())
+        again = self.store.export(build_creator_command(
+            "export", project_id="original-game",
+            payload={"format": "asset-catalog-json",
+                     "artifact_name": "temple-descriptors"},
+        ))
+        self.assertTrue(again["already_exported"])
+        self.assertEqual(again["artifact_sha256"], exported["artifact_sha256"])
+
     def test_standalone_sprite_package_contains_verified_catalog(self):
         self.create(original_record())
         exported = self.store.export(build_creator_command(
