@@ -376,6 +376,10 @@ def verify_published_godot_zip(
                         "game/frontier/sprites/" + asset_name + suffix
                         for suffix in (".tres", ".tscn")
                     ]
+                    if sprite.get("normal_map") is not None:
+                        resource_paths.append(
+                            "game/frontier/sprites/" + asset_name + ".lit.tres"
+                        )
                     if (item["godot_preview_scene_path"] != resource_paths[1]
                             or any(path not in expected for path in resource_paths)):
                         raise NativeSourceVerificationError(

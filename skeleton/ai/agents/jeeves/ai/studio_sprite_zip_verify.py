@@ -115,6 +115,10 @@ def verify_published_sprite_package(
                     ".png", ".json", ".hitboxes.json", ".tres", ".tscn",
                 )}
                 expected |= paths
+                resource_paths = [folder + ".tres", folder + ".tscn"]
+                if source.get("normal_map") is not None:
+                    resource_paths.append(folder + ".lit.tres")
+                    expected.add(folder + ".lit.tres")
                 png = archive.read(folder + ".png")
                 metadata = json.loads(archive.read(folder + ".json"))
                 boxes = json.loads(archive.read(folder + ".hitboxes.json"))
@@ -125,8 +129,8 @@ def verify_published_sprite_package(
                 verify_published_sprite(png, source)
                 checked_boxes = verify_exact_sprite_hitboxes(source, boxes)
                 verify_godot_sprite_resources(source, {
-                    folder + ".tres": archive.read(folder + ".tres").decode("utf-8"),
-                    folder + ".tscn": archive.read(folder + ".tscn").decode("utf-8"),
+                    resource_path: archive.read(resource_path).decode("utf-8")
+                    for resource_path in resource_paths
                 }, directory="sprites")
                 # Every optional source-generated file is required exactly when
                 # the original reviewed metadata calls for it. Ignore neither

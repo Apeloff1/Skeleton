@@ -1288,3 +1288,29 @@ receipts, missing heightfield output, and actual ZIP export. The
 native renderer has **not** yet been demonstrated as using these
 normal maps to shade actors. The receipts explicitly distinguish
 source-compiled normal textures from actual Godot lighting.
+
+
+### Reviewed sprite lighting in Godot 4
+
+The sprite compiler now emits **two distinct SpriteFrames resources** when an
+original sprite has an authorized `lighting.height_frames` source:
+`<asset>.tres` is the unmodified diffuse-only animation resource used by
+`AnimatedSprite3D` player/NPC bindings; `<asset>.lit.tres` is a 2D-only
+`CanvasTexture` resource combining the lossless diffuse and normal atlas
+with identical animation rectangles. The `<asset>.tscn` preview loads the
+latter and includes a `DirectionalLight2D`. Unlit sprites retain their
+original two-resource layout. Neither a 3D renderer nor the 2D preview may
+silently substitute one resource for the other.
+
+Both original-game and standalone ZIP verifiers regenerate the engine text,
+read and replay the actual saved normal-map PNG against the independently
+approved heightfield, check alpha and SHA evidence, and reject unexpected or
+missing resource members. Native import inspection additionally checks the
+real loaded 2D CanvasTexture normal binding and actual decoded source RGBA,
+while refusing CanvasTexture as a 3D sprite atlas. These are source/native
+resource checks, **not** an assertion that framebuffer pixels were observed,
+lighting quality was artistically approved, or 3D normal shading was added.
+3D normal-map shading requires a separate reviewed, 3D-compatible material.
+
+Engine compatibility: Godot 4 CanvasTexture is documented as 2D-only:
+https://docs.godotengine.org/en/stable/classes/class_canvastexture.html

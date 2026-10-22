@@ -64,20 +64,11 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
             raise SpriteResourceError("normal atlas source identity is not verified")
     ids: dict[str, int] = {}
     lines = [
-        f"[gd_resource type=\"SpriteFrames\" load_steps={len(frames) + (4 if has_normals else 2)} format=3]",
+        f"[gd_resource type=\"SpriteFrames\" load_steps={len(frames) + 2} format=3]",
         "",
         f"[ext_resource type=\"Texture2D\" path=\"res://{directory}/{asset}.png\" id=\"1\"]",
         "",
     ]
-    if has_normals:
-        lines.extend([
-            f'[ext_resource type="Texture2D" path="res://{directory}/{asset}.normal.png" id="2"]',
-            "",
-            '[sub_resource type="CanvasTexture" id="CanvasSurface"]',
-            'diffuse_texture = ExtResource("1")',
-            'normal_texture = ExtResource("2")',
-            "",
-        ])
     for index, frame in enumerate(frames):
         fid = _label(frame.get("frame_id"), "frame identity")
         if fid in ids:
@@ -94,8 +85,7 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
             raise SpriteResourceError("resource frame exceeds original PNG surface")
         lines.extend([
             f"[sub_resource type=\"AtlasTexture\" id=\"Atlas_{index}\"]",
-            ('atlas = SubResource("CanvasSurface")' if has_normals
-             else 'atlas = ExtResource("1")'),
+            'atlas = ExtResource("1")',
             f"region = Rect2({rect[0]}, {rect[1]}, {rect[2]}, {rect[3]})",
             "",
         ])
@@ -141,8 +131,29 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
         "]",
         "",
     ])
-    # An engine-loadable preview scene actually binds the SpriteFrames resource
-    # to AnimatedSprite2D; the base expedition 3D player still uses its own rig.
+    # A CanvasTexture is NOT supported for Sprite3D. Keep the historical
+    # diffuse-only .tres for AnimatedSprite3D gameplay. When normals are
+    # authored, emit an additional .lit.tres for the 2D preview and its
+    # DirectionalLight2D. Both variants retain identical atlas UVs and timing.
+    normal_preview = None
+    if has_normals:
+        lit_lines = list(lines)
+        lit_lines[0] = (
+            f'[gd_resource type="SpriteFrames" load_steps={len(frames) + 4} format=3]'
+        )
+        lit_lines[4:4] = [
+            f'[ext_resource type="Texture2D" path="res://{directory}/{asset}.normal.png" id="2"]',
+            "",
+            '[sub_resource type="CanvasTexture" id="CanvasSurface"]',
+            'diffuse_texture = ExtResource("1")',
+            'normal_texture = ExtResource("2")',
+            "",
+        ]
+        normal_preview = "\n".join(lit_lines).replace(
+            'atlas = ExtResource("1")',
+            'atlas = SubResource("CanvasSurface")',
+        )
+    # The preview scene is an AnimatedSprite2D, never a 3D CanvasTexture user.
     first_frame = frames[0]
     pivot = first_frame.get("pivot_px")
     if (type(pivot) is not list or len(pivot) != 2
@@ -151,10 +162,11 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
     rect = first_frame["rect_px"]
     offset_x = rect[2] / 2.0 - pivot[0]
     offset_y = rect[3] / 2.0 - pivot[1]
-    scene = "\n".join([
+    preview_resource = asset + (".lit.tres" if has_normals else ".tres")
+    scene_lines = [
         "[gd_scene load_steps=2 format=3]",
         "",
-        f"[ext_resource type=\"SpriteFrames\" path=\"res://{directory}/{asset}.tres\" id=\"1\"]",
+        f'[ext_resource type="SpriteFrames" path="res://{directory}/{preview_resource}" id="1"]',
         "",
         '[node name="OriginalAnimatedSprite" type="AnimatedSprite2D"]',
         'sprite_frames = ExtResource("1")',
@@ -163,11 +175,21 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
         f"offset = Vector2({offset_x:.3f}, {offset_y:.3f})",
         "texture_filter = 1",
         "",
-    ])
-    return {
+    ]
+    if has_normals:
+        scene_lines.extend([
+            '[node name="OriginalNormalPreviewLight" type="DirectionalLight2D" parent="."]',
+            "rotation = 0.785398",
+            "energy = 0.8",
+            "",
+        ])
+    result = {
         f"{directory}/{asset}.tres": "\n".join(lines),
-        f"{directory}/{asset}.tscn": scene,
+        f"{directory}/{asset}.tscn": "\n".join(scene_lines),
     }
+    if normal_preview is not None:
+        result[f"{directory}/{asset}.lit.tres"] = normal_preview
+    return result
 
 
 def verify_godot_sprite_resources(
@@ -185,6 +207,8 @@ def verify_godot_sprite_resources(
         "resource_paths": sorted(expected),
         "source_resource_reproducible": True,
         "canvas_normal_resource_compiled": bool(meta.get("normal_map")),
+        "three_dimensional_diffuse_resource_preserved": True,
+        "two_dimensional_lighting_preview_compiled": bool(meta.get("normal_map")),
         "normal_image_sha256": (meta["normal_map"]["normal_png_sha256"]
                                 if meta.get("normal_map") else None),
         "in_engine_loaded_and_rendered": False,

@@ -53,6 +53,25 @@ func _verify() -> void:
     if atlas.get_animation_names().size() != expected["animations"].size():
         quit(11)
         return
+    # A CanvasTexture is 2D only: never allow a lighting preview resource
+    # to replace SpriteFrames used by the actual AnimatedSprite3D actor.
+    var game_frames = load("res://game/frontier/sprites/ASSET_ID.tres")
+    if not (game_frames is SpriteFrames):
+        quit(34)
+        return
+    for game_state in expected["animations"]:
+        var game_name = StringName(game_state["name"])
+        if not game_frames.has_animation(game_name):
+            quit(35)
+            return
+        if game_frames.get_frame_count(game_name) != game_state["count"]:
+            quit(36)
+            return
+        for game_index in range(game_state["count"]):
+            var game_tex = game_frames.get_frame_texture(game_name, game_index)
+            if not (game_tex is AtlasTexture) or (game_tex.atlas is CanvasTexture):
+                quit(37)
+                return
     var image := Image.load_from_file("res://game/frontier/sprites/ASSET_ID.png")
     if image == null or image.is_empty() or image.get_format() != Image.FORMAT_RGBA8:
         quit(19)

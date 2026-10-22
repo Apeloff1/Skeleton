@@ -197,13 +197,21 @@ class HeightfieldNormalTests(unittest.TestCase):
     def test_godot_canvas_texture_binds_exact_reviewed_normal_atlas(self):
         metadata = compile_authored_sprite(lit_original())["metadata"]
         resources = compile_godot_sprite_resources(metadata)
-        source = resources["game/frontier/sprites/hero-idle.tres"]
+        game_source = resources["game/frontier/sprites/hero-idle.tres"]
+        source = resources["game/frontier/sprites/hero-idle.lit.tres"]
+        preview = resources["game/frontier/sprites/hero-idle.tscn"]
+        self.assertIn('atlas = ExtResource("1")', game_source)
+        self.assertNotIn("CanvasTexture", game_source)
+        self.assertIn('hero-idle.lit.tres', preview)
+        self.assertIn('OriginalNormalPreviewLight', preview)
         self.assertIn('[sub_resource type="CanvasTexture" id="CanvasSurface"]', source)
         self.assertIn('normal_texture = ExtResource("2")', source)
         self.assertIn('atlas = SubResource("CanvasSurface")', source)
         self.assertIn('hero-idle.normal.png', source)
         verification = verify_godot_sprite_resources(metadata, resources)
         self.assertTrue(verification["canvas_normal_resource_compiled"])
+        self.assertTrue(verification["three_dimensional_diffuse_resource_preserved"])
+        self.assertTrue(verification["two_dimensional_lighting_preview_compiled"])
         self.assertEqual(
             verification["normal_image_sha256"],
             metadata["normal_map"]["normal_png_sha256"],
@@ -227,7 +235,7 @@ class HeightfieldNormalTests(unittest.TestCase):
     def test_canvas_surface_resource_substitution_is_not_accepted(self):
         meta = compile_authored_sprite(lit_original())["metadata"]
         resources = compile_godot_sprite_resources(meta)
-        path = "game/frontier/sprites/hero-idle.tres"
+        path = "game/frontier/sprites/hero-idle.lit.tres"
         tampered = dict(resources)
         tampered[path] = tampered[path].replace(
             'normal_texture = ExtResource("2")',
@@ -257,6 +265,14 @@ class HeightfieldNormalTests(unittest.TestCase):
                     payload={"format": "sprite-atlas-zip", "artifact_name": "hero"},
                 ))
                 with zipfile.ZipFile(exports / result["artifact_name"]) as z:
+                    game_resource = z.read("sprites/hero-idle.tres").decode("utf-8")
+                    lit_resource = z.read("sprites/hero-idle.lit.tres").decode("utf-8")
+                    self.assertNotIn("CanvasTexture", game_resource)
+                    self.assertIn("CanvasTexture", lit_resource)
+                    self.assertIn("normal_texture", lit_resource)
+                    self.assertEqual(
+                        result["disk_verification"]["authored_normal_maps_replayed"], 1,
+                    )
                     normal = z.read("sprites/hero-idle.normal.png")
                     color = z.read("sprites/hero-idle.png")
                     metadata = json.loads(z.read("sprites/hero-idle.json"))

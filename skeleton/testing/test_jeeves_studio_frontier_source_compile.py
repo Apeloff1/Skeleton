@@ -378,6 +378,19 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         }, depends=("config-3d",))
         report = self.export_godot()
         with zipfile.ZipFile(self.export / report["artifact_name"]) as bundle:
+            diffuse_game_frames = bundle.read(
+                "game/frontier/sprites/lit-hero.tres"
+            ).decode("utf-8")
+            normal_preview_frames = bundle.read(
+                "game/frontier/sprites/lit-hero.lit.tres"
+            ).decode("utf-8")
+            normal_preview_scene = bundle.read(
+                "game/frontier/sprites/lit-hero.tscn"
+            ).decode("utf-8")
+            self.assertNotIn("CanvasTexture", diffuse_game_frames)
+            self.assertIn("CanvasTexture", normal_preview_frames)
+            self.assertIn("lit-hero.lit.tres", normal_preview_scene)
+            self.assertIn("OriginalNormalPreviewLight", normal_preview_scene)
             texture = bundle.read("game/frontier/sprites/lit-hero.normal.png")
             color = bundle.read("game/frontier/sprites/lit-hero.png")
             metadata = json.loads(
