@@ -125,8 +125,10 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "frames", "animations", "pixel_scale",
     }
     doc = record.get("document")
+    optional = {"atlas", "variants"}
     if (not isinstance(doc, dict)
-            or set(doc) not in (base_fields, base_fields | {"atlas"})):
+            or not base_fields <= set(doc)
+            or not set(doc) <= base_fields | optional):
         raise StudioSpriteError("sprite document has undeclared or missing source fields")
     if doc["kind"] != "pixel_sprite":
         raise StudioSpriteError("cannot compile unknown sprite asset source kind")
@@ -158,7 +160,15 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
                    for color in palette)):
         raise StudioSpriteError("sprite requires explicit bounded 8-digit RGBA palette")
     colors = [bytes.fromhex(color[1:]) for color in palette]
-    frames = doc["frames"]
+    from .studio_sprite_variants import (
+        SpriteVariantError, derive_original_sprite_variants,
+    )
+    try:
+        frames, variant_proofs = derive_original_sprite_variants(
+            doc, colors=colors, width=width, height=height,
+        )
+    except SpriteVariantError as exc:
+        raise StudioSpriteError(str(exc)) from exc
     if type(frames) is not list or not 1 <= len(frames) <= 64:
         raise StudioSpriteError("sprite atlas requires 1..64 authored pixel frames")
     ids: set[str] = set()
@@ -233,6 +243,8 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "sheet_width_px": sheet_width, "sheet_height_px": sheet_height,
         "rgba_palette_size": len(colors), "pixel_scale": scale,
         "atlas_geometry": atlas["geometry"],
+        "derived_frame_proofs": variant_proofs,
+        "original_authored_frame_count": len(doc["frames"]),
         "frames": frame_meta, "animations": animation_meta,
         "png_sha256": sha256(image).hexdigest(),
         "pixel_content_sha256": sha256(surface).hexdigest(),
