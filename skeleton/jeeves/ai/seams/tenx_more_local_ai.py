@@ -1,0 +1,1 @@
+"""10x more on local AI. Even deeper.\n"""\nclass TenXMoreLocalAI:\n    def tenx_more(self) -> dict:\n        return {\"native_ai\": True, \"scale\": 30, \"stored_prose\": 0, \"era_bind\": \"HOUSE_ERA\"}\n
