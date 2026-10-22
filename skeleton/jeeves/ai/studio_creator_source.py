@@ -548,6 +548,69 @@ class CreatorProjectSourceStore:
             ]),
         }
 
+    def compiled_world_spatial_index(self) -> dict[str, Any]:
+        """Read-only world placement descriptors backed by this source head.
+
+        All geometry references are resolved from the same reviewed asset
+        catalog and same SQLite generation, not untrusted client transforms.
+        """
+        from .studio_original_mesh_lod import compile_original_mesh_lod_collection
+        from .studio_original_mesh_physics import compile_original_mesh_physics_collection
+        from .studio_original_mesh_placements import compile_original_mesh_placements
+        from .studio_world_spatial_index import compile_world_spatial_index
+
+        with self._lock:
+            catalog = self.compiled_asset_catalog()
+            generation = catalog["source_head_sha256"]
+            self._refresh()
+            if generation != self._head:
+                raise CreatorSourceError(
+                    "world source changed between catalog and scene review"
+                )
+            lods = compile_original_mesh_lod_collection(self._records)
+            physics = compile_original_mesh_physics_collection(
+                self._records, lod_asset_ids=frozenset(
+                    item["manifest"]["asset_id"] for item in lods["sets"]
+                ),
+            )
+            placement = compile_original_mesh_placements(
+                self._records,
+                lod_assets=frozenset(
+                    item["manifest"]["asset_id"] for item in lods["sets"]
+                ),
+                physics_assets=frozenset(
+                    item["metadata"]["asset_id"] for item in physics["assets"]
+                ),
+            )
+            index = compile_world_spatial_index(
+                project_id=self.project_id, source_head_sha256=generation,
+                catalog=catalog, placements=placement["metadata"],
+            )
+            self._refresh()
+            if generation != self._head:
+                raise CreatorSourceError("world source changed during spatial indexing")
+            return index
+
+    def search_world_instances(
+        self, *, center_mm: list[int], radius_mm: int,
+        limit: int = 12, kind: str | None = None,
+    ) -> dict[str, Any]:
+        """Spatial query over reviewed actual game instances, not imagined assets."""
+        from .studio_world_spatial_index import query_world_spatial_index
+        index = self.compiled_world_spatial_index()
+        result = query_world_spatial_index(
+            index, center_mm=center_mm, radius_mm=radius_mm,
+            limit=limit, kind=kind,
+        )
+        return {
+            **result, "project_id": self.project_id,
+            "world_spatial_index_sha256": index["receipt_sha256"],
+            "retrieval_receipt_sha256": digest([
+                self.project_id, index["receipt_sha256"],
+                center_mm, radius_mm, kind, result["result_receipt_sha256"],
+            ]),
+        }
+
     def _mutate(self, command: CreatorCommand, *,
                 record_id: str, facet: str, document: dict[str, Any],
                 depends_on: list[str], old: dict[str, Any] | None) -> dict[str, Any]:
