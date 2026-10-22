@@ -7,6 +7,9 @@ unittest.TestCase classes under their Test* aliases and runs them normally.
 from skeleton.testing.test_jeeves_studio_sprite_actor_binding import (
     OriginalPlayerSpriteBindingTests as TestJeevesOriginalPlayerAvatar,
 )
+from skeleton.testing.test_jeeves_studio_sprite_variants import (
+    DirectionalSpriteTests as TestJeevesDirectionalSprite,
+)
 from skeleton.testing.test_jeeves_studio_sprite_quality import (
     SpriteQualityTests as TestJeevesSpriteQuality,
 )
@@ -25,7 +28,8 @@ from skeleton.testing.test_jeeves_studio_creator_source import (
 
 __all__ = [
     "TestJeevesSpriteForge", "TestJeevesPersistedSprites",
-    "TestJeevesSpriteQuality", "TestJeevesOriginalPlayerAvatar",
+    "TestJeevesSpriteQuality",
+    "TestJeevesDirectionalSprite", "TestJeevesOriginalPlayerAvatar",
     "TestJeevesFrontierSource", "TestJeevesRealGodotSource",
     "TestJeevesCreatorSource", "TestJeevesNativePlanFreshness",
 ]
