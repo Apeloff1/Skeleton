@@ -35,16 +35,52 @@ from skeleton.testing.test_jeeves_studio_world_streaming_activation_2026 import 
 )
 
 
-def candidate_fixture(*, enabled: bool = True) -> dict:
+def candidate_fixture(*, enabled: bool = True, pinned: bool = False) -> dict:
     from skeleton.jeeves.ai.studio_world_streaming_activation import (
         compile_world_streaming_activation,
+    )
+    from skeleton.jeeves.ai.studio_original_mesh_placements import (
+        compile_original_mesh_placements,
+    )
+    from skeleton.jeeves.ai.studio_original_mesh_physics import (
+        compile_original_mesh_physics,
+    )
+    from skeleton.testing.test_jeeves_studio_mesh_physics_2026 import (
+        source_body,
+    )
+    from skeleton.testing.test_jeeves_studio_mesh_placements_2026 import (
+        instance_record,
+    )
+    from skeleton.testing.test_jeeves_studio_asset_compilers_2026 import (
+        reseal,
     )
 
     records, placements = approved_world()
     original = records["trial-model-source"]
+    physical = []
+    if pinned:
+        body = source_body("rigid")
+        placed = instance_record(phys=True)
+        visual = instance_record()
+        visual["record_id"] = "second-visual-record"
+        visual["document"]["instance_id"] = "second-visual-instance"
+        visual = reseal(visual)
+        records.update({
+            body["record_id"]: body,
+            placed["record_id"]: placed,
+            visual["record_id"]: visual,
+        })
+        compiled = compile_original_mesh_physics(original, body)
+        physical = [{
+            "base_record": original, "source_record": body, **compiled,
+        }]
+        placements = compile_original_mesh_placements(
+            records, physics_assets=frozenset({"trial-mesh"}),
+        )
     catalog = compile_asset_catalog(
         project_id="stream-test", source_head_sha256="a" * 64,
         records=records, meshes=[compile_original_mesh(original)],
+        physics_assets=physical,
     )
     world = compile_world_spatial_index(
         project_id="stream-test", source_head_sha256="a" * 64,
@@ -98,7 +134,9 @@ def simulated_native_log(compiled: dict) -> str:
         "world_receipt_sha256": expected["world_receipt_sha256"],
         "chunk_receipt_sha256": expected["chunk_receipt_sha256"],
         "activation_receipt_sha256": expected["activation_receipt_sha256"],
-        "near_instance_ids": [expected["target_id"]],
+        "near_instance_ids": sorted(
+            [expected["target_id"]] + expected["pinned_instance_ids"]
+        ),
         "far_instance_ids": expected["pinned_instance_ids"],
         "target_id": expected["target_id"],
         "target_spawned": True,
@@ -216,6 +254,54 @@ class NativeWorldObservationTests(TestCase):
         return verify_native_world_stream_output(
             compiled, output, executable_sha256="f" * 64,
         )
+
+    def test_real_source_fixture_pins_rigid_body_across_camera_move(self):
+        compiled = compile_native_world_stream_probe(
+            candidate_fixture(pinned=True),
+        )
+        self.assertEqual(
+            compiled["expected"]["pinned_instance_ids"], ["temple-doorway"],
+        )
+        self.assertEqual(
+            compiled["expected"]["target_id"], "second-visual-instance",
+        )
+        verified = self.verified(compiled, simulated_native_log(compiled))
+        self.assertEqual(verified["pinned_physics_instances_retained"], 1)
+        self.assertEqual(verified["near_instantiated_count"], 2)
+        self.assertEqual(verified["far_instantiated_count"], 1)
+
+    def test_native_claiming_pinned_body_without_near_instantiation_fails(self):
+        compiled = compile_native_world_stream_probe(
+            candidate_fixture(pinned=True),
+        )
+        log = simulated_native_log(compiled).replace(
+            '"near_instance_ids": ["second-visual-instance", "temple-doorway"]',
+            '"near_instance_ids": ["second-visual-instance"]',
+        )
+        with self.assertRaises(NativeWorldStreamError):
+            self.verified(compiled, log)
+
+    def test_native_reconstructed_rigid_body_with_wrong_source_id_fails(self):
+        compiled = compile_native_world_stream_probe(
+            candidate_fixture(pinned=True),
+        )
+        log = simulated_native_log(compiled).replace(
+            '"far_instance_ids": ["temple-doorway"]',
+            '"far_instance_ids": ["an-invented-rigid-body"]',
+        )
+        with self.assertRaises(NativeWorldStreamError):
+            self.verified(compiled, log)
+
+    def test_native_pinned_continuity_boolean_cannot_be_missing(self):
+        compiled = compile_native_world_stream_probe(
+            candidate_fixture(pinned=True),
+        )
+        log = simulated_native_log(compiled).replace(
+            '"stateful_instances_retained": true',
+            '"stateful_instances_retained": false',
+        )
+        with self.assertRaises(NativeWorldStreamError):
+            self.verified(compiled, log)
 
     def test_matching_simulation_checks_observation_shape_not_actual_process(self):
         compiled = self.compiled()
