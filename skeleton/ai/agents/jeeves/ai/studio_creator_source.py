@@ -190,6 +190,15 @@ def _sprite_archive(
             raise CreatorSourceError("published sprite pixel atlas does not replay")
         files["sprites/" + name + ".png"] = raw
         files["sprites/" + name + ".json"] = _json(proof)
+        if entry.get("normal_png") is not None:
+            from .studio_sprite_surface import verify_normal_texture_bytes
+            normal = entry["normal_png"]
+            receipt = proof.get("normal_map")
+            verify_normal_texture_bytes(
+                raw, normal, receipt,
+                width=proof["sheet_width_px"], height=proof["sheet_height_px"],
+            )
+            files["sprites/" + name + ".normal.png"] = normal
         collision = verify_exact_sprite_hitboxes(
             proof, entry["collision_rectangles"],
         )
@@ -452,6 +461,13 @@ class CreatorProjectSourceStore:
         # Do not persist a structurally invalid image as a valid game asset.
         # Validate original pixel bytes and independent verification before
         # opening the SQLite write transaction (which stays short).
+        if facet == "audio_forge" and document.get("kind") == "procedural_pcm_sound":
+            from .studio_original_audio import compile_original_sound
+            compile_original_sound({
+                "record_id": record_id, "facet": facet,
+                "revision": version, "document": document,
+                "depends_on": depends_on, "source_sha256": content_sha,
+            })
         if facet == "sprite_forge" and document.get("kind") == "pixel_sprite":
             from .studio_sprite_forge import compile_authored_sprite
             from .studio_sprite_godot_resources import (
