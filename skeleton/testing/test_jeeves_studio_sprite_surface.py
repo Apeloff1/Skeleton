@@ -16,8 +16,8 @@ from skeleton.jeeves.ai.studio_sprite_forge import (
     _decode_verified_png, compile_authored_sprite,
 )
 from skeleton.jeeves.ai.studio_sprite_surface import (
-    SpriteSurfaceError, compile_authored_normals,
-    verify_authored_normals, verify_normal_texture_bytes,
+    SpriteSurfaceError, verify_authored_normals,
+    verify_normal_texture_bytes,
 )
 from skeleton.testing.test_jeeves_studio_sprite_forge import original_record
 
