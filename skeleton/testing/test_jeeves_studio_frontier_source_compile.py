@@ -13,6 +13,7 @@ from skeleton.jeeves.ai.studio_creator_source import (
     CreatorProjectSourceStore, CreatorSourceError,
 )
 from skeleton.jeeves.ai.studio_sprite_forge import StudioSpriteError
+from skeleton.jeeves.ai.studio_sprite_actor_binding import SpriteBindingError
 from skeleton.jeeves.ai.studio_host_bootstrap import NativeStudioHost
 from skeleton.jeeves.ai.studio_interaction_contract import (
     StudioEvidenceJournal, StudioInteractionError,
@@ -402,6 +403,84 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             }, depends=("config-3d",))
         self.assertEqual(self.owner.snapshot()["source_count"], 4)
         self.assertFalse(any(self.export.iterdir()))
+
+    def author_player_visual(self, *, animation="idle", source_dependency=True):
+        self.create("hero-art", "sprite_forge", {
+            "kind": "pixel_sprite", "asset_id": "hero-idle",
+            "width": 2, "height": 2, "pixel_scale": 2,
+            "palette": ["#00000000", "#3366ffff"],
+            "frames": [
+                {"frame_id": "first", "duration_ms": 120,
+                 "pixels": [0, 1, 1, 0]},
+                {"frame_id": "second", "duration_ms": 160,
+                 "pixels": [1, 0, 0, 1]},
+            ],
+            "animations": [
+                {"name": "idle", "frame_ids": ["first", "second"],
+                 "loop": True},
+            ],
+        }, depends=("config-3d",))
+        self.create("hero-visual-binding", "scene_forge", {
+            "kind": "sprite_actor_binding",
+            "target": "player_actor", "asset_id": "hero-idle",
+            "animation": animation, "pixel_size": 0.025,
+            "vertical_offset_m": 1.5,
+            "billboard": True, "hide_capsule": True,
+        }, depends=("hero-art",) if source_dependency else ("config-3d",))
+
+    def test_authored_sprite_is_bound_to_actual_moving_godot_player(self):
+        self.populate_3d()
+        self.author_player_visual()
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            script = archive.read("game/frontier/expedition.gd").decode("utf-8")
+            receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+            resource = archive.read("game/frontier/sprites/hero-idle.tres")
+        self.assertIn("var jeeves_avatar := AnimatedSprite3D.new()", script)
+        self.assertIn("actor.add_child(jeeves_avatar)", script)
+        self.assertIn('jeeves_avatar.animation = &"idle"', script)
+        self.assertIn("actor.mesh = null", script)
+        self.assertIn(b"SpriteFrames", resource)
+        self.assertTrue(receipt["animated_sprite3d_player_script_compiled"])
+        self.assertEqual(
+            receipt["authored_player_avatar_binding"]["record_id"],
+            "hero-visual-binding",
+        )
+        self.assertTrue(receipt["player_avatar_game_script_receipt"][
+            "source_reproduction_verified"
+        ])
+        self.assertFalse(receipt["native_sprite_scene_binding_verified"])
+        self.assertTrue(exported["disk_verification"][
+            "all_emitted_file_hashes_verified"
+        ])
+
+    def test_binding_requires_real_sprite_source_dependency(self):
+        self.populate_3d()
+        self.author_player_visual(source_dependency=False)
+        with self.assertRaisesRegex(SpriteBindingError, "depend"):
+            self.export_godot()
+        self.assertEqual(list(self.export.iterdir()), [])
+
+    def test_binding_rejects_nonexistent_animation(self):
+        self.populate_3d()
+        self.author_player_visual(animation="fictitious")
+        with self.assertRaisesRegex(SpriteBindingError, "animation"):
+            self.export_godot()
+        self.assertEqual(list(self.export.iterdir()), [])
+
+    def test_native_player_visual_does_not_self_certify_engine_render(self):
+        self.populate_3d()
+        self.author_player_visual()
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            proof = json.loads(archive.read("jeeves_source_receipt.json"))
+        self.assertFalse(proof["authored_player_avatar_binding"][
+            "engine_actor_visual_execution_verified"
+        ])
+        self.assertFalse(proof["player_avatar_game_script_receipt"][
+            "real_godot_sprite_render_observed"
+        ])
+        self.assertFalse(proof["native_godot_playthrough_verified"])
 
     def test_existing_uncompiled_story_is_never_claimed_as_engine_content(self):
         self.populate_3d()
