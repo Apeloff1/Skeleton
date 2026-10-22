@@ -157,6 +157,7 @@ def _sprite_archive(
 ) -> bytes:
     """Write reproducible PNG and animation-state assets with source receipts."""
     from .studio_sprite_verify import verify_published_sprite
+    from .studio_sprite_hitboxes import verify_exact_sprite_hitboxes
     from .studio_sprite_godot_resources import (
         compile_godot_sprite_resources, verify_godot_sprite_resources,
     )
@@ -167,6 +168,10 @@ def _sprite_archive(
         "project_id": project_id, "source_head_sha256": source_head_sha256,
         "asset_count": compiled["count"],
         "atlas_hashes": compiled["atlas_hashes"],
+        "collision_receipts": {
+            item["metadata"]["asset_id"]: item["collision_rectangles"]["receipt_sha256"]
+            for item in atlas
+        },
         "sprites": [item["metadata"] for item in atlas],
         "native_engine_sprite_binding_verified": False,
         "artist_review_claimed": False,
@@ -184,6 +189,12 @@ def _sprite_archive(
             raise CreatorSourceError("published sprite pixel atlas does not replay")
         files["sprites/" + name + ".png"] = raw
         files["sprites/" + name + ".json"] = _json(proof)
+        collision = verify_exact_sprite_hitboxes(
+            proof, entry["collision_rectangles"],
+        )
+        files["sprites/" + name + ".hitboxes.json"] = _json(
+            collision, limit=MAX_BUNDLE_BYTES,
+        )
         resources = compile_godot_sprite_resources(
             proof, directory="sprites",
         )
