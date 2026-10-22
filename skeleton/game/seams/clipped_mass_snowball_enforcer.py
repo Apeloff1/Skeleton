@@ -1,1 +1,1 @@
-"""Clipped mass snowball enforcer. Full law."""\nclass SnowballEnforcer:\n    def enforce(self, prior: float, delta: float) -> float:\n        return min(prior * 1.1, prior + abs(min(max(delta, -0.05), 0.05)))\n
+"""Clipped mass snowball enforcer — full law implementation."""\nclass SnowballEnforcer:\n    MAX_FACTOR = 1.1\n    CLIP = 0.05\n\n    def enforce(self, prior_mass: float, g_delta: float) -> float:\n        clipped = max(min(g_delta, self.CLIP), -self.CLIP)\n        candidate = prior_mass + abs(clipped)\n        return min(prior_mass * self.MAX_FACTOR, candidate)\n
