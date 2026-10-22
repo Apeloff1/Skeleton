@@ -1,1 +1,4 @@
-"""Cutting-edge delivery."""\nclass CuttingEdgeDelivery:\n    def upgrade(self) -> dict:\n        return {\"delivery_sota\": True, \"stored_prose\": 0}\n
+"""Cutting-edge delivery."""
+class CuttingEdgeDelivery:
+    def upgrade(self) -> dict:
+        return {"delivery_sota": True, "stored_prose": 0}
