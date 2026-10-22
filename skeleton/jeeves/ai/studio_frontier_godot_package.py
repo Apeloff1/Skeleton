@@ -319,7 +319,8 @@ def run_original_game_native_playthrough(
     )
     try:
         world = author_studio_expedition(project, profile)
-        if before["receipt"]["authored_player_avatar_binding"] is not None:
+        if (before["receipt"]["authored_player_avatar_binding"] is not None
+                or before["receipt"]["authored_npc_sprite_bindings"]):
             # The legacy runner regenerates baseline Godot files, so using it
             # here would falsely attest a game whose ACTUAL avatar never ran.
             # Execute the exact generated sprite-bound project instead.
@@ -352,6 +353,9 @@ def run_original_game_native_playthrough(
         "native_gameplay_consistent": True,
         "native_player_avatar_script_executed": (
             before["receipt"]["authored_player_avatar_binding"] is not None
+        ),
+        "native_npc_sprite_game_script_executed": bool(
+            before["receipt"]["authored_npc_sprite_bindings"]
         ),
         "native_visual_output_independently_observed": False,
         "complete_original_game_release_certified": False,
