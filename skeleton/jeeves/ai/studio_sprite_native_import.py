@@ -161,6 +161,55 @@ def _file_sha256(path: Path) -> str:
     return result.hexdigest()
 
 
+def _expected_original_frame_cue_observations(
+    metadata: dict[str, Any],
+) -> tuple[list[str], list[list[str | int]]]:
+    """Exact signal sequence expected from one real Godot signal probe.
+
+    The order is the original canonical sorted animation:frame key order,
+    followed by cue IDs within that frame. The engine must emit exactly
+    these (event_id, category, animation, frame_index) tuples.
+    """
+    from .studio_sprite_frame_cues import (
+        SpriteCueError, compile_frame_cues,
+    )
+
+    source = metadata.get("frame_cues")
+    if source is None:
+        return [], []
+    if not isinstance(source, dict) or not isinstance(source.get("cues"), list):
+        raise NativeSpriteImportError("original sprite cue evidence is malformed")
+    try:
+        reconstructed = compile_frame_cues(
+            {"cues": [
+                {
+                    key: cue[key] for key in (
+                        "animation", "frame_index", "event_id", "category",
+                    )
+                }
+                for cue in source["cues"]
+            ]},
+            metadata["animations"],
+        )
+    except (SpriteCueError, KeyError, TypeError, ValueError) as exc:
+        raise NativeSpriteImportError(
+            "original sprite cues cannot be independently reconstructed"
+        ) from exc
+    if reconstructed != source:
+        raise NativeSpriteImportError(
+            "source cue observations differ from independently reviewed timeline"
+        )
+    keys = sorted(source["by_animation_frame"])
+    expected: list[list[str | int]] = []
+    for cue_key in keys:
+        animation, frame = cue_key.split(":")
+        expected.extend(
+            [event_id, category, animation, int(frame)]
+            for category, event_id in source["by_animation_frame"][cue_key]
+        )
+    return keys, expected
+
+
 def inspect_godot_sprite_import(
     record: dict[str, Any], *, godot_executable: str,
     timeout_seconds: int = 90,
@@ -198,16 +247,9 @@ def inspect_godot_sprite_import(
     name_to_time = {
         frame_id: frame["duration_ms"] for frame_id, frame in frame_by_id.items()
     }
-    cue_source = meta.get("frame_cues")
-    cue_keys = (
-        sorted(cue_source["by_animation_frame"]) if cue_source
-        else []
+    cue_keys, cue_observations = _expected_original_frame_cue_observations(
+        meta,
     )
-    cue_observations: list[list[str | int]] = []
-    for cue_key in cue_keys:
-        state, frame = cue_key.split(":")
-        for category, event_id in cue_source["by_animation_frame"][cue_key]:
-            cue_observations.append([event_id, category, state, int(frame)])
     expected = {
         "cue_keys": cue_keys,
         "cue_observations": cue_observations,
