@@ -356,6 +356,47 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(journal.read()), 0)
 
+    def test_original_normal_map_is_verified_in_real_godot_source_zip(self):
+        self.populate_3d()
+        self.create("authored-lit-art", "sprite_forge", {
+            "kind": "pixel_sprite", "asset_id": "lit-hero",
+            "width": 2, "height": 2, "pixel_scale": 2,
+            "palette": ["#00000000", "#cc6644ff"],
+            "frames": [
+                {"frame_id": "idle-0", "duration_ms": 100,
+                 "pixels": [0, 1, 1, 0]},
+            ],
+            "animations": [{
+                "name": "idle", "frame_ids": ["idle-0"], "loop": True,
+            }],
+            "lighting": {
+                "kind": "heightfield_normals", "strength": 8,
+                "height_frames": [{
+                    "frame_id": "idle-0", "heights": [0, 120, 220, 255],
+                }],
+            },
+        }, depends=("config-3d",))
+        report = self.export_godot()
+        with zipfile.ZipFile(self.export / report["artifact_name"]) as bundle:
+            texture = bundle.read("game/frontier/sprites/lit-hero.normal.png")
+            color = bundle.read("game/frontier/sprites/lit-hero.png")
+            metadata = json.loads(
+                bundle.read("game/frontier/sprites/lit-hero.json")
+            )
+            manifest = json.loads(bundle.read("jeeves_source_receipt.json"))
+        from skeleton.jeeves.ai.studio_sprite_surface import verify_normal_texture_bytes
+        self.assertTrue(verify_normal_texture_bytes(
+            color, texture, metadata["normal_map"],
+            width=metadata["sheet_width_px"],
+            height=metadata["sheet_height_px"],
+        )["normalized_visible_vectors_verified"])
+        self.assertEqual(
+            manifest["packaged_original_sprites"][0]["normal_png_sha256"],
+            sha256(texture).hexdigest(),
+        )
+        self.assertTrue(report["disk_verification"]["all_emitted_file_hashes_verified"])
+        self.assertFalse(metadata["normal_map"]["normal_map_loaded_in_native_engine"])
+
     def test_original_sprite_png_is_packaged_inside_real_godot_project(self):
         self.populate_3d()
         self.create("hero-art", "sprite_forge", {
