@@ -201,6 +201,36 @@ def inspect_godot_sprite_import(
             target = root / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
+        # Godot 4 normally imports source PNG textures and editor resources
+        # into a per-project cache before headless scripts can load SpriteFrames.
+        # Force real, bounded editor import instead of treating missing cache as
+        # a valid engine rendering or sprite verification result.
+        with tempfile.TemporaryFile() as imported:
+            try:
+                preparation = subprocess.run(
+                    [str(binary), "--headless", "--path", str(root),
+                     "--editor", "--import"],
+                    cwd=root, stdin=subprocess.DEVNULL,
+                    stdout=imported, stderr=subprocess.STDOUT,
+                    timeout=timeout_seconds, check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                raise NativeSpriteImportError(
+                    "native Godot 4 resource import did not complete"
+                ) from exc
+            if imported.tell() > MAX_LOG_BYTES:
+                raise NativeSpriteImportError("native sprite import exceeded evidence budget")
+            imported.seek(0)
+            import_log = imported.read()
+            if preparation.returncode != 0:
+                raise NativeSpriteImportError(
+                    "Godot refused actual PNG/SpriteFrames import with code "
+                    + str(preparation.returncode)
+                )
+        if _file_sha256(binary) != before_executable_sha256:
+            raise NativeSpriteImportError(
+                "Godot binary content changed during original resource import"
+            )
         with tempfile.TemporaryFile() as output:
             try:
                 execution = subprocess.run(
@@ -264,6 +294,8 @@ def inspect_godot_sprite_import(
         "godot_decoded_rgba_sha256": native["decoded_rgba_sha256"],
         "original_atlas_rectangles_verified": True,
         "godot_png_resource_loaded": True,
+        "real_godot_editor_import_executed": True,
+        "editor_import_log_sha256": sha256(import_log).hexdigest(),
         "visual_rendering_verified": False,
     }
     result["receipt_sha256"] = digest(result)
