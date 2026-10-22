@@ -22,7 +22,7 @@ except ImportError:
     def emit_receipt(**kwargs):
         return kwargs.get("digest", "")
 
-_MAX_PLAYERS: Final[int] = 128
+_MAX_PLAYERS: Final[int] = 256
 _GRANT_TTL_S: Final[float] = 1200.0
 _MAX_LAG_MS: Final[int] = 150
 _INTEREST_RADIUS: Final[float] = 200.0
@@ -42,6 +42,11 @@ class PeerState:
     interested: bool = True
     encrypted: bool = True
 
+    @property
+    def lag(self) -> int:
+        """Backward-compatible observed lag, in milliseconds."""
+        return self.lag_ms
+
 @dataclass
 class PlayerGrant:
     player_id: str
@@ -55,6 +60,15 @@ class PlayerGrant:
     rollback_buffer: List[dict] = field(default_factory=list)
     distributed_rollback: List[int] = field(default_factory=list)
 
+    @property
+    def rollback(self) -> List[dict]:
+        """Original public rollback buffer alias."""
+        return self.rollback_buffer
+
+    @property
+    def interest_set(self) -> List[str]:
+        return [peer_id for peer_id, peer in self.peers.items() if peer.interested]
+
 @dataclass
 class SessionAuthority:
     session_id: str
@@ -62,6 +76,17 @@ class SessionAuthority:
     grants: Dict[str, PlayerGrant] = field(default_factory=dict)
     clock: List[int] = field(default_factory=list)
     global_tick: int = 0
+
+    @property
+    def tick(self) -> int:
+        return self.global_tick
+
+    def sync(self, player_id: str, peer_id: str, pos: tuple[float, float, float], lag: int) -> None:
+        """Preserve the original public multiplayer sync API."""
+        self.distributed_sync(player_id, peer_id, pos, lag)
+
+    def verify(self, player_id: str, digest: str) -> bool:
+        return self.verify_grant(player_id, digest)
 
     def issue_grant(self, player_id: str) -> PlayerGrant:
         if len(self.grants) >= self.max_players:
@@ -87,6 +112,10 @@ class SessionAuthority:
         grant = self.grants.get(player_id)
         if not grant:
             raise MultiplayerError("no grant")
+        if len(pos) != 3 or any(not math.isfinite(value) for value in pos):
+            raise MultiplayerError("invalid peer position")
+        if not isinstance(lag_ms, int) or lag_ms < 0:
+            raise MultiplayerError("invalid peer lag")
         if lag_ms > _MAX_LAG_MS:
             grant.peers.get(peer_id, PeerState(peer_id)).cheat_score += 0.2
         peer = grant.peers.setdefault(peer_id, PeerState(peer_id))

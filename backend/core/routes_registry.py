@@ -321,6 +321,7 @@ KNOWN_ROUTES_WITH_PREFIX: List[RouteEntry] = [
     ("routes.game_console_build", "router", "/api"),
     ("routes.game_studio_review", "router", "/api"),
     ("routes.game_console_studio", "router", "/api"),
+    ("routes.game_frontier_authoring", "router", "/api"),
     ("routes.game_successor", "router", "/api"),
     ("routes.game_studio_learning", "router", "/api"),
     ("routes.game_studio_tools", "router", "/api"),
