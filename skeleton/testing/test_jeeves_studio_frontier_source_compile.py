@@ -415,7 +415,7 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertFalse(any(self.export.iterdir()))
 
     def author_player_visual(self, *, animation="idle", source_dependency=True,
-                             movement_map=None):
+                             movement_map=None, directional_map=None):
         self.create("hero-art", "sprite_forge", {
             "kind": "pixel_sprite", "asset_id": "hero-idle",
             "width": 2, "height": 2, "pixel_scale": 2,
@@ -444,6 +444,8 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         }
         if movement_map is not None:
             binding_document["movement_animations"] = movement_map
+        if directional_map is not None:
+            binding_document["directional_animations"] = directional_map
         self.create("hero-visual-binding", "scene_forge",
                     binding_document, depends=("hero-art",)
                     if source_dependency else ("config-3d",))
