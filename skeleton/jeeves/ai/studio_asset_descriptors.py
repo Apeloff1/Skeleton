@@ -339,6 +339,7 @@ def compile_asset_catalog(
     sounds: Sequence[Mapping[str, Any]] = (),
     meshes: Sequence[Mapping[str, Any]] = (),
     lod_sets: Sequence[Mapping[str, Any]] = (),
+    physics_assets: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Build a reproducible, searchable catalogue from actual compiled bytes."""
     _text(project_id, "project", maximum=128)
@@ -423,9 +424,63 @@ def compile_asset_catalog(
         descriptors.append(item)
     if set(overlays) - keys:
         raise AssetDescriptorError("reviewed description references uncompiled asset")
+    # Runtime physics is optional authored content. Verify every physics scene
+    # against real source records before augmenting the base GLB descriptor.
+    from .studio_original_mesh_physics import (
+        verify_original_mesh_physics, OriginalMeshPhysicsError,
+    )
+    physics_receipts: dict[str, dict[str, Any]] = {}
+    for authored in physics_assets:
+        info = authored.get("metadata")
+        if not isinstance(info, Mapping):
+            raise AssetDescriptorError("physics catalog entry lacks source metadata")
+        try:
+            receipt = verify_original_mesh_physics(
+                authored["base_record"], authored["source_record"],
+                authored["scene"], info, has_lod=info["lod_bound"],
+            )
+        except (OriginalMeshPhysicsError, KeyError, TypeError) as exc:
+            raise AssetDescriptorError(
+                "published physics descriptor does not replay original collider"
+            ) from exc
+        key = info["asset_id"]
+        original = [
+            mesh for mesh in meshes if mesh["metadata"]["asset_id"] == key
+        ]
+        if (key in physics_receipts or len(original) != 1
+                or original[0]["metadata"]["glb_sha256"] !=
+                info["mesh_glb_sha256"]):
+            raise AssetDescriptorError(
+                "physics collider lacks unique original mesh provenance"
+            )
+        physics_receipts[key] = {
+            "body_type": info["body_type"],
+            "shape_type": info["collider"]["shape"],
+            "collision_layer": info["collision_layer"],
+            "collision_mask": info["collision_mask"],
+            "rigid_mass_kg": info["rigid_mass_kg"],
+            "material_friction": info["physics_material_friction"],
+            "material_restitution": info["physics_material_bounce"],
+            "has_source_lod": info["lod_bound"],
+            "physics_source_record_id": info["physics_source_record_id"],
+            "physics_source_sha256": info["physics_source_sha256"],
+            "physics_receipt_sha256": info["receipt_sha256"],
+            "scene_sha256": receipt["scene_sha256"],
+            "actual_collision_observed": False,
+        }
     by_asset = {
         (item["kind"], item["asset_id"]): item for item in descriptors
     }
+    for asset, props in sorted(physics_receipts.items()):
+        body = by_asset.get(("procedural_mesh", asset))
+        if body is None:
+            raise AssetDescriptorError("physically bound mesh lacks base descriptor")
+        body["metrics"]["physics"] = props
+        body["engine_targets"].append("godot4_original_collision")
+        body["receipt_sha256"] = digest({
+            field: value for field, value in body.items()
+            if field != "receipt_sha256"
+        })
     for asset, evidence in sorted(lod_index.items()):
         child = by_asset[("procedural_mesh", asset)]
         original = by_asset.get(("procedural_mesh", evidence["parent_asset_id"]))
@@ -500,6 +555,7 @@ def verify_asset_catalog(
     sounds: Sequence[Mapping[str, Any]] = (),
     meshes: Sequence[Mapping[str, Any]] = (),
     lod_sets: Sequence[Mapping[str, Any]] = (),
+    physics_assets: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Replay descriptors/index and prove exact identity against shipped bytes."""
     if not isinstance(raw, bytes) or len(raw) > MAX_CATALOG_BYTES:
@@ -519,7 +575,7 @@ def verify_asset_catalog(
     expected = compile_asset_catalog(
         project_id=project_id, source_head_sha256=source_head_sha256,
         records=records, sprites=sprites, sounds=sounds, meshes=meshes,
-        lod_sets=lod_sets,
+        lod_sets=lod_sets, physics_assets=physics_assets,
     )
     if published != expected:
         raise AssetDescriptorError("catalog semantics/index/lineage differ from real assets")

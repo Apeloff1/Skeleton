@@ -486,6 +486,9 @@ class CreatorProjectSourceStore:
         from .studio_original_mesh_lod import (
             compile_original_mesh_lod_collection,
         )
+        from .studio_original_mesh_physics import (
+            compile_original_mesh_physics_collection,
+        )
 
         with self._lock:
             self._refresh()
@@ -504,10 +507,16 @@ class CreatorProjectSourceStore:
                 sounds = compile_original_sound_collection(source)["assets"]
                 meshes = compile_original_mesh_collection(source)["assets"]
                 lod_sets = compile_original_mesh_lod_collection(source)["sets"]
+                physics_assets = compile_original_mesh_physics_collection(
+                    source, lod_asset_ids=frozenset(
+                        item["manifest"]["asset_id"] for item in lod_sets
+                    ),
+                )["assets"]
                 catalog = compile_asset_catalog(
                     project_id=self.project_id, source_head_sha256=generation,
                     records=source, sprites=sprites, sounds=sounds,
                     meshes=meshes, lod_sets=lod_sets,
+                    physics_assets=physics_assets,
                 )
                 raw = catalog_bytes(catalog)
                 # An unrelated external SQLite writer may have changed the

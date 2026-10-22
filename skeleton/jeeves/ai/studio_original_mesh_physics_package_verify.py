@@ -37,6 +37,7 @@ def verify_original_mesh_physics_archive(
         mesh_index[info["asset_id"]] = info
     seen = set()
     results = []
+    compiled_bodies: list[dict[str, Any]] = []
     for candidate in authored:
         if (type(candidate) is not dict or set(candidate) != {
                 "asset_id", "base_glb_sha256", "source_record_id",
@@ -93,6 +94,10 @@ def verify_original_mesh_physics_archive(
             raise OriginalMeshPhysicsArchiveError(
                 "collision body was substituted across source revisions"
             )
+        compiled_bodies.append({
+            "base_record": original, "source_record": author,
+            "metadata": metadata, "scene": scene,
+        })
         results.append({
             "asset_id": asset,
             "scene_sha256": checked["scene_sha256"],
@@ -123,6 +128,7 @@ def verify_original_mesh_physics_archive(
         "rigid_bodies": sum(r["body_type"] == "rigid" for r in results),
         "trigger_areas": sum(r["body_type"] == "area" for r in results),
         "verified_physics_receipts": results,
+        "compiled_physics_assets": compiled_bodies,
         "collider_source_replayed": True,
         "native_contact_or_trigger_event_observed": False,
     }
