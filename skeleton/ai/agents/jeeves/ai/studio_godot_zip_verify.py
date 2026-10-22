@@ -15,7 +15,7 @@ import zipfile
 from .studio_interaction_contract import digest
 
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
-MAX_ENTRIES = 129
+MAX_ENTRIES = 2048
 MAX_FILE_BYTES = 8 * 1024 * 1024
 PROOF_NAME = "jeeves_source_receipt.json"
 
@@ -105,6 +105,11 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "published native game source does not match build proof"
                     )
+            from .studio_asset_descriptors import (
+                AssetDescriptorError, verify_asset_catalog,
+            )
+            descriptor_sprites: list[dict[str, Any]] = []
+            descriptor_audio: list[dict[str, Any]] = []
             # Verify the genuinely authored NPC cast, not just its ZIP hash.
             from .studio_npc_cast_source import (
                 OriginalNpcCastError, verify_original_npc_cast,
@@ -195,6 +200,9 @@ def verify_published_godot_zip(
                         raise NativeSourceVerificationError(
                             "Godot original WAV differs from independently reconstructed PCM"
                         ) from exc
+                    descriptor_audio.append({
+                        "wav": archive.read(wav_path), "metadata": info,
+                    })
                     if (checked["wav_sha256"] != sound["wav_sha256"]
                             or checked["source_sha256"] != sound["source_sha256"]
                             or info["receipt_sha256"]
@@ -369,6 +377,9 @@ def verify_published_godot_zip(
                         raise NativeSourceVerificationError(
                             "original sprite collision receipt differs from game package"
                         )
+                    descriptor_sprites.append({
+                        "png": image, "metadata": sprite,
+                    })
                     from .studio_sprite_godot_resources import (
                         SpriteResourceError, verify_godot_sprite_resources,
                     )
@@ -693,6 +704,43 @@ def verify_published_godot_zip(
                             "NPC visual lost its original sprite or animation lineage"
                         )
                 reconstructed = npc_script
+            # Descriptor catalog must be regenerated from actual published
+            # sprites/WAVs. Derivative skin lineage is bound by the palette
+            # proof, not guessed from the compiler's generated metadata.
+            variant_map = {
+                item["asset_id"]: item
+                for item in proof.get("original_palette_variant_receipts", [])
+            }
+            if len(variant_map) != len(proof.get("original_palette_variant_receipts", [])):
+                raise NativeSourceVerificationError("duplicate palette provenance")
+            for sprite in descriptor_sprites:
+                evidence = variant_map.get(sprite["metadata"]["asset_id"])
+                if evidence is not None:
+                    sprite["palette_variant_receipt"] = evidence
+            catalog_path = "game/frontier/assets/catalog.json"
+            if catalog_path not in expected:
+                raise NativeSourceVerificationError("compiled original assets lack catalog")
+            try:
+                raw_catalog = archive.read(catalog_path)
+                catalog_proof = verify_asset_catalog(
+                    raw_catalog, project_id=project_id,
+                    source_head_sha256=source_head_sha256,
+                    sprites=descriptor_sprites, sounds=descriptor_audio,
+                )
+                metadata_catalog = json.loads(raw_catalog)
+                if (catalog_proof["catalog_sha256"]
+                        != proof.get("asset_catalog_sha256")
+                        or catalog_proof["descriptor_count"]
+                        != proof.get("asset_descriptor_count")
+                        or metadata_catalog.get("receipt_sha256")
+                        != proof.get("asset_catalog_receipt_sha256")):
+                    raise AssetDescriptorError(
+                        "published asset catalog differs from game-build manifest"
+                    )
+            except (AssetDescriptorError, ValueError, KeyError, TypeError) as exc:
+                raise NativeSourceVerificationError(
+                    "original asset descriptors cannot be replayed from native bytes"
+                ) from exc
             try:
                 actual_script = archive.read("game/frontier/expedition.gd").decode("utf-8")
             except UnicodeDecodeError as exc:
@@ -710,6 +758,8 @@ def verify_published_godot_zip(
         "archive_sha256": expected_archive_sha256,
         "archive_bytes": size,
         "verified_file_count": len(expected),
+        "asset_descriptor_count": catalog_proof["descriptor_count"],
+        "asset_catalog_sha256": catalog_proof["catalog_sha256"],
         "embedded_evidence_sha256": receipt_digest,
         "all_emitted_file_hashes_verified": True,
         "actual_godot_execution_verified": False,

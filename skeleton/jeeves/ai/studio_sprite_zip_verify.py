@@ -27,6 +27,9 @@ from .studio_sprite_surface import (
 from .studio_sprite_frame_cues import (
     SpriteCueError, emit_godot_frame_cue_files, verify_godot_frame_cue_files,
 )
+from .studio_asset_descriptors import (
+    AssetDescriptorError, verify_asset_catalog,
+)
 
 MAX_ARCHIVE = 16 * 1024 * 1024
 MAX_FILE = 8 * 1024 * 1024
@@ -57,7 +60,7 @@ def verify_published_sprite_package(
         with zipfile.ZipFile(path, "r") as archive:
             entries = archive.infolist()
             names = [item.filename for item in entries]
-            if (not 6 <= len(names) <= 9 * MAX_ASSETS + 1
+            if (not 7 <= len(names) <= 9 * MAX_ASSETS + 2
                     or len(names) != len(set(names))
                     or names != sorted(names)
                     or PROOF not in names):
@@ -97,7 +100,7 @@ def verify_published_sprite_package(
             if (not isinstance(sprites, list) or not 1 <= len(sprites) <= MAX_ASSETS
                     or proof.get("asset_count") != len(sprites)):
                 raise SpritePackageVerificationError("original asset count lacks source receipts")
-            expected: set[str] = {PROOF}
+            expected: set[str] = {PROOF, "assets/catalog.json"}
             by_name: dict[str, dict[str, Any]] = {}
             report: dict[str, Any] = {}
             for source in sprites:
@@ -187,12 +190,30 @@ def verify_published_sprite_package(
                     raise SpritePackageVerificationError("palette variant has ambiguous source")
                 seen.add(target)
                 verify_original_palette_variant(report[parent], report[target], source)
+                report[target]["palette_variant_receipt"] = source
+            catalog_raw = archive.read("assets/catalog.json")
+            catalog_replay = verify_asset_catalog(
+                catalog_raw, project_id=project_id,
+                source_head_sha256=source_head_sha256,
+                sprites=[report[name] for name in sorted(report)],
+            )
+            if (catalog_replay["catalog_sha256"]
+                    != proof.get("asset_catalog_sha256")
+                    or catalog_replay["descriptor_count"]
+                    != proof.get("asset_descriptor_count")):
+                raise SpritePackageVerificationError(
+                    "published sprite descriptor catalog differs from package proof"
+                )
+            catalog_metadata = json.loads(catalog_raw)
+            if (catalog_metadata.get("receipt_sha256")
+                    != proof.get("asset_catalog_receipt_sha256")):
+                raise SpritePackageVerificationError("descriptor catalog receipt was forged")
     except (
         zipfile.BadZipFile, OSError, RuntimeError, UnicodeError,
         ValueError, KeyError, TypeError,
         SpriteVerificationError, SpriteCollisionError,
         SpriteResourceError, SpritePaletteVariantError, SpriteSurfaceError,
-        SpriteCueError,
+        SpriteCueError, AssetDescriptorError,
     ) as exc:
         if isinstance(exc, SpritePackageVerificationError):
             raise
@@ -207,6 +228,8 @@ def verify_published_sprite_package(
         "archive_bytes": stat.st_size,
         "asset_count": len(by_name),
         "palette_variants_replayed": len(skins),
+        "descriptors_independently_replayed": catalog_replay["descriptor_count"],
+        "asset_catalog_sha256": catalog_replay["catalog_sha256"],
         "actual_archive_bytes_verified": True,
         "all_rgba_hitbox_and_resource_bytes_replayed": True,
         "authored_normal_maps_replayed": sum(

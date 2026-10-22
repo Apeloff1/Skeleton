@@ -196,6 +196,7 @@ def compile_original_godot_candidate(
         })
     authored_sprites: list[dict[str, Any]] = []
     sprite_names: list[str] = []
+    compiled_sprites: list[dict[str, Any]] = []
     original_hitboxes: dict[str, dict[str, Any]] = {}
     original_metadata: dict[str, dict[str, Any]] = {}
     if any(
@@ -209,6 +210,7 @@ def compile_original_godot_candidate(
         )
         artwork = compile_original_palette_collection(records)
         for sprite in artwork["assets"]:
+            compiled_sprites.append(sprite)
             info = sprite["metadata"]
             name = info["asset_id"]
             sprite_names.append(info["record_id"])
@@ -374,6 +376,21 @@ def compile_original_godot_candidate(
         file_hashes["game/frontier/expedition.gd"] = sha256(
             bound_npc_script.encode("utf-8")
         ).hexdigest()
+    # Produce one machine-searchable descriptor catalog for real compiled
+    # sprite and WAV bytes, including reviewed human semantics and rights.
+    # Its full verified bytes belong to the native project; the main receipt
+    # carries only its immutable hash and descriptor count.
+    from .studio_asset_descriptors import compile_asset_catalog, catalog_bytes
+    asset_catalog = compile_asset_catalog(
+        project_id=project_id, source_head_sha256=source_head_sha256,
+        records=records, sprites=compiled_sprites, sounds=audio["assets"],
+    )
+    catalog_raw = catalog_bytes(asset_catalog)
+    catalog_path = "game/frontier/assets/catalog.json"
+    if catalog_path in files or catalog_path in binary_assets:
+        raise FrontierSourceError("asset catalog overlaps existing game resource")
+    binary_assets[catalog_path] = catalog_raw
+    file_hashes[catalog_path] = sha256(catalog_raw).hexdigest()
     metadata = {
         "schema_version": SCHEMA, "project_id": project_id,
         "source_head_sha256": source_head_sha256,
@@ -388,6 +405,9 @@ def compile_original_godot_candidate(
         "original_npc_cast_receipt": npc_cast_receipt,
         "godot_verification_sha256": godot_proof["receipt_digest"],
         "godot_file_hashes": file_hashes,
+        "asset_catalog_sha256": sha256(catalog_raw).hexdigest(),
+        "asset_catalog_receipt_sha256": asset_catalog["receipt_sha256"],
+        "asset_descriptor_count": asset_catalog["descriptor_count"],
         "packaged_original_sprites": authored_sprites,
         "packaged_original_audio": authored_audio,
         "audio_engine_playback_verified": False,

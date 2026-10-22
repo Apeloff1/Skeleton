@@ -154,6 +154,7 @@ def _godot_archive(
 def _sprite_archive(
     compiled: Mapping[str, Any], *, project_id: str,
     source_head_sha256: str | None,
+    records: Mapping[str, Mapping[str, Any]],
 ) -> bytes:
     """Write reproducible PNG and animation-state assets with source receipts."""
     from .studio_sprite_verify import verify_published_sprite
@@ -163,11 +164,22 @@ def _sprite_archive(
     )
 
     atlas = compiled["assets"]
+    from .studio_asset_descriptors import (
+        compile_asset_catalog, catalog_bytes,
+    )
+    asset_catalog = compile_asset_catalog(
+        project_id=project_id, source_head_sha256=source_head_sha256,
+        records=records, sprites=atlas,
+    )
+    asset_catalog_raw = catalog_bytes(asset_catalog)
     metadata = {
         "schema_version": "skeleton.jeeves.sprite_package.v1",
         "project_id": project_id, "source_head_sha256": source_head_sha256,
         "asset_count": compiled["count"],
         "atlas_hashes": compiled["atlas_hashes"],
+        "asset_catalog_sha256": sha256(asset_catalog_raw).hexdigest(),
+        "asset_catalog_receipt_sha256": asset_catalog["receipt_sha256"],
+        "asset_descriptor_count": asset_catalog["descriptor_count"],
         "palette_variant_receipts": compiled["palette_variant_receipts"],
         "collision_receipts": {
             item["metadata"]["asset_id"]: item["collision_rectangles"]["receipt_sha256"]
@@ -178,7 +190,9 @@ def _sprite_archive(
         "artist_review_claimed": False,
     }
     metadata["receipt_sha256"] = digest(metadata)
-    files: dict[str, bytes] = {}
+    files: dict[str, bytes] = {
+        "assets/catalog.json": asset_catalog_raw,
+    }
     for entry in atlas:
         proof = entry["metadata"]
         name = proof["asset_id"]
@@ -685,7 +699,7 @@ class CreatorProjectSourceStore:
                 compiled = compile_original_palette_collection(self._records)
                 raw = _sprite_archive(
                     compiled, project_id=self.project_id,
-                    source_head_sha256=self._head,
+                    source_head_sha256=self._head, records=self._records,
                 )
                 extension = ".zip"
             elif export_format == "frontier-godot4-zip":

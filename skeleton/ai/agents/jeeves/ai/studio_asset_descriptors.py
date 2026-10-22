@@ -14,6 +14,7 @@ from hashlib import sha256
 import json
 import re
 import struct
+from math import isqrt
 from typing import Any
 
 from .studio_interaction_contract import digest
@@ -107,7 +108,7 @@ def _review_overlay(record: Mapping[str, Any]) -> dict[str, Any]:
     _list(doc["roles"], "roles", ROLE, 12)
     if type(doc["locale"]) is not str or not LOCALE.fullmatch(doc["locale"]):
         raise AssetDescriptorError("descriptor locale requires a BCP-47 language code")
-    if doc["rights_status"] not in RIGHTS:
+    if type(doc["rights_status"]) is not str or doc["rights_status"] not in RIGHTS:
         raise AssetDescriptorError("rights assertion is outside reviewed vocabulary")
     if (doc["rights_status"] in {
             "third_party_permission_asserted", "public_domain_asserted",
@@ -215,7 +216,7 @@ def _audio_metrics(sound: Mapping[str, Any]) -> dict[str, Any]:
         "waveform": meta["waveform"],
         "peak_abs_pcm": peak,
         "mean_abs_pcm": sum_abs // count,
-        "rms_pcm_x1000": __import__("math").isqrt(energy * 1_000_000 // count),
+        "rms_pcm_x1000": isqrt(energy * 1_000_000 // count),
         "peak_dbfs_estimate_available": False,
         "native_audio_playback_verified": False,
     }
