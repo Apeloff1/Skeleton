@@ -36,6 +36,9 @@ from skeleton.testing.test_jeeves_studio_sprite_palette_variants import (
     OriginalPaletteVariantTests as TestJeevesOriginalPaletteVariants,
     PersistentPaletteSkinTests as TestJeevesPersistedPaletteSkins,
 )
+from skeleton.testing.test_jeeves_studio_sprite_surface import (
+    HeightfieldNormalTests as TestJeevesSpriteSurface,
+)
 from skeleton.testing.test_jeeves_studio_sprite_quality import (
     SpriteQualityTests as TestJeevesSpriteQuality,
 )
@@ -55,6 +58,7 @@ from skeleton.testing.test_jeeves_studio_creator_source import (
 __all__ = [
     "TestJeevesSpriteForge", "TestJeevesPersistedSprites",
     "TestJeevesSpriteQuality",
+    "TestJeevesSpriteSurface",
     "TestJeevesOriginalPaletteVariants", "TestJeevesPersistedPaletteSkins",
     "TestJeevesOriginalNpcCast", "TestJeevesOriginalNpcSprites",
     "TestJeevesNpcSpritePreflight",
