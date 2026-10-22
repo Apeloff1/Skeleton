@@ -190,6 +190,15 @@ def _sprite_archive(
             raise CreatorSourceError("published sprite pixel atlas does not replay")
         files["sprites/" + name + ".png"] = raw
         files["sprites/" + name + ".json"] = _json(proof)
+        if entry.get("normal_png") is not None:
+            from .studio_sprite_surface import verify_normal_texture_bytes
+            normal = entry["normal_png"]
+            receipt = proof.get("normal_map")
+            verify_normal_texture_bytes(
+                raw, normal, receipt,
+                width=proof["sheet_width_px"], height=proof["sheet_height_px"],
+            )
+            files["sprites/" + name + ".normal.png"] = normal
         collision = verify_exact_sprite_hitboxes(
             proof, entry["collision_rectangles"],
         )
