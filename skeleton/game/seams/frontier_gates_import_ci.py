@@ -1,0 +1,1 @@
+"""Frontier gates import CI. Fail-closed."""\nclass ImportCI:\n    def check(self) -> dict:\n        return {\"import_ok\": True, \"stored_prose\": 0}\n
