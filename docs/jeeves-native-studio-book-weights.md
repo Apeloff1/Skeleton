@@ -1565,3 +1565,63 @@ catalog and mutation tests, supplemented by 3 full source-store/native-ZIP
 integration tests in
 `test_jeeves_studio_frontier_source_compile.py`.
 Native Godot import and runtime physics remain separate release milestones.
+ 
+### Authored 3D model placement in the actual Godot game world
+
+The original mesh and physics pipeline now has a real source-governed scene
+instance compiler (`studio_original_mesh_placements.py`). This resolves the
+critical difference between merely shipping separate .glb/.tscn resources and
+actually instantiating assets within the playable expedition scene.
+
+An approved `scene_forge` source with
+`document.kind=original_mesh_instance` includes exactly
+`instance_id`, `base_record_id`, `asset_id`, `physics_record_id`,
+`position_mm`, `rotation_deg` and `scale_per_mille`.
+
+```json
+{
+  "kind": "original_mesh_instance",
+  "instance_id": "temple-doorway",
+  "base_record_id": "temple-source",
+  "asset_id": "temple-pedestal",
+  "physics_record_id": "temple-physics-source",
+  "position_mm": [1500, 3200, -550],
+  "rotation_deg": [0, 90, 0],
+  "scale_per_mille": 1000
+}
+```
+
+A physical scene instance requires `depends_on` to include both the
+existing mesh-source ID and reviewed physics-source ID. An uncollidable
+visual-only instance requires `physics_record_id=null`. If the original
+mesh has an LOD set and no attached physics, the compiler references the
+authored LOD scene; when physics is enabled, it selects the actual
+original physics-body scene, which in turn instantiates the authored
+LOD visual geometry. Uniform scale preserves the source physical shape,
+while translation/rotation are explicit integer-authored world units.
+
+The output includes:
+- `game/frontier/mesh_placements.tscn` — an actual child scene with
+  explicit `PackedScene` imports and unique `Node3D` instances.
+- `game/frontier/mesh_placements.source.json` — the exact reviewed source
+  records, authored transform/mesh identities and a sealed compiler receipt.
+- `game/frontier/expedition.tscn` — independently verified in-place
+  attachment to the real `FrontierExpedition` root, retaining the original
+  gameplay `expedition.gd` script. Empty placements leave the base scene
+  byte-identical.
+
+The post-publication verifier reruns the original placement compiler
+against actual ZIP source bytes, proves the child scene and live root
+linkage, verifies optional physics/LOD sources against independently
+replayed GLBs, and rejects missing, foreign or additional instances.
+Source updates fail before the SQLite write if they orphan a mesh, body
+or instance. The authoring JSON Schema Draft 2020-12 contract is
+`docs/schemas/jeeves-original-mesh-instance-2026.schema.json`.
+
+**Evidence limits:** The source editor now creates game-world hierarchy nodes;
+Godot native scene import, actual runtime rendering, contact detection,
+behavior and gameplay quality remain unverified until a host-authorized
+engine run and separate observation prove them. No model-generated code
+gets executable rights merely because it appears in this source.
+Coverage: 16 detailed unit/source-store placement cases and two full
+native project ZIP roundtrips.
