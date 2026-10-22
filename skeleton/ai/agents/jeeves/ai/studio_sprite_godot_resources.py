@@ -41,13 +41,43 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
         raise SpriteResourceError("reviewed frames and original timed states required")
     if any(not isinstance(frame, Mapping) for frame in frames):
         raise SpriteResourceError("sprite frame is not typed")
+    # A Godot CanvasTexture carries both diffuse and independently authored
+    # normal atlases through the SAME AtlasTexture UVs, frame by frame. This
+    # enables 2D light-normal sampling without changing any source pixels.
+    lighting = meta.get("normal_map")
+    has_normals = lighting is not None
+    if has_normals:
+        if not isinstance(lighting, Mapping):
+            raise SpriteResourceError("normal atlas needs a canonical reviewed receipt")
+        receipt = dict(lighting)
+        pinned = receipt.pop("receipt_sha256", None)
+        if (not isinstance(pinned, str) or pinned != digest(receipt)
+                or lighting.get("schema_version") !=
+                "skeleton.jeeves.authored_sprite_normal_atlas.v1"
+                or lighting.get("color_png_sha256") != meta.get("png_sha256")
+                or lighting.get("normal_image_width_px") != meta.get("sheet_width_px")
+                or lighting.get("normal_image_height_px") != meta.get("sheet_height_px")
+                or lighting.get("source_heights_authored") is not True
+                or lighting.get("normal_map_loaded_in_native_engine") is not False
+                or not isinstance(lighting.get("normal_png_sha256"), str)
+                or re.fullmatch(r"[0-9a-f]{64}", lighting["normal_png_sha256"]) is None):
+            raise SpriteResourceError("normal atlas source identity is not verified")
     ids: dict[str, int] = {}
     lines = [
-        f"[gd_resource type=\"SpriteFrames\" load_steps={len(frames) + 2} format=3]",
+        f"[gd_resource type=\"SpriteFrames\" load_steps={len(frames) + (4 if has_normals else 2)} format=3]",
         "",
         f"[ext_resource type=\"Texture2D\" path=\"res://{directory}/{asset}.png\" id=\"1\"]",
         "",
     ]
+    if has_normals:
+        lines.extend([
+            f'[ext_resource type="Texture2D" path="res://{directory}/{asset}.normal.png" id="2"]',
+            "",
+            '[sub_resource type="CanvasTexture" id="CanvasSurface"]',
+            'diffuse_texture = ExtResource("1")',
+            'normal_texture = ExtResource("2")',
+            "",
+        ])
     for index, frame in enumerate(frames):
         fid = _label(frame.get("frame_id"), "frame identity")
         if fid in ids:
@@ -64,7 +94,8 @@ def compile_godot_sprite_resources(meta: Mapping[str, Any], *,
             raise SpriteResourceError("resource frame exceeds original PNG surface")
         lines.extend([
             f"[sub_resource type=\"AtlasTexture\" id=\"Atlas_{index}\"]",
-            'atlas = ExtResource("1")',
+            ('atlas = SubResource("CanvasSurface")' if has_normals
+             else 'atlas = ExtResource("1")'),
             f"region = Rect2({rect[0]}, {rect[1]}, {rect[2]}, {rect[3]})",
             "",
         ])
@@ -153,6 +184,9 @@ def verify_godot_sprite_resources(
         "source_sprite_receipt_sha256": meta["receipt_sha256"],
         "resource_paths": sorted(expected),
         "source_resource_reproducible": True,
+        "canvas_normal_resource_compiled": bool(meta.get("normal_map")),
+        "normal_image_sha256": (meta["normal_map"]["normal_png_sha256"]
+                                if meta.get("normal_map") else None),
         "in_engine_loaded_and_rendered": False,
     }
     result["receipt_sha256"] = digest(result)

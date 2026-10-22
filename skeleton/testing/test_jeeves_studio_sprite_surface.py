@@ -19,6 +19,13 @@ from skeleton.jeeves.ai.studio_sprite_surface import (
     SpriteSurfaceError, verify_authored_normals,
     verify_normal_texture_bytes,
 )
+from skeleton.jeeves.ai.studio_sprite_godot_resources import (
+    SpriteResourceError, compile_godot_sprite_resources,
+    verify_godot_sprite_resources,
+)
+from skeleton.jeeves.ai.studio_sprite_zip_verify import (
+    SpritePackageVerificationError, verify_published_sprite_package,
+)
 from skeleton.testing.test_jeeves_studio_sprite_forge import original_record
 
 
@@ -186,6 +193,48 @@ class HeightfieldNormalTests(unittest.TestCase):
         result = compile_authored_sprite(original_record())
         self.assertIsNone(result["normal_png"])
         self.assertNotIn("normal_map", result["metadata"])
+
+    def test_godot_canvas_texture_binds_exact_reviewed_normal_atlas(self):
+        metadata = compile_authored_sprite(lit_original())["metadata"]
+        resources = compile_godot_sprite_resources(metadata)
+        source = resources["game/frontier/sprites/hero-idle.tres"]
+        self.assertIn('[sub_resource type="CanvasTexture" id="CanvasSurface"]', source)
+        self.assertIn('normal_texture = ExtResource("2")', source)
+        self.assertIn('atlas = SubResource("CanvasSurface")', source)
+        self.assertIn('hero-idle.normal.png', source)
+        verification = verify_godot_sprite_resources(metadata, resources)
+        self.assertTrue(verification["canvas_normal_resource_compiled"])
+        self.assertEqual(
+            verification["normal_image_sha256"],
+            metadata["normal_map"]["normal_png_sha256"],
+        )
+        self.assertFalse(verification["in_engine_loaded_and_rendered"])
+
+    def test_unlit_sprites_preserve_diffuse_only_atlas_contract(self):
+        meta = compile_authored_sprite(original_record())["metadata"]
+        resources = compile_godot_sprite_resources(meta, directory="sprites")
+        source = resources["sprites/hero-idle.tres"]
+        self.assertNotIn("CanvasTexture", source)
+        self.assertNotIn("normal.png", source)
+        self.assertIn('atlas = ExtResource("1")', source)
+
+    def test_forged_normal_proof_cannot_be_bound_to_engine_resources(self):
+        meta = deepcopy(compile_authored_sprite(lit_original())["metadata"])
+        meta["normal_map"]["color_png_sha256"] = "0" * 64
+        with self.assertRaises(SpriteResourceError):
+            compile_godot_sprite_resources(meta)
+
+    def test_canvas_surface_resource_substitution_is_not_accepted(self):
+        meta = compile_authored_sprite(lit_original())["metadata"]
+        resources = compile_godot_sprite_resources(meta)
+        path = "game/frontier/sprites/hero-idle.tres"
+        tampered = dict(resources)
+        tampered[path] = tampered[path].replace(
+            'normal_texture = ExtResource("2")',
+            'normal_texture = ExtResource("1")',
+        )
+        with self.assertRaises(SpriteResourceError):
+            verify_godot_sprite_resources(meta, tampered)
 
     def test_source_store_exports_verified_normal_png_with_sprite(self):
         source = lit_original()

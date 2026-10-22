@@ -71,6 +71,28 @@ func _verify() -> void:
     if decoded_sha256 != expected["pixel_content_sha256"]:
         quit(23)
         return
+    var normal_digest := ""
+    var normal_byte_count := 0
+    if expected["normal_rgba_sha256"] != "":
+        var normal_image := Image.load_from_file("res://game/frontier/sprites/ASSET_ID.normal.png")
+        if (normal_image == null or normal_image.is_empty()
+                or normal_image.get_format() != Image.FORMAT_RGBA8
+                or normal_image.get_width() != expected["sheet_width"]
+                or normal_image.get_height() != expected["sheet_height"]):
+            quit(27)
+            return
+        var normal_hasher := HashingContext.new()
+        if normal_hasher.start(HashingContext.HASH_SHA256) != OK:
+            quit(28)
+            return
+        if normal_hasher.update(normal_image.get_data()) != OK:
+            quit(29)
+            return
+        normal_digest = normal_hasher.finish().hex_encode()
+        normal_byte_count = normal_image.get_data().size()
+        if normal_digest != expected["normal_rgba_sha256"]:
+            quit(30)
+            return
     var checked = 0
     for state in expected["animations"]:
         var name = StringName(state["name"])
@@ -90,6 +112,20 @@ func _verify() -> void:
             var tex = atlas.get_frame_texture(name, i)
             if not (tex is AtlasTexture):
                 quit(16)
+                return
+            if expected["normal_rgba_sha256"] != "":
+                if not (tex.atlas is CanvasTexture):
+                    quit(31)
+                    return
+                var surface := tex.atlas as CanvasTexture
+                if (surface.diffuse_texture == null
+                        or surface.normal_texture == null
+                        or surface.normal_texture.resource_path
+                        != "res://game/frontier/sprites/ASSET_ID.normal.png"):
+                    quit(32)
+                    return
+            elif tex.atlas is CanvasTexture:
+                quit(33)
                 return
             var rect = tex.region
             var frame_rect = state["rectangles"][i]
@@ -144,6 +180,10 @@ func _verify() -> void:
         "engine_import_succeeded": true,
         "native_gameplay_playthrough_verified": false
     }
+    if expected["normal_rgba_sha256"] != "":
+        report["decoded_normal_rgba_sha256"] = normal_digest
+        report["normal_pixel_bytes"] = normal_byte_count
+        report["normal_canvas_texture_bound"] = true
     print("JEEVES_SPRITE_IMPORT " + JSON.stringify(report))
     node.free()
     quit(0)
@@ -257,6 +297,10 @@ def inspect_godot_sprite_import(
         "sheet_width": meta["sheet_width_px"],
         "sheet_height": meta["sheet_height_px"],
         "pixel_content_sha256": meta["pixel_content_sha256"],
+        "normal_rgba_sha256": (
+            meta["normal_map"]["normal_rgba_sha256"]
+            if meta.get("normal_map") else ""
+        ),
         "height": meta["frame_height_px"],
         "animations": [
             {
@@ -281,6 +325,9 @@ def inspect_godot_sprite_import(
         root = Path(folder)
         for name, data in {
             **{name: body.encode("utf-8") for name, body in resources.items()},
+            **({f"game/frontier/sprites/{asset_id}.normal.png":
+                candidate["normal_png"]}
+               if candidate.get("normal_png") is not None else {}),
             f"game/frontier/sprites/{asset_id}.png": candidate["png"],
             "project.godot": b"config_version=5\n",
             "verify_sprite.gd": gdscript.encode("utf-8"),
@@ -367,6 +414,14 @@ def inspect_godot_sprite_import(
         "engine_import_succeeded": True,
         "native_gameplay_playthrough_verified": False,
     }
+    if meta.get("normal_map"):
+        required.update({
+            "decoded_normal_rgba_sha256": meta["normal_map"]["normal_rgba_sha256"],
+            "normal_pixel_bytes": (
+                meta["sheet_width_px"] * meta["sheet_height_px"] * 4
+            ),
+            "normal_canvas_texture_bound": True,
+        })
     if type(native) is not dict or native != required:
         raise NativeSpriteImportError("native sprite resource observation contradicts source")
     result = {
@@ -387,6 +442,9 @@ def inspect_godot_sprite_import(
         "godot_png_resource_loaded": True,
         "real_godot_editor_import_executed": True,
         "editor_import_log_sha256": sha256(import_log).hexdigest(),
+        "authored_normal_map_imported": bool(meta.get("normal_map")),
+        "normal_canvas_texture_verified": bool(meta.get("normal_map")),
+        "normal_lighting_rendered_or_perceptually_verified": False,
         "visual_rendering_verified": False,
     }
     result["receipt_sha256"] = digest(result)

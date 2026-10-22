@@ -21,6 +21,12 @@ from .studio_sprite_godot_resources import (
 from .studio_sprite_palette_variants import (
     verify_original_palette_variant, SpritePaletteVariantError,
 )
+from .studio_sprite_surface import (
+    SpriteSurfaceError, verify_authored_normals, verify_normal_texture_bytes,
+)
+from .studio_sprite_frame_cues import (
+    SpriteCueError, emit_godot_frame_cue_files, verify_godot_frame_cue_files,
+)
 
 MAX_ARCHIVE = 16 * 1024 * 1024
 MAX_FILE = 8 * 1024 * 1024
@@ -51,7 +57,7 @@ def verify_published_sprite_package(
         with zipfile.ZipFile(path, "r") as archive:
             entries = archive.infolist()
             names = [item.filename for item in entries]
-            if (not 6 <= len(names) <= 5 * MAX_ASSETS + 1
+            if (not 6 <= len(names) <= 9 * MAX_ASSETS + 1
                     or len(names) != len(set(names))
                     or names != sorted(names)
                     or PROOF not in names):
@@ -122,6 +128,37 @@ def verify_published_sprite_package(
                     folder + ".tres": archive.read(folder + ".tres").decode("utf-8"),
                     folder + ".tscn": archive.read(folder + ".tscn").decode("utf-8"),
                 }, directory="sprites")
+                # Every optional source-generated file is required exactly when
+                # the original reviewed metadata calls for it. Ignore neither
+                # an added file nor a missing one.
+                cue_files = emit_godot_frame_cue_files(
+                    source, directory="sprites",
+                )
+                expected.update(cue_files)
+                verify_godot_frame_cue_files(source, {
+                    file: archive.read(file).decode("utf-8")
+                    for file in cue_files
+                }, directory="sprites")
+                if source.get("normal_map") is not None:
+                    normal_name = folder + ".normal.png"
+                    normal_source_name = folder + ".normal.source.json"
+                    expected.update((normal_name, normal_source_name))
+                    normal_png = archive.read(normal_name)
+                    source_heights = json.loads(archive.read(normal_source_name))
+                    proof_normal = verify_normal_texture_bytes(
+                        png, normal_png, source["normal_map"],
+                        width=source["sheet_width_px"],
+                        height=source["sheet_height_px"],
+                    )
+                    replay_normal = verify_authored_normals(
+                        source_heights, metadata=source, color_png=png,
+                        normal_png=normal_png,
+                        normal_receipt=source["normal_map"],
+                    )
+                    if (not proof_normal["pixel_alpha_preserved"]
+                            or not replay_normal["height_map_replayed"]):
+                        raise SpritePackageVerificationError(
+                            "published normal source did not reconstruct")
                 if (checked_boxes["receipt_sha256"]
                         != proof.get("collision_receipts", {}).get(name)
                         or sha256(png).hexdigest() != proof.get("atlas_hashes", {}).get(name)):
@@ -150,7 +187,8 @@ def verify_published_sprite_package(
         zipfile.BadZipFile, OSError, RuntimeError, UnicodeError,
         ValueError, KeyError, TypeError,
         SpriteVerificationError, SpriteCollisionError,
-        SpriteResourceError, SpritePaletteVariantError,
+        SpriteResourceError, SpritePaletteVariantError, SpriteSurfaceError,
+        SpriteCueError,
     ) as exc:
         if isinstance(exc, SpritePackageVerificationError):
             raise
@@ -167,6 +205,12 @@ def verify_published_sprite_package(
         "palette_variants_replayed": len(skins),
         "actual_archive_bytes_verified": True,
         "all_rgba_hitbox_and_resource_bytes_replayed": True,
+        "authored_normal_maps_replayed": sum(
+            1 for source in sprites if source.get("normal_map") is not None
+        ),
+        "frame_cue_resources_replayed": sum(
+            1 for source in sprites if source.get("frame_cues")
+        ),
         "native_sprite_scene_binding_verified": False,
     }
     receipt["receipt_sha256"] = digest(receipt)
