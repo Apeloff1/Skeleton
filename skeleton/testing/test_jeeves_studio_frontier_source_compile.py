@@ -415,8 +415,8 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertFalse(any(self.export.iterdir()))
 
     def author_player_visual(self, *, animation="idle", source_dependency=True,
-                             movement_map=None, directional_map=None):
-        self.create("hero-art", "sprite_forge", {
+                             movement_map=None, directional_map=None, cues=None):
+        hero_document = {
             "kind": "pixel_sprite", "asset_id": "hero-idle",
             "width": 2, "height": 2, "pixel_scale": 2,
             "palette": ["#00000000", "#3366ffff"],
@@ -434,7 +434,11 @@ class RealGodotSourceBuildTests(unittest.TestCase):
                 {"name": "glide", "frame_ids": ["second"],
                  "loop": True},
             ],
-        }, depends=("config-3d",))
+        }
+        if cues is not None:
+            hero_document["cues"] = cues
+        self.create("hero-art", "sprite_forge",
+                    hero_document, depends=("config-3d",))
         binding_document = {
             "kind": "sprite_actor_binding",
             "target": "player_actor", "asset_id": "hero-idle",
@@ -542,6 +546,37 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             "all_emitted_file_hashes_verified"
         ])
         self.assertFalse(source["native_sprite_scene_binding_verified"])
+
+    def test_authored_frame_cues_execute_on_the_real_avatar_script_source(self):
+        self.populate_3d()
+        self.author_player_visual(cues=[
+            {"animation": "idle", "frame_index": 0,
+             "event_id": "footstep-1", "category": "footstep"},
+            {"animation": "walk", "frame_index": 1,
+             "event_id": "cloth-impact", "category": "impact"},
+        ])
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as bundle:
+            godot = bundle.read("game/frontier/expedition.gd").decode("utf-8")
+            cuescript = bundle.read(
+                "game/frontier/sprites/hero-idle.cues.gd",
+            ).decode("utf-8")
+            source = json.loads(bundle.read("jeeves_source_receipt.json"))
+            authored = json.loads(bundle.read(
+                "game/frontier/sprites/hero-idle.json",
+            ))
+        self.assertIn("jeeves_avatar.set_script(jeeves_cue_logic)", godot)
+        self.assertIn("frame_changed.connect(_publish_frame_cues)", cuescript)
+        self.assertIn("footstep-1", cuescript)
+        self.assertIn("cloth-impact", cuescript)
+        self.assertTrue(exported["disk_verification"]["all_emitted_file_hashes_verified"])
+        self.assertEqual(
+            source["authored_player_avatar_binding"]["frame_cues_sha256"],
+            authored["frame_cues"]["receipt_sha256"],
+        )
+        self.assertFalse(
+            source["native_godot_playthrough_verified"],
+        )
 
     def test_authored_sprite_is_bound_to_actual_moving_godot_player(self):
         self.populate_3d()
