@@ -132,6 +132,24 @@ def compile_original_godot_candidate(
     }
     if file_hashes != godot_proof["file_hashes"]:
         raise FrontierSourceError("Godot compiler proof does not match file bytes")
+    from .studio_npc_cast_source import (
+        compile_original_npc_cast, verify_original_npc_cast,
+    )
+    compiled_npc_cast = compile_original_npc_cast(
+        records, world, world_source_record_id=profile_ids[0],
+    )
+    npc_cast_receipt = None
+    if compiled_npc_cast is not None:
+        native_cast_path = "game/frontier/npcs.json"
+        if native_cast_path in files:
+            raise FrontierSourceError("NPC cast may not replace native engine assets")
+        native_cast = compiled_npc_cast["content"]
+        npc_cast_receipt = compiled_npc_cast["receipt"]
+        verify_original_npc_cast(
+            native_cast, npc_cast_receipt, world_digest=world.digest,
+        )
+        files[native_cast_path] = native_cast
+        file_hashes[native_cast_path] = sha256(native_cast.encode("utf-8")).hexdigest()
     # Keep original image resources in the REAL Godot project directory.
     # They are explicitly marked not yet bound to engine actor render nodes:
     # a PNG present on disk does not prove animated asset presentation.
@@ -242,6 +260,7 @@ def compile_original_godot_candidate(
             if name not in profile_ids
         ],
         "world_sha256": world.digest,
+        "original_npc_cast_receipt": npc_cast_receipt,
         "godot_verification_sha256": godot_proof["receipt_digest"],
         "godot_file_hashes": file_hashes,
         "packaged_original_sprites": authored_sprites,
