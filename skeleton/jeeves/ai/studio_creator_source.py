@@ -793,6 +793,34 @@ class CreatorProjectSourceStore:
             return {**evidence, "project_id": self.project_id,
                     "project_source_head_sha256": before, "record_id": key}
 
+    def verify_native_player_avatar(
+        self, *, godot_executable: str,
+        expected_binding_record_id: str,
+        timeout_seconds: int = 90,
+    ) -> dict[str, Any]:
+        """Observe original player sprite in installed Godot under a source lock."""
+        from .studio_sprite_actor_native import inspect_native_expedition_avatar
+        binding_id = identifier(expected_binding_record_id, "avatar scene source")
+        with self._lock:
+            self._refresh()
+            record = self._records.get(binding_id)
+            if (record is None or record["facet"] != "scene_forge"
+                    or record["document"].get("kind") != "sprite_actor_binding"):
+                raise CreatorSourceError("reviewed actor binding record not found")
+            previous = self._head
+            observed = inspect_native_expedition_avatar(
+                self.project_id, self._records,
+                source_head_sha256=previous,
+                godot_executable=godot_executable,
+                timeout_seconds=timeout_seconds,
+            )
+            self._refresh()
+            if self._head != previous:
+                raise CreatorSourceError("original game changed during Godot actor review")
+            return {
+                **observed, "avatar_binding_record_id": binding_id,
+            }
+
     def run_native_playthrough(
         self, *, godot_executable: str, timeout_seconds: int = 90,
     ) -> dict[str, Any]:
