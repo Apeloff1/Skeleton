@@ -25,7 +25,7 @@ from .studio_frontier_source_compile import (
 )
 from .studio_interaction_contract import digest
 from .studio_sprite_bound_native_runner import (
-    SpriteBoundNativeError, run_sprite_bound_native_expedition,
+    SpriteBoundNativeError,
 )
 
 SCHEMA = "skeleton.jeeves.frontier_godot_source.v1"

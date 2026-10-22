@@ -13,7 +13,6 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import subprocess
-from typing import Any
 
 from .studio_interaction_contract import digest
 
@@ -339,9 +338,15 @@ def run_host_mesh_probe(
         ) from exc
     if checked.returncode != 0 or len(checked.stdout) > MAX_LOG:
         raise MeshEngineProbeError("Godot mesh probe failed engine scene validation")
+    # Hash the installed executable without loading a potentially large
+    # release/editor binary into the process address space.
+    native_hash = sha256()
+    with godot_binary.open("rb") as file:
+        for block in iter(lambda: file.read(1024 * 1024), b""):
+            native_hash.update(block)
     return verify_native_mesh_probe_output(
         compiled, checked.stdout.decode("utf-8", "replace"),
-        executable_sha256=sha256(godot_binary.read_bytes()).hexdigest(),
+        executable_sha256=native_hash.hexdigest(),
         import_log_sha256=sha256(import_log).hexdigest(),
     )
 
