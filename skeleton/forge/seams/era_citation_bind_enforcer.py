@@ -1,1 +1,7 @@
-"""Era citation bind enforcer — full law."""\nclass EraBinder:\n    def bind(self, card: dict) -> dict:\n        card[\"era_bind\"] = \"HOUSE_ERA\"\n        card[\"citation\"] = \"GB-15\"\n        card[\"stored_prose\"] = 0\n        return card\n
+"""Era citation bind enforcer — full law."""
+class EraBinder:
+    def bind(self, card: dict) -> dict:
+        card["era_bind"] = "HOUSE_ERA"
+        card["citation"] = "GB-15"
+        card["stored_prose"] = 0
+        return card

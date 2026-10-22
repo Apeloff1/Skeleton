@@ -34,15 +34,15 @@ export type CurriculumCatalog = {
   schema: 'skeleton.jeeves.forge_book_curriculum.v1';
   book_count: number;
   indexed_not_materialized: true;
-  curriculum_levels: Array<{generation: BookGeneration; book_count: number;
+  curriculum_levels: {generation: BookGeneration; book_count: number;
     prerequisites: string[]; competencies: string[];
-    first_reference: string; last_reference: string}>;
+    first_reference: string; last_reference: string}[];
   provider_training: 'not_started'; weight_promoted: false;
 };
 export type CurriculumLesson = {
   schema: 'skeleton.jeeves.forge_book_curriculum.v1';
   reference: BookReference; parent_reference: string|null;
-  questions: Array<{question_id: number; prompt: string; type: 'exact_source_axis'}>;
+  questions: {question_id: number; prompt: string; type: 'exact_source_axis'}[];
   source_exercise_action: string;
   mastery_threshold: number; self_study_not_weight_training: true;
 };
@@ -61,10 +61,10 @@ export type CurriculumManifest = {
 export type CurriculumPath = {
   schema: 'skeleton.jeeves.forge_learning_path.v1';
   target: string; course_levels: number; curriculum_sha256: string;
-  modules: Array<{level: number; book: string; generation: BookGeneration;
+  modules: {level: number; book: string; generation: BookGeneration;
     operation: string; learning_objectives: string[];
     practical_checkpoints: string[]; theory_assessed: false;
-    practical_evidence_verified: false; lesson_sha256: string}>;
+    practical_evidence_verified: false; lesson_sha256: string}[];
   weights_promoted: false; requires_independent_practical_receipts: true;
 };
 export type CurriculumWorklist = {
@@ -72,8 +72,8 @@ export type CurriculumWorklist = {
   selected_generation: BookGeneration; start_index: number;
   sessions: number; issued_jobs: 0; completed_lessons: 0;
   worklist_sha256: string;
-  tasks: Array<{session: number; book: string; exact_operation: string;
-    status: 'not_started'}>;
+  tasks: {session: number; book: string; exact_operation: string;
+    status: 'not_started'}[];
 };
 export type CurriculumToolResponse = {
   schema_version: 'skeleton.game.studio_tool_receipt.v1';

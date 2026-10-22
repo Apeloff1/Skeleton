@@ -442,10 +442,10 @@ export type ForgeRouteAudit = {
   schema: 'skeleton.forge.route_playthrough_assurance.v1';
   project_id: string; project_sha256: string; source_version: number;
   scenario_count: number; passed_count: number; failed_count: number;
-  scenarios: Array<ForgeRouteScenario & {
+  scenarios: (ForgeRouteScenario & {
     source_layer_sha256: string; primary: ForgeRouteWitness;
     alternate: ForgeRouteWitness | null; passed: boolean; failure: string | null;
-  }>;
+  })[];
   receipt_sha256: string;
   verified_against_authoritative_source: true;
   reference_source_replay: true;

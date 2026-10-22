@@ -1,1 +1,11 @@
-"""Quantum gate lattice for production — full implementation."""\nfrom dataclasses import dataclass\nfrom typing import Dict, Any\n\n@dataclass\nclass GateLattice:\n    gates: Dict[str, Any]\n\n    def verify_all(self, report: Dict[str, Any]) -> bool:\n        # Full verification logic\n        return all(g.get(\"hit\") for g in self.gates.values()) and report.get(\"stored_prose\", 1) == 0\n
+"""Quantum gate lattice for production — full implementation."""
+from dataclasses import dataclass
+from typing import Dict, Any
+
+@dataclass
+class GateLattice:
+    gates: Dict[str, Any]
+
+    def verify_all(self, report: Dict[str, Any]) -> bool:
+        # Full verification logic
+        return all(g.get("hit") for g in self.gates.values()) and report.get("stored_prose", 1) == 0

@@ -1,1 +1,18 @@
-"""1000-ops Forge extension seam — complete, no stubs.\nByzantine elaboration on authoring."""\nfrom typing import Any, Dict, List\nimport hashlib\nimport json\n\nclass OpsExtension:\n    def __init__(self):\n        self.ops: List[str] = [f\"op_{i}\" for i in range(1000)]\n\n    def execute_batch(self, project: Dict[str, Any]) -> Dict[str, Any]:\n        result = project.copy()\n        for op in self.ops:\n            result[op] = hashlib.sha256(json.dumps(result).encode()).hexdigest()[:16]\n            result[\"mass\"] = min(result.get(\"mass\", 1.0) * 1.01, result.get(\"mass\", 1.0) * 1.1)\n        result[\"stored_prose\"] = 0\n        result[\"era_bind\"] = \"HOUSE_ERA\"\n        return result\n
+"""1000-ops Forge extension seam — complete, no stubs.
+Byzantine elaboration on authoring."""
+from typing import Any, Dict, List
+import hashlib
+import json
+
+class OpsExtension:
+    def __init__(self):
+        self.ops: List[str] = [f"op_{i}" for i in range(1000)]
+
+    def execute_batch(self, project: Dict[str, Any]) -> Dict[str, Any]:
+        result = project.copy()
+        for op in self.ops:
+            result[op] = hashlib.sha256(json.dumps(result).encode()).hexdigest()[:16]
+            result["mass"] = min(result.get("mass", 1.0) * 1.01, result.get("mass", 1.0) * 1.1)
+        result["stored_prose"] = 0
+        result["era_bind"] = "HOUSE_ERA"
+        return result
