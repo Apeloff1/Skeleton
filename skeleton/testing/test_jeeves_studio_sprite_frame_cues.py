@@ -150,6 +150,12 @@ class SpriteFrameCueTests(unittest.TestCase):
         with self.assertRaisesRegex(SpriteCueError, "signal source differs"):
             verify_godot_frame_cue_files(meta, generated)
 
+    def test_explicit_null_cues_are_not_silent_empty_source(self):
+        record = original_record()
+        record["document"]["cues"] = None
+        with self.assertRaisesRegex(SpriteCueError, "1..128"):
+            compile_authored_sprite(reseal(record))
+
     def test_legacy_sprite_remains_cue_free(self):
         artifact = compile_authored_sprite(original_record())
         self.assertIsNone(artifact["metadata"]["frame_cues"])
