@@ -289,6 +289,39 @@ class HeightfieldNormalTests(unittest.TestCase):
                     width=metadata["sheet_width_px"],
                     height=metadata["sheet_height_px"],
                 )["pixel_alpha_preserved"])
+                published = exports / result["artifact_name"]
+                independent = verify_published_sprite_package(
+                    published, project_id="original-game",
+                    source_head_sha256=owner.head_identity(),
+                    expected_archive_sha256=result["artifact_sha256"],
+                )
+                self.assertEqual(independent["authored_normal_maps_replayed"], 1)
+                self.assertTrue(independent[
+                    "all_rgba_hitbox_and_resource_bytes_replayed"
+                ])
+                # Rehash the whole archive so this denial exercises its
+                # independent resource replay rather than a trivial outer
+                # artifact SHA mismatch.
+                altered = root / "forged-preview.zip"
+                with zipfile.ZipFile(published) as source_zip:
+                    with zipfile.ZipFile(altered, "w") as forged_zip:
+                        for member in source_zip.infolist():
+                            body = source_zip.read(member.filename)
+                            if member.filename == "sprites/hero-idle.lit.tres":
+                                assert b'normal_texture = ExtResource("2")' in body
+                                body = body.replace(
+                                    b'normal_texture = ExtResource("2")',
+                                    b'normal_texture = ExtResource("1")',
+                                )
+                            forged_zip.writestr(member, body)
+                with self.assertRaises(SpritePackageVerificationError):
+                    verify_published_sprite_package(
+                        altered, project_id="original-game",
+                        source_head_sha256=owner.head_identity(),
+                        expected_archive_sha256=sha256(
+                            altered.read_bytes()
+                        ).hexdigest(),
+                    )
 
 
 if __name__ == "__main__":
