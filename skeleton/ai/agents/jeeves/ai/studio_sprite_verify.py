@@ -210,6 +210,27 @@ def verify_published_sprite(
         durations = {frame["frame_id"]: frame["duration_ms"] for frame in frames}
         if sum(durations[key] for key in keys) != state.get("duration_ms"):
             raise SpriteVerificationError("animation duration differs from source timeline")
+    from .studio_sprite_frame_cues import compile_frame_cues
+    recorded = metadata.get("frame_cues")
+    if recorded is not None:
+        try:
+            reproduced = compile_frame_cues({
+                "cues": [
+                    {
+                        key: entry[key] for key in (
+                            "animation", "frame_index", "event_id", "category",
+                        )
+                    } for entry in recorded["cues"]
+                ],
+            }, animations)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise SpriteVerificationError(
+                "original animation cue evidence cannot be reconstructed"
+            ) from exc
+        if reproduced != recorded:
+            raise SpriteVerificationError(
+                "sprite frame cue markers differ from actual animation timeline"
+            )
     body = {
         "schema_version": "skeleton.jeeves.sprite_pixel_replay.v1",
         "asset_id": metadata.get("asset_id"),
@@ -219,6 +240,9 @@ def verify_published_sprite(
         "source_frames_verified": len(frames),
         "animation_states_verified": len(animations),
         "collision_masks_verified": len(frames),
+        "authored_frame_cues_verified": (
+            recorded["cue_count"] if recorded is not None else 0
+        ),
         "lossless_directional_variants_verified": verified_variants,
         "layout_and_padding_reproduced": True,
         "native_renderer_executed": False,
