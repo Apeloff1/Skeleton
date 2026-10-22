@@ -2,6 +2,8 @@ name: Local AI Boilerplate
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'skeleton/local_ai/**'
       - 'skeleton/testing/test_local_ai_boilerplate.py'
