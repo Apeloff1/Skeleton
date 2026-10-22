@@ -1115,3 +1115,60 @@ events, spoofed frame names, unbound waypoints, reversed playback order,
 altered source policies and malformed logs. The original native engine
 execution path remains host-authorized and unavailable without a real
 approved Godot 4 binary.
+
+
+## Native decoded RGBA image proof and time-domain animation scrutiny
+
+### Imported Godot 4 texture pixels (not just metadata)
+
+The separately host-authorized `studio_sprite_native_import.py` now runs
+an **actual two-stage Godot 4 import**. It prepares the original sprite
+project, executes the installed engine's bounded
+`--headless --editor --import` resource-import phase, then launches a
+second headless GDScript inspector.
+
+The inspector loads the genuine `AnimatedSprite2D` scene and its
+`SpriteFrames` and `AtlasTexture` resources, checks every authored
+animation name, ordered frame count, loop policy and frame duration,
+and now compares **all four atlas coordinates** for every frame: X/Y
+offset and width/height. It also loads the original RGBA PNG using the
+engine's `Image.load_from_file`, insists on the actual RGBA8 format and
+declared dimensions, hashes the decoded complete image's pixel buffer
+using Godot `HashingContext.HASH_SHA256`, and requires that digest to
+agree with the Python sprite compiler's independent
+`pixel_content_sha256`. A successful native import report includes
+`decoded_rgba_sha256`, actual decoded pixel-byte count, import log
+SHA, native executable SHA and an explicit `visual_rendering_verified=false`
+flag. A refused importer, mismatched image format, wrong pixel or
+bad atlas coordinates fail closed. The approved native binary is
+rehashed after both process phases to detect executable replacement.
+
+These capabilities are **committed code paths**, not claims of native
+engine execution on the GitHub-connected assistant host. An installed
+Godot 4 binary and host permission are still necessary.
+
+### Pixel-resolved temporal quality inspection
+
+The new `studio_sprite_temporal_quality.py` recomputes each original
+animation frame's RGBA contents from the authored PNG at the exact
+integer pixel scale. For every frame it records original unscaled RGBA
+SHA, actual opacity-weighted alpha centroid, alpha-weight sum,
+number of changed RGBA pixels and changed alpha pixels relative to
+the preceding frame, and the integer fixed-point centroid step.
+
+The resulting evidence highlights transparent frames, consecutive
+identical frames and potentially large registration jumps across an
+animation. These are quality **review signals**, not automated
+creative or subjective judgment. They are added to each sprite's
+hash-linked metadata receipt and independently reconstructed by the
+read-side `studio_sprite_verify.py`; arbitrarily editing the temporal
+review, even while recomputing the outer receipt digest, cannot substitute
+for unchanged original PNG pixels.
+
+Twelve focused tests in
+`skeleton/testing/test_jeeves_studio_sprite_temporal_quality.py`
+cover unchanged and altered frames, alpha transitions, unpremultiplied
+opacity, oversized or invalid geometry, jitter warnings, deterministic
+rebuilds, and deliberately forged quality metadata. These tests are
+included in the root CI test collector. This stage neither generates
+a new sprite frame nor performs an actual on-screen rendering.
