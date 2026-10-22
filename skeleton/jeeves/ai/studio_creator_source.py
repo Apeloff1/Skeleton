@@ -200,6 +200,14 @@ def _sprite_archive(
             proof, directory="sprites",
         )
         verify_godot_sprite_resources(proof, resources, directory="sprites")
+        from .studio_sprite_frame_cues import (
+            emit_godot_frame_cue_files, verify_godot_frame_cue_files,
+        )
+        cue_sources = emit_godot_frame_cue_files(proof, directory="sprites")
+        verify_godot_frame_cue_files(
+            proof, cue_sources, directory="sprites",
+        )
+        resources.update(cue_sources)
         for path, source in resources.items():
             if path in files:
                 raise CreatorSourceError("Godot sprite resource identity collides")
