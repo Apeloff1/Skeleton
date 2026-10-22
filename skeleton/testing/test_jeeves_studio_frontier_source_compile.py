@@ -356,6 +356,73 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(journal.read()), 0)
 
+    def test_original_3d_mesh_and_descriptor_compile_to_real_godot_zip(self):
+        self.populate_3d()
+        mesh_source = {
+            "kind": "procedural_mesh", "asset_id": "temple-pedestal",
+            "primitive": "box", "size_mm": [1200, 700, 900],
+            "segments": 12, "color_rgba": "#aabbccff",
+            "metallic_per_mille": 100, "roughness_per_mille": 850,
+        }
+        self.create("temple-source", "asset_forge", mesh_source,
+                    depends=("config-3d",))
+        self.create("temple-meta", "asset_forge", {
+            "kind": "asset_descriptor",
+            "target_record_id": "temple-source",
+            "target_asset_id": "temple-pedestal",
+            "title": "Temple pedestal",
+            "description": "An original box-shaped pedestal for the ruins.",
+            "alt_text": "Low original rectangular pedestal.",
+            "tags": ["temple", "ruins", "stone"],
+            "roles": ["environment", "prop"],
+            "locale": "en", "rights_status": "self_authored_asserted",
+            "attribution": "",
+        }, depends=("temple-source",))
+        report = self.export_godot()
+        file_path = self.export / report["artifact_name"]
+        with zipfile.ZipFile(file_path) as archive:
+            archive_members = set(archive.namelist())
+            self.assertIn("game/frontier/assets/catalog.json", archive_members)
+            self.assertIn("game/frontier/meshes/temple-pedestal.glb", archive_members)
+            self.assertIn("game/frontier/meshes/temple-pedestal.source.json", archive_members)
+            glb = archive.read("game/frontier/meshes/temple-pedestal.glb")
+            source = json.loads(
+                archive.read("game/frontier/meshes/temple-pedestal.source.json")
+            )
+            catalog = json.loads(archive.read("game/frontier/assets/catalog.json"))
+            receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+        from skeleton.jeeves.ai.studio_original_mesh import verify_original_mesh
+        self.assertTrue(verify_original_mesh(
+            source["record"], glb, source["metadata"],
+        )["glb_buffer_and_index_geometry_replayed"])
+        self.assertEqual(
+            receipt["packaged_original_meshes"][0]["glb_sha256"],
+            sha256(glb).hexdigest(),
+        )
+        self.assertEqual(report["disk_verification"]["asset_descriptor_count"], 1)
+        self.assertEqual(catalog["descriptors"][0]["title"], "Temple pedestal")
+        self.assertFalse(catalog["rights_clearance_certified"])
+        self.assertFalse(receipt["native_mesh_import_verified"])
+        self.assertFalse(receipt["native_godot_playthrough_verified"])
+
+    def test_mesh_glb_source_geometry_survives_separate_disk_verification(self):
+        self.populate_3d()
+        self.create("original-3d-tower", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "beacon-tower",
+            "primitive": "cylinder", "size_mm": [1200, 4000, 1200],
+            "segments": 32, "color_rgba": "#ffaa77ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 720,
+        }, depends=("config-3d",))
+        exported = self.export_godot()
+        proof = verify_published_godot_zip(
+            self.export / exported["artifact_name"],
+            project_id="new-game", source_head_sha256=self.owner.head_identity(),
+            expected_archive_sha256=exported["artifact_sha256"],
+        )
+        self.assertEqual(proof["asset_descriptor_count"], 1)
+        self.assertTrue(proof["all_emitted_file_hashes_verified"])
+        self.assertFalse(proof["actual_godot_execution_verified"])
+
     def test_original_normal_map_is_verified_in_real_godot_source_zip(self):
         self.populate_3d()
         self.create("authored-lit-art", "sprite_forge", {
