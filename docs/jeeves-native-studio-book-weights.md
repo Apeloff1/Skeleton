@@ -1840,3 +1840,41 @@ compiling) a streaming world is
 `docs/schemas/jeeves-world-streaming-policy-2026.schema.json`.
 The default game remains non-streaming unless the author adds the
 explicit versioned `scene_forge` policy record.
+
+### Host-authorized native streaming lifecycle observations (October 2026)
+
+`studio_world_streaming_native_probe.py` provides a second, independent
+*installed-Godot* native execution path for games that explicitly activate
+`original_world_streaming_policy`. It verifies the canonical published
+world/chunk/activation source bytes, SHA-256 ancestry and source-approved
+scene patch. A trusted SceneTree GDScript (never an LLM-authored or ZIP-supplied
+override) loads the **actual** original game, moves a camera between an authored
+scenery instance and a remote position, invokes the real bounded streamer,
+and observes:
+
+- A non-stateful reviewed mesh actually instantiates near the camera
+- That mesh actually unloads when the camera leaves the authored extent
+- Stateful rigid/trigger instances remain the **same nodes** across transit
+- No unauthorized scene-instance IDs appear in the live loaded map
+
+The observer requires a single bounded stdout receipt with exact candidate,
+world, chunks and policy SHA lineage, unique source-owned instance IDs and
+verified near/far node inventories. Host-owned process launch, script path
+protection and bounded logs are required; editor/source compilation does not
+count as executing the engine. Activated projects with no nonstateful scenery
+fail closed for lifecycle certification rather than falsely claiming an unload.
+Engine errors, absent observations, spoofed hashes and unverifiable stateful
+persistence all deny success.
+
+The existing static-mesh native probe continues to import every original GLB,
+LOD and physics resource, but delegates dynamic scene-instance observations
+to the camera-transition probe when active streaming is selected. The final
+native game receipt records the independent streaming probe digest and the
+observed instantiation/unloading/persistent-body counts. Pixels, collision
+contacts and GPU residency are still **not** certified by this check.
+
+The focused regression suite
+`test_jeeves_studio_world_streaming_native_probe_2026.py`
+contains 21 source and adversarial observation tests. These tests use
+simulated stdout to check verification logic; only an actual host-authorized
+Godot 4 executable run can produce a real streaming-observation receipt.

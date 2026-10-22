@@ -149,18 +149,18 @@ class StreamerActivationSourceTests(unittest.TestCase):
                 with self.assertRaises(WorldStreamingActivationError):
                     compile_world_streaming_activation(recs, placed["metadata"])
 
-    def test_static_native_probe_cannot_claim_dynamic_streaming_execution(self):
-        # The runtime verifier inspects the candidate before reading arbitrary
-        # project files or invoking a host Godot process.
+    def test_partial_candidate_can_never_claim_native_streaming_execution(self):
+        # An approved activation record alone is not a runnable Godot game.
+        # The new dynamic path still requires real hashed scene/source bytes.
         from skeleton.jeeves.ai.studio_sprite_bound_native_runner import (
             SpriteBoundNativeError, run_exact_original_candidate_native_expedition,
+        )
+        from skeleton.jeeves.game_frontier_expedition import (
+            ExpeditionWorld, Traveler, Waypoint, TravelEdge,
         )
         from pathlib import Path
         from unittest.mock import patch
         compiled, _ = self.compile()
-        from skeleton.jeeves.game_frontier_expedition import (
-            ExpeditionWorld, Traveler, Waypoint, TravelEdge,
-        )
         world = ExpeditionWorld(
             project_id="native-test", source_digest="a" * 64,
             waypoints=(
@@ -182,7 +182,7 @@ class StreamerActivationSourceTests(unittest.TestCase):
                     candidate, world, Traveler(),
                     godot_executable="/usr/bin/godot",
                 )
-        self.assertIn("camera-driven", str(error.exception))
+        self.assertIn("camera-driven streamed world", str(error.exception))
 
     def test_unapproved_static_root_injection_is_rejected(self):
         compiled, placed = self.compile()
