@@ -156,6 +156,8 @@ def compile_original_godot_candidate(
     binary_assets: dict[str, bytes] = {}
     authored_sprites: list[dict[str, Any]] = []
     sprite_names: list[str] = []
+    original_hitboxes: dict[str, dict[str, Any]] = {}
+    original_metadata: dict[str, dict[str, Any]] = {}
     if any(
         isinstance(record.get("document"), dict)
         and record["document"].get("kind") == "pixel_sprite"
@@ -187,6 +189,8 @@ def compile_original_godot_candidate(
             collision_path = (
                 "game/frontier/sprites/" + name + ".hitboxes.json"
             )
+            original_hitboxes[name] = hitboxes
+            original_metadata[name] = info
             collision_bytes = json.dumps(
                 hitboxes, ensure_ascii=True, sort_keys=True,
                 separators=(",", ":"), allow_nan=False,
@@ -219,6 +223,26 @@ def compile_original_godot_candidate(
     )
     avatar = binding_from_source(records, authored_sprites)
     actor_script_receipt = None
+    player_sensor_receipt = None
+    if avatar is not None and avatar.get("collision_sensor") is True:
+        from .studio_sprite_native_sensor import (
+            compile_sprite_sensor_source, verify_sprite_sensor_source,
+        )
+        name = avatar["asset_id"]
+        compiled_sensor = compile_sprite_sensor_source(
+            original_metadata[name], original_hitboxes[name],
+        )
+        player_sensor_receipt = verify_sprite_sensor_source(
+            original_metadata[name], original_hitboxes[name],
+            compiled_sensor["script"], compiled_sensor["receipt"],
+        )
+        sensor_path = "game/frontier/sprites/" + name + ".sensor.gd"
+        if sensor_path in files or sensor_path in binary_assets:
+            raise FrontierSourceError("native player collision file path was overwritten")
+        files[sensor_path] = compiled_sensor["script"]
+        file_hashes[sensor_path] = sha256(
+            compiled_sensor["script"].encode("utf-8")
+        ).hexdigest()
     if avatar is not None:
         original_script = files["game/frontier/expedition.gd"]
         updated_script = bind_sprite_to_expedition_script(original_script, avatar)
@@ -268,6 +292,8 @@ def compile_original_godot_candidate(
         "animated_sprite2d_preview_scenes_authored": bool(authored_sprites),
         "authored_player_avatar_binding": avatar,
         "player_avatar_game_script_receipt": actor_script_receipt,
+        "player_collision_sensor_receipt": player_sensor_receipt,
+        "native_player_alpha_sensor_script_compiled": player_sensor_receipt is not None,
         "authored_npc_sprite_bindings": npc_sprite_bindings,
         "npc_sprite_game_script_receipt": npc_script_receipt,
         "animated_npc_sprite3d_source_compiled": bool(npc_sprite_bindings),
