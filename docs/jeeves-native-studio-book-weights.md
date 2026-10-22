@@ -1817,3 +1817,26 @@ live-camera execution probe confirms spawn/unload transitions, the
 runtime certifier explicitly refuses to certify active streaming.
 Source scripts are functional artifacts, but mere emitted bytes are
 not evidence of observed execution, memory usage or performance.
+
+### Stateful streamed-gameplay objects — October 22, 2026
+
+Godot chunk streaming and the deterministic companion loading planner
+now distinguish static source geometry from **simulation-stateful**
+`RigidBody3D` and `Area3D` objects. Such objects are retained/pinned
+after source generation even when their authored source position falls
+outside the camera culling region. The Godot streamer prioritizes them
+ahead of regular visual scenery for its per-frame loading budget and
+does not free them on camera departure. Static props remain eligible
+for unloading as the camera travels.
+
+A request with more persistently stateful objects than the planning
+budget is **rejected**, rather than silently evicting bodies and
+resetting velocities, triggers or gameplay memory. These rules are
+source-based and conservative; runtime physics contacts and GPU
+residency are still not certified without observed Godot execution.
+
+The source authoring contract for activating (rather than merely
+compiling) a streaming world is
+`docs/schemas/jeeves-world-streaming-policy-2026.schema.json`.
+The default game remains non-streaming unless the author adds the
+explicit versioned `scene_forge` policy record.

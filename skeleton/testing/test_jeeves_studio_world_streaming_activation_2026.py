@@ -149,6 +149,26 @@ class StreamerActivationSourceTests(unittest.TestCase):
                 with self.assertRaises(WorldStreamingActivationError):
                     compile_world_streaming_activation(recs, placed["metadata"])
 
+    def test_static_native_probe_cannot_claim_dynamic_streaming_execution(self):
+        # The runtime verifier inspects the candidate before reading arbitrary
+        # project files or invoking a host Godot process.
+        from skeleton.jeeves.ai.studio_sprite_bound_native_runner import (
+            SpriteBoundNativeError, run_exact_original_candidate_native_expedition,
+        )
+        from pathlib import Path
+        from unittest.mock import patch
+        compiled, _ = self.compile()
+        candidate = {
+            "receipt": {"world_streaming_policy": compiled["receipt"]},
+        }
+        with patch.object(Path, "is_file", return_value=True):
+            with self.assertRaises(SpriteBoundNativeError) as error:
+                run_exact_original_candidate_native_expedition(
+                    candidate, None, None,
+                    godot_executable="/usr/bin/godot",
+                )
+        self.assertIn("camera-driven", str(error.exception))
+
     def test_unapproved_static_root_injection_is_rejected(self):
         compiled, placed = self.compile()
         root = attach_authored_meshes_to_expedition(_GODOT_SCENE, placed)
