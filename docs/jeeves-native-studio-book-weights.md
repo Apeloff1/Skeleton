@@ -1278,7 +1278,7 @@ equivalence. Heightfield records are subject to normal source revision
 and pre-persistence checks, so changes require a new explicit edit and
 revised source hash.
 
-There are **12 new regression cases** in
+There are **14 new regression cases** in
 `skeleton/testing/test_jeeves_studio_sprite_surface.py`, collected into
 root CI, and a game ZIP round-trip test in
 `test_jeeves_studio_frontier_source_compile.py`. These cover real PNG
