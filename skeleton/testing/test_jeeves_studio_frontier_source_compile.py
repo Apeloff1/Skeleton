@@ -448,6 +448,62 @@ class RealGodotSourceBuildTests(unittest.TestCase):
                     binding_document, depends=("hero-art",)
                     if source_dependency else ("config-3d",))
 
+    def author_original_world_npc(self):
+        self.create("captain-spawn", "npc", {
+            "kind": "npc_spawn", "npc_id": "captain-sera",
+            "home_waypoint_id": "harbor",
+            "patrol_waypoint_ids": ["island_001", "harbor"],
+        }, depends=("generated-islands",))
+        self.create("captain-art-binding", "scene_forge", {
+            "kind": "sprite_npc_binding",
+            "npc_id": "captain-sera",
+            "asset_id": "hero-idle",
+            "animation": "idle",
+            "pixel_size": 0.025,
+            "vertical_offset_m": 1.5,
+            "billboard": True, "hide_capsule": True,
+        }, depends=("hero-art", "captain-spawn"))
+
+    def test_real_godot_player_and_original_npc_both_receive_animated_sprites(self):
+        self.populate_3d()
+        self.author_player_visual()
+        self.author_original_world_npc()
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            engine = archive.read("game/frontier/expedition.gd").decode("utf-8")
+            cast = json.loads(archive.read("game/frontier/npcs.json"))
+            receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+        self.assertEqual(cast["schema"], "skeleton.game.original_npc_cast.v1")
+        self.assertEqual(cast["cast"][0]["design"]["npc_id"], "captain-sera")
+        self.assertEqual(cast["cast"][0]["design"]["home"], "harbor")
+        self.assertEqual(cast["cast"][0]["proof"]["steps"],
+                         [{"new": "island_001"}, {"new": "harbor"}])
+        self.assertIn("npc.add_child(jeeves_npc_sprite)", engine)
+        self.assertIn("actor.add_child(jeeves_avatar)", engine)
+        self.assertIn('jeeves_npc_sprite.name = "OriginalAuthoredNPCSprite"', engine)
+        self.assertTrue(receipt["animated_npc_sprite3d_source_compiled"])
+        self.assertTrue(receipt["animated_sprite3d_player_script_compiled"])
+        self.assertEqual(receipt["original_npc_cast_receipt"]["npc_count"], 1)
+        self.assertEqual(receipt["npc_sprite_game_script_receipt"]["npc_bound_count"], 1)
+        self.assertFalse(receipt["npc_sprite_game_script_receipt"][
+            "native_npc_visual_render_verified"
+        ])
+        self.assertTrue(result["disk_verification"][
+            "all_emitted_file_hashes_verified"
+        ])
+
+    def test_original_npc_world_patrol_must_reference_a_real_waypoint(self):
+        self.populate_3d()
+        self.create("captain-spawn", "npc", {
+            "kind": "npc_spawn", "npc_id": "captain-sera",
+            "home_waypoint_id": "nonexistent-island",
+            "patrol_waypoint_ids": ["harbor"],
+        }, depends=("generated-islands",))
+        from skeleton.jeeves.ai.studio_npc_cast_source import OriginalNpcCastError
+        with self.assertRaisesRegex(OriginalNpcCastError, "real authored world waypoint"):
+            self.export_godot()
+        self.assertFalse(any(self.export.iterdir()))
+
     def test_authored_sprite_is_bound_to_actual_moving_godot_player(self):
         self.populate_3d()
         self.author_player_visual()
