@@ -1068,3 +1068,50 @@ references, tampered GDScript, missing source animations, and
 dependency-breaking edits. These tests are imported into root Python
 CI and the modules are mirrored into `skeleton/ai/agents/jeeves/ai`
 without relaxing architecture parity requirements.
+
+
+## Real Godot compass observations and independent route replay
+
+In addition to compiling the eight-direction `AnimatedSprite3D` script,
+the original game host now observes **actual native animation transitions**
+from that script during separately approved Godot 4 route playthroughs.
+
+A successful **native runtime** invokes the trusted game script. After an
+authorized waypoint transition has moved the original actor, and only if
+that compass direction was explicitly mapped to a real sprite animation,
+the actor reports an engine observation containing the visited waypoint
+ID, direction and chosen original animation. A navigation action blocked
+by its travel/stamina/permission rules does not advance the actor and
+therefore cannot produce a legitimate observed compass change.
+
+`studio_sprite_compass_evidence.py` independently reconstructs all
+expected compass observations from the **actual Python ExpeditionWorld**
+and the already-reviewed autoplay edge ID sequence, using each waypoint's
+original X/Y horizontal coordinates. It verifies precise waypoint
+identity, event count and order, animation name, world/project route hash,
+and the source-bound player-sprite receipt. An absent, duplicate,
+reordered, fabricated or mismatched event refuses the native compass
+attestation. A route containing no mapped directional animation produces
+zero events and an explicitly false `sprite_animation_observed` flag,
+rather than pretending the engine exercised a compass direction.
+
+`run_sprite_bound_native_expedition` consumes the independent report
+**only after** the real installed Godot process exits successfully and
+the full gameplay replay already agrees with the Python reference.
+The native execution receipt includes
+`compass_replay_receipt_sha256`,
+`observed_compass_transitions` and
+`native_player_heading_observed`, while the host-facing receipt includes
+`native_compass_route_replay_receipt_sha256`. The native code also
+supports **NPC-only** sprite games without falsely dereferencing a
+nonexistent player sprite receipt. Native visual observations still
+**do not** certify pixel output, screenshot identity, animation quality
+or final game release.
+
+`test_jeeves_studio_sprite_compass_evidence.py` supplies 15 focused
+world-geometry and replay tests; these are included in the root backend
+test suite. They challenge foreign worlds, missing transitions, duplicate
+events, spoofed frame names, unbound waypoints, reversed playback order,
+altered source policies and malformed logs. The original native engine
+execution path remains host-authorized and unavailable without a real
+approved Godot 4 binary.
