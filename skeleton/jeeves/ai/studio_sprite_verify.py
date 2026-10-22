@@ -109,6 +109,40 @@ def verify_published_sprite(
                     palette.append(rgba)
                 source_pixels.append(index_of[rgba])
         recovered.append({"pixels": source_pixels})
+    # Re-check directional variants from REAL emitted frame pixels, not from
+    # caller-supplied claims. Authored originals must precede all variants.
+    from .studio_sprite_variants import (
+        SpriteVariantError, verify_directional_rgba_variants,
+    )
+    proofs = metadata.get("derived_frame_proofs", [])
+    original_count = metadata.get("original_authored_frame_count", len(frames))
+    if (type(original_count) is not int
+            or not 1 <= original_count <= len(frames)
+            or type(proofs) is not list
+            or len(proofs) != len(frames) - original_count):
+        raise SpriteVerificationError("directional sprite source lineage is incomplete")
+    frames_rgba = {
+        frame["frame_id"]: b"".join(palette[i] for i in item["pixels"])
+        for frame, item in zip(frames, recovered, strict=True)
+    }
+    if len(frames_rgba) != len(frames):
+        raise SpriteVerificationError("duplicate frame identity breaks direction replay")
+    try:
+        verified_variants = verify_directional_rgba_variants(
+            frames_rgba, width=width, height=height, proofs=proofs,
+        )
+    except SpriteVariantError as exc:
+        raise SpriteVerificationError("directional source transform differs from actual pixels") from exc
+    if verified_variants != len(proofs) or any(
+        item["source_frame_id"] not in {
+            frame["frame_id"] for frame in frames[:original_count]
+        } for item in proofs
+    ) or {
+        item["frame_id"] for item in proofs
+    } != {
+        frame["frame_id"] for frame in frames[original_count:]
+    }:
+        raise SpriteVerificationError("derived frames are not bound to original authoring")
     try:
         spec = {
             "columns": geom["columns"], "padding_px": geom["padding_px"],
@@ -172,6 +206,7 @@ def verify_published_sprite(
         "source_frames_verified": len(frames),
         "animation_states_verified": len(animations),
         "collision_masks_verified": len(frames),
+        "lossless_directional_variants_verified": verified_variants,
         "layout_and_padding_reproduced": True,
         "native_renderer_executed": False,
     }
