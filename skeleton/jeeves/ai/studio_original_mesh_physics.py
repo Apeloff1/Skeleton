@@ -11,7 +11,6 @@ from collections.abc import Mapping
 from hashlib import sha256
 from math import pi
 import json
-from typing import Any
 
 from .studio_interaction_contract import digest
 from .studio_original_mesh import (
@@ -136,7 +135,7 @@ def _collider(mesh: Mapping[str, Any]) -> tuple[list[str], dict[str, Any]]:
     )
     return [
         '[sub_resource type="ConvexPolygonShape3D" id="ColliderShape"]',
-        "points = PackedVector3Array(" + rendered + ")",
+        "points = PackedVector3Array([" + rendered + "])",
     ], {
         "shape": "ConvexPolygonShape3D",
         "dimensions_m": dims,
