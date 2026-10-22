@@ -1,0 +1,1 @@
+"""Absolute final."""\nclass AbsoluteFinal:\n    def confirm(self) -> dict:\n        return {\"absolute\": True, \"stored_prose\": 0}\n
