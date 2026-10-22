@@ -5823,7 +5823,9 @@
         "rom_triangle_campaign.py",
         "rom_triangle_lens_progress.py",
         "sdk_custody_drift.py",
-        "sdk_study.py"
+        "sdk_study.py",
+        "book_learning_bridge.py",
+        "book_weight_candidate.py"
       ],
       "overlay_note": "Current main already implements these governed AI-only training modules. Declare their existing placement without copying them into the legacy tree or changing training authority."
     },
