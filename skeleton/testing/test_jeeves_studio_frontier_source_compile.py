@@ -470,6 +470,36 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             "billboard": True, "hide_capsule": True,
         }, depends=("hero-art", "captain-spawn"))
 
+    def test_original_npc_animation_emits_authored_frame_cues_in_real_godot(self):
+        self.populate_3d()
+        self.author_player_visual(cues=[
+            {"animation": "idle", "frame_index": 0,
+             "event_id": "captain-footstep", "category": "footstep"},
+            {"animation": "glide", "frame_index": 0,
+             "event_id": "captain-cloak", "category": "sound"},
+        ])
+        self.author_original_world_npc()
+        result = self.export_godot()
+        with zipfile.ZipFile(self.export / result["artifact_name"]) as archive:
+            code = archive.read("game/frontier/expedition.gd").decode("utf-8")
+            cues = archive.read(
+                "game/frontier/sprites/hero-idle.cues.gd",
+            ).decode("utf-8")
+            proof = json.loads(archive.read("jeeves_source_receipt.json"))
+        self.assertIn(
+            "jeeves_npc_sprite.set_script(jeeves_npc_cue_script)", code,
+        )
+        self.assertIn("captain-footstep", cues)
+        self.assertIn("captain-cloak", cues)
+        self.assertEqual(
+            proof["authored_npc_sprite_bindings"][0]["frame_cues_sha256"],
+            proof["authored_player_avatar_binding"]["frame_cues_sha256"],
+        )
+        self.assertTrue(
+            result["disk_verification"]["all_emitted_file_hashes_verified"],
+        )
+        self.assertFalse(proof["native_godot_playthrough_verified"])
+
     def test_real_godot_player_and_original_npc_both_receive_animated_sprites(self):
         self.populate_3d()
         self.author_player_visual()
