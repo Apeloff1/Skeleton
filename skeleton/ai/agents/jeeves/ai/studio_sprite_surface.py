@@ -89,11 +89,13 @@ def compile_authored_normals(
                 min(height - 1, max(0, y)) * width
                 + min(width - 1, max(0, x))
             ]
-        extent = gutter if extrude else 0
-        for py in range(-extent, fh + extent):
-            sy = min(height - 1, max(0, py // scale))
-            for px in range(-extent, fw + extent):
-                sx = min(width - 1, max(0, px // scale))
+        # The original authored height grid determines every derivative.
+        # Compute each tangent-space normal ONCE per source pixel, not once
+        # per enlarged/edge-extruded atlas texel; integer nearest-neighbor
+        # painting then preserves the exact source normal throughout scaling.
+        rgb_normals: list[bytes] = []
+        for sy in range(height):
+            for sx in range(width):
                 left = height_at(sx - 1, sy)
                 right = height_at(sx + 1, sy)
                 up = height_at(sx, sy - 1)
@@ -103,12 +105,20 @@ def compile_authored_normals(
                 mag = sqrt(dx * dx + dy * dy + 1.0)
                 def encode(n: float) -> int:
                     return min(255, max(0, int((n / mag + 1.0) * 127.5 + 0.5)))
+                rgb_normals.append(bytes((
+                    encode(-dx), encode(-dy), encode(1.0),
+                )))
+        extent = gutter if extrude else 0
+        for py in range(-extent, fh + extent):
+            sy = min(height - 1, max(0, py // scale))
+            for px in range(-extent, fw + extent):
+                sx = min(width - 1, max(0, px // scale))
                 pos = (y0 + py) * stride + (x0 + px) * 4
                 alpha = diffuse[pos + 3]
                 if alpha:
-                    output[pos:pos + 4] = bytes((
-                        encode(-dx), encode(-dy), encode(1.0), alpha,
-                    ))
+                    output[pos:pos + 4] = (
+                        rgb_normals[sy * width + sx] + bytes((alpha,))
+                    )
         source_receipts.append({
             "frame_id": frame["frame_id"],
             "height_samples_sha256": sha256(bytes(original)).hexdigest(),
