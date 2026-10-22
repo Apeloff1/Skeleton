@@ -356,6 +356,95 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(journal.read()), 0)
 
+    def test_authored_original_mesh_instance_executes_within_godot_scene_hierarchy(self):
+        self.populate_3d()
+        self.create("placed-base", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "archway",
+            "primitive": "box", "size_mm": [1400, 2900, 1200],
+            "segments": 8, "color_rgba": "#887766ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 910,
+        }, depends=("config-3d",))
+        self.create("placed-instance", "scene_forge", {
+            "kind": "original_mesh_instance",
+            "instance_id": "archway-entrance",
+            "base_record_id": "placed-base",
+            "asset_id": "archway", "physics_record_id": None,
+            "position_mm": [8000, 1500, -2500],
+            "rotation_deg": [0, 90, 0],
+            "scale_per_mille": 1000,
+        }, depends=("placed-base",))
+        export = self.export_godot()
+        with zipfile.ZipFile(self.export / export["artifact_name"]) as archive:
+            root = archive.read("game/frontier/expedition.tscn").decode("utf-8")
+            compiled = archive.read(
+                "game/frontier/mesh_placements.tscn"
+            ).decode("utf-8")
+            self.assertIn('name="OriginalMeshInstances"', root)
+            self.assertIn("res://game/frontier/mesh_placements.tscn", root)
+            self.assertIn("archway-entrance", compiled)
+            self.assertIn(
+                "res://game/frontier/meshes/archway.tscn", compiled,
+            )
+            receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+            self.assertEqual(
+                receipt["packaged_original_mesh_placements"]["instance_count"], 1,
+            )
+            self.assertFalse(receipt["packaged_original_mesh_placements"][
+                "godot_engine_scene_import_observed"
+            ])
+        checked = verify_published_godot_zip(
+            self.export / export["artifact_name"], project_id="new-game",
+            source_head_sha256=self.owner.head_identity(),
+            expected_archive_sha256=export["artifact_sha256"],
+        )
+        self.assertEqual(checked["original_3d_scene_instances_replayed"], 1)
+        self.assertTrue(checked["original_3d_instanced_in_world_scene"])
+        self.assertFalse(checked["actual_godot_execution_verified"])
+
+    def test_original_physics_actor_instantiates_correct_collision_scene_in_world(self):
+        self.populate_3d()
+        self.create("trigger-base", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "trigger-orb",
+            "primitive": "uv_sphere", "size_mm": [1200, 1400, 1200],
+            "segments": 24, "color_rgba": "#cc9900ff",
+            "metallic_per_mille": 200, "roughness_per_mille": 670,
+        }, depends=("config-3d",))
+        self.create("trigger-body", "physics", {
+            "kind": "procedural_mesh_physics",
+            "base_record_id": "trigger-base", "asset_id": "trigger-orb",
+            "body_type": "area", "density_kg_m3": 300,
+            "friction_per_mille": 300, "restitution_per_mille": 200,
+            "collision_layer": 2, "collision_mask": 7,
+        }, depends=("trigger-base",))
+        self.create("trigger-placement", "scene_forge", {
+            "kind": "original_mesh_instance",
+            "instance_id": "spawn-trigger",
+            "base_record_id": "trigger-base",
+            "asset_id": "trigger-orb",
+            "physics_record_id": "trigger-body",
+            "position_mm": [1000, 2000, 3000],
+            "rotation_deg": [0, 0, 0],
+            "scale_per_mille": 1000,
+        }, depends=("trigger-base", "trigger-body"))
+        export = self.export_godot()
+        with zipfile.ZipFile(self.export / export["artifact_name"]) as archive:
+            child = archive.read(
+                "game/frontier/mesh_placements.tscn"
+            ).decode("utf-8")
+            body = archive.read(
+                "game/frontier/meshes/trigger-orb.physics.tscn"
+            ).decode("utf-8")
+            self.assertIn("trigger-orb.physics.tscn", child)
+            self.assertIn('type="Area3D"', body)
+            self.assertIn('type="ConvexPolygonShape3D"', body)
+            self.assertIn("monitoring = true", body)
+        self.assertEqual(export["disk_verification"][
+            "original_3d_scene_instances_replayed"], 1)
+        self.assertEqual(export["disk_verification"][
+            "original_physics_bodies_replayed"], 1)
+        self.assertFalse(export["disk_verification"][
+            "actual_collision_contact_observed"])
+
     def test_authored_static_collision_is_actual_godot_scene_in_native_zip(self):
         self.populate_3d()
         self.create("collision-mesh", "asset_forge", {
