@@ -132,22 +132,42 @@ def compile_original_godot_candidate(
     }
     if file_hashes != godot_proof["file_hashes"]:
         raise FrontierSourceError("Godot compiler proof does not match file bytes")
+    from .studio_npc_cast_source import (
+        compile_original_npc_cast, verify_original_npc_cast,
+    )
+    compiled_npc_cast = compile_original_npc_cast(
+        records, world, world_source_record_id=profile_ids[0],
+    )
+    npc_cast_receipt = None
+    if compiled_npc_cast is not None:
+        native_cast_path = "game/frontier/npcs.json"
+        if native_cast_path in files:
+            raise FrontierSourceError("NPC cast may not replace native engine assets")
+        native_cast = compiled_npc_cast["content"]
+        npc_cast_receipt = compiled_npc_cast["receipt"]
+        verify_original_npc_cast(
+            native_cast, npc_cast_receipt, world_digest=world.digest,
+        )
+        files[native_cast_path] = native_cast
+        file_hashes[native_cast_path] = sha256(native_cast.encode("utf-8")).hexdigest()
     # Keep original image resources in the REAL Godot project directory.
     # They are explicitly marked not yet bound to engine actor render nodes:
     # a PNG present on disk does not prove animated asset presentation.
     binary_assets: dict[str, bytes] = {}
     authored_sprites: list[dict[str, Any]] = []
     sprite_names: list[str] = []
+    original_hitboxes: dict[str, dict[str, Any]] = {}
+    original_metadata: dict[str, dict[str, Any]] = {}
     if any(
         isinstance(record.get("document"), dict)
         and record["document"].get("kind") == "pixel_sprite"
         for record in records.values()
     ):
-        from .studio_sprite_forge import compile_sprite_collection
+        from .studio_sprite_palette_variants import compile_original_palette_collection
         from .studio_sprite_godot_resources import (
             compile_godot_sprite_resources, verify_godot_sprite_resources,
         )
-        artwork = compile_sprite_collection(records)
+        artwork = compile_original_palette_collection(records)
         for sprite in artwork["assets"]:
             info = sprite["metadata"]
             name = info["asset_id"]
@@ -169,6 +189,8 @@ def compile_original_godot_candidate(
             collision_path = (
                 "game/frontier/sprites/" + name + ".hitboxes.json"
             )
+            original_hitboxes[name] = hitboxes
+            original_metadata[name] = info
             collision_bytes = json.dumps(
                 hitboxes, ensure_ascii=True, sort_keys=True,
                 separators=(",", ":"), allow_nan=False,
@@ -201,6 +223,26 @@ def compile_original_godot_candidate(
     )
     avatar = binding_from_source(records, authored_sprites)
     actor_script_receipt = None
+    player_sensor_receipt = None
+    if avatar is not None and avatar.get("collision_sensor") is True:
+        from .studio_sprite_native_sensor import (
+            compile_sprite_sensor_source, verify_sprite_sensor_source,
+        )
+        name = avatar["asset_id"]
+        compiled_sensor = compile_sprite_sensor_source(
+            original_metadata[name], original_hitboxes[name],
+        )
+        player_sensor_receipt = verify_sprite_sensor_source(
+            original_metadata[name], original_hitboxes[name],
+            compiled_sensor["script"], compiled_sensor["receipt"],
+        )
+        sensor_path = "game/frontier/sprites/" + name + ".sensor.gd"
+        if sensor_path in files or sensor_path in binary_assets:
+            raise FrontierSourceError("native player collision file path was overwritten")
+        files[sensor_path] = compiled_sensor["script"]
+        file_hashes[sensor_path] = sha256(
+            compiled_sensor["script"].encode("utf-8")
+        ).hexdigest()
     if avatar is not None:
         original_script = files["game/frontier/expedition.gd"]
         updated_script = bind_sprite_to_expedition_script(original_script, avatar)
@@ -210,6 +252,26 @@ def compile_original_godot_candidate(
         files["game/frontier/expedition.gd"] = updated_script
         file_hashes["game/frontier/expedition.gd"] = sha256(
             updated_script.encode("utf-8")
+        ).hexdigest()
+    from .studio_sprite_npc_binding import (
+        authored_npc_sprite_bindings, bind_npc_sprites_to_expedition_script,
+        verify_native_npc_binding_script,
+    )
+    npc_sprite_bindings = authored_npc_sprite_bindings(
+        records, authored_sprites, files,
+    )
+    npc_script_receipt = None
+    if npc_sprite_bindings:
+        prior_npc_script = files["game/frontier/expedition.gd"]
+        bound_npc_script = bind_npc_sprites_to_expedition_script(
+            prior_npc_script, npc_sprite_bindings,
+        )
+        npc_script_receipt = verify_native_npc_binding_script(
+            prior_npc_script, bound_npc_script, npc_sprite_bindings,
+        )
+        files["game/frontier/expedition.gd"] = bound_npc_script
+        file_hashes["game/frontier/expedition.gd"] = sha256(
+            bound_npc_script.encode("utf-8")
         ).hexdigest()
     metadata = {
         "schema_version": SCHEMA, "project_id": project_id,
@@ -222,13 +284,23 @@ def compile_original_godot_candidate(
             if name not in profile_ids
         ],
         "world_sha256": world.digest,
+        "original_npc_cast_receipt": npc_cast_receipt,
         "godot_verification_sha256": godot_proof["receipt_digest"],
         "godot_file_hashes": file_hashes,
         "packaged_original_sprites": authored_sprites,
+        "original_palette_variant_receipts": (
+            artwork["palette_variant_receipts"]
+            if authored_sprites else []
+        ),
         "source_sprite_record_ids": sprite_names,
         "animated_sprite2d_preview_scenes_authored": bool(authored_sprites),
         "authored_player_avatar_binding": avatar,
         "player_avatar_game_script_receipt": actor_script_receipt,
+        "player_collision_sensor_receipt": player_sensor_receipt,
+        "native_player_alpha_sensor_script_compiled": player_sensor_receipt is not None,
+        "authored_npc_sprite_bindings": npc_sprite_bindings,
+        "npc_sprite_game_script_receipt": npc_script_receipt,
+        "animated_npc_sprite3d_source_compiled": bool(npc_sprite_bindings),
         "animated_sprite3d_player_script_compiled": avatar is not None,
         "native_sprite_scene_binding_verified": False,
         "gameplay_route_digest": route.digest,
@@ -277,7 +349,8 @@ def run_original_game_native_playthrough(
     )
     try:
         world = author_studio_expedition(project, profile)
-        if before["receipt"]["authored_player_avatar_binding"] is not None:
+        if (before["receipt"]["authored_player_avatar_binding"] is not None
+                or before["receipt"]["authored_npc_sprite_bindings"]):
             # The legacy runner regenerates baseline Godot files, so using it
             # here would falsely attest a game whose ACTUAL avatar never ran.
             # Execute the exact generated sprite-bound project instead.
@@ -310,6 +383,9 @@ def run_original_game_native_playthrough(
         "native_gameplay_consistent": True,
         "native_player_avatar_script_executed": (
             before["receipt"]["authored_player_avatar_binding"] is not None
+        ),
+        "native_npc_sprite_game_script_executed": bool(
+            before["receipt"]["authored_npc_sprite_bindings"]
         ),
         "native_visual_output_independently_observed": False,
         "complete_original_game_release_certified": False,
