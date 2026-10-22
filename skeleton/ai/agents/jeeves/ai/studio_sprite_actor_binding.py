@@ -116,6 +116,7 @@ def binding_from_source(
             "sprite_source_record_id": selected["source_record_id"],
             "sprite_png_sha256": selected["png_sha256"],
             "sprite_frames_resource_sha256": selected["godot_spriteframes_resource_sha256"],
+            "frame_cues_sha256": selected.get("frame_cues_sha256"),
             "pixel_size": _real(doc["pixel_size"], "visual pixel scaling", 0.001, 0.25),
             "vertical_offset_m": _real(
                 doc["vertical_offset_m"], "avatar vertical offset", -10, 30,
@@ -170,6 +171,10 @@ def validate_original_avatar_source_graph(
         "source_record_id": meta["record_id"],
         "png_sha256": meta["png_sha256"],
         "godot_spriteframes_resource_sha256": proof["receipt_sha256"],
+        "frame_cues_sha256": (
+            meta["frame_cues"]["receipt_sha256"] if meta.get("frame_cues")
+            else None
+        ),
         "animation_names": [state["name"] for state in meta["animations"]],
     }
     return binding_from_source(records, [verified])
@@ -214,9 +219,26 @@ def bind_sprite_to_expedition_script(
         "    jeeves_avatar.billboard = BaseMaterial3D.BILLBOARD_ENABLED"
         if binding["billboard"]
         else "    jeeves_avatar.billboard = BaseMaterial3D.BILLBOARD_DISABLED",
+    ]
+    if binding.get("frame_cues_sha256") is not None:
+        cue_digest = binding["frame_cues_sha256"]
+        if (type(cue_digest) is not str or len(cue_digest) != 64
+                or any(c not in "0123456789abcdef" for c in cue_digest)):
+            raise SpriteBindingError("animation cue receipt must have original SHA-256")
+        builder.extend([
+            "    # Godot cue script only emits source-authorized frame signals.",
+            "    var jeeves_cue_logic := load(",
+            '        "res://game/frontier/sprites/' + asset + '.cues.gd"',
+            "    ) as Script",
+            "    if jeeves_cue_logic == null:",
+            '        push_error("Authored sprite frame-cue signals are missing")',
+            "        return",
+            "    jeeves_avatar.set_script(jeeves_cue_logic)",
+        ])
+    builder.extend([
         "    actor.add_child(jeeves_avatar)",
         "    jeeves_avatar.play()",
-    ]
+    ])
     if binding.get("collision_sensor", False) is True:
         builder.extend([
             "    # Explicit Area3D nonblocking sprite-alpha collision sensor.",
