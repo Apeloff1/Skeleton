@@ -23,7 +23,7 @@ BINDING_KEYS = frozenset((
     "kind", "target", "asset_id", "animation",
     "pixel_size", "vertical_offset_m", "billboard", "hide_capsule",
 ))
-BINDING_OPTIONAL = frozenset(("movement_animations",))
+BINDING_OPTIONAL = frozenset(("movement_animations", "collision_sensor"))
 TRAVEL_STAMINA_ANCHOR = """    stamina -= int(costs["stamina"])"""
 
 
@@ -52,7 +52,7 @@ def binding_from_source(
             continue
         if (record.get("record_id") != record_id
                 or record.get("facet") != "scene_forge"
-                or set(doc) not in (BINDING_KEYS, BINDING_KEYS | BINDING_OPTIONAL)):
+                or not BINDING_KEYS <= set(doc) <= BINDING_KEYS | BINDING_OPTIONAL):
             raise SpriteBindingError("sprite actor source lacks exact scene-owned fields")
         if doc["target"] != "player_actor":
             raise SpriteBindingError("only the actual Expedition player actor is supported")
@@ -75,6 +75,9 @@ def binding_from_source(
             raise SpriteBindingError("sprite actor binding must depend on its real source record")
         if animation not in selected["animation_names"]:
             raise SpriteBindingError("player avatar animation does not exist in original frames")
+        collision_sensor = doc.get("collision_sensor", False)
+        if type(collision_sensor) is not bool:
+            raise SpriteBindingError("native alpha sensor policy must be an explicit boolean")
         movement_animations = doc.get("movement_animations", {})
         if (not isinstance(movement_animations, dict)
                 or len(movement_animations) > 32
@@ -88,6 +91,7 @@ def binding_from_source(
             )
         candidates.append({
             "schema_version": "skeleton.jeeves.player_sprite_binding.v1",
+            "collision_sensor": collision_sensor,
             "movement_animations": {
                 key: movement_animations[key]
                 for key in sorted(movement_animations)
@@ -199,6 +203,18 @@ def bind_sprite_to_expedition_script(
         "    actor.add_child(jeeves_avatar)",
         "    jeeves_avatar.play()",
     ]
+    if binding.get("collision_sensor", False) is True:
+        builder.extend([
+            "    # Explicit Area3D nonblocking sprite-alpha collision sensor.",
+            "    var jeeves_sensor := Area3D.new()",
+            '    jeeves_sensor.name = "OriginalAlphaCollisionSensor"',
+            "    jeeves_sensor.set_script(load(",
+            '        "res://game/frontier/sprites/' + asset + '.sensor.gd"',
+            "    ))",
+            "    actor.add_child(jeeves_sensor)",
+        ])
+    elif binding.get("collision_sensor", False) is not False:
+        raise SpriteBindingError("native alpha collision policy was modified")
     if binding["hide_capsule"]:
         # Hiding the actor node hides every descendant too. Clearing its mesh
         # retains its original Node3D transform and animated child visibility.
