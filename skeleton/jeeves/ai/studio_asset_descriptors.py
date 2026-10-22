@@ -431,10 +431,14 @@ def compile_asset_catalog(
         original = by_asset.get(("procedural_mesh", evidence["parent_asset_id"]))
         if original is None:
             raise AssetDescriptorError("LOD descriptor has no source-owned parent")
-        child["title"] = original["title"] + " - LOD " + str(evidence["level"])
-        child["description"] = (
-            original["description"] + " Lower-detail source geometry at "
+        suffix = " - LOD " + str(evidence["level"])
+        child["title"] = original["title"][:120 - len(suffix)] + suffix
+        text_suffix = (
+            " Lower-detail source geometry at "
             + str(evidence["switch_distance_mm"]) + " mm."
+        )
+        child["description"] = (
+            original["description"][:1400 - len(text_suffix)] + text_suffix
         )
         child["alt_text"] = original["alt_text"]
         child["tags"] = list(original["tags"])

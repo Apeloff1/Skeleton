@@ -199,6 +199,81 @@ class ParametricLodCompilerTests(unittest.TestCase):
         self.assertFalse(output["manifest"]["runtime_lod_switching_observed"])
 
 
+class LodDescriptorCatalogTests(unittest.TestCase):
+    def setUp(self):
+        self.original = source_mesh()
+        self.author = lod_record()
+        self.lods = compile_original_mesh_lod_set(self.original, self.author)
+
+    def catalog(self):
+        from skeleton.jeeves.ai.studio_asset_descriptors import compile_asset_catalog
+        return compile_asset_catalog(
+            project_id="original-game", source_head_sha256="a" * 64,
+            records={}, meshes=[self.lods["base"]], lod_sets=[self.lods],
+        )
+
+    def test_all_lod_glbs_have_searchable_descriptors_and_source_links(self):
+        from skeleton.jeeves.ai.studio_asset_descriptors import (
+            search_asset_catalog,
+        )
+        catalog = self.catalog()
+        self.assertEqual(catalog["descriptor_count"], 3)
+        levels = [
+            asset for asset in catalog["descriptors"]
+            if asset["metrics"].get("lod") is not None
+        ]
+        self.assertEqual(len(levels), 2)
+        self.assertEqual(
+            [asset["metrics"]["lod"]["switch_distance_mm"]
+             for asset in levels], [8000, 22000],
+        )
+        for level in levels:
+            self.assertEqual(level["metrics"]["lod"]["parent_asset_id"],
+                             "trial-mesh")
+            self.assertEqual(level["semantic_evidence"]["status"],
+                             "inherited_parent_source_not_independent_vision")
+            self.assertFalse(level["rights"]["legally_cleared_by_compiler"])
+        results = search_asset_catalog(catalog, "lod2")
+        self.assertEqual(results["results"][0]["asset_id"], "trial-mesh-lod2")
+
+    def test_published_descriptors_replay_against_real_lod_binary_bytes(self):
+        from skeleton.jeeves.ai.studio_asset_descriptors import (
+            verify_asset_catalog, catalog_bytes,
+        )
+        catalog = self.catalog()
+        verified = verify_asset_catalog(
+            catalog_bytes(catalog), project_id="original-game",
+            source_head_sha256="a" * 64,
+            meshes=[self.lods["base"]], lod_sets=[self.lods],
+        )
+        self.assertEqual(verified["descriptor_count"], 3)
+
+    def test_catalog_refuses_forged_lod_source_geometry(self):
+        from skeleton.jeeves.ai.studio_asset_descriptors import (
+            AssetDescriptorError, compile_asset_catalog,
+        )
+        swapped = deepcopy(self.lods)
+        swapped["levels"][0]["glb"] = swapped["levels"][1]["glb"]
+        with self.assertRaises(AssetDescriptorError):
+            compile_asset_catalog(
+                project_id="original-game", source_head_sha256="a" * 64,
+                records={}, meshes=[swapped["base"]], lod_sets=[swapped],
+            )
+
+    def test_descriptor_inheritance_never_certifies_parent_semantics(self):
+        catalog = self.catalog()
+        base = next(item for item in catalog["descriptors"]
+                    if item["asset_id"] == "trial-mesh")
+        variants = [item for item in catalog["descriptors"]
+                    if item["asset_id"].startswith("trial-mesh-lod")]
+        self.assertEqual(base["semantic_evidence"]["status"], "structural_only")
+        for variant in variants:
+            self.assertIsNone(variant["semantic_evidence"]["source_record_id"])
+            self.assertFalse(
+                variant["semantic_evidence"]["scene_content_recognized_by_model"]
+            )
+
+
 class GodotMeshLodSceneTests(unittest.TestCase):
     def setUp(self):
         self.output = compile_original_mesh_lod_set(source_mesh(), lod_record())
@@ -308,6 +383,16 @@ class SourceStoreLodMutationTests(unittest.TestCase):
         with self.assertRaises(OriginalMeshLodError):
             self.create(invalid)
         self.assertEqual(self.store.snapshot()["source_count"], 1)
+
+    def test_source_store_exposes_all_reviewed_lod_descriptors_to_jeeves(self):
+        self.create(source_mesh())
+        self.create(lod_record())
+        report = self.store.search_original_assets(
+            "trial-mesh-lod2", kind="procedural_mesh",
+        )
+        self.assertEqual(report["asset_count"], 3)
+        self.assertEqual(report["results"][0]["asset_id"], "trial-mesh-lod2")
+        self.assertEqual(report["results"][0]["metrics"]["lod"]["level"], 2)
 
     def test_updating_original_mesh_cannot_invalidate_existing_lods(self):
         self.create(source_mesh())

@@ -1457,3 +1457,42 @@ world or Godot runtime. Each export is pinned to the current Creator
 SQLite source head, deterministically hashed, and refuses overwriting a
 conflicting target. The source owner also exposes a read-only searchable
 catalog to the authenticated studio host and the standalone Jeeves model.
+
+### October 2026 — reviewed 3D LOD forge and instantiable GLB assets
+
+Source-authored 3D cylinder and UV-sphere projects can now add a second
+`asset_forge` record `kind=procedural_mesh_lod_set`, with
+`base_record_id`, `asset_id` and an ordered `levels` array. Each level
+must have `level`, `segments` (strictly decreasing) and
+`switch_distance_mm` (strictly increasing). The LOD record MUST depend on
+the reviewed base mesh. A mesh-source edit that invalidates its LOD chain is
+refused *before* the SQL transaction. No silent decimation or silent
+simplification is performed; every lower-poly asset is rebuilt deterministically
+at its authored segmentation.
+
+A real original Godot project ZIP now ships the parent `.glb`, derived
+`.lodN.glb` binaries, a complete `.lods.source.json` source/lineage
+package, `.tscn` importable GLB wrapper, and—when LODs exist—`.lod.gd`
+plus `.lod.tscn` camera-distance instancing controller. The generated Godot
+script includes a 0.25 m hysteresis buffer around authored switching
+distances to avoid threshold oscillation. Independent ZIP verification
+reconstructs all lowered geometry and exact GDScript/scene content, rejects
+orphan executable mesh scripts, and checks both real source-record hashes and
+derivation proofs.
+
+Every derived LOD binary also receives its own indexed asset descriptor. The
+descriptor includes the original parent asset identity, authored LOD source
+SHA-256, original LOD set receipt, source segmentation and switch distance.
+Author-reviewed descriptive meaning, alt text, tags, roles and *asserted*
+rights may be inherited from the parent with
+`inherited_parent_source_not_independent_vision` status. Such inheritance is
+not independent image recognition, copyright clearance or actual native
+render verification. Both the exported Godot catalog and standalone
+`asset-catalog-json` include the derived assets; the independent catalog
+verifier replays all LOD binary bytes.
+
+Source contract: `docs/schemas/jeeves-original-mesh-lod-2026.schema.json`.
+Validation: `test_jeeves_studio_mesh_lod_2026.py` and
+`test_jeeves_studio_frontier_source_compile.py`. Godot import,
+visible geometry and runtime LOD swapping remain unverified until
+host-authorized engine execution and independent observation.
