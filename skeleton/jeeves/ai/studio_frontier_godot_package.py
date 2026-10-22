@@ -264,6 +264,9 @@ def compile_original_godot_candidate(
                     info["frame_cues"]["receipt_sha256"]
                     if info.get("frame_cues") else None
                 ),
+                "frame_cue_event_ids": [
+                    cue["event_id"] for cue in info["frame_cues"]["cues"]
+                ] if info.get("frame_cues") else [],
                 "godot_frame_cue_resource_sha256": cue_proof["receipt_sha256"],
                 "png_sha256": info["png_sha256"],
                 "original_hitbox_receipt_sha256": hitboxes["receipt_sha256"],
@@ -272,7 +275,7 @@ def compile_original_godot_candidate(
         binding_from_source, bind_sprite_to_expedition_script,
         verify_actor_sprite_binding,
     )
-    avatar = binding_from_source(records, authored_sprites)
+    avatar = binding_from_source(records, authored_sprites, authored_audio)
     actor_script_receipt = None
     player_sensor_receipt = None
     if avatar is not None and avatar.get("collision_sensor") is True:
@@ -357,6 +360,10 @@ def compile_original_godot_candidate(
         "packaged_original_sprites": authored_sprites,
         "packaged_original_audio": authored_audio,
         "audio_engine_playback_verified": False,
+        "original_player_audio_cue_routes_compiled": (
+            len(avatar.get("audio_cue_bindings", {})) if avatar is not None
+            else 0
+        ),
         "original_palette_variant_receipts": (
             artwork["palette_variant_receipts"]
             if authored_sprites else []
