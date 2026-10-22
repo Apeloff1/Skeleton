@@ -3,11 +3,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from hashlib import sha256
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-import zipfile
 
 from skeleton.forge.creator.command_surface import build_creator_command
 from skeleton.jeeves.ai.studio_creator_source import CreatorProjectSourceStore

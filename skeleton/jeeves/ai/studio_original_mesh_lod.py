@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from hashlib import sha256
-from typing import Any
 
 from .studio_interaction_contract import digest
 from .studio_original_mesh import (
