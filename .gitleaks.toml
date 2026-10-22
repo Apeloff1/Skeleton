@@ -108,3 +108,10 @@ description = "Inherited generic API key rule with Skeleton documentation false-
     '^\s*"normal-api-requests\.json": "2e93eb5e78e85813323f81125fb256c979b678469acb73cd1cabf0703474f829",?$'
   ]
   paths = ['^machine/ai_first_install_session_evidence_2026-10-15\.json$']
+
+[[rules.allowlists]]
+  description = "Reviewed false positives: public local-tokenizer mode enum strings in AI startup PR #4205, never credentials"
+  fingerprints = [
+    "411d0f1ded21fc7b5629e0073df2dbd85b6b2db9:skeleton/ai/runtime/inference/local.py:generic-api-key:2133",
+    "411d0f1ded21fc7b5629e0073df2dbd85b6b2db9:frontend/src/features/Jeeves/RuntimeFoundationDetails.tsx:generic-api-key:47"
+  ]
