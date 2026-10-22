@@ -1001,3 +1001,70 @@ whole-game Godot palette-package roundtrip, and deep/shared DAG source
 regressions. The real engine source paths are implemented; **an installed
 Godot runtime, actual renderer and human creative/copyright review remain
 independent gates** and are not claimed as completed by these artifacts.
+
+
+## Original eight-way avatar facing follows actual Godot world movement
+
+The real game sprite actor compiler supports an **optional original compass
+animation map** on a source-authorized `scene_forge` record with
+`document.kind="sprite_actor_binding"`:
+
+```json
+{
+  "kind": "sprite_actor_binding",
+  "target": "player_actor",
+  "asset_id": "hero-idle",
+  "animation": "idle",
+  "pixel_size": 0.025,
+  "vertical_offset_m": 1.5,
+  "billboard": true,
+  "hide_capsule": true,
+  "directional_animations": {
+    "north": "face-n",
+    "north_east": "face-ne",
+    "east": "face-e",
+    "south_east": "face-se",
+    "south": "face-s",
+    "south_west": "face-sw",
+    "west": "face-w",
+    "north_west": "face-nw"
+  }
+}
+```
+
+Every named animation must already exist in the **actual** reviewed
+`sprite_forge` record whose source ID is in this binding's
+`depends_on` list. All eight directions are supported; subsets are
+valid, but missing directions never result in guessed art. Invalid
+animation names, unrecognized directions, source edits removing an
+in-use animation, and competing actor sources fail before publishing
+a broken world. The source editor rejects destructive dependent edits
+before committing its SQLite revision.
+
+The compiler changes the real Godot Expedition `_place_actor()` source
+rather than creating an unused animation helper. After an approved
+navigation edge causes an actual waypoint change, it derives horizontal
+heading from the previous and new actor positions, explicitly discards
+vertical-only movement, and selects an existing compass animation.
+World **north** is negative Z; **east** is positive X. All source
+changes are produced deterministically from a trusted engine-script
+anchor and independently recompiled during ZIP verification. If a
+travel-mode animation is also authored, a matching compass animation
+wins after the successful waypoint transition; nonexistent headings
+leave the previous mode animation unchanged.
+
+The source receipt includes
+`player_compass_godot_source_receipt` with reviewed source identity,
+original and transformed GDScript hashes, coordinate conventions,
+and exact authored directions. A second source verifier reconstructs
+every byte before the Godot ZIP receives a disk acceptance receipt.
+This is **real engine-loadable source generation**, not a claim that
+Godot rendered the result.
+
+The new `test_jeeves_studio_sprite_direction.py` contains 14
+regressions for cardinal and diagonal identifiers, actual Godot source
+movement, preserved stamina/navigation authority, malicious frame
+references, tampered GDScript, missing source animations, and
+dependency-breaking edits. These tests are imported into root Python
+CI and the modules are mirrored into `skeleton/ai/agents/jeeves/ai`
+without relaxing architecture parity requirements.
