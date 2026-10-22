@@ -1,0 +1,1 @@
+"""Tutolage school SAM CLOM KREM. Complete. Do not fork."""\nclass SchoolPolicy:\n    def apply(self) -> dict:\n        return {\"SAM\": True, \"CLOM\": True, \"KREM\": True, \"stored_prose\": 0}\n
