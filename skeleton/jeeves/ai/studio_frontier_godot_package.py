@@ -175,8 +175,25 @@ def compile_original_godot_candidate(
                 "source_sha256": info["source_sha256"],
                 "frame_count": len(info["frames"]),
                 "animation_count": len(info["animations"]),
+                "animation_names": [state["name"] for state in info["animations"]],
                 "png_sha256": info["png_sha256"],
             })
+    from .studio_sprite_actor_binding import (
+        binding_from_source, bind_sprite_to_expedition_script,
+        verify_actor_sprite_binding,
+    )
+    avatar = binding_from_source(records, authored_sprites)
+    actor_script_receipt = None
+    if avatar is not None:
+        original_script = files["game/frontier/expedition.gd"]
+        updated_script = bind_sprite_to_expedition_script(original_script, avatar)
+        actor_script_receipt = verify_actor_sprite_binding(
+            original_script, updated_script, avatar,
+        )
+        files["game/frontier/expedition.gd"] = updated_script
+        file_hashes["game/frontier/expedition.gd"] = sha256(
+            updated_script.encode("utf-8")
+        ).hexdigest()
     metadata = {
         "schema_version": SCHEMA, "project_id": project_id,
         "source_head_sha256": source_head_sha256,
@@ -193,6 +210,9 @@ def compile_original_godot_candidate(
         "packaged_original_sprites": authored_sprites,
         "source_sprite_record_ids": sprite_names,
         "animated_sprite2d_preview_scenes_authored": bool(authored_sprites),
+        "authored_player_avatar_binding": avatar,
+        "player_avatar_game_script_receipt": actor_script_receipt,
+        "animated_sprite3d_player_script_compiled": avatar is not None,
         "native_sprite_scene_binding_verified": False,
         "gameplay_route_digest": route.digest,
         "gameplay_execution_head_sha256": playthrough["receipt_head"],
