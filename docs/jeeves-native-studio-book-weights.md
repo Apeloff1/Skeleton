@@ -1432,7 +1432,7 @@ Interoperability is via JSON Schema Draft 2020-12 plus optional glTF 2.0
 `asset.extras` projection using `gltf_extras_for_asset`, not a fabricated
 extension registration or claim that a 2D sprite is suddenly a 3D glTF mesh.
 `SPDX 3.0` and `C2PA` are **not** emitted by this work: stored human
-rights assertions and unhashed human-authored alt text are not substitutes
+rights assertions and hash-linked human-authored alt text are not substitutes
 for those complete credential/signing mechanisms.
 
 References:

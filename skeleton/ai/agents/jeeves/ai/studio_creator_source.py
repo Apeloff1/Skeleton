@@ -609,6 +609,43 @@ class CreatorProjectSourceStore:
                     compile_original_palette_collection,
                 )
                 compile_original_palette_collection(next_records)
+        # Persisted descriptions are contractual dependencies: never allow a
+        # later source rename or semantic retargeting to silently leave broken
+        # asset descriptors in a supposedly valid project source graph.
+        if document.get("kind") in {
+            "pixel_sprite", "sprite_palette_variant", "procedural_pcm_sound",
+            "procedural_mesh", "asset_descriptor",
+        }:
+            future = dict(self._records)
+            future[record_id] = {
+                "record_id": record_id, "facet": facet, "revision": version,
+                "document": document, "depends_on": depends_on,
+                "source_sha256": content_sha,
+            }
+            seen_overlays: set[tuple[str, str]] = set()
+            for item in future.values():
+                candidate = item["document"]
+                if candidate.get("kind") != "asset_descriptor":
+                    continue
+                from .studio_asset_descriptors import _review_overlay
+                _review_overlay(item)
+                target_id = candidate["target_record_id"]
+                origin = future.get(target_id)
+                if origin is None or origin["document"].get("kind") not in {
+                    "pixel_sprite", "sprite_palette_variant",
+                    "procedural_pcm_sound", "procedural_mesh",
+                }:
+                    raise CreatorSourceError(
+                        "descriptor target was removed or is no longer an asset"
+                    )
+                if origin["document"].get("asset_id") != candidate["target_asset_id"]:
+                    raise CreatorSourceError(
+                        "descriptor asset identity became stale after source revision"
+                    )
+                key = (target_id, candidate["target_asset_id"])
+                if key in seen_overlays:
+                    raise CreatorSourceError("ambiguous duplicate asset descriptors")
+                seen_overlays.add(key)
         if self._event_count >= MAX_EVENTS:
             raise CreatorSourceError("source event journal needs archival")
         self._db.execute("BEGIN IMMEDIATE")

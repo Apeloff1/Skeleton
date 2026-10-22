@@ -47,7 +47,7 @@ export const JEEVES_STUDIO_DOMAINS: readonly Domain[] = [
   { id: 'ui', title: 'UI & HUD', question: 'Which screens, input schemes and HUD elements?', route: '/skeleton-studio', family: 'Interface' },
   { id: 'ux', title: 'Interaction flows', question: 'Which onboarding and interaction flows?', route: '/galaxy', family: 'Interface' },
   { id: 'sprite_forge', title: 'Sprite forge', question: 'Which sprite sheets, poses and palettes?', route: '/forge-hub', family: 'Forge' },
-  { id: 'asset_forge', title: 'Asset forge', question: 'Which props, materials and original meshes?', route: '/construct-forge', family: 'Forge' },
+  { id: 'asset_forge', title: 'Asset forge', question: 'Which actual 3D GLB meshes, PBR materials, human-reviewed asset descriptors, accessibility text, rights declarations and searchable tags?', route: '/construct-forge', family: 'Forge' },
   { id: 'scene_forge', title: 'Scene forge', question: 'Which scene graphs and triggers?', route: '/gameforge-studio', family: 'Forge' },
   { id: 'animation_forge', title: 'Animation forge', question: 'Which motion states, rigs and clips?', route: '/media-studio', family: 'Forge' },
   { id: 'audio_forge', title: 'Audio forge', question: 'Which original soundtrack and effects?', route: '/media-studio', family: 'Forge' },
