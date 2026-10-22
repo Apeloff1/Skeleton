@@ -950,3 +950,54 @@ non-square refusal, animation state references, forged transform receipts,
 source revisions, exact sparse/opaque alpha masks, geometric reconstruction,
 collision sidecar export and independent Godot package verification. These
 are imported by the repository's root backend test collection.
+
+
+## Signed palette skins and independent saved-sprite ZIP verification
+
+Original color skins are now an actual producer tool rather than a design
+promise. Jeeves can propose a `sprite_forge` source record with
+`kind: "sprite_palette_variant"`, unique portable `asset_id`,
+`parent_record_id` pointing at one previously admitted `pixel_sprite`
+record, and an explicit `color_map` from original `#RRGGBBAA` values
+to replacement `#RRGGBBAA` values. A separate reviewed source dependency
+on the parent record is mandatory. Example:
+
+```json
+{
+  "kind": "sprite_palette_variant",
+  "asset_id": "hero-night",
+  "parent_record_id": "hero-source",
+  "color_map": {"#ff0000ff": "#3366ffff"}
+}
+```
+
+Authoring store creation or edit checks both the parent and palette variant
+revision SHA before accepting the transaction, and rechecks all dependent
+palette skins whenever source sprite frames/palettes change. A skin may
+change only explicitly mapped RGB values; alpha, hitboxes, animation state,
+timing, frame UV rectangles and pixel coverage are immutable. Missing palette
+keys, redundant identity color maps, unrelated source dependencies, duplicate
+or unsafe asset IDs and hidden RGB in transparent colors fail closed.
+
+The compiler produces **actual separate PNG, .json, .hitboxes.json,
+.tres and .tscn files** for the skin in both standalone sprite ZIP exports
+and full Godot game exports. Every skin carries the immutable original source
+revision, variant source revision, compiled output SHA, source PNG SHA,
+and approved RGBA mapping, plus an independent pixel-by-pixel replay that
+checks every original and recolored pixel (including gutters) against
+the declared mapping. Neither an artist's creative approval nor use of a
+generative image model is asserted.
+
+A second, standalone `studio_sprite_zip_verify.py` verifier now rereads
+every published `sprite-atlas-zip` **from disk**, validates safe ZIP paths,
+metadata, exact file membership, decompression and total file budgets,
+fully decoded PNG source, frame timings, objective quality receipts, collision
+rectangles and animation resource identity. It also replays each recolor
+against the exact saved original PNG, rather than trusting a renamed
+compressed ZIP or a fresh outside hash.
+
+CI includes 17 separate adversarial palette/source/archive tests, a
+whole-game Godot palette-package roundtrip, and deep/shared DAG source
+regressions. The real engine source paths are implemented; **an installed
+Godot runtime, actual renderer and human creative/copyright review remain
+independent gates** and are not claimed as completed by these artifacts.
