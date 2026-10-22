@@ -279,6 +279,43 @@ def verify_published_godot_zip(
                             "original source SpriteFrames resource hash differs"
                         )
             # Rebuild the FULL Godot game entrypoint from the trusted
+            skins = proof.get("original_palette_variant_receipts", [])
+            if not isinstance(skins, list) or len(skins) > 128:
+                raise NativeSourceVerificationError("unbounded original game palette variants")
+            if skins:
+                from .studio_sprite_palette_variants import (
+                    SpritePaletteVariantError, verify_original_palette_variant,
+                )
+                indexed = {item["asset_id"]: item for item in original_sprites}
+                if len(indexed) != len(original_sprites):
+                    raise NativeSourceVerificationError("duplicate original sprite names")
+                checked: set[str] = set()
+                for skin in skins:
+                    if not isinstance(skin, dict):
+                        raise NativeSourceVerificationError("palette proof is not a source object")
+                    base_id, target_id = skin.get("base_asset_id"), skin.get("asset_id")
+                    if (base_id not in indexed or target_id not in indexed
+                            or target_id in checked or base_id == target_id):
+                        raise NativeSourceVerificationError("unresolved original sprite skin")
+                    checked.add(target_id)
+                    if indexed[target_id]["source_record_id"] != skin.get("variant_source_record_id"):
+                        raise NativeSourceVerificationError("palette skin source record mismatch")
+                    original = {
+                        "metadata": json.loads(archive.read(
+                            "game/frontier/sprites/" + base_id + ".json")),
+                        "png": archive.read("game/frontier/sprites/" + base_id + ".png"),
+                    }
+                    variant = {
+                        "metadata": json.loads(archive.read(
+                            "game/frontier/sprites/" + target_id + ".json")),
+                        "png": archive.read("game/frontier/sprites/" + target_id + ".png"),
+                    }
+                    try:
+                        verify_original_palette_variant(original, variant, skin)
+                    except (SpritePaletteVariantError, KeyError, TypeError) as exc:
+                        raise NativeSourceVerificationError(
+                            "published Godot original color skin differs from source pixels"
+                        ) from exc
             # exporter script, then replay exact player and NPC source edits.
             # Hashes alone cannot authorize injected script contents.
             from skeleton.jeeves.game_frontier_expedition_godot import _GODOT_SCRIPT
