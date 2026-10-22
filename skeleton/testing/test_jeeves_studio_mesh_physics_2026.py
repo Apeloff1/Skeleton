@@ -12,7 +12,9 @@ from skeleton.jeeves.ai.studio_asset_descriptors import (
     AssetDescriptorError, compile_asset_catalog, catalog_bytes,
     search_asset_catalog, verify_asset_catalog,
 )
-from skeleton.jeeves.ai.studio_creator_source import CreatorProjectSourceStore
+from skeleton.jeeves.ai.studio_creator_source import (
+    CreatorProjectSourceStore, CreatorSourceError,
+)
 from skeleton.jeeves.ai.studio_original_mesh import compile_original_mesh
 from skeleton.jeeves.ai.studio_original_mesh_physics import (
     OriginalMeshPhysicsError, compile_original_mesh_physics,
@@ -301,7 +303,9 @@ class PhysicalSourceStoreTests(unittest.TestCase):
                          "static")
 
     def test_collision_cannot_precede_real_mesh_source(self):
-        with self.assertRaises(OriginalMeshPhysicsError):
+        # Source references are checked before compiler dispatch; missing
+        # parents must be rejected without creating a durable source record.
+        with self.assertRaises(CreatorSourceError):
             self.create(source_body())
         self.assertEqual(self.store.snapshot()["source_count"], 0)
 

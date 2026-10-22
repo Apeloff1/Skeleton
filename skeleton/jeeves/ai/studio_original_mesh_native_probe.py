@@ -302,6 +302,10 @@ def verify_native_mesh_probe_output(
         "active_physics_bodies", "game_instances",
     }:
         raise MeshEngineProbeError("runtime probe returned incomplete measurements")
+    if observed["candidate_sha256"] != expected["candidate_sha256"]:
+        raise MeshEngineProbeError(
+            "runtime probe reported a different original candidate receipt"
+        )
     tests = (
         ("mesh_ids", expected["mesh_ids"]),
         ("physics_ids", expected["physics_ids"]),
