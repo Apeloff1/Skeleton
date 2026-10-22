@@ -253,6 +253,22 @@ def compile_original_godot_candidate(
         file_hashes["game/frontier/expedition.gd"] = sha256(
             updated_script.encode("utf-8")
         ).hexdigest()
+    compass_receipt = None
+    if avatar is not None and avatar.get("directional_animations"):
+        from .studio_sprite_direction import (
+            compile_eight_way_actor_facing, verify_eight_way_actor_facing,
+        )
+        original_script = files["game/frontier/expedition.gd"]
+        oriented_script = compile_eight_way_actor_facing(
+            original_script, avatar,
+        )
+        compass_receipt = verify_eight_way_actor_facing(
+            original_script, oriented_script, avatar,
+        )
+        files["game/frontier/expedition.gd"] = oriented_script
+        file_hashes["game/frontier/expedition.gd"] = sha256(
+            oriented_script.encode("utf-8")
+        ).hexdigest()
     from .studio_sprite_npc_binding import (
         authored_npc_sprite_bindings, bind_npc_sprites_to_expedition_script,
         verify_native_npc_binding_script,
@@ -296,6 +312,8 @@ def compile_original_godot_candidate(
         "animated_sprite2d_preview_scenes_authored": bool(authored_sprites),
         "authored_player_avatar_binding": avatar,
         "player_avatar_game_script_receipt": actor_script_receipt,
+        "player_compass_godot_source_receipt": compass_receipt,
+        "native_player_eight_way_facing_compiled": compass_receipt is not None,
         "player_collision_sensor_receipt": player_sensor_receipt,
         "native_player_alpha_sensor_script_compiled": player_sensor_receipt is not None,
         "authored_npc_sprite_bindings": npc_sprite_bindings,
