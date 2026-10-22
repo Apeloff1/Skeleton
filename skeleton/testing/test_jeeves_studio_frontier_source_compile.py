@@ -457,17 +457,56 @@ class RealGodotSourceBuildTests(unittest.TestCase):
 
     def test_binding_requires_real_sprite_source_dependency(self):
         self.populate_3d()
-        self.author_player_visual(source_dependency=False)
         with self.assertRaisesRegex(SpriteBindingError, "depend"):
-            self.export_godot()
+            self.author_player_visual(source_dependency=False)
         self.assertEqual(list(self.export.iterdir()), [])
 
     def test_binding_rejects_nonexistent_animation(self):
         self.populate_3d()
-        self.author_player_visual(animation="fictitious")
         with self.assertRaisesRegex(SpriteBindingError, "animation"):
-            self.export_godot()
+            self.author_player_visual(animation="fictitious")
         self.assertEqual(list(self.export.iterdir()), [])
+
+    def test_sprite_edit_cannot_break_already_bound_player_animation(self):
+        self.populate_3d()
+        self.author_player_visual()
+        before = self.owner.snapshot()["head_sha256"]
+        changed = [{
+            "name": "new-animation",
+            "frame_ids": ["first", "second"], "loop": True,
+        }]
+        with self.assertRaisesRegex(SpriteBindingError, "animation"):
+            self.owner.edit(build_creator_command(
+                "edit", project_id="new-game",
+                payload={
+                    "target_id": "hero-art", "expected_revision": 1,
+                    "patch": {"set": {"animations": changed}, "remove": []},
+                },
+            ))
+        self.assertEqual(self.owner.snapshot()["head_sha256"], before)
+        self.assertFalse(any(self.export.iterdir()))
+
+    def test_avatar_source_edit_preserves_binding_and_renews_attestation(self):
+        self.populate_3d()
+        self.author_player_visual()
+        before = self.owner.snapshot()["head_sha256"]
+        self.owner.edit(build_creator_command(
+            "edit", project_id="new-game",
+            payload={
+                "target_id": "hero-art", "expected_revision": 1,
+                "patch": {"set": {"pixel_scale": 3}, "remove": []},
+            },
+        ))
+        self.assertNotEqual(self.owner.snapshot()["head_sha256"], before)
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as z:
+            sprite = json.loads(z.read("game/frontier/sprites/hero-idle.json"))
+            binding = json.loads(z.read("jeeves_source_receipt.json"))[
+                "authored_player_avatar_binding"
+            ]
+        self.assertEqual(sprite["pixel_scale"], 3)
+        self.assertEqual(binding["sprite_png_sha256"], sprite["png_sha256"])
+        self.assertFalse(binding["engine_actor_visual_execution_verified"])
 
     def test_native_engine_actor_review_requires_installed_godot4(self):
         self.populate_3d()
