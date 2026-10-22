@@ -107,6 +107,7 @@ def authored_npc_sprite_bindings(
             "sprite_source_record_id": asset["source_record_id"],
             "sprite_png_sha256": asset["png_sha256"],
             "sprite_frames_resource_sha256": asset["godot_spriteframes_resource_sha256"],
+            "frame_cues_sha256": asset.get("frame_cues_sha256"),
             "pixel_size": _float(source["pixel_size"], "NPC pixel scale", 0.001, 0.25),
             "vertical_offset_m": _float(
                 source["vertical_offset_m"], "NPC sprite vertical offset", -10, 30,
@@ -216,12 +217,20 @@ def bind_npc_sprites_to_expedition_script(
         _float(item["vertical_offset_m"], "vertical offset", -10, 30)
         if type(item["billboard"]) is not bool or type(item["hide_capsule"]) is not bool:
             raise NpcSpriteBindingError("untyped NPC rendering policies")
+        cues_sha = item.get("frame_cues_sha256")
+        if cues_sha is not None and (
+            type(cues_sha) is not str or len(cues_sha) != 64
+            or any(ch not in "0123456789abcdef" for ch in cues_sha)
+        ):
+            raise NpcSpriteBindingError("NPC frame cue source digest changed")
         blocks.append('"' + npc_id + '": {"asset": "' + asset
                       + '", "animation": "' + anim
                       + '", "pixel_size": ' + format(item["pixel_size"], ".8f")
                       + ', "offset": ' + format(item["vertical_offset_m"], ".6f")
                       + ', "billboard": ' + str(item["billboard"]).lower()
-                      + ', "hide_capsule": ' + str(item["hide_capsule"]).lower() + '}')
+                      + ', "hide_capsule": ' + str(item["hide_capsule"]).lower()
+                      + ', "cues": ' + str(item.get("frame_cues_sha256") is not None).lower()
+                      + '}')
     declaration = [
         "            # Reviewed original NPC art, not unverified model instructions.",
         '            var jeeves_npc_id := str(profile.get("npc_id", ""))',
@@ -245,6 +254,13 @@ def bind_npc_sprites_to_expedition_script(
         "                    jeeves_npc_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED",
         '                        if jeeves_npc_visual["billboard"]',
         "                        else BaseMaterial3D.BILLBOARD_DISABLED",
+        '                    if jeeves_npc_visual["cues"]:',
+        '                        var jeeves_npc_cue_script := load("res://game/frontier/sprites/"',
+        '                            + jeeves_npc_visual["asset"] + ".cues.gd") as Script',
+        "                        if jeeves_npc_cue_script == null:",
+        '                            push_error("Original NPC frame cue signal script missing")',
+        "                            return",
+        "                        jeeves_npc_sprite.set_script(jeeves_npc_cue_script)",
         "                    npc.add_child(jeeves_npc_sprite)",
         "                    jeeves_npc_sprite.play()",
         '                    if jeeves_npc_visual["hide_capsule"]:',
