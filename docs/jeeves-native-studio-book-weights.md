@@ -1496,3 +1496,72 @@ Validation: `test_jeeves_studio_mesh_lod_2026.py` and
 `test_jeeves_studio_frontier_source_compile.py`. Godot import,
 visible geometry and runtime LOD swapping remain unverified until
 host-authorized engine execution and independent observation.
+
+### Original 3D mesh collision and physics compilation — October 2026
+
+Jeeves can now author *real* source-owned Godot 4 collision-body scenes for
+previously compiled original 3D GLBs. This is an opt-in record under
+`facet=physics`, document.kind=`procedural_mesh_physics`; the source
+`depends_on` graph must include the already-approved original
+`procedural_mesh` record. The exact authoring input is:
+
+```json
+{
+  "kind": "procedural_mesh_physics",
+  "base_record_id": "temple-source",
+  "asset_id": "temple-pedestal",
+  "body_type": "static",
+  "density_kg_m3": 2300,
+  "friction_per_mille": 850,
+  "restitution_per_mille": 50,
+  "collision_layer": 1,
+  "collision_mask": 31
+}
+```
+
+**Three actual Godot node types:** static emits `StaticBody3D`, rigid
+emits `RigidBody3D` with mass derived from source dimensions and authored
+density (and enabled continuous collision detection), area emits `Area3D`
+with native monitoring enabled; area scenes are trigger surfaces but do not
+invent a gameplay signal handler or synthetic contact events. Body geometry
+is derived from the same source that emits the GLB. Boxes are `BoxShape3D`,
+finite ground planes are thin 10 mm boxes, true uniform spheres are
+`SphereShape3D`, circular cylinders are `CylinderShape3D`. Ellipsoids
+and elliptical cylinders instead use `ConvexPolygonShape3D` with the real
+unique parametric source vertices, not a physically inaccurate uniform
+radius. All emitted convex polygons have explicit complexity bounds.
+
+Static and rigid bodies receive real `PhysicsMaterial` friction and bounce;
+rigid bodies derive mass from authored kg/m³ and analytic box, cylinder or
+ellipsoid volume, with limits to refuse unstable or impossible mass ranges.
+Collision layers and masks are bounded integers. Source mutations are
+checked before the durable source-store SQLite transaction, so a later
+mesh rename, physics policy invalidation or geometry change cannot
+silently orphan collision assets. A base mesh without an authorized physics
+record is left untouched and uncollidable by default.
+
+**Real published artifacts:**
+`game/frontier/meshes/<asset>.physics.tscn` includes the actual
+body, collision shape, physical material where applicable and an instanced
+rendering child pointing to the existing original GLB or authored LOD scene;
+`game/frontier/meshes/<asset>.physics.source.json` retains source revision
+and compiler metadata. The project receipt records source IDs, source SHA,
+GLB SHA, scene SHA, collision body type and physics compilation receipt.
+The separate post-publication verifier independently recreates all physics
+scene/source bytes, checks that each visual is linked to the existing
+reviewed GLB/LOD scene and forbids unapproved additional collision files.
+
+**Jeeves asset search:** base mesh descriptors now include authored collider
+shape, collision layer/mask, physical material, mass, type, scene SHA and
+source revision; the catalog is fully replayed from real source records.
+Source emission proves compiler behavior, not actual observed contact,
+collision response, trigger notifications or a Godot engine run.
+The physics source contract is available at
+`docs/schemas/jeeves-original-mesh-physics-2026.schema.json`.
+
+Coverage: `test_jeeves_studio_mesh_physics_2026.py` includes 24
+adversarial source, geometry, deterministic emission, scene replay,
+catalog and mutation tests, supplemented by 3 full source-store/native-ZIP
+integration tests in
+`test_jeeves_studio_frontier_source_compile.py`.
+Native Godot import and runtime physics remain separate release milestones.

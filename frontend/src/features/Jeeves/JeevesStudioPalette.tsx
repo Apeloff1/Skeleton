@@ -35,7 +35,7 @@ export const JEEVES_STUDIO_DOMAINS: readonly Domain[] = [
   { id: 'quests', title: 'Quest systems', question: 'Which interdependent quest paths and outcomes?', route: '/gameforge-studio', family: 'Design' },
   { id: 'combat', title: 'Combat', question: 'Which combat loops, moves and effects?', route: '/gameforge-studio', family: 'Design' },
   { id: 'movement', title: 'Locomotion', question: 'Which traversal and camera mechanics?', route: '/physics-studio', family: 'Simulation' },
-  { id: 'physics', title: 'Physics', question: 'Which collision, traction and weight distribution rules?', route: '/physics-studio', family: 'Simulation' },
+  { id: 'physics', title: 'Physics', question: 'Which original mesh collisions, rigid-body mass and density, layers, friction, restitution, triggers, traction and weight distribution rules?', route: '/physics-studio', family: 'Simulation' },
   { id: 'weather', title: 'Weather & forces', question: 'Which wind, turbulence and weather responses?', route: '/physics-studio', family: 'Simulation' },
   { id: 'economy', title: 'Economy', question: 'Which resource, crafting and trade loops?', route: '/systems-forge', family: 'Design' },
   { id: 'inventory', title: 'Inventory', question: 'How will equipment weight and items interact?', route: '/systems-forge', family: 'Design' },
