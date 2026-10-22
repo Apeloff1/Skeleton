@@ -499,7 +499,7 @@ class RealGodotSourceBuildTests(unittest.TestCase):
     def test_avatar_movement_mode_must_have_safe_identifier(self):
         self.populate_3d()
         with self.assertRaisesRegex(SpriteBindingError, "movement state map"):
-            self.author_player_visual(movement_map={"walk\\";queue_free": "walk"})
+            self.author_player_visual(movement_map={"walk;queue_free": "walk"})
         self.assertEqual(list(self.export.iterdir()), [])
 
     def test_binding_requires_real_sprite_source_dependency(self):
