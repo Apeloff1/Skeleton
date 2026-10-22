@@ -211,6 +211,26 @@ def compile_original_godot_candidate(
         file_hashes["game/frontier/expedition.gd"] = sha256(
             updated_script.encode("utf-8")
         ).hexdigest()
+    from .studio_sprite_npc_binding import (
+        authored_npc_sprite_bindings, bind_npc_sprites_to_expedition_script,
+        verify_native_npc_binding_script,
+    )
+    npc_sprite_bindings = authored_npc_sprite_bindings(
+        records, authored_sprites, files,
+    )
+    npc_script_receipt = None
+    if npc_sprite_bindings:
+        prior_npc_script = files["game/frontier/expedition.gd"]
+        bound_npc_script = bind_npc_sprites_to_expedition_script(
+            prior_npc_script, npc_sprite_bindings,
+        )
+        npc_script_receipt = verify_native_npc_binding_script(
+            prior_npc_script, bound_npc_script, npc_sprite_bindings,
+        )
+        files["game/frontier/expedition.gd"] = bound_npc_script
+        file_hashes["game/frontier/expedition.gd"] = sha256(
+            bound_npc_script.encode("utf-8")
+        ).hexdigest()
     metadata = {
         "schema_version": SCHEMA, "project_id": project_id,
         "source_head_sha256": source_head_sha256,
@@ -229,6 +249,9 @@ def compile_original_godot_candidate(
         "animated_sprite2d_preview_scenes_authored": bool(authored_sprites),
         "authored_player_avatar_binding": avatar,
         "player_avatar_game_script_receipt": actor_script_receipt,
+        "authored_npc_sprite_bindings": npc_sprite_bindings,
+        "npc_sprite_game_script_receipt": npc_script_receipt,
+        "animated_npc_sprite3d_source_compiled": bool(npc_sprite_bindings),
         "animated_sprite3d_player_script_compiled": avatar is not None,
         "native_sprite_scene_binding_verified": False,
         "gameplay_route_digest": route.digest,
