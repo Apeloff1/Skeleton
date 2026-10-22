@@ -111,6 +111,40 @@ class WorldChunkCompilerTests(unittest.TestCase):
         )
         self.assertEqual(planned["candidate_instances_in_view"], 1)
 
+    def test_truncated_camera_budget_does_not_unload_other_visible_asset(self):
+        world, _ = setup_world()
+        second = deepcopy(world["instances"][0])
+        second["instance_id"] = "farther-visible"
+        second["asset_id"] = "other-reviewed-mesh"
+        second["scene_resource_path"] = (
+            "game/frontier/meshes/other-reviewed-mesh.tscn"
+        )
+        second["position_mm"][0] += 5000
+        second["broadphase_aabb_min_mm"][0] += 5000
+        second["broadphase_aabb_max_mm"][0] += 5000
+        second["receipt_sha256"] = digest({
+            k: v for k, v in second.items() if k != "receipt_sha256"
+        })
+        world["instances"].append(second)
+        world["instance_count"] = 2
+        world["receipt_sha256"] = digest({
+            k: v for k, v in world.items() if k != "receipt_sha256"
+        })
+        chunks = compile_world_chunk_catalog(world)
+        already_loaded = second["scene_resource_path"]
+        plan = plan_chunk_resources(
+            chunks, world, camera_mm=[1500, 3200, -550],
+            view_radius_mm=10000,
+            previously_loaded=[already_loaded], limit=1,
+        )
+        self.assertTrue(plan["selection_truncated"])
+        self.assertEqual(plan["candidate_instances_in_view"], 2)
+        self.assertEqual(plan["selected_instances"], ["temple-doorway"])
+        self.assertEqual(plan["resources_to_release"], [])
+        self.assertEqual(plan["resources_to_load"], [
+            "game/frontier/meshes/trial-mesh.tscn",
+        ])
+
     def test_source_glb_with_lod_selects_importable_lod_scene(self):
         spatial, chunks = setup_world(lod=True)
         plan = plan_chunk_resources(
