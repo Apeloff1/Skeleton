@@ -1,9 +1,9 @@
-"""Another-pass multiplayer. Predictive interest mesh, distributed rollback, 256 players.
+"""Larger-pass multiplayer. Full interest mesh, predictive, distributed, 256 players.
 Fail-closed. Receipts."""
 from __future__ import annotations
 import hashlib, time, math
 from dataclasses import dataclass, field
-from typing import Dict, Final, List
+from typing import Dict, List
 
 class MultiplayerError(Exception):
     pass
@@ -11,9 +11,10 @@ class MultiplayerError(Exception):
 @dataclass
 class PeerState:
     player_id: str
-    position: tuple = (0.0,0.0,0.0)
+    position: tuple = (0.0, 0.0, 0.0)
     interested: bool = True
     cheat_score: float = 0.0
+    lag: int = 0
 
 @dataclass
 class PlayerGrant:
@@ -35,22 +36,25 @@ class SessionAuthority:
         if len(self.grants) >= self.max_players:
             raise MultiplayerError("full")
         g = PlayerGrant(player_id=player_id, session_id=self.session_id)
-        g.digest = hashlib.sha256(f"{player_id}:{self.session_id}".encode()).hexdigest()
+        g.digest = hashlib.sha256(f"{player_id}:{self.session_id}:larger".encode()).hexdigest()
         self.grants[player_id] = g
         return g
 
     def sync(self, player_id: str, peer_id: str, pos: tuple, lag: int) -> None:
-        g = self.grants[player_id]
+        g = self.grants.get(player_id)
+        if not g:
+            raise MultiplayerError("no grant")
         peer = g.peers.setdefault(peer_id, PeerState(peer_id))
         peer.position = pos
-        peer.interested = math.hypot(pos[0], pos[1]) < 350
+        peer.lag = lag
+        peer.interested = math.hypot(pos[0], pos[1]) < 400
         if peer.interested and peer_id not in g.interest_set:
             g.interest_set.append(peer_id)
         self.tick += 1
-        g.rollback.append({"tick": self.tick, "pos": pos})
-        if lag > 100:
-            peer.cheat_score += 0.3
+        g.rollback.append({"tick": self.tick, "pos": pos, "lag": lag})
+        if lag > 80:
+            peer.cheat_score += 0.4
 
     def verify(self, player_id: str, digest: str) -> bool:
         g = self.grants.get(player_id)
-        return bool(g and g.digest == digest and all(p.cheat_score < 4.0 for p in g.peers.values()))
+        return bool(g and g.digest == digest and all(p.cheat_score < 5.0 for p in g.peers.values()))
