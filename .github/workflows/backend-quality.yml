@@ -201,7 +201,8 @@ jobs:
             skeleton/testing/test_jeeves_studio_native_mesh_probe_2026.py \
             skeleton/testing/test_jeeves_studio_world_spatial_index_2026.py \
             skeleton/testing/test_jeeves_studio_world_chunks_2026.py \
-            skeleton/testing/test_jeeves_studio_world_streamer_2026.py
+            skeleton/testing/test_jeeves_studio_world_streamer_2026.py \
+            skeleton/testing/test_jeeves_studio_world_streaming_activation_2026.py
       - name: Frontier expedition playable multi-route world and Forge Studio
         if: steps.scope.outputs.full == 'true'
         working-directory: .

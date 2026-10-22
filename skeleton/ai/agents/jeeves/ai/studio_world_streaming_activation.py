@@ -14,10 +14,6 @@ import re
 from typing import Any
 
 from .studio_interaction_contract import digest
-from .studio_original_mesh_placements import (
-    OriginalMeshPlacementError, PLACEMENT_SCENE,
-    attach_authored_meshes_to_expedition,
-)
 
 SCHEMA = "skeleton.jeeves.world_streaming_activation.v1"
 KIND = "original_world_streaming_policy"

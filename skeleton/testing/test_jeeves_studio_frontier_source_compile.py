@@ -548,6 +548,70 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertEqual(result["disk_verification"][
             "original_physics_bodies_replayed"], 0)
 
+    def test_authored_world_streaming_activation_replaces_static_scene_without_duplication(self):
+        self.populate_3d()
+        self.create("stream-base", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "stream-statue",
+            "primitive": "box", "size_mm": [900, 1700, 700],
+            "segments": 6, "color_rgba": "#998866ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 800,
+        }, depends=("config-3d",))
+        self.create("stream-instance", "scene_forge", {
+            "kind": "original_mesh_instance", "instance_id": "stream-statue-one",
+            "base_record_id": "stream-base", "asset_id": "stream-statue",
+            "physics_record_id": None, "position_mm": [2000, 800, 3000],
+            "rotation_deg": [0, 40, 0], "scale_per_mille": 1100,
+        }, depends=("stream-base",))
+        self.create("stream-mode", "scene_forge", {
+            "kind": "original_world_streaming_policy",
+            "mode": "replace_static", "view_radius_m": 200,
+            "instantiate_per_frame": 3,
+        }, depends=("stream-instance",))
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            scene = archive.read(
+                "game/frontier/expedition.tscn"
+            ).decode("utf-8")
+            self.assertIn(
+                "res://game/frontier/assets/world_streamer.tscn", scene,
+            )
+            self.assertNotIn(
+                "res://game/frontier/mesh_placements.tscn", scene,
+            )
+            self.assertEqual(scene.count("OriginalMeshInstances"), 1)
+            self.assertIn("view_radius_m = 200.0", scene)
+            self.assertIn("instantiate_per_frame = 3", scene)
+            raw = archive.read(
+                "game/frontier/assets/world_streaming.source.json"
+            )
+            policy = json.loads(raw)
+            self.assertEqual(
+                policy["record"]["record_id"], "stream-mode",
+            )
+            receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+            self.assertTrue(receipt["world_streaming_policy"]["enabled"])
+            self.assertEqual(receipt["packaged_original_mesh_placements"][
+                "instance_count"], 1)
+            self.assertFalse(receipt["native_world_streaming_executed"])
+            self.assertEqual(
+                receipt["world_streaming_policy_source_sha256"],
+                sha256(raw).hexdigest(),
+            )
+        verified = exported["disk_verification"]
+        self.assertTrue(
+            verified["world_streamer_source_replayed"],
+        )
+        self.assertEqual(verified["original_3d_scene_instances_replayed"], 1)
+
+    def test_missing_approved_3d_placement_refuses_activated_streaming(self):
+        self.populate_3d()
+        with self.assertRaises((CreatorSourceError, ValueError)):
+            self.create("stream-mode", "scene_forge", {
+                "kind": "original_world_streaming_policy",
+                "mode": "replace_static", "view_radius_m": 100,
+                "instantiate_per_frame": 4,
+            }, depends=("config-3d",))
+
     def test_real_godot_world_streamer_component_ships_as_verified_opt_in_source(self):
         self.populate_3d()
         self.create("streamer-mesh", "asset_forge", {

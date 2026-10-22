@@ -4,7 +4,6 @@ from __future__ import annotations
 from copy import deepcopy
 import json
 import unittest
-from unittest.mock import patch
 
 from skeleton.jeeves.ai.studio_interaction_contract import digest
 from skeleton.jeeves.ai.studio_original_mesh_placements import (
@@ -15,9 +14,6 @@ from skeleton.jeeves.ai.studio_world_streaming_activation import (
     recover_exact_static_mesh_scene, replace_static_meshes_with_streaming,
     streaming_policy_source_bytes, verify_streaming_policy_archive,
     STATIC_LINK, STREAM_LINK,
-)
-from skeleton.jeeves.ai.studio_sprite_bound_native_runner import (
-    SpriteBoundNativeError, run_exact_original_candidate_native_expedition,
 )
 from skeleton.jeeves.game_frontier_expedition_godot import _GODOT_SCENE
 from skeleton.testing.test_jeeves_studio_asset_compilers_2026 import (

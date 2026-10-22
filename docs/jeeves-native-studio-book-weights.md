@@ -1783,3 +1783,37 @@ rejecting substituted scripts even when an archive is self-consistently
 rehashed. Tests:
 `test_jeeves_studio_world_streamer_2026.py` and the native Godot
 ZIP replay cases in `test_jeeves_studio_frontier_source_compile.py`.
+
+### Active (nonduplicating) original-world streaming — Oct 22, 2026
+
+A new optional versioned `scene_forge` source record with
+`kind=original_world_streaming_policy`,
+`mode=replace_static`, bounded `view_radius_m` and
+`instantiate_per_frame` values, and an explicit `depends_on`
+reference to an existing original 3D placement now activates **real
+Godot runtime streaming in the default expedition scene**.
+
+This is a user-authored opt-in. The exporter replaces the single
+`OriginalMeshInstances` PackedScene reference with
+`assets/world_streamer.tscn`, instead of attaching a second set of
+meshes. The existing non-streaming default is preserved exactly when
+no activation record exists. The streaming scene overrides the authored
+per-frame instantiation budget and camera radius. The original static
+placement source records and child scene are retained in the ZIP as
+auditable design history, even when the active root uses streamed
+instances instead.
+
+Source records and the activated scene link are SHA-bound in
+`assets/world_streaming.source.json`. On published ZIP verification,
+Jeeves replays the source policy and **reverses the exact active
+root-scene replacement** before separately checking the original
+mesh-placement source bundle. Script/source tampering, duplicated
+streaming policies, missing placement dependency or inconsistent
+root-scene overrides fail closed.
+
+Important: Native static Godot scene verification is **not accepted**
+as proof that frame-budgeted streaming occurred. Until a separate
+live-camera execution probe confirms spawn/unload transitions, the
+runtime certifier explicitly refuses to certify active streaming.
+Source scripts are functional artifacts, but mere emitted bytes are
+not evidence of observed execution, memory usage or performance.
