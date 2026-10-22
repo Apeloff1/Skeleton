@@ -12,6 +12,9 @@ import zipfile
 from skeleton.forge.creator.command_surface import build_creator_command
 from skeleton.jeeves.ai.studio_creator_source import CreatorProjectSourceStore
 from skeleton.jeeves.ai.studio_interaction_contract import digest
+from skeleton.jeeves.ai.studio_sprite_zip_verify import (
+    SpritePackageVerificationError, verify_published_sprite_package,
+)
 from skeleton.jeeves.ai.studio_sprite_palette_variants import (
     SpritePaletteVariantError, compile_original_palette_variant,
     compile_original_palette_collection, verify_original_palette_variant,
@@ -207,6 +210,52 @@ class PersistentPaletteSkinTests(unittest.TestCase):
             self.assertNotEqual(
                 sha256(archive.read("sprites/hero-idle.png")).hexdigest(),
                 sha256(archive.read("sprites/hero-night.png")).hexdigest(),
+            )
+
+    def test_independent_disk_archive_replays_all_saved_skin_pixels(self):
+        original = original_record()
+        self.create("hero-source", original["document"])
+        self.create("night-recolor", skin(original)["document"],
+                    deps=["hero-source"])
+        exported = self.store.export(build_creator_command(
+            "export", project_id="original-game",
+            payload={"format": "sprite-atlas-zip", "artifact_name": "night"},
+        ))
+        path = self.exports / exported["artifact_name"]
+        replay = verify_published_sprite_package(
+            path, project_id="original-game",
+            source_head_sha256=self.store.head_identity(),
+            expected_archive_sha256=exported["artifact_sha256"],
+        )
+        self.assertEqual(replay["asset_count"], 2)
+        self.assertEqual(replay["palette_variants_replayed"], 1)
+        self.assertTrue(replay["all_rgba_hitbox_and_resource_bytes_replayed"])
+        self.assertEqual(replay["receipt_sha256"],
+                         exported["disk_verification"]["receipt_sha256"])
+
+    def test_modified_inside_zip_fails_even_with_correct_new_archive_hash(self):
+        original = original_record()
+        self.create("hero-source", original["document"])
+        self.create("night-recolor", skin(original)["document"],
+                    deps=["hero-source"])
+        exported = self.store.export(build_creator_command(
+            "export", project_id="original-game",
+            payload={"format": "sprite-atlas-zip", "artifact_name": "night"},
+        ))
+        original_path = self.exports / exported["artifact_name"]
+        tampered = self.root / "tampered-original-game.zip"
+        with zipfile.ZipFile(original_path) as source:
+            with zipfile.ZipFile(tampered, "w") as writer:
+                for info in source.infolist():
+                    content = source.read(info.filename)
+                    if info.filename == "sprites/hero-night.png":
+                        content += b"modified-native-pixels"
+                    writer.writestr(info, content)
+        with self.assertRaises(SpritePackageVerificationError):
+            verify_published_sprite_package(
+                tampered, project_id="original-game",
+                source_head_sha256=self.store.head_identity(),
+                expected_archive_sha256=sha256(tampered.read_bytes()).hexdigest(),
             )
 
     def test_invalid_palette_skin_denied_before_sqlite_commit(self):
