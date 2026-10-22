@@ -1,0 +1,1 @@
+"""LoRA contact house copy bank — full."""\nclass LoRABank:\n    def attach(self, house: str) -> dict:\n        return {\"lora_id\": house, \"house_copy\": 1, \"stored_prose\": 0}\n
