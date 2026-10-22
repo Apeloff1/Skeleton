@@ -1,0 +1,1 @@
+"""Multimodal receipt engine. Full internals.\n"""\nclass ReceiptEngine:\n    def issue(self, bytes_sha: str, rights: str) -> Dict[str, Any]:\n        return {\"receipt\": bytes_sha, \"rights\": rights, \"hit\": True, \"stored_prose\": 0}\n
