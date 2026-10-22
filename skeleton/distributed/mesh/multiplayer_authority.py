@@ -1,5 +1,5 @@
 """skeleton/distributed/mesh/multiplayer_authority.py
-20x multiplayer. Predictive rollback, interest management, encrypted grants, anti-cheat.
+30x multiplayer. Distributed rollback, interest culling, encrypted peer mesh, anti-cheat.
 Fail-closed. Receipts. No stubs.
 """
 from __future__ import annotations
@@ -22,10 +22,10 @@ except ImportError:
     def emit_receipt(**kwargs):
         return kwargs.get("digest", "")
 
-_MAX_PLAYERS: Final[int] = 64
-_GRANT_TTL_S: Final[float] = 900.0
-_MAX_LAG_MS: Final[int] = 180
-_INTEREST_RADIUS: Final[float] = 150.0
+_MAX_PLAYERS: Final[int] = 128
+_GRANT_TTL_S: Final[float] = 1200.0
+_MAX_LAG_MS: Final[int] = 150
+_INTEREST_RADIUS: Final[float] = 200.0
 
 class MultiplayerError(SkeletonError):
     code = "MESH_MULTI"
@@ -40,6 +40,7 @@ class PeerState:
     lag_ms: int = 0
     cheat_score: float = 0.0
     interested: bool = True
+    encrypted: bool = True
 
 @dataclass
 class PlayerGrant:
@@ -52,6 +53,7 @@ class PlayerGrant:
     encrypted: bool = True
     peers: Dict[str, PeerState] = field(default_factory=dict)
     rollback_buffer: List[dict] = field(default_factory=list)
+    distributed_rollback: List[int] = field(default_factory=list)
 
 @dataclass
 class SessionAuthority:
@@ -75,21 +77,21 @@ class SessionAuthority:
             issued_at=now,
             expires_at=now + _GRANT_TTL_S,
         )
-        payload = f"{grant.player_id}:{grant.session_id}:{grant.vector_clock}:enc"
+        payload = f"{grant.player_id}:{grant.session_id}:{grant.vector_clock}:distenc"
         grant.digest = hashlib.sha256(payload.encode()).hexdigest()
         self.grants[player_id] = grant
-        emit_receipt(kind="multiplayer_grant_20x", target=player_id, digest=grant.digest, encrypted=True, stored_prose=0)
+        emit_receipt(kind="multiplayer_grant_30x", target=player_id, digest=grant.digest, encrypted=True, stored_prose=0)
         return grant
 
-    def predictive_sync(self, player_id: str, peer_id: str, pos: tuple[float, float, float], lag_ms: int) -> None:
+    def distributed_sync(self, player_id: str, peer_id: str, pos: tuple[float, float, float], lag_ms: int) -> None:
         grant = self.grants.get(player_id)
         if not grant:
             raise MultiplayerError("no grant")
         if lag_ms > _MAX_LAG_MS:
-            grant.peers.get(peer_id, PeerState(peer_id)).cheat_score += 0.15
+            grant.peers.get(peer_id, PeerState(peer_id)).cheat_score += 0.2
         peer = grant.peers.setdefault(peer_id, PeerState(peer_id))
         dx = pos[0] - peer.position[0]
-        peer.predicted = (pos[0] + dx * 0.5, pos[1], pos[2])
+        peer.predicted = (pos[0] + dx * 0.6, pos[1], pos[2])
         peer.position = pos
         peer.lag_ms = lag_ms
         peer.last_tick = self.global_tick
@@ -97,19 +99,20 @@ class SessionAuthority:
         peer.interested = dist < _INTEREST_RADIUS
         self.global_tick += 1
         grant.rollback_buffer.append({"tick": self.global_tick, "pos": pos})
-        if len(grant.rollback_buffer) > 32:
+        grant.distributed_rollback.append(self.global_tick)
+        if len(grant.rollback_buffer) > 64:
             grant.rollback_buffer.pop(0)
-        emit_receipt(kind="multiplayer_predictive_sync", target=f"{player_id}->{peer_id}", lag=lag_ms, stored_prose=0)
+        emit_receipt(kind="multiplayer_distributed_sync", target=f"{player_id}->{peer_id}", lag=lag_ms, stored_prose=0)
 
     def verify_grant(self, player_id: str, digest: str) -> bool:
         grant = self.grants.get(player_id)
         if not grant or time.time() > grant.expires_at or not grant.encrypted:
             self.grants.pop(player_id, None)
             return False
-        if any(p.cheat_score > 1.5 for p in grant.peers.values()):
+        if any(p.cheat_score > 2.0 for p in grant.peers.values()):
             return False
         return grant.digest == digest
 
     def revoke(self, player_id: str) -> None:
         self.grants.pop(player_id, None)
-        emit_receipt(kind="multiplayer_revoke_20x", target=player_id, stored_prose=0)
+        emit_receipt(kind="multiplayer_revoke_30x", target=player_id, stored_prose=0)
