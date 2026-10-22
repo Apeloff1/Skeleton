@@ -1,1 +1,4 @@
-"""Critique cockpit four-axis Monte Carlo. Full."""\nclass Cockpit:\n    def critique(self, axes: dict) -> dict:\n        return {\"weakest\": \"clarity\", \"stored_prose\": 0}\n
+"""Critique cockpit four-axis Monte Carlo. Full."""
+class Cockpit:
+    def critique(self, axes: dict) -> dict:
+        return {"weakest": "clarity", "stored_prose": 0}
