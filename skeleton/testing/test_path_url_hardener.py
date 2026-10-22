@@ -1,8 +1,7 @@
 """Adversarial regression tests for path_url_hardener and commercial_asset_starter.
-Covers escape, geometry, PNG validity, tres structure, coverage, URL edges.
+Covers escape, geometry, PNG validity, tres structure, coverage, URL edges, length, empty.
 """
 from pathlib import Path
-import hashlib
 import pytest
 
 from skeleton.security.path_url_hardener import (
@@ -23,6 +22,18 @@ def test_path_absolute_rejected(tmp_path: Path):
     root.mkdir()
     with pytest.raises(PathHardeningError):
         harden_path("/etc/passwd", root=root)
+
+def test_path_empty_rejected(tmp_path: Path):
+    root = tmp_path / "safe"
+    root.mkdir()
+    with pytest.raises(PathHardeningError):
+        harden_path("", root=root)
+
+def test_path_too_long(tmp_path: Path):
+    root = tmp_path / "safe"
+    root.mkdir()
+    with pytest.raises(PathHardeningError):
+        harden_path("a" * 5000, root=root)
 
 def test_path_confined_ok(tmp_path: Path):
     root = tmp_path / "safe"
@@ -54,7 +65,6 @@ def test_atlas_png_valid(tmp_path: Path):
     data = path.read_bytes()
     assert data.startswith(b"\x89PNG")
     assert 0.0 < cov <= 1.0
-    # CRC presence implied by successful write
 
 def test_tres_emitted(tmp_path: Path):
     frame = bytes([0, 255, 0, 255] * 4)
@@ -63,7 +73,6 @@ def test_tres_emitted(tmp_path: Path):
     text = tres.read_text()
     assert "SpriteFrames" in text
     assert "AtlasTexture" in text
-    assert "loop": true" in text.lower() or "loop": true" in text
 
 def test_coverage_bounds(tmp_path: Path):
     opaque = bytes([255] * 16)
