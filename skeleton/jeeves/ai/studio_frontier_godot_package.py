@@ -260,11 +260,23 @@ def run_original_game_native_playthrough(
     )
     try:
         world = author_studio_expedition(project, profile)
-        result = run_headless_expedition(
-            world, traveler, godot_executable=godot_executable,
-            timeout_seconds=timeout_seconds,
-        )
-    except ExpeditionError as exc:
+        if before["receipt"]["authored_player_avatar_binding"] is not None:
+            # The legacy runner regenerates baseline Godot files, so using it
+            # here would falsely attest a game whose ACTUAL avatar never ran.
+            # Execute the exact generated sprite-bound project instead.
+            from .studio_sprite_bound_native_runner import (
+                run_sprite_bound_native_expedition, SpriteBoundNativeError,
+            )
+            result = run_sprite_bound_native_expedition(
+                before, world, traveler, godot_executable=godot_executable,
+                timeout_seconds=timeout_seconds,
+            )
+        else:
+            result = run_headless_expedition(
+                world, traveler, godot_executable=godot_executable,
+                timeout_seconds=timeout_seconds,
+            )
+    except (ExpeditionError, SpriteBoundNativeError) as exc:
         raise FrontierSourceError("real Godot 4 execution or independent replay failed") from exc
     if (result.get("native_process_executed") is not True
             or result.get("native_gameplay_consistent") is not True
@@ -282,6 +294,10 @@ def run_original_game_native_playthrough(
         "observed_replay_receipt_sha256": result["observed_replay_receipt"],
         "real_godot4_process_executed": True,
         "native_gameplay_consistent": True,
+        "native_player_avatar_script_executed": (
+            before["receipt"]["authored_player_avatar_binding"] is not None
+        ),
+        "native_visual_output_independently_observed": False,
         "complete_original_game_release_certified": False,
     }
     receipt["receipt_sha256"] = digest(receipt)
