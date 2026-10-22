@@ -335,6 +335,54 @@ def verify_published_godot_zip(
                     )
                 reconstructed = player_script
 
+            source_sensor = proof.get("player_collision_sensor_receipt")
+            sensor_flag = proof.get("native_player_alpha_sensor_script_compiled")
+            if original_avatar is None or original_avatar.get("collision_sensor") is not True:
+                if source_sensor is not None or sensor_flag is not False:
+                    raise NativeSourceVerificationError(
+                        "a native collision sensor was claimed without authored permission"
+                    )
+                if any(name.endswith(".sensor.gd") for name in expected):
+                    raise NativeSourceVerificationError(
+                        "unapproved sprite collision script present in Godot game"
+                    )
+            else:
+                if not isinstance(source_sensor, dict) or sensor_flag is not True:
+                    raise NativeSourceVerificationError(
+                        "source-approved player sensor lacks native shape proof"
+                    )
+                asset = original_avatar["asset_id"]
+                sensor_file = "game/frontier/sprites/" + asset + ".sensor.gd"
+                source_file = "game/frontier/sprites/" + asset + ".json"
+                hitboxes_file = "game/frontier/sprites/" + asset + ".hitboxes.json"
+                if (sensor_file not in expected
+                        or source_file not in expected
+                        or hitboxes_file not in expected
+                        or [name for name in expected if name.endswith(".sensor.gd")]
+                        != [sensor_file]):
+                    raise NativeSourceVerificationError(
+                        "original native player collision source files are incomplete"
+                    )
+                from .studio_sprite_native_sensor import (
+                    SpriteSensorError, verify_sprite_sensor_source,
+                )
+                try:
+                    reviewed_meta = json.loads(archive.read(source_file))
+                    reviewed_masks = json.loads(archive.read(hitboxes_file))
+                    compiled_script = archive.read(sensor_file).decode("utf-8")
+                    verified_sensor = verify_sprite_sensor_source(
+                        reviewed_meta, reviewed_masks, compiled_script,
+                        source_sensor,
+                    )
+                except (SpriteSensorError, UnicodeDecodeError, ValueError, TypeError) as exc:
+                    raise NativeSourceVerificationError(
+                        "native collision sensor script differs from original masks"
+                    ) from exc
+                if verified_sensor != source_sensor:
+                    raise NativeSourceVerificationError(
+                        "published native collision source changed after review"
+                    )
+
             npc_bindings = proof.get("authored_npc_sprite_bindings", [])
             npc_receipt = proof.get("npc_sprite_game_script_receipt")
             if (type(npc_bindings) is not list or len(npc_bindings) > 64):
