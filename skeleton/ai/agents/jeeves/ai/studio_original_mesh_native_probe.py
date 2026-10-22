@@ -13,6 +13,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 
 from .studio_interaction_contract import digest
 
@@ -271,17 +272,17 @@ def verify_native_mesh_probe_output(
     import_log_sha256: str,
 ) -> dict[str, Any]:
     """No result based solely on exit code, claimed hashes or missing log lines."""
+    if (not isinstance(compiled, Mapping)
+            or type(output) is not str or len(output) > MAX_LOG
+            or type(import_log_sha256) is not str
+            or len(import_log_sha256) != 64):
+        raise MeshEngineProbeError("native probe output or import log is unavailable")
     if any(marker in output for marker in (
             "SCRIPT ERROR:", "Parse Error:", "ERROR:", "Failed loading resource"
     )):
         raise MeshEngineProbeError(
             "Godot reported an error during real 3D asset import/instantiation"
         )
-    if (not isinstance(compiled, Mapping)
-            or type(output) is not str or len(output) > MAX_LOG
-            or type(import_log_sha256) is not str
-            or len(import_log_sha256) != 64):
-        raise MeshEngineProbeError("native probe output or import log is unavailable")
     expected = compiled.get("expected")
     if not isinstance(expected, Mapping):
         raise MeshEngineProbeError("native expected source was lost")
@@ -358,31 +359,46 @@ def run_host_mesh_probe(
     script_path = root / SCRIPT_PATH
     script_path.write_text(compiled["script"], encoding="utf-8")
     import_log: bytes
+    observed_log: bytes
     try:
-        result = subprocess.run(
-            [str(godot_binary), "--headless", "--path", str(root), "--import"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, timeout=timeout_seconds, check=False,
-        )
-        import_log = result.stdout
-        if (result.returncode or len(import_log) > MAX_LOG
-                or any(marker in import_log for marker in (
-                    b"SCRIPT ERROR:", b"Parse Error:", b"ERROR:",
-                    b"Failed loading resource",
-                ))):
-            raise MeshEngineProbeError("Godot 4 editor could not import authored GLBs")
-        checked = subprocess.run(
-            [str(godot_binary), "--headless", "--path", str(root),
-             "--script", "res://" + SCRIPT_PATH],
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, timeout=timeout_seconds, check=False,
-        )
+        # Source-owned games may misbehave or emit oversized logs. Spool both
+        # native subprocess outputs to bounded local files, not RAM pipes.
+        with tempfile.TemporaryFile() as editor_output:
+            result = subprocess.run(
+                [str(godot_binary), "--headless", "--path", str(root), "--import"],
+                stdin=subprocess.DEVNULL, stdout=editor_output,
+                stderr=subprocess.STDOUT, timeout=timeout_seconds, check=False,
+            )
+            if result.returncode or editor_output.tell() > MAX_LOG:
+                raise MeshEngineProbeError(
+                    "Godot 4 editor did not import bounded original GLBs"
+                )
+            editor_output.seek(0)
+            import_log = editor_output.read()
+        if any(marker in import_log for marker in (
+            b"SCRIPT ERROR:", b"Parse Error:", b"ERROR:",
+            b"Failed loading resource",
+        )):
+            raise MeshEngineProbeError(
+                "Godot 4 editor reported an original GLB import error"
+            )
+        with tempfile.TemporaryFile() as probe_output:
+            checked = subprocess.run(
+                [str(godot_binary), "--headless", "--path", str(root),
+                 "--script", "res://" + SCRIPT_PATH],
+                stdin=subprocess.DEVNULL, stdout=probe_output,
+                stderr=subprocess.STDOUT, timeout=timeout_seconds, check=False,
+            )
+            if checked.returncode or probe_output.tell() > MAX_LOG:
+                raise MeshEngineProbeError(
+                    "Godot 4 native scene did not complete its bounded asset probe"
+                )
+            probe_output.seek(0)
+            observed_log = probe_output.read()
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise MeshEngineProbeError(
             "host Godot 4 executable did not complete its 3D asset verification"
         ) from exc
-    if checked.returncode != 0 or len(checked.stdout) > MAX_LOG:
-        raise MeshEngineProbeError("Godot mesh probe failed engine scene validation")
     # Hash the installed executable without loading a potentially large
     # release/editor binary into the process address space.
     native_hash = sha256()
@@ -390,7 +406,7 @@ def run_host_mesh_probe(
         for block in iter(lambda: file.read(1024 * 1024), b""):
             native_hash.update(block)
     return verify_native_mesh_probe_output(
-        compiled, checked.stdout.decode("utf-8", "replace"),
+        compiled, observed_log.decode("utf-8", "replace"),
         executable_sha256=native_hash.hexdigest(),
         import_log_sha256=sha256(import_log).hexdigest(),
     )
