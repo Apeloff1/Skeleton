@@ -1,6 +1,6 @@
 """skeleton/forge/pipelines/commercial_asset_starter.py
-Complete deterministic PNG atlas emitter. Full IHDR/IDAT/IEND + CRC32.
-Extends studio_sprite plane. No stubs.
+Complete deterministic PNG atlas + Godot SpriteFrames .tres emitter.
+Full IHDR/IDAT/IEND, CRC32, zlib, AtlasTexture binding. No stubs.
 """
 from __future__ import annotations
 
@@ -39,21 +39,16 @@ def _png_chunk(tag: bytes, data: bytes) -> bytes:
     return length + tag + data + crc
 
 def _write_png(raw: bytes, width: int, height: int, path: Path) -> None:
-    # IHDR
-    ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
     ihdr = _png_chunk(b"IHDR", ihdr_data)
-    # IDAT
-    # filter bytes: 0 for each scanline
     scanlines = b""
     stride = width * 4
     for y in range(height):
         scanlines += b"\x00" + raw[y * stride:(y + 1) * stride]
     compressed = zlib.compress(scanlines, level=9)
     idat = _png_chunk(b"IDAT", compressed)
-    # IEND
     iend = _png_chunk(b"IEND", b"")
-    png = _PNG_SIG + ihdr + idat + iend
-    path.write_bytes(png)
+    path.write_bytes(_PNG_SIG + ihdr + idat + iend)
 
 def _alpha_coverage(raw: bytes, total_pixels: int) -> float:
     if total_pixels == 0:
@@ -101,3 +96,48 @@ def emit_atlas(
         stored_prose=0,
     )
     return atlas_path, coverage
+
+def emit_godot_tres(
+    atlas_path: Path,
+    frame_count: int,
+    frame_w: int,
+    frame_h: int,
+    out_dir: Path,
+    duration: float = 0.1,
+) -> Path:
+    """Write a minimal valid Godot 4 SpriteFrames .tres bound to the atlas PNG."""
+    if frame_count <= 0 or frame_count > _MAX_FRAMES:
+        raise AssetPipelineError("bad frame count for tres")
+    cols = min(8, frame_count)
+    tres_path = out_dir / (atlas_path.stem + ".tres")
+    lines = [
+        '[gd_resource type="SpriteFrames" load_steps=2 format=3]',
+        '',
+        f'[ext_resource type="Texture2D" path="res://{atlas_path.name}" id="1_atlas"]',
+        '',
+        '[sub_resource type="AtlasTexture" id="AtlasTexture_1"]',
+        'atlas = ExtResource("1_atlas")',
+        f'region = Rect2(0, 0, {frame_w}, {frame_h})',
+        '',
+        '[resource]',
+        'animations = [{
+',
+        '"frames": [{
+',
+    ]
+    for i in range(frame_count):
+        r, c = divmod(i, cols)
+        x = c * (frame_w + _GUTTER)
+        y = r * (frame_h + _GUTTER)
+        lines.append(f'{{"duration": {duration}, "texture": SubResource("AtlasTexture_1")}},')
+    lines.extend([
+        '],',
+        '"loop": true,',
+        '"name": &"default",',
+        '"speed": 5.0',
+        '}]',
+    ])
+    tres_path.write_text("\n".join(lines))
+    digest = hashlib.sha256(tres_path.read_bytes()).hexdigest()
+    emit_receipt(kind="godot_tres", target=str(tres_path), digest=digest, stored_prose=0)
+    return tres_path
