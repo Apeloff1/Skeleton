@@ -125,6 +125,7 @@ def _source(candidate: Mapping[str, Any]) -> dict[str, Any]:
         "near_position_mm": target["position_mm"],
         "far_position_mm": [1_000_000_000, 1_000_000_000, 1_000_000_000],
         "max_steps": len(instances) + 4,
+        "instantiation_budget": policy["instantiate_per_frame"],
     }
     return expected
 
@@ -166,6 +167,12 @@ func _probe() -> void:
         _fail("streamer has no live frame implementation")
         return
     streamer.set_process(false)
+    if int(streamer.get("instantiate_per_frame")) != int(expected["instantiation_budget"]):
+        _fail("actual game streamer ignored authored source frame budget")
+        return
+    if int(streamer.get("release_per_frame")) != 8:
+        _fail("actual game streamer ignored bounded eviction budget")
+        return
     var camera := Camera3D.new()
     camera.name = "JeevesIndependentStreamingProbeCamera"
     world.add_child(camera)
@@ -178,6 +185,12 @@ func _probe() -> void:
     )
     for step in range(int(expected["max_steps"])):
         streamer.call("_process", 0.016)
+        if int(streamer.get("_last_frame_instantiated")) > int(expected["instantiation_budget"]):
+            _fail("native streamer exceeded authored per-frame instantiation budget")
+            return
+        if int(streamer.get("_last_frame_released")) > 8:
+            _fail("native streamer exceeded bounded per-frame eviction budget")
+            return
     var near = streamer.get("_loaded")
     if not (near is Dictionary):
         _fail("actual streamer has no instance state")
@@ -205,6 +218,12 @@ func _probe() -> void:
     )
     for step in range(int(expected["max_steps"])):
         streamer.call("_process", 0.016)
+        if int(streamer.get("_last_frame_instantiated")) > int(expected["instantiation_budget"]):
+            _fail("far camera exceeded authored per-frame creation budget")
+            return
+        if int(streamer.get("_last_frame_released")) > 8:
+            _fail("far camera exceeded bounded per-frame release budget")
+            return
     var far = streamer.get("_loaded")
     if not (far is Dictionary):
         _fail("streamer lost its loaded map")
