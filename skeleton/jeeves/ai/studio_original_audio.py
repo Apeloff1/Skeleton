@@ -171,7 +171,17 @@ def verify_original_sound(
     pcm = wav[44:]
     if pcm != _render_samples(doc):
         raise OriginalAudioError("actual audio samples differ from original source waveform")
-    if (metadata.get("wav_sha256") != sha256(wav).hexdigest()
+    if (metadata.get("schema_version") != SCHEMA
+            or metadata.get("channels") != 1
+            or metadata.get("bits_per_sample") != 16
+            or metadata.get("sample_rate_hz") != doc["sample_rate_hz"]
+            or metadata.get("duration_ms") != doc["duration_ms"]
+            or metadata.get("waveform") != doc["waveform"]
+            or metadata.get("peak_gain_per_mille") != doc["gain_per_mille"]
+            or metadata.get("original_procedural_source_only") is not True
+            or metadata.get("audio_playback_in_game_verified") is not False
+            or metadata.get("copyright_clearance_certified") is not False
+            or metadata.get("wav_sha256") != sha256(wav).hexdigest()
             or metadata.get("pcm_sha256") != sha256(pcm).hexdigest()
             or metadata.get("source_sha256") != record["source_sha256"]
             or metadata.get("asset_id") != asset_id
