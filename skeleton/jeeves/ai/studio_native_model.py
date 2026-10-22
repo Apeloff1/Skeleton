@@ -150,6 +150,8 @@ class NativeStudioModel:
         existing_sources: list[dict[str, Any]] = []
         asset_sources: list[dict[str, Any]] = []
         asset_catalog_receipt: str | None = None
+        spatial_scene_sources: list[dict[str, Any]] = []
+        world_index_receipt: str | None = None
         source_head: str | None = None
         if self.source_store is not None:
             if self.source_store.project_id != controller.journal.project_id:
@@ -175,6 +177,26 @@ class NativeStudioModel:
                 raise StudioInteractionError(
                     "game asset catalog and source context belong to different revisions"
                 )
+            # Read authored mesh placements from a different compiler lens:
+            # asset identity and physical placement are not interchangeable.
+            world_index = self.source_store.compiled_world_spatial_index()
+            if world_index["source_head_sha256"] != source_head:
+                raise StudioInteractionError(
+                    "world instance placement index belongs to stale project source"
+                )
+            spatial_scene_sources = world_index["instances"][:12]
+            world_index_receipt = world_index["receipt_sha256"]
+            controller.journal.append("world_spatial_context_retrieved", {
+                "world_index_receipt_sha256": world_index_receipt,
+                "source_head_sha256": source_head,
+                "source_instance_count": world_index["instance_count"],
+                "retrieved_instance_receipts": [
+                    item["receipt_sha256"] for item in spatial_scene_sources
+                ],
+                "bounds_are_conservative_not_collision_observations": True,
+                "native_engine_execution_claimed": False,
+                "model_weights_modified": False,
+            })
             controller.journal.append("asset_catalog_context_retrieved", {
                 "asset_catalog_sha256": asset_catalog_receipt,
                 "source_head_sha256": source_head,
@@ -196,6 +218,8 @@ class NativeStudioModel:
             "reviewed_project_canon": canon_facts,
             "existing_project_source": existing_sources,
             "reviewed_and_byte_measured_assets": asset_sources,
+            "reviewed_source_instanced_world_objects": spatial_scene_sources,
+            "world_spatial_index_receipt_sha256": world_index_receipt,
             "asset_catalog_receipt_sha256": asset_catalog_receipt,
             "existing_source_history_sha256": source_head,
             "canon_head_sha256": canon_head,
