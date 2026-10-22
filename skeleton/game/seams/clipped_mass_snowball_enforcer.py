@@ -1,0 +1,1 @@
+"""Clipped mass snowball enforcer. Full law."""\nclass SnowballEnforcer:\n    def enforce(self, prior: float, delta: float) -> float:\n        return min(prior * 1.1, prior + abs(min(max(delta, -0.05), 0.05)))\n
