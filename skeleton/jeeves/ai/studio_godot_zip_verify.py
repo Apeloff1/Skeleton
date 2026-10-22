@@ -223,6 +223,7 @@ def verify_published_godot_zip(
                         "godot_preview_scene_path",
                         "original_hitbox_receipt_sha256",
                         "frame_cues_sha256", "godot_frame_cue_resource_sha256",
+                        "frame_cue_event_ids",
                     }:
                         raise NativeSourceVerificationError(
                             "compiled sprite record has incomplete source references"
@@ -255,7 +256,11 @@ def verify_published_godot_zip(
                             or len(sprite.get("frames", [])) != item["frame_count"]
                             or len(sprite.get("animations", [])) != item["animation_count"]
                             or [state["name"] for state in sprite["animations"]]
-                            != item["animation_names"]):
+                            != item["animation_names"]
+                            or (
+                                [cue["event_id"] for cue in sprite["frame_cues"]["cues"]]
+                                if sprite.get("frame_cues") else []
+                            ) != item["frame_cue_event_ids"]):
                         raise NativeSourceVerificationError(
                             "Godot sprite source identity or animation receipt differs"
                         )
@@ -410,6 +415,10 @@ def verify_published_godot_zip(
             actor_script_proof = proof.get("player_avatar_game_script_receipt")
             reconstructed = _GODOT_SCRIPT
             if original_avatar is None:
+                if proof.get("original_player_audio_cue_routes_compiled") != 0:
+                    raise NativeSourceVerificationError(
+                        "unbound game claims generated live audio cue routes"
+                    )
                 if (actor_script_proof is not None
                         or proof.get("animated_sprite3d_player_script_compiled") is not False):
                     raise NativeSourceVerificationError(
@@ -449,6 +458,31 @@ def verify_published_godot_zip(
                     raise NativeSourceVerificationError(
                         "real player sprite binding lost its source or animation"
                     )
+                audio_routes = original_avatar.get("audio_cue_bindings", {})
+                audio_heads = original_avatar.get("audio_source_sha256_by_event", {})
+                if (type(audio_routes) is not dict
+                        or type(audio_heads) is not dict
+                        or set(audio_routes) != set(audio_heads)
+                        or proof.get("original_player_audio_cue_routes_compiled")
+                        != len(audio_routes)):
+                    raise NativeSourceVerificationError(
+                        "player audio frame-cue binding count or source claims differ"
+                    )
+                audio_catalog = {
+                    sound["asset_id"]: sound for sound in original_audio
+                }
+                if len(audio_catalog) != len(original_audio):
+                    raise NativeSourceVerificationError(
+                        "player sound routes are ambiguous across original WAV assets"
+                    )
+                for cue_id, sound_id in audio_routes.items():
+                    assigned = audio_catalog.get(sound_id)
+                    if (assigned is None
+                            or cue_id not in matches[0]["frame_cue_event_ids"]
+                            or audio_heads[cue_id] != assigned["source_sha256"]):
+                        raise NativeSourceVerificationError(
+                            "player audio event lost original sprite or WAV source identity"
+                        )
                 reconstructed = player_script
 
             from .studio_sprite_direction import (
