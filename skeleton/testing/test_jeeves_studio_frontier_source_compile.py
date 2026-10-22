@@ -356,6 +356,87 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(journal.read()), 0)
 
+    def test_actual_source_authored_lod_scenes_and_meshes_ship_in_godot_zip(self):
+        self.populate_3d()
+        self.create("beacon-base", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "beacon-tower",
+            "primitive": "cylinder", "size_mm": [1500, 4100, 1900],
+            "segments": 32, "color_rgba": "#cdb585ff",
+            "metallic_per_mille": 50, "roughness_per_mille": 770,
+        }, depends=("config-3d",))
+        self.create("beacon-lods", "asset_forge", {
+            "kind": "procedural_mesh_lod_set",
+            "base_record_id": "beacon-base",
+            "asset_id": "beacon-tower",
+            "levels": [
+                {"level": 1, "segments": 16, "switch_distance_mm": 15000},
+                {"level": 2, "segments": 8, "switch_distance_mm": 38000},
+            ],
+        }, depends=("beacon-base",))
+        export = self.export_godot()
+        source_zip = self.export / export["artifact_name"]
+        with zipfile.ZipFile(source_zip) as z:
+            names = set(z.namelist())
+            expected = {
+                "game/frontier/meshes/beacon-tower.glb",
+                "game/frontier/meshes/beacon-tower.tscn",
+                "game/frontier/meshes/beacon-tower.lod1.glb",
+                "game/frontier/meshes/beacon-tower.lod2.glb",
+                "game/frontier/meshes/beacon-tower.lod.gd",
+                "game/frontier/meshes/beacon-tower.lod.tscn",
+                "game/frontier/meshes/beacon-tower.lods.source.json",
+            }
+            self.assertTrue(expected <= names)
+            script = z.read(
+                "game/frontier/meshes/beacon-tower.lod.gd"
+            ).decode("utf-8")
+            self.assertIn("ORIGINAL_SWITCH_METERS", script)
+            self.assertIn("15.000", script)
+            self.assertIn("38.000", script)
+            self.assertIn("get_camera_3d()", script)
+            self.assertIn("queue_free()", script)
+            base = z.read("game/frontier/meshes/beacon-tower.glb")
+            low = z.read("game/frontier/meshes/beacon-tower.lod2.glb")
+            self.assertNotEqual(sha256(base).hexdigest(),
+                                sha256(low).hexdigest())
+            proof = json.loads(z.read("jeeves_source_receipt.json"))
+            self.assertEqual(proof["packaged_original_mesh_lods"][0]["levels"], 2)
+            self.assertFalse(proof["native_mesh_lod_switching_verified"])
+        replay = verify_published_godot_zip(
+            source_zip, project_id="new-game",
+            source_head_sha256=self.owner.head_identity(),
+            expected_archive_sha256=export["artifact_sha256"],
+        )
+        self.assertEqual(replay["original_glb_scenes_replayed"], 1)
+        self.assertEqual(replay["original_lod_levels_replayed"], 2)
+        self.assertFalse(replay["actual_godot_execution_verified"])
+
+    def test_original_mesh_without_lods_still_has_usable_godot_scene(self):
+        self.populate_3d()
+        self.create("ruins-rock", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "ruins-rock",
+            "primitive": "box", "size_mm": [500, 600, 700],
+            "segments": 6, "color_rgba": "#998877ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 1000,
+        }, depends=("config-3d",))
+        output = self.export_godot()
+        with zipfile.ZipFile(self.export / output["artifact_name"]) as archive:
+            src = archive.read(
+                "game/frontier/meshes/ruins-rock.tscn"
+            ).decode("utf-8")
+            self.assertIn('type="PackedScene"', src)
+            self.assertIn("ruins-rock.glb", src)
+            self.assertNotIn(
+                "game/frontier/meshes/ruins-rock.lod.gd",
+                archive.namelist(),
+            )
+        self.assertEqual(
+            output["disk_verification"]["original_glb_scenes_replayed"], 1,
+        )
+        self.assertEqual(
+            output["disk_verification"]["original_lod_levels_replayed"], 0,
+        )
+
     def test_original_3d_mesh_and_descriptor_compile_to_real_godot_zip(self):
         self.populate_3d()
         mesh_source = {
