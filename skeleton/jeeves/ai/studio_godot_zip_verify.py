@@ -372,6 +372,44 @@ def verify_published_godot_zip(
                     )
                 reconstructed = player_script
 
+            from .studio_sprite_direction import (
+                SpriteDirectionError, compile_eight_way_actor_facing,
+                verify_eight_way_actor_facing,
+            )
+            compass_receipt = proof.get("player_compass_godot_source_receipt")
+            authored_compass = (
+                original_avatar.get("directional_animations", {})
+                if isinstance(original_avatar, dict) else {}
+            )
+            if not authored_compass:
+                if (compass_receipt is not None
+                        or proof.get("native_player_eight_way_facing_compiled") is not False):
+                    raise NativeSourceVerificationError(
+                        "Godot source falsely claims reviewed compass animation"
+                    )
+            else:
+                if (not isinstance(compass_receipt, dict)
+                        or proof.get("native_player_eight_way_facing_compiled") is not True):
+                    raise NativeSourceVerificationError(
+                        "source-bound player facing lacks independent certificate"
+                    )
+                try:
+                    compass_script = compile_eight_way_actor_facing(
+                        reconstructed, original_avatar,
+                    )
+                    reproduced = verify_eight_way_actor_facing(
+                        reconstructed, compass_script, original_avatar,
+                    )
+                except SpriteDirectionError as exc:
+                    raise NativeSourceVerificationError(
+                        "native player facing script differs from source"
+                    ) from exc
+                if reproduced != compass_receipt:
+                    raise NativeSourceVerificationError(
+                        "original compass direction GDScript certificate differs"
+                    )
+                reconstructed = compass_script
+
             source_sensor = proof.get("player_collision_sensor_receipt")
             sensor_flag = proof.get("native_player_alpha_sensor_script_compiled")
             if original_avatar is None or original_avatar.get("collision_sensor") is not True:
