@@ -88,6 +88,33 @@ class DirectionalSpriteTests(unittest.TestCase):
         self.assertEqual(frames[3]["pixels"], [2, 0, 0, 2])
         self.assertEqual(frames[4]["pixels"], [0, 1, 1, 0])
 
+    def test_quarter_turns_preserve_exact_pixels_in_a_square_frame(self):
+        record = authored_variants()
+        record["document"]["frames"][0]["pixels"] = [0, 1, 2, 0]
+        record["document"]["variants"] = [
+            {"frame_id": "east", "source_frame_id": "idle-0",
+             "transform": "rotate_90_cw", "duration_ms": 130},
+            {"frame_id": "west", "source_frame_id": "idle-0",
+             "transform": "rotate_90_ccw", "duration_ms": 130},
+        ]
+        frames, _ = derive_original_sprite_variants(
+            record["document"],
+            colors=[bytes.fromhex(c[1:]) for c in record["document"]["palette"]],
+            width=2, height=2,
+        )
+        self.assertEqual(frames[2]["pixels"], [2, 0, 0, 1])
+        self.assertEqual(frames[3]["pixels"], [1, 0, 0, 2])
+
+    def test_quarter_turn_rejects_rectangular_source_without_clipping(self):
+        record = authored_variants()
+        record["document"]["width"] = 2
+        record["document"]["height"] = 1
+        record["document"]["frames"][0]["pixels"] = [0, 1]
+        record["document"]["frames"][1]["pixels"] = [0, 2]
+        record["document"]["variants"][0]["transform"] = "rotate_90_cw"
+        with self.assertRaisesRegex(StudioSpriteError, "square"):
+            compile_authored_sprite(reseal(record))
+
     def test_missing_parent_is_fatal_not_inferred(self):
         record = authored_variants()
         record["document"]["variants"][0]["source_frame_id"] = "imaginary"
