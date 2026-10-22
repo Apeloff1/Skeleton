@@ -43,6 +43,36 @@ def _bounded_json(url: str, *, timeout: float) -> dict[str, object] | None:
     return value if isinstance(value, dict) else None
 
 
+def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) -> dict[str, object]:
+    """Fail-closed live check shared by app doctor and install --start.
+
+    A 200 from /health does not prove first-party application endpoints mounted.
+    Only a bounded, unredirected live backend report can prove their presence.
+    """
+    report: dict[str, object] = {
+        "observed": False,
+        "ready": False,
+        "missing": [],
+        "scope": "Critical first-party route registration must be observed from the live backend.",
+    }
+    status = _bounded_json(backend_base.rstrip("/") + "/api/health/registry", timeout=timeout)
+    critical = status.get("critical_routes") if isinstance(status, dict) else None
+    if (
+        isinstance(critical, dict)
+        and type(critical.get("ok")) is bool
+        and type(critical.get("report_available")) is bool
+        and isinstance(critical.get("missing"), list)
+        and all(isinstance(item, str) and len(item) <= 128 for item in critical["missing"])
+        and len(critical["missing"]) <= 32
+    ):
+        report.update(
+            observed=critical["report_available"],
+            ready=critical["ok"] and critical["report_available"],
+            missing=critical["missing"],
+        )
+    return report
+
+
 def first_install_report(
     root: Path | None = None,
     *,
@@ -107,9 +137,7 @@ def first_install_report(
         )
         ai["catalog_configured"] = bool(local_paths[2])
     services_ready = None
-    # A responding backend is not installation-ready when required API routers failed
-    # to mount. The registry itself must be observed, not inferred from liveness.
-    route_registry: dict[str, object] = {
+    route_registry = {
         "observed": False,
         "ready": False,
         "missing": [],
@@ -123,21 +151,7 @@ def first_install_report(
         services_ready = probes_ok(probes)
         live_checks = [probe.to_dict() for probe in probes]
         backend_base = manifest.service("backend").public_url.rstrip("/")
-        route_status = _bounded_json(backend_base + "/api/health/registry", timeout=timeout)
-        critical = route_status.get("critical_routes") if isinstance(route_status, dict) else None
-        if (
-            isinstance(critical, dict)
-            and type(critical.get("ok")) is bool
-            and type(critical.get("report_available")) is bool
-            and isinstance(critical.get("missing"), list)
-            and all(isinstance(item, str) and len(item) <= 128 for item in critical["missing"])
-            and len(critical["missing"]) <= 32
-        ):
-            route_registry.update(
-                observed=critical["report_available"],
-                ready=critical["ok"] and critical["report_available"],
-                missing=critical["missing"],
-            )
+        route_registry = critical_backend_route_report(backend_base, timeout=timeout)
         services_ready = bool(services_ready) and route_registry["ready"] is True
         status_url = backend_base + "/api/ai/providers"
         status = _bounded_json(status_url, timeout=timeout)
