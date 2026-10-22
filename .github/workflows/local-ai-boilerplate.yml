@@ -12,6 +12,9 @@ on:
       - 'skeleton/local_ai/**'
       - 'skeleton/testing/test_local_ai_boilerplate.py'
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
