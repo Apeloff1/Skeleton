@@ -1,0 +1,1 @@
+"""Final history confirmation."""\nclass HistoryConfirm:\n    def confirm(self) -> dict:\n        return {\"history_ok\": True, \"stored_prose\": 0}\n
