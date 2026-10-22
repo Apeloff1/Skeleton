@@ -254,7 +254,9 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "native_engine_sprite_binding_verified": False,
     }
     from .studio_sprite_quality_metrics import sprite_quality_metrics
+    from .studio_sprite_temporal_quality import temporal_sprite_report
     metadata["objective_quality"] = sprite_quality_metrics(metadata)
+    metadata["temporal_quality"] = temporal_sprite_report(surface, metadata)
     metadata["receipt_sha256"] = digest(metadata)
     # An independent verifier samples source pixels from the actual decoded
     # PNG, reconstructs the complete atlas, and checks alpha masks and timing.
