@@ -125,7 +125,7 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "frames", "animations", "pixel_scale",
     }
     doc = record.get("document")
-    optional = {"atlas", "variants"}
+    optional = {"atlas", "variants", "cues"}
     if (not isinstance(doc, dict)
             or not base_fields <= set(doc)
             or not set(doc) <= base_fields | optional):
@@ -253,6 +253,9 @@ def compile_authored_sprite(record: Mapping[str, Any]) -> dict[str, Any]:
         "generated_with_model_image_weights": False,
         "native_engine_sprite_binding_verified": False,
     }
+    from .studio_sprite_frame_cues import compile_frame_cues, verify_frame_cues
+    metadata["frame_cues"] = compile_frame_cues(doc, animation_meta)
+    verify_frame_cues(doc, metadata)
     from .studio_sprite_quality_metrics import sprite_quality_metrics
     from .studio_sprite_temporal_quality import temporal_sprite_report
     metadata["objective_quality"] = sprite_quality_metrics(metadata)
