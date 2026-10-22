@@ -58,8 +58,10 @@ def run_sprite_bound_native_expedition(
     proof = candidate.get("receipt")
     if (not isinstance(files, Mapping) or not isinstance(binaries, Mapping)
             or not isinstance(proof, Mapping)
-            or proof.get("authored_player_avatar_binding") is None
-            or proof.get("animated_sprite3d_player_script_compiled") is not True
+            or not (
+                proof.get("animated_sprite3d_player_script_compiled") is True
+                or proof.get("animated_npc_sprite3d_source_compiled") is True
+            )
             or proof.get("world_sha256") != world.digest):
         raise SpriteBoundNativeError("native run requires a real source-bound player sprite game")
     expected = proof.get("godot_file_hashes")
@@ -158,13 +160,45 @@ def run_sprite_bound_native_expedition(
     if (replay["native_candidate_receipt_head"] != observed["candidate_receipt_head"]
             or replay["executed_actions"] != len(recipe["steps"])):
         raise SpriteBoundNativeError("sprite-bound game reports inconsistent native transitions")
+    from .studio_sprite_compass_evidence import (
+        PREFIX as COMPASS_PREFIX,
+        SpriteCompassEvidenceError, inspect_native_compass_observations,
+    )
+    binding = proof.get("authored_player_avatar_binding")
+    compass_receipt = None
+    if isinstance(binding, Mapping) and binding.get("directional_animations"):
+        try:
+            compass_receipt = inspect_native_compass_observations(
+                output, world, recipe, binding,
+            )
+        except SpriteCompassEvidenceError as exc:
+            raise SpriteBoundNativeError(
+                "real Godot player heading differs from original world movement"
+            ) from exc
+    elif any(line.startswith(COMPASS_PREFIX) for line in output.splitlines()):
+        raise SpriteBoundNativeError(
+            "unapproved native game source claimed player compass observations"
+        )
     result_proof = {
         "schema_version": "skeleton.jeeves.sprite_bound_native_playthrough.v1",
         "project_id": world.project_id,
         "world_digest": world.digest,
         "source_head_sha256": proof["source_head_sha256"],
         "native_candidate_receipt_sha256": proof["receipt_sha256"],
-        "player_binding_sha256": proof["authored_player_avatar_binding"]["receipt_sha256"],
+        "player_binding_sha256": (
+            binding["receipt_sha256"] if isinstance(binding, Mapping) else None
+        ),
+        "compass_replay_receipt_sha256": (
+            compass_receipt["receipt_sha256"] if compass_receipt else None
+        ),
+        "observed_compass_transitions": (
+            compass_receipt["waypoint_compass_events_verified"]
+            if compass_receipt else 0
+        ),
+        "native_player_heading_observed": (
+            compass_receipt["sprite_animation_observed"]
+            if compass_receipt else False
+        ),
         "bound_godot_script_sha256": proof["godot_file_hashes"]["game/frontier/expedition.gd"],
         "native_executable_sha256": baseline,
         "native_log_sha256": sha256(output.encode("utf-8")).hexdigest(),
@@ -172,7 +206,12 @@ def run_sprite_bound_native_expedition(
         "native_process_executed": True,
         "native_gameplay_consistent": True,
         "completed": True,
-        "real_avatar_script_loaded_for_gameplay": True,
+        "real_avatar_script_loaded_for_gameplay": (
+            proof.get("animated_sprite3d_player_script_compiled") is True
+        ),
+        "real_npc_sprite_script_loaded_for_gameplay": (
+            proof.get("animated_npc_sprite3d_source_compiled") is True
+        ),
         "visual_output_independently_observed": False,
     }
     result_proof["receipt_digest"] = digest(result_proof)
