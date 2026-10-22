@@ -1677,3 +1677,41 @@ Quality workflow. It does not add a new workflow or specialized CI gate.
 The new adversarial runtime-probe suite contains 24 tests, including
 strict exact-candidate routing checks that deliberately mock the Godot
 process. Those mocking tests prove routing logic only, not real execution.
+
+### October 22, 2026 — source-owned world-instance descriptors
+
+The separate `studio_world_spatial_index.py` compiler now describes real
+`scene_forge.original_mesh_instance` placements **in addition to** standalone
+sprite, WAV and GLB asset descriptions. The generated
+`game/frontier/assets/world-index.json` is content-addressed and contains:
+
+- The actual authored scene instance ID, source record revision SHA, GLB
+  source/bytes SHA, parent asset catalog descriptor SHA and Godot resource path
+- Position in integer millimeters, authored rotation and scale, optional
+  reviewed collision body and authored LOD availability
+- Conservative world-space AABB bounds generated from the compiled glTF
+  position accessor bounds. These bounding spheres enclose an arbitrary
+  rotation but are **not** true collision shapes or claims of rendered visibility
+- Inherited reviewer-approved title, roles and tags, never invented semantics
+- Deterministic spatial queries (position, radius, optional physics/visual/LOD
+  filters) with result SHA, explicit false runtime-contact claims and bounded
+  retrieval sizes
+
+The native creator source owner exposes
+`compiled_world_spatial_index()` and
+`search_world_instances(center_mm=[x,y,z], radius_mm=n, ...)`. Both
+functions read the current creator SQLite revision and refuse an external
+source-head change midway through compilation. Source-only projects with
+no placements produce an **empty but valid** instance index, rather than
+pretending every original GLB is already in a game world.
+
+The post-publication Godot ZIP verifier independently replays the actual
+world-instance descriptors from the separately verified `assets/catalog.json`
+and authoritative game scene-placement receipt, checking exact JSON bytes,
+parent GLB SHA, source revision, physics/LOD relationship and the game
+build's world index receipt. It neither trusts unsigned client-supplied
+transforms nor treats approximate broad-phase bounds as physics contacts.
+
+Covered by `skeleton/testing/test_jeeves_studio_world_spatial_index_2026.py`
+and source-to-ZIP integration tests in
+`skeleton/testing/test_jeeves_studio_frontier_source_compile.py`.

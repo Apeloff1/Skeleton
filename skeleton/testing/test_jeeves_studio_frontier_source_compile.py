@@ -548,6 +548,65 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         self.assertEqual(result["disk_verification"][
             "original_physics_bodies_replayed"], 0)
 
+    def test_real_world_instance_descriptors_publish_with_persistent_godot_scene(self):
+        self.populate_3d()
+        self.create("rock-mesh", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "rock-prop",
+            "primitive": "box", "size_mm": [600, 1400, 700],
+            "segments": 6, "color_rgba": "#998877ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 930,
+        }, depends=("config-3d",))
+        self.create("rock-placed", "scene_forge", {
+            "kind": "original_mesh_instance", "instance_id": "north-rock",
+            "base_record_id": "rock-mesh", "asset_id": "rock-prop",
+            "physics_record_id": None, "position_mm": [3000, 500, -1000],
+            "rotation_deg": [0, 60, 0], "scale_per_mille": 1100,
+        }, depends=("rock-mesh",))
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            world_path = "game/frontier/assets/world-index.json"
+            self.assertIn(world_path, archive.namelist())
+            raw = archive.read(world_path)
+            index = json.loads(raw)
+            source_receipt = json.loads(archive.read("jeeves_source_receipt.json"))
+            self.assertEqual(index["instance_count"], 1)
+            self.assertEqual(index["instances"][0]["instance_id"], "north-rock")
+            self.assertEqual(index["instances"][0]["asset_id"], "rock-prop")
+            self.assertEqual(index["instances"][0]["position_mm"],
+                             [3000, 500, -1000])
+            self.assertEqual(index["instances"][0]["kind"], "visual")
+            self.assertEqual(
+                source_receipt["world_spatial_index_sha256"],
+                sha256(raw).hexdigest(),
+            )
+            self.assertEqual(
+                source_receipt["world_spatial_receipt_sha256"],
+                index["receipt_sha256"],
+            )
+            self.assertFalse(index["actual_native_scene_import_observed"])
+        self.assertEqual(exported["disk_verification"][
+            "world_spatial_instance_descriptors_replayed"], 1)
+
+    def test_unplaced_3d_model_still_publishes_empty_world_spatial_index(self):
+        self.populate_3d()
+        self.create("unused-asset", "asset_forge", {
+            "kind": "procedural_mesh", "asset_id": "not-in-scene",
+            "primitive": "box", "size_mm": [800, 600, 600],
+            "segments": 4, "color_rgba": "#778866ff",
+            "metallic_per_mille": 0, "roughness_per_mille": 700,
+        }, depends=("config-3d",))
+        exported = self.export_godot()
+        with zipfile.ZipFile(self.export / exported["artifact_name"]) as archive:
+            index = json.loads(archive.read(
+                "game/frontier/assets/world-index.json"
+            ))
+            self.assertEqual(index["instance_count"], 0)
+            self.assertEqual(index["instances"], [])
+        self.assertEqual(
+            exported["disk_verification"]["world_spatial_instance_descriptors_replayed"],
+            0,
+        )
+
     def test_actual_source_authored_lod_scenes_and_meshes_ship_in_godot_zip(self):
         self.populate_3d()
         self.create("beacon-base", "asset_forge", {
