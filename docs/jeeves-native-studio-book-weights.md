@@ -1172,3 +1172,64 @@ opacity, oversized or invalid geometry, jitter warnings, deterministic
 rebuilds, and deliberately forged quality metadata. These tests are
 included in the root CI test collector. This stage neither generates
 a new sprite frame nor performs an actual on-screen rendering.
+
+
+## Frame-accurate animation cues on real Godot actors
+
+A reviewed, persistent `sprite_forge` record with
+`document.kind="pixel_sprite"` may optionally include an authored
+`cues` list. Each cue names an existing animation, a **zero-based
+animation sequence index**, a portable event ID, and one finite signal
+category. For example:
+
+```json
+{
+  "cues": [
+    {"animation": "walk", "frame_index": 0,
+     "event_id": "step-left", "category": "footstep"},
+    {"animation": "walk", "frame_index": 2,
+     "event_id": "step-right", "category": "footstep"},
+    {"animation": "attack", "frame_index": 3,
+     "event_id": "sword-impact", "category": "impact"}
+  ]
+}
+```
+
+The source compiler validates these against the **actual ordered,
+authored** `animations[].frame_ids`, including repeated frames in a
+cycle. It refuses unknown animations, out-of-range indices, duplicate
+cue IDs at the same animation frame, unsupported effect categories,
+untrusted script text, explicit `null` or over-budget records. It
+computes a SHA-bound canonical cue schedule and independently replays
+it during PNG/animation verification. Pre-commit source validation
+rejects malformed cue authorship before the SQLite game source changes.
+
+Compilation emits real
+`game/frontier/sprites/<asset_id>.cues.json` and
+`game/frontier/sprites/<asset_id>.cues.gd` in the Godot game ZIP.
+Standalone sprite ZIPs emit the same source files under `sprites/`.
+The native GDScript extends `AnimatedSprite3D`, observes
+`frame_changed` and `animation_changed`, and emits typed
+`cue_fired(event_id, category, animation_name, frame_index)` signals
+with no arbitrary user GDScript, host shell, filesystem, scene changes
+or synthesized sound output.
+
+An explicitly authored `sprite_actor_binding` wires that script
+onto the moving **player** `AnimatedSprite3D`. An explicitly authored
+`sprite_npc_binding` likewise wires it to the actual Godot NPC cast
+sprite. The game compiler hashes each source and cue-resource receipt;
+the independent exported ZIP verifier reconstructs the exact GDScript
+and timeline. The original source dependency and animation names
+remain authoritative.
+
+**The emitted signals are live game hooks, not automatically playing
+music, producing particle effects, dealing combat damage or asserting
+audible/visual output.** Effects require a separate reviewed consumer.
+A source-only build and a unit test are not proof that a Godot engine
+has launched; native replay and the installed-engine validation remain
+distinct privileged host operations.
+
+The root CI collector now runs
+`skeleton/testing/test_jeeves_studio_sprite_frame_cues.py`, including
+malformed source, unsafe-event, duplicate-frame, tamper, persistence
+and full Godot player/NPC packaging regressions.
