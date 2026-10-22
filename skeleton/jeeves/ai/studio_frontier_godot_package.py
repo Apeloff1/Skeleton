@@ -672,12 +672,19 @@ def run_original_game_native_playthrough(
     )
     try:
         world = author_studio_expedition(project, profile)
-        if (before["receipt"]["authored_player_avatar_binding"] is not None
-                or before["receipt"]["authored_npc_sprite_bindings"]):
-            # The legacy runner regenerates baseline Godot files, so using it
-            # here would falsely attest a game whose ACTUAL avatar never ran.
-            # Execute the exact generated sprite-bound project instead.
-            result = run_sprite_bound_native_expedition(
+        if (
+            before["receipt"]["authored_player_avatar_binding"] is not None
+            or before["receipt"]["authored_npc_sprite_bindings"]
+            or before["receipt"]["packaged_original_meshes"]
+            or before["receipt"]["packaged_original_audio"]
+        ):
+            # The baseline runner regenerates the plain game. It is NEVER
+            # sufficient for a candidate containing original sprites, WAVs,
+            # real 3D mesh imports, physics or source-instanced scenery.
+            from .studio_sprite_bound_native_runner import (
+                run_exact_original_candidate_native_expedition,
+            )
+            result = run_exact_original_candidate_native_expedition(
                 before, world, traveler, godot_executable=godot_executable,
                 timeout_seconds=timeout_seconds,
             )
@@ -719,6 +726,19 @@ def run_original_game_native_playthrough(
         "native_npc_sprite_game_script_executed": bool(
             before["receipt"]["authored_npc_sprite_bindings"]
         ),
+        "native_mesh_probe_receipt_sha256": result.get(
+            "native_mesh_probe_receipt_sha256"
+        ),
+        "native_meshes_imported_observed": result.get(
+            "actual_godot_meshes_imported", 0
+        ),
+        "native_mesh_physics_bodies_observed": result.get(
+            "actual_godot_physics_bodies_instantiated", 0
+        ),
+        "native_game_scene_mesh_instances_observed": result.get(
+            "actual_godot_scene_mesh_instances", 0
+        ),
+        "native_collision_events_observed": False,
         "native_visual_output_independently_observed": False,
         "complete_original_game_release_certified": False,
     }

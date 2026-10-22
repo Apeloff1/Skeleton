@@ -40,10 +40,12 @@ def _sha(path: Path) -> str:
     return h.hexdigest()
 
 
-def run_sprite_bound_native_expedition(
+def run_exact_original_candidate_native_expedition(
     candidate: Mapping[str, Any], world: ExpeditionWorld, player: Traveler,
     *, godot_executable: str, timeout_seconds: int = 90,
+    require_sprite: bool = False,
 ) -> dict[str, Any]:
+    """Run exact hashed Godot project, including authored meshes and 3D physics."""
     if not isinstance(world, ExpeditionWorld) or not isinstance(player, Traveler):
         raise SpriteBoundNativeError("original typed world/player required")
     if (type(godot_executable) is not str or not godot_executable
@@ -56,14 +58,24 @@ def run_sprite_bound_native_expedition(
     files = candidate.get("files")
     binaries = candidate.get("binary_assets")
     proof = candidate.get("receipt")
+    has_sprite = (
+        proof.get("animated_sprite3d_player_script_compiled") is True
+        or bool(proof.get("animated_npc_sprite3d_source_compiled"))
+    ) if isinstance(proof, Mapping) else False
+    meshes = proof.get("packaged_original_meshes") if isinstance(proof, Mapping) else None
+    has_mesh = type(meshes) is list and bool(meshes)
+    has_real_assets = (
+        has_sprite or has_mesh or bool(proof.get("packaged_original_audio"))
+    ) if isinstance(proof, Mapping) else False
     if (not isinstance(files, Mapping) or not isinstance(binaries, Mapping)
             or not isinstance(proof, Mapping)
-            or not (
-                proof.get("animated_sprite3d_player_script_compiled") is True
-                or proof.get("animated_npc_sprite3d_source_compiled") is True
-            )
+            or type(require_sprite) is not bool
+            or (require_sprite and not has_sprite)
+            or not has_real_assets
             or proof.get("world_sha256") != world.digest):
-        raise SpriteBoundNativeError("native run requires a real source-bound player sprite game")
+        raise SpriteBoundNativeError(
+            "native run requires the exact reviewed original asset candidate"
+        )
     expected = proof.get("godot_file_hashes")
     if (not isinstance(expected, Mapping)
             or set(expected) != set(files) | set(binaries)
@@ -91,6 +103,8 @@ def run_sprite_bound_native_expedition(
                               allow_nan=False).encode("utf-8")
     if "game/frontier/autoplay.json" in contents:
         raise SpriteBoundNativeError("candidate attempted to override authorized autoplay")
+    if "_jeeves_authored_asset_probe.gd" in contents:
+        raise SpriteBoundNativeError("candidate cannot shadow trusted native probe")
     contents["game/frontier/autoplay.json"] = recipe_bytes
     baseline = _sha(binary)
     try:
@@ -109,6 +123,19 @@ def run_sprite_bound_native_expedition(
             destination = root / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(raw)
+        mesh_probe = None
+        if has_mesh:
+            from .studio_original_mesh_native_probe import (
+                MeshEngineProbeError, run_host_mesh_probe,
+            )
+            try:
+                mesh_probe = run_host_mesh_probe(
+                    root, binary, candidate, timeout_seconds=timeout_seconds,
+                )
+            except MeshEngineProbeError as exc:
+                raise SpriteBoundNativeError(
+                    "actual authored GLBs, body or game instances did not import"
+                ) from exc
         with tempfile.TemporaryFile() as logfile:
             try:
                 result = subprocess.run(
@@ -212,10 +239,38 @@ def run_sprite_bound_native_expedition(
         "real_npc_sprite_script_loaded_for_gameplay": (
             proof.get("animated_npc_sprite3d_source_compiled") is True
         ),
+        "native_mesh_probe_receipt_sha256": (
+            mesh_probe["receipt_sha256"] if mesh_probe is not None else None
+        ),
+        "actual_godot_meshes_imported": (
+            mesh_probe["imported_geometry_mesh_count"] if mesh_probe else 0
+        ),
+        "actual_godot_physics_bodies_instantiated": (
+            mesh_probe["instanced_3d_physics_bodies"] if mesh_probe else 0
+        ),
+        "actual_godot_scene_mesh_instances": (
+            mesh_probe["source_game_scene_instances"] if mesh_probe else 0
+        ),
+        "actual_physics_contacts_observed": False,
         "visual_output_independently_observed": False,
     }
     result_proof["receipt_digest"] = digest(result_proof)
     return result_proof
 
 
-__all__ = ["SpriteBoundNativeError", "run_sprite_bound_native_expedition"]
+def run_sprite_bound_native_expedition(
+    candidate: Mapping[str, Any], world: ExpeditionWorld, player: Traveler,
+    *, godot_executable: str, timeout_seconds: int = 90,
+) -> dict[str, Any]:
+    """Backwards-compatible sprite-only entrypoint for its existing callers."""
+    return run_exact_original_candidate_native_expedition(
+        candidate, world, player,
+        godot_executable=godot_executable, timeout_seconds=timeout_seconds,
+        require_sprite=True,
+    )
+
+
+__all__ = [
+    "SpriteBoundNativeError", "run_sprite_bound_native_expedition",
+    "run_exact_original_candidate_native_expedition",
+]
