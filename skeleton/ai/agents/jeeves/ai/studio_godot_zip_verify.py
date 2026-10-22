@@ -122,6 +122,7 @@ def verify_published_godot_zip(
                         "frame_count", "animation_count", "animation_names",
                         "png_sha256", "godot_spriteframes_resource_sha256",
                         "godot_preview_scene_path",
+                        "original_hitbox_receipt_sha256",
                     }:
                         raise NativeSourceVerificationError(
                             "compiled sprite record has incomplete source references"
@@ -183,6 +184,28 @@ def verify_published_godot_zip(
                     if not inspected["layout_and_padding_reproduced"]:
                         raise NativeSourceVerificationError(
                             "Godot sprite atlas verification did not replay source"
+                        )
+                    from .studio_sprite_hitboxes import (
+                        SpriteCollisionError, verify_exact_sprite_hitboxes,
+                    )
+                    hitbox_path = "game/frontier/sprites/" + asset_name + ".hitboxes.json"
+                    if hitbox_path not in expected:
+                        raise NativeSourceVerificationError(
+                            "packaged sprite omitted exact frame collision geometry"
+                        )
+                    try:
+                        published_hitboxes = json.loads(archive.read(hitbox_path))
+                        collision_proof = verify_exact_sprite_hitboxes(
+                            sprite, published_hitboxes,
+                        )
+                    except (SpriteCollisionError, TypeError, ValueError) as exc:
+                        raise NativeSourceVerificationError(
+                            "Godot sprite collision shapes differ from source alpha pixels"
+                        ) from exc
+                    if (collision_proof["receipt_sha256"]
+                            != item["original_hitbox_receipt_sha256"]):
+                        raise NativeSourceVerificationError(
+                            "original sprite collision receipt differs from game package"
                         )
                     from .studio_sprite_godot_resources import (
                         SpriteResourceError, verify_godot_sprite_resources,
