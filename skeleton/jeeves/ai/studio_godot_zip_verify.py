@@ -255,6 +255,17 @@ def verify_published_godot_zip(
                 descriptor_meshes.append({
                     "glb": archive.read(model_path), "metadata": info,
                 })
+            from .studio_original_mesh_lod_package_verify import (
+                OriginalMeshArchiveError, verify_original_mesh_archive_resources,
+            )
+            try:
+                mesh_scene_proof = verify_original_mesh_archive_resources(
+                    archive, expected, proof, descriptor_meshes,
+                )
+            except OriginalMeshArchiveError as exc:
+                raise NativeSourceVerificationError(
+                    "published original mesh scenes and LOD binaries failed replay"
+                ) from exc
             original_sprites = proof.get("packaged_original_sprites", [])
             if (not isinstance(original_sprites, list)
                     or len(original_sprites) > 128
@@ -804,6 +815,8 @@ def verify_published_godot_zip(
         "verified_file_count": len(expected),
         "asset_descriptor_count": catalog_proof["descriptor_count"],
         "asset_catalog_sha256": catalog_proof["catalog_sha256"],
+        "original_glb_scenes_replayed": mesh_scene_proof["mesh_scenes_replayed"],
+        "original_lod_levels_replayed": mesh_scene_proof["lod_levels_replayed"],
         "embedded_evidence_sha256": receipt_digest,
         "all_emitted_file_hashes_verified": True,
         "actual_godot_execution_verified": False,
