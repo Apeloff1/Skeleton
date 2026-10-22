@@ -153,6 +153,12 @@ def run_exact_original_candidate_native_expedition(
             output = logfile.read().decode("utf-8", errors="replace")
     if _sha(binary) != baseline:
         raise SpriteBoundNativeError("native Godot executable was modified during replay")
+    if any(marker in output for marker in (
+        "SCRIPT ERROR:", "Parse Error:", "ERROR:", "Failed loading resource",
+    )):
+        raise SpriteBoundNativeError(
+            "actual Godot asset project emitted engine script/import errors"
+        )
     if result.returncode != 0:
         raise SpriteBoundNativeError(
             "sprite-bound native Godot process exited with error "

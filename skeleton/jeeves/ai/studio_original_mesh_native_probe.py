@@ -271,6 +271,12 @@ def verify_native_mesh_probe_output(
     import_log_sha256: str,
 ) -> dict[str, Any]:
     """No result based solely on exit code, claimed hashes or missing log lines."""
+    if any(marker in output for marker in (
+            "SCRIPT ERROR:", "Parse Error:", "ERROR:", "Failed loading resource"
+    )):
+        raise MeshEngineProbeError(
+            "Godot reported an error during real 3D asset import/instantiation"
+        )
     if (not isinstance(compiled, Mapping)
             or type(output) is not str or len(output) > MAX_LOG
             or type(import_log_sha256) is not str
@@ -359,7 +365,11 @@ def run_host_mesh_probe(
             stderr=subprocess.STDOUT, timeout=timeout_seconds, check=False,
         )
         import_log = result.stdout
-        if result.returncode or len(import_log) > MAX_LOG:
+        if (result.returncode or len(import_log) > MAX_LOG
+                or any(marker in import_log for marker in (
+                    b"SCRIPT ERROR:", b"Parse Error:", b"ERROR:",
+                    b"Failed loading resource",
+                ))):
             raise MeshEngineProbeError("Godot 4 editor could not import authored GLBs")
         checked = subprocess.run(
             [str(godot_binary), "--headless", "--path", str(root),

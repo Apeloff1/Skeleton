@@ -244,6 +244,18 @@ class MeshEngineProbeCompilerTests(TestCase):
         with self.assertRaises(MeshEngineProbeError):
             verify(compiled, log + "\n" + log)
 
+    def test_native_probe_rejects_valid_receipt_if_godot_reported_script_error(self):
+        compiled = compile_native_mesh_probe(fake_candidate())
+        report = "SCRIPT ERROR: invalid compiled imported scene\\n" + observed_log(compiled)
+        with self.assertRaises(MeshEngineProbeError):
+            verify(compiled, report)
+
+    def test_native_probe_rejects_valid_receipt_with_import_resource_error(self):
+        compiled = compile_native_mesh_probe(fake_candidate())
+        report = observed_log(compiled) + "\\nERROR: Failed loading resource"
+        with self.assertRaises(MeshEngineProbeError):
+            verify(compiled, report)
+
     def test_probe_denies_missing_native_stdout(self):
         compiled = compile_native_mesh_probe(fake_candidate())
         with self.assertRaises(MeshEngineProbeError):
