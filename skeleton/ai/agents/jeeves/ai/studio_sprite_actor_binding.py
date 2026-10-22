@@ -96,6 +96,50 @@ def binding_from_source(
     return result
 
 
+def validate_original_avatar_source_graph(
+    records: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Preflight actual authored player binding before any SQLite revision.
+
+    A source edit that removes or renames a referenced original animation
+    cannot leave a previously approved game with a dangling player avatar.
+    """
+    binding_records = [
+        record for record in records.values()
+        if isinstance(record.get("document"), Mapping)
+        and record["document"].get("kind") == "sprite_actor_binding"
+    ]
+    if not binding_records:
+        return None
+    if len(binding_records) != 1:
+        raise SpriteBindingError("one and only one source record may own player avatar")
+    requested_asset = binding_records[0]["document"].get("asset_id")
+    candidates = [
+        record for record in records.values()
+        if isinstance(record.get("document"), Mapping)
+        and record["document"].get("kind") == "pixel_sprite"
+        and record["document"].get("asset_id") == requested_asset
+    ]
+    if len(candidates) != 1:
+        raise SpriteBindingError("player avatar requires exactly one original source asset")
+    from .studio_sprite_forge import compile_authored_sprite
+    from .studio_sprite_godot_resources import (
+        compile_godot_sprite_resources, verify_godot_sprite_resources,
+    )
+    sprite = compile_authored_sprite(candidates[0])
+    meta = sprite["metadata"]
+    resource = compile_godot_sprite_resources(meta)
+    proof = verify_godot_sprite_resources(meta, resource)
+    verified = {
+        "asset_id": meta["asset_id"],
+        "source_record_id": meta["record_id"],
+        "png_sha256": meta["png_sha256"],
+        "godot_spriteframes_resource_sha256": proof["receipt_sha256"],
+        "animation_names": [state["name"] for state in meta["animations"]],
+    }
+    return binding_from_source(records, [verified])
+
+
 def bind_sprite_to_expedition_script(
     script: str, binding: Mapping[str, Any],
 ) -> str:
@@ -167,5 +211,6 @@ def verify_actor_sprite_binding(
 
 __all__ = [
     "SpriteBindingError", "binding_from_source",
+    "validate_original_avatar_source_graph",
     "bind_sprite_to_expedition_script", "verify_actor_sprite_binding",
 ]
