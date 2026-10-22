@@ -638,6 +638,31 @@ class CreatorProjectSourceStore:
             })
             resources = compile_godot_sprite_resources(candidate["metadata"])
             verify_godot_sprite_resources(candidate["metadata"], resources)
+        if facet in ("asset_forge", "physics", "scene_forge"):
+            from .studio_original_mesh_placements import (
+                compile_original_mesh_placements,
+            )
+            from .studio_original_mesh_lod import (
+                compile_original_mesh_lod_collection,
+            )
+            future = dict(self._records)
+            future[record_id] = {
+                "record_id": record_id, "facet": facet,
+                "revision": version, "document": document,
+                "depends_on": depends_on, "source_sha256": content_sha,
+            }
+            future_lods = compile_original_mesh_lod_collection(future)["sets"]
+            future_bodies = {
+                item["document"]["asset_id"]
+                for item in future.values()
+                if (isinstance(item.get("document"), dict)
+                    and item["document"].get("kind") == "procedural_mesh_physics")
+            }
+            compile_original_mesh_placements(
+                future, lod_assets=frozenset(
+                    item["manifest"]["asset_id"] for item in future_lods
+                ), physics_assets=frozenset(future_bodies),
+            )
         if facet in ("sprite_forge", "scene_forge"):
             from .studio_sprite_actor_binding import (
                 validate_original_avatar_source_graph,

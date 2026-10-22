@@ -305,6 +305,8 @@ def compile_original_mesh_placement_source_bundle(
 def verify_original_mesh_placement_source_bundle(
     raw: bytes, *, published_scene: str,
     published_root: str,
+    expected_lod_asset_ids: frozenset[str],
+    expected_physics_asset_ids: frozenset[str],
 ) -> dict[str, Any]:
     """Replay actual child scene + native root binding from retained records."""
     if not isinstance(raw, bytes) or len(raw) > 1024 * 1024:
@@ -317,6 +319,17 @@ def verify_original_mesh_placement_source_bundle(
             "records", "lod_asset_ids", "physics_asset_ids", "metadata",
     } or _source_json(payload) != raw):
         raise OriginalMeshPlacementError("placement source not exact canonical JSON")
+    if (frozenset(payload["lod_asset_ids"]) !=
+            (expected_lod_asset_ids & frozenset(
+                item["asset_id"] for item in payload["metadata"]["instances"]
+            )) or frozenset(payload["physics_asset_ids"]) !=
+            (expected_physics_asset_ids & frozenset(
+                item["asset_id"] for item in payload["metadata"]["instances"]
+                if item["physics_record_id"] is not None
+            ))):
+        raise OriginalMeshPlacementError(
+            "authored mesh placement references unshipped physics or LOD"
+        )
     try:
         compiled = compile_original_mesh_placements(
             payload["records"],

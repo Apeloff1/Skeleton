@@ -342,6 +342,43 @@ def compile_original_godot_candidate(
             "metadata_receipt_sha256": info["receipt_sha256"],
             "lod_bound": info["lod_bound"],
         })
+    # Every approved visual or physics placement now becomes an actual
+    # instantiated descendant of the playable expedition scene root.
+    from .studio_original_mesh_placements import (
+        PLACEMENT_SCENE, PLACEMENT_SOURCE,
+        compile_original_mesh_placements,
+        attach_authored_meshes_to_expedition,
+        compile_original_mesh_placement_source_bundle,
+    )
+    placements = compile_original_mesh_placements(
+        records, lod_assets=frozenset(lod_by_asset),
+        physics_assets=frozenset(
+            item["metadata"]["asset_id"] for item in physics["assets"]
+        ),
+    )
+    if placements["metadata"]["instance_count"]:
+        for resource_path, resource_body in placements["files"].items():
+            if resource_path in files or resource_path in binary_assets:
+                raise FrontierSourceError("mesh placement scene conflicts with source")
+            files[resource_path] = resource_body
+            file_hashes[resource_path] = sha256(
+                resource_body.encode("utf-8")
+            ).hexdigest()
+        bundle = compile_original_mesh_placement_source_bundle(
+            records, placements,
+        )
+        if PLACEMENT_SOURCE in files or PLACEMENT_SOURCE in binary_assets:
+            raise FrontierSourceError("mesh placement proof conflicts with assets")
+        binary_assets[PLACEMENT_SOURCE] = bundle
+        file_hashes[PLACEMENT_SOURCE] = sha256(bundle).hexdigest()
+        game_scene_path = "game/frontier/expedition.tscn"
+        merged_scene = attach_authored_meshes_to_expedition(
+            files[game_scene_path], placements,
+        )
+        files[game_scene_path] = merged_scene
+        file_hashes[game_scene_path] = sha256(
+            merged_scene.encode("utf-8")
+        ).hexdigest()
     authored_sprites: list[dict[str, Any]] = []
     sprite_names: list[str] = []
     compiled_sprites: list[dict[str, Any]] = []
@@ -563,6 +600,7 @@ def compile_original_godot_candidate(
         "packaged_original_meshes": authored_meshes,
         "packaged_original_mesh_lods": authored_mesh_lods,
         "packaged_original_mesh_physics": authored_physics,
+        "packaged_original_mesh_placements": placements["metadata"],
         "native_collision_physics_verified": False,
         "native_mesh_import_verified": False,
         "native_mesh_lod_switching_verified": False,
