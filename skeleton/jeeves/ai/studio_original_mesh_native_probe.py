@@ -163,7 +163,7 @@ def compile_native_mesh_probe(candidate: Mapping[str, Any]) -> dict[str, Any]:
         "            return",
         "        imported.append(str(mesh_id))",
         "    var imported_lods: Array[String] = []",
-        "    for lod_path in expected[\\"lod_paths\\"]:",
+        "    for lod_path in expected[\"lod_paths\"]:",
         '        var lod_scene = load("res://" + str(lod_path))',
         "        if not (lod_scene is PackedScene):",
         '            _fail("authored LOD GLB importer refused " + str(lod_path))',
