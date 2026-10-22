@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -47,3 +48,32 @@ def test_collection_agents_obtain_shared_mongo_only_on_first_read(monkeypatch):
     assert collection_agents.all_collection_names() == ["academy_decks", "games_worlds"]
     assert collection_agents.all_collection_names() == ["academy_decks", "games_worlds"]
     assert calls == ["opened"]
+
+
+def test_both_swarm_routers_mount_without_eager_mongo_or_vault(tmp_path: Path) -> None:
+    script = """
+from pathlib import Path
+from core import databases
+def forbid():
+    raise AssertionError('swarm router import obtained MongoDB connection')
+databases.get_sync_db = forbid
+from routes import swarm_hub, swarm_cold_legion
+assert swarm_hub.router.routes
+assert swarm_cold_legion.router.routes
+from core import compressed_vault
+assert not compressed_vault.VAULT_ROOT.exists()
+assert not compressed_vault.SCRATCH_ROOT.exists()
+"""
+    env = os.environ.copy()
+    env["HYPERSCALE_VAULT_DIR"] = str(tmp_path / "vault")
+    env["HYPERSCALE_SCRATCH_DIR"] = str(tmp_path / "scratch")
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
