@@ -2,12 +2,21 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import json
 import unittest
+
+from skeleton.forge.creator.command_surface import build_creator_command
+from skeleton.jeeves.ai.studio_creator_source import CreatorProjectSourceStore
+from skeleton.testing.test_jeeves_studio_sprite_forge import (
+    original_record, original_sprite,
+)
 
 from skeleton.jeeves.game_frontier_expedition_godot import _GODOT_SCRIPT
 from skeleton.jeeves.ai.studio_sprite_npc_binding import (
     NpcSpriteBindingError, _npc_cast_names,
+    preflight_original_npc_sprite_graph,
     authored_npc_sprite_bindings, bind_npc_sprites_to_expedition_script,
     verify_native_npc_binding_script,
 )
@@ -197,6 +206,87 @@ class OriginalNpcSpriteBindingTests(unittest.TestCase):
             bind_npc_sprites_to_expedition_script(_GODOT_SCRIPT, []),
             _GODOT_SCRIPT,
         )
+
+
+class NpcSpriteGraphPreflightTests(unittest.TestCase):
+    def records(self):
+        game_art = original_record()
+        source = authored(
+            asset="hero-idle", dependencies=["hero-source"],
+        )
+        return {"hero-source": game_art, **source}
+
+    def test_real_original_sprite_deps_are_valid_before_commit(self):
+        report = preflight_original_npc_sprite_graph(self.records())
+        self.assertEqual(report["checked_record_ids"], ["scene-1"])
+        self.assertTrue(report["sprite_dependencies_valid"])
+        self.assertFalse(report["world_npc_identity_verified"])
+
+    def test_edits_cannot_leave_dangling_sprite_animation(self):
+        sources = self.records()
+        sources["scene-1"]["document"]["animation"] = "unknown"
+        with self.assertRaisesRegex(NpcSpriteBindingError, "animation missing"):
+            preflight_original_npc_sprite_graph(sources)
+
+    def test_edits_cannot_remove_original_asset_dependency(self):
+        sources = self.records()
+        sources["scene-1"]["depends_on"] = []
+        with self.assertRaisesRegex(NpcSpriteBindingError, "depend"):
+            preflight_original_npc_sprite_graph(sources)
+
+    def test_edits_cannot_change_npc_sprite_with_invalid_source_sha(self):
+        sources = self.records()
+        sources["hero-source"]["document"]["width"] = 6
+        with self.assertRaises(ValueError):
+            preflight_original_npc_sprite_graph(sources)
+
+    def test_duplicate_original_npc_identity_is_refused_at_commit_boundary(self):
+        sources = self.records()
+        sources["different"] = deepcopy(sources["scene-1"])
+        sources["different"]["record_id"] = "different"
+        with self.assertRaisesRegex(NpcSpriteBindingError, "authored twice"):
+            preflight_original_npc_sprite_graph(sources)
+
+    def test_durable_edit_preserves_original_animation_when_npc_depends_on_it(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            with CreatorProjectSourceStore(
+                root / "game.sqlite", project_id="original-game",
+                export_root=root,
+            ) as store:
+                store.create(build_creator_command(
+                    "create", project_id="original-game",
+                    payload={"intent": {
+                        "record_id": "hero-source", "facet": "sprite_forge",
+                        "document": original_sprite(), "depends_on": [],
+                    }},
+                ))
+                store.create(build_creator_command(
+                    "create", project_id="original-game",
+                    payload={"intent": {
+                        "record_id": "scene-1", "facet": "scene_forge",
+                        "document": self.records()["scene-1"]["document"],
+                        "depends_on": ["hero-source"],
+                    }},
+                ))
+                before = store.snapshot()["head_sha256"]
+                with self.assertRaisesRegex(NpcSpriteBindingError, "animation missing"):
+                    store.edit(build_creator_command(
+                        "edit", project_id="original-game",
+                        payload={
+                            "target_id": "hero-source", "expected_revision": 1,
+                            "patch": {
+                                "set": {"animations": [{
+                                    "name": "walk",
+                                    "frame_ids": ["idle-0"],
+                                    "loop": True,
+                                }]},
+                                "remove": [],
+                            },
+                        },
+                    ))
+                self.assertEqual(store.snapshot()["head_sha256"], before)
+                self.assertEqual(store.snapshot()["source_count"], 2)
 
 
 if __name__ == "__main__":
