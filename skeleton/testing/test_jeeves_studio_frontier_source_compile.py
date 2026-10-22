@@ -377,11 +377,20 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         with zipfile.ZipFile(self.export / result["artifact_name"]) as z:
             png = z.read("game/frontier/sprites/hero-idle.png")
             info = json.loads(z.read("game/frontier/sprites/hero-idle.json"))
+            hitboxes = json.loads(
+                z.read("game/frontier/sprites/hero-idle.hitboxes.json")
+            )
             receipt = json.loads(z.read("jeeves_source_receipt.json"))
         self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(info["sheet_width_px"], 8)
         self.assertEqual(info["frames"][1]["duration_ms"], 200)
         self.assertEqual(info["png_sha256"], sha256(png).hexdigest())
+        from skeleton.jeeves.ai.studio_sprite_hitboxes import verify_exact_sprite_hitboxes
+        self.assertEqual(verify_exact_sprite_hitboxes(info, hitboxes), hitboxes)
+        self.assertEqual(
+            receipt["packaged_original_sprites"][0]["original_hitbox_receipt_sha256"],
+            hitboxes["receipt_sha256"],
+        )
         self.assertEqual(receipt["packaged_original_sprites"][0]["asset_id"],
                          "hero-idle")
         self.assertIn("hero-art", receipt["source_sprite_record_ids"])
