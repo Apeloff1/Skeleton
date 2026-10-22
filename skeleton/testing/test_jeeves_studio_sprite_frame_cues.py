@@ -14,6 +14,10 @@ from skeleton.jeeves.ai.studio_sprite_frame_cues import (
     verify_frame_cues, verify_godot_frame_cue_files,
 )
 from skeleton.jeeves.ai.studio_sprite_forge import compile_authored_sprite
+from skeleton.jeeves.ai.studio_sprite_native_import import (
+    NativeSpriteImportError, _expected_original_frame_cue_observations,
+    _GD_CHECK,
+)
 from skeleton.jeeves.ai.studio_sprite_verify import (
     SpriteVerificationError, verify_published_sprite,
 )
@@ -155,6 +159,46 @@ class SpriteFrameCueTests(unittest.TestCase):
         record["document"]["cues"] = None
         with self.assertRaisesRegex(SpriteCueError, "1..128"):
             compile_authored_sprite(reseal(record))
+
+    def test_real_engine_cue_probe_has_exact_independent_expectations(self):
+        artifact = compile_authored_sprite(original_with_cues())
+        keys, expected = _expected_original_frame_cue_observations(
+            artifact["metadata"],
+        )
+        self.assertEqual(keys, ["idle:0", "idle:1", "pose:0"])
+        self.assertEqual(expected, [
+            ["step-left", "footstep", "idle", 0],
+            ["cloth-swish", "sound", "idle", 1],
+            ["action-marker", "marker", "pose", 0],
+        ])
+        self.assertIn('cue_script := load(', _GD_CHECK)
+        self.assertIn('cue_fired', _GD_CHECK)
+        self.assertIn('observed_cues != expected["cue_observations"]', _GD_CHECK)
+
+    def test_real_engine_probe_is_inert_for_legacy_sprite(self):
+        legacy = compile_authored_sprite(original_record())
+        self.assertEqual(
+            _expected_original_frame_cue_observations(legacy["metadata"]),
+            ([], []),
+        )
+
+    def test_native_probe_rejects_fake_cue_timing_with_rehashed_claim(self):
+        artifact = compile_authored_sprite(original_with_cues())
+        forged = deepcopy(artifact["metadata"])
+        forged["frame_cues"]["cues"][0]["frame_id"] = "wrong"
+        forged["frame_cues"]["receipt_sha256"] = digest({
+            key: value for key, value in forged["frame_cues"].items()
+            if key != "receipt_sha256"
+        })
+        with self.assertRaisesRegex(NativeSpriteImportError, "differ"):
+            _expected_original_frame_cue_observations(forged)
+
+    def test_native_probe_rejects_malformed_missing_source_cues(self):
+        artifact = compile_authored_sprite(original_with_cues())
+        forged = deepcopy(artifact["metadata"])
+        forged["frame_cues"]["cues"][0]["event_id"] = []
+        with self.assertRaises(NativeSpriteImportError):
+            _expected_original_frame_cue_observations(forged)
 
     def test_legacy_sprite_remains_cue_free(self):
         artifact = compile_authored_sprite(original_record())
