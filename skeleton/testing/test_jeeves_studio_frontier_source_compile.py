@@ -383,8 +383,18 @@ class RealGodotSourceBuildTests(unittest.TestCase):
             metadata = json.loads(
                 bundle.read("game/frontier/sprites/lit-hero.json")
             )
+            original_heights = json.loads(
+                bundle.read("game/frontier/sprites/lit-hero.normal.source.json")
+            )
             manifest = json.loads(bundle.read("jeeves_source_receipt.json"))
-        from skeleton.jeeves.ai.studio_sprite_surface import verify_normal_texture_bytes
+        from skeleton.jeeves.ai.studio_sprite_surface import (
+            verify_authored_normals, verify_normal_texture_bytes,
+        )
+        self.assertTrue(verify_authored_normals(
+            original_heights, metadata=metadata,
+            color_png=color, normal_png=texture,
+            normal_receipt=metadata["normal_map"],
+        )["height_map_replayed"])
         self.assertTrue(verify_normal_texture_bytes(
             color, texture, metadata["normal_map"],
             width=metadata["sheet_width_px"],
