@@ -648,15 +648,15 @@ class RealGodotSourceBuildTests(unittest.TestCase):
         ])
 
     def test_audio_cue_cannot_reference_uncreated_sound(self):
-        from skeleton.jeeves.ai.studio_sprite_actor_binding import SpriteBindingError
+        from skeleton.jeeves.ai.studio_creator_source import CreatorSourceError
         self.populate_3d()
-        self.author_player_visual(
-            cues=[{"animation": "idle", "frame_index": 0,
-                   "event_id": "step-left", "category": "footstep"}],
-            audio_bindings={"step-left": "missing-original-sound"},
-        )
-        # Creating a dependency on missing footstep-source fails at the
-        # source-store boundary before a sound could be invented.
+        with self.assertRaises(CreatorSourceError):
+            self.author_player_visual(
+                cues=[{"animation": "idle", "frame_index": 0,
+                       "event_id": "step-left", "category": "footstep"}],
+                audio_bindings={"step-left": "missing-original-sound"},
+            )
+        # A missing source dependency never becomes a silent default tone.
         self.assertFalse(any(self.export.iterdir()))
 
     def test_authored_sprite_is_bound_to_actual_moving_godot_player(self):
