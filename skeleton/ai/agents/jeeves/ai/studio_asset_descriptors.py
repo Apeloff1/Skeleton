@@ -222,35 +222,70 @@ def _audio_metrics(sound: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _mesh_metrics(mesh: Mapping[str, Any]) -> dict[str, Any]:
+    info, glb = mesh["metadata"], mesh["glb"]
+    if (info.get("schema_version") != "skeleton.jeeves.original_mesh_glb.v1"
+            or info.get("glb_sha256") != sha256(glb).hexdigest()
+            or info.get("indexed_geometry") is not True
+            or info.get("mesh_has_normals") is not True
+            or info.get("mesh_has_uv0") is not True):
+        raise AssetDescriptorError("parametric mesh receipts do not match GLB")
+    return {
+        "format": "glTF_2.0_GLB", "primitive": info["primitive"],
+        "vertices": info["vertices"], "triangles": info["triangles"],
+        "coordinate_system": info["coordinate_system"],
+        "bounds_min_m": info["bounds_min_m"],
+        "bounds_max_m": info["bounds_max_m"],
+        "material_model": info["material_model"],
+        "indexed_geometry": True, "has_normals": True, "has_uv0": True,
+        "native_mesh_import_verified": False,
+        "native_framebuffer_render_verified": False,
+    }
+
+
 def _asset(sprite: Mapping[str, Any] | None, sound: Mapping[str, Any] | None,
+           mesh: Mapping[str, Any] | None,
            overlay: Mapping[str, Any] | None) -> dict[str, Any]:
-    if (sprite is None) == (sound is None):
-        raise AssetDescriptorError("exactly one compiled asset modality is required")
-    source = sprite if sprite is not None else sound
+    if sum(x is not None for x in (sprite, sound, mesh)) != 1:
+        raise AssetDescriptorError("exactly one compiled asset modality required")
+    source = sprite if sprite is not None else (
+        sound if sound is not None else mesh
+    )
     assert source is not None
     meta = source["metadata"]
-    is_sprite = sprite is not None
+    is_sprite, is_sound = sprite is not None, sound is not None
     target = meta.get("record_id") if is_sprite else meta.get("source_record_id")
     origin = meta.get("source_sha256")
-    # Palette skins are derivative sources: their original variant record
-    # and parent source form a separate immutable, explicit provenance link.
     variant = sprite.get("palette_variant_receipt") if is_sprite else None
     if variant is not None:
         target = variant["variant_source_record_id"]
         origin = variant["variant_source_revision_sha256"]
     if (type(target) is not str or not ID.fullmatch(target)
-            or not isinstance(meta.get("asset_id"), str)
+            or type(meta.get("asset_id")) is not str
             or not ID.fullmatch(meta["asset_id"])):
         raise AssetDescriptorError("compiled asset lost durable source identity")
-    content_sha = _content_digest(meta, sprite=is_sprite)
-    actual = source["png"] if is_sprite else source["wav"]
+    body = dict(meta)
+    receipt = body.pop("receipt_sha256", None)
+    if receipt != digest(body):
+        raise AssetDescriptorError("compiled asset receipt does not replay")
+    content_sha = _hex(
+        meta["png_sha256"] if is_sprite else (
+            meta["wav_sha256"] if is_sound else meta["glb_sha256"]
+        ), "published asset content",
+    )
+    actual = source["png"] if is_sprite else (
+        source["wav"] if is_sound else source["glb"]
+    )
     if not isinstance(actual, bytes) or sha256(actual).hexdigest() != content_sha:
         raise AssetDescriptorError("descriptor references different output bytes")
     document = overlay["document"] if overlay else None
     if document is not None and (document["target_record_id"] != target
                                   or document["target_asset_id"] != meta["asset_id"]):
         raise AssetDescriptorError("reviewed descriptor targets different compiler output")
-    metrics = _sprite_metrics(sprite) if sprite is not None else _audio_metrics(sound)  # type: ignore[arg-type]
+    metrics = (_sprite_metrics(sprite) if is_sprite else
+               _audio_metrics(sound) if is_sound else _mesh_metrics(mesh))
+    kind = ("pixel_sprite" if is_sprite else
+            "procedural_sound" if is_sound else "procedural_mesh")
     label = meta["asset_id"].replace("-", " ").replace("_", " ")
     fallback = (
         f"Original pixel sprite {meta['asset_id']}: {len(meta['animations'])} "
@@ -258,15 +293,19 @@ def _asset(sprite: Mapping[str, Any] | None, sound: Mapping[str, Any] | None,
         if is_sprite else
         f"Original procedural sound {meta['asset_id']}: "
         f"{meta['duration_ms']} ms {meta['waveform']} waveform."
+        if is_sound else
+        f"Original glTF mesh {meta['asset_id']}: {meta['primitive']} "
+        f"with {meta['triangles']} triangles."
     )
     return {
-        "schema_version": SCHEMA,
-        "asset_id": meta["asset_id"],
-        "kind": "pixel_sprite" if is_sprite else "procedural_sound",
+        "schema_version": SCHEMA, "asset_id": meta["asset_id"], "kind": kind,
         "source_record_id": target, "source_sha256": _hex(origin, "source lineage"),
         "source_compiler_receipt_sha256": meta["receipt_sha256"],
         "content_sha256": content_sha,
-        "content_media_type": "image/png" if is_sprite else "audio/wav",
+        "content_media_type": (
+            "image/png" if is_sprite else
+            "audio/wav" if is_sound else "model/gltf-binary"
+        ),
         "title": document["title"] if document else label.title(),
         "description": document["description"] if document else fallback,
         "alt_text": document["alt_text"] if document else fallback,
@@ -286,7 +325,8 @@ def _asset(sprite: Mapping[str, Any] | None, sound: Mapping[str, Any] | None,
         },
         "engine_targets": (
             ["godot4_2d", "godot4_sprite3d_diffuse"]
-            if is_sprite else ["godot4_wav"]
+            if is_sprite else
+            ["godot4_wav"] if is_sound else ["godot4_gltf_import"]
         ),
         "metrics": metrics,
     }
@@ -297,12 +337,13 @@ def compile_asset_catalog(
     records: Mapping[str, Mapping[str, Any]],
     sprites: Sequence[Mapping[str, Any]] = (),
     sounds: Sequence[Mapping[str, Any]] = (),
+    meshes: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Build a reproducible, searchable catalogue from actual compiled bytes."""
     _text(project_id, "project", maximum=128)
     if source_head_sha256 is not None:
         _hex(source_head_sha256, "project source head")
-    if len(sprites) + len(sounds) > MAX_ASSETS:
+    if len(sprites) + len(sounds) + len(meshes) > MAX_ASSETS:
         raise AssetDescriptorError("asset catalog exceeds checked compiler budget")
     overlays = {}
     overlay_sources = []
@@ -319,17 +360,18 @@ def compile_asset_catalog(
     descriptors: list[dict[str, Any]] = []
     keys: set[tuple[str, str]] = set()
     ids: set[tuple[str, str]] = set()
-    for sprite, sound in (
-        [(entry, None) for entry in sprites]
-        + [(None, entry) for entry in sounds]
+    for sprite, sound, mesh in (
+        [(entry, None, None) for entry in sprites]
+        + [(None, entry, None) for entry in sounds]
+        + [(None, None, entry) for entry in meshes]
     ):
-        item = _asset(sprite, sound, None)
+        item = _asset(sprite, sound, mesh, None)
         key = (item["source_record_id"], item["asset_id"])
         if key in keys or (item["kind"], item["asset_id"]) in ids:
             raise AssetDescriptorError("duplicate compiled asset identity")
         keys.add(key)
         ids.add((item["kind"], item["asset_id"]))
-        item = _asset(sprite, sound, overlays.get(key))
+        item = _asset(sprite, sound, mesh, overlays.get(key))
         item["receipt_sha256"] = digest(item)
         descriptors.append(item)
     if set(overlays) - keys:
@@ -376,6 +418,7 @@ def verify_asset_catalog(
     raw: bytes, *, project_id: str, source_head_sha256: str | None,
     sprites: Sequence[Mapping[str, Any]] = (),
     sounds: Sequence[Mapping[str, Any]] = (),
+    meshes: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Replay descriptors/index and prove exact identity against shipped bytes."""
     if not isinstance(raw, bytes) or len(raw) > MAX_CATALOG_BYTES:
@@ -394,7 +437,7 @@ def verify_asset_catalog(
         raise AssetDescriptorError("duplicate semantic source record in archive")
     expected = compile_asset_catalog(
         project_id=project_id, source_head_sha256=source_head_sha256,
-        records=records, sprites=sprites, sounds=sounds,
+        records=records, sprites=sprites, sounds=sounds, meshes=meshes,
     )
     if published != expected:
         raise AssetDescriptorError("catalog semantics/index/lineage differ from real assets")
@@ -416,7 +459,8 @@ def search_asset_catalog(catalog: Mapping[str, Any], query: str,
         raise AssetDescriptorError("asset search requires bounded text")
     if type(limit) is not int or not 1 <= limit <= 50:
         raise AssetDescriptorError("asset search limit out of bounds")
-    if kind is not None and kind not in ("pixel_sprite", "procedural_sound"):
+    if kind is not None and kind not in (
+            "pixel_sprite", "procedural_sound", "procedural_mesh"):
         raise AssetDescriptorError("unknown asset modality")
     words = set(re.findall(r"[a-z0-9]+", query.casefold()))
     index = catalog.get("inverted_index")
