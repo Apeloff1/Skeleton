@@ -1565,7 +1565,7 @@ catalog and mutation tests, supplemented by 3 full source-store/native-ZIP
 integration tests in
 `test_jeeves_studio_frontier_source_compile.py`.
 Native Godot import and runtime physics remain separate release milestones.
- 
+
 ### Authored 3D model placement in the actual Godot game world
 
 The original mesh and physics pipeline now has a real source-governed scene
