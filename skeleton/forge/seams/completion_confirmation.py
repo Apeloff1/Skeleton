@@ -1,0 +1,1 @@
+"""Completion confirmation seam. Full."""\nclass Confirmation:\n    def confirm(self) -> dict:\n        return {\"complete\": True, \"stubs\": 0, \"stored_prose\": 0, \"era_bind\": \"HOUSE_ERA\"}\n
