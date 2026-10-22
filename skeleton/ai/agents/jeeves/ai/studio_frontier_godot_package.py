@@ -485,7 +485,7 @@ def compile_original_godot_candidate(
     asset_catalog = compile_asset_catalog(
         project_id=project_id, source_head_sha256=source_head_sha256,
         records=records, sprites=compiled_sprites, sounds=audio["assets"],
-        meshes=meshes["assets"],
+        meshes=meshes["assets"], lod_sets=lod_collection["sets"],
     )
     catalog_raw = catalog_bytes(asset_catalog)
     catalog_path = "game/frontier/assets/catalog.json"

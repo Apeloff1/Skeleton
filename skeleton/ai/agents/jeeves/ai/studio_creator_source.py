@@ -483,6 +483,9 @@ class CreatorProjectSourceStore:
         from .studio_sprite_palette_variants import compile_original_palette_collection
         from .studio_original_audio import compile_original_sound_collection
         from .studio_original_mesh import compile_original_mesh_collection
+        from .studio_original_mesh_lod import (
+            compile_original_mesh_lod_collection,
+        )
 
         with self._lock:
             self._refresh()
@@ -500,9 +503,11 @@ class CreatorProjectSourceStore:
                 )
                 sounds = compile_original_sound_collection(source)["assets"]
                 meshes = compile_original_mesh_collection(source)["assets"]
+                lod_sets = compile_original_mesh_lod_collection(source)["sets"]
                 catalog = compile_asset_catalog(
                     project_id=self.project_id, source_head_sha256=generation,
-                    records=source, sprites=sprites, sounds=sounds, meshes=meshes,
+                    records=source, sprites=sprites, sounds=sounds,
+                    meshes=meshes, lod_sets=lod_sets,
                 )
                 raw = catalog_bytes(catalog)
                 # An unrelated external SQLite writer may have changed the

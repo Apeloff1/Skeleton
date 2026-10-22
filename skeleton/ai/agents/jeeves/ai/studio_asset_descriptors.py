@@ -338,12 +338,59 @@ def compile_asset_catalog(
     sprites: Sequence[Mapping[str, Any]] = (),
     sounds: Sequence[Mapping[str, Any]] = (),
     meshes: Sequence[Mapping[str, Any]] = (),
+    lod_sets: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Build a reproducible, searchable catalogue from actual compiled bytes."""
     _text(project_id, "project", maximum=128)
     if source_head_sha256 is not None:
         _hex(source_head_sha256, "project source head")
-    if len(sprites) + len(sounds) + len(meshes) > MAX_ASSETS:
+    # LODs are real derived binary assets. Describe every published GLB
+    # separately and retain the source-authored parent/distance relationship.
+    # User semantics are inherited from the reviewed parent, never guessed
+    # by analyzing geometry.
+    compiled_meshes = list(meshes)
+    lod_index: dict[str, dict[str, Any]] = {}
+    for lod in lod_sets:
+        manifest = lod.get("manifest") if isinstance(lod, Mapping) else None
+        if not isinstance(manifest, Mapping):
+            raise AssetDescriptorError("LOD descriptor lacks verified source manifest")
+        claims = dict(manifest)
+        seal = claims.pop("receipt_sha256", None)
+        if seal != digest(claims):
+            raise AssetDescriptorError("LOD descriptor has invalid source signature")
+        parent = manifest["asset_id"]
+        base = [
+            mesh for mesh in meshes
+            if mesh["metadata"]["asset_id"] == parent
+        ]
+        if (len(base) != 1 or
+                base[0]["metadata"]["glb_sha256"] != manifest["base_glb_sha256"]):
+            raise AssetDescriptorError("LOD parent does not match a compiled GLB")
+        if len(lod["levels"]) != len(manifest["levels"]):
+            raise AssetDescriptorError("LOD descriptor count differs from source")
+        for level, evidence in zip(
+            lod["levels"], manifest["levels"], strict=True,
+        ):
+            info = level["metadata"]
+            if (info["glb_sha256"] != evidence["glb_sha256"]
+                    or info["receipt_sha256"] != evidence["compiler_receipt_sha256"]
+                    or level["level"] != evidence["level"]
+                    or level["switch_distance_mm"] !=
+                    evidence["switch_distance_mm"]
+                    or info["asset_id"] in lod_index):
+                raise AssetDescriptorError(
+                    "LOD derived binary identity conflicts with original source"
+                )
+            compiled_meshes.append(level)
+            lod_index[info["asset_id"]] = {
+                "parent_asset_id": parent,
+                "level": evidence["level"],
+                "segments": evidence["segments"],
+                "switch_distance_mm": evidence["switch_distance_mm"],
+                "authored_lod_source_sha256": manifest["author_source_sha256"],
+                "lod_set_receipt_sha256": manifest["receipt_sha256"],
+            }
+    if len(sprites) + len(sounds) + len(compiled_meshes) > MAX_ASSETS:
         raise AssetDescriptorError("asset catalog exceeds checked compiler budget")
     overlays = {}
     overlay_sources = []
@@ -363,7 +410,7 @@ def compile_asset_catalog(
     for sprite, sound, mesh in (
         [(entry, None, None) for entry in sprites]
         + [(None, entry, None) for entry in sounds]
-        + [(None, None, entry) for entry in meshes]
+        + [(None, None, entry) for entry in compiled_meshes]
     ):
         item = _asset(sprite, sound, mesh, None)
         key = (item["source_record_id"], item["asset_id"])
@@ -376,6 +423,35 @@ def compile_asset_catalog(
         descriptors.append(item)
     if set(overlays) - keys:
         raise AssetDescriptorError("reviewed description references uncompiled asset")
+    by_asset = {
+        (item["kind"], item["asset_id"]): item for item in descriptors
+    }
+    for asset, evidence in sorted(lod_index.items()):
+        child = by_asset[("procedural_mesh", asset)]
+        original = by_asset.get(("procedural_mesh", evidence["parent_asset_id"]))
+        if original is None:
+            raise AssetDescriptorError("LOD descriptor has no source-owned parent")
+        child["title"] = original["title"] + " - LOD " + str(evidence["level"])
+        child["description"] = (
+            original["description"] + " Lower-detail source geometry at "
+            + str(evidence["switch_distance_mm"]) + " mm."
+        )
+        child["alt_text"] = original["alt_text"]
+        child["tags"] = list(original["tags"])
+        child["roles"] = list(original["roles"])
+        child["locale"] = original["locale"]
+        child["rights"] = dict(original["rights"])
+        child["semantic_evidence"] = {
+            **original["semantic_evidence"],
+            "status": "inherited_parent_source_not_independent_vision",
+            "parent_descriptor_receipt_sha256": original["receipt_sha256"],
+            "scene_content_recognized_by_model": False,
+        }
+        child["metrics"]["lod"] = evidence
+        child["receipt_sha256"] = digest({
+            key: value for key, value in child.items()
+            if key != "receipt_sha256"
+        })
     descriptors.sort(key=lambda item: (item["kind"], item["asset_id"]))
     terms: dict[str, list[str]] = {}
     for item in descriptors:
@@ -419,6 +495,7 @@ def verify_asset_catalog(
     sprites: Sequence[Mapping[str, Any]] = (),
     sounds: Sequence[Mapping[str, Any]] = (),
     meshes: Sequence[Mapping[str, Any]] = (),
+    lod_sets: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Replay descriptors/index and prove exact identity against shipped bytes."""
     if not isinstance(raw, bytes) or len(raw) > MAX_CATALOG_BYTES:
@@ -438,6 +515,7 @@ def verify_asset_catalog(
     expected = compile_asset_catalog(
         project_id=project_id, source_head_sha256=source_head_sha256,
         records=records, sprites=sprites, sounds=sounds, meshes=meshes,
+        lod_sets=lod_sets,
     )
     if published != expected:
         raise AssetDescriptorError("catalog semantics/index/lineage differ from real assets")

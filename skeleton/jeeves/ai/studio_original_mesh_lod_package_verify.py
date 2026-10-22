@@ -45,6 +45,7 @@ def verify_original_mesh_archive_resources(
         lookup[item["asset_id"]] = item
     actual_scene_paths: set[str] = set()
     lod_levels = 0
+    reconstructed_lod_sets: list[dict[str, Any]] = []
     for mesh in meshes:
         metadata = mesh.get("metadata") if isinstance(mesh, Mapping) else None
         if not isinstance(metadata, Mapping):
@@ -98,6 +99,10 @@ def verify_original_mesh_archive_resources(
                     "actual published LODs do not replay source geometry"
                 ) from exc
             lod_levels += replay["levels_replayed"]
+            from .studio_original_mesh_lod import compile_original_mesh_lod_set
+            reconstructed_lod_sets.append(compile_original_mesh_lod_set(
+                source["base_record"], source["author_record"],
+            ))
         scene_paths = ["game/frontier/meshes/" + asset + ".tscn"]
         if receipt is not None:
             scene_paths.extend([
@@ -139,6 +144,7 @@ def verify_original_mesh_archive_resources(
         "mesh_scenes_replayed": len(meshes),
         "lod_sets_replayed": len(lods),
         "lod_levels_replayed": lod_levels,
+        "lod_catalog_sets": reconstructed_lod_sets,
         "native_scene_import_verified": False,
         "native_lod_switching_verified": False,
     }

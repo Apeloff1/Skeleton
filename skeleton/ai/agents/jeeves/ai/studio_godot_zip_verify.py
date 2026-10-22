@@ -781,6 +781,7 @@ def verify_published_godot_zip(
                     source_head_sha256=source_head_sha256,
                     sprites=descriptor_sprites, sounds=descriptor_audio,
                     meshes=descriptor_meshes,
+                    lod_sets=mesh_scene_proof["lod_catalog_sets"],
                 )
                 metadata_catalog = json.loads(raw_catalog)
                 if (catalog_proof["catalog_sha256"]
