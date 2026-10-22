@@ -163,11 +163,11 @@ def compile_original_godot_candidate(
         and record["document"].get("kind") == "pixel_sprite"
         for record in records.values()
     ):
-        from .studio_sprite_forge import compile_sprite_collection
+        from .studio_sprite_palette_variants import compile_original_palette_collection
         from .studio_sprite_godot_resources import (
             compile_godot_sprite_resources, verify_godot_sprite_resources,
         )
-        artwork = compile_sprite_collection(records)
+        artwork = compile_original_palette_collection(records)
         for sprite in artwork["assets"]:
             info = sprite["metadata"]
             name = info["asset_id"]
@@ -288,6 +288,10 @@ def compile_original_godot_candidate(
         "godot_verification_sha256": godot_proof["receipt_digest"],
         "godot_file_hashes": file_hashes,
         "packaged_original_sprites": authored_sprites,
+        "original_palette_variant_receipts": (
+            artwork["palette_variant_receipts"]
+            if authored_sprites else []
+        ),
         "source_sprite_record_ids": sprite_names,
         "animated_sprite2d_preview_scenes_authored": bool(authored_sprites),
         "authored_player_avatar_binding": avatar,
