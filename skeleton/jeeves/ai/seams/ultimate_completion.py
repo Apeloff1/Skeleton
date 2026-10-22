@@ -1,0 +1,1 @@
+"""Ultimate completion confirmation."""\nclass Ultimate:\n    def confirm(self) -> dict:\n        return {\"ultimate\": True, \"stubs\": 0, \"stored_prose\": 0}\n
