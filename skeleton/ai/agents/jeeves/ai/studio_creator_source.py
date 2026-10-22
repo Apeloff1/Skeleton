@@ -442,6 +442,17 @@ class CreatorProjectSourceStore:
             })
             resources = compile_godot_sprite_resources(candidate["metadata"])
             verify_godot_sprite_resources(candidate["metadata"], resources)
+        if facet in ("sprite_forge", "scene_forge"):
+            from .studio_sprite_actor_binding import (
+                validate_original_avatar_source_graph,
+            )
+            next_records = dict(self._records)
+            next_records[record_id] = {
+                "record_id": record_id, "facet": facet,
+                "revision": version, "source_sha256": content_sha,
+                "document": document, "depends_on": depends_on,
+            }
+            validate_original_avatar_source_graph(next_records)
         if self._event_count >= MAX_EVENTS:
             raise CreatorSourceError("source event journal needs archival")
         self._db.execute("BEGIN IMMEDIATE")
