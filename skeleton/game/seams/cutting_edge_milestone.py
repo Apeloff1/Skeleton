@@ -1,0 +1,1 @@
+"""Cutting-edge milestone."""\nclass CuttingEdgeMilestone:\n    def upgrade(self) -> dict:\n        return {\"milestone_sota\": True, \"stored_prose\": 0}\n
