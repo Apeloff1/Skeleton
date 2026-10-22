@@ -168,6 +168,7 @@ def verify_published_godot_zip(
                         "png_sha256", "godot_spriteframes_resource_sha256",
                         "godot_preview_scene_path",
                         "original_hitbox_receipt_sha256",
+                        "frame_cues_sha256", "godot_frame_cue_resource_sha256",
                     }:
                         raise NativeSourceVerificationError(
                             "compiled sprite record has incomplete source references"
@@ -277,6 +278,30 @@ def verify_published_godot_zip(
                     if bound["receipt_sha256"] != item["godot_spriteframes_resource_sha256"]:
                         raise NativeSourceVerificationError(
                             "original source SpriteFrames resource hash differs"
+                        )
+                    from .studio_sprite_frame_cues import (
+                        SpriteCueError, verify_godot_frame_cue_files,
+                    )
+                    cue_paths = [
+                        "game/frontier/sprites/" + asset_name + suffix
+                        for suffix in (".cues.gd", ".cues.json")
+                    ]
+                    cue_files = {
+                        path: archive.read(path).decode("utf-8")
+                        for path in cue_paths if path in expected
+                    }
+                    try:
+                        cue_proof = verify_godot_frame_cue_files(sprite, cue_files)
+                    except (SpriteCueError, ValueError, TypeError) as exc:
+                        raise NativeSourceVerificationError(
+                            "Godot frame cue sources differ from reviewed animation timeline"
+                        ) from exc
+                    if (cue_proof["receipt_sha256"]
+                            != item["godot_frame_cue_resource_sha256"]
+                            or (sprite.get("frame_cues") or {}).get("receipt_sha256")
+                            != item["frame_cues_sha256"]):
+                        raise NativeSourceVerificationError(
+                            "original frame-cue signaling lineage differs"
                         )
             # Rebuild the FULL Godot game entrypoint from the trusted
             skins = proof.get("original_palette_variant_receipts", [])
