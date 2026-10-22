@@ -1,7 +1,7 @@
 """
-╔════════════════════════════════════════════════════════════════════════╗
+╔═══════════════════════════════════════════════════════════════════╗
 ║  HYPERSCALE COMPRESSED VAULT                                           ║
-║  ────────────────────────────────────────────────────────────────────  ║
+║  ─────────────────────────────────────────────────────────────────────  ║
 ║  Stores massive knowledge databases as zstd-level-22 compressed        ║
 ║  JSONL archives on disk (typical 15-25× compression ratio).            ║
 ║  MongoDB only holds tiny manifest pointers, so the 9.8G volume         ║
@@ -13,7 +13,7 @@
 ║    • iter_shard(name)                 → streaming iterator             ║
 ║    • vault_stats()                    → on-disk + decompressed totals  ║
 ║    • list_shards()                    → all manifest entries           ║
-╚════════════════════════════════════════════════════════════════════════╝
+╚═══════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
 import os
@@ -25,6 +25,8 @@ import threading
 import re
 from pathlib import Path
 from typing import Iterable, Iterator, Any
+
+from .path_hardening import validate_safe_identifier, safe_join, audit_receipt
 
 _COMPRESSOR_OBJ = None
 _DECOMPRESSOR_OBJ = None
@@ -71,8 +73,8 @@ def _json_default(obj: Any):
         return None
 
 
-# ── Paths ───────────────────────────────────────────────────────────────
-def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
+# ── Paths ───────────────────────────────────────────────────────────────────
+ndef _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
         p.mkdir(parents=True, exist_ok=True)
@@ -128,31 +130,20 @@ def _save_manifest() -> None:
 _load_manifest()
 
 
-_SAFE_SHARD_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}")
-
-
 def _safe_name(name: str) -> str:
-    """Accept only a short ASCII identifier, never a path fragment."""
-    if not isinstance(name, str) or not _SAFE_SHARD_NAME.fullmatch(name):
-        raise ValueError("invalid shard name")
-    if name in {".", ".."} or name.endswith("."):
-        raise ValueError("invalid shard name")
-    return name
+    """Accept only a short ASCII identifier, never a path fragment. Now via path_hardening."""
+    return validate_safe_identifier(name)
 
 
 def _shard_path(name: str, scratch: bool = False) -> Path:
     safe = _safe_name(name)
     root = (SCRATCH_ROOT if scratch else VAULT_ROOT).resolve()
-    candidate = (root / f"{safe}.jsonl.zst").resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError as exc:
-        raise ValueError("invalid shard path") from exc
+    candidate = safe_join(root, f"{safe}.jsonl.zst")
     return candidate
 
 
-# ── Core write/read ─────────────────────────────────────────────────────
-def write_shard(
+# ── Core write/read ────────────────────────────────────────────────────────────────
+ndef write_shard(
     name: str,
     rows: Iterable[dict[str, Any]],
     *,
@@ -165,6 +156,7 @@ def write_shard(
     name = _safe_name(name)
     shard_path = _shard_path(name, scratch)
     shard_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt = audit_receipt(shard_path, "write_shard")
 
     count = 0
     raw_bytes = 0
@@ -192,6 +184,7 @@ def write_shard(
         "compression_ratio": round(raw_bytes / max(compressed_bytes, 1), 2),
         "sha1": hasher.hexdigest(),
         "created_at": time.time(),
+        "audit_receipt": receipt,
     }
     if not scratch:
         _MANIFEST[name] = entry
