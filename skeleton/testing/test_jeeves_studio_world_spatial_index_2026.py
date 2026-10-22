@@ -157,6 +157,56 @@ class WorldIndexCompilerTests(unittest.TestCase):
             kind="visual",
         )["matches"], 0)
 
+    def test_reviewed_collision_layer_filter_is_real_source_property(self):
+        index = self.scene(physical=True)
+        entry = index["instances"][0]
+        self.assertEqual(entry["collision_layer"], 5)
+        self.assertEqual(entry["collision_mask"], 11)
+        self.assertEqual(entry["collision_shape_type"], "BoxShape3D")
+        self.assertEqual(query_world_spatial_index(
+            index, center_mm=entry["position_mm"], radius_mm=0,
+            collision_layer_mask=1,
+        )["matches"], 1)
+        self.assertEqual(query_world_spatial_index(
+            index, center_mm=entry["position_mm"], radius_mm=0,
+            collision_layer_mask=2,
+        )["matches"], 0)
+        self.assertEqual(query_world_spatial_index(
+            index, center_mm=entry["position_mm"], radius_mm=0,
+            collision_layer_mask=5,
+        )["matches"], 1)
+
+    def test_asset_filters_return_only_matching_compiled_mesh(self):
+        index = self.scene()
+        here = index["instances"][0]["position_mm"]
+        filtered = query_world_spatial_index(
+            index, center_mm=here, radius_mm=0, asset_id="trial-mesh",
+        )
+        self.assertEqual(filtered["matches"], 1)
+        self.assertEqual(filtered["applied_filters"]["asset_id"], "trial-mesh")
+        self.assertEqual(query_world_spatial_index(
+            index, center_mm=here, radius_mm=0, asset_id="different",
+        )["matches"], 0)
+
+    def test_nonexistent_reviewed_tag_is_not_guessed(self):
+        index = self.scene()
+        center = index["instances"][0]["position_mm"]
+        self.assertEqual(query_world_spatial_index(
+            index, center_mm=center, radius_mm=0, tag="temple",
+        )["matches"], 0)
+        self.assertEqual(query_world_spatial_index(
+            index, center_mm=center, radius_mm=0, role="terrain",
+        )["matches"], 0)
+
+    def test_reject_unbounded_or_boolean_physics_layer_query(self):
+        index = self.scene(physical=True)
+        for bad in (0, True, -1, 1 << 31):
+            with self.assertRaises(WorldSpatialIndexError):
+                query_world_spatial_index(
+                    index, center_mm=[1500, 3200, -550],
+                    radius_mm=1000, collision_layer_mask=bad,
+                )
+
     def test_source_derived_lod_is_described_without_claiming_engine_import(self):
         index = self.scene(lod=True)
         item = index["instances"][0]

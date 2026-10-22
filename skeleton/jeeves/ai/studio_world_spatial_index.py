@@ -187,6 +187,15 @@ def compile_world_spatial_index(
             "physics_body_type": (
                 actual_physics["body_type"] if kind == "physics" else None
             ),
+            "collision_shape_type": (
+                actual_physics["shape_type"] if kind == "physics" else None
+            ),
+            "collision_layer": (
+                actual_physics["collision_layer"] if kind == "physics" else None
+            ),
+            "collision_mask": (
+                actual_physics["collision_mask"] if kind == "physics" else None
+            ),
             "authored_lod_available": actual_lod,
             "title": asset["title"],
             "tags": list(asset["tags"]),
@@ -251,12 +260,35 @@ def query_world_spatial_index(
     index: Mapping[str, Any], *, center_mm: list[int],
     radius_mm: int, limit: int = 12,
     kind: str | None = None,
+    asset_id: str | None = None,
+    tag: str | None = None,
+    role: str | None = None,
+    collision_layer_mask: int | None = None,
 ) -> dict[str, Any]:
     """A bounded spatial AABB candidate retrieval, NOT a hit/collision claim."""
     center = _vec(center_mm, 3, -10_000_000, 10_000_000)
     if (type(radius_mm) is not int or not 0 <= radius_mm <= 10_000_000
             or type(limit) is not int or not 1 <= limit <= 32
-            or kind not in (None, "visual", "lod", "physics")):
+            or kind not in (None, "visual", "lod", "physics")
+            or (asset_id is not None and (
+                type(asset_id) is not str or not VALID_ID.fullmatch(asset_id)
+            ))
+            or (tag is not None and (
+                type(tag) is not str
+                or re.fullmatch(r"[a-z][a-z0-9_-]{0,39}", tag) is None
+            ))
+            or (role is not None and (
+                type(role) is not str
+                or role not in {
+                    "character", "npc", "terrain", "environment", "prop",
+                    "item", "ui", "vfx", "tile", "cinematic", "ambience",
+                    "music", "dialogue", "sfx", "other",
+                }
+            ))
+            or (collision_layer_mask is not None and (
+                type(collision_layer_mask) is not int
+                or not 1 <= collision_layer_mask <= 1048575
+            ))):
         raise WorldSpatialIndexError("spatial query must be bounded")
     if (not isinstance(index, Mapping)
             or index.get("schema_version") != SCHEMA
@@ -269,7 +301,14 @@ def query_world_spatial_index(
         raise WorldSpatialIndexError("spatial lookup index is not sealed")
     scored: list[tuple[int, str, dict[str, Any]]] = []
     for item in index["instances"]:
-        if kind is not None and item.get("kind") != kind:
+        if (kind is not None and item.get("kind") != kind
+                or asset_id is not None and item.get("asset_id") != asset_id
+                or tag is not None and tag not in item.get("tags", [])
+                or role is not None and role not in item.get("roles", [])
+                or (collision_layer_mask is not None and (
+                    type(item.get("collision_layer")) is not int
+                    or item["collision_layer"] & collision_layer_mask == 0
+                ))):
             continue
         low, high = item["broadphase_aabb_min_mm"], item["broadphase_aabb_max_mm"]
         squared = sum(
@@ -287,6 +326,10 @@ def query_world_spatial_index(
         "source_index_receipt_sha256": proof,
         "source_head_sha256": index["source_head_sha256"],
         "matches": len(scored),
+        "applied_filters": {
+            "kind": kind, "asset_id": asset_id, "tag": tag, "role": role,
+            "collision_layer_mask": collision_layer_mask,
+        },
         "instances": selected,
         "result_receipt_sha256": digest(selected),
         "native_collision_or_visibility_verified": False,

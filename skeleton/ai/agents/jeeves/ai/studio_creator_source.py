@@ -594,20 +594,26 @@ class CreatorProjectSourceStore:
     def search_world_instances(
         self, *, center_mm: list[int], radius_mm: int,
         limit: int = 12, kind: str | None = None,
+        asset_id: str | None = None,
+        tag: str | None = None,
+        role: str | None = None,
+        collision_layer_mask: int | None = None,
     ) -> dict[str, Any]:
-        """Spatial query over reviewed actual game instances, not imagined assets."""
+        """Filter real reviewed game instances by world, semantics and physics."""
         from .studio_world_spatial_index import query_world_spatial_index
         index = self.compiled_world_spatial_index()
         result = query_world_spatial_index(
             index, center_mm=center_mm, radius_mm=radius_mm,
-            limit=limit, kind=kind,
+            limit=limit, kind=kind, asset_id=asset_id,
+            tag=tag, role=role, collision_layer_mask=collision_layer_mask,
         )
         return {
             **result, "project_id": self.project_id,
             "world_spatial_index_sha256": index["receipt_sha256"],
             "retrieval_receipt_sha256": digest([
                 self.project_id, index["receipt_sha256"],
-                center_mm, radius_mm, kind, result["result_receipt_sha256"],
+                center_mm, radius_mm, limit, kind, asset_id, tag, role,
+                collision_layer_mask, result["result_receipt_sha256"],
             ]),
         }
 
