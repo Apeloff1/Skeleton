@@ -94,8 +94,8 @@ def plan_mirrors(
             continue
         source = mapping.get("source")
         destination = mapping.get("destination")
-        source_dir = _safe_path(root, source)
-        destination_dir = _safe_path(root, destination)
+        _safe_path(root, source)
+        _safe_path(root, destination)
         if not str(destination).startswith("skeleton/ai/"):
             raise ValueError("mirror destination outside governed AI root")
         kind = mapping.get("kind")
@@ -117,6 +117,23 @@ def plan_mirrors(
                 for name in tracked
                 if name.startswith(prefix)
             ]
+        if kind == "tree":
+            # Expose destination-only files too. Overlays are intentionally
+            # separate AI-owned implementations and must not be touched.
+            target_prefix = destination.rstrip("/") + "/"
+            source_prefix = source.rstrip("/") + "/"
+            for dest_rel in sorted(tracked):
+                if not dest_rel.startswith(target_prefix):
+                    continue
+                local = dest_rel[len(target_prefix):]
+                if _within(local, overlays):
+                    continue
+                if source_prefix + local not in tracked:
+                    conflicts[dest_rel] = {
+                        "source": source_prefix + local,
+                        "destination": dest_rel,
+                        "reason": "destination has no tracked canonical source",
+                    }
         for src_rel, dest_rel, local in sorted(names):
             if kind == "tree" and (_within(local, exclusions) or _within(local, overlays)):
                 continue
