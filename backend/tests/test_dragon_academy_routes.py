@@ -774,6 +774,10 @@ def test_original_campaign_api_builds_real_multistage_forks_and_solver_diversity
         # Direct Python and HTTP JSON callers see the identical documented
         # array contract; tuple-shaped internal dataclasses cannot leak here.
         assert isinstance(stage["routes"]["routes"],list)
+        # Direct Python invocation must expose the same JSON-compatible shape
+        # as HTTP serialization. Tuple-only reports cannot be replayed by the
+        # independent verifier even when their paths are real.
+        assert isinstance(stage["routes"]["routes"], list)
         proof=verify_route_report(BASE_LEVELS[index],stage["routes"])
         assert proof["routes"]>=1
     assert "no human" in result["claim"]
