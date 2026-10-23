@@ -817,3 +817,20 @@ def test_original_campaign_does_not_invent_branch_choices_for_two_stages():
     assert report["chapter_paths"]["ending_count"]==1
     assert report["chapter_paths"]["choice_nodes"]==0
     assert len(report["chapter_paths"]["complete_routes"])==1
+
+
+def test_standalone_original_routes_round_trip_through_independent_verifier():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_multipath import verify_route_report
+
+    board = BASE_LEVELS[0]
+    request = route.NativeRouteAnalysisRequest(
+        rows=list(board), max_routes=4, search_budget=4000,
+    )
+    report = route.native_production_multiple_routes(request, owner=identity())
+    assert report["ok"] is True
+    assert isinstance(report["routes"], list)
+    assert report["routes"]
+    verified = verify_route_report(board, report)
+    assert verified["status"] == "original_routes_replayed"
+    assert verified["routes"] == len(report["routes"])
