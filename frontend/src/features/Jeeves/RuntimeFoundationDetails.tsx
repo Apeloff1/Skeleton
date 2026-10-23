@@ -93,7 +93,7 @@ export function LearnerReferenceDetails({ partition, observed }: { partition: Ru
     demand(outputs.length === 3 && new Set(outputs.map(row => row.name)).size === 3);
     const limitations = array(explanation.limitations, 4).map(value => text(value, 512));
     return <Detail key={digest} title="Operational predictor sensitivity" summary={`Historical numeric input · policy ${binding.learning_policy_version} · predictor ${fingerprint(predictor)}`}>
-      <Text style={s.caption}>Each signed value describes this predictor's local response to a normalized feature. It is not causal importance, an additive explanation, answer correctness or game quality.</Text>
+      <Text style={s.caption}>Each signed value describes this predictor&apos;s local response to a normalized feature. It is not causal importance, an additive explanation, answer correctness or game quality.</Text>
       {outputs.map(row => <View key={row.name} style={s.output}><Text style={s.title}>{human(row.name)} · {row.prediction.toFixed(3)}</Text>{row.features.map(feature => <Text key={feature.name} style={s.caption}>{human(feature.name)}: input {feature.value.toFixed(3)} · local sensitivity {feature.sensitivity >= 0 ? '+' : ''}{feature.sensitivity.toFixed(4)}</Text>)}</View>)}
       <Text style={s.caption}>Retained outcome {fingerprint(sample)} · explanation {fingerprint(digest)}. The latest source pin belongs to the predictor state and does not identify the source of this historical replay input.</Text>
       {limitations.map((value, index) => <Text key={index} style={s.caption}>{value}</Text>)}
