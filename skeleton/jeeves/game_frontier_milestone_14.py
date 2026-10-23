@@ -41,8 +41,8 @@ def receipt(history: SnapshotHistory) -> HistoryReceipt:
 
 def between(history: SnapshotHistory, start: int, end: int) -> tuple[ArchiveSnapshot, ...]:
     """Return snapshots in the half-open range [start, end)."""
-    if not history.entries:
-        raise HistoryQueryError("history is empty")
-    if not 0 <= start < end <= len(history.entries):
+    if not history.verify():
+        raise HistoryQueryError("history must verify before range query")
+    if type(start) is not int or type(end) is not int or not 0 <= start < end <= len(history.entries):
         raise HistoryQueryError("range out of bounds")
     return tuple(history.entries[start:end])
