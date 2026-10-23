@@ -422,3 +422,41 @@ def test_unrelated_flattened_route_cannot_claim_requested_mount(monkeypatch) -> 
     assert report["mounted_names"] == []
     assert "routes.requested_direct (empty_router)" in report["skipped_names"]
     assert all(route.path != "/api/foreign/ready" for route in app.routes)
+
+
+def test_flattened_foreign_route_with_same_path_cannot_claim_target(monkeypatch) -> None:
+    """The same URL must not attest a different router's endpoint."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    wanted = APIRouter(prefix="/api/studio")
+
+    @wanted.get("/ready")
+    def wanted_ready():
+        return {"ready": True}
+
+    foreign = APIRouter(prefix="/api/studio")
+
+    @foreign.get("/ready")
+    def foreign_ready():
+        return {"ready": False}
+
+    initial_import = routes_registry.importlib.import_module
+
+    def fake_import(name: str):
+        if name == "routes.requested_identity":
+            return SimpleNamespace(router=wanted)
+        return initial_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", fake_import)
+    app = FastAPI()
+    monkeypatch.setattr(
+        app, "include_router",
+        lambda _router, **_kwargs: app.router.routes.extend(foreign.routes),
+    )
+
+    report = register_routes(app, [("routes.requested_identity", "router")])
+    assert report["ok"] == 0
+    assert report["skipped_names"] == ["routes.requested_identity (empty_router)"]
+    assert all(route.path != "/api/studio/ready" for route in app.routes)
