@@ -3330,8 +3330,13 @@ async def start_background_build(req: StartBuildRequest):
     }
     try:
         await asyncio.to_thread(_check_build_resources, preflight)
-    except GalaxyBuildStopped as exc:
-        raise HTTPException(503, f"Build admission refused: {exc.reason}.") from None
+    except GalaxyBuildStopped:
+        # The stop reason is retained in build state; never echo exception data
+        # through an unauthenticated 5xx admission response.
+        raise HTTPException(
+            status_code=503,
+            detail="Build admission refused by resource or execution safeguards.",
+        ) from None
     # No await between the final custody check and reserving the slot.
     if _build_has_live_work(req.build_id):
         return {"build_id": req.build_id, "status": "already_running"}
