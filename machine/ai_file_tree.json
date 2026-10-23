@@ -5768,6 +5768,8 @@
         "__init__.py",
         "adapter_training.py",
         "bitemporal_authority.py",
+        "book_learning_bridge.py",
+        "book_weight_candidate.py",
         "candidate_weights.py",
         "capability_ledger.py",
         "checkpoint_lineage.py",
@@ -6632,7 +6634,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "182_mapping_plus_180_native_owner_current_main_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
+  "validation_state": "182_mapping_plus_182_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7770,7 +7772,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 180
+    "native_ai_owner_count": 182
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -10553,6 +10555,28 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Native Jeeves candidate-only book weight pipeline with provenance and admission boundaries.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-BOOK-LEARNING-BRIDGE",
+      "path": "skeleton/ai/training/book_learning_bridge.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Rights-reviewed, byte-complete original or licensed book intake to existing Jeeves training corpus with shard receipts.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-BOOK-WEIGHT-CANDIDATE",
+      "path": "skeleton/ai/training/book_weight_candidate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Source-bound candidate-only Jeeves checkpoint optimization from reviewed book shards; no automatic production promotion.",
       "volume_refs": [
         "VOL-006"
       ]

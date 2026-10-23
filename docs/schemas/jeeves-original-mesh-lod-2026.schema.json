@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Apeloff1/Skeleton/blob/main/docs/schemas/jeeves-original-mesh-lod-2026.schema.json",
+  "title": "Jeeves reviewed source-authored original GLB LOD set",
+  "description": "Requires a separate hashed asset_forge source record with an explicit depends_on reference to the base procedural_mesh. Strict segment decreases and distance order are enforced by the Python compiler.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "base_record_id",
+    "asset_id",
+    "levels"
+  ],
+  "properties": {
+    "kind": {
+      "const": "procedural_mesh_lod_set"
+    },
+    "base_record_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,59}$"
+    },
+    "levels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "level",
+          "segments",
+          "switch_distance_mm"
+        ],
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "segments": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 63
+          },
+          "switch_distance_mm": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 10000000
+          }
+        }
+      }
+    }
+  }
+}

@@ -23,6 +23,7 @@ import { chatProgressLabel } from '../../product/chatProgress';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
+import JeevesStudioPalette from './JeevesStudioPalette';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import { getJeevesRequestContext } from '../../state/settingsStore';
 import type { Artifact, Conversation, Message } from './workspace';
@@ -320,6 +321,9 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>{chatProgressLabel(snapshot.progress?.state)}</Text><Button icon="stop-outline" label={snapshot.progress?.state === 'cancelling' ? 'Stopping…' : 'Stop'} disabled={snapshot.progress?.state === 'cancelling'} onPress={() => { void controller.cancel(); }} /></View>}
       </ScrollView>
       <View style={s.composer} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}>
+        <JeevesStudioPalette disabled={busy}
+          onCompose={draft => controller.edit({ draft })}
+          onNavigate={path => router.push(path as never)} />
         {!busy && !modelReady && <View style={{ gap: 6 }}>
           <Text accessibilityLiveRegion="polite" style={s.small}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : selectedModel?.readiness.message || readiness?.models.readiness?.message) || 'AI readiness has not confirmed an available conversation engine. Your draft stays here while you finish setup.'}</Text>
           <View style={s.row}><Button icon="refresh-outline" label="Check readiness" onPress={() => { void refreshModels(); }} /><Button icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><Button icon="hardware-chip-outline" label="Choose model" onPress={() => setModelPicker(true)} /></View>

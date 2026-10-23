@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
@@ -687,10 +688,16 @@ async def test_cross_service_golden_journey_preserves_receipt_lineage(
                 ),
             ]
 
-        async def generate(self, _request):
+        async def generate(self, request):
             if not self.responses:
                 raise AssertionError("unexpected extra provider turn")
-            return self.responses.pop(0)
+            return replace(
+                self.responses.pop(0),
+                context_id=request.context_id,
+                context_digest=request.context_digest,
+                context_source_snapshot=request.context_source_snapshot,
+                context_compiler_version=request.context_compiler_version,
+            )
 
     tools = AsyncToolRuntime()
 

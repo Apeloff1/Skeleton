@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Apeloff1/Skeleton/blob/main/docs/schemas/jeeves-world-streaming-policy-2026.schema.json",
+  "title": "Jeeves authored Godot original-world streaming activation policy",
+  "description": "Create a versioned scene_forge record with a depends_on edge to at least one reviewed original_mesh_instance source. Only one activation is allowed. Native engine runtime requires separately observed streaming.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "mode",
+    "view_radius_m",
+    "instantiate_per_frame"
+  ],
+  "properties": {
+    "kind": {
+      "const": "original_world_streaming_policy"
+    },
+    "mode": {
+      "const": "replace_static"
+    },
+    "view_radius_m": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5000
+    },
+    "instantiate_per_frame": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32
+    }
+  }
+}

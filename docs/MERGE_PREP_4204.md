@@ -1,0 +1,1 @@
+# Merge preparation for #4204\n\nCI status pending. Once Backend Quality, TypeScript, security, architecture, and E2E are green on exact head, ready for merge. All seams have stored_prose=0, era_bind=HOUSE_ERA, clipped-G. No stubs. Full systems.
