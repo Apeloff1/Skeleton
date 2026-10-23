@@ -225,8 +225,10 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     const buildId = validBuildId(created.data?.build_id);
     assert.ok(buildId, 'create must return a safe build_id');
     // The full ten-batch live generator exceeded 60 seconds while generating real assets.
-    // Keep the complete source-producing flow, with a bounded three-minute admission budget.
-    const started = await call('POST', '/api/galaxy-studio/start-build', { build_id: buildId, build_duration_minutes: 3 }, ctx.token);
+    // Preserve the complete source-producing flow. CI observed all ten batches finishing
+    // before a three-minute deadline stopped real delivery-floor generation; use a
+    // bounded ten-minute budget for the full workload rather than forging completion.
+    const started = await call('POST', '/api/galaxy-studio/start-build', { build_id: buildId, build_duration_minutes: 10 }, ctx.token);
     assert.equal(started.ok, true, `start-build HTTP ${started.status}: ${String(started.data?.detail?.code || started.data?.detail || "unavailable").slice(0, 240)}`);
     ctx.buildId = buildId;
   });
