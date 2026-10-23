@@ -4,6 +4,7 @@ Skeleton API Server — FastAPI application factory and state management.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from dataclasses import asdict, is_dataclass
@@ -83,6 +84,8 @@ class ServerState:
         self.engine_execution_admission_runtime: Optional[Any] = None
         self.engine_quota_ledger: Optional[Any] = None
         self.engine_pressure_ledger: Optional[Any] = None
+        self._engine_shutdown_pending = False
+        self._engine_close_task: asyncio.Task[None] | None = None
         self.governance_lifecycle: Optional[Any] = None
         self.governance_registry: Optional[Any] = None
         self.governance_audit_log: Optional[Any] = None
@@ -474,12 +477,12 @@ class ServerState:
 
     async def close_canonical_memory_writer(self) -> None:
         client = self.canonical_memory_mongo_client
+        if client is not None:
+            client.close()
         self.canonical_memory_writer = None
         self.canonical_memory_repository = None
         self.canonical_memory_projection_coordinator = None
         self.canonical_memory_mongo_client = None
-        if client is not None:
-            client.close()
 
     def bind_swarm_runtime(self, runtime: Any) -> Any:
         """Replace the live swarm runtime and atomically rebind dependent control planes."""
@@ -657,6 +660,11 @@ class ServerState:
     ) -> Any:
         """Bind durable engine API authority and local execution coordinator."""
 
+        if self._engine_shutdown_pending or (
+            self.engine_execution_coordinator is not None
+            and self.engine_execution_coordinator.shutdown_started
+        ):
+            raise RuntimeError("engine shutdown must finish before execution authority can start")
         if self.engine_execution_service is not None:
             return self.engine_execution_service
 
@@ -864,6 +872,28 @@ class ServerState:
     async def close_engine_execution_service(self) -> None:
         """Drain execution authority and close durable handles without masking faults."""
 
+        if self._engine_close_task is None:
+            self._engine_shutdown_pending = True
+            self._engine_close_task = asyncio.create_task(self._close_engine_execution_service_owned())
+        task = self._engine_close_task
+        cancelled = False
+        try:
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    cancelled = True
+            task.result()
+            if cancelled:
+                raise asyncio.CancelledError
+        finally:
+            if task.done() and self._engine_close_task is task:
+                # Failed cleanup retains its actual owners below. A later
+                # explicit close can retry without starting replacement work.
+                self._engine_close_task = None
+
+    async def _close_engine_execution_service_owned(self) -> None:
+
         errors: list[BaseException] = []
         coordinator = self.engine_execution_coordinator
         if coordinator is not None:
@@ -871,9 +901,14 @@ class ServerState:
                 await coordinator.shutdown()
             except BaseException as exc:
                 errors.append(exc)
+            if coordinator.physical_shutdown_complete is not True:
+                raise RuntimeError(
+                    "engine shutdown has not established physical drain; live authority retained for retry"
+                ) from (errors[0] if errors else None)
 
         service = self.engine_execution_service
         if service is not None:
+            service_closed = True
             for closer in (
                 service.repository.close,
                 service.submissions.close,
@@ -882,37 +917,49 @@ class ServerState:
                     closer()
                 except BaseException as exc:
                     errors.append(exc)
+                    service_closed = False
+            if service_closed:
+                self.engine_execution_service = None
 
         receipt_store = self.engine_tool_receipt_store
         if receipt_store is not None:
             try:
                 receipt_store.close()
+                self.engine_tool_receipt_store = None
             except BaseException as exc:
                 errors.append(exc)
 
         quota_ledger = self.engine_quota_ledger
         close_quota = getattr(quota_ledger, "close", None)
-        if callable(close_quota):
-            try:
+        try:
+            if callable(close_quota):
                 close_quota()
-            except BaseException as exc:
-                errors.append(exc)
+            self.engine_quota_ledger = None
+        except BaseException as exc:
+            errors.append(exc)
 
         pressure_ledger = self.engine_pressure_ledger
         close_pressure = getattr(pressure_ledger, "close", None)
-        if callable(close_pressure):
-            try:
+        try:
+            if callable(close_pressure):
                 close_pressure()
-            except BaseException as exc:
-                errors.append(exc)
+            self.engine_pressure_ledger = None
+        except BaseException as exc:
+            errors.append(exc)
 
-        self.engine_execution_coordinator = None
-        self.engine_execution_service = None
-        self.engine_tool_receipt_store = None
-        self.engine_admission_runtime = None
-        self.engine_execution_admission_runtime = None
-        self.engine_quota_ledger = None
-        self.engine_pressure_ledger = None
+        if all(
+            owner is None
+            for owner in (
+                self.engine_execution_service,
+                self.engine_tool_receipt_store,
+                self.engine_quota_ledger,
+                self.engine_pressure_ledger,
+            )
+        ):
+            self.engine_execution_coordinator = None
+            self.engine_admission_runtime = None
+            self.engine_execution_admission_runtime = None
+            self._engine_shutdown_pending = False
 
         if errors:
             kinds = ",".join(type(exc).__name__ for exc in errors[:8])
@@ -1055,10 +1102,7 @@ def _bind_realtime(app: Any, state: Any) -> None:
 async def _close_realtime(app: Any) -> None:
     unsubscribe = getattr(app.state, "realtime_unsubscribe", None)
     if callable(unsubscribe):
-        try:
-            unsubscribe()
-        except Exception:
-            pass
+        unsubscribe()
     app.state.realtime_unsubscribe = None
     hub = getattr(app.state, "realtime_hub", None)
     if hub is not None:
@@ -1066,7 +1110,7 @@ async def _close_realtime(app: Any) -> None:
 
 
 def create_app() -> Any:
-    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle
+    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle, ServicePhase
 
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
@@ -1164,14 +1208,47 @@ def create_app() -> Any:
 
     @app.on_event("shutdown")
     async def shutdown():
-        runtime_lifecycle.begin_drain(reason="engine-fastapi-shutdown")
-        await _close_realtime(app)
+        if getattr(app.state, "runtime_shutdown_complete", False):
+            return
+        if runtime_lifecycle.phase not in {ServicePhase.STOPPED, ServicePhase.FAILED}:
+            runtime_lifecycle.begin_drain(reason="engine-fastapi-shutdown")
+        task = getattr(app.state, "runtime_shutdown_task", None)
+        if task is None or task.done():
+            task = asyncio.create_task(finish_shutdown())
+            app.state.runtime_shutdown_task = task
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+        task.result()
+        if cancelled:
+            raise asyncio.CancelledError
+
+    async def finish_shutdown():
+        # Execution finalization can still need Mongo/governance/realtime.
+        # Close the producer of that work before its finalization dependencies,
+        # under one owned task that survives cancellation of the ASGI caller.
         state = get_state()
-        await state.close_canonical_memory_writer()
-        await state.close_engine_execution_service()
-        state.close_governance_registry()
+        engine_failure = None
+        try:
+            await state.close_engine_execution_service()
+        except BaseException as exc:
+            if state._engine_shutdown_pending or state.engine_execution_coordinator is not None:
+                # An unconfirmed owner and every dependency remain reachable
+                # for an explicit retry; a later step cannot mask its custody.
+                raise
+            engine_failure = exc
         state.close_operation_runtime()
-        runtime_lifecycle.mark_stopped(reason="engine-durable-runtimes-drained")
+        await _close_realtime(app)
+        await state.close_canonical_memory_writer()
+        state.close_governance_registry()
+        if engine_failure is not None:
+            raise RuntimeError("engine workers drained with shutdown supervision errors") from engine_failure
+        if runtime_lifecycle.phase is ServicePhase.DRAINING:
+            runtime_lifecycle.mark_stopped(reason="engine-durable-runtimes-drained")
+        app.state.runtime_shutdown_complete = True
 
     @app.get("/")
     async def root():

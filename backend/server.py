@@ -5175,8 +5175,8 @@ def _kick_build_watchdog_start():
     """Galaxy Studio build watchdog — self-heals stuck/orphaned builds.
 
     Called from lifespan() via ``_kick(30, "build-watchdog", ...)``. Scans
-    every 20s, resurrects orphaned runners, snapshots to vault, and
-    force-completes builds that have run past their target duration.
+    every 20s, recovers orphaned runners within admission limits, and
+    requests expired builds to stop while preserving partial work until drain.
     """
     try:
         from core.build_watchdog import start_watchdog

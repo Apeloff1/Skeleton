@@ -436,7 +436,9 @@
       ],
       "status": "present",
       "working_order_continuation": "Existing admin runtime control adds scoped failed-maintenance retry under exact source/attempt custody guards, aggregate execution recovery status and bounded retention diagnostics. Same engine/provider/store owners; no implicit replay, model promotion or authority transfer.",
-      "operator_and_learning_continuation": "Same engine/provider/SQLite owners; strict per-section finite policy bounds, fixed-watermark scoped numeric pages with opaque canonical JSON, explicit same-row breaker CAS, fresh resource telemetry and immutable per-request local token preparation. No new service, model-weight promotion, retry grant or qualification."
+      "operator_and_learning_continuation": "Same engine/provider/SQLite owners; strict per-section finite policy bounds, fixed-watermark scoped numeric pages with opaque canonical JSON, explicit same-row breaker CAS, fresh resource telemetry and immutable per-request local token preparation. No new service, model-weight promotion, retry grant or qualification.",
+      "fault_consistency_continuation": "Existing engine envelope transport now streams under finite byte/structure and absolute deadline bounds, rejects duplicate/nonfinite JSON and binds terminal event/status/result identities before result normalization. Chat persistence rejects malformed schema/lease fields; numeric learner admission requires canonical feedback provenance. No new owner, store, retry grant or correctness certification.",
+      "operational_gap_continuation": "Existing application/engine boundaries retain fair native preflight and shutdown custody, exact primary-read chat recovery, scoped crawler receipt/dispatch fencing and bounded readiness observations. Existing Galaxy artifact APIs distinguish queued preparation, partial stop and acknowledged remote submission. Canonical owners and explicit grants remain unchanged; see construction operational_gap_continuation."
     },
     {
       "id": "runtime_dependency:application-api->retrieval",

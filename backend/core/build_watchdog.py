@@ -5,7 +5,7 @@
 ║  Runs a periodic background task that:                                 ║
 ║    • Discovers all builds with status == 'building'                    ║
 ║    • Restarts any that have no active runner (orphan recovery)         ║
-║    • Force-completes builds stuck past their target duration            ║
+║    • Stops overdue builds while retaining physical worker custody            ║
 ║    • Snapshots build metadata to compressed vault every N seconds so   ║
 ║      a node crash never loses the build                                ║
 ║                                                                        ║
@@ -14,103 +14,143 @@
 ║  _active_runners, _run_background_build).                              ║
 ╚════════════════════════════════════════════════════════════════════════╝
 """
+
 from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger("GalaxyStudio.Watchdog")
 
 # Tuning
-CHECK_INTERVAL_SEC = 20        # how often the watchdog tick runs
-STALE_AFTER_SEC    = 90        # no phase update for 90s → reseed runner
-SNAPSHOT_EVERY_SEC = 60        # flush build snapshot to vault this often
-FORCE_COMPLETE_AT  = 1.5       # × target_duration → force-complete
+CHECK_INTERVAL_SEC = 20  # how often the watchdog tick runs
+STALE_AFTER_SEC = 90  # diagnostic only; heartbeat age is not worker death
+SNAPSHOT_EVERY_SEC = 60  # flush build snapshot to vault this often
+FORCE_COMPLETE_AT = 1.0  # compatibility name: deadline requests a truthful stop
 
 # ─── Orphan-recovery rate limits (2026-02-18) ───────────────────────────
 # Without these, a watchdog activation on a host with many orphan builds
 # would resurrect them ALL on the first tick, saturating CPU/memory.
-WARMUP_TICKS                 = 3   # first N ticks: no orphan restarts
-MAX_RESTARTS_PER_TICK        = 1   # cap restarts per single sweep
-MAX_RESTARTS_PER_5MIN        = 3   # rolling window cap
+WARMUP_TICKS = 3  # first N ticks: no orphan restarts
+MAX_RESTARTS_PER_TICK = 1  # cap restarts per single sweep
+MAX_RESTARTS_PER_5MIN = 3  # rolling window cap
 
 _watchdog_task: asyncio.Task | None = None
 _stopped = False
 _tick_count: int = 0
 _restart_history: list[float] = []  # epoch seconds of recent restarts
+_last_tick_at: float = 0.0
+_last_counts: dict[str, int] = {}
 
 
 def _now_iso() -> str:
     return datetime.utcnow().isoformat()
 
 
-async def _snapshot_to_vault(build: dict) -> None:
+async def _snapshot_to_vault(build: dict) -> bool:
     """Persist build metadata to Mongo via the robust `_save_build` path
     (which already handles BSON-size overflow via minimal-save fallback).
     This doubles as our crash-recovery snapshot."""
     try:
         from routes.galaxy_studio import _save_build
-        await _save_build(build)
+
+        return await _save_build(build) is True
     except Exception as e:
-        logger.debug(f"snapshot skipped: {e}")
+        logger.debug("snapshot skipped: %s", type(e).__name__)
+        return False
 
 
 async def _restart_runner(build_id: str, duration_min: int) -> bool:
-    """Re-kick the background runner for a build that lost its task."""
+    """Resume an actual orphan, retaining the same task handle as admission."""
+    from routes.galaxy_studio import (
+        TOTAL_BATCHES,
+        _run_background_build,
+        _active_runners,
+        _load_build,
+        _background_tasks,
+        _any_build_has_live_work,
+        _request_build_stop,
+        _active_artifact_job,
+    )
+
+    if type(duration_min) is not int or not 1 <= duration_min <= 60:
+        return False
+    build = await _load_build(build_id)
+    if (
+        not build
+        or build.get("status") != "building"
+        or build.get("_bg_stop_requested")
+        or _active_artifact_job(build) is not None
+    ):
+        return False
+    elapsed = _age_seconds(build.get("_bg_started"))
+    if elapsed is None or elapsed < -5:
+        await _request_build_stop(build_id, "build_clock_unavailable", failed=True)
+        return False
+    if elapsed >= duration_min * 60:
+        await _request_build_stop(build_id, "build_deadline_exceeded", failed=True)
+        return False
+    # Recheck after the load await. Never replace a live task, native future,
+    # or reserved single-builder slot because its heartbeat is old.
+    if _any_build_has_live_work():
+        return False
     try:
-        from routes.galaxy_studio import _run_background_build, _active_runners, _load_build
-        if build_id in _active_runners:
-            return False  # already running
-        build = await _load_build(build_id)
-        if not build:
+        completed = build.get("_bg_last_batch_completed")
+        resume_from = (
+            max(1, int(completed) + 1)
+            if completed is not None
+            else max(1, int(build.get("_bg_current_batch", 1)))
+        )
+        if resume_from > TOTAL_BATCHES + 1:
             return False
-        # Resume from the next batch if we already have progress
-        resume_from = max(1, int(build.get("_bg_current_batch", 0)) + 1)
-        if resume_from > 10:
-            return False  # already complete
         _active_runners.add(build_id)
-        asyncio.create_task(_run_background_build(build_id, duration_min, resume_from_batch=resume_from))
-        logger.info(f"[watchdog] resurrected build {build_id} from batch {resume_from}")
+        task = asyncio.create_task(
+            _run_background_build(build_id, duration_min, resume_from_batch=resume_from)
+        )
+        _background_tasks[build_id] = task
+        logger.info("[watchdog] resumed build %s from batch %s", build_id, resume_from)
         return True
-    except Exception as e:
-        logger.warning(f"[watchdog] restart failed for {build_id}: {e}")
+    except Exception as exc:
+        _active_runners.discard(build_id)  # no task was admitted
+        logger.warning("[watchdog] restart failed for %s: %s", build_id, type(exc).__name__)
         return False
 
 
 async def _force_complete(build_id: str) -> None:
+    """Compatibility helper: deadlines stop work; they never complete phases."""
+    from routes.galaxy_studio import _request_build_stop
+
+    await _request_build_stop(build_id, "build_deadline_exceeded", failed=True)
+    logger.warning("[watchdog] requested deadline stop for %s; partial artifacts retained", build_id)
+
+
+def _age_seconds(value: Any) -> float | None:
+    if not isinstance(value, str):
+        return None
     try:
-        from routes.galaxy_studio import _load_build, _save_build, _active_runners
-        build = await _load_build(build_id)
-        if not build:
-            return
-        build["status"] = "completed"
-        build["_bg_status"] = "completed"
-        build["current_phase"] = build.get("total_phases", 100)
-        build["_bg_completed_at"] = _now_iso()
-        await _save_build(build)
-        _active_runners.discard(build_id)
-        logger.info(f"[watchdog] force-completed over-runtime build {build_id}")
-        # Bound disk: prune the vault after a force-complete (protect this build).
-        try:
-            from core import build_vault as _bv
-            _pr = _bv.prune_old_builds(keep=12, protect={build_id})
-            if _pr.get("pruned"):
-                logger.info(f"[watchdog] vault auto-prune: {_pr}")
-        except Exception as _pe:
-            logger.warning(f"[watchdog] vault auto-prune failed: {_pe}")
-    except Exception as e:
-        logger.warning(f"[watchdog] force-complete failed for {build_id}: {e}")
+        stamp = datetime.fromisoformat(value)
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - stamp).total_seconds()
+    except (ValueError, TypeError):
+        return None
 
 
 async def _scan_once() -> dict:
-    """One sweep. Returns counts: {restarted, completed, snapshotted, scanned, skipped_warmup, skipped_ratelimit}."""
+    """One bounded sweep. Timed-out work increments stopped, never completed."""
     global _tick_count, _restart_history
     _tick_count += 1
     counts = {
-        "restarted": 0, "completed": 0, "snapshotted": 0, "scanned": 0,
-        "skipped_warmup": 0, "skipped_ratelimit": 0,
+        "restarted": 0,
+        "completed": 0,
+        "stopped": 0,
+        "stale_live": 0,
+        "snapshotted": 0,
+        "scanned": 0,
+        "skipped_warmup": 0,
+        "skipped_ratelimit": 0,
     }
     # Drop restart-history entries older than 5 minutes
     cutoff = time.time() - 300
@@ -118,7 +158,13 @@ async def _scan_once() -> dict:
     restarts_this_tick = 0
 
     try:
-        from routes.galaxy_studio import _builds, _active_runners, _load_build
+        from routes.galaxy_studio import (
+            _builds,
+            _load_build,
+            _build_has_live_work,
+            _request_build_stop,
+            _active_artifact_job,
+        )
         from services.database import db as _db
 
         # Collect ids from both in-memory and Mongo
@@ -143,36 +189,36 @@ async def _scan_once() -> dict:
                 b = _builds.get(bid) or await _load_build(bid)
                 if not b:
                     continue
-                if b.get("status") != "building":
+                if (
+                    b.get("status") != "building"
+                    or b.get("_bg_status") == "manual"
+                    or _active_artifact_job(b) is not None
+                ):
                     continue
 
-                started_iso = b.get("_bg_started")
                 target_min = b.get("_bg_target_duration", 15)
-                elapsed_sec = 0.0
-                if started_iso:
-                    try:
-                        elapsed_sec = (datetime.utcnow() - datetime.fromisoformat(started_iso)).total_seconds()
-                    except Exception:
-                        pass
-
-                # (a) Force-complete builds that have blown past their budget
+                if type(target_min) is not int or not 1 <= target_min <= 60:
+                    await _request_build_stop(bid, "build_duration_invalid", failed=True)
+                    counts["stopped"] += 1
+                    continue
+                elapsed_sec = _age_seconds(b.get("_bg_started"))
+                if b.get("_bg_stop_requested"):
+                    await _request_build_stop(bid, str(b.get("_bg_stop_reason") or "build_stopped"))
+                    continue
+                if elapsed_sec is None or elapsed_sec < -5:
+                    await _request_build_stop(bid, "build_clock_unavailable", failed=True)
+                    counts["stopped"] += 1
+                    continue
                 if elapsed_sec > target_min * 60 * FORCE_COMPLETE_AT:
                     await _force_complete(bid)
-                    counts["completed"] += 1
+                    counts["stopped"] += 1
                     continue
-
-                # (b1) Zombie-runner detection — runner is "active" but has not
-                # updated its heartbeat in > STALE_AFTER_SEC. Force-discard the
-                # runner ref so (b2) will spawn a fresh one next tick.
-                last_hb_iso = b.get("_bg_last_heartbeat")
-                if bid in _active_runners and last_hb_iso:
-                    try:
-                        hb_age = (datetime.utcnow() - datetime.fromisoformat(last_hb_iso)).total_seconds()
-                        if hb_age > STALE_AFTER_SEC:
-                            _active_runners.discard(bid)
-                            logger.warning(f"[watchdog] zombie runner discarded for {bid} (heartbeat age={hb_age:.0f}s)")
-                    except Exception:
-                        pass
+                live = _build_has_live_work(bid)
+                heartbeat_age = _age_seconds(b.get("_bg_last_heartbeat"))
+                if live and heartbeat_age is not None and heartbeat_age > STALE_AFTER_SEC:
+                    counts["stale_live"] += 1
+                    # Staleness is evidence for diagnostics, never evidence
+                    # that a physical executor has released its slot.
 
                 # (b2) Orphan detection — status=building but no active runner.
                 # RATE LIMITS (2026-02-18):
@@ -180,7 +226,7 @@ async def _scan_once() -> dict:
                 #     a stale orphan list can be diagnosed / cleaned manually.
                 #   • Per tick: at most MAX_RESTARTS_PER_TICK new runners.
                 #   • Per 5-min rolling window: at most MAX_RESTARTS_PER_5MIN.
-                if bid not in _active_runners:
+                if not live:
                     if _tick_count <= WARMUP_TICKS:
                         counts["skipped_warmup"] += 1
                         continue
@@ -199,9 +245,9 @@ async def _scan_once() -> dict:
                 # (c) Periodic snapshot
                 last_snap = float(b.get("_watchdog_last_snap", 0) or 0)
                 if now - last_snap >= SNAPSHOT_EVERY_SEC:
-                    await _snapshot_to_vault(b)
-                    b["_watchdog_last_snap"] = now
-                    counts["snapshotted"] += 1
+                    if await _snapshot_to_vault(b):
+                        b["_watchdog_last_snap"] = now
+                        counts["snapshotted"] += 1
             except Exception as e:
                 logger.debug(f"[watchdog] per-build check failed for {bid}: {e}")
     except Exception as e:
@@ -222,11 +268,16 @@ async def _loop():
             # Update last-tick timestamp so LoadSheddingMiddleware can detect
             # a stale watchdog and shed load when the loop is wedged.
             globals()["_last_tick_at"] = time.time()
+            globals()["_last_counts"] = dict(counts)
             # Log only ticks with action, but always log warmup ticks for
             # diagnostics, and rate-limited skips so they're visible.
-            if (counts["restarted"] or counts["completed"]
-                    or counts["skipped_warmup"] or counts["skipped_ratelimit"]
-                    or _tick_count <= WARMUP_TICKS):
+            if (
+                counts["restarted"]
+                or counts["stopped"]
+                or counts["skipped_warmup"]
+                or counts["skipped_ratelimit"]
+                or _tick_count <= WARMUP_TICKS
+            ):
                 logger.info(f"[watchdog] tick {_tick_count}: {counts}")
         except asyncio.CancelledError:
             break
@@ -259,11 +310,15 @@ def stop_watchdog() -> None:
 
 
 async def health_snapshot() -> dict:
-    counts = await _scan_once()
+    """Read-only inspection; health polling cannot restart or stop builds."""
+    running = bool(_watchdog_task is not None and not _watchdog_task.done() and not _stopped)
     return {
-        "ok": True,
-        "counts": counts,
+        "ok": running,
+        "running": running,
+        "counts": dict(_last_counts),
+        "last_tick_at": _last_tick_at or None,
         "interval_sec": CHECK_INTERVAL_SEC,
         "snapshot_every_sec": SNAPSHOT_EVERY_SEC,
-        "force_complete_multiplier": FORCE_COMPLETE_AT,
+        "force_complete_multiplier": None,  # legacy field: force-completion is disabled
+        "deadline_stop_multiplier": FORCE_COMPLETE_AT,
     }
