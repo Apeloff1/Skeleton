@@ -17,7 +17,7 @@ from fastapi import FastAPI
 
 from core.routes_registry import KNOWN_ROUTES, KNOWN_ROUTES_WITH_PREFIX, register_routes
 from routes import registry_health
-from routes.registry_health import CRITICAL_BOOT_ROUTERS
+from routes.registry_health import CRITICAL_BOOT_ROUTERS, CRITICAL_ROUTE_PATHS
 
 
 def _flat_pairs():
@@ -72,6 +72,7 @@ def test_critical_product_router_is_mounted_and_never_silently_skipped(module_pa
     assert report["skipped"] == 0, report["skipped_names"]
     assert report["ok"] == 1
     assert report["mounted_names"] == [module_path]
+    assert CRITICAL_ROUTE_PATHS[module_path] in report["mounted_paths"][module_path]
     assert len(app.routes) > 4, f"mounted {module_path} declares no reachable endpoints"
 
 
@@ -95,6 +96,10 @@ def test_critical_route_readiness_fails_closed_on_import_skip(monkeypatch) -> No
             "skipped": 1,
             "skipped_names": ["routes.lafs (import_failed RuntimeError: dependency unavailable)"],
             "mounted_names": sorted(CRITICAL_BOOT_ROUTERS - {"routes.lafs"}),
+            "mounted_paths": {
+                name: [path] for name, path in CRITICAL_ROUTE_PATHS.items()
+                if name != "routes.lafs"
+            },
             "at": 1.0,
         },
     )
@@ -111,7 +116,11 @@ def test_critical_route_readiness_accepts_complete_report(monkeypatch) -> None:
         "_LAST_REPORT",
         {
             "ok": 200, "skipped": 0, "skipped_names": [],
-            "mounted_names": sorted(CRITICAL_BOOT_ROUTERS), "at": 1.0,
+            "mounted_names": sorted(CRITICAL_BOOT_ROUTERS),
+            "mounted_paths": {
+                name: [path] for name, path in CRITICAL_ROUTE_PATHS.items()
+            },
+            "at": 1.0,
         },
     )
     status = registry_health.critical_router_readiness()
@@ -135,6 +144,10 @@ def test_critical_route_readiness_rejects_silent_absent_mount(monkeypatch) -> No
         {
             "ok": 200, "skipped": 0, "skipped_names": [],
             "mounted_names": sorted(CRITICAL_BOOT_ROUTERS - {"routes.marketplace"}),
+            "mounted_paths": {
+                name: [path] for name, path in CRITICAL_ROUTE_PATHS.items()
+                if name != "routes.marketplace"
+            },
             "at": 1.0,
         },
     )
@@ -202,3 +215,27 @@ def test_partial_router_mount_is_rolled_back_and_later_router_can_mount(monkeypa
     assert report["mounted_names"] == ["routes.working_mount"]
     assert "routes.partial_mount (import_failed RuntimeError)" in report["skipped_names"]
     assert [route.path for route in app.routes].count("/registered") == 1
+
+def test_critical_router_with_wrong_path_is_not_marked_ready(monkeypatch) -> None:
+    mounted_paths = {
+        name: [path] for name, path in CRITICAL_ROUTE_PATHS.items()
+    }
+    mounted_paths["routes.marketplace"] = ["/api/unrelated"]
+    monkeypatch.setattr(
+        registry_health, "_LAST_REPORT",
+        {
+            "ok": 200, "skipped": 0, "skipped_names": [],
+            "mounted_names": sorted(CRITICAL_BOOT_ROUTERS),
+            "mounted_paths": mounted_paths, "at": 1.0,
+        },
+    )
+    status = registry_health.critical_router_readiness()
+    assert status["report_available"] is True
+    assert status["ok"] is False
+    assert status["missing"] == ["routes.marketplace"]
+
+
+def test_expected_critical_paths_are_unique_and_canonical() -> None:
+    assert frozenset(CRITICAL_ROUTE_PATHS) == CRITICAL_BOOT_ROUTERS
+    assert len(set(CRITICAL_ROUTE_PATHS.values())) == len(CRITICAL_BOOT_ROUTERS)
+    assert all(path.startswith("/api/") for path in CRITICAL_ROUTE_PATHS.values())
