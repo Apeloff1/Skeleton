@@ -62,7 +62,12 @@ def _declared_route_paths(router, *, mount_prefix: str = "") -> list[str]:
                 paths.append(prefix + path)
                 continue
             nested = getattr(route, "original_router", None)
-            nested_prefix = getattr(route, "prefix", "")
+            # FastAPI's preserved-router wrapper stores its mounting prefix
+            # on include_context, not consistently as a direct attribute.
+            include_context = getattr(route, "include_context", None)
+            nested_prefix = getattr(include_context, "prefix", None)
+            if not isinstance(nested_prefix, str):
+                nested_prefix = getattr(route, "prefix", "")
             if (
                 nested is not None
                 and nested is not current
@@ -116,7 +121,11 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             # router. Only resolve its declared child paths after a real app
             # route-tree change; the empty-router and failed-include checks
             # remain fail-closed.
-            if newly_mounted and not registered_paths:
+            if (
+                newly_mounted
+                and not registered_paths
+                and any(getattr(mounted, "original_router", None) is router for mounted in newly_mounted)
+            ):
                 registered_paths = _declared_route_paths(
                     router, mount_prefix=prefix or "",
                 )
