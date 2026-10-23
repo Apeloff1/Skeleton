@@ -6689,16 +6689,6 @@
   },
   "retained_outside_ai_tree": [
     {
-      "path": "skeleton/inference",
-      "owner": "provider-neutral inference runtime",
-      "reason": "Canonical bounded inference runtime remains at skeleton/inference; provider authority remains at skeleton/provider_runtime.py pending explicit ownership cutover."
-    },
-    {
-      "path": "skeleton/README.py",
-      "owner": "package documentation",
-      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
-    },
-    {
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
@@ -6709,179 +6699,14 @@
       "reason": "mixed acquired-source quarantine; only explicitly assigned files move after characterization and provenance preservation"
     },
     {
-      "path": "skeleton/architecture.py",
-      "owner": "architecture authority",
-      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
-    },
-    {
-      "path": "skeleton/foundation/architecture/index.py",
-      "owner": "architecture authority",
-      "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round3.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round4.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round5.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round6.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round7.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round8.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round9.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round10.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round11.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round12.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round13.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round14.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round15.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round16.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round17.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round18.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round19.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round20.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round21.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round22.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/manifest.py",
-      "owner": "package/module registry",
-      "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
-    },
-    {
-      "path": "skeleton/quickstart.py",
-      "owner": "developer/package guidance",
-      "reason": "quickstart guidance is a package/developer surface, not engine implementation"
-    },
-    {
-      "path": "skeleton/release",
-      "owner": "release engineering",
-      "reason": "release evidence and qualification remain outside the AI runtime per architecture ownership"
-    },
-    {
-      "path": "skeleton/requirements.py",
-      "owner": "package dependency metadata",
-      "reason": "package dependency declaration stays at package boundary"
-    },
-    {
-      "path": "skeleton/setup_config.py",
-      "owner": "package/install metadata",
-      "reason": "setup/install metadata stays with packaging and installer ownership"
-    },
-    {
-      "path": "skeleton/ubuntu",
-      "owner": "deployment/platform support",
-      "reason": "Ubuntu/cloud/service support belongs to deployment/operations ownership, not the AI engine tree"
-    },
-    {
-      "path": "skeleton/telemetry",
-      "owner": "observability/telemetry boundary",
-      "reason": "Top-level telemetry compatibility surface remains outside canonical AI implementation ownership during staged migration."
-    },
-    {
-      "path": "skeleton/turn",
-      "owner": "package/compatibility boundary",
-      "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
-    },
-    {
-      "path": "skeleton/parse",
-      "owner": "package/parsing compatibility boundary",
-      "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
-    },
-    {
-      "path": "skeleton/era",
-      "owner": "simulation compatibility boundary",
-      "reason": "legacy era namespace remains a compatibility shim for skeleton/simulation/era after TREE-030"
-    },
-    {
-      "path": "skeleton/genos",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level genos compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/cue",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
       "path": "skeleton/agents",
       "owner": "automation compatibility boundary",
       "reason": "legacy skeleton.agents namespace remains a compatibility shim after TREE-028"
+    },
+    {
+      "path": "skeleton/app_services",
+      "owner": "Existing application-foundation service adapters",
+      "reason": "Existing in-process application auth/projects/build-job/assets ports and adapters remain canonical here per docs/contracts/job_queue.md and docs/architecture/c4/02-container.md; no HTTP entry, model provider or new service/state owner is introduced."
     },
     {
       "path": "skeleton/application",
@@ -6889,127 +6714,7 @@
       "reason": "legacy application namespace remains a shim for skeleton/app/runtime"
     },
     {
-      "path": "skeleton/contexts",
-      "owner": "context compatibility boundary",
-      "reason": "legacy plural contexts namespace remains a shim for skeleton/context/domains"
-    },
-    {
-      "path": "skeleton/persist",
-      "owner": "persistence compatibility boundary",
-      "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
-    },
-    {
-      "path": "skeleton/swarm",
-      "owner": "compatibility shim for skeleton/automation/swarm",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/swarm"
-    },
-    {
-      "path": "skeleton/hive",
-      "owner": "compatibility shim for skeleton/automation/hive",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/hive"
-    },
-    {
-      "path": "skeleton/overseer",
-      "owner": "compatibility shim for skeleton/automation/overseer",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/overseer"
-    },
-    {
-      "path": "skeleton/content",
-      "owner": "compatibility shim for skeleton/simulation/content",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/content"
-    },
-    {
-      "path": "skeleton/creator",
-      "owner": "forge compatibility boundary",
-      "reason": "legacy creator namespace remains a shim for skeleton/forge/creator"
-    },
-    {
-      "path": "skeleton/economy",
-      "owner": "compatibility shim for skeleton/simulation/economy",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/economy"
-    },
-    {
-      "path": "skeleton/world",
-      "owner": "compatibility shim for skeleton/simulation/world",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/world"
-    },
-    {
-      "path": "skeleton/platform",
-      "owner": "simulation compatibility boundary",
-      "reason": "legacy platform namespace remains a shim for skeleton/simulation/platform"
-    },
-    {
-      "path": "skeleton/pipelines",
-      "owner": "forge compatibility boundary",
-      "reason": "legacy pipelines namespace remains a shim for skeleton/forge/pipelines"
-    },
-    {
-      "path": "skeleton/genesis.py",
-      "owner": "bootstrap compatibility boundary",
-      "reason": "legacy genesis entrypoint remains a shim for skeleton/bootstrap/genesis.py"
-    },
-    {
-      "path": "skeleton/provider_contract.py",
-      "owner": "provider compatibility boundary",
-      "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
-    },
-    {
-      "path": "skeleton/jvm_accelerators.py",
-      "owner": "native compatibility boundary",
-      "reason": "legacy JVM accelerator registry remains a compatibility entrypoint"
-    },
-    {
-      "path": "skeleton/kv_cache.py",
-      "owner": "KV compatibility boundary",
-      "reason": "legacy KV cache facade remains a compatibility entrypoint"
-    },
-    {
-      "path": "skeleton/bootstrap",
-      "owner": "core bootstrap owner",
-      "reason": "bootstrap contains canonical package wiring; only explicitly governed AI-relevant files are mirrored"
-    },
-    {
-      "path": "skeleton/providers",
-      "owner": "integration contract owner",
-      "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
-    },
-    {
       "path": "skeleton/architecture_index.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round3.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round4.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round5.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round6.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round7.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round8.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round9.py",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
@@ -7079,174 +6784,49 @@
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/game",
-      "owner": "simulation compatibility boundary",
-      "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
-    },
-    {
-      "path": "skeleton/school",
-      "owner": "learning compatibility boundary",
-      "reason": "legacy School namespace remains a compatibility shim for skeleton/learning/school after TREE-030"
-    },
-    {
-      "path": "skeleton/social",
-      "owner": "research compatibility boundary",
-      "reason": "legacy social namespace remains a compatibility shim for skeleton/research/social after TREE-034"
-    },
-    {
-      "path": "skeleton/galaxy",
-      "owner": "distributed compatibility boundary",
-      "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
-    },
-    {
-      "path": "skeleton/network",
-      "owner": "distributed compatibility boundary",
-      "reason": "legacy Network namespace remains a compatibility shim for skeleton/distributed/network after TREE-036"
-    },
-    {
-      "path": "skeleton/mesh",
-      "owner": "distributed compatibility boundary",
-      "reason": "legacy Mesh namespace remains a compatibility shim for skeleton/distributed/mesh after TREE-037"
-    },
-    {
-      "path": "skeleton/graphs",
-      "owner": "knowledge compatibility boundary",
-      "reason": "legacy graphs namespace remains a compatibility shim for skeleton/knowledge/graphs after TREE-038"
-    },
-    {
-      "path": "skeleton/chronicle",
-      "owner": "provenance compatibility boundary",
-      "reason": "legacy Chronicle namespace remains a compatibility shim for skeleton/provenance/chronicle after TREE-039"
-    },
-    {
-      "path": "skeleton/integrations",
-      "owner": "tools compatibility boundary",
-      "reason": "legacy integrations namespace remains a compatibility shim for skeleton/tools/integrations after TREE-040"
-    },
-    {
-      "path": "skeleton/foundation/architecture",
+      "path": "skeleton/architecture_round3.py",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/main_guard",
-      "owner": "repository-machine control boundary",
-      "reason": "main-guard enforces repository and CI integrity outside canonical AI runtime ownership"
+      "path": "skeleton/architecture_round4.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/ops",
-      "owner": "operations/release tooling",
-      "reason": "operational cockpit, release/preview hygiene, and smoke-verdict tooling stay outside canonical AI runtime ownership"
+      "path": "skeleton/architecture_round5.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/verification",
-      "owner": "verification and assurance infrastructure",
-      "reason": "Repository verification/evidence infrastructure remains outside canonical AI runtime ownership; it validates AI and non-AI surfaces without becoming product runtime authority."
+      "path": "skeleton/architecture_round6.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/persistence/scatter10240",
-      "owner": "AIFT-PERSISTENCE generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+      "path": "skeleton/architecture_round7.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/retrieval/scatter10240",
-      "owner": "AIFT-RETRIEVAL generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+      "path": "skeleton/architecture_round8.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/vault/scatter10240",
-      "owner": "AIFT-VAULT generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+      "path": "skeleton/architecture_round9.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/observability/scatter10240",
-      "owner": "AIFT-OBSERVABILITY generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+      "path": "skeleton/architecture.py",
+      "owner": "architecture authority",
+      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
-      "path": "skeleton/eval/scatter10240",
-      "owner": "AIFT-EVALUATION generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/reliability/scatter10240",
-      "owner": "AIFT-RELIABILITY generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/resilience/scatter10240",
-      "owner": "AIFT-RESILIENCE generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/cognition/facet10240",
-      "owner": "AIFT-COGNITION generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/primitives/facet10240",
-      "owner": "AIFT-PRIMITIVES generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/simulation/scatter10240",
-      "owner": "AIFT-SIMULATION generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/quality/scatter10240",
-      "owner": "AIFT-QUALITY generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/inventory/scatter10240",
-      "owner": "AIFT-INVENTORY generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/support/scatter10240",
-      "owner": "AIFT-SUPPORT generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/motive/facet10240",
-      "owner": "AIFT-MOTIVE generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/sheaf/facet10240",
-      "owner": "AIFT-SHEAF generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/spine/facet10240",
-      "owner": "AIFT-SPINE generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/viscera/facet10240",
-      "owner": "AIFT-VISCERA generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/turn/facet10240",
-      "owner": "AIFT-TURN-COMPAT generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/telemetry/scatter10240",
-      "owner": "AIFT-TELEMETRY-COMPAT generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/provenance/scatter10240",
-      "owner": "AIFT-PROVENANCE generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
-    },
-    {
-      "path": "skeleton/document_vision/vol155",
-      "owner": "AIFT-DOCUMENT-VISION generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+      "path": "skeleton/artifact",
+      "owner": "Artifact plane",
+      "reason": "Artifact assembly and output delivery remain a separately governed app-production surface until ownership and import cutover are proven"
     },
     {
       "path": "skeleton/audio/eras",
@@ -7259,14 +6839,59 @@
       "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
     },
     {
-      "path": "skeleton/video/vol158",
-      "owner": "AIFT-VIDEO generated capability organ pack",
+      "path": "skeleton/backlog",
+      "owner": "Production backlog",
+      "reason": "Backlog orchestration is app-wide work management; defer AI-tree ownership until the scheduling authority is verified"
+    },
+    {
+      "path": "skeleton/bootstrap",
+      "owner": "core bootstrap owner",
+      "reason": "bootstrap contains canonical package wiring; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/chronicle",
+      "owner": "provenance compatibility boundary",
+      "reason": "legacy Chronicle namespace remains a compatibility shim for skeleton/provenance/chronicle after TREE-039"
+    },
+    {
+      "path": "skeleton/cli",
+      "owner": "Command-line shell",
+      "reason": "Public CLI and command routing stay with the application shell; do not mirror without command entrypoint regression evidence"
+    },
+    {
+      "path": "skeleton/client",
+      "owner": "Existing typed application HTTP/SSE client SDK",
+      "reason": "Canonical client SDK remains outside AI implementation ownership per docs/architecture/c4/02-container.md and accepted docs/architecture/ADR-realtime-transport.md; it consumes existing authenticated application/engine routes and never owns model execution."
+    },
+    {
+      "path": "skeleton/cognition/facet10240",
+      "owner": "AIFT-COGNITION generated capability organ pack",
       "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
     },
     {
-      "path": "skeleton/supply_chain/vol178",
-      "owner": "AIFT-SUPPLY-CHAIN generated capability organ pack",
-      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+      "path": "skeleton/compat",
+      "owner": "Canonical Python runtime compatibility adapters",
+      "reason": "Retain feature-detected Python runtime shims outside staged AI migration; the adapters are shared across application, engine, tests and CI, and remain the canonical owner of cross-version portability contracts."
+    },
+    {
+      "path": "skeleton/completion",
+      "owner": "App completion assessor",
+      "reason": "System-wide readiness and milestone closure remain application acceptance functions pending verified AI cutover"
+    },
+    {
+      "path": "skeleton/content",
+      "owner": "compatibility shim for skeleton/simulation/content",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/content"
+    },
+    {
+      "path": "skeleton/contexts",
+      "owner": "context compatibility boundary",
+      "reason": "legacy plural contexts namespace remains a shim for skeleton/context/domains"
+    },
+    {
+      "path": "skeleton/creator",
+      "owner": "forge compatibility boundary",
+      "reason": "legacy creator namespace remains a shim for skeleton/forge/creator"
     },
     {
       "path": "skeleton/cs300",
@@ -7274,14 +6899,344 @@
       "reason": "CS-300 capability ladder and paired-learning evidence; governed by machine/cs300 ladder contracts, not AI runtime ownership."
     },
     {
+      "path": "skeleton/cue",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/deck",
+      "owner": "Command deck",
+      "reason": "Shared operator command deck remains an application control surface until runtime integration is verified"
+    },
+    {
+      "path": "skeleton/dna",
+      "owner": "Generative DNA primitives",
+      "reason": "DNA and helix helpers remain specialized world-generation components pending a signed runtime owner decision"
+    },
+    {
+      "path": "skeleton/document_vision/vol155",
+      "owner": "AIFT-DOCUMENT-VISION generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
       "path": "skeleton/domains",
       "owner": "domain registry surface",
       "reason": "domain packs governed by machine/ai_domain_registry.json; AI runtime context domains are already excluded from AIFT-CONTEXT."
     },
     {
+      "path": "skeleton/economy",
+      "owner": "compatibility shim for skeleton/simulation/economy",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/economy"
+    },
+    {
+      "path": "skeleton/emulation",
+      "owner": "Emulator platform plane",
+      "reason": "Console emulation mapping remains platform-bound game infrastructure pending native and compatibility qualification"
+    },
+    {
+      "path": "skeleton/era",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy era namespace remains a compatibility shim for skeleton/simulation/era after TREE-030"
+    },
+    {
+      "path": "skeleton/errors",
+      "owner": "Error taxonomy",
+      "reason": "Error hierarchy and reporting remain shared application diagnostics rather than unilaterally AI-owned"
+    },
+    {
+      "path": "skeleton/eval/scatter10240",
+      "owner": "AIFT-EVALUATION generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/fix",
+      "owner": "Maintenance automation",
+      "reason": "Repair and issue-closing commands remain shared maintenance tooling; no automatic AI authority promotion"
+    },
+    {
+      "path": "skeleton/foundation/architecture",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/foundation/architecture/index.py",
+      "owner": "architecture authority",
+      "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round10.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round11.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round12.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round13.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round14.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round15.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round16.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round17.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round18.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round19.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round20.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round21.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round22.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round3.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round4.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round5.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round6.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round7.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round8.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round9.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/frontend",
+      "owner": "Frontend bridge",
+      "reason": "UI and presentation adapters remain frontend-owned pending wired, tested interfaces to the AI runtime"
+    },
+    {
+      "path": "skeleton/galaxy",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
+    },
+    {
+      "path": "skeleton/game",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
+    },
+    {
+      "path": "skeleton/gameforge",
+      "owner": "GameForge production orchestration",
+      "reason": "Tracked game-production conductor and end-to-end orchestration modules retain game-studio builder ownership until engine integration, source provenance, and explicit AI-tree import cutover are verified."
+    },
+    {
+      "path": "skeleton/gates",
+      "owner": "Quality gates",
+      "reason": "Cross-package import and validation gates retain independent assurance ownership"
+    },
+    {
+      "path": "skeleton/genesis.py",
+      "owner": "bootstrap compatibility boundary",
+      "reason": "legacy genesis entrypoint remains a shim for skeleton/bootstrap/genesis.py"
+    },
+    {
+      "path": "skeleton/genos",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level genos compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/godot",
+      "owner": "Godot exporter",
+      "reason": "Native engine exporters remain game platform and packaging surfaces until verified engine integration"
+    },
+    {
+      "path": "skeleton/graphs",
+      "owner": "knowledge compatibility boundary",
+      "reason": "legacy graphs namespace remains a compatibility shim for skeleton/knowledge/graphs after TREE-038"
+    },
+    {
+      "path": "skeleton/hive",
+      "owner": "compatibility shim for skeleton/automation/hive",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/hive"
+    },
+    {
+      "path": "skeleton/house",
+      "owner": "Compatibility migration",
+      "reason": "Legacy compatibility and shim cleanup remain migration-housekeeping authority"
+    },
+    {
+      "path": "skeleton/inference",
+      "owner": "provider-neutral inference runtime",
+      "reason": "Canonical bounded inference runtime remains at skeleton/inference; provider authority remains at skeleton/provider_runtime.py pending explicit ownership cutover."
+    },
+    {
+      "path": "skeleton/install",
+      "owner": "Installer and first-run",
+      "reason": "Installers, dependency doctors, resource setup, and upgrades remain app installation authority, not AI runtime"
+    },
+    {
+      "path": "skeleton/integrations",
+      "owner": "tools compatibility boundary",
+      "reason": "legacy integrations namespace remains a compatibility shim for skeleton/tools/integrations after TREE-040"
+    },
+    {
+      "path": "skeleton/inventory/scatter10240",
+      "owner": "AIFT-INVENTORY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/jobs",
+      "owner": "Job scheduling plane",
+      "reason": "Queue and job orchestration remain shared scheduler ownership until policy-bound AI delegation is proven"
+    },
+    {
+      "path": "skeleton/jvm_accelerators.py",
+      "owner": "native compatibility boundary",
+      "reason": "legacy JVM accelerator registry remains a compatibility entrypoint"
+    },
+    {
+      "path": "skeleton/kv_cache.py",
+      "owner": "KV compatibility boundary",
+      "reason": "legacy KV cache facade remains a compatibility entrypoint"
+    },
+    {
+      "path": "skeleton/layers",
+      "owner": "Runtime layers",
+      "reason": "Adapter and layer candidates remain a distinct runtime subsystem pending proven module provenance and model authority"
+    },
+    {
+      "path": "skeleton/local_ai",
+      "owner": "Standalone local AI package",
+      "reason": "Large independently packaged local AI implementation retains its own ownership until licensed training, model serving, and imports are verified"
+    },
+    {
+      "path": "skeleton/lora",
+      "owner": "LoRA asset plane",
+      "reason": "LoRA contact, bank and adaptation source stays with the model-training plane pending weight provenance checks"
+    },
+    {
+      "path": "skeleton/main_guard",
+      "owner": "repository-machine control boundary",
+      "reason": "main-guard enforces repository and CI integrity outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/manifest.py",
+      "owner": "package/module registry",
+      "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
+    },
+    {
+      "path": "skeleton/maximise",
+      "owner": "Optimization harness",
+      "reason": "Optimization and maximum-workload tooling remain shared production scheduling utilities"
+    },
+    {
+      "path": "skeleton/merge",
+      "owner": "Repository merge orchestration",
+      "reason": "Merge readiness and conflict resolution stay with repository operations authority"
+    },
+    {
+      "path": "skeleton/mesh",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Mesh namespace remains a compatibility shim for skeleton/distributed/mesh after TREE-037"
+    },
+    {
+      "path": "skeleton/mobile",
+      "owner": "Mobile runtime",
+      "reason": "Device and mobile model-bank adapters remain platform-specific runtime scope"
+    },
+    {
+      "path": "skeleton/models",
+      "owner": "Model serving and weights",
+      "reason": "Model catalog, LoRA, GGUF runtime and training receipts require model/checkpoint verification before AI-tree promotion"
+    },
+    {
+      "path": "skeleton/motive/facet10240",
+      "owner": "AIFT-MOTIVE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/network",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Network namespace remains a compatibility shim for skeleton/distributed/network after TREE-036"
+    },
+    {
+      "path": "skeleton/observability/scatter10240",
+      "owner": "AIFT-OBSERVABILITY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/ops",
+      "owner": "operations/release tooling",
+      "reason": "operational cockpit, release/preview hygiene, and smoke-verdict tooling stay outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/organs",
+      "owner": "Product subsystem projection",
+      "reason": "Subsystem facades and organ surfaces remain product shell integration pending owner classification"
+    },
+    {
+      "path": "skeleton/overseer",
+      "owner": "compatibility shim for skeleton/automation/overseer",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/overseer"
     },
     {
       "path": "skeleton/p3",
@@ -7299,19 +7254,69 @@
       "reason": "phase-5 engineering closure deliverables governed by the masterplan phase contracts."
     },
     {
-      "path": "skeleton/volumes",
-      "owner": "masterplan volume organs",
-      "reason": "per-volume construction organs referenced by masterplan implementation_paths; retained outside the AI tree pending explicit per-volume cutover."
+      "path": "skeleton/packaging",
+      "owner": "Distribution packaging",
+      "reason": "Deliverables, installers, release layouts, and export packages remain release ownership"
     },
     {
-      "path": "skeleton/app_services",
-      "owner": "Existing application-foundation service adapters",
-      "reason": "Existing in-process application auth/projects/build-job/assets ports and adapters remain canonical here per docs/contracts/job_queue.md and docs/architecture/c4/02-container.md; no HTTP entry, model provider or new service/state owner is introduced."
+      "path": "skeleton/parse",
+      "owner": "package/parsing compatibility boundary",
+      "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
     },
     {
-      "path": "skeleton/client",
-      "owner": "Existing typed application HTTP/SSE client SDK",
-      "reason": "Canonical client SDK remains outside AI implementation ownership per docs/architecture/c4/02-container.md and accepted docs/architecture/ADR-realtime-transport.md; it consumes existing authenticated application/engine routes and never owns model execution."
+      "path": "skeleton/persist",
+      "owner": "persistence compatibility boundary",
+      "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
+    },
+    {
+      "path": "skeleton/persistence/scatter10240",
+      "owner": "AIFT-PERSISTENCE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/pipelines",
+      "owner": "forge compatibility boundary",
+      "reason": "legacy pipelines namespace remains a shim for skeleton/forge/pipelines"
+    },
+    {
+      "path": "skeleton/platform",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy platform namespace remains a shim for skeleton/simulation/platform"
+    },
+    {
+      "path": "skeleton/primitives/facet10240",
+      "owner": "AIFT-PRIMITIVES generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/provenance/scatter10240",
+      "owner": "AIFT-PROVENANCE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/provider_contract.py",
+      "owner": "provider compatibility boundary",
+      "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/providers",
+      "owner": "integration contract owner",
+      "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/quality/scatter10240",
+      "owner": "AIFT-QUALITY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/quickstart.py",
+      "owner": "developer/package guidance",
+      "reason": "quickstart guidance is a package/developer surface, not engine implementation"
+    },
+    {
+      "path": "skeleton/README.py",
+      "owner": "package documentation",
+      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
     },
     {
       "path": "skeleton/realtime",
@@ -7319,15 +7324,162 @@
       "reason": "Accepted docs/architecture/ADR-realtime-transport.md retains the shared event envelope, bounded hub, authorization/presence, SLO and secret-guard implementation here; transport adds no competing model/runtime or durable state authority."
     },
     {
-      "path": "skeleton/compat",
-      "owner": "Canonical Python runtime compatibility adapters",
-      "reason": "Retain feature-detected Python runtime shims outside staged AI migration; the adapters are shared across application, engine, tests and CI, and remain the canonical owner of cross-version portability contracts."
+      "path": "skeleton/release",
+      "owner": "release engineering",
+      "reason": "release evidence and qualification remain outside the AI runtime per architecture ownership"
+    },
+    {
+      "path": "skeleton/reliability/scatter10240",
+      "owner": "AIFT-RELIABILITY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/requirements.py",
+      "owner": "package dependency metadata",
+      "reason": "package dependency declaration stays at package boundary"
+    },
+    {
+      "path": "skeleton/resilience/scatter10240",
+      "owner": "AIFT-RESILIENCE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/retrieval/scatter10240",
+      "owner": "AIFT-RETRIEVAL generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/router",
+      "owner": "Application router",
+      "reason": "Application route unification stays with shared API control-plane ownership"
+    },
+    {
+      "path": "skeleton/runtimes",
+      "owner": "Specialized runtimes",
+      "reason": "Specialized runtime implementations need explicit execution authority and compatibility gates before migration"
+    },
+    {
+      "path": "skeleton/school",
+      "owner": "learning compatibility boundary",
+      "reason": "legacy School namespace remains a compatibility shim for skeleton/learning/school after TREE-030"
+    },
+    {
+      "path": "skeleton/setup_config.py",
+      "owner": "package/install metadata",
+      "reason": "setup/install metadata stays with packaging and installer ownership"
+    },
+    {
+      "path": "skeleton/sheaf/facet10240",
+      "owner": "AIFT-SHEAF generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/simulation/scatter10240",
+      "owner": "AIFT-SIMULATION generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/social",
+      "owner": "research compatibility boundary",
+      "reason": "legacy social namespace remains a compatibility shim for skeleton/research/social after TREE-034"
+    },
+    {
+      "path": "skeleton/sota",
+      "owner": "Quality improvement studio",
+      "reason": "SOTA improvement targets are cross-product QA candidates; no completion or ownership can be inferred from filenames"
+    },
+    {
+      "path": "skeleton/spine/facet10240",
+      "owner": "AIFT-SPINE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/supply_chain/vol178",
+      "owner": "AIFT-SUPPLY-CHAIN generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/support/scatter10240",
+      "owner": "AIFT-SUPPORT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/swarm",
+      "owner": "compatibility shim for skeleton/automation/swarm",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/swarm"
+    },
+    {
+      "path": "skeleton/telemetry",
+      "owner": "observability/telemetry boundary",
+      "reason": "Top-level telemetry compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/telemetry/scatter10240",
+      "owner": "AIFT-TELEMETRY-COMPAT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/turn",
+      "owner": "package/compatibility boundary",
+      "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/turn/facet10240",
+      "owner": "AIFT-TURN-COMPAT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/tutolage",
+      "owner": "Learning and academy",
+      "reason": "Education and tutelage studio remains learning-product ownership pending AI model interface qualification"
+    },
+    {
+      "path": "skeleton/ubuntu",
+      "owner": "deployment/platform support",
+      "reason": "Ubuntu/cloud/service support belongs to deployment/operations ownership, not the AI engine tree"
+    },
+    {
+      "path": "skeleton/vault/scatter10240",
+      "owner": "AIFT-VAULT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/verification",
+      "owner": "verification and assurance infrastructure",
+      "reason": "Repository verification/evidence infrastructure remains outside canonical AI runtime ownership; it validates AI and non-AI surfaces without becoming product runtime authority."
+    },
+    {
+      "path": "skeleton/video/vol158",
+      "owner": "AIFT-VIDEO generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/viscera/facet10240",
+      "owner": "AIFT-VISCERA generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/visual",
+      "owner": "Visual game validation",
+      "reason": "Renderer and visual engine verification belong to the game QA/render pipeline pending an explicit AI capability cutover"
+    },
+    {
+      "path": "skeleton/volumes",
+      "owner": "masterplan volume organs",
+      "reason": "per-volume construction organs referenced by masterplan implementation_paths; retained outside the AI tree pending explicit per-volume cutover."
+    },
+    {
+      "path": "skeleton/world",
+      "owner": "compatibility shim for skeleton/simulation/world",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/world"
     }
   ],
   "classification_coverage": {
-    "status": "closed_after_completed_work_fill",
+    "status": "reconciled_retained_standalone_and_shared_roots_pending_verified_cutover",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "40e81412e995a9b153a02ff39f3ae1aec187de25"
+    "source_head": "40e81412e995a9b153a02ff39f3ae1aec187de25",
+    "newly_classified": 30,
+    "verification_note": "30 previously unclassified tracked roots retain explicit non-canonical owners; parity validation and runtime promotion requirements remain enforced."
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
