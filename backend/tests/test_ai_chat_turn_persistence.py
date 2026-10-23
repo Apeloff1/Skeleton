@@ -646,6 +646,7 @@ async def test_mongo_legacy_operation_gets_atomic_ownership_schema():
         "lease_heartbeat_sequence",
         "lease_previous_digest",
         "lease_digest",
+        "lease_token",
         "ownership_receipt_digest",
         "ownership_audit_sequence",
     ):
