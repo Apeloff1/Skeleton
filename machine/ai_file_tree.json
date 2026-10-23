@@ -5746,31 +5746,18 @@
         "deduplication.py",
         "distillation.py",
         "flgb_training_runtime.py",
-        "jeeves_adaptive_sim_training.py",
-        "jeeves_book_curriculum.py",
-        "jeeves_book_weight_pipeline.py",
-        "jeeves_boomerang_queue.py",
-        "jeeves_capability_replay.py",
-        "jeeves_capacity_growth.py",
-        "jeeves_cinematic_simulation.py",
         "jeeves_game_corpus.py",
         "jeeves_game_corpus_builder.py",
         "jeeves_game_design_benchmark.py",
         "jeeves_game_design_review_cli.py",
         "jeeves_game_design_review_gate.py",
         "jeeves_game_vocabulary.py",
-        "jeeves_multidomain.py",
-        "jeeves_parallel_mirrors.py",
         "jeeves_production_game_recovery.py",
         "jeeves_production_game_session.py",
         "jeeves_production_game_train.py",
         "jeeves_production_readiness.py",
-        "jeeves_studio_curriculum.py",
-        "jeeves_studio_multifactor_corpus.py",
-        "jeeves_studio_rule_corpus.py",
         "jeeves_torch_game_vocabulary.py",
         "jeeves_training_progress.py",
-        "joint_learning_custody.py",
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
         "model_release_journal.py",
@@ -5780,13 +5767,6 @@
         "promotion_gate.py",
         "promotion_lifecycle.py",
         "resource_admission.py",
-        "rom_fleet_audit.py",
-        "rom_inventory_snapshot.py",
-        "rom_study.py",
-        "rom_triangle_campaign.py",
-        "rom_triangle_lens_progress.py",
-        "sdk_custody_drift.py",
-        "sdk_study.py",
         "shadow_candidate_gate.py",
         "shadow_idle_training.py",
         "shadow_native_trainer.py",
@@ -5825,7 +5805,25 @@
         "temporal_revocation.py",
         "temporal_signals.py",
         "temporal_uncertainty.py",
-        "training_manifest.py"
+        "training_manifest.py",
+        "jeeves_multidomain.py",
+        "jeeves_parallel_mirrors.py",
+        "jeeves_cinematic_simulation.py",
+        "jeeves_adaptive_sim_training.py",
+        "jeeves_capacity_growth.py",
+        "jeeves_capability_replay.py",
+        "jeeves_boomerang_queue.py",
+        "jeeves_studio_curriculum.py",
+        "jeeves_studio_multifactor_corpus.py",
+        "jeeves_studio_rule_corpus.py",
+        "joint_learning_custody.py",
+        "rom_fleet_audit.py",
+        "rom_inventory_snapshot.py",
+        "rom_study.py",
+        "rom_triangle_campaign.py",
+        "rom_triangle_lens_progress.py",
+        "sdk_custody_drift.py",
+        "sdk_study.py"
       ],
       "overlay_note": "Current main already implements these governed AI-only training modules. Declare their existing placement without copying them into the legacy tree or changing training authority."
     },
@@ -7081,6 +7079,11 @@
       "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
     },
     {
+      "path": "skeleton/gameforge",
+      "owner": "GameForge production orchestration",
+      "reason": "Tracked game-production conductor and end-to-end orchestration modules retain game-studio builder ownership until engine integration, source provenance, and explicit AI-tree import cutover are verified."
+    },
+    {
       "path": "skeleton/gates",
       "owner": "Quality gates",
       "reason": "Cross-package import and validation gates retain independent assurance ownership"
@@ -7475,8 +7478,8 @@
     "status": "reconciled_retained_standalone_and_shared_roots_pending_verified_cutover",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
     "source_head": "40e81412e995a9b153a02ff39f3ae1aec187de25",
-    "newly_classified": 29,
-    "verification_note": "Previously unclassified tracked roots retain explicit non-canonical owners; no AI-tree parity or completion requirement was waived."
+    "newly_classified": 30,
+    "verification_note": "30 previously unclassified tracked roots retain explicit non-canonical owners; parity validation and runtime promotion requirements remain enforced."
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -7744,15 +7747,6 @@
       "commit": "4737a8c8bdbc7fc3aab1e1b525ef677393d33153",
       "state": "pending_app_assembly",
       "package": "react-native-worklets@0.13.0"
-    },
-    "jeeves_book_training_native_overlays": {
-      "reason": "These two rights-pinned, host-operated training entrypoints exist only in the canonical AI training tree. They use native AI training dependencies absent from the legacy skeleton/training package; their explicit owner is skeleton/ai/training until an import-verified cutover is approved.",
-      "paths": [
-        "jeeves_book_curriculum.py",
-        "jeeves_book_weight_pipeline.py"
-      ],
-      "source_disposition": "native_ai_training_only; do not mirror into legacy training namespace",
-      "promotion": "candidate weights remain unpromoted pending evidence and acceptance gates"
     }
   },
   "reconciliation": {
