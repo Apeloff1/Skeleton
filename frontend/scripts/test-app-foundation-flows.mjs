@@ -225,7 +225,7 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     const buildId = validBuildId(created.data?.build_id);
     assert.ok(buildId, 'create must return a safe build_id');
     const started = await call('POST', '/api/galaxy-studio/start-build', { build_id: buildId, build_duration_minutes: 1 }, ctx.token);
-    assert.equal(started.ok, true, `start-build HTTP ${started.status}`);
+    assert.equal(started.ok, true, `start-build HTTP ${started.status}: ${String(started.data?.detail?.code || started.data?.detail || "unavailable").slice(0, 240)}`);
     ctx.buildId = buildId;
   });
   await t.test('F4-05 watch the live build to completed', async () => {
