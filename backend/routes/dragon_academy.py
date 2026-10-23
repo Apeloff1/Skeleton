@@ -2311,7 +2311,10 @@ def native_production_multiple_routes(
         raise HTTPException(
             status_code=422, detail="Original puzzle board could not produce bounded proven route analysis"
         ) from None
-    return {"ok": True, **route_report(routes)}
+    # Keep direct Python and HTTP responses in the same JSON-compatible
+    # schema. The independent path verifier requires arrays, not Python
+    # tuple fields leaked through dataclasses.asdict.
+    return {"ok": True, **jsonable_encoder(route_report(routes))}
 
 
 @router.post("/native/production/puzzle/current-hint")
