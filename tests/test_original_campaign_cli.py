@@ -96,3 +96,31 @@ def test_cli_writes_canonical_json_receipt_and_new_game(tmp_path,capsys):
     assert report["controller_profile"]=="four_button"
     assert len(report["game_manifest_receipt"])==64
     assert (root/"game/frontier/expedition.tscn").is_file()
+
+
+def test_cli_builds_real_verified_zip_candidate_without_approval(tmp_path):
+    from skeleton.jeeves.game_frontier_campaign_delivery import (
+        verify_campaign_bundle, restore_campaign_bundle,
+    )
+    archive=tmp_path/"original.zip"
+    report=build_full_original_campaign(
+        "zip_candidate",gdd_digest=GDD,seed=19,islands=5,
+        destination=tmp_path/"authored_project",archive=archive,
+    )
+    assert archive.is_file()
+    assert report["delivery_seven_stage_receipts"]==7
+    assert len(report["delivery_archive_sha256"])==64
+    assert not report["delivery_release_approved"]
+    # The actual generated project is source-of-truth, not an invented receipt.
+    files={str(p.relative_to(tmp_path/"authored_project")).replace("\\","/"):
+           p.read_text(encoding="utf-8") for p in (tmp_path/"authored_project").rglob("*")
+           if p.is_file()}
+    from skeleton.jeeves.game_frontier_campaign_delivery import prepare_campaign_bundle
+    reconstructed=prepare_campaign_bundle(files,project_id="zip_candidate",
+        gdd_digest=GDD,world_digest=report["world_digest"])
+    assert reconstructed["archive"]==archive.read_bytes()
+    assert verify_campaign_bundle(archive.read_bytes(), reconstructed["report"],
+                                  original_files=files)["verified"]
+    restored=tmp_path/"restored"
+    assert restore_campaign_bundle(archive.read_bytes(),reconstructed["report"],restored)["restored"]
+    assert (restored/"project.godot").read_bytes()==(tmp_path/"authored_project"/"project.godot").read_bytes()
