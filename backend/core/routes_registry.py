@@ -38,16 +38,16 @@ from fastapi import FastAPI
 RouteEntry = Union[Tuple[str, str], Tuple[str, str, str]]
 
 
-def _declared_route_paths(router, *, mount_prefix: str = "") -> list[str]:
-    """Resolve included endpoint paths without materializing the whole API tree.
+def _declared_route_bindings(
+    router, *, mount_prefix: str = ""
+) -> list[tuple[str, object]]:
+    """Walk declared endpoints and preserve the exact target callable.
 
-    FastAPI <=0.136 copied child routes into app.routes. FastAPI >=0.137
-    preserves included routers using nested wrapper entries that have no
-    route.path. Inspect the already-admitted source router only when the
-    target app actually acquired a new mount, so a no-op include is never
-    reported as a successful capability.
+    In newer FastAPI, nested included routers are represented by wrappers.
+    In older versions the mounted routes are copies with the *same* endpoint
+    function. A path alone is not identity: a foreign router may use that URL.
     """
-    paths: list[str] = []
+    bindings: list[tuple[str, object]] = []
     pending: list[tuple[object, str, frozenset[int]]] = [
         (router, mount_prefix, frozenset())
     ]
@@ -59,11 +59,13 @@ def _declared_route_paths(router, *, mount_prefix: str = "") -> list[str]:
         for route in getattr(current, "routes", ()):
             path = getattr(route, "path", None)
             if isinstance(path, str):
-                paths.append(prefix + path)
+                endpoint = getattr(route, "endpoint", None)
+                if endpoint is None:
+                    endpoint = getattr(route, "app", None)
+                if endpoint is not None:
+                    bindings.append((prefix + path, endpoint))
                 continue
             nested = getattr(route, "original_router", None)
-            # FastAPI's preserved-router wrapper stores its mounting prefix
-            # on include_context, not consistently as a direct attribute.
             include_context = getattr(route, "include_context", None)
             nested_prefix = getattr(include_context, "prefix", None)
             if not isinstance(nested_prefix, str):
@@ -75,8 +77,15 @@ def _declared_route_paths(router, *, mount_prefix: str = "") -> list[str]:
                 and hasattr(nested, "routes")
             ):
                 pending.append((nested, prefix + nested_prefix, ancestors))
-    return paths
+    return bindings
 
+
+def _declared_route_paths(router, *, mount_prefix: str = "") -> list[str]:
+    return [
+        path for path, _endpoint in _declared_route_bindings(
+            router, mount_prefix=mount_prefix
+        )
+    ]
 
 def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
     """
@@ -117,13 +126,23 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             # route while discarding the requested router. A changed route
             # count is not sufficient proof: the exposed path must also be
             # declared by the exact requested source router.
-            declared_paths = set(
-                _declared_route_paths(router, mount_prefix=prefix or "")
-            )
+            declared = {
+                (path, id(endpoint))
+                for path, endpoint in _declared_route_bindings(
+                    router, mount_prefix=prefix or ""
+                )
+            }
             registered_paths = [
                 route.path for route in newly_mounted
                 if isinstance(getattr(route, "path", None), str)
-                and route.path in declared_paths
+                and (
+                    route.path,
+                    id(
+                        getattr(route, "endpoint", None)
+                        if getattr(route, "endpoint", None) is not None
+                        else getattr(route, "app", None)
+                    ),
+                ) in declared
             ]
             # FastAPI 0.137+ mounts a single non-path wrapper for a complete
             # router. Only resolve its declared child paths after a real app
