@@ -58,6 +58,8 @@ class FakeCursor:
 def _expression_operand(doc, operand, now):
     """Minimal Mongo expression evaluator for the lease CAS test double."""
     if isinstance(operand, str):
+        # Mongo's aggregation server clock is $NOW; $NOW is merely a
+        # document field reference and must not satisfy an expiry fence.
         if operand == "$NOW":
             return now
         if operand.startswith("$"):
@@ -632,6 +634,7 @@ async def test_mongo_legacy_operation_gets_atomic_ownership_schema():
         "lease_heartbeat_sequence",
         "lease_previous_digest",
         "lease_digest",
+        "lease_token",
         "ownership_receipt_digest",
         "ownership_audit_sequence",
     ):
