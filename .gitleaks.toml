@@ -114,7 +114,19 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   condition = "AND"
   regexTarget = "line"
   regexes = [
-    '''^\s*if tokenizer in \{"native_tokenizer", "utf8_byte_tokens", "reference_tokens"\} and counter:$'''
+    '''^\s*elif tokenizer == "utf8_bytes_upper_bound" or not counter:
+  ]
+  paths = ['''^skeleton/ai/runtime/inference/local\.py$''']
+
+  [[rules.allowlists]]
+  description = "Reviewed UI validation of fixed local tokenizer enum literals"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = [
+    '''^\s*demand\(\['native_tokenizer', 'utf8_byte_tokens', 'reference_tokens', 'conservative_utf8_bytes', 'backend_token_counter'\]\.includes\(basis\)'''
+  ]
+  paths = ['''^frontend/src/features/Jeeves/RuntimeFoundationDetails\.tsx$''']
+''
   ]
   paths = ['''^skeleton/ai/runtime/inference/local\.py$''']
 
