@@ -142,6 +142,7 @@ def catalog() -> dict:
             "chronicle_recipe_count": 45000000000,
              "epoch_recipe_count": 450000000000,
             "saga_recipe_count": 4500000000000,
+            "continuity_recipe_count": 4500000000000,
             "epic_recipe_count": 45000000000000,
             "recipe_search_path": "/api/game-frontier-authoring/recipes",
             "persistence_owner": "canonical_game_learning_workspace",
