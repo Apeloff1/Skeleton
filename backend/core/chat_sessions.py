@@ -445,7 +445,11 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
     return tuple(segments), dependencies
 
 
-async def assert_current_dependencies(metadata, *, user, tenant_id, owner_id):
+async def assert_current_dependencies(
+    metadata, *, user, tenant_id, owner_id, authority: Any | None = None
+):
+    """Revalidate pinned sources through the admission owner's conversation scope."""
+    owner = conversation_authority if authority is None else authority
     from fastapi import HTTPException
     from core.canonical_memory import canonical_memory_repository
 
@@ -525,10 +529,10 @@ async def assert_current_dependencies(metadata, *, user, tenant_id, owner_id):
                 or len(pin["query"]) > 512
             ):
                 raise ValueError("Dragon binding schema differs")
-            thread = await conversation_authority.get_thread(
+            thread = await owner.get_thread(
                 pin["thread_id"], tenant_id=tenant_id, owner_id=owner_id
             )
-            current = await conversation_authority.dragon_context_segments(thread, pin["query"])
+            current = await owner.dragon_context_segments(thread, pin["query"])
             if (pin["source_id"], pin["content_digest"]) not in {
                 (segment.source_id, segment.content_digest) for segment in current
             }:
@@ -565,8 +569,10 @@ async def inherit_history_dependencies(
     tenant_id,
     owner_id,
     current_message=None,
+    authority: Any | None = None,
 ):
     """Preserve causal source obligations through newly selected chat history."""
+    owner = conversation_authority if authority is None else authority
     selected_ids = {
         segment.source_id for segment in selected_segments if segment.source_type == "conversation"
     }
@@ -652,7 +658,7 @@ async def inherit_history_dependencies(
             raise ConversationConflict(
                 "selected context exceeds its causal source bound; start a fresh conversation"
             )
-    inherited = await conversation_authority.chat_history_dependencies(
+    inherited = await owner.chat_history_dependencies(
         thread.thread_id, causal_ids, tenant_id=tenant_id, owner_id=owner_id
     )
     checked_dependencies = []
@@ -714,7 +720,7 @@ async def inherit_history_dependencies(
                 )
             unknown = snapshots - known
             if unknown:
-                current_dragon = await conversation_authority.dragon_context_segments(
+                current_dragon = await owner.dragon_context_segments(
                     thread, message.content or ""
                 )
                 for segment in current_dragon:
