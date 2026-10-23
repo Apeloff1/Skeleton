@@ -332,6 +332,12 @@ class _Registry:
     def require_active(self):
         return self.provider
 
+    def require_for_context(self, context_policy):
+        """Implement the engine's scoped provider-selection contract in fixtures."""
+        if not isinstance(context_policy, dict):
+            raise TypeError("context policy must be a dictionary")
+        return self.require_active()
+
 
 def _boundary(
     tmp_path,
