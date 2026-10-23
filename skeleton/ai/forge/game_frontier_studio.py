@@ -52,6 +52,9 @@ STUDIO_TOOLS = (
     "native_3d_airflow_field_editor", "native_rigid_body_field_receipt_inspector",
     "native_quest_graph_compiler", "native_quest_stage_branch_editor",
     "native_approved_session_replay_inspector",
+    "authored_tile_operations", "authored_prefab_and_actor_operations",
+    "authored_quest_event_music_operations", "authored_transactional_editor",
+    "authored_playable_godot_export",
 )
 
 
@@ -730,6 +733,8 @@ def author_studio_expedition(project: StudioProject, profile, *, weather=None):
         raise StudioError("expedition placement compilation budget exceeded")
     anchor=compile_studio_project(project)["content_sha256"]
     world=author_archipelago(project.project_id,anchor,profile,weather=weather)
+    from skeleton.forge.game_frontier_studio_tile_navigation import add_studio_walkable_paths
+    world=add_studio_walkable_paths(project,world)
     waypoints=list(world.waypoints)
     edges=list(world.edges)
     originals=tuple(world.waypoints)
@@ -829,10 +834,22 @@ def compile_studio_expedition(project: StudioProject, profile, *, weather=None,
             max_stamina=1000,skill=0.8,
         )
         files=emit_expedition_godot_project(world,native_player)
-        out["godot_project_files"]=files
         out["godot_candidate_proof"]=verify_expedition_godot_project(
             files,world,native_player,
         )
+        from skeleton.forge.game_frontier_studio_native_runtime import (
+            add_studio_native_gameplay,
+        )
+        compiled_files=add_studio_native_gameplay(project, files)
+        from skeleton.forge.game_frontier_studio_terrain_runtime import (
+            add_studio_native_terrain,
+        )
+        compiled_files=add_studio_native_terrain(project, compiled_files)
+        out["godot_project_files"]=compiled_files
+        out["studio_native_runtime_installed"]=len(compiled_files)>len(files)
+        out["studio_native_runtime_sha256"]=sha256(json.dumps(
+            compiled_files, sort_keys=True, separators=(",", ":"),
+            allow_nan=False).encode("utf-8")).hexdigest()
     out["receipt_digest"]=sha256(json.dumps(
         out,sort_keys=True,separators=(",",":"),allow_nan=False,
     ).encode("utf-8")).hexdigest()
