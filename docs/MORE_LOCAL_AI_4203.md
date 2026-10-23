@@ -1,0 +1,1 @@
+# More work on local AI for #4203\n\nBook weights, full-book candidate training, hash-linked receipts, questionnaires, game interaction. Complete systems.

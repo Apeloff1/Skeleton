@@ -5794,18 +5794,31 @@
         "deduplication.py",
         "distillation.py",
         "flgb_training_runtime.py",
+        "jeeves_adaptive_sim_training.py",
+        "jeeves_book_curriculum.py",
+        "jeeves_book_weight_pipeline.py",
+        "jeeves_boomerang_queue.py",
+        "jeeves_capability_replay.py",
+        "jeeves_capacity_growth.py",
+        "jeeves_cinematic_simulation.py",
         "jeeves_game_corpus.py",
         "jeeves_game_corpus_builder.py",
         "jeeves_game_design_benchmark.py",
         "jeeves_game_design_review_cli.py",
         "jeeves_game_design_review_gate.py",
         "jeeves_game_vocabulary.py",
+        "jeeves_multidomain.py",
+        "jeeves_parallel_mirrors.py",
         "jeeves_production_game_recovery.py",
         "jeeves_production_game_session.py",
         "jeeves_production_game_train.py",
         "jeeves_production_readiness.py",
+        "jeeves_studio_curriculum.py",
+        "jeeves_studio_multifactor_corpus.py",
+        "jeeves_studio_rule_corpus.py",
         "jeeves_torch_game_vocabulary.py",
         "jeeves_training_progress.py",
+        "joint_learning_custody.py",
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
         "model_release_journal.py",
@@ -5815,6 +5828,13 @@
         "promotion_gate.py",
         "promotion_lifecycle.py",
         "resource_admission.py",
+        "rom_fleet_audit.py",
+        "rom_inventory_snapshot.py",
+        "rom_study.py",
+        "rom_triangle_campaign.py",
+        "rom_triangle_lens_progress.py",
+        "sdk_custody_drift.py",
+        "sdk_study.py",
         "shadow_candidate_gate.py",
         "shadow_idle_training.py",
         "shadow_native_trainer.py",
@@ -5853,25 +5873,7 @@
         "temporal_revocation.py",
         "temporal_signals.py",
         "temporal_uncertainty.py",
-        "training_manifest.py",
-        "jeeves_multidomain.py",
-        "jeeves_parallel_mirrors.py",
-        "jeeves_cinematic_simulation.py",
-        "jeeves_adaptive_sim_training.py",
-        "jeeves_capacity_growth.py",
-        "jeeves_capability_replay.py",
-        "jeeves_boomerang_queue.py",
-        "jeeves_studio_curriculum.py",
-        "jeeves_studio_multifactor_corpus.py",
-        "jeeves_studio_rule_corpus.py",
-        "joint_learning_custody.py",
-        "rom_fleet_audit.py",
-        "rom_inventory_snapshot.py",
-        "rom_study.py",
-        "rom_triangle_campaign.py",
-        "rom_triangle_lens_progress.py",
-        "sdk_custody_drift.py",
-        "sdk_study.py"
+        "training_manifest.py"
       ],
       "overlay_note": "Current main already implements these governed AI-only training modules. Declare their existing placement without copying them into the legacy tree or changing training authority."
     },
@@ -6630,7 +6632,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "182_mapping_plus_178_native_owner_current_main_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
+  "validation_state": "182_mapping_plus_180_native_owner_current_main_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7768,7 +7770,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 178
+    "native_ai_owner_count": 180
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -10529,6 +10531,28 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Replay-verified multi-circumstance game-rule data for Jeeves candidates. No agent-supplied observation, score, reward or LM label is admitted. Every scenario source and every action is reconstructed with canonical game rules. The resulting ",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-BOOK-CURRICULUM",
+      "path": "skeleton/ai/training/jeeves_book_curriculum.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native Jeeves rights-reviewed book curriculum composition and evidence.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-BOOK-WEIGHT-PIPELINE",
+      "path": "skeleton/ai/training/jeeves_book_weight_pipeline.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native Jeeves candidate-only book weight pipeline with provenance and admission boundaries.",
       "volume_refs": [
         "VOL-006"
       ]
