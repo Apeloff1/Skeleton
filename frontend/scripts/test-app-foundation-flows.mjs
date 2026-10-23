@@ -239,7 +239,7 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
       if (response.ok) lastStatus = response.data;
       return response.ok ? { data: response.data } : { ok: false };
     }, { intervalMs: 2_000, maxIntervalMs: 10_000, maxChecks });
-    const reason = String(lastStatus?._bg_stop_reason || lastStatus?._bg_error || lastStatus?.error || 'none').slice(0, 160);
+    const reason = String(lastStatus?.execution?.stop_reason || lastStatus?.redundancy?.error_details?.at(-1)?.code || lastStatus?.error || 'none').slice(0, 160);
     t.diagnostic(`watch outcome: ${outcome.phase}; checks=${outcome.checks}; stop_reason=${reason}`);
     assert.equal(outcome.phase, 'completed', `${outcome.message}; stop_reason=${reason}`);
     ctx.completed = true;
