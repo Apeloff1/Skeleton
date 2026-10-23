@@ -135,8 +135,14 @@ async def test_completed_digest_matched_replay_does_not_need_active_engine(monke
     def never_call_engine(*_args, **_kwargs):
         raise AssertionError("Committed replay must not contact engine config")
 
+    async def persisted_request_refs(*_args, **_kwargs):
+        # Request identity is read from its canonical persisted record, not
+        # from an unrelated Mongo collection in this isolated test.
+        return user_message.attachment_refs
+
     monkeypatch.setattr(ai_routes.conversation_authority, "active_transcript", transcript)
     monkeypatch.setattr(ai_routes.conversation_authority, "get_thread", get_thread)
+    monkeypatch.setattr(ai_routes.conversation_authority, "user_request_refs", persisted_request_refs)
     monkeypatch.setattr(ai_routes.EngineClient, "from_env", never_call_engine)
 
     result = await ai_routes.ai_chat(
@@ -161,7 +167,11 @@ async def test_replay_key_with_changed_request_identity_is_rejected(monkeypatch)
     async def transcript(*_args, **_kwargs):
         return (user_message, reply)
 
+    async def persisted_request_refs(*_args, **_kwargs):
+        return user_message.attachment_refs
+
     monkeypatch.setattr(ai_routes.conversation_authority, "active_transcript", transcript)
+    monkeypatch.setattr(ai_routes.conversation_authority, "user_request_refs", persisted_request_refs)
     with pytest.raises(HTTPException) as error:
         await ai_routes.ai_chat(changed, user={"email": "replay@example.org"})
     assert error.value.status_code == 409
