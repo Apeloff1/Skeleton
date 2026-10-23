@@ -113,6 +113,23 @@ class _DeterministicRegistry:
     def require_active(self):
         return self._provider
 
+    def require_for_context(self, context_policy):
+        """Match the production selection API for this single-provider harness.
+
+        An explicit provider switch is not supported by the fixture and must
+        never fall back silently to the injected provider.
+        """
+        if context_policy.get("provider_selection"):
+            raise AssertionError("the test registry cannot select an alternate provider")
+        return self.require_active()
+
+    def runtime_serving_engines(self):
+        # The harness injects a hosted deterministic fake, not a local engine.
+        return ()
+
+    def runtime_serving_routes(self):
+        return ()
+
 
 def _verification(_request, candidate, _context_digest):
     if not isinstance(candidate, str) or not candidate.strip():

@@ -15,12 +15,12 @@ on:
 permissions:
   contents: read
 
-# Each PR retains an isolated merge-critical required check. Main pushes share
-# one integration lane, so superseded commits cannot accumulate stale runs.
-# Independent security/provenance checks remain unchanged.
+# An updated PR may supersede only its own prior checks. Main SHA runs keep
+# independent immutable evidence: cancelling one must never erase a main
+# verification required for provenance and rollback.
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: merge-readiness-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTHON_VERSION: "3.11.16"
