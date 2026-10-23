@@ -93,7 +93,10 @@ class ContinuityBookPaths(Sequence[str]):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return tuple(self[i] for i in range(*index.indices(len(self))))
+            indices = range(*index.indices(len(self)))
+            if len(indices) > 64:
+                raise StudioError("virtual catalogue slices are limited to 64 entries")
+            return tuple(self[i] for i in indices)
         d, t, director, world, phase, campaign, chronicle, epoch, continuity = identity(index)
         return (f"game_studio_5000000000000/{d}/{t}/{director}/{world}/"
                 f"{phase}/{campaign}/{chronicle}/{epoch}/{continuity}.md")
