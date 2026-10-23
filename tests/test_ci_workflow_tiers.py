@@ -20,7 +20,7 @@ class WorkflowTierTests(unittest.TestCase):
             (ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8")
         )
         referenced = set(re.findall(
-            r"\\.github/workflows/[A-Za-z0-9._-]+\\.ya?ml",
+            r"\.github/workflows/[A-Za-z0-9._-]+\.ya?ml",
             json.dumps(masterplan),
         ))
         self.assertTrue(referenced, "masterplan must retain workflow evidence")
