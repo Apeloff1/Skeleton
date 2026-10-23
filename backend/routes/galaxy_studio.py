@@ -239,7 +239,8 @@ async def _save_build(build):
             "_swarm_discourse",
             "_bg_deadline_monotonic",
         }
-        save_doc = {k: v for k, v in build.items() if k not in _heavy}
+        # Mongo owns _id; never attempt to mutate it in an upsert/update.
+        save_doc = {k: v for k, v in build.items() if k not in _heavy and k != "_id"}
         if isinstance(save_doc.get("_artifact_job"), dict):
             save_doc["_artifact_job"] = {
                 key: value for key, value in save_doc["_artifact_job"].items() if not key.startswith("_")
