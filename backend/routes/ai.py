@@ -779,6 +779,7 @@ async def _replayed_cooperation(*, thread, user_message, assistant_message, tena
     try:
         if policy is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
             if command is None:
@@ -855,6 +856,7 @@ async def _terminal_chat_evidence(
             code = None
         if command is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
         cooperation = cooperation_progress_projection(status, command=command)
@@ -1970,6 +1972,7 @@ async def ai_chat(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread,
         user_message=user_message,
         tenant_id=tenant_id,
@@ -2846,6 +2849,7 @@ async def get_ai_chat_turn(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if prepared_command is not None and chat_turn is None:
@@ -3595,6 +3599,7 @@ async def cancel_ai_chat_turn(
         }
 
     metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if metadata is not None:
@@ -4087,6 +4092,7 @@ async def resume_ai_chat_turn(
         raise HTTPException(status_code=404, detail="Chat turn not found")
     require_writable_tip(thread, transcript, message)
     metadata, command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id
     )
     if command is None:
