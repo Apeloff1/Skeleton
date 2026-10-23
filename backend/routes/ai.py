@@ -2014,7 +2014,6 @@ async def ai_chat(
         await assert_current_dependencies(
             prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
             authority=conversation_authority,
-
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -2194,7 +2193,6 @@ async def ai_chat(
                     await assert_current_dependencies(
                         prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
                         authority=conversation_authority,
-
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -2591,7 +2589,6 @@ async def ai_chat(
             await assert_current_dependencies(
                 prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
                 authority=conversation_authority,
-
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -3103,7 +3100,6 @@ async def get_ai_chat_turn(
         await assert_current_dependencies(
             prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
             authority=conversation_authority,
-
         )
     try:
         _validate_chat_handoff_binding(
