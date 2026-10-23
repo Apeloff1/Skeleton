@@ -35,6 +35,20 @@ def _thread_and_user():
         title="Durable chat",
         data_class="internal",
     )
+    # The already-persisted user message must carry the same immutable
+    # request identity that the canonical route attaches at admission.
+    # A mock with no receipt represents an unbound legacy turn and is
+    # correctly rejected by the real replay guard.
+    from routes.ai import AIChatRequest, _chat_request_identity_ref
+
+    request_identity = _chat_request_identity_ref(
+        AIChatRequest(
+            message="Build it.",
+            thread_id=thread_id,
+            idempotency_key="turn-1",
+            expected_thread_version=1,
+        )
+    )
     user = ConversationMessage(
         message_id=str(uuid4()),
         thread_id=thread_id,
@@ -44,6 +58,7 @@ def _thread_and_user():
         created_at=NOW,
         idempotency_key="turn-1",
         content="Build it.",
+        attachment_refs=(request_identity,),
         data_class="internal",
     )
     return thread, user
