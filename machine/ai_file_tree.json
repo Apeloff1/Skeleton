@@ -7079,6 +7079,11 @@
       "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
     },
     {
+      "path": "skeleton/gameforge",
+      "owner": "GameForge production orchestration",
+      "reason": "Tracked game-production conductor and end-to-end orchestration modules retain game-studio builder ownership until engine integration, source provenance, and explicit AI-tree import cutover are verified."
+    },
+    {
       "path": "skeleton/gates",
       "owner": "Quality gates",
       "reason": "Cross-package import and validation gates retain independent assurance ownership"
@@ -7473,8 +7478,8 @@
     "status": "reconciled_retained_standalone_and_shared_roots_pending_verified_cutover",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
     "source_head": "40e81412e995a9b153a02ff39f3ae1aec187de25",
-    "newly_classified": 29,
-    "verification_note": "Previously unclassified tracked roots retain explicit non-canonical owners; no AI-tree parity or completion requirement was waived."
+    "newly_classified": 30,
+    "verification_note": "30 previously unclassified tracked roots retain explicit non-canonical owners; parity validation and runtime promotion requirements remain enforced."
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
