@@ -58,10 +58,10 @@ class FakeCursor:
 def _expression_operand(doc, operand, now):
     """Minimal Mongo expression evaluator for the lease CAS test double."""
     if isinstance(operand, str):
-        # Mongo aggregation binds server clock as $NOW, not $NOW (which
+        # Mongo aggregation binds server clock as $$NOW, not $NOW (which
         # names a document field). Resolve it before field lookups so
         # expiry and takeover CAS tests faithfully model MongoDB.
-        if operand == "$NOW":
+        if operand == "$$NOW":
             return now
         if operand.startswith("$"):
             return doc.get(operand[1:])
@@ -79,12 +79,12 @@ def test_fake_mongo_server_clock_uses_double_dollar_now():
     from core import chat_turns as turn_module
 
     doc = {"lease_expires_at": turn_module._utcnow() + timedelta(seconds=10)}
-    assert _expression_operand(doc, "$NOW", turn_module._utcnow()) is not None
+    assert _expression_operand(doc, "$$NOW", turn_module._utcnow()) is not None
     assert _expression_operand(doc, "$NOW", turn_module._utcnow()) is None
 
 
 def _matches_expression(doc, expression):
-    # Mongo evaluates $NOW at the server's comparison point. Tests freeze the
+    # Mongo evaluates $$NOW at the server's comparison point. Tests freeze the
     # authority clock, so the fake storage uses that same deterministic clock.
     from core import chat_turns as chat_turn_module
 
