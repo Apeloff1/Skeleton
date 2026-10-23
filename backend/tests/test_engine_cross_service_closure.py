@@ -583,7 +583,12 @@ async def test_coordinator_lease_integrity_fault_poisoning_is_fail_closed(
 
     snapshot = coordinator.supervision_snapshot()
     assert snapshot["faulted"] is True
-    assert snapshot["active_lease_count"] == 0
+    # The externally removed lease is no longer active in the lifecycle, but
+    # the coordinator MUST retain unresolved custody until a verified release.
+    # Discarding this identity would hide a supervision integrity failure.
+    assert lifecycle.inflight_work == 0
+    assert snapshot["active_lease_count"] == 1
+    assert snapshot["active_lease_ids"] == ("engine-execution:fault-test",)
     assert snapshot["supervision_faults"]
 
     command = _command(
