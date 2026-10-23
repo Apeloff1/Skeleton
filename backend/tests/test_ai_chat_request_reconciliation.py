@@ -99,6 +99,8 @@ def _canonical_completed_turn(request, *, tenant_id: str, owner_id: str):
         content="durable reply",
         parent_message_id=user_message.message_id,
         causal_user_message_id=user_message.message_id,
+        operation_id=route._chat_turn_ids(request.thread_id, user_message.message_id)[0],
+        ai_result_id="engine-result:" + route._chat_turn_ids(request.thread_id, user_message.message_id)[1],
         data_class="internal",
     )
     thread = ConversationThread(
