@@ -209,8 +209,11 @@ async def read_prepared(
         refs = tuple(user_message.attachment_refs or ())
     else:
         refs = await refs_lookup(
-        thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
-    )
+            thread.thread_id,
+            user_message.message_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
     if refs != user_message.attachment_refs:
         from dataclasses import replace
 
