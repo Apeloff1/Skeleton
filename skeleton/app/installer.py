@@ -291,6 +291,22 @@ def install_application(
                 ),
             )
         )
+        if healthy:
+            from skeleton.app.first_install import critical_backend_route_report
+
+            route_status = critical_backend_route_report(host_urls["backend"], timeout=3.0)
+            routes_ready = route_status["ready"] is True
+            phases.append(
+                InstallPhase(
+                    "critical-api-routes",
+                    routes_ready,
+                    (
+                        "required application API routers are registered"
+                        if routes_ready
+                        else "required API routes missing or unverified; inspect app doctor --live and /api/health/registry"
+                    ),
+                )
+            )
 
     return InstallReceipt(root=root, phases=tuple(phases))
 

@@ -632,6 +632,31 @@ def _chat_request_digest_candidates(request: AIChatRequest) -> set[str]:
                 ).encode()
             ).hexdigest()
         )
+        # The original v1 request identity omitted optional execution selectors
+        # altogether. Only accept that exact historical form when no extra
+        # semantics are supplied; otherwise it could alias distinct requests.
+        if (
+            not request.attachment_refs
+            and request.provider_id is None
+            and request.model_id is None
+            and request.max_output_tokens is None
+            and request.temperature is None
+        ):
+            original_payload = {
+                "schema_version": "backend.ai.chat-request.v1",
+                "message": request.message,
+                "idempotency_key": request.idempotency_key,
+                "context_sha256": payload["context_sha256"],
+                "memory_policy": payload["memory_policy"],
+            }
+            candidates.add(
+                hashlib.sha256(
+                    json.dumps(
+                        original_payload, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+            )
     return candidates
 
 
