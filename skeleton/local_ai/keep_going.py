@@ -1,0 +1,2 @@
+"""Keep going."""
+KEEP = True

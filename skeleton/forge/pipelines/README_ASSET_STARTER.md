@@ -1,4 +1,4 @@
-# Commercial Asset Starter (injected into #4204)
+# Commercial Asset Starter (injected into #4200)
 
 Deterministic PNG atlas + Godot SpriteFrames .tres emitter.
 

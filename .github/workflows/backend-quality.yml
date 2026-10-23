@@ -297,7 +297,9 @@ jobs:
             tests/test_game_frontier_campaign_seven_audits.py \
             tests/test_game_frontier_navigation_advanced.py \
             tests/test_game_frontier_world_assurance.py \
-            tests/test_game_frontier_postproduction.py
+            tests/test_game_frontier_postproduction.py \
+            tests/test_game_frontier_campaign_delivery.py \
+            tests/test_original_campaign_cli.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .

@@ -86,15 +86,26 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
         return fp
 
 
-VAULT_ROOT = _resolve_writable_dir(
-    os.environ.get("HYPERSCALE_VAULT_DIR", "/app/backend/data/vault/compressed"),
-    "/tmp/hyperscale_vault",
-)
+# Route imports must not create directories or read on-disk vault manifests.
+# Resolve the writable configured location only at the first storage operation.
+VAULT_ROOT = Path(os.environ.get("HYPERSCALE_VAULT_DIR", "/app/backend/data/vault/compressed"))
+SCRATCH_ROOT = Path(os.environ.get("HYPERSCALE_SCRATCH_DIR", "/tmp/hyperscale_scratch"))
+_STORAGE_LOCK = threading.Lock()
+_STORAGE_READY = False
 
-SCRATCH_ROOT = _resolve_writable_dir(
-    os.environ.get("HYPERSCALE_SCRATCH_DIR", "/tmp/hyperscale_scratch"),
-    "/tmp/hyperscale_scratch",
-)
+def _ensure_storage() -> None:
+    global VAULT_ROOT, SCRATCH_ROOT, _MANIFEST_FILE, _STORAGE_READY
+    if _STORAGE_READY:
+        return
+    with _STORAGE_LOCK:
+        if _STORAGE_READY:
+            return
+        vault = _resolve_writable_dir(str(VAULT_ROOT), "/tmp/hyperscale_vault")
+        scratch = _resolve_writable_dir(str(SCRATCH_ROOT), "/tmp/hyperscale_scratch")
+        VAULT_ROOT, SCRATCH_ROOT = vault, scratch
+        _MANIFEST_FILE = vault / "_manifest.json"
+        _load_manifest()
+        _STORAGE_READY = True
 
 _COMPRESSION_LEVEL = int(os.environ.get("HYPERSCALE_ZSTD_LEVEL", "21"))
 _COMPRESSOR = _CodecProxy("c")
@@ -120,12 +131,13 @@ def _load_manifest() -> None:
 
 
 def _save_manifest() -> None:
+    _ensure_storage()
     tmp = _MANIFEST_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(_MANIFEST, separators=(",", ":")))
     tmp.replace(_MANIFEST_FILE)
 
 
-_load_manifest()
+# No on-disk manifest reads during import.
 
 
 _SAFE_SHARD_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}")
@@ -142,6 +154,7 @@ def _safe_name(name: str) -> str:
 
 def _shard_path(name: str, scratch: bool = False) -> Path:
     safe = _safe_name(name)
+    _ensure_storage()
     root = (SCRATCH_ROOT if scratch else VAULT_ROOT).resolve()
     candidate = (root / f"{safe}.jsonl.zst").resolve()
     try:
@@ -211,6 +224,7 @@ def _cache_evict_if_needed() -> None:
 
 
 def _load_full(name: str) -> list[dict]:
+    _ensure_storage()
     name = _safe_name(name)
     if name not in _MANIFEST:
         raise KeyError(f"Shard '{name}' not in manifest")
@@ -248,6 +262,7 @@ def read_shard(name: str, limit: int = 50, offset: int = 0) -> list[dict]:
 
 
 def iter_shard(name: str) -> Iterator[dict]:
+    _ensure_storage()
     name = _safe_name(name)
     if name not in _MANIFEST:
         raise KeyError(f"Shard '{name}' not in manifest")
@@ -275,14 +290,17 @@ def sample_shard(name: str, k: int = 5) -> list[dict]:
 
 
 def list_shards() -> list[dict]:
+    _ensure_storage()
     return sorted(_MANIFEST.values(), key=lambda e: e["name"])
 
 
 def get_shard_entry(name: str) -> dict | None:
+    _ensure_storage()
     return _MANIFEST.get(_safe_name(name))
 
 
 def vault_stats() -> dict:
+    _ensure_storage()
     _load_manifest()
     shards = list(_MANIFEST.values())
     total_raw = sum(s.get("raw_bytes", 0) for s in shards)
@@ -308,6 +326,7 @@ def purge_cache() -> int:
 
 
 def delete_shard(name: str) -> bool:
+    _ensure_storage()
     name = _safe_name(name)
     entry = _MANIFEST.pop(name, None)
     if not entry:

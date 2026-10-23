@@ -32,7 +32,7 @@ from skeleton.contracts.ai_execution import (
     execution_payload_digest,
 )
 from skeleton.contracts.verification import VerificationReceipt
-from skeleton.contracts import runtime_learning as learning
+from skeleton.contracts import runtime_learning_core as learning
 
 
 class ExecutionRepositoryError(RuntimeError):

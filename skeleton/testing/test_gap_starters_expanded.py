@@ -33,13 +33,16 @@ def test_emulation_map():
     assert inv.unmapped_count == 69
 
 def test_combined_receipt_flow(tmp_path: Path):
+    # hardener
     root = tmp_path / "s"
     root.mkdir()
     with pytest.raises(PathHardeningError):
         harden_path("../escape", root=root)
+    # atlas
     frame = bytes([128] * 16)
     p, c = emit_atlas([frame], 2, 2, tmp_path, "r")
     assert p.exists()
+    # multi
     a = SessionAuthority("sess")
     g = a.issue_grant("player")
     assert a.verify_grant("player", g.digest)

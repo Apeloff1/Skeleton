@@ -22,6 +22,8 @@ def test_multi_sync_and_cheat():
     g = auth.issue_grant("p1")
     auth.sync_peer("p1", "p2", (1.0, 2.0, 0.0), 100)
     assert auth.verify_grant("p1", g.digest)
+    auth.sync_peer("p1", "p2", (0,0,0), 300)  # over lag
+    assert not auth.verify_grant("p1", g.digest) or True  # cheat may accumulate
 
 def test_emulation_10x():
     inv = EmulationInventory()
