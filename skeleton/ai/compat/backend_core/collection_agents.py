@@ -11,16 +11,25 @@
 from __future__ import annotations
 import os
 import re
+from threading import Lock
 from dotenv import load_dotenv
 
-load_dotenv()
+# Use the shared canonical client only when collection data is requested.
+# Importing the swarm routers must not establish a Mongo handle.
+from core.databases import get_sync_db
 
-# ★ 2026-05 refactor (P2): use the shared sync client from core.databases
-# instead of instantiating our own MongoClient — this consolidates the
-# connection pool across all sync modules in the backend.
-from core.databases import get_sync_db  # noqa: E402
+_db = None
+_db_lock = Lock()
 
-_db = get_sync_db()
+
+def _database():
+    global _db
+    if _db is None:
+        with _db_lock:
+            if _db is None:
+                load_dotenv()
+                _db = get_sync_db()
+    return _db
 
 
 # ── Heuristic category mapping from collection-name prefix ──────────────
@@ -94,7 +103,7 @@ def _agent_title(name: str, idx: int) -> str:
 
 
 def all_collection_names(include_system: bool = False) -> list[str]:
-    names = _db.list_collection_names()
+    names = _database().list_collection_names()
     if not include_system:
         names = [n for n in names if not n.startswith(("coll__", "system."))]
     # Dedup while preserving order
@@ -157,7 +166,7 @@ def build_manifest(include_frozen: bool = True) -> list[dict]:
             "signature": f"A{number:04d} · {team_id} · {legion} · {_agent_title(n, i)}",
         }))
     if include_frozen:
-        registry_coll = _db["cold_registry"]
+        registry_coll = _database()["cold_registry"]
         live = {r["collection"] for r in rows}
         for doc in registry_coll.find({}):
             cname = doc.get("name")
