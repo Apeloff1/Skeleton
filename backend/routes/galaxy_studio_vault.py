@@ -79,63 +79,17 @@ async def vault_create_zip(build_id: str) -> dict:
     if not build:
         raise HTTPException(404, "Build not found")
 
-    from core import build_vault as _bv
-    vault_count = _bv.get_file_count(build_id)
-    mem_files = build.get("files") or {}
-    if vault_count == 0 and not mem_files:
-        raise HTTPException(400, "No files to package. Complete build first.")
+    from routes.galaxy_studio import _create_vault_zip
 
-    safe_id = _safe_segment(build_id, what="build_id")
-    slug = _safe_slug(build.get("title") or "build", fallback="build")
-    zip_filename = f"{slug}-{safe_id[:8]}.zip"
-    zip_path = _resolve_under_dir(get_vault_dir(), "zips", zip_filename)
-    os.makedirs(os.path.dirname(zip_path), exist_ok=True)
-
-    zip_write_file = get_zip_write_file()
-    written: set[str] = set()
-    total_files = 0
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
-        # 1) Stream vault shards (memory-bounded).
-        for path, content in _bv.iter_files(build_id):
-            if path in written:
-                continue
-            try:
-                zip_write_file(zf, f"{slug}/{path}", content)
-                written.add(path)
-                total_files += 1
-            except Exception:
-                continue
-        # 2) Top up with any unflushed in-memory files.
-        for path, content in mem_files.items():
-            if path in written:
-                continue
-            try:
-                zip_write_file(zf, f"{slug}/{path}", content)
-                written.add(path)
-                total_files += 1
-            except Exception:
-                continue
-
-    entry = get_vault_save()(
-        safe_id,
-        "zip",
-        build.get("title", "game"),
-        zip_path,
-        {"file_count": total_files, "genre": build.get("genre", "unknown")},
-    )
-    try:
-        await save_vault_entry(entry)
-    except Exception:
-        pass
-
+    entry = await _create_vault_zip(build)
     return {
         "vault_id": entry["vault_id"],
-        "filename": zip_filename,
+        "filename": entry["filename"],
         "size": entry["size_human"],
         "size_bytes": entry["size_bytes"],
-        "file_count": total_files,
+        "file_count": entry.get("file_count", 0),
         "download_url": f"/api/galaxy-studio/vault/download/{entry['vault_id']}",
-        "message": f"ZIP saved to vault: {zip_filename} ({entry['size_human']})",
+        "message": f"ZIP saved to vault: {entry['filename']} ({entry['size_human']})",
     }
 
 
@@ -192,6 +146,8 @@ async def vault_download(vault_id: str):
     entry = _vault_entries.get(safe_vid) or _vault_entries.get(vault_id)
     if not entry:
         raise HTTPException(404, "Vault entry not found")
+    if not entry.get("path"):
+        raise HTTPException(404, "Artifact file is not available; inspect its submission status.")
     root = os.path.realpath(get_vault_dir())
     real = os.path.realpath(entry["path"])
     if real != root and not real.startswith(root + os.sep):

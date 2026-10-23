@@ -19,10 +19,14 @@ from typing import Any
 
 from skeleton.ai.model_runtime import (
     GenerationConfig,
+    GenerationResult,
     NativeLLMRuntime,
+    ReplayReceipt,
     RuntimeContractError,
+    RuntimeEvent,
+    RuntimeUsage,
 )
-from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA
+from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA, digest_json
 from skeleton.ai.model_runtime.tokenization import TokenSequence, TokenizerContractError
 from skeleton.skills.tool_contract import (
     ToolContractError,
@@ -32,6 +36,8 @@ from skeleton.skills.tool_contract import (
 
 from .local import (
     LocalInferenceCancelled,
+    LocalInputBudget,
+    LocalInputBudgetError,
     LocalInferenceRequest,
     LocalInferenceResult,
     LocalPreparedInput,
@@ -43,6 +49,196 @@ _MAX_OUTPUT_BYTES = 4 * 1024 * 1024
 
 class NativeRuntimeBackendError(RuntimeError):
     """Native runtime could not satisfy the local inference contract."""
+
+
+class _NativeStreamAudit:
+    """Check bounded stream/terminal consistency before publishing native work.
+
+    These checks establish that one owner's observable records agree. They
+    confer no independent quality, correctness or promotion authority.
+    """
+
+    def __init__(self, runtime: NativeLLMRuntime, prompt: TokenSequence, config: GenerationConfig) -> None:
+        self.runtime, self.prompt, self.config = runtime, prompt, config
+        self.events: list[RuntimeEvent] = []
+        self.generated_ids: list[int] = []
+        self.generated_tokens: list[str] = []
+        self.stopped = False
+        self.completed = False
+        self.output_bytes = 0
+        self.config_digest = digest_json(config.to_dict())
+        self.request_digest = digest_json(
+            {
+                "model_digest": runtime.model_digest,
+                "tokenizer_digest": runtime.tokenizer.digest,
+                "prompt_sequence_digest": prompt.digest,
+                "config_digest": self.config_digest,
+            }
+        )
+
+    @staticmethod
+    def _text_size(text: str) -> int:
+        if not isinstance(text, str) or len(text) > _MAX_OUTPUT_BYTES:
+            raise RuntimeContractError("native stream text exceeds its output bound")
+        size = 0
+        try:
+            for offset in range(0, len(text), 8192):
+                size += len(text[offset : offset + 8192].encode("utf-8", errors="strict"))
+                if size > _MAX_OUTPUT_BYTES:
+                    raise RuntimeContractError("native stream text exceeds its output bound")
+        except UnicodeError as exc:
+            raise RuntimeContractError("native stream text is not valid UTF-8") from exc
+        return size
+
+    def observe(self, event: RuntimeEvent) -> None:
+        if not isinstance(event, RuntimeEvent):
+            raise RuntimeContractError("native decoder emitted an invalid event type")
+        event = RuntimeEvent(**{name: getattr(event, name) for name in RuntimeEvent.__dataclass_fields__})
+        if (
+            self.completed
+            or event.sequence != len(self.events)
+            or len(self.events) >= self.config.max_new_tokens + 4
+        ):
+            raise RuntimeContractError("native decoder event sequence is invalid")
+        if event.cache_tokens > self.runtime.limits.max_context:
+            raise RuntimeContractError("native decoder cache accounting exceeds its context")
+        self._text_size(event.text_delta)
+        if not self.events:
+            if (
+                event.kind != "admitted"
+                or event.token_id is not None
+                or event.detail_digest != self.request_digest
+            ):
+                raise RuntimeContractError("native decoder admission event does not bind its request")
+        elif len(self.events) == 1:
+            if (
+                event.kind != "prompt"
+                or event.token_id is not None
+                or event.detail_digest != self.prompt.digest
+            ):
+                raise RuntimeContractError("native decoder prompt event differs from admitted input")
+        elif event.kind == "token":
+            if (
+                self.stopped
+                or type(event.token_id) is not int
+                or not 0 <= event.token_id < self.runtime.tokenizer.vocab_size
+            ):
+                raise RuntimeContractError("native decoder token event violates its stream state")
+            if len(self.generated_ids) >= self.config.max_new_tokens:
+                raise RuntimeContractError("native decoder exceeded its output-token budget")
+            expected = digest_json(
+                {
+                    "request_digest": self.request_digest,
+                    "ordinal": len(self.generated_ids) + 1,
+                    "token_id": event.token_id,
+                }
+            )
+            if event.detail_digest != expected:
+                raise RuntimeContractError("native decoder token event digest differs")
+            piece = self.runtime.tokenizer.token_text(event.token_id)
+            self.output_bytes += self._text_size(piece) + int(bool(self.generated_ids))
+            if self.output_bytes > _MAX_OUTPUT_BYTES:
+                raise RuntimeContractError("native generation exceeds its output-byte budget")
+            hidden = bool(self.config.stop_strings) or (
+                event.token_id in self.config.stop_token_ids and not self.config.include_stop_tokens
+            )
+            if event.text_delta != ("" if hidden else piece):
+                raise RuntimeContractError("native token text differs from its admitted tokenizer")
+            self.generated_ids.append(event.token_id)
+            self.generated_tokens.append(piece)
+        elif event.kind == "stopped":
+            if (
+                self.stopped
+                or not self.generated_ids
+                or self.events[-1].kind != "token"
+                or event.token_id != self.generated_ids[-1]
+                or event.detail_digest != self.events[-1].detail_digest
+                or event.text_delta
+            ):
+                raise RuntimeContractError("native decoder stop event has no matching generated token")
+            self.stopped = True
+        elif event.kind == "completed":
+            if event.token_id is not None or event.detail_digest is None:
+                raise RuntimeContractError("native decoder completion has no terminal receipt")
+            self.completed = True
+        else:
+            raise RuntimeContractError("native decoder emitted an event outside its lifecycle")
+        self.events.append(event)
+
+    def validate(self, result: GenerationResult) -> None:
+        if not isinstance(result, GenerationResult) or not self.completed:
+            raise RuntimeContractError("native decoder terminated without a complete event stream")
+        self._text_size(result.text)
+        if not isinstance(result.finish_reason, str):
+            raise RuntimeContractError("native terminal reason must be text")
+        if (
+            type(result.generated_ids) is not tuple
+            or result.generated_ids != tuple(self.generated_ids)
+            or type(result.generated_tokens) is not tuple
+            or result.generated_tokens != tuple(self.generated_tokens)
+            or result.prompt_sequence != self.prompt
+            or type(result.events) is not tuple
+            or result.events != tuple(self.events)
+        ):
+            raise RuntimeContractError("native terminal output differs from its actual streamed tokens")
+        if not isinstance(result.usage, RuntimeUsage) or not isinstance(result.replay_receipt, ReplayReceipt):
+            raise RuntimeContractError("native terminal usage or replay receipt has an invalid type")
+        usage = RuntimeUsage(
+            **{name: getattr(result.usage, name) for name in RuntimeUsage.__dataclass_fields__}
+        )
+        receipt = ReplayReceipt(
+            **{name: getattr(result.replay_receipt, name) for name in ReplayReceipt.__dataclass_fields__}
+        )
+        if (
+            usage.prompt_tokens != len(self.prompt.token_ids)
+            or usage.generated_tokens != len(self.generated_ids)
+            or usage.model_bytes != self.runtime.model_bytes
+            or usage.kv_peak_bytes > self.runtime.limits.max_kv_bytes
+        ):
+            raise RuntimeContractError("native terminal usage differs from admitted runtime accounting")
+        expected_output = digest_json(
+            {"generated_ids": self.generated_ids, "text": result.text, "finish_reason": result.finish_reason}
+        )
+        if (
+            receipt.model_digest != self.runtime.model_digest
+            or receipt.tokenizer_digest != self.runtime.tokenizer.digest
+            or receipt.architecture_digest != self.runtime.architecture.digest
+            or receipt.device_digest != self.runtime.device.digest
+            or receipt.request_digest != self.request_digest
+            or receipt.config_digest != self.config_digest
+            or receipt.seed != self.config.seed
+            or receipt.output_digest != expected_output
+            or self.events[-1].detail_digest != receipt.digest
+        ):
+            raise RuntimeContractError("native terminal replay receipt differs from observed execution")
+        if (
+            result.finish_reason not in {"completed", "length", "stop_token", "stop_string"}
+            or self.stopped != (result.finish_reason in {"stop_token", "stop_string"})
+            or result.finish_reason == "length"
+            and len(self.generated_ids) != self.config.max_new_tokens
+        ):
+            raise RuntimeContractError("native terminal reason contradicts observed generation")
+        visible = self.generated_ids
+        if result.finish_reason == "stop_token":
+            if not visible or visible[-1] not in self.config.stop_token_ids:
+                raise RuntimeContractError("native stop token differs from the generation policy")
+            if not self.config.include_stop_tokens:
+                visible = visible[:-1]
+        expected_text = self.runtime.tokenizer.decode_ids(visible)
+        if result.finish_reason == "stop_string":
+            matches = [expected_text.find(marker) for marker in self.config.stop_strings]
+            matches = [position for position in matches if position >= 0]
+            if not matches:
+                raise RuntimeContractError("native string stop has no matching admitted delimiter")
+            expected_text = expected_text[: min(matches)]
+        if (
+            result.text != expected_text
+            or self.events[-1].text_delta != (result.text if self.config.stop_strings else "")
+            or not isinstance(result.checkpoint_digest, str)
+            or len(result.checkpoint_digest) != 64
+            or any(character not in "0123456789abcdef" for character in result.checkpoint_digest)
+        ):
+            raise RuntimeContractError("native terminal text or checkpoint binding is invalid")
 
 
 class NativeRuntimeLocalModel:
@@ -114,6 +310,23 @@ class NativeRuntimeLocalModel:
         if self.runtime.model_identity.identity_digest != self._runtime_digest:
             raise NativeRuntimeBackendError("native runtime identity drift")
 
+    def check_readiness(self) -> None:
+        """Read admitted metadata/device availability without scanning weights.
+
+        Full weight/tokenizer integrity remains mandatory in the admitted
+        preparation and inference worker. This probe cannot attest those bytes.
+        """
+        device = self.runtime.device
+        if (
+            self.model_id != self._admitted_model_id
+            or self.runtime.model_digest != self._model_digest
+            or self.runtime.tokenizer.digest != self._tokenizer_digest
+            or self.runtime.model_identity.identity_digest != self._runtime_digest
+            or str(getattr(self.runtime.model, "device", "cpu") or "cpu") != device.actual
+            or bool(getattr(self.runtime.model, "resident", False)) != device.resident
+        ):
+            raise NativeRuntimeBackendError("native runtime is no longer admitted on its execution device")
+
     def to_dict(self) -> dict[str, Any]:
         """Return the canonical integrity-checked native runtime checkpoint."""
         self.assert_identity()
@@ -135,16 +348,17 @@ class NativeRuntimeLocalModel:
             raise TypeError("request must be LocalInferenceRequest")
         limits = self.generation_limits()
         rendered = self._render_prompt(request)
-        if len(rendered) > limits["tokenizer_max_chars"]:
-            raise NativeRuntimeBackendError("native request exceeds tokenizer character budget")
+        try:
+            budget = LocalInputBudget.from_limits(limits)
+            budget.validate_request(request, 0, rendered=rendered)
+        except LocalInputBudgetError as exc:
+            raise NativeRuntimeBackendError(str(exc)) from exc
         sequence = self.runtime.encode(rendered)
         count = len(sequence.token_ids)
-        if (
-            count > limits["context_window"]
-            or count + request.max_output_tokens > limits["max_total_tokens"]
-            or request.max_output_tokens > limits["max_output_tokens"]
-        ):
-            raise NativeRuntimeBackendError("native prepared input exceeds activated generation limits")
+        try:
+            budget.validate_tokens(count, request.max_output_tokens)
+        except LocalInputBudgetError as exc:
+            raise NativeRuntimeBackendError(str(exc)) from exc
         return LocalPreparedInput(
             request_digest=request.digest,
             model_digest=self._model_digest,
@@ -187,6 +401,13 @@ class NativeRuntimeLocalModel:
             )
         ):
             raise NativeRuntimeBackendError("native prepared token sequence changed after admission")
+        try:
+            LocalInputBudget.from_limits(self._declared_generation_limits()).validate_tokens(
+                prepared.input_tokens,
+                request.max_output_tokens,
+            )
+        except LocalInputBudgetError as exc:
+            raise NativeRuntimeBackendError(str(exc)) from exc
 
     def generation_limits(self) -> dict[str, Any]:
         """Expose activated sliding-context and tokenizer admission ceilings."""
@@ -531,24 +752,17 @@ class NativeRuntimeLocalModel:
                 raise NativeRuntimeBackendError("native request exceeds the admitted context budget")
             if input_tokens + request.max_output_tokens > limits["max_total_tokens"]:
                 raise NativeRuntimeBackendError("native request exceeds the admitted total-token budget")
-            generated_bytes = 0
-            generated_count = 0
+            audit = _NativeStreamAudit(self.runtime, prompt_sequence, config)
             # stream_sequence admits the exact sequence used for accounting;
             # native string stops finish normally with real usage and receipt.
             with self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt) as stream:
                 for event in stream:
                     interrupt()
-                    if event.kind == "token":
-                        generated_count += 1
-                        if generated_count > request.max_output_tokens:
-                            raise NativeRuntimeBackendError("native decoder exceeded its output-token budget")
-                        piece = self.runtime.tokenizer.token_text(event.token_id)
-                        generated_bytes += self._output_size(piece) + int(generated_count > 1)
-                        if generated_bytes > _MAX_OUTPUT_BYTES:
-                            raise NativeRuntimeBackendError("native generation exceeds the local output byte budget")
+                    audit.observe(event)
             result = stream.result
             if result is None:
                 raise NativeRuntimeBackendError("native runtime terminated without a generation result")
+            audit.validate(result)
         except LocalInferenceCancelled:
             raise
         except RuntimeContractError as exc:
@@ -562,7 +776,6 @@ class NativeRuntimeLocalModel:
             result.prompt_sequence != prompt_sequence
             or result.usage.prompt_tokens != input_tokens
             or result.usage.generated_tokens != len(result.generated_ids)
-            or generated_count != len(result.generated_ids)
             or len(result.generated_ids) > request.max_output_tokens
         ):
             raise NativeRuntimeBackendError("native terminal result does not match admitted token accounting")

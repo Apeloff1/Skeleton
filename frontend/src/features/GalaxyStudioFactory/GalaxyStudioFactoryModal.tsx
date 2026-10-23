@@ -29,6 +29,8 @@ import { TunnelStatusPill } from '../../components/TunnelStatusPill';
 import Slider from '@react-native-community/slider';
 
 import { apiFetch } from '../../utils/apiController';
+import { safeFetch as boundedFetch } from '../../utils/apiClient';
+import { authHeaders, getAuthToken } from '../../auth/gameforgeAuth';
 
 // Palette + StyleSheet extracted into ./GalaxyStudioFactoryModal.styles
 // to keep this file under the AST/parser timeout threshold.
@@ -40,12 +42,74 @@ import { CodeFileView, CodeBrowseView, VaultView } from './GalaxyStudioFactoryMo
 import { useRouter } from 'expo-router';
 import { jeevesSpeak } from '../Academy/jeevesTts';
 import { shareResult } from '../../utils/shareResult';
+import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
 import { FALLBACK_GENRES } from './fallbackGenres';
 const BACKEND = CANONICAL_API_BASE;
 
 interface Props { visible: boolean; onClose: () => void; }
 type Step = 'pick' | 'building' | 'done';
+
+const BUILD_STOP_REASONS: Record<string, string> = {
+  artifact_storage_unavailable: 'Artifact storage is unavailable.', vault_write_failed: 'Generated files could not be saved.',
+  memory_limit_reached: 'The build reached its memory limit.', build_deadline_exceeded: 'The build reached its authorized time limit.',
+  worker_deadline_exceeded: 'A physical worker exceeded its deadline.', build_metadata_unavailable: 'Build metadata could not be saved.',
+  batch_generation_failed: 'A generation batch failed.', operator_stop_requested: 'The operator requested a stop.',
+};
+function statusStopReason(value: unknown): string {
+  return typeof value === 'string' && BUILD_STOP_REASONS[value] ? BUILD_STOP_REASONS[value] : 'Inspect the retained build state before retrying.';
+}
+function validGalaxyStatus(value: any, bid: string): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.build_id !== bid
+    || typeof value.status !== 'string' || value.status.length > 64
+    || !Number.isSafeInteger(value.completed_phases) || !Number.isSafeInteger(value.total_phases)
+    || value.completed_phases < 0 || value.total_phases < 1 || value.completed_phases > value.total_phases || value.total_phases > 10000
+    || !Number.isSafeInteger(value.file_count) || value.file_count < 0 || value.file_count > 10000000
+    || !Number.isSafeInteger(value.total_batches) || value.total_batches < 1 || value.total_batches > 100
+    || !Number.isSafeInteger(value.current_batch) || value.current_batch < 0 || value.current_batch > value.total_batches
+    || value.bg_current_batch !== undefined && (!Number.isSafeInteger(value.bg_current_batch) || value.bg_current_batch < 0 || value.bg_current_batch > value.total_batches)
+    || value.batch_name !== undefined && (typeof value.batch_name !== 'string' || value.batch_name.length > 160)) return false;
+  if (value.batch_names !== undefined && (!value.batch_names || typeof value.batch_names !== 'object' || Array.isArray(value.batch_names)
+    || Object.keys(value.batch_names).length > 100 || Object.entries(value.batch_names).some(([key, name]) => !/^[0-9]{1,3}$/.test(key) || typeof name !== 'string' || name.length > 160))) return false;
+  if (value.phase_log !== undefined && (!Array.isArray(value.phase_log) || value.phase_log.length > 10000
+    || value.phase_log.some((entry: any) => !entry || typeof entry !== 'object' || Array.isArray(entry)
+      || entry.batch !== undefined && (!Number.isSafeInteger(entry.batch) || entry.batch < 1 || entry.batch > value.total_batches)
+      || entry.status !== undefined && (typeof entry.status !== 'string' || entry.status.length > 64)))) return false;
+  if (value.recent_files !== undefined && (!Array.isArray(value.recent_files) || value.recent_files.length > 32
+    || value.recent_files.some((file: any) => !file || typeof file !== 'object' || Array.isArray(file)
+      || typeof file.path !== 'string' || file.path.length > 4096 || typeof file.ext !== 'string' || file.ext.length > 64
+      || !Number.isSafeInteger(file.size) || file.size < 0))) return false;
+  if (value.bg_progress != null && (typeof value.bg_progress !== 'object' || Array.isArray(value.bg_progress)
+    || ['elapsed_formatted', 'remaining_formatted'].some(key => value.bg_progress[key] !== undefined
+      && (typeof value.bg_progress[key] !== 'string' || value.bg_progress[key].length > 80)))) return false;
+  if (value.execution === undefined) return true; // Older owners remain observable; their completion is not inferred.
+  const execution = value.execution;
+  return !!execution && typeof execution === 'object' && !Array.isArray(execution)
+    && ['runner_live', 'stop_requested', 'drain_pending', 'partial_artifacts', 'storage_failed'].every(key => typeof execution[key] === 'boolean')
+    && Number.isSafeInteger(execution.physical_workers) && execution.physical_workers >= 0 && execution.physical_workers <= 4096
+    && Number.isSafeInteger(execution.unflushed_files) && execution.unflushed_files >= 0 && execution.unflushed_files <= 10000000
+    && (execution.operation == null || ['expansion', 'zip', 'vault_zip', 'native_apk', 'apk'].includes(execution.operation))
+    && (execution.operation_status == null || ['running', 'stopping', 'completed', 'failed', 'cancelled', 'unknown'].includes(execution.operation_status))
+    && (execution.stop_reason === null || typeof execution.stop_reason === 'string' && execution.stop_reason.length <= 64);
+}
+
+function artifactLink(value: unknown, external = false): string | null {
+  if (typeof value !== 'string' || value.length > 4096) return null;
+  if (/^\/api\/galaxy-studio\/vault\/download\/[a-zA-Z0-9_-]{1,160}$/.test(value)) return `${BACKEND}${value}`;
+  if (!external) return null;
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null; }
+  catch { return null; }
+}
+function artifactJob(value: any, bid: string): any {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.build_id !== bid
+    || !['none', 'running', 'stopping', 'completed', 'failed', 'cancelled', 'unknown'].includes(value.status)) throw new Error('Artifact status is incompatible with this build.');
+  for (const key of ['stage', 'error', 'message']) if (value[key] != null && (typeof value[key] !== 'string' || value[key].length > 2000)) throw new Error('Artifact status text is invalid.');
+  for (const key of ['files_added', 'total_files', 'file_count', 'phases_completed', 'phases_total', 'unflushed_files']) {
+    if (value[key] !== undefined && (!Number.isSafeInteger(value[key]) || value[key] < 0 || value[key] > 10000000)) throw new Error('Artifact status counts are invalid.');
+  }
+  if (value.result != null && (typeof value.result !== 'object' || Array.isArray(value.result))) throw new Error('Artifact result is invalid.');
+  return value.status === 'none' ? null : value;
+}
 
 // Map the Studio's gameEras id → backend final-build era key (core/eras.py).
 const ERA_KEY_MAP: Record<string, string> = {
@@ -73,18 +137,18 @@ const APK_STAGE_LABEL: Record<string, string> = {
 };
 
 function ActiveJobRow({ kind, job, T, topBorder }: { kind: 'expand' | 'apk'; job: any; T: any; topBorder?: boolean }) {
-  const running = job.status === 'running';
+  const running = job.status === 'running' || job.status === 'stopping';
   const color = job.status === 'completed' ? '#22C55E' : job.status === 'failed' ? '#EF4444' : '#60A5FA';
   let detail: string;
   if (kind === 'expand') {
-    detail = running ? `generating… (pipeline ${job.phases_completed ?? 0}/${job.phases_total ?? 7})`
+    detail = job._stale ? 'Status unavailable; last observation retained.' : job.status === 'stopping' ? 'Stopping; waiting for physical work to drain. Files are partial.' : running ? `generating… (pipeline ${job.phases_completed ?? 0}/${job.phases_total ?? 7})`
       : job.status === 'completed' ? `+${(job.files_added ?? 0).toLocaleString()} files → ${(job.total_files ?? 0).toLocaleString()} total`
-      : job.status === 'failed' ? (job.error || 'failed') : String(job.status);
+      : ['failed', 'cancelled', 'unknown'].includes(job.status) ? `${job.status}; retained work is partial. ${job.unflushed_files || 0} unsaved files.` : String(job.status);
   } else {
     const res = job.result || {};
-    detail = running ? (APK_STAGE_LABEL[job.stage] || job.stage || 'working…')
-      : job.status === 'completed' ? `${res.apk_status || 'done'} • ${res.file_count ?? 0} files`
-      : job.status === 'failed' ? (job.error || 'failed') : String(job.status);
+    detail = job._stale ? 'Status unavailable; last observation retained.' : job.status === 'stopping' ? 'Stopping local work; waiting for physical drain.' : running ? (APK_STAGE_LABEL[job.stage] || job.stage || 'working…')
+      : job.status === 'completed' ? res.eas_build_id ? 'Packaging finished; remote submission acknowledged. APK completion is separate.' : 'ZIP preparation finished; no acknowledged APK submission.'
+      : ['failed', 'cancelled', 'unknown'].includes(job.status) ? `${job.status}; saved ZIPs may remain. Remote submission may be unconfirmed.` : String(job.status);
   }
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderTopWidth: topBorder ? 1 : 0, borderTopColor: T.border }}>
@@ -98,26 +162,6 @@ function ActiveJobRow({ kind, job, T, topBorder }: { kind: 'expand' | 'apk'; job
     </View>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════
-// FAILSAFE CONFIG — ZERO RECURSION polling, backoff via tick-skipping
-// ═══════════════════════════════════════════════════════════════════════
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const POLL_BASE_INTERVAL = 5000;   // 5s base interval (setInterval tick rate)
-
-// Batch name mapping for client-side estimates when server is unreachable
-const BATCH_NAME_BY_NUM: Record<number | string, string> = {
-  1: 'Vision & Concept',
-  2: 'Deep Design',
-  3: 'Quantum Core',
-  4: 'Game Factory',
-  5: 'Code Generation',
-  6: 'Art & Audio',
-  7: 'Narrative',
-  8: 'QA Gauntlet',
-  9: 'Marketing',
-  10: 'Production & Deploy',
-};
 
 // ═══ DESCRIPTION CARD ═══
 // eslint-disable-next-line react/display-name
@@ -632,6 +676,8 @@ export default function GalaxyStudioFactoryModal
   const router = useRouter();
   const [buildId, setBuildId] = useState<string | null>(null);
   const [buildStatus, setBuildStatus] = useState<any>(null);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const [buildLog, setBuildLog] = useState<string[]>([]);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const lastPhaseRef = useRef(0);
@@ -650,9 +696,16 @@ export default function GalaxyStudioFactoryModal
   const [expandLoading, setExpandLoading] = useState<string | null>(null);
   const [zipLoading, setZipLoading] = useState(false);
   const [apkLoading, setApkLoading] = useState(false);
+  const [retainedZip, setRetainedZip] = useState<{ url: string; filename: string } | null>(null);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [easStatus, setEasStatus] = useState<any>(null);
-  const easPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const artifactEpochRef = useRef(0);
+  const artifactRequestsRef = useRef(new Set<AbortController>());
+  const artifactCommandRef = useRef<symbol | null>(null);
+  const artifactStopRef = useRef<symbol | null>(null);
+  const jobsRefreshRef = useRef<(manual?: boolean) => Promise<void>>(async () => {});
+  const easStatusRef = useRef<any>(null);
+  easStatusRef.current = easStatus;
   // EAS cloud-compile auth state — drives the green/amber pill next to the tunnel pill
   const [easAuth, setEasAuth] = useState<{ connected: boolean; account?: string; email?: string; cli_version?: string; message?: string } | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -673,197 +726,127 @@ export default function GalaxyStudioFactoryModal
   const [finResult, setFinResult] = useState<any | null>(null);
   const [finError, setFinError] = useState<string | null>(null);
   const finPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finJobRef = useRef<{ buildId: string; jobId: string } | null>(null);
+  const swarmPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // "Populate my world" — drop Construct/Material forge assets into this build.
   const [popBusy, setPopBusy] = useState(false);
   const [popResult, setPopResult] = useState<any | null>(null);
+
+  const detachArtifactObservation = useCallback(() => {
+    artifactEpochRef.current += 1;
+    for (const request of artifactRequestsRef.current) request.abort();
+    artifactRequestsRef.current.clear(); artifactCommandRef.current = null; artifactStopRef.current = null;
+    if (finPollRef.current) { clearInterval(finPollRef.current); finPollRef.current = null; }
+    if (swarmPollRef.current) { clearInterval(swarmPollRef.current); swarmPollRef.current = null; }
+  }, []);
 
   const pickScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const logScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   useEffect(() => {
+    let detached = false;
+    let restoreRequest: AbortController | null = null;
     if (visible) {
-      fetchManifest();
-      fetchGenres();
-      resetState();
-      // Auto-restore saved build on open — if user killed app mid-build, pick up where they left off.
-      // ★ PREFLIGHT CHECK: verify the saved build actually exists on the backend
-      //   BEFORE flipping to 'building' state. Prevents the stuck-on-launch
-      //   state when the previous build's pod was recycled or files got purged.
-      (async () => {
+      fetchManifest(); fetchGenres(); resetState();
+      void (async () => {
         try {
           const raw = await AsyncStorage.getItem(STORAGE_KEY);
-          if (!raw) return;
+          if (detached || !raw || raw.length > 4096) return;
           const saved = JSON.parse(raw);
-          if (!saved?.build_id || !saved?.start_ms) return;
-          // Ignore legacy temp local-ids — they don't exist on the server and cause 404s
-          if (typeof saved.build_id === 'string' && saved.build_id.startsWith('local-')) {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            return;
-          }
-          const elapsed = Date.now() - saved.start_ms;
-          const duration = saved.duration_ms || 15 * 60 * 1000;
-          // If the saved build is older than 30 minutes, discard — backend
-          // pods recycle aggressively and any older build_id is stale.
-          if (elapsed > 30 * 60 * 1000) {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            return;
-          }
-          // ── PREFLIGHT ── ping /status; if 404 or clearly dead → silently clear storage.
+          if (typeof saved?.build_id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(saved.build_id)
+            || saved.build_id.startsWith('local-') || !Number.isFinite(saved.start_ms) || saved.start_ms <= 0) return;
+          const bid = saved.build_id;
+          const duration = Number.isFinite(saved.duration_ms) && saved.duration_ms > 0 ? saved.duration_ms : 15 * 60 * 1000;
+          let snapshot: any = null;
+          restoreRequest = new AbortController();
+          const timer = setTimeout(() => restoreRequest?.abort(), 8000);
           try {
-            const controller = new AbortController();
-            const tm = setTimeout(() => controller.abort(), 8000);
-            const pre = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${saved.build_id}`, {
-              signal: controller.signal,
-              headers: { 'Cache-Control': 'no-cache', 'Accept': 'application/json' },
-              // @ts-ignore
-              cache: 'no-store',
+            const response = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${encodeURIComponent(bid)}`, {
+              signal: restoreRequest.signal, headers: { 'Cache-Control': 'no-cache', Accept: 'application/json' }, cache: 'no-store',
             });
-            clearTimeout(tm);
-            if (pre.status === 404) {
-              // Backend lost it — don't get stuck on a zombie restore.
-              await AsyncStorage.removeItem(STORAGE_KEY);
-              return;
+            if (detached) return;
+            if (response.status === 404) { await AsyncStorage.removeItem(STORAGE_KEY); return; }
+            if (response.ok) {
+              const value = await response.json();
+              if (validGalaxyStatus(value, bid)) snapshot = value;
             }
-            if (pre.ok) {
-              const pj = await pre.json();
-              // If already completed or failed, skip the automatic restore and
-              // present a fresh pick screen (the user can still retrieve the
-              // completed build via /vault).
-              if (pj.status === 'completed' || pj.status === 'failed' || pj._lost) {
-                await AsyncStorage.removeItem(STORAGE_KEY);
-                return;
-              }
-            }
-          } catch {
-            // Preflight failed (offline / slow network) — fall through and
-            // attempt a restore anyway; the existing polling logic will
-            // self-heal or give up after 3× 404.
+          } catch { /* A failed observation does not confirm that the job stopped. */ }
+          finally { clearTimeout(timer); }
+          if (detached) return;
+          setTitle(typeof saved.title === 'string' ? saved.title.slice(0, 160) : 'Retained Build');
+          setBuildId(bid); buildIdRef.current = bid;
+          buildStartMsRef.current = saved.start_ms; buildDurationMsRef.current = duration; lastPhaseRef.current = 0;
+          const retainedGame = snapshot?.execution?.operation && ['completed', 'failed', 'cancelled'].includes(snapshot.status);
+          if (snapshot?.execution && (retainedGame || classifyBuildJob(snapshot) !== 'pending')) {
+            setBuildStatus(snapshot); setStep('done');
+            if (snapshot.status !== 'completed') setStatusMsg(`Retained build is ${snapshot.status}. ${statusStopReason(snapshot.execution.stop_reason)} Files are partial.`);
+            void refreshFiles(bid);
+            return;
           }
-          addLog(`♾ Restoring previous build — ${saved.title || saved.build_id}`);
-          setTitle(saved.title || 'Restored Build');
-          setBuildId(saved.build_id);
+          if (snapshot) setBuildStatus(snapshot);
+          addLog(`ℹ Restoring build observation — ${bid}`);
           setStep('building');
-          buildStartMsRef.current = saved.start_ms;
-          buildDurationMsRef.current = duration;
-          lastPhaseRef.current = 0;
-          startPolling(saved.build_id, { resumeStartMs: saved.start_ms, resumeDurationMs: duration });
-        } catch {}
+          startPolling(bid, { resumeStartMs: saved.start_ms, resumeDurationMs: duration });
+        } catch { /* Invalid local markers never authorize a new build or recovery. */ }
       })();
     }
-    return () => { stopPolling(); };
+    return () => { detached = true; restoreRequest?.abort(); stopPolling(); detachArtifactObservation(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const resetState = () => {
+    detachArtifactObservation();
     setStep('pick'); setTitle(''); setSelectedGenre(null); setSelectedSubgenre(null);
     setExtraGenreIds([]); setExtraSubgenreIds([]); setMultiGenreMode(false);
     setGenreSearch(''); setExpandedGenre(null); setGameVision(''); setSystemArch('');
     setWorldLaws(''); setAgentInstructions(''); setShowDescriptions(false); setScaleCommand(''); setComplexity(10); setAgeTarget('ALL'); setGraphicsEra(7); setNpcDensity(7); setSoundEra(7); setWorldSize(7); setPhysicsRealism(7); setAiComplexity(7); setLightingEngine(7); setParticleEffects(7); setDestructionPhysics(7); setNarrativeBranching(7); setEconomyComplexity(7); setMultiplayerMax(7); setWeatherSystems(7); setDayNightCycle(7); setAnimationFluidity(7); setPostProcessing(7); setFoliageDensity(7); setWaterSimulation(7); setUiMinimalism(7); setLootVariety(7); setCraftingDepth(7); setDialogDepth(7); setStealthMechanics(7); setVehicleSimulation(7); setBiomeDiversity(7); setFactionReputation(7); setSkillSystem(7); setGoreSystem(7); setModdingSupport(7); setJuice(7); setTargetFiles(MAX_TARGET_FILES);
+    buildIdRef.current = null;
     setBuildId(null); setBuildStatus(null); setBuildLog([]); setFiles(null);
     setSelectedFile(null); setFileContent(''); setShowCode(false);
+    setLoading(false); setResumeLoading(false); setEasStatus(null); setRetainedZip(null);
     setExpandLoading(null); setZipLoading(false); setApkLoading(false); setStatusMsg(null);
+    setPopBusy(false); setPopResult(null); setJobsObserved(false);
     setVaultData(null); setShowVault(false);
-    setFinBusy(false); setFinStages([]); setFinResult(null); setFinError(null);
+    setFinBusy(false); setFinStages([]); setFinResult(null); setFinError(null); finJobRef.current = null;
     if (finPollRef.current) { clearInterval(finPollRef.current); finPollRef.current = null; }
     progressAnim.setValue(0); lastPhaseRef.current = 0;
     stopPolling();
   };
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // safeFetch v7 — Stack-Overflow-grade resilient HTTP client
-  // Patterns applied:
-  //   • AWS-style FULL JITTER exponential backoff (prevents thundering herd)
-  //   • AbortController with guaranteed cleanup (fixes memory leaks seen in SO)
-  //   • cache:'no-store' avoids stale 502s from CDN edge
-  //   • keep-alive hint reduces TCP handshake cost
-  //   • Idempotency-Key header on POST (server-side dedup)
-  //   • Client-side circuit breaker — after 10 consecutive failures,
-  //     open the circuit for 30s to avoid hammering a dead server
-  //   • Retries only on 5xx / network / timeout — NEVER on 4xx (that'd be wrong)
-  // ═══════════════════════════════════════════════════════════════════════
-  const breakerRef = useRef({ failures: 0, openUntil: 0 });
-
-  const safeFetch = async (url: string, opts?: RequestInit, retries: number = 3): Promise<any> => {
-    // Circuit breaker check
-    const now = Date.now();
-    if (breakerRef.current.openUntil > now) {
-      const waitMs = breakerRef.current.openUntil - now;
-      throw new Error(`Circuit open — server unhealthy. Retry in ${Math.ceil(waitMs / 1000)}s`);
-    }
-
-    const method = (opts?.method || 'GET').toUpperCase();
-    // Idempotency key — allows server to dedupe retried POSTs
-    const idemKey = `${method}-${Math.random().toString(36).slice(2)}-${Date.now()}`;
-
-    let lastError: any;
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      const controller = new AbortController();
-      // Timeout with guaranteed cleanup
-      const timeoutMs = 45000 + attempt * 5000; // increase timeout on each retry
-      const timeoutHandle = setTimeout(() => {
-        try { controller.abort(); } catch {}
-      }, timeoutMs);
-
-      try {
-        const mergedHeaders: Record<string, string> = {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
-          'X-Idempotency-Key': idemKey,
-          'X-Attempt': String(attempt),
-          ...(opts?.headers as any || {}),
-        };
-        const res = await apiFetch(url, {
-          ...opts,
-          headers: mergedHeaders,
-          signal: controller.signal,
-          // @ts-ignore — keepalive hint (supported in modern fetch)
-          cache: 'no-store',
-          credentials: 'omit',
-        });
-        clearTimeout(timeoutHandle);
-
-        // 4xx — don't retry; client error
-        if (res.status >= 400 && res.status < 500) {
-          const txt = await res.text().catch(() => '');
-          throw new Error(`${res.status}: ${txt.slice(0, 200)}`);
-        }
-        // 5xx — retry
-        if (!res.ok) {
-          const txt = await res.text().catch(() => '');
-          throw new Error(`${res.status}: ${txt.slice(0, 100)}`);
-        }
-
-        const text = await res.text();
-        // Success — reset breaker
-        breakerRef.current.failures = 0;
-        breakerRef.current.openUntil = 0;
-        try { return JSON.parse(text); } catch { return text as any; }
-      } catch (err: any) {
-        clearTimeout(timeoutHandle);
-        lastError = err;
-        const msg = String(err?.message || err);
-        const isClientError = /^4\d\d:/.test(msg);
-        // Don't retry 4xx — they're deterministic errors
-        if (isClientError) {
-          throw err;
-        }
-        if (attempt < retries) {
-          // AWS "Full Jitter" — random between 0 and capped backoff
-          const base = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
-          const cap = 8000;
-          const backoff = Math.floor(Math.random() * Math.min(cap, base));
-          await new Promise(r => setTimeout(r, backoff));
-        }
+  // Use the shared headers/body deadline and caller cancellation. A mutation
+  // is sent once; transport uncertainty never becomes an automatic replay.
+  const safeFetch = useCallback(async (url: string, opts?: RequestInit, _attempts?: number): Promise<any> => {
+    if (!visibleRef.current || opts?.signal?.aborted) throw new Error('Observation detached.');
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    opts?.signal?.addEventListener('abort', abort, { once: true });
+    if (opts?.signal?.aborted) controller.abort();
+    const token = getAuthToken();
+    const epoch = artifactEpochRef.current;
+    artifactRequestsRef.current.add(controller);
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json', 'Cache-Control': 'no-cache, no-store' };
+      new Headers(opts?.headers).forEach((value, key) => { headers[key] = value; });
+      const result = await boundedFetch(url, {
+        method: opts?.method || 'GET', body: opts?.body ?? undefined,
+        headers: authHeaders(headers), signal: controller.signal,
+        retries: 0, timeoutMs: 30000, maxResponseChars: 8 * 1024 * 1024,
+      });
+      if (controller.signal.aborted || !visibleRef.current || epoch !== artifactEpochRef.current || token !== getAuthToken()) throw new Error('Observation detached.');
+      if (!result.ok) {
+        const detail = result.status >= 400 && result.status < 500
+          ? String(result.error || 'Request rejected.').slice(0, 180)
+          : result.error === 'timeout' ? 'Response deadline exceeded; server work is unconfirmed.'
+            : 'Response unavailable; server work is unconfirmed.';
+        throw new Error(`${result.status}: ${detail}`);
       }
+      if (result.data == null) throw new Error('No response snapshot was confirmed.');
+      return result.data;
+    } finally {
+      artifactRequestsRef.current.delete(controller);
+      opts?.signal?.removeEventListener('abort', abort);
     }
-    // All retries failed — trip breaker
-    breakerRef.current.failures++;
-    if (breakerRef.current.failures >= 10) {
-      breakerRef.current.openUntil = Date.now() + 30000; // open for 30s
-      breakerRef.current.failures = 0;
-    }
-    throw lastError;
-  };
+  }, []);
 
   // ═══ FAILSAFE fetchManifest/fetchGenres — via resilientNet (persistent cache + multi-host fallback) ═══
   const fetchManifest = async () => {
@@ -962,19 +945,12 @@ export default function GalaxyStudioFactoryModal
     // 2026-05 FIX: retry up to 3× with backoff (was single shot @ 25s — any
     // ngrok flap left the user staring at no pill / "yellow fallback" forever).
     // Re-checks every 60s while modal is open to recover from transient blips.
-    const fetchEasOnce = async (attempt = 0): Promise<boolean> => {
+    let easChecking = false;
+    const fetchEasOnce = async (): Promise<boolean> => {
+      if (!alive || easChecking) return true;
+      easChecking = true;
       try {
-        const ctrl = new AbortController();
-        const tm = setTimeout(() => ctrl.abort(), 8000);
-        const r = await apiFetch(`${BACKEND}/api/galaxy-studio/eas/whoami`, {
-          signal: ctrl.signal,
-          // @ts-ignore
-          cache: 'no-store',
-          credentials: 'omit',
-        });
-        clearTimeout(tm);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
+        const d = await safeFetch(`${BACKEND}/api/galaxy-studio/eas/whoami`);
         if (!alive) return true;
         const connected = d?.status === 'authenticated' && d?.mocked === false;
         setEasAuth({
@@ -987,11 +963,11 @@ export default function GalaxyStudioFactoryModal
         return true;
       } catch {
         return false;
-      }
+      } finally { easChecking = false; }
     };
     (async () => {
       for (let a = 0; a < 3; a++) {
-        const ok = await fetchEasOnce(a);
+        const ok = await fetchEasOnce();
         if (ok) break;
         await new Promise((r) => setTimeout(r, 600 * (a + 1)));
       }
@@ -1003,53 +979,104 @@ export default function GalaxyStudioFactoryModal
 
   // Poll worker-pool health every 6s during the building step — silent & direct (no breaker)
   useEffect(() => {
-    if (step !== 'building') return;
-    let alive = true;
+    if (!visible || step !== 'building') return;
+    let alive = true, inFlight = false;
     const tick = async () => {
+      if (!alive || inFlight) return;
+      inFlight = true;
       try {
-        const ctrl = new AbortController();
-        const tm = setTimeout(() => ctrl.abort(), 15000);
-        const r = await apiFetch(`${BACKEND}/api/galaxy-studio/workers`, {
-          signal: ctrl.signal,
-          // @ts-ignore
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store' },
-          credentials: 'omit',
-        });
-        clearTimeout(tm);
-        if (!r.ok) return;
-        const d = await r.json();
+        const d = await safeFetch(`${BACKEND}/api/galaxy-studio/workers`);
         if (alive && d) setWorkerStats(d);
-      } catch {}
+      } catch {} finally { inFlight = false; }
     };
     tick();
     const iv = setInterval(tick, 6000);
     return () => { alive = false; clearInterval(iv); };
-  }, [step]);
+  }, [visible, step, safeFetch]);
 
-  // ═══ Active Jobs tray — poll background expansion/APK jobs while on the
-  // Done screen so a reopened modal reconnects to anything still running. ═══
+  // One existing tray observer follows expansion, packaging and acknowledged
+  // EAS work. Detaching this view only stops observation.
   const [jobs, setJobs] = useState<{ expand: any; apk: any }>({ expand: null, apk: null });
+  const [jobsObserved, setJobsObserved] = useState(false);
   useEffect(() => {
-    if (step !== 'done' || !buildId) { setJobs({ expand: null, apk: null }); return; }
-    let alive = true;
-    const fetchOne = async (path: string) => {
+    if (!visible || step !== 'done' || !buildId) { setJobs({ expand: null, apk: null }); setJobsObserved(false); return; }
+    const bid = buildId;
+    const epoch = artifactEpochRef.current;
+    const token = getAuthToken();
+    const abort = new AbortController();
+    let alive = true, inFlight = false, lastEasRead = 0;
+    let retainedFileCount = files?.total_files ?? 0;
+    const current = () => alive && visibleRef.current && buildIdRef.current === bid && epoch === artifactEpochRef.current && token === getAuthToken();
+    const tick = async (manual = false) => {
+      if (!current() || inFlight) return;
+      inFlight = true;
       try {
-        const d = await safeFetch(`${BACKEND}${path}`);
-        return d && d.status && d.status !== 'none' ? d : null;
-      } catch { return null; }
+        const [expandValue, apkValue, owner] = await Promise.all([
+          safeFetch(`${BACKEND}/api/galaxy-studio/expand/status/${encodeURIComponent(bid)}`, { signal: abort.signal }),
+          safeFetch(`${BACKEND}/api/galaxy-studio/vault/apk-status/${encodeURIComponent(bid)}`, { signal: abort.signal }),
+          safeFetch(`${BACKEND}/api/galaxy-studio/status/${encodeURIComponent(bid)}`, { signal: abort.signal }),
+        ]);
+        if (!current()) return;
+        if (!validGalaxyStatus(owner, bid) || !owner.execution) throw new Error('Physical operation state is not available.');
+        const execution = owner.execution;
+        const drain = execution.runner_live || execution.physical_workers > 0 || execution.drain_pending;
+        const normalize = (value: any, operation: string) => {
+          const job = artifactJob(value, bid);
+          if (!job) return null;
+          const matching = operation === 'apk' ? ['apk', 'native_apk'].includes(execution.operation) : execution.operation === operation;
+          if (!matching) return job;
+          if (execution.operation_status === 'unknown') return { ...job, status: 'unknown' };
+          if (drain && (job.status !== 'running' || execution.stop_requested)) return { ...job, status: 'stopping' };
+          if (!drain && ['failed', 'cancelled'].includes(execution.operation_status)) return { ...job, status: execution.operation_status };
+          return job;
+        };
+        const expand = normalize(expandValue, 'expansion'), apk = normalize(apkValue, 'apk');
+        setJobs({ expand, apk }); setJobsObserved(true); setBuildStatus({ ...owner, _observation_stale: false });
+        if (!drain && retainedFileCount !== owner.file_count) { retainedFileCount = owner.file_count; void refreshFiles(bid, { silent: true }); }
+        if (expand && expand.status !== 'running' && expand.status !== 'stopping') setExpandLoading(null);
+        if (apk && apk.status !== 'running' && apk.status !== 'stopping') setApkLoading(false);
+        const result = apk?.result;
+        const remoteId = typeof result?.eas_build_id === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(result.eas_build_id) ? result.eas_build_id : null;
+        const previous = easStatusRef.current;
+        if (remoteId && previous?.eas_build_id !== remoteId) {
+          const acknowledged = { status: 'building', message: 'EAS acknowledged submission. No installable APK has been confirmed yet.', eas_build_id: remoteId, download_url: null, polling: true };
+          easStatusRef.current = acknowledged; setEasStatus(acknowledged);
+        } else if (!remoteId && apk?.status === 'completed' && !previous?.eas_build_id) {
+          const local = { status: 'zip_ready', message: 'ZIP preparation completed. No APK submission was acknowledged; use the ZIP for manual compilation.', download_url: null, polling: false };
+          easStatusRef.current = local; setEasStatus(local);
+        }
+        const observed = easStatusRef.current;
+        if (observed?.eas_build_id && (manual || observed.polling) && (manual || Date.now() - lastEasRead >= 10000)) {
+          lastEasRead = Date.now();
+          try {
+            const remote = await safeFetch(`${BACKEND}/api/galaxy-studio/eas-status/${encodeURIComponent(bid)}`, { signal: abort.signal });
+            if (!current()) return;
+            const state = typeof remote?.status === 'string' ? remote.status.toLowerCase() : 'unknown';
+            if (remote.eas_build_id !== undefined && remote.eas_build_id !== observed.eas_build_id) throw new Error('Remote build identity changed.');
+            const finished = ['completed', 'finished'].includes(state);
+            const failed = ['failed', 'errored', 'canceled', 'cancelled'].includes(state);
+            const running = ['building', 'queued', 'new', 'in_queue', 'in_progress'].includes(state);
+            const url = finished ? artifactLink(remote.artifact_url || remote.download_url || remote.apk_url, true) : null;
+            const next = { ...observed, status: finished && url ? 'completed' : failed ? state : running ? state : 'unknown',
+              message: finished && url ? 'The remote build reports completion and provides this APK artifact.' : failed ? 'The remote build ended without a completed APK.' : running ? 'EAS reports ongoing remote work.' : 'Remote completion is unconfirmed. Refresh jobs to inspect it again; no resubmission was requested.',
+              download_url: url, polling: running };
+            easStatusRef.current = next; setEasStatus(next);
+          } catch {
+            if (current()) { const next = { ...observed, status: 'unknown', message: 'Remote status is unavailable. Refresh jobs to inspect the acknowledged build; no resubmission was requested.', download_url: null, polling: false }; easStatusRef.current = next; setEasStatus(next); }
+          }
+        }
+      } catch {
+        if (current()) {
+          setJobsObserved(false);
+          setJobs(previous => ({ expand: previous.expand ? { ...previous.expand, _stale: true } : null, apk: previous.apk ? { ...previous.apk, _stale: true } : null }));
+        }
+      } finally { inFlight = false; }
     };
-    const tick = async () => {
-      const [expand, apk] = await Promise.all([
-        fetchOne(`/api/galaxy-studio/expand/status/${buildId}`),
-        fetchOne(`/api/galaxy-studio/vault/apk-status/${buildId}`),
-      ]);
-      if (alive) setJobs({ expand, apk });
-    };
-    tick();
-    const iv = setInterval(tick, 5000);
-    return () => { alive = false; clearInterval(iv); };
-  }, [step, buildId]);
+    jobsRefreshRef.current = tick;
+    void tick();
+    const timer = setInterval(() => { void tick(); }, 5000);
+    return () => { alive = false; abort.abort(); clearInterval(timer); jobsRefreshRef.current = async () => {}; };
+  }, [visible, step, buildId, safeFetch]);
 
   // ═══ Auto-load files when entering Done step ═══
   // 2026-05 FIX: if the user lands on the Done screen via persisted-state
@@ -1059,9 +1086,11 @@ export default function GalaxyStudioFactoryModal
     if (step !== 'done') return;
     const bid = buildId || buildIdRef.current;
     if (!bid) return;
+    const epoch = artifactEpochRef.current;
     if (files && (files.total_files || 0) > 0) return;
     // Files not loaded yet → fetch
     refreshFiles(bid).then((d) => {
+      if (!visibleRef.current || artifactEpochRef.current !== epoch || buildIdRef.current !== bid) return;
       if (!d || (d.total_files || 0) === 0) {
         addLog(`ℹ Vault is empty for this build. Try regenerating, or open Vault to find a prior archive.`);
       }
@@ -1075,21 +1104,26 @@ export default function GalaxyStudioFactoryModal
   // build log and retries with exponential backoff on transient failures.
   const refreshFiles = useCallback(async (bid: string, opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
+    const epoch = artifactEpochRef.current, token = getAuthToken();
+    const current = () => visibleRef.current && buildIdRef.current === bid && epoch === artifactEpochRef.current && token === getAuthToken();
     for (let attempt = 0; attempt < 3; attempt++) {
+      if (!current()) return null;
       try {
         const data = await safeFetch(`${BACKEND}/api/galaxy-studio/files/${bid}`);
         if (data) {
+          if (!current()) return null;
           setFiles(data);
           if (!silent) {
             if (data.total_files > 0) {
               addLog(`✓ Loaded ${data.total_files.toLocaleString()} files from ${data.source || 'server'}`);
             } else {
-              addLog(`⚠ /files returned 0 — vault may be empty or restarted. Trying recovery...`);
+              addLog('ℹ No retained files were reported for this build. No recovery was requested.');
             }
           }
           return data;
         }
       } catch (e: any) {
+        if (!current()) return null;
         if (attempt === 2 && !silent) {
           addLog(`⚠ Could not load files: ${String(e?.message || e).slice(0, 100)}`);
         }
@@ -1100,340 +1134,189 @@ export default function GalaxyStudioFactoryModal
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ═══════════════════════════════════════════════════════════════════
-  // PERMANENT CONNECTION ENGINE v10 — CLIENT CLOCK IS SOURCE OF TRUTH
-  // ═══════════════════════════════════════════════════════════════════
-  // PHILOSOPHY: The UI NEVER disconnects because the UI NEVER depends on
-  // the network for progress. The 15-minute build clock runs 100% locally.
-  //   • A local `tickTimer` runs every 1s and drives ALL progress UI
-  //   • A silent `syncTimer` runs every 8s and quietly syncs real counts
-  //   • Sync failures are INVISIBLE — no error logs, no "reconnecting"
-  //   • State is persisted to AsyncStorage → survives reload/app-kill
-  //   • When sync succeeds, real file_count & batch data override estimates
-  // Net effect: the user never sees a disconnected state. The connection
-  // is "permanent" because the network is no longer on the critical path.
-  // ═══════════════════════════════════════════════════════════════════
+  // Server observations own work progress and terminal state. The local clock
+  // is elapsed-time display only; it never completes, resumes or cancels work.
   const buildIdRef = useRef<string | null>(null);
   const pollActiveRef = useRef(false);
   const pollDoneRef = useRef(false);
+  const pollEpochRef = useRef(0);
+  const syncRequestRef = useRef<AbortController | null>(null);
+  const buildControlBusyRef = useRef(false);
   const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const buildStartMsRef = useRef<number>(0);
-  const buildDurationMsRef = useRef<number>(15 * 60 * 1000); // 15 min default
+  const buildDurationMsRef = useRef<number>(15 * 60 * 1000);
   const lastSyncOkRef = useRef<number>(0);
+  const notFoundCountRef = useRef(0);
 
   const STORAGE_KEY = '@galaxy_studio_active_build_v1';
 
-  // Persist current build state to AsyncStorage
   const persistState = useCallback(async () => {
     try {
       const bid = buildIdRef.current;
       if (!bid) return;
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
-        build_id: bid,
-        start_ms: buildStartMsRef.current,
-        duration_ms: buildDurationMsRef.current,
-        title,
-        genre: selectedGenre?.id,
-        last_seen: Date.now(),
+        build_id: bid, start_ms: buildStartMsRef.current,
+        duration_ms: buildDurationMsRef.current, title,
+        genre: selectedGenre?.id, last_seen: Date.now(),
       }));
-    } catch {}
+    } catch { /* A local marker is not authoritative build persistence. */ }
   }, [title, selectedGenre]);
 
-  // Silent server sync — never surfaces errors, never retries inside, never logs failures.
-  // Runs in the background; only updates UI when it succeeds.
-  const notFoundCountRef = useRef<number>(0);
-  const staleCheckRef = useRef<{ lastPhase: number; lastPhaseTs: number }>({ lastPhase: 0, lastPhaseTs: 0 });
-  const resurrectInflightRef = useRef<boolean>(false);
-
-  // ═══ Self-healing resurrect — try to bring a lost/stuck build back ═══
-  const attemptResurrect = useCallback(async (bid: string, reason: string): Promise<boolean> => {
-    if (resurrectInflightRef.current) return false;
-    resurrectInflightRef.current = true;
-    try {
-      const res = await apiFetch(`${BACKEND}/api/galaxy-studio/resurrect/${bid}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store' },
-        // @ts-ignore
-        cache: 'no-store', credentials: 'omit',
-      });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        addLog(`🔄 Self-heal: resurrected build (${reason}) — resumed from batch ${data.resumed_from_batch || '?'}`);
-        return true;
-      }
-    } catch {}
-    finally {
-      setTimeout(() => { resurrectInflightRef.current = false; }, 5000);
-    }
-    return false;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stopPolling = useCallback(() => {
+    pollEpochRef.current += 1;
+    pollActiveRef.current = false; pollDoneRef.current = true;
+    syncRequestRef.current?.abort(); syncRequestRef.current = null;
+    if (tickTimerRef.current) { clearInterval(tickTimerRef.current); tickTimerRef.current = null; }
+    if (syncTimerRef.current) { clearInterval(syncTimerRef.current); syncTimerRef.current = null; }
   }, []);
 
   const silentSync = useCallback(async (bid: string) => {
+    if (!visibleRef.current || !pollActiveRef.current || pollDoneRef.current || buildIdRef.current !== bid || syncRequestRef.current) return null;
+    const epoch = pollEpochRef.current;
+    const controller = new AbortController(); syncRequestRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const current = () => visibleRef.current && !controller.signal.aborted && pollEpochRef.current === epoch && buildIdRef.current === bid;
     try {
-      const controller = new AbortController();
-      const tm = setTimeout(() => controller.abort(), 30000);
-      const res = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${bid}`, {
-        signal: controller.signal,
-        headers: { 'Cache-Control': 'no-cache, no-store', 'Accept': 'application/json' },
-        // @ts-ignore
-        cache: 'no-store',
-        credentials: 'omit',
+      const res = await apiFetch(`${BACKEND}/api/galaxy-studio/status/${encodeURIComponent(bid)}`, {
+        signal: controller.signal, headers: { 'Cache-Control': 'no-cache, no-store', Accept: 'application/json' },
+        cache: 'no-store', credentials: 'omit',
       });
-      clearTimeout(tm);
-      // ── 404 handling with self-heal attempt ──
-      // Try to resurrect on the first 404 before giving up. The backend
-      // watchdog may have already saved the build metadata to Mongo, so
-      // /resurrect can often bring it back even if Mongo lost the doc.
+      if (!current()) return null;
       if (res.status === 404) {
         notFoundCountRef.current += 1;
-        if (notFoundCountRef.current === 1) {
-          // First 404: try to resurrect
-          const resurrected = await attemptResurrect(bid, 'status 404');
-          if (resurrected) return null;
-        }
+        setStatusMsg('The server cannot currently find this build. No completion or cancellation is confirmed.');
         if (notFoundCountRef.current >= 3) {
-          // Three 404s in a row even after resurrect attempt = build really gone.
-          pollDoneRef.current = true;
-          pollActiveRef.current = false;
+          setBuildStatus((previous: any) => ({ ...(previous || {}), status: 'lost', _lost: true, _observation_stale: true }));
+          addLog('⚠ Build status was not found after three observations. Inspect the retained artifacts or explicitly start another build.');
           stopPolling();
-          addLog(`⚠ Server lost track of this build (3 consecutive 404s).`);
-          addLog(`Tap 'New Build' below to restart — your settings are preserved.`);
-          setBuildStatus((prev: any) => ({
-            ...(prev || {}),
-            status: 'lost',
-            _lost: true,
-          }));
-          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
         }
         return null;
       }
-      if (!res.ok) return null;
-      notFoundCountRef.current = 0;
+      if (!res.ok) throw new Error('Build status is unavailable.');
       const data = await res.json();
-      lastSyncOkRef.current = Date.now();
-      // ── Stale-build detection — phase hasn't advanced in 90s? resurrect ──
-      try {
-        const nowMs = Date.now();
-        const curPhase = Number(data.current_phase) || 0;
-        const prev = staleCheckRef.current;
-        if (curPhase > prev.lastPhase) {
-          staleCheckRef.current = { lastPhase: curPhase, lastPhaseTs: nowMs };
-        } else if (
-          data.status === 'building'
-          && prev.lastPhaseTs > 0
-          && (nowMs - prev.lastPhaseTs) > 90_000
-          && curPhase < 100
-        ) {
-          // Stuck — try a resurrect and reset the stale timer
-          await attemptResurrect(bid, `stalled at phase ${curPhase}/100`);
-          staleCheckRef.current = { lastPhase: curPhase, lastPhaseTs: nowMs };
-        }
-      } catch {}
-
-      setBuildStatus((prev: any) => {
-        // Merge server data over client estimate, but preserve client's clock values
-        // so the timer NEVER goes backwards or gets stuck when server clock is behind.
-        const clientBg = prev?.bg_progress;
-        const serverBg = data?.bg_progress;
-        let mergedBg = serverBg || clientBg;
-        if (clientBg && serverBg) {
-          // Use whichever has more elapsed time (so client doesn't appear to rewind)
-          mergedBg = (clientBg.elapsed_seconds || 0) > (serverBg.elapsed_seconds || 0) ? clientBg : serverBg;
-        }
-        const merged = {
-          ...(prev || {}),
-          ...data,
-          // Preserve client clock if server didn't provide one or has smaller elapsed
-          bg_progress: mergedBg,
-          // Preserve the higher file_count if server responds with lower (transient during sync)
-          file_count: Math.max(prev?.file_count || 0, data?.file_count || 0),
-        };
-        return merged;
-      });
-
-      // Log new phases quietly
-      if (data.phase_log && data.phase_log.length > lastPhaseRef.current) {
-        const newEntries = data.phase_log.slice(lastPhaseRef.current);
-        for (const p of newEntries) {
-          const batchLabel = `Batch ${p.batch || '?'}: ${p.name || 'Unknown'}`;
-          if (p.status === 'fallback') addLog(`⚠ ${batchLabel} — recovered`);
-          else if (p.status === 'resumed') addLog(`▶ ${batchLabel} — resumed`);
-          else if (p.error) addLog(`⚠ ${batchLabel}`);
-          else addLog(`✓ ${batchLabel} — ${p.file_count?.toLocaleString() || 0} files`);
+      if (!current()) return null;
+      if (!validGalaxyStatus(data, bid)) throw new Error('The server returned incompatible build state.');
+      notFoundCountRef.current = 0; lastSyncOkRef.current = Date.now();
+      setBuildStatus((previous: any) => ({ ...data,
+        _local_elapsed_formatted: previous?._local_elapsed_formatted,
+        _local_remaining_formatted: previous?._local_remaining_formatted,
+        _observation_stale: false,
+      }));
+      const ratio = data.completed_phases / data.total_phases;
+      Animated.timing(progressAnim, { toValue: ratio, duration: 500, useNativeDriver: false }).start();
+      if (Array.isArray(data.phase_log) && data.phase_log.length > lastPhaseRef.current) {
+        for (const phase of data.phase_log.slice(lastPhaseRef.current, lastPhaseRef.current + 100)) {
+          if (!phase || typeof phase !== 'object') continue;
+          const name = typeof phase.name === 'string' ? phase.name.slice(0, 160) : 'Generation batch';
+          if (phase.status === 'completed' || phase.status === 'success') addLog(`✓ ${name} — recorded complete`);
+          else if (phase.error || phase.status === 'failed') addLog(`⚠ ${name} — incomplete`);
+          else addLog(`ℹ ${name} — ${typeof phase.status === 'string' ? phase.status.slice(0, 32) : 'observed'}`);
         }
         lastPhaseRef.current = data.phase_log.length;
       }
-
-      // If server says completed, mark done
-      if (data.status === 'completed' || data.bg_status === 'completed') {
-        pollDoneRef.current = true;
-        pollActiveRef.current = false;
+      const artifactHandoff = data.status === 'completed' && data.completed_phases === data.total_phases && !!data.execution?.operation;
+      const outcome = artifactHandoff ? 'completed' : data.execution ? classifyBuildJob(data) : 'pending';
+      const execution = data.execution;
+      if (execution?.stop_requested || execution?.storage_failed) {
+        setStatusMsg(`${statusStopReason(execution.stop_reason)} ${execution.drain_pending || execution.runner_live || execution.physical_workers > 0 ? 'Waiting for physical workers to drain. Retained files are partial.' : 'Retained files are partial.'}`);
+      } else if (!execution && data.status === 'completed') {
+        setStatusMsg('The server reports completion without compatible physical-work metadata. Refresh after updating the backend; completion is not confirmed here.');
+      } else setStatusMsg(null);
+      if (outcome !== 'pending') {
         stopPolling();
-        addLog(`✓ Build complete — ${(data.file_count || 0).toLocaleString()} files`);
-        // Wave-3 — celebratory Jeeves chime on completion
-        try {
-          jeevesSpeak(
-            `Build complete. ${(data.file_count || 0).toLocaleString()} files generated.`,
-            { context: 'celebration', prependCatchphrase: true },
-          );
-        } catch {}
-        try { await refreshFiles(bid); } catch {}
         setStep('done');
-        try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
+        if (outcome === 'completed') {
+          addLog(artifactHandoff ? 'Game generation is complete. Follow the separate artifact operation in Active Jobs.' : `✓ Build complete — ${data.file_count.toLocaleString()} retained files`);
+          if (!artifactHandoff) {
+            try { jeevesSpeak(`Build complete. ${data.file_count.toLocaleString()} files generated.`, { context: 'celebration', prependCatchphrase: true }); } catch {}
+            try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
+          }
+        } else {
+          const detail = statusStopReason(execution?.stop_reason);
+          setStatusMsg(`${outcome === 'cancelled' ? 'Build stopped' : 'Build failed'}. ${detail} Retained files are partial.`);
+          addLog(`⚠ ${outcome === 'cancelled' ? 'Build stopped' : 'Build failed'} — retained artifacts are partial.`);
+        }
+        // The results screen loads retained files independently; a failed
+        // file read cannot hide the authoritative stopped/failed outcome.
       }
       return data;
     } catch {
-      // Silent — network issues are invisible to the user
+      if (current()) {
+        setBuildStatus((previous: any) => previous ? { ...previous, _observation_stale: true } : previous);
+        setStatusMsg('Build status is unavailable. The last observed work is retained; no completion, failure or cancellation is inferred.');
+      }
       return null;
+    } finally {
+      clearTimeout(timer);
+      if (syncRequestRef.current === controller) syncRequestRef.current = null;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [addLog, progressAnim, stopPolling]);
 
   const startPolling = useCallback((bid: string, opts?: { resumeStartMs?: number; resumeDurationMs?: number }) => {
-    // Clear any previous timers
-    if (tickTimerRef.current) { clearInterval(tickTimerRef.current); tickTimerRef.current = null; }
-    if (syncTimerRef.current) { clearInterval(syncTimerRef.current); syncTimerRef.current = null; }
-
-    buildIdRef.current = bid;
-    pollActiveRef.current = true;
-    pollDoneRef.current = false;
-
-    // Initialize local clock (for fresh builds or resumed builds)
-    if (opts?.resumeStartMs) {
-      buildStartMsRef.current = opts.resumeStartMs;
-    } else if (!buildStartMsRef.current) {
-      buildStartMsRef.current = Date.now();
-    }
+    stopPolling();
+    buildIdRef.current = bid; pollActiveRef.current = true; pollDoneRef.current = false;
+    lastSyncOkRef.current = 0; notFoundCountRef.current = 0;
+    if (opts?.resumeStartMs) buildStartMsRef.current = opts.resumeStartMs;
+    else if (!buildStartMsRef.current) buildStartMsRef.current = Date.now();
     if (opts?.resumeDurationMs) buildDurationMsRef.current = opts.resumeDurationMs;
-
-    // ═══ TICK TIMER — drives all time-based UI every 1s, purely client-side ═══
     tickTimerRef.current = setInterval(() => {
-      if (!pollActiveRef.current || pollDoneRef.current) return;
-      const elapsedMs = Date.now() - buildStartMsRef.current;
-      const totalMs = buildDurationMsRef.current;
-      const timePct = Math.min(100, (elapsedMs / totalMs) * 100);
-      const estBatch = Math.min(10, Math.floor((timePct / 100) * 10) + 1);
-
-      // Smooth local progress bar
-      Animated.timing(progressAnim, {
-        toValue: Math.min(1, elapsedMs / totalMs),
-        duration: 900,
-        useNativeDriver: false,
-      }).start();
-
-      // Update buildStatus with client-estimated values (server will override when sync lands)
-      setBuildStatus((prev: any) => {
-        const elapsedSec = Math.floor(elapsedMs / 1000);
-        const remainingSec = Math.max(0, Math.floor((totalMs - elapsedMs) / 1000));
-        return {
-          ...(prev || {}),
-          progress_pct: timePct,
-          bg_current_batch: Math.max(prev?.bg_current_batch || 0, estBatch),
-          current_batch: Math.max(prev?.current_batch || 0, estBatch),
-          total_batches: 10,
-          batch_name: BATCH_NAME_BY_NUM[estBatch] || prev?.batch_name || 'Generating',
-          batch_names: prev?.batch_names || BATCH_NAME_BY_NUM,
-          bg_progress: {
-            elapsed_seconds: elapsedSec,
-            target_seconds: Math.floor(totalMs / 1000),
-            elapsed_formatted: `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`,
-            remaining_formatted: `${Math.floor(remainingSec / 60)}m ${remainingSec % 60}s`,
-            time_pct: Math.round(timePct),
-          },
-          // If server hasn't returned yet, assume client-side running
-          status: prev?.status || 'building',
-        };
-      });
-
-      // Client-side completion — if we hit 100% and server never acked, force-complete then finish
-      if (elapsedMs >= totalMs && !pollDoneRef.current) {
-        silentSync(bid).then(async (data) => {
-          if (pollDoneRef.current) return;
-          if (data?.status === 'completed') return; // silentSync already handled it
-          // Force-complete on server so expand/vault flows work
-          try {
-            const ctrl = new AbortController();
-            const tm = setTimeout(() => ctrl.abort(), 30000);
-            await apiFetch(`${BACKEND}/api/galaxy-studio/force-complete/${bid}`, {
-              method: 'POST',
-              signal: ctrl.signal,
-              headers: { 'Cache-Control': 'no-cache, no-store' },
-              // @ts-ignore
-              cache: 'no-store',
-              credentials: 'omit',
-            });
-            clearTimeout(tm);
-            addLog(`✓ Server finalized — fetching files...`);
-          } catch {
-            addLog(`ℹ Server unreachable for finalize — files may be partial`);
-          }
-          pollDoneRef.current = true;
-          pollActiveRef.current = false;
-          stopPolling();
-          try { await refreshFiles(bid); } catch {}
-          setStep('done');
-          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
-        });
-      }
-
-      // Persist state every ~10s
-      if (Math.floor(elapsedMs / 1000) % 10 === 0) persistState();
+      if (!pollActiveRef.current || pollDoneRef.current || !visibleRef.current) return;
+      const elapsedMs = Math.max(0, Date.now() - buildStartMsRef.current);
+      const elapsed = Math.floor(elapsedMs / 1000);
+      const remaining = Math.max(0, Math.floor((buildDurationMsRef.current - elapsedMs) / 1000));
+      setBuildStatus((previous: any) => ({ ...(previous || {}),
+        _local_elapsed_formatted: `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`,
+        _local_remaining_formatted: `${Math.floor(remaining / 60)}m ${remaining % 60}s`,
+        _observation_stale: !lastSyncOkRef.current || Date.now() - lastSyncOkRef.current > 30000,
+      }));
+      if (elapsed % 10 === 0) void persistState();
     }, 1000);
+    syncTimerRef.current = setInterval(() => { void silentSync(bid); }, 8000);
+    void silentSync(bid); void persistState();
+  }, [persistState, silentSync, stopPolling]);
 
-    // ═══ SYNC TIMER — silent best-effort server sync every 8s ═══
-    syncTimerRef.current = setInterval(() => {
-      if (!pollActiveRef.current || pollDoneRef.current) return;
-      silentSync(bid);
-    }, 8000);
-
-    // Fire one immediate sync
-    silentSync(bid);
-    persistState();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [silentSync, progressAnim, persistState, refreshFiles]);
-
-  const stopPolling = useCallback(() => {
-    pollActiveRef.current = false;
-    pollDoneRef.current = true;
-    if (tickTimerRef.current) { clearInterval(tickTimerRef.current); tickTimerRef.current = null; }
-    if (syncTimerRef.current) { clearInterval(syncTimerRef.current); syncTimerRef.current = null; }
-    if (easPollRef.current) { clearInterval(easPollRef.current); easPollRef.current = null; }
-  }, []);
-
-  // ═══ CONTINUE — Resume an interrupted build from last saved batch ═══
+  // Recovery and stopping are explicit owner commands. Their HTTP response is
+  // followed by a status read; it is never treated as a completion receipt.
   const resumeBuild = useCallback(async () => {
     const bid = buildIdRef.current || buildId;
-    if (!bid) { addLog('⚠ No build to resume'); return; }
-    setResumeLoading(true);
-    addLog(`▶ Requesting server to continue build from last saved batch...`);
+    if (!visibleRef.current || !bid || buildControlBusyRef.current) return;
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && buildIdRef.current === bid && pollEpochRef.current === epoch;
+    buildControlBusyRef.current = true; setResumeLoading(true);
     try {
-      const data = await safeFetch(`${BACKEND}/api/galaxy-studio/resume/${bid}`, { method: 'POST' }, 3);
-      if (data?.status === 'resumed') {
-        addLog(`✅ Resumed from batch ${data.resume_from_batch}/${data.total_batches} (${data.file_count?.toLocaleString() || 0} files preserved)`);
-      } else if (data?.status === 'completed') {
-        addLog(`✓ Build already completed`);
-        try { await refreshFiles(bid); } catch {}
-        setStep('done');
-        setResumeLoading(false);
-        return;
-      } else if (data?.status === 'already_running') {
-        addLog(`ℹ Build is already running — sync is active`);
-      } else {
-        addLog(`✓ Server response: ${data?.message || 'resumed'}`);
-      }
+      const data = await safeFetch(`${BACKEND}/api/galaxy-studio/resurrect/${encodeURIComponent(bid)}`, { method: 'POST' }, 1);
+      if (!current()) return;
+      addLog(data?.status === 'resurrected' ? '▶ Resume acknowledged. Waiting for actual worker progress.' : 'ℹ Resume response received. Refreshing authoritative build state.');
       startPolling(bid);
     } catch {
-      // Even on server error, keep local clock running — connection is permanent
-      addLog(`ℹ Server unreachable — local build continues offline`);
-    }
-    setResumeLoading(false);
-  }, [buildId, addLog, startPolling, refreshFiles]);
+      if (current()) setStatusMsg('Resume was not confirmed. Refresh status before explicitly trying again.');
+    } finally { buildControlBusyRef.current = false; if (visibleRef.current) setResumeLoading(false); }
+  }, [buildId, addLog, safeFetch, startPolling]);
+
+  const stopBuild = useCallback(async () => {
+    const bid = buildIdRef.current || buildId;
+    if (!visibleRef.current || !bid || buildControlBusyRef.current) return;
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && buildIdRef.current === bid && pollEpochRef.current === epoch;
+    buildControlBusyRef.current = true; setResumeLoading(true);
+    try {
+      await safeFetch(`${BACKEND}/api/galaxy-studio/force-complete/${encodeURIComponent(bid)}`, { method: 'POST' }, 1);
+      if (!current()) return;
+      addLog('ℹ Stop request acknowledged. Waiting for physical drain and the final retained-artifact status.');
+      startPolling(bid);
+    } catch {
+      if (current()) setStatusMsg('The stop request was not confirmed. Refresh status before deciding whether to retry.');
+    } finally { buildControlBusyRef.current = false; if (visibleRef.current) setResumeLoading(false); }
+  }, [buildId, addLog, safeFetch, startPolling]);
 
   // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
   const startBuild = async () => {
-    if (!title.trim() || !selectedGenre) return;
+    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
+    buildControlBusyRef.current = true;
+    stopPolling();
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && pollEpochRef.current === epoch;
     setStep('building'); setLoading(true);
     setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
 
@@ -1506,10 +1389,13 @@ export default function GalaxyStudioFactoryModal
       });
       createData = data;
       id = createData?.build_id || '';
-      if (!id) throw new Error('server returned no build_id');
-      setBuildId(id);
-      addLog(`✓ Server build created — ${createData.total_agents?.toLocaleString?.() || '1.4M'} agents`);
+      if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(id) || id.startsWith('local-')) throw new Error('server returned no compatible build_id');
+      if (!current()) { buildControlBusyRef.current = false; return; }
+      setBuildId(id); buildIdRef.current = id;
+      addLog(`✓ Server build created — ${id}`);
     } catch (e: any) {
+      buildControlBusyRef.current = false;
+      if (!current()) return;
       const msg = String(e?.message || e || 'unknown');
       // ★ NEW POLICY (2026-04-30): NEVER auto-revert to the questionnaire.
       //   Server creates are idempotent (X-Idempotency-Key) so the build may
@@ -1520,15 +1406,15 @@ export default function GalaxyStudioFactoryModal
       //   back if they really want to abandon).
       addLog(`⚠ Create endpoint error: ${msg.slice(0, 240)}`);
       if (/^4\d\d:/.test(msg) || msg.includes('422:') || msg.includes('400:')) {
-        addLog(`✦ Validation error from server. Tap "Build Another Game" below or use back to edit.`);
+        addLog('✦ The server rejected the request. Close this view and edit the build settings.');
       } else if (/^429:/.test(msg) || msg.includes('429:') || msg.includes('already running')) {
-        addLog(`✦ Server says a build is already running for this account — polling will pick it up.`);
+        addLog('✦ The server rejected another build. Inspect the account’s existing build before retrying.');
       } else if (/^503:/.test(msg)) {
-        addLog(`✦ Server back-pressure (memory). Retrying in background; build will sync when stable.`);
+        addLog('✦ The server could not admit the build. No background retry is running here.');
       } else {
-        addLog(`✦ Network/tunnel hiccup — your build is likely still running on the server.`);
+        addLog('✦ Creation was not confirmed. Check server build records before submitting another build.');
       }
-      addLog(`Staying on build screen — polling continues. Tap ←  to cancel.`);
+      setStatusMsg('No build identifier was confirmed, so progress cannot be observed here. Closing this view does not cancel server work.');
       setLoading(false);
       return;
     }
@@ -1547,7 +1433,8 @@ export default function GalaxyStudioFactoryModal
         timeoutMs: 15000,               // start-build is near-instant, no need for 30s
         headers: { 'X-Idempotency-Key': `gs-start-${id}` },
       });
-      addLog(`✓ Background workers dispatched — 1.4M+ agents active`);
+      if (!current()) { buildControlBusyRef.current = false; return; }
+      addLog('ℹ Start request acknowledged. Waiting for actual worker observations.');
       const nonDefault = Object.entries(phase_weights).filter(([_, v]) => v !== 1.0);
       if (nonDefault.length > 0) {
         addLog(`⚙ Applied ${nonDefault.length} phase_weight overrides from Settings`);
@@ -1556,34 +1443,38 @@ export default function GalaxyStudioFactoryModal
       const swarmJobId = startResp?.data?.swarm_job_id;
       if (swarmJobId) {
         addLog(`🧠 Swarm planner scheduled the build DAG (job ${String(swarmJobId).slice(0, 8)}) — streaming…`);
-        let ticks = 0;
+        let ticks = 0, inFlight = false;
+        const swarmEpoch = artifactEpochRef.current;
+        const currentSwarm = () => visibleRef.current && artifactEpochRef.current === swarmEpoch && buildIdRef.current === id;
+        if (swarmPollRef.current) clearInterval(swarmPollRef.current);
         const swarmTimer = setInterval(async () => {
-          ticks += 1;
+          if (!currentSwarm() || ticks >= 40) { clearInterval(swarmTimer); return; }
+          if (inFlight) return;
+          inFlight = true; ticks += 1;
           try {
-            const jr = await apiFetch(`${BACKEND}/api/galaxy-studio/swarm/planner/job/${swarmJobId}`, { timeoutMs: 12000 });
-            if (jr.ok) {
-              const jd = await jr.json();
-              if (jd.status === 'done') {
-                const ex = jd.result?.execution;
-                addLog(`🧠 Swarm DAG complete — ${ex?.phases_executed ?? '?'}/${ex?.phases_planned ?? '?'} phases · ${ex?.wave_count ?? '?'} waves`);
-                clearInterval(swarmTimer);
-              } else if (jd.status === 'error') {
-                addLog(`🧠 Swarm DAG note: ${String(jd.error || 'unavailable').slice(0, 60)}`);
-                clearInterval(swarmTimer);
-              }
+            const job = await safeFetch(`${BACKEND}/api/galaxy-studio/swarm/planner/job/${encodeURIComponent(String(swarmJobId))}`);
+            if (!currentSwarm()) return;
+            if (job.status === 'done') {
+              addLog('The swarm planner reports its DAG complete. Main build completion remains independently observed.');
+              clearInterval(swarmTimer);
+            } else if (['error', 'failed', 'cancelled'].includes(job.status)) {
+              addLog('Swarm planner work ended without confirmed completion.');
+              clearInterval(swarmTimer);
             }
-          } catch { /* keep polling */ }
-          if (ticks > 40) clearInterval(swarmTimer);  // safety cap (~2 min)
+          } catch { /* Main build observation remains authoritative. */ }
+          finally { inFlight = false; }
         }, 3000);
+        swarmPollRef.current = swarmTimer;
       }
     } catch (e: any) {
+      if (!current()) { buildControlBusyRef.current = false; return; }
       const msg = String(e?.message || e || 'unknown');
       if (msg.includes('429:') || msg.includes('already_running') || msg.includes('already running')) {
-        addLog(`ℹ Build is already running on server — sync is active`);
+        addLog('ℹ The server reported existing work. Reading its current status.');
       } else if (msg.includes('503:')) {
-        addLog(`ℹ Server busy (memory pressure) — build will auto-retry when stable`);
+        addLog('ℹ The server could not admit work. Status observation will show whether any runner is present.');
       } else {
-        addLog(`ℹ Start endpoint hiccup (${msg.slice(0, 60)}) — build will sync when server returns`);
+        addLog(`ℹ Start was not confirmed (${msg.slice(0, 60)}). Reading the retained build status.`);
       }
     }
 
@@ -1592,170 +1483,111 @@ export default function GalaxyStudioFactoryModal
     buildStartMsRef.current = startMs;
     buildDurationMsRef.current = 15 * 60 * 1000;
     startPolling(id, { resumeStartMs: startMs, resumeDurationMs: 15 * 60 * 1000 });
+    buildControlBusyRef.current = false;
     setLoading(false);
   };
 
-  // ═══ DOWNLOAD / APK / EXPAND — SEPARATE STATES ═══
-  const isAnyActionLoading = zipLoading || apkLoading;
+  // Artifact commands are explicit, single-attempt requests. The tray above
+  // owns their existing observation interval; local deadlines never end jobs.
+  const isAnyActionLoading = zipLoading || apkLoading || !!expandLoading;
+  const artifactRenderEpoch = artifactEpochRef.current;
+  const artifactRenderToken = getAuthToken();
+  const artifactContext = () => {
+    const bid = buildId;
+    const epoch = artifactRenderEpoch, token = artifactRenderToken;
+    return { bid, current: () => !!bid && visibleRef.current && buildIdRef.current === bid && epoch === artifactEpochRef.current && token === getAuthToken() };
+  };
+  const artifactIdle = jobsObserved && !isAnyActionLoading && !finBusy && !popBusy && artifactCommandRef.current === null && !buildStatus?.execution?.runner_live
+    && !buildStatus?.execution?.physical_workers && !buildStatus?.execution?.drain_pending
+    && !['running', 'stopping', 'unknown'].includes(buildStatus?.execution?.operation_status);
 
   const downloadZIP = async () => {
-    if (!buildId || isAnyActionLoading) return;
+    const context = artifactContext();
+    if (!context.current() || artifactCommandRef.current || !artifactIdle) return;
+    const command = Symbol('zip'); artifactCommandRef.current = command;
     setZipLoading(true); setStatusMsg(null);
     try {
-      const data = await safeFetch(`${BACKEND}/api/galaxy-studio/vault/zip/${buildId}`, { method: 'POST' });
-      if (data.download_url) {
-        setStatusMsg(`✓ ${data.filename} (${data.size})`);
-        Linking.openURL(`${BACKEND}${data.download_url}`).catch(() => {});
-        loadVault();
-      }
-    } catch (e: any) { setStatusMsg(`⚠ ZIP error: ${e.message?.slice(0, 60)}`); }
-    setZipLoading(false);
+      void persistState(); if (!context.current()) return;
+      const data = await safeFetch(`${BACKEND}/api/galaxy-studio/vault/zip/${encodeURIComponent(context.bid!)}`, { method: 'POST' });
+      if (!context.current()) return;
+      const url = artifactLink(data.download_url);
+      if (!url || typeof data.filename !== 'string' || data.filename.length > 256) throw new Error('A completed ZIP download was not confirmed.');
+      setRetainedZip({ url, filename: data.filename });
+      setStatusMsg('ZIP archive was retained. Open the saved ZIP below to download it.');
+    } catch (error) { if (context.current()) setStatusMsg(`ZIP request or download was not confirmed. Inspect jobs and retained archives before retrying. ${error instanceof Error ? error.message.slice(0, 180) : ''}`); }
+    finally { if (artifactCommandRef.current === command) { artifactCommandRef.current = null; if (context.current()) setZipLoading(false); } if (context.current()) void jobsRefreshRef.current(true); }
   };
 
   const packageAPK = async () => {
-    if (!buildId || isAnyActionLoading) return;
+    const context = artifactContext();
+    if (!context.current() || artifactCommandRef.current || !artifactIdle) return;
+    const command = Symbol('apk'); artifactCommandRef.current = command;
     setApkLoading(true); setStatusMsg(null);
     try {
-      // Kick off the BACKGROUND packaging job (returns immediately now).
-      const start = await safeFetch(`${BACKEND}/api/galaxy-studio/vault/zip-to-apk/${buildId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ build_id: buildId }),
+      void persistState(); if (!context.current()) return;
+      const start = await safeFetch(`${BACKEND}/api/galaxy-studio/vault/zip-to-apk/${encodeURIComponent(context.bid!)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ build_id: context.bid }),
       });
-      // Poll /vault/apk-status until packaging finishes; legacy inline result still works.
-      let data: any = start;
-      if (start?.apk_status === 'running') {
-        const stageLabel: Record<string, string> = {
-          queued: 'queued', zipping: 'zipping files', zip_ready: 'zip ready',
-          materializing: 'writing project', npm_install: 'installing deps',
-          eas_init: 'initializing EAS', eas_build: 'triggering EAS build', done: 'finalizing',
-        };
-        setStatusMsg('⏳ Packaging APK…');
-        const deadline = Date.now() + 8 * 60 * 1000; // 8-min safety cap
-        data = null;
-        while (Date.now() < deadline) {
-          await new Promise(r => setTimeout(r, 3000));
-          let s: any;
-          try { s = await safeFetch(`${BACKEND}/api/galaxy-studio/vault/apk-status/${buildId}`); }
-          catch { continue; } // transient hiccup — keep polling
-          if (!s) continue;
-          if (s.status === 'completed') { data = s.result || {}; break; }
-          if (s.status === 'failed') { throw new Error(s.error || 'packaging failed'); }
-          setStatusMsg(`⏳ Packaging APK… (${stageLabel[s.stage] || s.stage || 'working'})`);
-        }
-        if (!data) throw new Error('packaging is taking longer than expected — check vault shortly');
-      }
-      if (data.download_url) {
-        Linking.openURL(`${BACKEND}${data.download_url}`).catch(() => {});
-      }
-      // Seed EAS status card
-      setEasStatus({
-        status: data.apk_status || data.status || 'building',
-        message: data.apk_message || data.message || 'EAS cloud compile in progress...',
-        eas_build_id: data.eas_build_id || null,
-        download_url: data.apk_url || data.apk_download_url || null,
-        polling: data.apk_status === 'building',
-      });
-      // Start polling EAS status endpoint (merged Jeeves feature)
-      if (easPollRef.current) { clearInterval(easPollRef.current); easPollRef.current = null; }
-      if (data.apk_status === 'building' || data.eas_build_id) {
-        easPollRef.current = setInterval(async () => {
-          try {
-            const ctrl = new AbortController();
-            const tm = setTimeout(() => ctrl.abort(), 20000);
-            const r = await apiFetch(`${BACKEND}/api/galaxy-studio/eas-status/${buildId}`, {
-              signal: ctrl.signal,
-              // @ts-ignore
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache, no-store' },
-              credentials: 'omit',
-            });
-            clearTimeout(tm);
-            if (!r.ok) return;
-            const d = await r.json();
-            setEasStatus((prev: any) => ({
-              ...(prev || {}),
-              status: d.status || prev?.status,
-              message: d.message || prev?.message,
-              download_url: d.download_url || d.apk_url || prev?.download_url,
-              polling: d.status === 'building' || d.status === 'queued',
-            }));
-            if (d.status === 'completed' || d.status === 'finished' || d.status === 'errored' || d.status === 'failed') {
-              if (easPollRef.current) { clearInterval(easPollRef.current); easPollRef.current = null; }
-            }
-          } catch {}
-        }, 10000);
-      }
-      if (data.apk_status === 'building') {
-        setStatusMsg(`✓ APK building on EAS! ZIP also ready. Build: ${data.eas_build_id}`);
-      } else if (data.apk_message) {
-        setStatusMsg(`${data.apk_status === 'error' ? '⚠' : '✓'} ${data.apk_message}`);
-      } else {
-        setStatusMsg(`✓ ${data.filename} (${data.size})`);
-      }
-      loadVault();
-    } catch (e: any) { setStatusMsg(`⚠ Package error: ${e.message?.slice(0, 60)}`); }
-    setApkLoading(false);
+      if (!context.current()) return;
+      if (start.build_id !== context.bid) throw new Error('Packaging returned a different build.');
+      const remoteId = typeof start.eas_build_id === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(start.eas_build_id) ? start.eas_build_id : null;
+      if (start.apk_status === 'building' && remoteId) {
+        const observed = { status: 'building', eas_build_id: remoteId, polling: true, download_url: null, message: 'EAS acknowledged the submission; APK completion is separate.' };
+        easStatusRef.current = observed; setEasStatus(observed);
+        setStatusMsg('Existing EAS submission acknowledged. Following its current status.');
+      } else if (['running', 'stopping', 'unknown', 'cancelled', 'failed'].includes(start.apk_status || start.status)) {
+        setStatusMsg(start.apk_status === 'running' || start.status === 'running' ? 'Packaging queued. Submission to EAS is not confirmed until a remote build ID is acknowledged.' : 'Packaging is unresolved or stopping. Inspect the current job before deciding whether to retry.');
+      } else throw new Error('Packaging admission was not confirmed.');
+    } catch (error) { if (context.current()) setStatusMsg(`Packaging submission is unconfirmed. Inspect the saved job before retrying; no automatic replay occurred. ${error instanceof Error ? error.message.slice(0, 180) : ''}`); }
+    finally { if (artifactCommandRef.current === command) { artifactCommandRef.current = null; if (context.current()) setApkLoading(false); } if (context.current()) void jobsRefreshRef.current(true); }
   };
 
   const expandGame = async (expansionType: string, label: string) => {
-    if (!buildId) return;
+    const context = artifactContext();
+    if (!context.current() || artifactCommandRef.current || !artifactIdle || buildStatus?.status !== 'completed') return;
+    const command = Symbol('expand'); artifactCommandRef.current = command;
     setExpandLoading(expansionType); setStatusMsg(null);
     try {
-      // Kick off the BACKGROUND expansion job (returns immediately now).
+      void persistState(); if (!context.current()) return;
       const start = await safeFetch(`${BACKEND}/api/galaxy-studio/expand`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ build_id: buildId, expansion_type: expansionType, scale: scaleCommand || 'large expansion', description: `${expansionType} expansion for ${title}` }),
+        body: JSON.stringify({ build_id: context.bid, expansion_type: expansionType, scale: scaleCommand || 'large expansion', description: `${expansionType} expansion for ${title}` }),
       });
+      if (!context.current()) return;
+      if (start.build_id !== context.bid || !['running', 'stopping', 'unknown', 'cancelled', 'failed'].includes(start.expansion_status)) throw new Error('Expansion admission was not confirmed.');
+      setStatusMsg(start.expansion_status === 'running' ? `${label} queued. Recorded progress appears in Active Jobs after durable generation.` : `${label} is ${start.expansion_status}. Retained files may be partial; inspect the current job.`);
+    } catch (error) { if (context.current()) setStatusMsg(`${label} submission is unconfirmed. Inspect the saved job before retrying; no automatic replay occurred. ${error instanceof Error ? error.message.slice(0, 180) : ''}`); }
+    finally { if (artifactCommandRef.current === command) { artifactCommandRef.current = null; if (context.current()) setExpandLoading(null); } if (context.current()) void jobsRefreshRef.current(true); }
+  };
 
-      // Backward-compat: if a server ever returns the completed result inline.
-      if (start?.files_added != null && start?.expansion_status == null) {
-        setStatusMsg(`✓ ${label}: +${start.files_added?.toLocaleString()} files → ${start.total_files?.toLocaleString()} total`);
-        await refreshFiles(buildId);
-        setExpandLoading(null);
-        return;
-      }
-
-      // Poll /expand/status until the background job finishes.
-      setStatusMsg(`⏳ ${label}: expanding…`);
-      const deadline = Date.now() + 5 * 60 * 1000; // 5-min safety cap
-      let done = false;
-      while (Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, 3000));
-        let st: any;
-        try {
-          st = await safeFetch(`${BACKEND}/api/galaxy-studio/expand/status/${buildId}`);
-        } catch { continue; } // transient hiccup — keep polling
-        if (!st) continue;
-        if (st.status === 'completed') {
-          setStatusMsg(`✓ ${label}: +${st.files_added?.toLocaleString()} files → ${st.total_files?.toLocaleString()} total`);
-          await refreshFiles(buildId);
-          done = true;
-          break;
-        }
-        if (st.status === 'failed') {
-          throw new Error(st.error || 'expansion failed');
-        }
-        const pc = st.phases_completed ?? 0, pt = st.phases_total ?? 7;
-        setStatusMsg(`⏳ ${label}: generating files… (pipeline ${pc}/${pt})`);
-      }
-      if (!done) throw new Error('expansion is taking longer than expected — check files shortly');
-    } catch (e: any) { setStatusMsg(`⚠ ${label} failed: ${e.message?.slice(0, 60)}`); }
-    setExpandLoading(null);
+  const stopArtifactJob = async () => {
+    const context = artifactContext();
+    if (!context.current() || artifactStopRef.current) return;
+    const command = Symbol('stop-artifact'); artifactStopRef.current = command;
+    setResumeLoading(true);
+    try {
+      await safeFetch(`${BACKEND}/api/galaxy-studio/force-complete/${encodeURIComponent(context.bid!)}`, { method: 'POST' });
+      if (context.current()) setStatusMsg('Local stop request acknowledged. Observing physical drain; retained files may be partial. An acknowledged EAS cloud build has its own remote lifecycle.');
+    } catch { if (context.current()) setStatusMsg('Stop was not confirmed. Refresh the current job before explicitly retrying Stop.'); }
+    finally { if (artifactStopRef.current === command) { artifactStopRef.current = null; if (context.current()) setResumeLoading(false); } if (context.current()) void jobsRefreshRef.current(true); }
   };
 
   const viewFile = async (path: string) => {
-    if (!buildId) return;
+    const context = artifactContext();
+    if (!context.current()) return;
     try {
-      const d = await safeFetch(`${BACKEND}/api/galaxy-studio/file/${buildId}/${path}`);
-      if (d) { setSelectedFile(d); setFileContent(d.content || ''); setShowCode(true); }
+      const d = await safeFetch(`${BACKEND}/api/galaxy-studio/file/${encodeURIComponent(context.bid!)}/${path.split('/').map(encodeURIComponent).join('/')}`);
+      if (context.current() && d) { setSelectedFile(d); setFileContent(d.content || ''); setShowCode(true); }
     } catch {}
   };
 
   const loadVault = async () => {
+    const context = artifactContext();
+    if (!context.current()) return;
     try {
       const data = await safeFetch(`${BACKEND}/api/galaxy-studio/vault`);
-      if (data) { setVaultData(data); setShowVault(true); }
-    } catch { setStatusMsg('⚠ Could not load vault'); }
+      if (context.current() && data) { setVaultData(data); setShowVault(true); }
+    } catch { if (context.current()) setStatusMsg('⚠ Could not load vault'); }
   };
 
   const filteredGenres = useMemo(() => {
@@ -2596,7 +2428,7 @@ export default function GalaxyStudioFactoryModal
             <DescCard icon="eye-outline" color="#8B5CF6" label="Core Loop & Player Fantasy" hint="What is the ultimate goal? What is the minute-to-minute gameplay loop?" placeholder="Players explore a shattered dimension to harvest chronitons, fighting reality-warping entities..." value={gameVision} onChange={setGameVision} onInputFocus={() => scrollToY(160)} />
             <DescCard icon="cog-outline" color="#2563EB" label="Deep Systems & SOTA Mechanics" hint="Describe your most complex systems (Economy, Advanced AI, Fluid Physics, Destruction)" placeholder="Fully destructible environments using voxel-based physics, driven by an adaptive reinforcement-learning AI director..." value={systemArch} onChange={setSystemArch} onInputFocus={() => scrollToY(320)} />
             <DescCard icon="book-outline" color="#F59E0B" label="World Laws & Consequences" hint="What are the strict rules of the universe? What happens on death or failure?" placeholder="Time moves only when the player moves. Death resets the dimension but retains collected chronitons (roguelite loop)..." value={worldLaws} onChange={setWorldLaws} onInputFocus={() => scrollToY(480)} />
-            <DescCard icon="flash-outline" color="#EC4899" label="Agent Directives & SOTA Quality" hint="Strict instructions for the 28,000+ AI Agents building your game" placeholder="Ensure 4K textures, 60FPS physics step, deep narrative branching, and a robust late-game scaling system..." value={agentInstructions} onChange={setAgentInstructions} onInputFocus={() => scrollToY(640)} />
+            <DescCard icon="flash-outline" color="#EC4899" label="Agent Directives & SOTA Quality" hint="Instructions for the configured generation pipeline; actual workers and progress are observed during the build" placeholder="Ensure 4K textures, 60FPS physics step, deep narrative branching, and a robust late-game scaling system..." value={agentInstructions} onChange={setAgentInstructions} onInputFocus={() => scrollToY(640)} />
             <DescCard icon="resize-outline" color="#F97316" label="Scale (optional override)" hint="Free-form override — e.g. 'massive 25GB game'. Leave blank to use the slider below." placeholder="25GB · 500K assets · enormous open world…" value={scaleCommand} onChange={setScaleCommand} onInputFocus={() => scrollToY(800)} />
             <FileSizeSlider value={targetFiles} onChange={onTargetFilesChange} />
 
@@ -2856,9 +2688,13 @@ export default function GalaxyStudioFactoryModal
     const batchNames = buildStatus?.batch_names || {};
     const bgCurrentBatch = buildStatus?.bg_current_batch || 0;
     const bg = buildStatus?.bg_progress;
-    const elapsed = bg?.elapsed_formatted || '0m 0s';
-    const remaining = bg?.remaining_formatted || '15m 0s';
-    const timePct = bg?.time_pct || 0;
+    const elapsed = buildStatus?._local_elapsed_formatted || bg?.elapsed_formatted || 'Not observed';
+    const remaining = buildStatus?._local_remaining_formatted || bg?.remaining_formatted || 'Not observed';
+    const phasePct = Math.max(0, Math.min(100, completedCount / Math.max(1, totalPhases) * 100));
+    const execution = buildStatus?.execution;
+    const stopping = execution?.stop_requested === true || execution?.drain_pending === true;
+    const observed = buildStatus?._observation_stale === false;
+    const canResume = observed && buildStatus?.status === 'building' && execution?.runner_live === false && execution.physical_workers === 0 && !stopping;
 
     return (
       <View style={{ flex: 1, paddingHorizontal: 14, paddingTop: 10 }}>
@@ -2903,7 +2739,7 @@ export default function GalaxyStudioFactoryModal
           </View>
           <View style={s.liveBadge}>
             <Animated.View style={[s.liveDot, { opacity: buildPulse }]} />
-            <Text style={s.liveBadgeText}>LIVE</Text>
+            <Text style={s.liveBadgeText}>{observed ? stopping ? 'STOPPING' : 'OBSERVED' : 'STATUS UNKNOWN'}</Text>
           </View>
         </View>
 
@@ -2912,12 +2748,12 @@ export default function GalaxyStudioFactoryModal
           <View style={s.timerBox}>
             <Ionicons name="time-outline" size={14} color={T.cyan} />
             <Text style={s.timerText}>{elapsed}</Text>
-            <Text style={s.timerLabel}>elapsed</Text>
+            <Text style={s.timerLabel}>local elapsed</Text>
           </View>
           <View style={[s.timerBox, { borderColor: T.gold + '30' }]}>
             <Ionicons name="hourglass-outline" size={14} color={T.gold} />
             <Text style={[s.timerText, { color: T.gold }]}>{remaining}</Text>
-            <Text style={s.timerLabel}>remaining</Text>
+            <Text style={s.timerLabel}>target window</Text>
           </View>
           <View style={[s.timerBox, { borderColor: T.success + '30' }]}>
             <Ionicons name="document-text-outline" size={14} color={T.success} />
@@ -2995,7 +2831,7 @@ export default function GalaxyStudioFactoryModal
               />
             </Animated.View>
           </View>
-          <Text style={s.progressPct}>{Math.round(timePct)}%</Text>
+          <Text style={s.progressPct}>{Math.round(phasePct)}% phases recorded</Text>
         </View>
 
         {/* Batch chips — 10 batches instead of 100 individual phases */}
@@ -3003,8 +2839,8 @@ export default function GalaxyStudioFactoryModal
           {Array.from({ length: totalBatches }, (_, i) => {
             const batchNum = i + 1;
             const bName = batchNames[String(batchNum)] || `Batch ${batchNum}`;
-            const done = batchNum < (bgCurrentBatch || currentBatch);
-            const current = batchNum === (bgCurrentBatch || currentBatch);
+            const done = Array.isArray(buildStatus?.phase_log) && buildStatus.phase_log.some((entry: any) => entry?.batch === batchNum && ['success', 'completed'].includes(entry.status));
+            const current = !done && observed && !stopping && batchNum === (bgCurrentBatch || currentBatch);
             return (
               <View key={batchNum} style={[s.batchChip, done && { backgroundColor: T.success + '20', borderColor: T.success + '40' }, current && { backgroundColor: T.accent + '20', borderColor: T.accent }]}>
                 {done ? <Ionicons name="checkmark-circle" size={14} color={T.success} /> : current ? <ActivityIndicator size={12} color={T.accent} /> : <View style={s.phaseDot} />}
@@ -3062,19 +2898,23 @@ export default function GalaxyStudioFactoryModal
           {buildLog.length > 0 && (
             <View style={s.logPulse}>
               <ActivityIndicator size={10} color={T.accent} />
-              <Text style={s.logPulseText}>Auto-polling active — never gives up</Text>
+              <Text style={s.logPulseText}>{pollActiveRef.current ? 'Reading owner status; the local clock grants no work.' : 'Observation paused. Refresh status to inspect the owner.'}</Text>
             </View>
           )}
         </ScrollView>
 
-        {/* Permanent-Connection Status: one unified Continue button */}
-        <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.success, marginTop: 8, marginHorizontal: 4 }]} onPress={resumeBuild} activeOpacity={0.7} disabled={resumeLoading}>
-          {resumeLoading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="infinite-outline" size={20} color="#fff" />}
-          <View style={{ flex: 1 }}>
-            <Text style={[s.actionBtnTitle, { color: '#fff' }]}>Continue / Sync</Text>
-            <Text style={[s.actionBtnSub, { color: '#fffa' }]}>Local build runs offline — tap to sync with server</Text>
-          </View>
-          <Ionicons name="chevron-forward-outline" size={16} color="#fffa" />
+        {statusMsg && <Text accessibilityLiveRegion="polite" style={{ color: T.warning, fontSize: 12, lineHeight: 18, marginHorizontal: 4, marginTop: 8 }}>{statusMsg}</Text>}
+        {execution && <Text style={{ color: T.textMuted, fontSize: 11, lineHeight: 17, marginHorizontal: 4, marginTop: 6 }}>
+          {execution.runner_live ? 'Runner present' : 'No live runner observed'} · {execution.physical_workers} physical workers · {execution.drain_pending ? 'drain pending' : 'drain not pending'} · {execution.unflushed_files} unsaved files{execution.storage_failed ? ' · storage failed' : ''}.
+        </Text>}
+        <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.accent, marginTop: 8, marginHorizontal: 4 }]} onPress={() => { const bid = buildIdRef.current; if (bid) startPolling(bid); }} activeOpacity={0.7} disabled={resumeLoading}>
+          <Ionicons name="refresh-outline" size={20} color="#fff" /><View style={{ flex: 1 }}><Text style={[s.actionBtnTitle, { color: '#fff' }]}>Refresh build status</Text><Text style={[s.actionBtnSub, { color: '#fffa' }]}>Read actual progress without restarting work</Text></View>
+        </TouchableOpacity>
+        {canResume && <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.success, marginTop: 8, marginHorizontal: 4 }]} onPress={resumeBuild} activeOpacity={0.7} disabled={resumeLoading}>
+          {resumeLoading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="play-outline" size={20} color="#fff" />}<View style={{ flex: 1 }}><Text style={[s.actionBtnTitle, { color: '#fff' }]}>Resume interrupted work</Text><Text style={[s.actionBtnSub, { color: '#fffa' }]}>Request recovery through the existing build owner</Text></View>
+        </TouchableOpacity>}
+        <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.danger, marginTop: 8, marginHorizontal: 4, opacity: stopping || resumeLoading ? .5 : 1 }]} onPress={stopBuild} activeOpacity={0.7} disabled={stopping || resumeLoading || !buildId}>
+          <Ionicons name="stop-outline" size={20} color="#fff" /><View style={{ flex: 1 }}><Text style={[s.actionBtnTitle, { color: '#fff' }]}>{stopping ? 'Waiting for physical drain' : 'Stop build'}</Text><Text style={[s.actionBtnSub, { color: '#fffa' }]}>Retain partial files; stopping never marks the build complete</Text></View>
         </TouchableOpacity>
       </View>
     );
@@ -3082,61 +2922,66 @@ export default function GalaxyStudioFactoryModal
 
   // ═══ FINAL BUILD & PACKAGING (7-stage) — kick async job + stream stages ═══
   const runFinalBuild = useCallback(async () => {
-    if (!buildId || finBusy) return;
-    setFinBusy(true); setFinError(null); setFinResult(null); setFinStages([]);
+    const context = artifactContext();
+    if (!context.current() || !buildId || finBusy || !artifactIdle) return;
+    setFinBusy(true); setFinError(null);
     if (finPollRef.current) { clearInterval(finPollRef.current); finPollRef.current = null; }
-    const eraKey = ERA_KEY_MAP[selectedEra?.id] || 'modern';
-    const cfg = {
-      graphic_style: styleParams?.graphic || visualStyle,
-      dimension: styleParams?.dimension || (perspective === 'side_scroll' || perspective === 'top_down' ? '2d' : '3d'),
-      visual_style: visualStyle,
-      audio_mood: audioMood,
-      era_id: selectedEra?.id, era_label: selectedEra?.label,
-    };
     try {
-      const kick = await safeFetch(`${BACKEND}/api/galaxy-studio/final-build/package/async`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          build_id: buildId, genre: selectedGenre?.id || 'rpg',
-          era: eraKey, seed: 1, persist: true, config: cfg,
-        }),
-      });
-      const jobId = kick?.job_id;
-      if (!jobId) throw new Error('no job id returned');
-      addLog(`🏁 Final Build started — packaging "${title}" (${selectedEra?.label || eraKey})`);
-      finPollRef.current = setInterval(async () => {
+      let jobId = finJobRef.current?.buildId === buildId ? finJobRef.current.jobId : null;
+      if (!jobId) {
+        const eraKey = ERA_KEY_MAP[selectedEra?.id] || 'modern';
+        const kick = await safeFetch(`${BACKEND}/api/galaxy-studio/final-build/package/async`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ build_id: buildId, genre: selectedGenre?.id || 'rpg', era: eraKey, seed: 1, persist: true,
+            config: { graphic_style: styleParams?.graphic || visualStyle,
+              dimension: styleParams?.dimension || (perspective === 'side_scroll' || perspective === 'top_down' ? '2d' : '3d'),
+              visual_style: visualStyle, audio_mood: audioMood, era_id: selectedEra?.id, era_label: selectedEra?.label } }),
+        });
+        if (!context.current()) return;
+        if (typeof kick?.job_id !== 'string' || !/^[a-zA-Z0-9_-]{1,160}$/.test(kick.job_id)) throw new Error('No final-build job identifier was acknowledged. Inspect jobs before submitting another build.');
+        const acknowledgedJobId: string = kick.job_id;
+        jobId = acknowledgedJobId; finJobRef.current = { buildId, jobId: acknowledgedJobId };
+        setFinResult(null); setFinStages([]);
+        addLog(`Final-build job acknowledged: ${jobId}. Waiting for its recorded result.`);
+      }
+      let inFlight = false;
+      const timer = setInterval(async () => {
+        if (!context.current()) { clearInterval(timer); return; }
+        if (inFlight) return;
+        inFlight = true;
+        const stop = () => { clearInterval(timer); if (finPollRef.current === timer) finPollRef.current = null; };
         try {
-          const jd = await safeFetch(`${BACKEND}/api/galaxy-studio/final-build/job/${jobId}`);
-          if (Array.isArray(jd?.stages)) setFinStages(jd.stages);
-          if (jd?.status === 'done') {
-            if (finPollRef.current) { clearInterval(finPollRef.current); finPollRef.current = null; }
-            setFinResult(jd.result || null);
-            setFinBusy(false);
-            const r = jd.result || {};
-            addLog(r.can_ship
-              ? `✓ Final Build PASSED — ${r.gates_passed}/7 gates · score ${r.overall_score} · ready to play & download`
-              : `⚠ Final Build BLOCKED — ${r.gates_passed}/7 gates (need all + ≥${r.production_threshold})`);
-          } else if (jd?.status === 'error') {
-            if (finPollRef.current) { clearInterval(finPollRef.current); finPollRef.current = null; }
-            setFinError(jd.error || 'final build failed');
-            setFinBusy(false);
-          }
-        } catch { /* keep polling */ }
+          const job = await safeFetch(`${BACKEND}/api/galaxy-studio/final-build/job/${encodeURIComponent(jobId!)}`);
+          if (!context.current()) return;
+          if (Array.isArray(job?.stages) && job.stages.length <= 7) setFinStages(job.stages);
+          if (job?.status === 'done') {
+            if (!job.result || typeof job.result !== 'object' || typeof job.result.can_ship !== 'boolean') throw new Error('The final-build result is unconfirmed.');
+            stop(); finJobRef.current = null;
+            setFinResult(job.result); setFinBusy(false);
+            addLog(job.result.can_ship ? 'Final-build owner reports that its shipping gates passed.' : 'Final-build owner reports blocked shipping gates.');
+          } else if (['error', 'failed', 'cancelled'].includes(job?.status)) {
+            stop(); finJobRef.current = null;
+            setFinError(`Final-build owner reports ${job.status}. Retained output may be partial.`); setFinBusy(false);
+          } else if (!['queued', 'running', 'pending', 'stopping'].includes(job?.status)) throw new Error('Final-build state is unknown.');
+        } catch {
+          stop();
+          if (context.current()) { setFinError('Final-build status is unavailable. Resume observation of the same job; no replacement job was submitted.'); setFinBusy(false); }
+        } finally { inFlight = false; }
       }, 700);
-    } catch (e: any) {
-      setFinError(String(e?.message || e).slice(0, 160));
-      setFinBusy(false);
+      finPollRef.current = timer;
+    } catch (error) {
+      if (context.current()) { setFinError(error instanceof Error ? error.message.slice(0, 200) : 'Final-build submission is unconfirmed.'); setFinBusy(false); }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildId, finBusy, selectedEra, selectedGenre, styleParams, visualStyle, perspective, audioMood, title]);
+  }, [buildId, artifactRenderEpoch, artifactRenderToken, finBusy, artifactIdle, selectedEra, selectedGenre, styleParams, visualStyle, perspective, audioMood, title]);
 
   // Cleanup the final-build poller on unmount.
   useEffect(() => () => { if (finPollRef.current) clearInterval(finPollRef.current); }, []);
 
   // ═══ POPULATE MY WORLD — Construct + Material forge into this build's Vault ═══
   const populateWorld = useCallback(async () => {
-    if (!buildId || popBusy) return;
+    const context = artifactContext();
+    if (!context.current() || !buildId || popBusy || !artifactIdle) return;
     setPopBusy(true); setPopResult(null);
     const eraKey = ERA_KEY_MAP[selectedEra?.id] || 'modern';
     const genre = selectedGenre?.id || 'rpg';
@@ -3151,15 +2996,16 @@ export default function GalaxyStudioFactoryModal
           body: JSON.stringify({ build_id: buildId, era: eraKey, seed: 1, material_count: 24, mount: true, config: { genre } }),
         }),
       ]);
+      if (!context.current()) return;
       const constructs = c?.constructs || 0;
       const materials = m?.materials || 0;
       setPopResult({ constructs, materials });
       addLog(`🏙️ Populated world — +${constructs} constructs, +${materials} materials mounted to the Vault. Re-run Final Build to package them.`);
     } catch (e: any) {
-      setPopResult({ error: String(e?.message || e).slice(0, 120) });
-    } finally { setPopBusy(false); }
+      if (context.current()) setPopResult({ error: String(e?.message || e).slice(0, 120) });
+    } finally { if (context.current()) setPopBusy(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildId, popBusy, selectedEra, selectedGenre]);
+  }, [buildId, artifactRenderEpoch, artifactRenderToken, popBusy, artifactIdle, selectedEra, selectedGenre]);
 
   // ═══ STEP 3: DONE ═══
   const renderDone = () => {
@@ -3191,9 +3037,18 @@ export default function GalaxyStudioFactoryModal
       );
     }
 
+    const complete = !!buildStatus?.execution && buildStatus.status === 'completed'
+      && buildStatus.completed_phases === buildStatus.total_phases
+      && (!!buildStatus.execution.operation || classifyBuildJob(buildStatus) === 'completed');
+    const localOperation = buildStatus?.execution?.operation;
+    const localLive = !!localOperation && (buildStatus.execution.runner_live || buildStatus.execution.physical_workers > 0 || buildStatus.execution.drain_pending);
+    const zipUrl = retainedZip?.url || artifactLink(jobs.apk?.result?.download_url);
     return (
       <ScrollView style={{ flex: 1, paddingHorizontal: 14 }} showsVerticalScrollIndicator={false}>
-        <View style={s.doneHero}><Ionicons name="checkmark-circle" size={48} color={T.success} /><Text style={s.doneTitle}>{title}</Text><Text style={s.doneSub}>{selectedGenre?.icon} {selectedGenre?.name}{selectedSubgenre ? ` / ${selectedSubgenre.replace(/_/g, ' ')}` : ''}</Text></View>
+        <View style={s.doneHero}><Ionicons name={complete ? 'checkmark-circle' : 'warning-outline'} size={48} color={complete ? T.success : T.warning} /><Text style={s.doneTitle}>{title}</Text><Text style={s.doneSub}>{complete ? 'Game generation complete · packaging is tracked separately' : buildStatus?.status === 'cancelled' ? 'Build stopped — retained files are partial' : buildStatus?.status === 'failed' ? 'Build failed — retained files are partial' : 'Retained artifacts — completion unverified'}</Text><Text style={s.doneSub}>{selectedGenre?.icon} {selectedGenre?.name}{selectedSubgenre ? ` / ${selectedSubgenre.replace(/_/g, ' ')}` : ''}</Text></View>
+        {!complete && buildStatus?.execution && <Text accessibilityLiveRegion="polite" style={{ color: T.warning, fontSize: 12, lineHeight: 18, marginBottom: 10 }}>
+          {statusStopReason(buildStatus.execution.stop_reason)} Only saved files can be reopened.{buildStatus.execution.unflushed_files > 0 ? ` ${buildStatus.execution.unflushed_files.toLocaleString()} generated files remain unsaved.` : ''}{buildStatus.execution.storage_failed ? ' Storage failed; do not assume the file count is durable.' : ''}
+        </Text>}
         {files && (<View style={s.statsBar}>
           <View style={s.statBox}><Text style={s.statNum}>{files.total_files?.toLocaleString()}</Text><Text style={s.statLabel}>files</Text></View>
           <View style={s.statDivider} /><View style={s.statBox}><Text style={s.statNum}>{files.total_lines?.toLocaleString()}</Text><Text style={s.statLabel}>lines</Text></View>
@@ -3209,7 +3064,7 @@ export default function GalaxyStudioFactoryModal
           <Text style={{ color: T.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 10 }}>
             Drop 24 era-correct buildings/cities/castles + 24 materials straight into this build&apos;s Vault, then re-run Final Build to package them.
           </Text>
-          <TouchableOpacity onPress={populateWorld} disabled={popBusy || !buildId} activeOpacity={0.85}
+          <TouchableOpacity onPress={populateWorld} disabled={popBusy || !buildId || !artifactIdle} activeOpacity={0.85}
             style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#6c8cff', paddingVertical: 12, borderRadius: 10 }, popBusy && { opacity: 0.6 }]} testID="populate-world-btn">
             {popBusy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="business" size={18} color="#fff" />}
             <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>{popBusy ? 'Populating…' : '🏙️ Populate world'}</Text>
@@ -3235,11 +3090,11 @@ export default function GalaxyStudioFactoryModal
 
           <TouchableOpacity
             style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: T.accent, paddingVertical: 12, borderRadius: 10 }, finBusy && { opacity: 0.6 }]}
-            onPress={runFinalBuild} disabled={finBusy || !buildId} activeOpacity={0.85} testID="final-build-btn"
+            onPress={runFinalBuild} disabled={finBusy || !buildId || !artifactIdle} activeOpacity={0.85} testID="final-build-btn"
           >
             {finBusy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name={finResult ? 'refresh-outline' : 'rocket'} size={18} color="#fff" />}
             <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>
-              {finBusy ? 'Building & packaging…' : finResult ? 'Re-run Final Build' : '🏁 Run Final Build & Package'}
+              {finBusy ? 'Following final-build job…' : finJobRef.current ? 'Resume final-build observation' : finResult ? 'Re-run Final Build' : '🏁 Run Final Build & Package'}
             </Text>
           </TouchableOpacity>
 
@@ -3318,6 +3173,13 @@ export default function GalaxyStudioFactoryModal
           <Ionicons name={statusMsg.startsWith('✓') ? 'checkmark-circle' : 'information-circle'} size={16} color={statusMsg.startsWith('✓') ? T.success : T.warning} />
           <Text style={[s.statusText, statusMsg.startsWith('✓') ? { color: T.success } : { color: T.warning }]}>{statusMsg}</Text>
         </View>)}
+        <View style={{ gap: 8, marginBottom: 8 }}>
+          <TouchableOpacity style={s.actionBtnSmall} onPress={() => { void jobsRefreshRef.current(true); }} accessibilityRole="button"><Ionicons name="refresh-outline" size={16} color={T.accent} /><Text style={s.actionBtnSmallText}>Refresh jobs &amp; remote status</Text></TouchableOpacity>
+          {!jobsObserved && <Text accessibilityLiveRegion="polite" style={{ color: T.warning, fontSize: 12 }}>Current physical operation state is unconfirmed. New artifact requests remain disabled until a fresh observation succeeds.</Text>}
+          {localOperation && <Text style={{ color: T.textMuted, fontSize: 12 }}>{localOperation}: {buildStatus.execution.operation_status || 'unconfirmed'} · {buildStatus.execution.physical_workers} physical workers · {buildStatus.execution.unflushed_files} unsaved files. Closing this view only stops observation.</Text>}
+          {localLive && <TouchableOpacity style={[s.actionBtnSmall, resumeLoading && { opacity: .5 }]} disabled={resumeLoading} accessibilityRole="button" onPress={() => { void stopArtifactJob(); }}><Ionicons name="stop-outline" size={16} color={T.danger} /><Text style={[s.actionBtnSmallText, { color: T.danger }]}>{buildStatus.execution.stop_requested ? 'Retry local Stop' : 'Stop current local job'}</Text></TouchableOpacity>}
+          {zipUrl && <TouchableOpacity style={s.actionBtnSmall} accessibilityRole="button" onPress={() => { const context = artifactContext(); if (context.current()) void Linking.openURL(zipUrl).catch(() => { if (context.current()) setStatusMsg('The retained ZIP could not be opened. Its archive remains available in the Vault.'); }); }}><Ionicons name="download-outline" size={16} color={T.success} /><Text style={s.actionBtnSmallText}>Download retained ZIP{retainedZip ? ` · ${retainedZip.filename}` : ''}</Text></TouchableOpacity>}
+        </View>
         {(jobs.expand || jobs.apk) && (
           <View style={{ backgroundColor: T.surfaceAlt, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: T.border, marginBottom: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -3329,11 +3191,11 @@ export default function GalaxyStudioFactoryModal
           </View>
         )}
         <View style={s.actionGroup}>
-          <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.accent }, zipLoading && { opacity: 0.5 }]} onPress={downloadZIP} disabled={zipLoading} activeOpacity={0.7}>
-            <Ionicons name="download-outline" size={22} color="#fff" /><View style={{ flex: 1 }}><Text style={s.actionBtnTitle}>Download ZIP</Text><Text style={s.actionBtnSub}>Full source code package</Text></View>
+          <TouchableOpacity style={[s.actionBtn, { backgroundColor: T.accent }, !artifactIdle && { opacity: 0.5 }]} onPress={downloadZIP} disabled={!artifactIdle} activeOpacity={0.7}>
+            <Ionicons name="download-outline" size={22} color="#fff" /><View style={{ flex: 1 }}><Text style={s.actionBtnTitle}>Prepare ZIP</Text><Text style={s.actionBtnSub}>Retain a source archive, then open its download</Text></View>
             {zipLoading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="chevron-forward-outline" size={18} color="#fff9" />}
           </TouchableOpacity>
-          <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#1D4ED8' }, apkLoading && { opacity: 0.5 }]} onPress={packageAPK} disabled={apkLoading} activeOpacity={0.7}>
+          <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#1D4ED8' }, !artifactIdle && { opacity: 0.5 }]} onPress={packageAPK} disabled={!artifactIdle} activeOpacity={0.7}>
             <Ionicons name="phone-portrait-outline" size={22} color="#fff" /><View style={{ flex: 1 }}><Text style={s.actionBtnTitle}>Build APK</Text><Text style={s.actionBtnSub}>EAS cloud build + ZIP download</Text></View>
             {apkLoading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="chevron-forward-outline" size={18} color="#fff9" />}
           </TouchableOpacity>
@@ -3348,7 +3210,7 @@ export default function GalaxyStudioFactoryModal
               {easStatus.message && <Text style={{ color: T.textMuted, fontSize: 12, marginTop: 6 }}>{easStatus.message}</Text>}
               {easStatus.eas_build_id && <Text style={{ color: T.textDim, fontSize: 11, marginTop: 4 }}>ID: {easStatus.eas_build_id}</Text>}
               {easStatus.download_url && (
-                <TouchableOpacity style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1D4ED8', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, alignSelf: 'flex-start' }} onPress={() => Linking.openURL(easStatus.download_url)} activeOpacity={0.7}>
+                <TouchableOpacity style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1D4ED8', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, alignSelf: 'flex-start' }} onPress={() => { const context = artifactContext(); const url = artifactLink(easStatus.download_url, true); if (url && context.current()) void Linking.openURL(url).catch(() => { if (context.current()) setStatusMsg('The acknowledged APK artifact could not be opened. Refresh remote status and retry its download.'); }); }} activeOpacity={0.7}>
                   <Ionicons name="download-outline" size={16} color="#fff" />
                   <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Download APK</Text>
                 </TouchableOpacity>
@@ -3390,7 +3252,7 @@ export default function GalaxyStudioFactoryModal
           <View style={s.expandGrid}>
             {[{ type: 'all', icon: 'planet-outline', label: 'Full DLC', color: '#8B5CF6' }, { type: 'content', icon: 'document-text-outline', label: 'Content', color: '#2563EB' }, { type: 'systems', icon: 'cog-outline', label: 'Systems', color: '#F59E0B' }, { type: 'zones', icon: 'map-outline', label: 'Zones', color: '#22C55E' }, { type: 'enemies', icon: 'skull-outline', label: 'Enemies', color: '#EF4444' }, { type: 'items', icon: 'diamond-outline', label: 'Items', color: '#EC4899' }].map(exp => {
               const isLoading = expandLoading === exp.type;
-              return (<TouchableOpacity key={exp.type} style={[s.expandBtn, { borderColor: exp.color + '40' }, isLoading && { opacity: 0.6 }]} onPress={() => expandGame(exp.type, exp.label)} disabled={!!expandLoading} activeOpacity={0.7}>
+              return (<TouchableOpacity key={exp.type} style={[s.expandBtn, { borderColor: exp.color + '40' }, !artifactIdle && { opacity: 0.6 }]} onPress={() => expandGame(exp.type, exp.label)} disabled={!artifactIdle || !complete} activeOpacity={0.7}>
                 {isLoading ? <ActivityIndicator size={16} color={exp.color} /> : <Ionicons name={exp.icon as any} size={18} color={exp.color} />}
                 <Text style={[s.expandBtnText, { color: exp.color }]}>{exp.label}</Text>
               </TouchableOpacity>);
@@ -3508,7 +3370,7 @@ export default function GalaxyStudioFactoryModal
             <Text style={[s.gxBridgeText, { color: '#2563EB' }]}>Playground</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={s.newBuildBtn} onPress={resetState}><Ionicons name="refresh-outline" size={18} color={T.accent} /><Text style={s.newBuildText}>Build Another Game</Text></TouchableOpacity>
+        <TouchableOpacity style={s.newBuildBtn} onPress={() => { void AsyncStorage.removeItem(STORAGE_KEY); resetState(); }}><Ionicons name="refresh-outline" size={18} color={T.accent} /><Text style={s.newBuildText}>Build Another Game</Text></TouchableOpacity>
         {/* ✨ 2026-05 — extra-tall bottom safety margin so the home-indicator
             / soft-nav doesn't overlap the last button. User flagged it
             being clipped on devices with bottom safe-area. */}
@@ -3517,7 +3379,7 @@ export default function GalaxyStudioFactoryModal
     );
   };
 
-  const getTitle = () => step === 'pick' ? 'Galaxy Studio' : step === 'building' ? '' : title || 'Game Ready';
+  const getTitle = () => step === 'pick' ? 'Galaxy Studio' : step === 'building' ? '' : title || 'Retained build artifacts';
   const getSub = () => step === 'pick' ? `${genres.length} genres • ${manifest?.total_agents?.toLocaleString() || '28,894'} agents` : step === 'building' ? `Batch ${buildStatus?.bg_current_batch || buildStatus?.current_batch || 0}/${buildStatus?.total_batches || 10} • ${(buildStatus?.completed_phases || 0)}/${buildStatus?.total_phases || 100} phases • ${(buildStatus?.file_count || 0).toLocaleString()} files` : `${files?.total_files?.toLocaleString() || 0} files • ${files?.total_lines?.toLocaleString() || 0} lines`;
 
   return (
@@ -3529,7 +3391,7 @@ export default function GalaxyStudioFactoryModal
             if (showCode) { setShowCode(false); setSelectedFile(null); return; }
             if (showVault) { setShowVault(false); return; }
             if (step === 'done') { setStep('pick'); return; }
-            if (step === 'building') return;
+            if (step === 'building') { onClose(); return; }
             onClose();
           }} style={s.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name={step === 'pick' && !showCode && !showVault && !showMLConsole ? 'close-outline' : 'arrow-back-outline'} size={24} color={T.text} />

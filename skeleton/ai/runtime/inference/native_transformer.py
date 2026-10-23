@@ -17,12 +17,16 @@ from skeleton.ai.model_runtime.tokenization import TokenSequence
 
 from .local import (
     LocalInferenceCancelled,
+    LocalInputBudget,
+    LocalInputBudgetError,
     LocalInferenceEngine,
     LocalInferenceRequest,
     LocalInferenceResult,
     LocalModelAdapter,
     LocalPreparedInput,
 )
+
+from .native_runtime import _NativeStreamAudit
 
 _MAX_OUTPUT_BYTES = 4 * 1024 * 1024
 
@@ -70,6 +74,19 @@ class NativeTransformerModel:
     def assert_identity(self) -> None:
         self._assert_identity()
 
+    def check_readiness(self) -> None:
+        """Inspect admitted identity/device metadata; workers verify weights."""
+        device = self.runtime.device
+        if (
+            self.model_id != self._admitted_model_id
+            or self.runtime.model_digest != self._model_digest
+            or self.runtime.tokenizer.digest != self._tokenizer_digest
+            or self._compute_runtime_digest() != self._runtime_digest
+            or str(getattr(self.runtime.model, "device", "cpu") or "cpu") != device.actual
+            or bool(getattr(self.runtime.model, "resident", False)) != device.resident
+        ):
+            raise RuntimeContractError("native transformer is no longer admitted on its execution device")
+
     def count_input_tokens(self, request: LocalInferenceRequest) -> int:
         return self.prepare_input(request).input_tokens
 
@@ -87,16 +104,17 @@ class NativeTransformerModel:
             raise ValueError("native transformer backend does not claim structured-output conformance")
         limits = self.generation_limits()
         rendered = request.rendered_input
-        if len(rendered) > limits["tokenizer_max_chars"]:
-            raise RuntimeContractError("native request exceeds tokenizer character budget")
+        try:
+            budget = LocalInputBudget.from_limits(limits)
+            budget.validate_request(request, 0, rendered=rendered)
+        except LocalInputBudgetError as exc:
+            raise RuntimeContractError(str(exc)) from exc
         sequence = self.runtime.encode(rendered)
         count = len(sequence.token_ids)
-        if (
-            count > limits["context_window"]
-            or count + request.max_output_tokens > limits["max_total_tokens"]
-            or request.max_output_tokens > limits["max_output_tokens"]
-        ):
-            raise RuntimeContractError("native prepared input exceeds activated generation limits")
+        try:
+            budget.validate_tokens(count, request.max_output_tokens)
+        except LocalInputBudgetError as exc:
+            raise RuntimeContractError(str(exc)) from exc
         return LocalPreparedInput(
             request_digest=request.digest,
             model_digest=self._model_digest,
@@ -139,6 +157,13 @@ class NativeTransformerModel:
             )
         ):
             raise RuntimeContractError("native prepared token sequence changed after admission")
+        try:
+            LocalInputBudget.from_limits(self._declared_generation_limits()).validate_tokens(
+                prepared.input_tokens,
+                request.max_output_tokens,
+            )
+        except LocalInputBudgetError as exc:
+            raise RuntimeContractError(str(exc)) from exc
 
     def generation_limits(self) -> dict[str, Any]:
         """Publish limits from the admitted decoder and its actual tokenizer."""
@@ -237,38 +262,28 @@ class NativeTransformerModel:
                 raise LocalInferenceCancelled("local generation cancelled")
 
         eos_id = self.runtime.tokenizer.special_token_id("eos")
-        stream = self.runtime.stream_sequence(
-            prompt_sequence,
-            GenerationConfig(
-                max_new_tokens=request.max_output_tokens,
-                seed=request.seed,
-                temperature=0.0,
-                use_cache=True,
-                stop_token_ids=() if eos_id is None else (eos_id,),
-                stop_strings=request.stop,
-                include_stop_tokens=False,
-            ),
-            interrupt=interrupt,
+        config = GenerationConfig(
+            max_new_tokens=request.max_output_tokens,
+            seed=request.seed,
+            temperature=0.0,
+            use_cache=True,
+            stop_token_ids=() if eos_id is None else (eos_id,),
+            stop_strings=request.stop,
+            include_stop_tokens=False,
         )
-        generated_bytes = 0
-        generated_count = 0
+        audit = _NativeStreamAudit(self.runtime, prompt_sequence, config)
+        stream = self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt)
         with stream:
             # The native decoder stops internally and still produces its real
             # terminal result, usage and receipt. Closing at a token event
             # would discard that terminal result rather than complete it.
             for event in stream:
                 interrupt()
-                if event.kind == "token":
-                    generated_count += 1
-                    if generated_count > request.max_output_tokens:
-                        raise RuntimeContractError("native decoder exceeded its output-token budget")
-                    piece = self.runtime.tokenizer.token_text(event.token_id)
-                    generated_bytes += _bounded_utf8_size(piece, _MAX_OUTPUT_BYTES) + int(generated_count > 1)
-                    if generated_bytes > _MAX_OUTPUT_BYTES:
-                        raise RuntimeContractError("native generation exceeds the local output byte budget")
+                audit.observe(event)
         result = stream.result
         if result is None:
             raise RuntimeError("native transformer completed without a terminal result")
+        audit.validate(result)
         self._assert_identity()
         interrupt()
 
@@ -279,7 +294,6 @@ class NativeTransformerModel:
             result.prompt_sequence != prompt_sequence
             or result.usage.prompt_tokens != len(prompt_sequence.token_ids)
             or result.usage.generated_tokens != output_tokens
-            or generated_count != output_tokens
             or output_tokens > request.max_output_tokens
         ):
             raise RuntimeContractError("native terminal result does not match admitted token accounting")

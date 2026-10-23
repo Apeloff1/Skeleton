@@ -183,6 +183,45 @@ function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<boolean> {
   });
 }
 
+/** Bound streamed UTF-8 before joining a document. Native fetch adapters that
+ * expose only text() retain their platform buffering; their result is checked
+ * before parsing and the caller still owns an absolute headers/body deadline. */
+export async function readBoundedResponseText(res: Response, maximum: number): Promise<{ text: string; oversized: boolean }> {
+  const limit = boundedResponseChars(maximum);
+  const length = res.headers?.get?.('content-length');
+  if (length != null && (!/^[0-9]{1,20}$/.test(length) || Number(length) > limit)) {
+    try { void res.body?.cancel().catch(() => undefined); } catch {}
+    return { text: '', oversized: true };
+  }
+  if (!res.body || typeof res.body.getReader !== 'function' || typeof TextDecoder === 'undefined') {
+    const text = await res.text();
+    return text.length > limit ? { text: '', oversized: true } : { text, oversized: false };
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  const parts: string[] = [];
+  let size = 0;
+  let complete = false;
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) { complete = true; break; }
+      size += chunk.value.byteLength;
+      if (size > limit) return { text: '', oversized: true };
+      const text = decoder.decode(chunk.value, { stream: true });
+      // Coalesce small chunks so trickling bytes cannot create millions of
+      // array entries within an otherwise valid response byte allowance.
+      if (parts.length && parts[parts.length - 1].length < 4096) parts[parts.length - 1] += text;
+      else parts.push(text);
+    }
+    parts.push(decoder.decode());
+    return { text: parts.join(''), oversized: false };
+  } finally {
+    if (!complete) { try { void reader.cancel().catch(() => undefined); } catch {} }
+    try { reader.releaseLock(); } catch {}
+  }
+}
+
 async function _doFetch<T>(
   method: string, path: string, body: any, opts: RequestOpts,
 ): Promise<ApiResult<T>> {
@@ -191,14 +230,22 @@ async function _doFetch<T>(
   const bucket = _cbBucket(path);
   // Query parameters can carry signed URLs, bearer tokens or opaque IDs.
   const logPath = path.split(/[?#]/, 1)[0].slice(0, 160);
+  const maxResponseChars = boundedResponseChars(opts.maxResponseChars);
+  if (opts.signal?.aborted) return { ok: false, status: 0, data: null, error: 'aborted', rid };
+  // Credential-bearing and queried requests must not reuse an account-blind
+  // session cache. Include the actual public endpoint in every eligible key.
+  const publicHeaders = Object.keys(opts.headers || {}).every(key => ['accept', 'content-type', 'cache-control'].includes(key.toLowerCase()));
+  const cacheKey = method === 'GET' && opts.cacheKey && publicHeaders && path.startsWith('/') && !/[?#]/.test(url)
+    ? `api:${url}:${opts.cacheKey}` : null;
 
   // Read sessionStorage cache (web only) — a hit needs no network/timer.
-  if (method === 'GET' && opts.cacheKey && typeof sessionStorage !== 'undefined') {
+  if (cacheKey && typeof sessionStorage !== 'undefined') {
     try {
-      const raw = sessionStorage.getItem(`api:${opts.cacheKey}`);
-      if (raw) {
+      const raw = sessionStorage.getItem(cacheKey);
+      if (raw && raw.length <= maxResponseChars + 2048) {
         const c = JSON.parse(raw);
-        if (Date.now() - c.ts < (opts.cacheTtlMs ?? 60_000)) {
+        const age = Date.now() - c.ts;
+        if (typeof c.ts === 'number' && Number.isFinite(c.ts) && age >= 0 && age < (opts.cacheTtlMs ?? 60_000)) {
           return { ok: true, status: 200, data: c.data, error: null, rid: c.rid || null };
         }
       }
@@ -232,7 +279,6 @@ async function _doFetch<T>(
   // Do not let caller-supplied retries/timeout create an unbounded loop.
   const maxAttempts = 1 + boundedRetries(opts.retries, method, !!opts.idempotencyKey, opts.serverDedupeVerified === true);
   const perAttemptTimeout = boundedTimeoutMs(opts.timeoutMs ?? 15_000);
-  const maxResponseChars = boundedResponseChars(opts.maxResponseChars);
 
   const backoff = (attempt: number, gateway: boolean) => {
     const base = gateway ? 400 : 200;
@@ -253,11 +299,15 @@ async function _doFetch<T>(
     // into this controller rather than choosing one signal or the other.
     const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
     let callerAborted = false;
+    let rejectCancelled: (error: Error) => void = () => {};
+    const cancelled = new Promise<never>((_resolve, reject) => { rejectCancelled = reject; });
     const abortFromCaller = () => {
       callerAborted = true;
       try { ac?.abort(); } catch {}
+      rejectCancelled(new Error('request_cancelled'));
     };
     if (opts.signal) opts.signal.addEventListener('abort', abortFromCaller, { once: true });
+    if (opts.signal?.aborted) abortFromCaller();
     const signal = ac?.signal || opts.signal;
     let timedOut = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -282,12 +332,12 @@ async function _doFetch<T>(
             method, headers, signal,
             body: body == null ? undefined : JSON.stringify(body),
           });
-          const length = Number(res.headers?.get?.('content-length') || 0);
-          if (length > maxResponseChars) return { res, text: '', oversized: true };
-          const text = await res.text();
-          return { res, text, oversized: text.length > maxResponseChars };
+          const bounded = await readBoundedResponseText(res, maxResponseChars);
+          if (bounded.oversized) ac?.abort();
+          return { res, ...bounded };
         })(),
         deadline,
+        cancelled,
       ]);
       cleanup();
       if (oversized) {
@@ -317,8 +367,8 @@ async function _doFetch<T>(
         continue;
       }
 
-      if (method === 'GET' && res.ok && opts.cacheKey && typeof sessionStorage !== 'undefined') {
-        try { sessionStorage.setItem(`api:${opts.cacheKey}`, JSON.stringify({ ts: Date.now(), data, rid })); } catch {}
+      if (res.ok && cacheKey && typeof sessionStorage !== 'undefined') {
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data, rid })); } catch {}
       }
 
       if (!res.ok) {
@@ -493,10 +543,9 @@ async function attemptRequest<T>(
     // ignore an abort while response.text() is pending.
     const request = (async (): Promise<FetchEnvelope<T>> => {
       const res = await fetch(url, { method, headers, body, signal: ctrl.signal });
-      const length = Number(res.headers?.get?.('content-length') || 0);
-      if (length > maxResponseChars) return { ok: false, status: res.status, error: 'response_too_large' };
-      const raw = await res.text();
-      if (raw.length > maxResponseChars) return { ok: false, status: res.status, error: 'response_too_large' };
+      const bounded = await readBoundedResponseText(res, maxResponseChars);
+      if (bounded.oversized) { ctrl.abort(); return { ok: false, status: res.status, error: 'response_too_large' }; }
+      const raw = bounded.text;
       let parsed: any = undefined;
       if (raw) {
         try { parsed = JSON.parse(raw); } catch { parsed = raw; }

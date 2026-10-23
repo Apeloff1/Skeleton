@@ -3516,11 +3516,13 @@ class ProviderRegistry:
         Runtime pressure and maintenance never create a provider, resolve
         credentials, change a selected model or alter activation identity.
         Shared engines are returned once even when several adapters use them.
+        A separately supplied local verifier is also an activated owner, even
+        when it is intentionally absent from selectable generation routes.
         """
         engines: list[Any] = []
         seen: set[int] = set()
-        for adapter in self._model_adapters.values():
-            if adapter.provider_id != "local":
+        for adapter in (*self._model_adapters.values(), self._verification_adapter):
+            if adapter is None or adapter.provider_id != "local":
                 continue
             engine = getattr(adapter, "engine", None)
             if (

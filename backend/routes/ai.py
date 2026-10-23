@@ -3953,6 +3953,21 @@ async def configure_ai_learning_checkpoint(
     return result
 
 
+@router.get("/workflow-templates")
+async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
+    """Expose scoped draft settings without granting execution authority."""
+    from skeleton.contracts.ai_workflows import workflow_template_catalog
+
+    tenant_id, actor_id = _chat_identity(user)
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "schema_version": "skeleton.ai.workflow_templates.v1",
+        "actor_id": actor_id,
+        "tenant_id": tenant_id,
+        "catalog": workflow_template_catalog(),
+    }
+
+
 @router.get("/chat/readiness")
 async def chat_readiness(user=Depends(require_role("viewer"))):
     tenant_id, owner_id = _chat_identity(user)

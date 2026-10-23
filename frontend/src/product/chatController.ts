@@ -34,11 +34,14 @@ export type PendingChatTurn = {
   cooperation?: ChatCooperationSummary | null;
   requestCooperation?: ChatCooperationPolicy;
   accepted: boolean;
+  stopRequested?: boolean;
   serverResumeAvailable?: boolean;
 };
 
 export type ChatControllerState = {
   ready: boolean;
+  /** Verified device-cache identity. Never an execution or authorization grant. */
+  accountScope: string | null;
   threads: ConversationThread[];
   activeThread: ConversationThread | null;
   messages: ConversationMessage[];
@@ -65,7 +68,7 @@ export type SendChatOptions = {
   cooperation?: ChatCooperationPolicy;
 };
 
-type PendingReference = { threadId: string; idempotencyKey: string; lastEventId: number; kind?: 'chat' | 'regeneration'; messageId?: string; cooperationPolicy?: ChatCooperationPolicy };
+type PendingReference = { threadId: string; idempotencyKey: string; lastEventId: number; kind?: 'chat' | 'regeneration'; messageId?: string; cooperationPolicy?: ChatCooperationPolicy; stopRequested?: boolean };
 type SavedSelection = {
   schema_version: 1;
   activeThreadId: string | null;
@@ -91,7 +94,7 @@ function sortedThreads(threads: ConversationThread[]): ConversationThread[] {
 /** Device state is a rebuildable view, never a transcript or execution authority. */
 export class ChatController {
   private snapshot: ChatControllerState = {
-    ready: false, threads: [], activeThread: null, messages: [], models: [],
+    ready: false, accountScope: null, threads: [], activeThread: null, messages: [], models: [],
     selectedModelId: null, status: 'loading', pending: null, error: null,
     notice: null, hasMoreThreads: false, reviewedAnswer: null,
   };
@@ -111,6 +114,7 @@ export class ChatController {
   private authToken: string | null = null;
   private pendingReferences = new Map<string, PendingReference>();
   private submission: Submission | null = null;
+  private submissions = new Map<string, Submission>();
   private mutationRetry: (() => Promise<void>) | null = null;
   private nextSave: { key: string; value: string } | null = null;
   private saving = false;
@@ -123,6 +127,8 @@ export class ChatController {
   private cancellationRequests = new Set<string>();
   private regenerationAdmitting = false;
   private regenerationSubmission: { thread: ConversationThread; messageId: string; key: string; model: ChatModel | null } | null = null;
+  private requestedThreadId: string | null = null;
+  private reconnecting = false;
 
   constructor(private options: ChatControllerOptions = {}) {}
 
@@ -136,7 +142,7 @@ export class ChatController {
     if (this.disposed) return;
     if (this.authToken !== null && getAuthToken() !== this.authToken) {
       this.observing?.abort(); this.activeRead?.abort(); this.listRead?.abort(); this.lifetime.abort();
-      this.snapshot = { ...this.snapshot, ready: false, threads: [], activeThread: null, messages: [],
+      this.snapshot = { ...this.snapshot, ready: false, accountScope: null, threads: [], activeThread: null, messages: [],
         pending: null, models: [], reviewedAnswer: null, status: 'error', error: new ChatClientError('Sign in again to continue.', { kind: 'authorization' }) };
       this.listeners.forEach(listener => listener());
       return;
@@ -150,7 +156,11 @@ export class ChatController {
   }
 
   private async identity(): Promise<void> {
+    const originalToken = getAuthToken();
     const identity = await resolveStorageTenantIdentity();
+    if (originalToken !== getAuthToken()) throw new ChatClientError('Your account changed while chat was verifying its storage scope. Reopen the conversation.', {
+      kind: 'authorization', code: 'account_changed', retryable: false,
+    });
     const key = 'canonical-chat-ui:v1:' + encodeURIComponent(identity.tenantId) + ':' + encodeURIComponent(identity.principalId);
     if (this.storageKey && this.storageKey !== key) {
       this.observing?.abort(); this.activeRead?.abort();
@@ -165,6 +175,7 @@ export class ChatController {
     }
     this.storageKey = key;
     this.authToken = token;
+    if (this.snapshot.accountScope !== key) this.emit({ accountScope: key });
   }
 
   private assertSession(): void {
@@ -214,6 +225,7 @@ export class ChatController {
         if (typeof pending.threadId !== 'string' || pending.threadId.length > 64
           || typeof pending.idempotencyKey !== 'string' || pending.idempotencyKey.length > 1024
           || !Number.isSafeInteger(pending.lastEventId) || pending.lastEventId < 0
+          || pending.stopRequested !== undefined && typeof pending.stopRequested !== 'boolean'
           || (pending.kind !== undefined && pending.kind !== 'chat' && pending.kind !== 'regeneration')
           || (pending.kind === 'regeneration' && (typeof pending.messageId !== 'string' || !pending.messageId || pending.messageId.length > 64))) return null;
         if (pending.cooperationPolicy !== undefined) {
@@ -232,8 +244,10 @@ export class ChatController {
       this.lifetime = new AbortController();
       this.storageKey = null; this.authToken = null; this.pendingReferences.clear();
       this.submission = null; this.regenerationSubmission = null; this.mutationRetry = null;
+      this.submissions.clear();
       this.cancellationRequests.clear();
-      this.emit({ ready: false, activeThread: null, messages: [], threads: [], pending: null,
+      this.requestedThreadId = null;
+      this.emit({ ready: false, accountScope: null, activeThread: null, messages: [], threads: [], pending: null,
         models: [], selectedModelId: null, reviewedAnswer: null, status: 'loading', error: null, notice: null });
     }
     if (this.initializing) return this.initializing;
@@ -247,7 +261,10 @@ export class ChatController {
     try {
       await this.identity();
       const saved = await this.readSelection();
-      for (const pending of saved?.pendingTurns ?? []) this.pendingReferences.set(pending.threadId, pending);
+      for (const pending of saved?.pendingTurns ?? []) {
+        this.pendingReferences.set(pending.threadId, pending);
+        if (pending.stopRequested) this.cancellationRequests.add(pending.idempotencyKey);
+      }
       const [catalogResult, pageResult] = await Promise.allSettled([
         getChatModels(this.request()), listConversationPage({ ...this.request(), limit: 50 }),
       ]);
@@ -293,16 +310,18 @@ export class ChatController {
   }
 
   openConversation = async (threadId: string): Promise<void> => {
+    this.requestedThreadId = threadId;
     const epoch = ++this.selectionEpoch;
     this.activeRead?.abort(); this.observing?.abort();
     const controller = new AbortController(); this.activeRead = controller;
-    this.submission = null; this.regenerationSubmission = null; this.mutationRetry = null;
+    this.submission = this.submissions.get(threadId) ?? null;
+    this.regenerationSubmission = null; this.mutationRetry = null;
     this.emit({ status: 'loading', error: null, pending: null, messages: [], activeThread: null, reviewedAnswer: null });
     try {
       await this.identity();
       const snapshot = await reconstructConversation(threadId, this.request(controller.signal));
       if (epoch !== this.selectionEpoch) return;
-      this.emit({ activeThread: snapshot.thread, messages: snapshot.messages, status: 'idle' });
+      this.emit({ activeThread: snapshot.thread, messages: snapshot.messages, status: 'loading' });
       this.upsertThread(snapshot.thread); this.saveSelection();
       const savedReference = this.pendingReferences.get(threadId);
       let key = savedReference?.kind === 'regeneration' ? undefined : savedReference?.idempotencyKey;
@@ -323,11 +342,14 @@ export class ChatController {
             .map(reference => ({ messageId: reference.message_id, key: reference.idempotency_key }));
       for (const reference of regenerationReferences) {
         if (!reference.messageId) continue;
+        this.emit({ pending: this.pendingFromTurn(threadId, reference.key,
+          { success: false, accepted: false, terminal: false, state: 'outcome_unconfirmed' },
+          { kind: 'regeneration', messageId: reference.messageId }) });
         const turn = await getRegenerationTurn(threadId, reference.messageId, reference.key, this.request(controller.signal));
         if (epoch !== this.selectionEpoch) return;
         if (turn.terminal) {
           if (turn.success || savedReference?.kind === 'regeneration') { await this.settle(turn, epoch); return; }
-          continue;
+          this.emit({ pending: null }); continue;
         }
         const pending = this.pendingFromTurn(threadId, reference.key, turn, { kind: 'regeneration', messageId: reference.messageId });
         this.emit({ pending, status: turn.accepted === false ? 'error' : 'streaming',
@@ -337,15 +359,16 @@ export class ChatController {
         return;
       }
       if (key) {
+        const user = snapshot.messages.find(message => message.author_type === 'user' && message.idempotency_key === key);
+        const placeholder = this.pendingFromTurn(threadId, key,
+          { success: false, accepted: false, terminal: false, state: 'outcome_unconfirmed', ...(user ? { user_message: user } : {}) });
+        const original = this.submission?.pending.idempotencyKey === key ? this.submission.pending : null;
+        this.emit({ pending: original ? { ...placeholder, message: original.message, attachmentRefs: original.attachmentRefs, context: original.context } : placeholder });
         const turn = validateChatTurn(await getConversationTurn(threadId, key, this.request(controller.signal)), threadId, key);
         if (epoch !== this.selectionEpoch) return;
         if (turn.terminal) { await this.settle(turn, epoch); return; }
         const pending = this.pendingFromTurn(threadId, key, turn);
-        if (!pending.accepted && !turn.server_resume_available && turn.user_message?.supersedes_message_id) {
-          this.submission = { thread: snapshot.thread, pending,
-            model: this.snapshot.models.find(model => model.id === this.snapshot.selectedModelId) ?? null,
-            options: { attachmentRefs: turn.user_message.attachment_refs.filter(ref => ref.startsWith('chat-attachment://')) } };
-        }
+        if (this.submission?.pending.idempotencyKey !== key) this.submission = null;
         this.emit({ pending, status: pending.accepted ? 'streaming' : 'error',
           error: pending.accepted ? null : new ChatClientError('This turn is saved. Resume to submit it.', { kind: 'unavailable', code: 'awaiting_admission' }) });
         this.rememberPending(pending);
@@ -357,8 +380,20 @@ export class ChatController {
       const user = [...snapshot.messages].reverse().find(message => message.author_type === 'user');
       const assistant = user && snapshot.messages.find(message => message.author_type === 'assistant' && message.causal_user_message_id === user.message_id);
       if (user) {
+        if (!assistant) this.emit({ pending: this.pendingFromTurn(threadId, user.idempotency_key,
+          { success: false, accepted: false, terminal: false, state: 'outcome_unconfirmed', user_message: user }) });
         try {
           const turn = validateChatTurn(await getConversationTurn(threadId, user.idempotency_key, this.request(controller.signal)), threadId, user.idempotency_key);
+          if (epoch !== this.selectionEpoch) return;
+          if (!assistant) {
+            if (turn.terminal) { await this.settle(turn, epoch); return; }
+            const pending = this.pendingFromTurn(threadId, user.idempotency_key, turn);
+            this.emit({ pending, status: pending.accepted ? 'streaming' : 'error',
+              error: pending.accepted ? null : new ChatClientError('This turn is saved. Resume to submit it.', { kind: 'unavailable', code: 'awaiting_admission' }) });
+            this.rememberPending(pending);
+            if (pending.accepted) void this.observe(pending, epoch).catch(() => {});
+            return;
+          }
           if (epoch === this.selectionEpoch && turn.cooperation) {
             if (assistant && turn.assistant_message?.message_id === assistant.message_id && turn.cooperation.complete) {
               this.emit({ reviewedAnswer: { messageId: assistant.message_id, summary: turn.cooperation } });
@@ -368,10 +403,11 @@ export class ChatController {
           }
         } catch (error) {
           const failure = asChatError(error);
-          if (failure.kind === 'authorization' || failure.kind === 'cancelled') throw failure;
+          if (!assistant || failure.kind === 'authorization' || failure.kind === 'cancelled') throw failure;
           // Canonical conversation reads stay available without an engine.
         }
       }
+      if (epoch === this.selectionEpoch) this.emit({ status: 'idle' });
     } catch (error) {
       const failure = asChatError(error);
       if (epoch === this.selectionEpoch && failure.kind !== 'cancelled') { this.emit({ status: 'error', error: failure }); throw failure; }
@@ -386,12 +422,14 @@ export class ChatController {
       state: turn.state ?? 'running', startedAt: turn.user_message?.created_at ?? new Date().toISOString(),
       operationId: turn.operation_id, executionId: turn.engine_execution_id, cooperation: turn.cooperation,
       requestCooperation: this.pendingReferences.get(threadId)?.cooperationPolicy,
-      accepted: turn.accepted !== false, serverResumeAvailable: turn.server_resume_available };
+      accepted: turn.accepted !== false, serverResumeAvailable: turn.server_resume_available,
+      stopRequested: turn.cancellation_requested === true || this.cancellationRequests.has(key) || this.pendingReferences.get(threadId)?.stopRequested === true };
   }
 
   private rememberPending(pending: PendingChatTurn): void {
     this.pendingReferences.set(pending.threadId, { threadId: pending.threadId,
       idempotencyKey: pending.idempotencyKey, lastEventId: pending.lastEventId, kind: pending.kind, messageId: pending.messageId,
+      ...(pending.stopRequested || this.cancellationRequests.has(pending.idempotencyKey) ? { stopRequested: true } : {}),
       ...(pending.requestCooperation ? { cooperationPolicy: normalizeChatCooperation(pending.requestCooperation) } : {}) });
     while (this.pendingReferences.size > 32) this.pendingReferences.delete(this.pendingReferences.keys().next().value!);
     this.saveSelection();
@@ -424,7 +462,14 @@ export class ChatController {
     } finally { this.creating = false; }
   }
 
-  newConversation = async (input: { title?: string } = {}): Promise<void> => this.createAndSelect(input);
+  newConversation = async (input: { title?: string } = {}): Promise<void> => {
+    if (this.sending || this.retrying || this.cancelling || this.reconnecting || this.regenerationAdmitting) {
+      throw new ChatClientError('Wait for the current conversation request before opening another conversation.', { kind: 'conflict' });
+    }
+    // Starting a different conversation leaves the saved reference intact.
+    // It neither cancels nor retries the unresolved work in the prior thread.
+    await this.createAndSelect(input, !!this.snapshot.pending && this.snapshot.status === 'error');
+  };
 
   send = async (message: string, options: SendChatOptions = {}): Promise<void> => {
     if (this.sending || this.snapshot.pending || ['submitting', 'cancelling', 'loading'].includes(this.snapshot.status)) {
@@ -440,6 +485,9 @@ export class ChatController {
       throw new ChatClientError('Context, attachment references or generation settings are invalid.', { kind: 'validation' });
     }
     const originThreadId = this.snapshot.activeThread?.thread_id ?? null;
+    if (this.submissions.size >= 32 && (!originThreadId || !this.submissions.has(originThreadId))) {
+      throw new ChatClientError('This view holds 32 unresolved original requests. Check their saved turns before starting more work; the requests have been preserved.', { kind: 'conflict', code: 'pending_request_limit' });
+    }
     const model = this.modelForNewTurn();
     let epoch = this.selectionEpoch;
     this.sending = true;
@@ -468,12 +516,22 @@ export class ChatController {
         lastEventId: 0, state: 'submitting', startedAt: new Date().toISOString(), accepted: false,
         ...(options.cooperation ? { requestCooperation: normalizeChatCooperation(options.cooperation) } : {}) };
       this.submission = { thread, pending, model, options: { ...options, attachmentRefs: [...pending.attachmentRefs] } };
+      this.submissions.set(thread.thread_id, this.submission);
       this.mutationRetry = null;
       this.emit({ pending, status: 'submitting', error: null, notice: null });
       this.rememberPending(pending);
       await this.submit(this.submission, epoch);
     } catch (error) { const failure = asChatError(error); if (epoch === this.selectionEpoch) this.emit({ status: 'error', error: failure }); throw failure; }
-    finally { this.sending = false; }
+    finally {
+      this.sending = false;
+      const pending = this.getSnapshot().pending;
+      if (epoch === this.selectionEpoch && pending && this.cancellationRequests.has(pending.idempotencyKey)
+        && !this.cancelling && this.snapshot.status === 'error') {
+        // An explicit Stop issued during ambiguous admission remains a Stop;
+        // it must never turn into another admission on the next reconnect.
+        void this.cancel().catch(() => {});
+      }
+    }
   };
 
   private async submit(submission: Submission, epoch: number): Promise<void> {
@@ -488,6 +546,7 @@ export class ChatController {
       if (turn.user_message) this.mergeMessages([turn.user_message]);
       if (turn.terminal) { await this.settle(turn, epoch); return; }
       const pending = { ...submission.pending, accepted: turn.accepted !== false, state: turn.state ?? 'running',
+        stopRequested: this.cancellationRequests.has(submission.pending.idempotencyKey) || turn.cancellation_requested === true,
         operationId: turn.operation_id, executionId: turn.engine_execution_id, cooperation: turn.cooperation };
       submission.pending = pending;
       if (!pending.accepted) {
@@ -527,7 +586,7 @@ export class ChatController {
       const followOptions = {
         ...this.request(controller.signal), lastEventId: pending.lastEventId,
         executionId: pending.executionId, operationId: pending.operationId, provisionalText: pending.streamText,
-        onConnection: (state: import('./aiChatClient').ChatStreamConnection) => { if (current()) this.emit({ status: this.snapshot.status === 'cancelling' ? 'cancelling'
+        onConnection: (state: import('./aiChatClient').ChatStreamConnection) => { if (current()) this.emit({ status: this.snapshot.status === 'cancelling' || this.snapshot.pending?.stopRequested ? 'cancelling'
           : state === 'reconnecting' || state === 'resyncing' ? 'reconnecting' : 'streaming' }); },
         onCursor: (lastEventId: number) => updatePending({ lastEventId }),
         onText: (streamText: string) => updatePending({ streamText }),
@@ -551,6 +610,12 @@ export class ChatController {
 
   private async settle(turn: ConversationTurn, epoch: number): Promise<void> {
     if (epoch !== this.selectionEpoch) return;
+    if (turn.terminal !== true) throw new ChatClientError('The server has not confirmed a terminal reply. Check the saved turn before continuing.', {
+      kind: 'protocol', code: 'terminal_state_unconfirmed', retryable: false,
+    });
+    if (turn.success && !turn.assistant_message) throw new ChatClientError('The saved answer is missing from the completion record. Check the same turn again; no replacement reply was started.', {
+      kind: 'protocol', code: 'canonical_reply_missing', retryable: false,
+    });
     const threadId = turn.thread?.thread_id ?? this.snapshot.activeThread?.thread_id;
     if (!threadId) return;
     const pending = this.snapshot.pending;
@@ -560,6 +625,7 @@ export class ChatController {
     this.pendingReferences.delete(threadId);
     if (this.snapshot.pending) this.cancellationRequests.delete(this.snapshot.pending.idempotencyKey);
     this.submission = null; this.regenerationSubmission = null;
+    this.submissions.delete(threadId);
     if (turn.thread) this.upsertThread(turn.thread);
     this.mergeMessages([turn.user_message, turn.assistant_message, turn.terminal_message].filter(Boolean) as ConversationMessage[]);
     if (turn.assistant_message && cooperation?.complete) this.emit({ reviewedAnswer: { messageId: turn.assistant_message.message_id, summary: cooperation } });
@@ -583,7 +649,9 @@ export class ChatController {
     if (!pending) return;
     const epoch = this.selectionEpoch;
     this.cancellationRequests.add(pending.idempotencyKey);
-    this.emit({ status: 'cancelling', error: null });
+    const stopping = { ...pending, stopRequested: true };
+    this.rememberPending(stopping);
+    this.emit({ pending: stopping, status: 'cancelling', error: null });
     if (!pending.accepted && (this.sending || this.regenerationAdmitting)) return;
     try {
       await this.identity();
@@ -598,7 +666,7 @@ export class ChatController {
           : validateChatTurn(await getConversationTurn(pending.threadId, pending.idempotencyKey, this.request()), pending.threadId, pending.idempotencyKey);
         await this.settle(final, epoch);
       } else {
-        const observed = { ...pending, accepted: turn.accepted !== false, state: turn.state ?? pending.state,
+        const observed = { ...stopping, accepted: turn.accepted !== false, state: turn.state ?? pending.state,
           operationId: turn.operation_id ?? pending.operationId, executionId: turn.engine_execution_id ?? pending.executionId };
         this.emit({ pending: observed }); this.rememberPending(observed);
         if (observed.accepted) await this.observe(observed, epoch);
@@ -615,12 +683,13 @@ export class ChatController {
   };
 
   retry = async (): Promise<void> => {
-    if (this.retrying) return;
+    if (this.retrying || this.reconnecting || this.sending || this.cancelling || this.disposed) return;
     this.retrying = true;
     try {
     if (this.mutationRetry) { await this.mutationRetry(); return; }
     const pending = this.snapshot.pending;
     if (!pending) { await this.refreshConversation(); return; }
+    if (pending.stopRequested || this.cancellationRequests.has(pending.idempotencyKey)) { await this.cancel(); return; }
     const epoch = this.selectionEpoch;
     this.emit({ error: null, status: pending.accepted ? 'reconnecting' : 'submitting' });
     try {
@@ -628,6 +697,7 @@ export class ChatController {
       let turn = pending.kind === 'regeneration'
         ? await getRegenerationTurn(pending.threadId, pending.messageId!, pending.idempotencyKey, this.request())
         : validateChatTurn(await getConversationTurn(pending.threadId, pending.idempotencyKey, this.request()), pending.threadId, pending.idempotencyKey);
+      if (this.disposed || epoch !== this.selectionEpoch || this.snapshot.pending?.idempotencyKey !== pending.idempotencyKey) return;
       if (turn.accepted === false && !turn.terminal) {
         if (pending.kind === 'regeneration') {
           turn = await resumeRegenerationTurn(pending.threadId, pending.messageId!, pending.idempotencyKey, this.request());
@@ -658,13 +728,57 @@ export class ChatController {
       if (epoch !== this.selectionEpoch) return;
       if (failure.status === 404 && pending.kind === 'regeneration' && this.regenerationSubmission && !pending.accepted) await this.admitRegeneration(this.regenerationSubmission, pending, epoch);
       else if (failure.status === 404 && this.submission && !pending.accepted) await this.submit(this.submission, epoch);
-      else { this.emit({ status: 'error', error: failure }); throw failure; }
+      else {
+        const visible = failure.status === 404 ? new ChatClientError('This saved key could not be confirmed, and its original request settings are unavailable in this view. Keep it for inspection or open another conversation. No replacement request was submitted.', {
+          kind: 'conflict', code: 'original_request_required', requestId: failure.requestId, retryable: false,
+        }) : failure;
+        this.emit({ status: 'error', error: visible }); throw visible;
+      }
     }
     } finally { this.retrying = false; }
   };
 
+  /** Read the saved operation and follow admitted work. Never submits/resumes/cancels it. */
+  reconnect = async (): Promise<void> => {
+    if (this.reconnecting || this.retrying || this.sending || this.cancelling || this.disposed) return;
+    const pending = this.snapshot.pending;
+    if (!pending) { await this.refreshConversation(); return; }
+    this.reconnecting = true;
+    const epoch = this.selectionEpoch;
+    const current = () => !this.disposed && epoch === this.selectionEpoch
+      && this.snapshot.pending?.idempotencyKey === pending.idempotencyKey;
+    this.emit({ status: 'reconnecting', error: null });
+    try {
+      await this.identity();
+      const turn = pending.kind === 'regeneration'
+        ? await getRegenerationTurn(pending.threadId, pending.messageId!, pending.idempotencyKey, this.request())
+        : validateChatTurn(await getConversationTurn(pending.threadId, pending.idempotencyKey, this.request()), pending.threadId, pending.idempotencyKey);
+      if (!current()) return;
+      if (turn.terminal) { await this.settle(turn, epoch); return; }
+      const recovered = { ...pending, accepted: turn.accepted !== false,
+        state: turn.state ?? pending.state, operationId: turn.operation_id ?? pending.operationId,
+        executionId: turn.engine_execution_id ?? pending.executionId, serverResumeAvailable: turn.server_resume_available,
+        ...(turn.cooperation ? { cooperation: reconcileChatCooperation(pending.cooperation, turn.cooperation) } : {}) };
+      this.rememberPending(recovered);
+      if (!recovered.accepted) {
+        this.emit({ pending: recovered, status: 'error', error: new ChatClientError(
+          this.cancellationRequests.has(pending.idempotencyKey)
+            ? 'Stop is not confirmed. The saved request was not resubmitted. Check it again or explicitly retry Stop.'
+            : 'The turn is saved but has not been admitted. Resume the saved turn explicitly when the engine is ready.',
+          { kind: 'unavailable', code: 'awaiting_admission', retryable: false },
+        ) });
+        return;
+      }
+      this.emit({ pending: recovered, status: this.cancellationRequests.has(pending.idempotencyKey) ? 'cancelling' : 'streaming' });
+      void this.observe(recovered, epoch).catch(() => {});
+    } catch (error) {
+      if (current()) { const failure = asChatError(error); this.emit({ status: 'error', error: failure }); throw failure; }
+    } finally { this.reconnecting = false; }
+  };
+
   refreshConversation = async (): Promise<void> => {
-    const threadId = this.snapshot.activeThread?.thread_id;
+    if (this.snapshot.pending) { await this.reconnect(); return; }
+    const threadId = this.snapshot.activeThread?.thread_id ?? this.requestedThreadId;
     if (threadId) await this.openConversation(threadId);
     else await this.initialize();
   };
@@ -696,6 +810,7 @@ export class ChatController {
   edit = async (messageId: string, content: string): Promise<void> => {
     const thread = this.snapshot.activeThread;
     if (!thread || this.snapshot.pending || ['submitting', 'cancelling', 'loading'].includes(this.snapshot.status)) throw new ChatClientError('Wait for the current conversation update before editing.', { kind: 'conflict' });
+    if (this.submissions.size >= 32 && !this.submissions.has(thread.thread_id)) throw new ChatClientError('Check the saved unresolved requests before editing another turn.', { kind: 'conflict', code: 'pending_request_limit' });
     const model = this.modelForNewTurn();
     const key = newKey('edit'); const epoch = this.selectionEpoch;
     const execute = async () => {
@@ -720,6 +835,7 @@ export class ChatController {
         this.submission = { thread: snapshot.thread, pending,
           model,
           options: { attachmentRefs } };
+        this.submissions.set(thread.thread_id, this.submission);
         this.emit({ pending, status: 'submitting' }); this.rememberPending(pending);
         await this.submit(this.submission, epoch);
       } catch (error) { if (epoch === this.selectionEpoch) { const failure = asChatError(error); this.emit({ status: 'error', error: failure }); throw failure; } }
@@ -798,6 +914,7 @@ export class ChatController {
     try {
       await this.identity(); await requestConversationDeletion(thread, this.request());
       this.pendingReferences.delete(thread.thread_id);
+      this.submissions.delete(thread.thread_id);
       this.emit({ threads: this.snapshot.threads.filter(item => item.thread_id !== thread.thread_id), ...(this.snapshot.activeThread?.thread_id === thread.thread_id ? { activeThread: null, messages: [], error: null } : {}) });
       this.saveSelection();
     } catch (error) { const failure = asChatError(error); this.emit({ error: failure }); throw failure; }
@@ -823,6 +940,7 @@ export class ChatController {
   dispose = (): void => {
     this.disposed = true; this.selectionEpoch += 1; this.listEpoch += 1;
     this.observing?.abort(); this.activeRead?.abort(); this.listRead?.abort(); this.lifetime.abort(); this.listeners.clear();
+    this.submissions.clear();
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = null;
     void this.flushSelection();
