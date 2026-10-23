@@ -15,11 +15,11 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Checkout exact source
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
       - name: Generate 9000 original-game Markdown handbooks
@@ -41,7 +41,7 @@ jobs:
           print(f'Generated {len(files)} original-game technical books.')
           PY
       - name: Archive generated books and SHA receipts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: forge-studio-9000-handbooks
           path: build/forge-studio-books/
