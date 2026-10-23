@@ -59,7 +59,7 @@ def _expression_operand(doc, operand, now):
     """Minimal Mongo expression evaluator for the lease CAS test double."""
     if isinstance(operand, str):
         # Mongo aggregation binds server clock as $NOW, not $NOW (which
-        # would name a document field). Resolve it before field lookups so
+        # names a document field). Resolve it before field lookups so
         # expiry and takeover CAS tests faithfully model MongoDB.
         if operand == "$NOW":
             return now
