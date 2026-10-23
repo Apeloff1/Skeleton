@@ -1,0 +1,10 @@
+{
+  "name": "skeleton-local-ai",
+  "version": "1.0.0-sota",
+  "seams": 50,
+  "entry": "skeleton.local_ai",
+  "facade": "LocalAIFacade",
+  "doctor": "doctor",
+  "health": "health",
+  "description": "SOTA local AI boilerplate for Cortex, Jeeves, and GameForge. Complete seams, no stubs."
+}

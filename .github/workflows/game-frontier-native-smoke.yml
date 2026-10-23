@@ -23,6 +23,7 @@ on:
       - "scripts/build_original_expedition.py"
       - "scripts/build_original_campaign.py"
       - "tests/test_original_expedition_cli.py"
+      - "skeleton/game/production_native_quality.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
 
 permissions:
@@ -80,6 +81,16 @@ jobs:
           assert len(proof["native_playthrough_receipt"]) == 64, proof
           assert "game/frontier/expedition.gd" in files, proof
           assert not proof["independent_native_engine_signoff"], proof
+          from skeleton.game.production_native_quality import run_native_quality_probe
+          native_quality = run_native_quality_probe(
+              files, source_sha256=proof["world_digest"],
+              executable=os.environ["FRONTIER_GODOT"], timeout_seconds=90,
+          )
+          assert native_quality["native_engine_executed"]
+          assert native_quality["frames"] == 30
+          assert not native_quality["gpu_capture_attested"]
+          assert not native_quality["device_performance_attested"]
+
           print(json.dumps({
               "executed_real_godot_expedition": True,
               "original_project": proof["project_id"],
