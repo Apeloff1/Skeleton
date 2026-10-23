@@ -25,6 +25,7 @@ BINDING_KEYS = frozenset((
 ))
 BINDING_OPTIONAL = frozenset((
     "movement_animations", "collision_sensor", "directional_animations",
+    "audio_cue_bindings",
 ))
 TRAVEL_STAMINA_ANCHOR = """    stamina -= int(costs["stamina"])"""
 
@@ -45,6 +46,7 @@ def _real(value: Any, name: str, minimum: float, maximum: float) -> float:
 def binding_from_source(
     records: Mapping[str, Mapping[str, Any]],
     authored_sprites: list[dict[str, Any]],
+    authored_audio: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Select at most one reviewed, dependency-bound player visual source."""
     candidates = []
@@ -100,7 +102,37 @@ def binding_from_source(
             raise SpriteBindingError(
                 "movement state map must reference actual original animation names"
             )
+        cues = doc.get("audio_cue_bindings", {})
+        if (not isinstance(cues, dict) or len(cues) > 32):
+            raise SpriteBindingError("original cue audio mapping must be a finite typed object")
+        available_cues = selected.get("frame_cue_event_ids", [])
+        if not isinstance(available_cues, list):
+            raise SpriteBindingError("reviewed sprite frame cue catalogue is missing")
+        catalog = {item["asset_id"]: item for item in (authored_audio or [])}
+        if len(catalog) != len(authored_audio or []):
+            raise SpriteBindingError("original audio asset identities are ambiguous")
+        audio_refs: dict[str, str] = {}
+        for event_id, sound_asset in sorted(cues.items()):
+            if (type(event_id) is not str or ASSET.fullmatch(event_id) is None
+                    or event_id not in available_cues
+                    or type(sound_asset) is not str
+                    or ASSET.fullmatch(sound_asset) is None):
+                raise SpriteBindingError(
+                    "audio effect cue must reference an authored sprite event and sound"
+                )
+            original = catalog.get(sound_asset)
+            if original is None or original["source_record_id"] not in record["depends_on"]:
+                raise SpriteBindingError(
+                    "audio cue requires real reviewed sound and exact original dependency"
+                )
+            audio_refs[event_id] = original["source_sha256"]
+        if audio_refs and selected.get("frame_cues_sha256") is None:
+            raise SpriteBindingError("audio output cannot play without authored frame signals")
         candidates.append({
+            "audio_cue_bindings": {
+                cue: cues[cue] for cue in sorted(cues)
+            },
+            "audio_source_sha256_by_event": audio_refs,
             "schema_version": "skeleton.jeeves.player_sprite_binding.v1",
             "collision_sensor": collision_sensor,
             "directional_animations": {
@@ -177,7 +209,20 @@ def validate_original_avatar_source_graph(
         ),
         "animation_names": [state["name"] for state in meta["animations"]],
     }
-    return binding_from_source(records, [verified])
+    from .studio_original_audio import compile_original_sound_collection
+    verified["frame_cue_event_ids"] = (
+        [cue["event_id"] for cue in meta["frame_cues"]["cues"]]
+        if meta.get("frame_cues") else []
+    )
+    authored_audio = [
+        {
+            "asset_id": sound["metadata"]["asset_id"],
+            "source_record_id": sound["metadata"]["source_record_id"],
+            "source_sha256": sound["metadata"]["source_sha256"],
+        }
+        for sound in compile_original_sound_collection(records)["assets"]
+    ]
+    return binding_from_source(records, [verified], authored_audio)
 
 
 def bind_sprite_to_expedition_script(
@@ -220,6 +265,22 @@ def bind_sprite_to_expedition_script(
         if binding["billboard"]
         else "    jeeves_avatar.billboard = BaseMaterial3D.BILLBOARD_DISABLED",
     ]
+    audio_cues = binding.get("audio_cue_bindings", {})
+    if (not isinstance(audio_cues, dict) or len(audio_cues) > 32
+            or any(type(key) is not str or ASSET.fullmatch(key) is None
+                   or type(value) is not str or ASSET.fullmatch(value) is None
+                   for key, value in audio_cues.items())):
+        raise SpriteBindingError("native audio cue routing lost original review")
+    if audio_cues and binding.get("frame_cues_sha256") is None:
+        raise SpriteBindingError("sound playback requires authored cue signal source")
+    if audio_cues:
+        verified_shas = binding.get("audio_source_sha256_by_event")
+        if (not isinstance(verified_shas, dict)
+                or set(verified_shas) != set(audio_cues)
+                or any(type(digest_value) is not str or len(digest_value) != 64
+                       or any(ch not in "0123456789abcdef" for ch in digest_value)
+                       for digest_value in verified_shas.values())):
+            raise SpriteBindingError("original sound source lineage is incomplete")
     if binding.get("frame_cues_sha256") is not None:
         cue_digest = binding["frame_cues_sha256"]
         if (type(cue_digest) is not str or len(cue_digest) != 64
@@ -234,6 +295,29 @@ def bind_sprite_to_expedition_script(
             '        push_error("Authored sprite frame-cue signals are missing")',
             "        return",
             "    jeeves_avatar.set_script(jeeves_cue_logic)",
+        ])
+    if audio_cues:
+        # Only reviewed event and sound identities become code literals.
+        # No arbitrary user-provided expression, path or script is evaluated.
+        entries = ", ".join(
+            f'"{event_id}": "{audio_cues[event_id]}"'
+            for event_id in sorted(audio_cues)
+        )
+        builder.extend([
+            "    var jeeves_sound_player := AudioStreamPlayer3D.new()",
+            '    jeeves_sound_player.name = "OriginalCueAudioPlayer"',
+            "    actor.add_child(jeeves_sound_player)",
+            "    var jeeves_cue_to_sound: Dictionary = {" + entries + "}",
+            '    jeeves_avatar.connect("cue_fired", func(event_id, _category, _name, _frame):',
+            "        var jeeves_sound_id := str(jeeves_cue_to_sound.get(str(event_id), \"\"))",
+            '        if jeeves_sound_id != "":',
+            '            var jeeves_original_wav := load(',
+            '                "res://game/frontier/audio/" + jeeves_sound_id + ".wav"',
+            '            ) as AudioStream',
+            "            if jeeves_original_wav != null:",
+            "                jeeves_sound_player.stream = jeeves_original_wav",
+            "                jeeves_sound_player.play()",
+            "    )",
         ])
     builder.extend([
         "    actor.add_child(jeeves_avatar)",
