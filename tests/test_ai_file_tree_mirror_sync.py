@@ -163,3 +163,22 @@ def test_cli_check_apply_and_receipt_are_stable(tmp_path: Path, capsys):
     assert result["applied"] == 1
     assert main(common) == 0
     assert json.loads(capsys.readouterr().out)["planned"] == 0
+
+
+def test_destination_only_files_are_reported_but_governed_overlays_are_retained(tmp_path: Path):
+    manifest, tracked = _fixture(tmp_path)
+    orphan = tmp_path / "skeleton/ai/runtime/contracts/untracked_owner.py"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_text("OWNER = 'unknown'\n", encoding="utf-8")
+    tracked.add("skeleton/ai/runtime/contracts/untracked_owner.py")
+    additions, conflicts = plan_mirrors(tmp_path, manifest, tracked)
+    assert [x["destination"] for x in additions] == [DEST]
+    assert conflicts == [{
+        "source": "skeleton/contracts/untracked_owner.py",
+        "destination": "skeleton/ai/runtime/contracts/untracked_owner.py",
+        "reason": "destination has no tracked canonical source",
+    }]
+    manifest["mappings"][0]["overlay_children"] = ["untracked_owner.py"]
+    _, retained_conflicts = plan_mirrors(tmp_path, manifest, tracked)
+    assert retained_conflicts == []
+    assert orphan.read_text() == "OWNER = 'unknown'\n"
