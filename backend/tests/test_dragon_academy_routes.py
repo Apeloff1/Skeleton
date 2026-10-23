@@ -771,6 +771,9 @@ def test_original_campaign_api_builds_real_multistage_forks_and_solver_diversity
     assert result["challenge"]["has_player_observations"] is False
     for index,stage in enumerate(result["stages"]):
         assert stage["stage"]==index+1
+        # Direct Python and HTTP JSON callers see the identical documented
+        # array contract; tuple-shaped internal dataclasses cannot leak here.
+        assert isinstance(stage["routes"]["routes"],list)
         proof=verify_route_report(BASE_LEVELS[index],stage["routes"])
         assert proof["routes"]>=1
     assert "no human" in result["claim"]
