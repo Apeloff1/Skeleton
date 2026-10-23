@@ -38,6 +38,41 @@ from fastapi import FastAPI
 RouteEntry = Union[Tuple[str, str], Tuple[str, str, str]]
 
 
+def _declared_route_paths(router, *, mount_prefix: str = "") -> list[str]:
+    """Resolve included endpoint paths without materializing the whole API tree.
+
+    FastAPI <=0.136 copied child routes into app.routes. FastAPI >=0.137
+    preserves included routers using nested wrapper entries that have no
+    route.path. Inspect the already-admitted source router only when the
+    target app actually acquired a new mount, so a no-op include is never
+    reported as a successful capability.
+    """
+    paths: list[str] = []
+    pending: list[tuple[object, str, frozenset[int]]] = [
+        (router, mount_prefix, frozenset())
+    ]
+    while pending:
+        current, prefix, ancestors = pending.pop()
+        if id(current) in ancestors:
+            continue
+        ancestors = ancestors | {id(current)}
+        for route in getattr(current, "routes", ()):
+            path = getattr(route, "path", None)
+            if isinstance(path, str):
+                paths.append(prefix + path)
+                continue
+            nested = getattr(route, "original_router", None)
+            nested_prefix = getattr(route, "prefix", "")
+            if (
+                nested is not None
+                and nested is not current
+                and isinstance(nested_prefix, str)
+                and hasattr(nested, "routes")
+            ):
+                pending.append((nested, prefix + nested_prefix, ancestors))
+    return paths
+
+
 def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
     """
     Register each router in ``entries`` on the given FastAPI app.
@@ -72,10 +107,19 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
                 app.include_router(router, prefix=prefix)
             else:
                 app.include_router(router)
+            newly_mounted = app.routes[prior_routes:]
             registered_paths = [
-                route.path for route in app.routes[prior_routes:]
+                route.path for route in newly_mounted
                 if isinstance(getattr(route, "path", None), str)
             ]
+            # FastAPI 0.137+ mounts a single non-path wrapper for a complete
+            # router. Only resolve its declared child paths after a real app
+            # route-tree change; the empty-router and failed-include checks
+            # remain fail-closed.
+            if newly_mounted and not registered_paths:
+                registered_paths = _declared_route_paths(
+                    router, mount_prefix=prefix or "",
+                )
             if not registered_paths:
                 skipped_names.append(f"{module_path} (empty_router)")
                 continue
