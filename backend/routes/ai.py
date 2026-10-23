@@ -1982,8 +1982,19 @@ async def ai_chat(
     )
     if prepared_command is None:
         # Validate an existing legacy binding, but never synthesize a replacement
-        # for the old USER-before-command crash window.
-        await conversation_authority.user_engine_command(
+        # for the old USER-before-command crash window. Reference authorities
+        # without a legacy command store must fail closed, not crash with
+        # AttributeError or silently start a second engine execution.
+        legacy_command_reader = getattr(conversation_authority, "user_engine_command", None)
+        if not callable(legacy_command_reader):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "legacy_command_not_admitted",
+                    "message": "The exact original legacy command is unavailable; it cannot be reconstructed or replaced.",
+                },
+            )
+        await legacy_command_reader(
             thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
         )
         try:
