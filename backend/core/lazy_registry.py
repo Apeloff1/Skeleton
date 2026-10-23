@@ -147,6 +147,7 @@ _LOADERS = {
     'core.forge_registry': lambda: importlib.import_module('core.forge_registry'),
     'core.forge_validator': lambda: importlib.import_module('core.forge_validator'),
     'core.full_roster': lambda: importlib.import_module('core.full_roster'),
+    'core.game_frontier_authoring': lambda: importlib.import_module('core.game_frontier_authoring'),
     'core.game_choices': lambda: importlib.import_module('core.game_choices'),
     'core.game_console_build': lambda: importlib.import_module('core.game_console_build'),
     'core.game_console_studio': lambda: importlib.import_module('core.game_console_studio'),
