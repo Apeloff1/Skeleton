@@ -5566,6 +5566,54 @@
       ]
     },
     {
+      "id": "AIFT-RESEARCH-QUARANTINE-100X",
+      "source": "skeleton/research/quarantine_100x.py",
+      "destination": "skeleton/ai/research/quarantine_100x.py",
+      "kind": "file",
+      "source_git_object_sha": "12eec0c7d705fd868b2407d5ba2cc9cdf73591fe",
+      "role": "100x bounded research quarantine surface retained under canonical research ownership.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_quarantine_mirror_pending_explicit_cutover",
+      "volume_refs": [
+        "VOL-001"
+      ]
+    },
+    {
+      "id": "AIFT-RESEARCH-QUARANTINE-EXTREME",
+      "source": "skeleton/research/quarantine_extreme.py",
+      "destination": "skeleton/ai/research/quarantine_extreme.py",
+      "kind": "file",
+      "source_git_object_sha": "23d4e3e1bbe77073f0b968e33b3b94021d8d6153",
+      "role": "Extreme bounded research quarantine surface retained under canonical research ownership.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_quarantine_mirror_pending_explicit_cutover",
+      "volume_refs": [
+        "VOL-001"
+      ]
+    },
+    {
       "id": "AIFT-ECS-ADAPTER",
       "source": "skeleton/ecs",
       "destination": "skeleton/ai/runtime/ecs",
