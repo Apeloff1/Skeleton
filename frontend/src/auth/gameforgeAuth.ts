@@ -17,6 +17,7 @@ const EMERGENT_AUTH = 'https://auth.emergentagent.com/';
 let _token = '';
 let _tokenLoaded = false;
 let _tokenEpoch = 0;
+const _authObservers = new Set<() => void>();
 let _tokenInitialization: Promise<void> | null = null;
 let _tenantIdentityCache: {
   token: string;
@@ -25,6 +26,14 @@ let _tenantIdentityCache: {
 
 export function getAuthToken(): string {
   return _token;
+}
+
+export function getAuthEpoch(): number { return _tokenEpoch; }
+
+/** Invalidate observations without publishing bearer material. */
+export function subscribeAuthChanges(observer: () => void): () => void {
+  _authObservers.add(observer);
+  return () => { _authObservers.delete(observer); };
 }
 
 export function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -36,6 +45,7 @@ async function persist(token: string) {
   _tokenLoaded = true;
   if (token !== _token) _tenantIdentityCache = null;
   _token = token;
+  for (const observer of _authObservers) { try { observer(); } catch {} }
   try {
     if (Platform.OS === 'web') {
       if (token) localStorage.setItem(KEY, token);
@@ -156,7 +166,7 @@ export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdent
 }
 
 /** Validate the current token against the backend. Clears it on 401. */
-export async function checkMe(): Promise<MeResult> {
+export async function checkMe(signal?: AbortSignal): Promise<MeResult> {
   const unknown = (error: string): MeResult => ({ authenticated: false, enforced: true, role: 'anonymous', user: null, observed: false, error });
   const epoch = _tokenEpoch;
   try {
@@ -166,7 +176,9 @@ export async function checkMe(): Promise<MeResult> {
   }
   if (_tokenEpoch !== epoch) return unknown('Your account changed. Verify the current session again.');
   const stored = _token;
-  const r = await api.get<any>('/api/auth/me', { headers: authHeaders(), timeoutMs: 12000, retries: 0 });
+  if (signal?.aborted) return unknown('Account inspection cancelled.');
+  const r = await api.get<any>('/api/auth/me', { signal, headers: authHeaders(), timeoutMs: 12000, retries: 0 });
+  if (signal?.aborted) return unknown('Account inspection cancelled.');
   if (_tokenEpoch !== epoch || _token !== stored) return unknown('Your account changed. Verify the current session again.');
   if (r.status === 401) {
     await persist('');

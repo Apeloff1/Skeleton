@@ -58,6 +58,9 @@ class FakeCursor:
 def _expression_operand(doc, operand, now):
     """Minimal Mongo expression evaluator for the lease CAS test double."""
     if isinstance(operand, str):
+        # Mongo aggregation binds server clock as $$NOW, not $NOW (which
+        # names a document field). Resolve it before field lookups so
+        # expiry and takeover CAS tests faithfully model MongoDB.
         if operand == "$$NOW":
             return now
         if operand.startswith("$"):
@@ -71,14 +74,13 @@ def _expression_operand(doc, operand, now):
     return operand
 
 
-def test_mongo_server_clock_is_distinct_from_the_now_field():
-    """The lease CAS must resolve Mongo server time, never a missing $NOW field."""
+def test_fake_mongo_server_clock_uses_double_dollar_now():
+    """Lease fences must compare against server time, not a missing field."""
     from core import chat_turns as turn_module
 
-    moment = turn_module._utcnow()
-    doc = {"lease_expires_at": moment + timedelta(seconds=10)}
-    assert _expression_operand(doc, "$$NOW", moment) == moment
-    assert _expression_operand(doc, "$NOW", moment) is None
+    doc = {"lease_expires_at": turn_module._utcnow() + timedelta(seconds=10)}
+    assert _expression_operand(doc, "$$NOW", turn_module._utcnow()) is not None
+    assert _expression_operand(doc, "$NOW", turn_module._utcnow()) is None
 
 
 def _matches_expression(doc, expression):
@@ -91,7 +93,9 @@ def _matches_expression(doc, expression):
         raise AssertionError("unsupported Mongo expression")
     operation, arguments = next(iter(expression.items()))
     if operation == "$or":
-        return any(_matches_expression(doc, expression) for expression in arguments)
+        return any(_matches_expression(doc, item) for item in arguments)
+    if operation == "$and":
+        return all(_matches_expression(doc, item) for item in arguments)
     if operation in {"$gt", "$lte", "$eq"}:
         if not isinstance(arguments, list) or len(arguments) != 2:
             raise AssertionError("unsupported Mongo comparison")

@@ -129,6 +129,8 @@ services:
       - GAMEFORGE_SEED_ADMIN_EMAIL=${GAMEFORGE_SEED_ADMIN_EMAIL:-}
       - GAMEFORGE_SEED_ADMIN_PASSWORD=${GAMEFORGE_SEED_ADMIN_PASSWORD:-}
       - SKIP_HEAVY_SEED=${SKIP_HEAVY_SEED:-true}
+      # Durable build artifacts share the backend_data volume, never the 64MiB /tmp tmpfs.
+      - GALAXY_BUILDS_VAULT_DIR=/app/data/builds_vault
       - CURIOSITY_DATA_ROOT=/app/data/curiosity
       - CURIOSITY_IDLE_ENABLED=${CURIOSITY_IDLE_ENABLED:-false}
       - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}

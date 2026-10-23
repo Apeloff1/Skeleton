@@ -17,9 +17,12 @@ import ChatModelCapabilities from './ChatModelCapabilities';
 import ChatAnswerDetails from './ChatAnswerDetails';
 import ChatCooperationDetails from './ChatCooperationDetails';
 import ChatResponseReviewControl from './ChatResponseReviewControl';
+import WorkflowTemplatePicker from './WorkflowTemplatePicker';
+import type { WorkflowTemplate } from '../../product/aiWorkflowClient';
 import { cooperationConfigurationIssues, reviewedResponsePolicy } from '../../product/chatCooperation';
 import { chatProgressLabel } from '../../product/chatProgress';
 import { useChatReadiness } from '../../product/useChatReadiness';
+import { chatReadinessMessage } from '../../product/chatSessionClient';
 import { MAX_CONTEXT } from './workspace';
 import { getJeevesRequestContext } from '../../state/settingsStore';
 import ChatTaskActions from './workbench/ChatTaskActions';
@@ -198,7 +201,6 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const [files, setFiles] = useState<Record<string, UploadedFile[]>>({});
   const [attachmentConsent, setAttachmentConsent] = useState(false);
   const [filetreeOpen, setFiletreeOpen] = useState(false);
-  const [selectedTreeNode, setSelectedTreeNode] = useState('chr_16k.chr');
   const [consentChecked, setConsentChecked] = useState(false);
   const [attachmentTypes, setAttachmentTypes] = useState<string[]>([]);
   const [checkingAttachments, setCheckingAttachments] = useState(false);
@@ -215,45 +217,88 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const nearBottom = useRef(true);
   const uploadController = useRef<AbortController | null>(null);
   const mounted = useRef(true);
-  const sending = useRef(false);
-  const creatingRef = useRef(false);
+  const sending = useRef<symbol | null>(null);
+  const creatingRef = useRef<symbol | null>(null);
   const accountToken = getAuthToken();
   const previousAccountToken = useRef(accountToken);
+  const draftAccountScope = useRef<string | null>(null);
+  const recoveryDrafts = useRef(new Map<string, { key: string; text: string }>());
+  const liveController = useRef(controller);
+  liveController.current = controller;
   const threadId = state.activeThread?.thread_id || '__new';
   const threadIdRef = useRef(threadId);
   threadIdRef.current = threadId;
-  const draft = drafts[threadId] || '';
-  const attached = files[threadId] || [];
+  const accountDraftsReady = state.accountScope !== null
+    && (draftAccountScope.current === null || draftAccountScope.current === state.accountScope);
+  const draft = accountDraftsReady ? drafts[threadId] || '' : '';
+  const attached = accountDraftsReady ? files[threadId] || [] : [];
   const busy = ['submitting', 'streaming', 'reconnecting', 'cancelling'].includes(state.status);
   const loading = state.status === 'loading';
   const selectedModel = state.models.find(model => model.id === state.selectedModelId);
   const observedModel = readiness?.models.models.find(model => model.id === selectedModel?.id);
   const modelReady = readiness?.available === true && !!selectedModel?.available && selectedModel.selectable
     && observedModel?.available === true && observedModel.selectable;
-  const answerTokenLimit = Math.min(outputTokens ?? selectedModel?.default_output_tokens ?? 1024, selectedModel?.max_output_tokens ?? 1024);
+  const observedOutputLimit = selectedModel && observedModel
+    ? Math.min(selectedModel.max_output_tokens ?? 0, observedModel.max_output_tokens) : undefined;
+  const answerTokenLimit = Math.min(outputTokens ?? selectedModel?.default_output_tokens ?? 1024, observedOutputLimit ?? 1024);
   const reviewAvailable = readiness?.capabilities.cooperative_review === true;
   const reviewIssues = cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], answerTokenLimit);
   const reviewBudgetReady = !reviewResponse || reviewAvailable && !reviewFieldError && reviewIssues.length === 0;
-  const canSend = !!draft.trim() && !state.pending && !busy && !loading && !uploading && !creating && state.ready && modelReady && reviewBudgetReady && state.activeThread?.state !== 'archived';
+  const canSend = accountDraftsReady && !!draft.trim() && !state.pending && !busy && !loading && !uploading && !creating && state.ready && modelReady && reviewBudgetReady && state.activeThread?.state !== 'archived';
+  const workflowDraftReady = !state.pending && !busy && !loading && !uploading && !creating && state.ready && state.activeThread?.state !== 'archived';
+  const workflowContextKey = JSON.stringify([
+    threadId, state.selectedModelId, modelReady, reviewAvailable, observedOutputLimit,
+    selectedModel?.activation, observedModel?.activation,
+  ]);
+  const workflowUnavailableReason = (value: WorkflowTemplate): string | null => {
+    if (value.surface !== 'chat') return 'Choose a chat template for this composer.';
+    const live = controller.getSnapshot();
+    if (!workflowDraftReady || !live.ready || live.pending || ['loading', 'submitting', 'streaming', 'reconnecting', 'cancelling'].includes(live.status)
+      || live.activeThread?.thread_id !== state.activeThread?.thread_id || live.activeThread?.state === 'archived') return 'Resolve the current turn before changing the next message settings.';
+    if (!modelReady || !Number.isSafeInteger(observedOutputLimit)) return 'Choose an available model and refresh its output limits before applying a template.';
+    if (value.settings.max_tokens > observedOutputLimit!) return `This template needs ${value.settings.max_tokens.toLocaleString()} answer tokens; the selected model permits ${observedOutputLimit!.toLocaleString()}.`;
+    if (value.settings.review_response) {
+      if (!reviewAvailable) return 'Cooperative response review is unavailable for the current account and engine.';
+      return reviewFieldError || cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], value.settings.max_tokens)[0] || null;
+    }
+    return null;
+  };
+  const applyWorkflowTemplate = (value: WorkflowTemplate) => {
+    const reason = workflowUnavailableReason(value);
+    if (reason || value.surface !== 'chat') throw new Error(reason || 'Choose a chat template.');
+    setOutputTokens(value.settings.max_tokens);
+    setReviewResponse(value.settings.review_response);
+  };
   const messages = state.messages.filter(message => message.author_type === 'user' || message.author_type === 'assistant');
+  const attachedMessages = messages.filter(message => message.attachment_refs.some(reference => reference.startsWith('chat-attachment://')));
   const pending = state.pending?.threadId === state.activeThread?.thread_id ? state.pending : null;
   const threadGroups = useMemo(() => groupThreads(state.threads.filter(thread =>
     thread.state === (archived ? 'archived' : 'active') && (!query.trim() || thread.title.toLowerCase().includes(query.trim().toLowerCase()))
   )), [state.threads, archived, query]);
   const notify = useCallback((text: string) => setToast(text), []);
   const run = useCallback((action: () => Promise<void>) => {
-    void action().catch(caught => notify(caught instanceof Error ? caught.message : 'This action could not be completed.'));
-  }, [notify]);
-  const setDraft = (value: string) => setDrafts(current => ({ ...current, [threadId]: value }));
+    void action().catch(caught => {
+      if (accountToken === getAuthToken() && liveController.current === controller) notify(caught instanceof Error ? caught.message : 'This action could not be completed.');
+    });
+  }, [notify, accountToken, controller]);
+  const setDraft = (value: string) => {
+    if (accountDraftsReady && accountToken === getAuthToken() && liveController.current === controller) setDrafts(current => ({ ...current, [threadId]: value }));
+  };
   const scrollToBottom = useCallback((animated = true) => {
     scroll.current?.scrollToEnd({ animated }); nearBottom.current = true; setNewBelow(false);
   }, []);
   const createConversation = useCallback(async () => {
-    if (creatingRef.current || busy || loading || uploading) return;
-    creatingRef.current = true; setCreating(true); setSidebarOpen(false);
-    try { await controller.newConversation(); input.current?.focus(); }
-    finally { creatingRef.current = false; if (mounted.current) setCreating(false); }
-  }, [controller, busy, loading, uploading]);
+    if (accountToken !== getAuthToken() || liveController.current !== controller || creatingRef.current || busy || loading || uploading) return;
+    const operation = Symbol('create-conversation'); creatingRef.current = operation;
+    const creatingAccount = getAuthToken();
+    setCreating(true); setSidebarOpen(false);
+    try {
+      await controller.newConversation();
+      if (creatingAccount === getAuthToken() && liveController.current === controller) input.current?.focus();
+    } finally {
+      if (creatingRef.current === operation) { creatingRef.current = null; if (mounted.current) setCreating(false); }
+    }
+  }, [controller, accountToken, busy, loading, uploading]);
 
   useEffect(() => {
     mounted.current = true;
@@ -267,16 +312,35 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   useEffect(() => {
     if (state.error?.kind !== 'authorization') return;
     uploadController.current?.abort();
-    setDrafts({}); setFiles({}); setManage(null); setAttachmentConsent(false);
+    setFiles({}); setManage(null); setAttachmentConsent(false); setFiletreeOpen(false);
     setReviewResponse(false); setReviewPolicy(reviewedResponsePolicy()); setReviewFieldError(null); setOutputTokens(null);
   }, [state.error?.kind]);
   useEffect(() => {
     if (previousAccountToken.current === accountToken) return;
     previousAccountToken.current = accountToken;
-    uploadController.current?.abort();
-    setDrafts({}); setFiles({}); setManage(null); setAttachmentConsent(false);
+    uploadController.current?.abort(); uploadController.current = null;
+    sending.current = null; creatingRef.current = null;
+    setUploading(false); setCreating(false); setMutationBusy(false); setDialogError(null); setUploadError(null); setToast(null); setModelsOpen(false);
+    setFiles({}); setManage(null); setAttachmentConsent(false); setFiletreeOpen(false);
     setReviewResponse(false); setReviewPolicy(reviewedResponsePolicy()); setReviewFieldError(null); setOutputTokens(null);
   }, [accountToken]);
+  useEffect(() => {
+    if (state.accountScope === null) return;
+    if (draftAccountScope.current !== null && draftAccountScope.current !== state.accountScope) {
+      setDrafts({}); recoveryDrafts.current.clear();
+    }
+    draftAccountScope.current = state.accountScope;
+  }, [state.accountScope]);
+  useEffect(() => {
+    if (!accountDraftsReady || loading) return;
+    const restored = recoveryDrafts.current.get(threadId);
+    if (!restored) return;
+    const admitted = state.pending?.idempotencyKey === restored.key && state.pending.accepted;
+    const settled = !state.pending && state.messages.some(message => message.author_type === 'user' && message.idempotency_key === restored.key);
+    if (!admitted && !settled) return;
+    recoveryDrafts.current.delete(threadId);
+    setDrafts(current => current[threadId] === restored.text ? { ...current, [threadId]: '' } : current);
+  }, [accountDraftsReady, loading, state.pending, state.messages, threadId]);
   useEffect(() => {
     if (!attachmentConsent) return;
     const abort = new AbortController();
@@ -333,7 +397,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   }, [createConversation, compact, mutationBusy, run]);
 
   const send = async () => {
-    if (!canSend || sending.current) return;
+    if (accountToken !== getAuthToken() || liveController.current !== controller || !canSend || sending.current) return;
     let preferenceContext: string;
     try {
       preferenceContext = getJeevesRequestContext('', MAX_CONTEXT);
@@ -341,7 +405,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
       notify(error instanceof Error ? error.message : 'Jeeves preferences exceed the request context bound.');
       return; // Keep the draft and attachments intact.
     }
-    sending.current = true;
+    const operation = Symbol('send-chat'); sending.current = operation;
     const sendingAccount = getAuthToken();
     const text = draft.trim();
     const origin = threadId;
@@ -356,22 +420,50 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         ...(preferenceContext ? { context: preferenceContext } : {}),
       });
       const next = controller.getSnapshot();
-      if (next.pending?.accepted || next.status === 'idle') setFiles(current => ({ ...current, [origin]: [] }));
-      else if (next.error && !next.pending?.accepted && sendingAccount === getAuthToken()) setDrafts(current => current[origin] ? current : { ...current, [origin]: text });
+      if (sendingAccount !== getAuthToken() || liveController.current !== controller) return;
+      if (next.pending || next.status === 'idle') {
+        // The exact saved turn owns its attachment references even when its
+        // submission response is ambiguous. Reuse goes through Resume only.
+        setFiles(current => ({ ...current, [origin]: [] }));
+        if (next.pending && !next.pending.accepted) {
+          const destination = next.pending.threadId;
+          recoveryDrafts.current.set(destination, { key: next.pending.idempotencyKey, text });
+          setDrafts(current => current[destination] ? current : { ...current, [destination]: text });
+        }
+      } else if (next.error) {
+        const destination = origin === '__new' ? next.activeThread?.thread_id ?? origin : origin;
+        setDrafts(current => current[destination] ? current : { ...current, [destination]: text });
+      }
     } catch (caught) {
-      if (sendingAccount === getAuthToken()) setDrafts(current => current[origin] ? current : { ...current, [origin]: text });
-      notify(caught instanceof Error ? caught.message : 'The message could not be sent.');
-    } finally { sending.current = false; }
+      if (sendingAccount === getAuthToken() && liveController.current === controller) {
+        const next = controller.getSnapshot();
+        // A pending turn already preserves the text and original request.
+        // Restore only pre-admission failures to the visible created thread.
+        if (!next.pending) {
+          const destination = origin === '__new' ? next.activeThread?.thread_id ?? origin : origin;
+          setDrafts(current => current[destination] ? current : { ...current, [destination]: text });
+        } else {
+          setFiles(current => ({ ...current, [origin]: [] }));
+          if (!next.pending.accepted) {
+            const destination = next.pending.threadId;
+            recoveryDrafts.current.set(destination, { key: next.pending.idempotencyKey, text });
+            setDrafts(current => current[destination] ? current : { ...current, [destination]: text });
+          }
+        }
+        notify(caught instanceof Error ? caught.message : 'The message could not be sent.');
+      }
+    } finally { if (sending.current === operation) sending.current = null; }
   };
 
   const pickAttachment = async (multiple = false) => {
-    if (uploading || busy || creatingRef.current || !attachmentTypes.length) return;
+    if (accountToken !== getAuthToken() || liveController.current !== controller || uploading || busy || creatingRef.current || !attachmentTypes.length) return;
     setUploading(true); setUploadError(null);
     const origin = threadIdRef.current;
     const uploadingAccount = getAuthToken();
     const abort = new AbortController(); uploadController.current = abort;
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: attachmentTypes, copyToCacheDirectory: true, multiple });
+      if (!mounted.current || abort.signal.aborted || uploadingAccount !== getAuthToken() || liveController.current !== controller) return;
       if (result.canceled) return;
       const existingCount = (files[origin] || []).length;
       const remainingSlots = Math.max(0, 4 - existingCount);
@@ -412,26 +504,29 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     } catch (caught) {
       if (mounted.current && !abort.signal.aborted) setUploadError(caught instanceof Error ? caught.message : 'This file could not be attached.');
     } finally {
-      if (mounted.current) setUploading(false);
-      if (uploadController.current === abort) uploadController.current = null;
+      if (uploadController.current === abort) { uploadController.current = null; if (mounted.current) setUploading(false); }
     }
   };
 
   const removeAttachment = (file: UploadedFile) => {
-    if (!state.activeThread) return;
+    if (accountToken !== getAuthToken() || liveController.current !== controller || !state.activeThread) return;
     const origin = state.activeThread.thread_id;
+    const removingAccount = getAuthToken();
     run(async () => {
       await deleteChatAttachment(file.attachmentRef, origin);
+      if (removingAccount !== getAuthToken() || liveController.current !== controller) return;
       setFiles(current => ({ ...current, [origin]: (current[origin] || []).filter(item => item.attachmentRef !== file.attachmentRef) }));
     });
   };
 
   const manageAction = async (action: 'rename' | 'archive' | 'delete' | 'export') => {
-    if (!manage || mutationBusy) return;
+    if (accountToken !== getAuthToken() || liveController.current !== controller || !manage || mutationBusy) return;
     setMutationBusy(true); setDialogError(null);
     const managingAccount = getAuthToken();
+    const current = () => mounted.current && managingAccount === getAuthToken() && liveController.current === controller;
     try {
       if (controller.getSnapshot().activeThread?.thread_id !== manage.thread.thread_id) await controller.openConversation(manage.thread.thread_id);
+      if (!current()) return;
       const selected = controller.getSnapshot();
       if (selected.activeThread?.thread_id !== manage.thread.thread_id) throw new Error('This conversation could not be opened. Refresh and try again.');
       if (selected.pending && action !== 'export') throw new Error('Finish or stop the reply before changing this conversation.');
@@ -445,14 +540,16 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
       }
       else {
         await controller.remove();
+        if (!current()) return;
         const removed = manage.thread.thread_id;
         setDrafts(current => { const next = { ...current }; delete next[removed]; return next; });
         setFiles(current => { const next = { ...current }; delete next[removed]; return next; });
       }
+      if (!current()) return;
       setManage(null);
       if (action !== 'export') await controller.refreshThreads({ query: query.trim(), includeArchived: archived });
-    } catch (caught) { setDialogError(caught instanceof Error ? caught.message : 'This conversation could not be updated.'); }
-    finally { setMutationBusy(false); }
+    } catch (caught) { if (current()) setDialogError(caught instanceof Error ? caught.message : 'This conversation could not be updated.'); }
+    finally { if (current()) setMutationBusy(false); }
   };
 
   const sidebar = <View style={[s.sidebar, compact && s.mobileSidebar]}>
@@ -519,11 +616,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           <Ionicons name={state.error.kind === 'cancelled' ? 'stop-circle-outline' : 'alert-circle-outline'} size={20} color={state.error.kind === 'cancelled' ? C.textMuted : C.warning} />
           <Text style={s.alertText}>{state.error.message}</Text>
           <IconButton icon="close-outline" label="Dismiss error" onPress={controller.dismissError} /></View>
+          <Text selectable style={s.muted}>{state.error.code}{state.error.requestId ? ` · request ${state.error.requestId}` : ''}</Text>
           <View style={s.row}>{state.error.retryable && <MiniButton icon="refresh-outline" label="Try again" disabled={busy}
             onPress={() => run(async () => {
-              if (state.pending) await controller.retry();
-              else if (state.activeThread) await controller.refreshConversation();
-              else { await controller.refreshThreads(); await controller.refreshModels(); }
+              await controller.reconnect();
             })} />}
             {state.error.kind === 'conflict' && <MiniButton icon="refresh-outline" label="Refresh conversation" disabled={busy}
               onPress={() => run(controller.refreshConversation)} />}
@@ -561,9 +657,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
                 {busy && <View style={s.thinking}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>
                   {state.status === 'cancelling' ? 'Stop requested; waiting for confirmation…' : state.status === 'reconnecting' ? 'Reconnecting to the saved turn…' : pending.streamText ? 'Writing the provisional answer…' : chatProgressLabel(pending.state)}
                 </Text></View>}
-                {!busy && <View style={s.messageActions}><Text style={s.muted}>{pending.state === 'cancelled' ? 'Response stopped' : 'Response interrupted'}</Text>
-                  <MiniButton icon="refresh-outline" label="Retry" onPress={() => run(controller.retry)} />
-                  <MiniButton icon="stop-circle-outline" label="Stop reply" onPress={() => run(controller.cancel)} /></View>}
+                {!busy && <View style={s.messageActions}><Text style={s.muted}>Saved turn; final outcome not confirmed</Text>
+                  <MiniButton icon="cloud-download-outline" label="Check saved turn" onPress={() => run(controller.reconnect)} />
+                  {!pending.stopRequested && <MiniButton icon="refresh-outline" label="Resume saved turn" onPress={() => run(controller.retry)} />}
+                  <MiniButton icon="stop-circle-outline" label={pending.stopRequested ? 'Retry Stop' : 'Stop reply'} onPress={() => run(controller.cancel)} /></View>}
               </View>}
             </View>}
           </ScrollView>}
@@ -572,6 +669,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         <View style={[s.composerArea, compact && s.compactContent]} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}><View style={s.composerColumn}>
           {state.activeThread?.state === 'archived' ? <View style={s.alert}><Text style={s.alertText}>Restore this conversation to continue chatting.</Text>
             <Button icon="arrow-undo-outline" label="Restore conversation" onPress={() => run(() => controller.archive(false))} /></View> : <>
+            {!busy && !loading && !pending && !modelReady && <View style={s.alert}>
+              <Text accessibilityLiveRegion="polite" style={s.alertText}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : readiness?.models.readiness?.message || observedModel?.readiness.message) || 'A ready model and conversation storage are required. Your draft is preserved while you finish setup.'}</Text>
+              <View style={s.row}><MiniButton icon="refresh-outline" label="Check readiness & models" onPress={() => run(async () => { await Promise.all([refreshReadiness(), controller.refreshModels()]); })} /><MiniButton icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><MiniButton icon="hardware-chip-outline" label="Choose model" onPress={() => setModelsOpen(true)} /></View>
+            </View>}
             {!!uploadError && <View style={s.row}><Text style={[s.errorText, { flex: 1 }]} accessibilityRole="alert">{uploadError}</Text><IconButton icon="close-outline" label="Dismiss file error" onPress={() => setUploadError(null)} /></View>}
             <View style={[s.composer, focused && s.focusedComposer]}>
               {!!attached.length && <View style={s.files}>{attached.map(file => <View key={file.attachmentRef} style={s.file}>
@@ -580,6 +681,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
                 <IconButton icon="close-outline" label={`Remove ${file.filename}`} disabled={busy} onPress={() => removeAttachment(file)} />
               </View>)}</View>}
               <TextInput ref={input} value={draft} onChangeText={setDraft} multiline maxLength={MAX_MESSAGE_LENGTH}
+                editable={accountDraftsReady}
                 placeholder={busy ? 'Your next message…' : 'Message Jeeves…'} placeholderTextColor={C.textDim}
                 accessibilityLabel="Message Jeeves" style={s.composerInput} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                 onKeyPress={event => { if (Platform.OS !== 'web') return;
@@ -591,7 +693,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
                   onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
                 <MiniButton icon="cloud-upload-outline" label="Upload all files" disabled={busy || loading || creating || uploading || attached.length >= 4 || !state.ready}
                   onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
-                <MiniButton icon="folder-open-outline" label="Visual filetree" disabled={busy || loading || creating}
+                <MiniButton icon="folder-open-outline" label="Conversation files" disabled={busy || loading || creating}
                   onPress={() => setFiletreeOpen(true)} />
                 {uploading ? <View style={s.row}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>Attaching…</Text>
                   <MiniButton icon="close-outline" label="Cancel" onPress={() => uploadController.current?.abort()} /></View> :
@@ -607,7 +709,9 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
               policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={observedModel}
               fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues}
               refreshModels={async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); }} />
-            <Text style={s.composerHint}>{reviewResponse && !reviewAvailable ? 'Response review is unavailable. Refresh readiness or turn off review to continue.' : !reviewBudgetReady ? reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.' : pending && !busy ? 'Retry or stop the interrupted reply to continue.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
+            <WorkflowTemplatePicker surface="chat" contextKey={workflowContextKey} disabled={!workflowDraftReady}
+              unavailableReason={workflowUnavailableReason} onApply={applyWorkflowTemplate} />
+            <Text style={s.composerHint}>{pending && !busy ? pending.stopRequested ? 'Stop intent is saved. Check the same turn or explicitly retry Stop; Resume will not resubmit it.' : 'Check the saved turn, explicitly resume it, or open another conversation. Its original request stays unchanged.' : reviewResponse && !reviewAvailable ? 'Response review is unavailable. Refresh readiness or turn off review to continue.' : !reviewBudgetReady ? reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
           </>}
         </View></View>
       </View>
@@ -682,33 +786,26 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         <Button icon="cloud-upload-outline" label="Upload all files" primary disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
           onPress={() => { setAttachmentConsent(false); void pickAttachment(true); }} /></View>
     </Dialog>}
-    {filetreeOpen && <Dialog title="Visual filetree" close={() => setFiletreeOpen(false)}>
-      <Text style={s.dialogBody}>Inspect, view, download, or target sectional game creation and decompilation nodes with AI tools.</Text>
+    {filetreeOpen && <Dialog title="Conversation files" close={() => setFiletreeOpen(false)}>
+      <Text style={s.dialogBody}>Files actually attached to this conversation and its next message. Open a file group to read its authorized metadata and text preview.</Text>
       <ScrollView style={s.dialogScroll} contentContainerStyle={s.modelList} keyboardShouldPersistTaps="handled">
-        {[
-          { name: 'hdr_vec.sec', kind: 'binary_section', detail: 'ROM header & interrupt vector table (copyright voided)', tool: 'adaptive_sequential_decompiler' },
-          { name: 'code_bnk0.asm', kind: 'disassembly', detail: 'Sectional CFG & lifted fixed-tick state-machine routines', tool: 'sectional_disassembly_organizer' },
-          { name: 'chr_16k.chr', kind: 'sprite_bank_16k', detail: 'Nuance-resprayed 32k upscale -> 16k quality downscaled sprite bank', tool: 'quality_downscaler_32k_to_16k' },
-          { name: 'pal_nuance.pal', kind: 'palette_bgr555', detail: 'Perceptual hue-shifted 15-bit BGR555 sub-palettes (0.0 overlap)', tool: 'nuance_sprite_resprayer' },
-          { name: 'smw_yoshi_1.lvl', kind: 'smw_mode1_stage', detail: 'Super Mario World Mode-1 26deg/45deg slope & Dragon Coin stage', tool: 'smw_stage_synthesizer' },
-          { name: 'insp_cat.json', kind: 'inspiration_manifest', detail: 'Clean-room copyright-voided inspirational source manifest', tool: 'inspiration_source_cataloguer' },
-        ].map(node => <TouchableOpacity key={node.name} accessibilityRole="button" accessibilityLabel={`Inspect ${node.name}`}
-          accessibilityState={{ selected: selectedTreeNode === node.name }}
-          style={[s.modelItem, selectedTreeNode === node.name && s.selectedModel]}
-          onPress={() => setSelectedTreeNode(node.name)}>
-          <View style={s.between}><Text style={s.modelName}>{node.name}</Text><Text style={s.badge}>{node.kind}</Text></View>
-          <Text style={s.modelDetails}>{node.detail}</Text>
-          <View style={s.row}>
-            <MiniButton icon="eye-outline" label="View / Inspect" onPress={() => { setSelectedTreeNode(node.name); notify(`Inspecting ${node.name}: ${node.detail}`); }} />
-            <MiniButton icon="download-outline" label="Download" onPress={() => notify(`Prepared ${node.name} download.`)} />
-            <MiniButton icon="construct-outline" label="Target with AI tool" onPress={() => {
-              setDraft(`Target filetree node /smw_snes_world/${node.name} with AI tool ${node.tool}`);
-              setFiletreeOpen(false);
-              input.current?.focus();
-            }} />
-          </View>
-        </TouchableOpacity>)}
+        {!!attached.length && <View style={s.modelItem}>
+          <Text style={s.modelName}>Next message · {attached.length} staged files</Text>
+          {attached.map(file => <View key={file.attachmentRef} style={{ gap: 6 }}>
+            <View style={s.between}><Text selectable style={s.modelName}>{file.filename}</Text><Text style={s.badge}>{Math.max(1, Math.ceil(file.sizeBytes / 1024))} KB</Text></View>
+            <Text style={s.modelDetails}>{file.mimeType} · expires {new Date(file.expiresAt).toLocaleString()}</Text>
+            {!!file.preview && <Text selectable numberOfLines={8} style={s.muted}>{file.preview}</Text>}
+          </View>)}
+        </View>}
+        {attachedMessages.slice(-50).map(message => <View key={message.message_id} style={s.modelItem}>
+          <Text numberOfLines={2} style={s.modelName}>{message.content || 'Attached files'}</Text>
+          <Text style={s.modelDetails}>{new Date(message.created_at).toLocaleString()}</Text>
+          <ChatAttachments references={message.attachment_refs.filter(reference => reference.startsWith('chat-attachment://'))} threadId={message.thread_id} />
+        </View>)}
+        {!attached.length && !attachedMessages.length && <Text style={s.muted}>No files are attached to this conversation. Use Attach a file to choose a supported file and acknowledge permission.</Text>}
+        {attachedMessages.length > 50 && <Text style={s.muted}>Showing the latest 50 file groups. Earlier attachments remain available beside their original messages.</Text>}
       </ScrollView>
+      <Text style={s.dialogBody}>This view shows server metadata and previews. Full conversation export is available from Conversation options; attachment bytes are excluded.</Text>
       <View style={s.dialogActions}><Button label="Close" onPress={() => setFiletreeOpen(false)} /></View>
     </Dialog>}
     {!!toast && <View pointerEvents="none" style={s.toast} accessibilityLiveRegion="polite"><Text style={s.toastText}>{toast}</Text></View>}

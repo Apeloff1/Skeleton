@@ -608,5 +608,16 @@
     "implementation_state": "draft",
     "grants": "existing attester grant and allowed tenant/capability configuration; no provider selection or model promotion authority",
     "checkpoint_lifecycle": "bounded numeric controller checkpoints only; admin tenant/model/state+policy CAS with immutable audit; imported state cold starts confidence"
+  },
+  "workflow_template_surface": {
+    "owner_plane": "application-api",
+    "interface": "GET /api/ai/workflow-templates",
+    "contract": "skeleton/contracts/ai_workflows.py",
+    "mode": "authenticated draft configuration projection of existing capabilities; no execution readiness/authority",
+    "surfaces": [
+      "assistant.text composers",
+      "existing studio goal creation",
+      "existing Dragon capture creation"
+    ]
   }
 }

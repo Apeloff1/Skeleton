@@ -223,7 +223,7 @@ async def download_selected_jeeves_source_books(
 async def search_epic_handbooks(
     domain: str = "", treatment: str = "", director: str = "",
     worldline: str = "", phase: str = "", campaign: str = "",
-    chronicle: str = "", epoch: str = "", saga: str = "", epic: str = "",
+    chronicle: str = "", epoch: str = "", saga: str = "", epic: str = "", continuity: str = "",
     offset: int = 0, limit: int = 32, user=Depends(get_current_user),
 ):
     """Authenticated indexed discovery of nine billion bounded virtual manuals."""
@@ -274,6 +274,59 @@ async def read_epic_handbook(
     except StudioError as exc:
         raise HTTPException(404, detail={"code": "unknown_epic_manual",
                                          "message": str(exc)}) from exc
+
+
+
+@router.get("/continuity-handbooks")
+async def search_continuity_handbooks(
+    domain: str = "", treatment: str = "", director: str = "",
+    worldline: str = "", phase: str = "", campaign: str = "",
+    chronicle: str = "", epoch: str = "", continuity: str = "",
+    offset: int = 0, limit: int = 32, user=Depends(get_current_user),
+):
+    """Bounded, authenticated virtual continuity handbook discovery."""
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import list_books
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return list_books(
+            domain=domain, treatment=treatment, director=director,
+            worldline=worldline, phase=phase, campaign=campaign,
+            chronicle=chronicle, epoch=epoch, continuity=continuity,
+            offset=offset, limit=limit,
+        )
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "invalid_continuity_handbook_search", "message": str(exc)}) from exc
+
+
+@router.get("/continuity-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}")
+async def rank_continuity_handbooks(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, chronicle: str, epoch: str,
+    sort: str = "quality", user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import rank_variants
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return rank_variants(domain, treatment, director, worldline, phase, campaign, chronicle, epoch, sort=sort)
+    except StudioError as exc:
+        raise HTTPException(422, detail={"code": "invalid_continuity_handbook_ranking", "message": str(exc)}) from exc
+
+
+@router.get("/continuity-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{continuity}")
+async def read_continuity_handbook(
+    domain: str, treatment: str, director: str, worldline: str,
+    phase: str, campaign: str, chronicle: str, epoch: str, continuity: str,
+    user=Depends(get_current_user),
+):
+    _scope(user)
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import receipt
+    from skeleton.forge.game_frontier_studio import StudioError
+    try:
+        return receipt(domain, treatment, director, worldline, phase, campaign, chronicle, epoch, continuity)
+    except StudioError as exc:
+        raise HTTPException(404, detail={"code": "unknown_continuity_handbook", "message": str(exc)}) from exc
 
 
 @router.get("/saga-handbooks")
@@ -587,9 +640,21 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_chronicle_production import search_chronicles
     from skeleton.forge.game_frontier_studio_epoch_production import search_epochs
     from skeleton.forge.game_frontier_studio_saga_production import search_sagas
+    from skeleton.forge.game_frontier_studio_continuity_production import search_continuities
     from skeleton.forge.game_frontier_studio_epic_variations import search_epics
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "continuity":
+            if query or saga or epic:
+                raise StudioError("continuity discovery uses exact filters and no saga/epic selectors")
+            return search_continuities(
+                domain=domain, system_layer=system_layer, director=director,
+                finish=finish, worldline=worldline, phase=phase,
+                campaign=campaign, chronicle=chronicle, epoch=epoch,
+                continuity=continuity, offset=offset, limit=limit,
+            )
+        if continuity:
+            raise StudioError("continuity selector requires continuity generation")
         if generation == "epic":
             if query:
                 raise StudioError("Epic source search requires exact indexed filters")

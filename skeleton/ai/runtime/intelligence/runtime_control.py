@@ -184,24 +184,33 @@ class RuntimeOptimizationControl:
         }
         # Separate connections share the declared execution database. No
         # process-wide agent, shadow database or autonomous provider is made.
-        self._maintenance = create_studio_maintenance(
-            store_path=Path(raw_path).expanduser().resolve(),
+        store_path = Path(raw_path)
+        if not store_path.is_absolute():
+            # The execution repository passes its literal path to SQLite.
+            # Preserve '~', symlinks and '..' rather than opening a different
+            # database through user expansion or filesystem resolution.
+            store_path = Path.cwd() / store_path
+        maintenance = create_studio_maintenance(
+            store_path=store_path,
             telemetry_probe=self._telemetry,
             host_authorize=self._authorize_maintenance,
             callbacks=callbacks,
             after_verified_chunk=self._acknowledge_learning_chunk,
             maximum_history_events=2_000_000,
         )
-        self._maintenance_unavailable = ""
-        self._maintenance_retryable = False
-        synchronize = getattr(self._maintenance, "synchronize_foreground", None)
-        if callable(synchronize):
-            with self._activity_lock:
-                foreground = self._foreground
-            try:
-                synchronize(foreground)
-            except Exception as exc:
-                self._maintenance_coordination_error = type(exc).__name__
+        with self._activity_lock:
+            # Foreground edges cannot overtake initialization or publish an
+            # older counter snapshot after a newly admitted request. Only
+            # presence synchronization runs here; queue/provider work does not.
+            synchronize = getattr(maintenance, "synchronize_foreground", None)
+            if callable(synchronize):
+                try:
+                    synchronize(self._foreground)
+                except Exception as exc:
+                    self._maintenance_coordination_error = type(exc).__name__
+            self._maintenance = maintenance
+            self._maintenance_unavailable = ""
+            self._maintenance_retryable = False
 
     def _recover_maintenance_initialization(self) -> None:
         if self._maintenance is not None or not self._maintenance_retryable or self._closed:
@@ -335,11 +344,11 @@ class RuntimeOptimizationControl:
             self._foreground += 1
             self._last_activity_ns = time.time_ns()
             self._last_activity_monotonic_ns = time.monotonic_ns()
-        if self._maintenance is not None:
-            try:
-                self._maintenance.foreground_started()
-            except Exception as exc:
-                self._maintenance_coordination_error = type(exc).__name__
+            if self._maintenance is not None:
+                try:
+                    self._maintenance.foreground_started()
+                except Exception as exc:
+                    self._maintenance_coordination_error = type(exc).__name__
 
     def pressure(self) -> float:
         active = queued = capacity = 0
@@ -357,11 +366,11 @@ class RuntimeOptimizationControl:
             self._foreground = max(0, self._foreground - 1)
             self._last_activity_ns = time.time_ns()
             self._last_activity_monotonic_ns = time.monotonic_ns()
-        if self._maintenance is not None:
-            try:
-                self._maintenance.foreground_finished()
-            except Exception as exc:
-                self._maintenance_coordination_error = type(exc).__name__
+            if self._maintenance is not None:
+                try:
+                    self._maintenance.foreground_finished()
+                except Exception as exc:
+                    self._maintenance_coordination_error = type(exc).__name__
         if self._maintenance is None or self._closed:
             return
         if not self._maintenance.policy.enabled:

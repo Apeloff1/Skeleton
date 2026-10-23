@@ -41,6 +41,7 @@ from .game_frontier_studio_campaign_production import CAMPAIGN_ACTIONS, edit_cam
 from .game_frontier_studio_chronicle_production import CHRONICLE_ACTIONS, edit_chronicle
 from .game_frontier_studio_epoch_production import EPOCH_ACTIONS, edit_epoch
 from .game_frontier_studio_saga_production import SAGA_ACTIONS, edit_saga
+from .game_frontier_studio_continuity_production import CONTINUITY_ACTIONS, edit_continuity
 from .game_frontier_studio_epic_variations import EPIC_ACTIONS, edit_epic
 from .game_frontier_studio_quest_terrain_edit import (
     QUEST_ACTIONS, TERRAIN_ACTIONS, edit_quest_structure, edit_terrain,
@@ -232,6 +233,8 @@ def execute_authoring(project: StudioProject, operation: str,
         return edit_chronicle(project, operation, payload, execute_authoring)
     if operation in EPOCH_ACTIONS:
         return edit_epoch(project, operation, payload, execute_authoring)
+    if operation in CONTINUITY_ACTIONS:
+        return edit_continuity(project, operation, payload, execute_authoring)
     if operation in SAGA_ACTIONS:
         return edit_saga(project, operation, payload, execute_authoring)
     if operation in EPIC_ACTIONS:
@@ -333,6 +336,9 @@ def authored_summary(project: StudioProject) -> dict[str, Any]:
         "chronicle_recipe_count": len(CHRONICLE_ACTIONS),
         "epoch_recipe_count": len(EPOCH_ACTIONS),
         "saga_recipe_count": len(SAGA_ACTIONS),
+        # Continuity is a separate supplemental namespace. Keep the shipped
+        # Saga/Epic 50T positional catalogue unchanged for persisted indices.
+        "continuity_recipe_count": len(CONTINUITY_ACTIONS),
         "epic_recipe_count": len(EPIC_ACTIONS),
         "catalog_total": len(AUTHORING_ACTIONS),
         "recipe_search_required": True,

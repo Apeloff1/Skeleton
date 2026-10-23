@@ -224,19 +224,26 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     assert.equal(created.ok, true, `create HTTP ${created.status}`);
     const buildId = validBuildId(created.data?.build_id);
     assert.ok(buildId, 'create must return a safe build_id');
-    const started = await call('POST', '/api/galaxy-studio/start-build', { build_id: buildId, build_duration_minutes: 1 }, ctx.token);
-    assert.equal(started.ok, true, `start-build HTTP ${started.status}`);
+    // The full ten-batch live generator exceeded 60 seconds while generating real assets.
+    // Preserve the complete source-producing flow. CI observed all ten batches finishing
+    // before a three-minute deadline stopped real delivery-floor generation; use a
+    // bounded ten-minute budget for the full workload rather than forging completion.
+    const started = await call('POST', '/api/galaxy-studio/start-build', { build_id: buildId, build_duration_minutes: 10 }, ctx.token);
+    assert.equal(started.ok, true, `start-build HTTP ${started.status}: ${String(started.data?.detail?.code || started.data?.detail || "unavailable").slice(0, 240)}`);
     ctx.buildId = buildId;
   });
   await t.test('F4-05 watch the live build to completed', async () => {
     need('buildId');
     const maxChecks = Number(process.env.SKELETON_E2E_MAX_CHECKS || 120);
+    let lastStatus = null;
     const outcome = await watchBuildJob(async () => {
-      const s = await call('GET', `/api/galaxy-studio/status/${ctx.buildId}`, undefined, ctx.token);
-      return s.ok ? { data: s.data } : { ok: false };
+      const response = await call('GET', `/api/galaxy-studio/status/${ctx.buildId}`, undefined, ctx.token);
+      if (response.ok) lastStatus = response.data;
+      return response.ok ? { data: response.data } : { ok: false };
     }, { intervalMs: 2_000, maxIntervalMs: 10_000, maxChecks });
-    t.diagnostic(`watch outcome: ${outcome.phase} after ${outcome.checks} checks`);
-    assert.equal(outcome.phase, 'completed', outcome.message);
+    const reason = String(lastStatus?.execution?.stop_reason || lastStatus?.redundancy?.error_details?.at(-1)?.code || lastStatus?.error || 'none').slice(0, 160);
+    t.diagnostic(`watch outcome: ${outcome.phase}; checks=${outcome.checks}; stop_reason=${reason}`);
+    assert.equal(outcome.phase, 'completed', `${outcome.message}; stop_reason=${reason}`);
     ctx.completed = true;
   });
   await t.test('F5-04 new build appears in the library', async () => {

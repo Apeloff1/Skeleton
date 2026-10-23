@@ -776,6 +776,8 @@ class LlamaCppModel:
             self.model_id != self._admitted_model_id
             or not _stat_matches(self._runtime)
             or not _stat_matches(self._model)
+            or not os.access(self._runtime.path, os.R_OK | os.X_OK)
+            or not os.access(self._model.path, os.R_OK)
             or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
         ):
             raise LlamaCppRuntimeError("activated local runtime/model file changed or is unavailable")
