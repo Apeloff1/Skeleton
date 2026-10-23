@@ -129,7 +129,7 @@ def plan_mirrors(
             if target.is_symlink():
                 raise ValueError("destination symlink is prohibited")
             if target.exists():
-                if local not in facades and not _equivalent(original, target):
+                if mapping.get("parity_mode") != "compatibility_facade" and local not in facades and not _equivalent(original, target):
                     conflicts[dest_rel] = {
                         "source": src_rel, "destination": dest_rel,
                         "reason": "existing destination differs; never overwrite",
