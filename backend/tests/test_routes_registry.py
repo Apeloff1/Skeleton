@@ -305,6 +305,7 @@ def test_noop_router_inclusion_never_claims_a_capability(monkeypatch) -> None:
     assert report["skipped"] == 1
     assert report["mounted_names"] == []
     assert "routes.unmounted_leaf (empty_router)" in report["skipped_names"]
+    assert not any(getattr(item, "original_router", None) is leaf for item in app.routes)
 
 
 
@@ -379,3 +380,4 @@ def test_unrelated_mount_cannot_fabricate_registered_capability(monkeypatch) -> 
     assert report["ok"] == 0
     assert report["skipped"] == 1
     assert report["mounted_names"] == []
+    assert not any(getattr(item, "original_router", None) is unrelated for item in app.routes)
