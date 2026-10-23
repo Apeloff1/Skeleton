@@ -60,3 +60,41 @@ def test_empty_raises():
 def test_bound_rejects_zero():
     with pytest.raises(HistoryQueryError):
         HistoryBound(max_entries=0)
+
+
+
+def test_corrupt_head_never_becomes_new_authoritative_chain():
+    history = SnapshotHistory()
+    _fill(history, 4)
+    history.head = "0" * 64
+    original_entries = list(history.entries)
+    with pytest.raises(HistoryQueryError, match="verify"):
+        compact(history, HistoryBound(max_entries=2))
+    assert history.entries == original_entries
+    assert history.head == "0" * 64
+
+
+def test_reject_tampered_snapshots_even_for_read_only_queries():
+    history = SnapshotHistory()
+    _fill(history, 3)
+    history.entries.reverse()
+    with pytest.raises(HistoryQueryError, match="verify"):
+        at(history, 0)
+    with pytest.raises(HistoryQueryError, match="verify"):
+        latest(history)
+
+
+def test_invalid_index_type_denied_without_coercion():
+    history = SnapshotHistory()
+    _fill(history, 2)
+    for value in (True, 1.0, "1", -1):
+        with pytest.raises(HistoryQueryError):
+            at(history, value)
+
+
+def test_noop_compaction_still_refuses_corrupted_history():
+    history = SnapshotHistory()
+    _fill(history, 2)
+    history.head = "0" * 64
+    with pytest.raises(HistoryQueryError, match="verify"):
+        compact(history, HistoryBound(max_entries=5))
