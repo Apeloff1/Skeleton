@@ -162,7 +162,8 @@ class NativeWorldSourceTests(TestCase):
         self.assertIn('load("res://game/frontier/expedition.tscn")', script)
         self.assertIn('get_node_or_null("OriginalMeshInstances")', script)
         self.assertIn('camera.global_position = Vector3(', script)
-        self.assertIn('streamer._process(0.016)', script)
+        # Godot dispatches the streamer via call() on both camera passes.
+        self.assertEqual(script.count('streamer.call("_process", 0.016)'), 2)
         self.assertIn("node.get_parent() != streamer", script)
         self.assertIn("pinned physics body was never instantiated", script)
         self.assertIn("stateful body was evicted or rebuilt", script)
