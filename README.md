@@ -195,6 +195,14 @@ now accepts artifacts, GGUF deployments and catalogs, prepares read-only contain
 bindings, supplies required startup secrets and supports explicit administrator
 bootstrap. Runtime status reports model draining, bounded restart recovery,
 learner retention and failed-maintenance retry eligibility.
+Local identity/token preparation shares admitted worker capacity with generation.
+Shutdown retains native workers, lifecycle leases and finalization dependencies
+until drain is established. Reconnect inspects existing chat work; ambiguous
+requests keep their identity and explicit Stop intent. Setup shows database health
+before sign-in and clears account-specific observations when the account changes.
+See [failure recovery and artifact operations](docs/ai/AI_FOUNDATIONS_AND_RECOVERY.md)
+for partial expansion/package results, interrupted cleanup and uncertain remote
+submissions. These source changes remain unqualified for runtime reliability.
 The advanced policy form uses the server's actual editable fields and installed
 capacity limits. Administrators can also preview and download bounded pages of
 retained numeric learning data, and reset an eligible maintenance circuit against
@@ -224,6 +232,12 @@ rejected and restored rounds for the next planning decision.
 The crawler source library supports individual withdrawal and capture-age limits.
 Jeeves excludes withdrawn, expired and stale captures; changing source policy
 invalidates old reference pins until the source is reviewed again.
+
+**Workflow templates** now stage bounded settings in chat, studio goal creation
+and Dragon capture forms. They preserve your content and permissions and require
+ordinary submission before work starts. Runtime inspection adds activated local
+limits, scoped learner explanations and maintenance scheduling blockers. See
+[AI workflow foundations and recovery](docs/ai/AI_FOUNDATIONS_AND_RECOVERY.md).
 
 See [crawler, builder and training operations](docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md)
 and [native prerequisites](docs/ai/STUDIO_INSTALLATION_AND_NATIVE_READINESS.md).

@@ -70,6 +70,63 @@ class EngineRequestRejectedError(EngineProtocolError):
     """A bounded control update failed canonical engine policy validation."""
 
 
+def _bounded_engine_json(content: bytearray) -> dict[str, Any]:
+    """Decode one bounded engine envelope without ambiguous scalar identities."""
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if not key.isascii() and any(0xD800 <= ord(character) <= 0xDFFF for character in key):
+                raise ValueError("invalid Unicode engine envelope key")
+            if key in value:
+                raise ValueError("duplicate engine envelope key")
+            value[key] = item
+        return value
+
+    def reject_constant(_value: str) -> None:
+        raise ValueError("non-finite engine constant")
+
+    def finite_float(value: str) -> float:
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("non-finite engine number")
+        return number
+
+    try:
+        payload = json.loads(
+            content.decode("utf-8"),
+            object_pairs_hook=unique_object,
+            parse_constant=reject_constant,
+            parse_float=finite_float,
+        )
+    except (ValueError, UnicodeError, RecursionError, OverflowError) as exc:
+        raise EngineProtocolError("engine returned invalid finite UTF-8 JSON") from exc
+    if not isinstance(payload, dict):
+        raise EngineProtocolError("engine response must be an object")
+    pending = [(payload, 0)]
+    nodes = 0
+    while pending:
+        item, depth = pending.pop()
+        nodes += 1
+        if depth > 96 or nodes > 262_144:
+            raise EngineProtocolError("engine response exceeds its structure bound")
+        if (
+            isinstance(item, str)
+            and not item.isascii()
+            and any(0xD800 <= ord(character) <= 0xDFFF for character in item)
+        ):
+            raise EngineProtocolError("engine response contains invalid Unicode")
+        if isinstance(item, dict):
+            if nodes + len(pending) + len(item) > 262_144:
+                raise EngineProtocolError("engine response exceeds its structure bound")
+            pending.extend((child, depth + 1) for child in item.values())
+        elif isinstance(item, list):
+            if nodes + len(pending) + len(item) > 262_144:
+                raise EngineProtocolError("engine response exceeds its structure bound")
+            pending.extend((child, depth + 1) for child in item)
+    return payload
+
+
 class EngineExecutionFailed(EngineClientError):
     """A submitted engine execution reached a non-success terminal state."""
 
@@ -434,13 +491,17 @@ class EngineTerminalResult:
     def from_payload(cls, payload: Mapping[str, Any]) -> "EngineTerminalResult":
         body = _json_object(payload, "result")
         status = _text(body.get("status"), "result.status", maximum=64)
+        if status not in {"completed", "degraded", "failed", "cancelled"}:
+            raise EngineProtocolError("engine result status is not terminal")
+        operation_id = _text(body.get("operation_id"), "result.operation_id", maximum=192)
+        execution_id = _text(body.get("execution_id"), "result.execution_id", maximum=192)
         if status != "completed":
             _json_object(body.get("usage", {}), "result.usage")
             failure_code = execution_failure_code(body)
             raise EngineExecutionFailed(
                 "engine execution did not complete successfully"
                 + (" (" + failure_code + ")" if failure_code else ""),
-                execution_id=str(body.get("execution_id") or ""),
+                execution_id=execution_id,
                 status=status,
                 failure_code=failure_code,
                 result=body,
@@ -464,16 +525,8 @@ class EngineTerminalResult:
             return tuple(dict.fromkeys(item.strip() for item in raw))
 
         return cls(
-            operation_id=_text(
-                body.get("operation_id"),
-                "result.operation_id",
-                maximum=192,
-            ),
-            execution_id=_text(
-                body.get("execution_id"),
-                "result.execution_id",
-                maximum=192,
-            ),
+            operation_id=operation_id,
+            execution_id=execution_id,
             status=status,
             final_output=final_output.strip(),
             usage=_json_object(body.get("usage", {}), "result.usage"),
@@ -1004,6 +1057,7 @@ class EngineClient:
     """Bounded async HTTP client for the canonical engine API."""
 
     _TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
+    _MAX_CANCEL_CLEANUPS = 64
 
     def __init__(
         self,
@@ -1015,6 +1069,7 @@ class EngineClient:
             raise TypeError("config must be EngineClientConfig")
         self.config = config
         self._transport = transport
+        self._cancel_cleanups: dict[tuple[str, str, str], asyncio.Task[Any]] = {}
 
     @classmethod
     def from_env(
@@ -1040,6 +1095,9 @@ class EngineClient:
             "authorization": "Bearer " + token,
             "x-zaibatsu-attester": self.config.service_principal,
             "accept": "application/json",
+            # Bound wire bytes directly. Do not allow a compressed response to
+            # expand before the application can apply its response ceiling.
+            "accept-encoding": "identity",
         }
         if trace_id:
             headers["x-trace-id"] = _text(
@@ -1060,25 +1118,6 @@ class EngineClient:
         max_response_bytes: int | None = None,
         surface_validation_rejection: bool = False,
     ) -> dict[str, Any]:
-        timeout = httpx.Timeout(self.config.request_timeout_s)
-        try:
-            async with httpx.AsyncClient(
-                timeout=timeout,
-                transport=self._transport,
-                follow_redirects=False,
-            ) as client:
-                response = await client.request(
-                    method,
-                    self._url(suffix),
-                    headers=self._headers(trace_id=trace_id),
-                    json=None if json_body is None else dict(json_body),
-                    params=None if params is None else dict(params),
-                )
-        except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise EngineUnavailableError("engine transport is unavailable") from exc
-        except httpx.HTTPError as exc:
-            raise EngineUnavailableError("engine transport failed") from exc
-
         response_limit = (
             self.config.max_response_bytes
             if max_response_bytes is None
@@ -1088,36 +1127,60 @@ class EngineClient:
                 maximum=128 * 1024 * 1024,
             )
         )
-        content_length = response.headers.get("content-length")
-        if content_length is not None:
-            try:
-                advertised = int(content_length)
-            except ValueError as exc:
-                raise EngineProtocolError("engine content-length is invalid") from exc
-            if advertised > response_limit:
-                raise EngineProtocolError("engine response exceeds configured size bound")
-        if len(response.content) > response_limit:
-            raise EngineProtocolError("engine response exceeds configured size bound")
-
-        if response.status_code == 404:
-            raise EngineNotFoundError("engine resource was not found")
-        if response.status_code == 409:
-            raise EngineConflictError("engine rejected conflicting request")
-        if response.status_code in {401, 403}:
-            raise EngineAuthorizationError("engine rejected delegated authority")
-        if response.status_code >= 500:
-            raise EngineUnavailableError("engine service is unavailable")
-        if surface_validation_rejection and response.status_code in {400, 422}:
-            raise EngineRequestRejectedError("engine rejected runtime control policy")
-        if response.status_code >= 400:
-            raise EngineProtocolError(f"engine rejected request with status {response.status_code}")
+        timeout = httpx.Timeout(self.config.request_timeout_s)
+        content = bytearray()
         try:
-            payload = response.json()
-        except ValueError as exc:
-            raise EngineProtocolError("engine returned invalid JSON") from exc
-        if not isinstance(payload, Mapping):
-            raise EngineProtocolError("engine response must be an object")
-        return dict(payload)
+            # HTTPX read timeouts alone can be renewed by a trickling peer.
+            # The existing request allowance covers the entire response.
+            async with asyncio.timeout(self.config.request_timeout_s):
+                async with httpx.AsyncClient(
+                    timeout=timeout,
+                    transport=self._transport,
+                    follow_redirects=False,
+                ) as client:
+                    async with client.stream(
+                        method,
+                        self._url(suffix),
+                        headers=self._headers(trace_id=trace_id),
+                        json=None if json_body is None else dict(json_body),
+                        params=None if params is None else dict(params),
+                    ) as response:
+                        content_length = response.headers.get("content-length")
+                        if content_length is not None:
+                            if not re.fullmatch(r"[0-9]{1,20}", content_length):
+                                raise EngineProtocolError("engine content-length is invalid")
+                            if int(content_length) > response_limit:
+                                raise EngineProtocolError("engine response exceeds configured size bound")
+                        if response.headers.get("content-encoding", "identity").strip().lower() not in {
+                            "",
+                            "identity",
+                        }:
+                            raise EngineProtocolError("engine response must use identity content encoding")
+                        if response.status_code == 404:
+                            raise EngineNotFoundError("engine resource was not found")
+                        if response.status_code == 409:
+                            raise EngineConflictError("engine rejected conflicting request")
+                        if response.status_code in {401, 403}:
+                            raise EngineAuthorizationError("engine rejected delegated authority")
+                        if response.status_code >= 500:
+                            raise EngineUnavailableError("engine service is unavailable")
+                        if surface_validation_rejection and response.status_code in {400, 422}:
+                            raise EngineRequestRejectedError("engine rejected runtime control policy")
+                        if response.status_code >= 400:
+                            raise EngineProtocolError(
+                                f"engine rejected request with status {response.status_code}"
+                            )
+                        if not 200 <= response.status_code < 300:
+                            raise EngineProtocolError("engine returned an unexpected non-success response")
+                        async for chunk in response.aiter_bytes(chunk_size=min(65_536, response_limit + 1)):
+                            if len(content) + len(chunk) > response_limit:
+                                raise EngineProtocolError("engine response exceeds configured size bound")
+                            content.extend(chunk)
+        except (TimeoutError, httpx.TimeoutException, httpx.NetworkError) as exc:
+            raise EngineUnavailableError("engine transport is unavailable") from exc
+        except httpx.HTTPError as exc:
+            raise EngineUnavailableError("engine transport failed") from exc
+        return _bounded_engine_json(content)
 
     @staticmethod
     def _validate_image_payload(
@@ -2471,6 +2534,8 @@ class EngineClient:
                 raise EngineProtocolError("engine event stream is not strictly ordered")
             last_sequence = sequence
             if event.get("type") == "execution.result":
+                if result is not None:
+                    raise EngineProtocolError("engine event stream contains multiple terminal results")
                 candidate = event.get("result")
                 if not isinstance(candidate, Mapping):
                     raise EngineProtocolError("execution.result event is malformed")
@@ -2493,6 +2558,9 @@ class EngineClient:
             tenant_id=tenant_id,
             trace_id=trace_id,
         )
+        if _text(status.get("execution_id"), "status.execution_id", maximum=192) != execution_id:
+            raise EngineProtocolError("terminal status execution identity mismatch")
+        operation_id = _text(status.get("operation_id"), "status.operation_id", maximum=192)
         state = _text(
             status.get("execution_state"),
             "execution_state",
@@ -2507,9 +2575,25 @@ class EngineClient:
             tenant_id=tenant_id,
             trace_id=trace_id,
         )
+        if events.get("execution_id") != execution_id:
+            raise EngineProtocolError("terminal event projection execution identity mismatch")
         result = self._result_from_events(events)
         if result is None:
             raise EngineProtocolError("terminal engine execution is missing result event")
+        if (
+            _text(result.get("execution_id"), "result.execution_id", maximum=192) != execution_id
+            or _text(result.get("operation_id"), "result.operation_id", maximum=192) != operation_id
+        ):
+            raise EngineProtocolError("terminal result execution/operation identity mismatch")
+        result_status = _text(result.get("status"), "result.status", maximum=64)
+        # Qualified/abstained results retain status=degraded while their
+        # execution reaches COMPLETED. They still follow the existing
+        # non-success publication policy; no other terminal pair may disagree.
+        expected_statuses = {"completed", "degraded"} if state == "completed" else {state}
+        if result_status not in expected_statuses or (
+            status.get("result_status") is not None and status["result_status"] != result_status
+        ):
+            raise EngineProtocolError("terminal result status conflicts with execution status")
         if state != "completed":
             failure_code = execution_failure_code(result)
             if failure_code is None and status.get("failure_code") is not None:
@@ -2547,23 +2631,33 @@ class EngineClient:
         )
         started = monotonic()
         attempts = 0
-        while True:
-            attempts += 1
-            if attempts > self.config.max_poll_attempts:
-                raise EngineUnavailableError("engine polling budget exhausted")
-            if monotonic() - started > timeout:
-                raise EngineUnavailableError("engine execution did not reach terminal state in time")
+        try:
+            # One poll can read status, events and the terminal result. Their
+            # individual HTTP deadlines cannot extend this aggregate wait.
+            async with asyncio.timeout(timeout):
+                while True:
+                    attempts += 1
+                    if attempts > self.config.max_poll_attempts:
+                        raise EngineUnavailableError("engine polling budget exhausted")
+                    if monotonic() - started >= timeout:
+                        raise EngineUnavailableError("engine execution did not reach terminal state in time")
 
-            terminal = await self.terminal_result_if_available(
-                execution_id=execution_id,
-                actor_id=actor_id,
-                tenant_id=tenant_id,
-                trace_id=trace_id,
-            )
-            if terminal is not None:
-                return terminal
+                    terminal = await self.terminal_result_if_available(
+                        execution_id=execution_id,
+                        actor_id=actor_id,
+                        tenant_id=tenant_id,
+                        trace_id=trace_id,
+                    )
+                    if terminal is not None:
+                        if monotonic() - started >= timeout:
+                            raise EngineUnavailableError(
+                                "engine execution did not reach terminal state in time"
+                            )
+                        return terminal
 
-            await asyncio.sleep(self.config.poll_interval_s)
+                    await asyncio.sleep(self.config.poll_interval_s)
+        except TimeoutError as exc:
+            raise EngineUnavailableError("engine execution did not reach terminal state in time") from exc
 
     async def _recover_ambiguous_submit(
         self,
@@ -2624,7 +2718,18 @@ class EngineClient:
     ) -> None:
         """Best-effort bounded durable cancellation after caller interruption."""
 
-        try:
+        identity = (
+            command.operation.tenant_id,
+            command.operation.actor_id,
+            command.execution_request.execution_id,
+        )
+        cleanup = self._cancel_cleanups.get(identity)
+        if cleanup is None:
+            # Each request has its own absolute transport deadline. Retain and
+            # observe cleanup until that deadline, without allowing repeated
+            # disconnects to create unlimited detached requests.
+            if len(self._cancel_cleanups) >= self._MAX_CANCEL_CLEANUPS:
+                return
             cleanup = asyncio.create_task(
                 self.cancel(
                     command.execution_request.execution_id,
@@ -2634,15 +2739,27 @@ class EngineClient:
                     trace_id=command.operation.trace_id,
                 )
             )
+            self._cancel_cleanups[identity] = cleanup
+
+            def observe_cleanup(finished: asyncio.Task[Any]) -> None:
+                if self._cancel_cleanups.get(identity) is finished:
+                    self._cancel_cleanups.pop(identity, None)
+                if not finished.cancelled():
+                    finished.exception()
+
+            cleanup.add_done_callback(observe_cleanup)
+
+        # A client can outlive an application-loop restart. An already admitted
+        # cleanup on another loop is never a reason to issue another cancel or
+        # to await a foreign-loop task during caller cancellation.
+        if cleanup.get_loop() is not asyncio.get_running_loop():
+            return
+        try:
             await asyncio.wait_for(
                 asyncio.shield(cleanup),
                 timeout=min(self.config.request_timeout_s, 5.0),
             )
-        except (
-            asyncio.TimeoutError,
-            EngineClientError,
-            httpx.HTTPError,
-        ):
+        except (asyncio.CancelledError, Exception):
             # The caller cancellation remains primary. The engine execution is
             # durable, so a failed cleanup request can still be reconciled by
             # explicit status/cancel or server-side deadline/recovery policy.

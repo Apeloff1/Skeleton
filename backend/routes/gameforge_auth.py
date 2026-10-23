@@ -138,6 +138,7 @@ def seed_admin() -> None:
                     "$set": fields,
                     "$setOnInsert": {
                         "email": seed.email,
+                        "tenant_id": "default",
                         "created_at": datetime.now(timezone.utc),
                     },
                 },
@@ -235,6 +236,7 @@ def register(body: RegisterIn):
     users.insert_one(
         {
             "email": body.email.lower(),
+            "tenant_id": "default",
             "password_hash": hash_password(body.password),
             "role": "viewer",
             "disabled": False,
@@ -321,6 +323,7 @@ async def google_session(body: SessionIn):
         users.insert_one(
             {
                 "email": email,
+                "tenant_id": "default",
                 "role": role,
                 "auth": "google",
                 "disabled": False,

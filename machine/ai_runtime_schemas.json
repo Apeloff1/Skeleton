@@ -2671,6 +2671,296 @@
         "Envelope schema skeleton.ai.runtime_maintenance_circuit_reset.v1 echoes actor/tenant/kind and returns result plus current runtime; result closed/failures0/open_until_ns0 and generation expected+1.",
         "Result includes exact scope_id,kind,generation,source_digest,failure_digest,deduplicated; snapshot reports explicit resettable/reset_reason. No HTTP auto-retry."
       ]
+    },
+    "AIWorkflowTemplate": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "schema_version": {
+          "type": "string",
+          "enum": [
+            "skeleton.ai.workflow_template.v1"
+          ]
+        },
+        "template_id": {
+          "type": "string",
+          "max_length": 96
+        },
+        "revision": {
+          "type": "PositiveInt",
+          "maximum": 1000000
+        },
+        "surface": {
+          "type": "string",
+          "enum": [
+            "chat",
+            "studio",
+            "crawler"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "max_length": 80
+        },
+        "description": {
+          "type": "string",
+          "max_length": 512
+        },
+        "settings": {
+          "type": "JsonObject"
+        },
+        "requirements": {
+          "type": "array<string>",
+          "max_items": 8
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "draft_only"
+          ]
+        },
+        "execution_authorized": {
+          "type": "boolean"
+        },
+        "template_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "execution_authorized is always false; templates only stage bounded draft settings after explicit apply.",
+        "skeleton/contracts/ai_workflows.py owns immutable exact per-surface setting whitelists; no prompt, URL, model, credential, consent, edit/run/quality/automation grant is a template field.",
+        "Canonical JSON and each template/catalog digest are verified before an account-bound Apply; a changed model/thread/project/catalog invalidates pending Apply.",
+        "The existing command owner revalidates actual model capacity, current project state, authorization and consent on submission; catalog availability is not execution readiness."
+      ]
+    },
+    "AIWorkflowCatalogEnvelope": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "schema_version": {
+          "type": "string",
+          "enum": [
+            "skeleton.ai.workflow_templates.v1"
+          ]
+        },
+        "actor_id": {
+          "type": "string",
+          "max_length": 512
+        },
+        "tenant_id": {
+          "type": "string",
+          "max_length": 512
+        },
+        "catalog": {
+          "type": "JsonObject",
+          "maximum_serialized_bytes": 65536
+        }
+      },
+      "invariants": [
+        "Authenticated viewer observation, no-store response, no provider calls, durable writes, artifact generation or workflow execution.",
+        "Catalog skeleton.ai.workflow_catalog.v1 has at most16 templates, bounded revision and catalog_digest; execution_authorized=false.",
+        "Fresh account scope is checked for inspection and explicit Apply; metadata fails closed on unknown fields, malformed finite budgets, invalid Unicode or mismatched digests."
+      ]
+    },
+    "LocalInferenceExecutionContract": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "schema_version": {
+          "type": "string",
+          "enum": [
+            "skeleton.local_inference.execution_contract.v1"
+          ]
+        },
+        "provider_id": {
+          "type": "string",
+          "max_length": 128
+        },
+        "model_id": {
+          "type": "string",
+          "max_length": 256
+        },
+        "source_model_id": {
+          "type": "string",
+          "max_length": 256
+        },
+        "model_digest": {
+          "type": "Digest256"
+        },
+        "runtime_digest": {
+          "type": "Digest256",
+          "nullable": true
+        },
+        "execution_profile_digest": {
+          "type": "Digest256",
+          "nullable": true
+        },
+        "generation_limits": {
+          "type": "JsonObject"
+        },
+        "protocols": {
+          "type": "array<string>",
+          "max_items": 32
+        },
+        "input_accounting": {
+          "type": "JsonObject"
+        },
+        "capacity": {
+          "type": "JsonObject"
+        },
+        "lifecycle": {
+          "type": "JsonObject"
+        },
+        "contract_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "Side-effect-free projection from activated model/protocol/operator limits, not a new provider activation or readiness authority.",
+        "Generation/input budgets are enforced by the same owner-local finite validator before generation; identity/token preparation uses fair admitted physical workers, and status inspection never performs runtime tokenization.",
+        "Source model identity may differ from a configured route alias; the activated model digest pins the contract.",
+        "Native event sequence, streamed token IDs and terminal/replay identity consistency are checked before output/cache publication; these are not independent semantic correctness proofs.",
+        "Cancellation, absolute deadlines and physical worker custody remain authoritative.",
+        "Cache/coalescing identities pin each original provider resource ceiling; a low-budget leader cannot poison another independently valid request.",
+        "Permanent close denies replacement admission and awaits native preflight/generation drain. Coordinator shutdown includes deduplicated verifier engines and retains host/database/finalization dependencies until exact physical custody is discharged."
+      ]
+    },
+    "RuntimeLearningExplanation": {
+      "schema_version": 1,
+      "owner_plane": "orchestration",
+      "fields": {
+        "schema_version": {
+          "type": "string",
+          "enum": [
+            "skeleton.runtime.learning.explanation.v1"
+          ]
+        },
+        "advisory_only": {
+          "type": "boolean"
+        },
+        "basis": {
+          "type": "string",
+          "enum": [
+            "retained_numeric_replay",
+            "current_request"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "analytic_local_partial_derivative"
+          ]
+        },
+        "feature_schema": {
+          "type": "string"
+        },
+        "predictor_digest": {
+          "type": "Digest256"
+        },
+        "input_digest": {
+          "type": "Digest256"
+        },
+        "policy_digest": {
+          "type": "Digest256"
+        },
+        "binding": {
+          "type": "JsonObject"
+        },
+        "outputs": {
+          "type": "array<JsonObject>",
+          "max_items": 3
+        },
+        "explanation_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "Optional null when learner evidence is stale, corrupt or not ready; diagnostics never update weights, policy, grants or stored maintenance receipts.",
+        "Three operational outputs each expose at most4 of12 normalized feature sensitivities; signed finite derivatives in[-16384,16384] are local predictor behavior, not causal importance or creative/factual quality.",
+        "Binding pins tenant/scope/partition/model/state and actual tenant learner policy version/digest; this version differs from global runtime-control policy version.",
+        "A retained replay sample is checkpoint-bound with exact sample/outcome digests; latest state source provenance is not falsely attributed to that older sample.",
+        "Whole predictor digest must verify before any embedded checkpoint salvage; checkpoint replay samples require canonical feedback/execution provenance beyond retained diagnostic hashes."
+      ]
+    },
+    "MaintenanceReadOnlyInspection": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "handler_registry": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "queue_summary": {
+          "type": "JsonObject",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "Existing scoped snapshot only; at most5 registered local kinds and100 returned task scheduling projections.",
+        "Queue ages/backoff/due observations use last persisted host logical clock; finite epoch nanoseconds can exceed browser safe-integer precision and are advisory observations only.",
+        "execution_authority=none and host_admission_required=true; awaiting_host_admission never asserts that work is currently eligible.",
+        "Inspection never invokes host callbacks, probes workers, advances clocks, reserves work or writes state.",
+        "Malformed optional display diagnostics remain explicitly unavailable while existing policy CAS and scope checks remain authoritative."
+      ]
+    },
+    "GalaxyArtifactExecutionObservation": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "operation": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 32
+        },
+        "operation_status": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "running",
+            "stopping",
+            "completed",
+            "failed",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "runner_live": {
+          "type": "boolean"
+        },
+        "physical_workers": {
+          "type": "integer",
+          "min": 0
+        },
+        "stop_requested": {
+          "type": "boolean"
+        },
+        "stop_reason": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 128
+        },
+        "drain_pending": {
+          "type": "boolean"
+        },
+        "partial_artifacts": {
+          "type": "boolean"
+        },
+        "unflushed_files": {
+          "type": "integer",
+          "min": 0
+        },
+        "storage_failed": {
+          "type": "boolean"
+        }
+      },
+      "invariants": [
+        "Additive fields of the existing Galaxy status execution projection; no independent command or grant.",
+        "Main game phase completion is independent of later ZIP, expansion and APK operation completion.",
+        "Persisted active metadata without actual local custody projects unknown; stale heartbeat and elapsed time never establish drain.",
+        "Current operation stop/failure and partial artifacts retain physical custody until native work settles; no successful output is inferred from elapsed time or HTTP command acknowledgement.",
+        "Queued APK preparation is not remote submission. Durable submission intent and a service-acknowledged remote build ID distinguish preparation, acknowledged work and unresolved side effects.",
+        "Artifact admission is the existing process-local build owner; this does not establish distributed consensus or multi-host fencing."
+      ]
     }
   },
   "cross_record_invariants": [

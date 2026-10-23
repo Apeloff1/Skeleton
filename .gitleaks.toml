@@ -108,3 +108,10 @@ description = "Inherited generic API key rule with Skeleton documentation false-
     '^\s*"normal-api-requests\.json": "2e93eb5e78e85813323f81125fb256c979b678469acb73cd1cabf0703474f829",?$'
   ]
   paths = ['^machine/ai_first_install_session_evidence_2026-10-15\.json$']
+
+  [[rules.allowlists]]
+  description = "Historical fixed local tokenizer enum branch; reviewed non-credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*elif tokenizer == "utf8_bytes_upper_bound" or not counter:$''']
+  paths = ['''^skeleton/ai/runtime/inference/local\.py$''']

@@ -53,6 +53,15 @@ configured account to manage roles through the existing administrator authority.
 There is no shared default administrator password or automatic first-user
 elevation.
 
+New password, OAuth and bootstrap accounts explicitly belong to the existing
+`default` tenant, matching the initial engine service grant. Upgrades preserve
+existing user tenants and legacy email-scoped Dragon captures. If a legacy account
+receives `crawler_admission_scope_denied`, explicitly include its existing tenant
+in the engine attester configuration; do not reassign its stored captures. The
+configuration helper supports repeated `--tenant` flags; include `default` too
+when retaining access for new default-tenant accounts. Reconfiguration still
+requires the helper's original model input and credential-preservation rules.
+
 The first-install continuation has been exercised with fresh Mongo, engine,
 production backend and Nginx containers, including actual local-model inference,
 account restart recovery and crawler controls. Desktop and mobile browser
@@ -262,6 +271,10 @@ through the same conversation history. Start a new conversation with current
 permitted context when a source has been withdrawn.
 
 ## Adaptive runtime and maintenance
+
+For bounded chat/studio/capture starters, local execution limits and recovery from
+conflicting or malformed component results, see
+[AI workflow foundations and recovery](AI_FOUNDATIONS_AND_RECOVERY.md).
 
 In Jeeves chat, expand the AI conversation status bar to open **Runtime
 optimization**. The panel reports current capacity, queue pressure, derived cache,

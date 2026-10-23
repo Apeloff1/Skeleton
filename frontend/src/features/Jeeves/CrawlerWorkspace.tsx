@@ -7,6 +7,8 @@ import StudioLoginGate, { useStudioAuth } from '../../auth/StudioLoginGate';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import { createCrawl, controlCrawl, crawlRequestKey, eraseCrawl, getCrawlEvents, exportCrawlSource, getCrawl, getCrawlerReadiness, listCrawls, listCrawlSources, runCrawl, type CapturedSource, type CrawlCreate, type CrawlEvent, type CrawlerReadiness, type CrawlSession, type SourceExport } from '../../product/crawlerClient';
 import { ChatClientError } from '../../product/chatErrors';
+import { type WorkflowTemplate } from '../../product/aiWorkflowClient';
+import WorkflowTemplatePicker from './WorkflowTemplatePicker';
 import s, { colors } from './CrawlerWorkspace.styles';
 import CrawlerAutomationPanel from './CrawlerAutomationPanel';
 import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
@@ -118,7 +120,8 @@ function CrawlerContent() {
     restoredSession.current = requestedSession;
     void perform(async signal => { const value = await getCrawl(requestedSession, signal); if (!signal.aborted) open(value, true); });
   }, [requestedSession, perform, open]);
-  const mutate = async (name: string, operation: (signal: AbortSignal) => Promise<CrawlSession>, isRun = false, stopControl = false) => {
+  const mutate = async (name: string, operation: (signal: AbortSignal) => Promise<CrawlSession>, isRun = false, stopControl = false, ownerToken = token.current) => {
+    if (ownerToken !== getAuthToken() || token.current !== ownerToken) { setError('Your account changed. Reload this capture before submitting a request.'); return; }
     const lock = stopControl ? 'control' : isRun ? 'run' : 'mutation';
     if (actionLocks.current[lock] || actionLocks.current.mutation || !stopControl && (actionLocks.current.run || actionLocks.current.control)) return;
     actionLocks.current[lock] = true;
@@ -127,7 +130,7 @@ function CrawlerContent() {
       await perform(async signal => {
         let value: CrawlSession;
         try { value = await operation(signal); }
-        catch (err) { if (!signal.aborted && epoch === generation.current && (!(err instanceof ChatClientError) || ['network', 'timeout', 'unavailable'].includes(err.kind))) setRetry(() => () => mutate(name, operation, isRun, stopControl)); throw err; }
+        catch (err) { if (!signal.aborted && epoch === generation.current && (!(err instanceof ChatClientError) || ['network', 'timeout', 'unavailable'].includes(err.kind))) setRetry(() => () => mutate(name, operation, isRun, stopControl, ownerToken)); throw err; }
         if (signal.aborted || epoch !== generation.current) return;
         accept(value); setNotice(isRun ? 'The bounded slice finished. Counters show only committed requests and captures.' : 'The server confirmed this command.');
         if (activeRef.current?.session_id === value.session_id) {
@@ -140,7 +143,28 @@ function CrawlerContent() {
       if (epoch === generation.current) { if (isRun) setRunning(false); else setBusy(''); }
     }
   };
+  const templateUnavailable = (template: WorkflowTemplate): string | null => {
+    if (template.surface !== 'crawler') return 'Choose a crawler workflow template.';
+    if (template.settings.max_bytes % 1048576 !== 0 || template.settings.max_bytes < 1048576) return 'This form requires a byte budget in whole MiB between 1 and 32.';
+    return null;
+  };
+  const applyTemplate = (template: WorkflowTemplate) => {
+    if (token.current !== getAuthToken() || !canWrite || busy || running || active && !creating
+      || actionLocks.current.mutation || actionLocks.current.run || actionLocks.current.control || pane !== 'capture') {
+      throw new ChatClientError('Reopen the idle new-capture form before applying template settings.', { kind: 'validation', retryable: false });
+    }
+    const reason = templateUnavailable(template);
+    if (reason || template.surface !== 'crawler') throw new ChatClientError(reason || 'Choose a crawler template.', { kind: 'validation', retryable: false });
+    const settings = template.settings;
+    setRequests(String(settings.max_requests)); setDocuments(String(settings.max_documents));
+    setMegabytes(String(settings.max_bytes / 1048576)); setDepth(String(settings.max_depth)); setError('');
+  };
   const create = () => {
+    if (token.current !== getAuthToken() || !canWrite || readiness?.available !== true || !consent || !rights || !seeds.trim()
+      || busy || running || actionLocks.current.mutation || actionLocks.current.run || actionLocks.current.control) {
+      setError('Confirm your current account, capture readiness, seed URLs and both consent choices before creating a crawl.'); return;
+    }
+    if (![requests, documents, megabytes, depth].every(value => /^\d+$/.test(value))) { setError('Enter whole-number request, document, MiB and link-depth budgets.'); return; }
     const numeric = [Number(requests), Number(documents), Number(megabytes), Number(depth)];
     if (!numeric.every(Number.isInteger) || numeric[0] < 1 || numeric[0] > 128 || numeric[1] < 1 || numeric[1] > 64 || numeric[2] < 1 || numeric[2] > 32 || numeric[3] < 0 || numeric[3] > 3) { setError('Use requests 1–128, documents 1–64, MB 1–32 and depth 0–3.'); return; }
     const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(/[\s,]+/).map(item => item.trim()).filter(item => item.length > 0 && item.length <= 80).slice(0, 16), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], consent: true, rights_acknowledged: true };
@@ -148,7 +172,7 @@ function CrawlerContent() {
   };
   const control = (action: 'pause' | 'resume' | 'cancel') => {
     if (!active || actionLocks.current.control || actionLocks.current.mutation || confirming.current) return;
-    const id = active.session_id; const key = crawlRequestKey(action); let attempt = 0;
+    const id = active.session_id; const key = crawlRequestKey(action); const ownerToken = token.current; let attempt = 0;
     const commands: { idempotency_key: string; expected_version: number; action: 'pause' | 'resume' | 'cancel' }[] = [];
     const execute = async (signal: AbortSignal): Promise<CrawlSession> => {
       while (attempt < 3) {
@@ -158,7 +182,7 @@ function CrawlerContent() {
       }
       throw new ChatClientError('The crawl is changing too quickly to confirm this control. Refresh and try again.', { kind: 'conflict', code: 'crawler_conflict' });
     };
-    const act = () => void mutate(label(action), execute, false, action !== 'resume');
+    const act = () => void mutate(label(action), execute, false, action !== 'resume', ownerToken);
     if (action !== 'cancel') { act(); return; }
     confirming.current = true;
     if (Platform.OS === 'web') { const accepted = globalThis.confirm('Cancel this crawl? Captured sources remain available. This session cannot be resumed after cancellation.'); confirming.current = false; if (accepted) act(); }
@@ -166,7 +190,9 @@ function CrawlerContent() {
   };
   const erase = () => {
     if (!active || actionLocks.current.mutation || actionLocks.current.run || actionLocks.current.control || confirming.current) return; const id = active.session_id; const body = { idempotency_key: crawlRequestKey('erase'), expected_version: active.version };
+    const ownerToken = token.current;
     const operation = async () => {
+      if (ownerToken !== getAuthToken() || token.current !== ownerToken) { setError('Your account changed. Reopen the capture before erasing its sources.'); return; }
       if (actionLocks.current.mutation || actionLocks.current.run || actionLocks.current.control) return; actionLocks.current.mutation = true;
       const epoch = generation.current; setBusy('Erasing sources'); setError(''); setRetry(null);
       await perform(async signal => {
@@ -194,7 +220,7 @@ function CrawlerContent() {
       {sessions.map(row => <TouchableOpacity key={row.session_id} accessibilityRole="button" accessibilityState={{ selected: active?.session_id === row.session_id }} style={[s.check, active?.session_id === row.session_id && { backgroundColor: '#251f38', padding: 12, borderRadius: 8 }]} onPress={() => open(row)}><Text style={s.label}>{row.title}</Text><Text style={s.small}>{label(row.status)} · {row.counters.documents} captures · {row.counters.requests} requests</Text></TouchableOpacity>)}
       {nextCursor && <Button title="Load more crawls" onPress={() => void perform(async signal => { const page = await listCrawls(nextCursor, signal); if (!signal.aborted) { setSessions(rows => [...rows, ...page.sessions.filter(row => !rows.some(old => old.session_id === row.session_id))].slice(0, 128)); setNextCursor(page.next_cursor); } })} />}
     </View><View style={[s.column, { flexBasis: 620, gap: 20 }]}>
-      {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Create the source scope first, then authorize a finite automatic run or one manual slice.</Text>
+      {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Create the source scope first, then authorize a finite automatic run or one manual slice.</Text><WorkflowTemplatePicker surface="crawler" contextKey={`${active?.session_id ?? 'new'}:${creating ? 'new' : 'initial'}:${pane}:${generation.current}`} disabled={!canWrite || !!busy || running || pane !== 'capture'} unavailableReason={templateUnavailable} onApply={applyTemplate} />
         <Text style={s.label}>Name (optional)</Text><TextInput accessibilityLabel="Crawl name" value={title} onChangeText={setTitle} maxLength={160} style={field} placeholder="Engine documentation" placeholderTextColor={colors.muted} />
         <Text style={s.label}>Seed URLs · one per line</Text><TextInput accessibilityLabel="Seed URLs" value={seeds} onChangeText={setSeeds} maxLength={32768} multiline style={[field, { minHeight: 110 }]} placeholder={'https://example.org/docs/\nhttps://example.org/guide/'} placeholderTextColor={colors.muted} autoCapitalize="none" />
         <Text style={s.label}>Topics (optional, commas or spaces)</Text><TextInput accessibilityLabel="Crawl topics" value={topics} onChangeText={setTopics} maxLength={1280} style={field} placeholder="movement, tools, scripting" placeholderTextColor={colors.muted} />
