@@ -586,9 +586,17 @@ class EngineExecutionCoordinator:
             # accepted command must not disappear with an unobserved task.
             self._driver_failures += 1
             self._last_driver_error = type(exc).__name__
+            # Log only trusted source locations (never exception values or
+            # full filesystem paths) to make production failures actionable.
+            # The user-facing result remains the same fail-closed error code.
+            frames = tuple(
+                f"{Path(frame.filename).name}:{frame.name}:{frame.lineno}"
+                for frame in traceback.extract_tb(exc.__traceback__)[-3:]
+            )
             logging.getLogger(__name__).warning(
-                "Engine driver setup failed (%s)",
+                "Engine driver setup failed (%s); frames=%s",
                 type(exc).__name__,
+                frames,
             )
             try:
                 await self._finalize_failure(
