@@ -71,6 +71,7 @@ def test_critical_product_router_is_mounted_and_never_silently_skipped(module_pa
     report = register_routes(app, entries)
     assert report["skipped"] == 0, report["skipped_names"]
     assert report["ok"] == 1
+    assert report["mounted_names"] == [module_path]
     assert len(app.routes) > 4, f"mounted {module_path} declares no reachable endpoints"
 
 
@@ -93,6 +94,7 @@ def test_critical_route_readiness_fails_closed_on_import_skip(monkeypatch) -> No
             "ok": 200,
             "skipped": 1,
             "skipped_names": ["routes.lafs (import_failed RuntimeError: dependency unavailable)"],
+            "mounted_names": sorted(CRITICAL_BOOT_ROUTERS - {"routes.lafs"}),
             "at": 1.0,
         },
     )
@@ -107,7 +109,54 @@ def test_critical_route_readiness_accepts_complete_report(monkeypatch) -> None:
     monkeypatch.setattr(
         registry_health,
         "_LAST_REPORT",
-        {"ok": 200, "skipped": 0, "skipped_names": [], "at": 1.0},
+        {
+            "ok": 200, "skipped": 0, "skipped_names": [],
+            "mounted_names": sorted(CRITICAL_BOOT_ROUTERS), "at": 1.0,
+        },
     )
     status = registry_health.critical_router_readiness()
     assert status == {"ok": True, "missing": [], "report_available": True}
+
+
+def test_critical_route_readiness_rejects_missing_positive_mount_evidence(monkeypatch) -> None:
+    monkeypatch.setattr(
+        registry_health, "_LAST_REPORT",
+        {"ok": 200, "skipped": 0, "skipped_names": [], "at": 1.0},
+    )
+    report = registry_health.critical_router_readiness()
+    assert report["ok"] is False
+    assert report["report_available"] is False
+    assert set(report["missing"]) == CRITICAL_BOOT_ROUTERS
+
+
+def test_critical_route_readiness_rejects_silent_absent_mount(monkeypatch) -> None:
+    monkeypatch.setattr(
+        registry_health, "_LAST_REPORT",
+        {
+            "ok": 200, "skipped": 0, "skipped_names": [],
+            "mounted_names": sorted(CRITICAL_BOOT_ROUTERS - {"routes.marketplace"}),
+            "at": 1.0,
+        },
+    )
+    report = registry_health.critical_router_readiness()
+    assert report == {
+        "ok": False, "report_available": True, "missing": ["routes.marketplace"],
+    }
+
+
+def test_empty_router_does_not_report_successful_mount(monkeypatch) -> None:
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    original_import = routes_registry.importlib.import_module
+    def import_router(name: str):
+        if name == "routes.fake_empty":
+            return SimpleNamespace(router=APIRouter())
+        return original_import(name)
+    monkeypatch.setattr(routes_registry.importlib, "import_module", import_router)
+    app = FastAPI()
+    report = register_routes(app, [("routes.fake_empty", "router")])
+    assert report["ok"] == 0
+    assert report["skipped"] == 1
+    assert report["mounted_names"] == []

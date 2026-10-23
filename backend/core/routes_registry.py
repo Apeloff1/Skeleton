@@ -46,6 +46,7 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
     """
     started = time.time()
     ok = 0
+    mounted_names: List[str] = []
     skipped_names: List[str] = []
     for entry in entries:
         if len(entry) == 2:
@@ -62,10 +63,15 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             if router is None:
                 skipped_names.append(f"{module_path} (attr {attr!r} missing)")
                 continue
+            prior_routes = len(app.routes)
             if prefix:
                 app.include_router(router, prefix=prefix)
             else:
                 app.include_router(router)
+            if len(app.routes) == prior_routes:
+                skipped_names.append(f"{module_path} (empty_router)")
+                continue
+            mounted_names.append(module_path)
             ok += 1
         except Exception as exc:
             # Import exceptions can contain credentials, tokens, filesystem paths
@@ -84,7 +90,10 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
         flush=True,
         file=sys.stderr,
     )
-    return {"ok": ok, "skipped": len(skipped_names), "skipped_names": skipped_names}
+    return {
+        "ok": ok, "skipped": len(skipped_names),
+        "skipped_names": skipped_names, "mounted_names": mounted_names,
+    }
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -453,6 +462,7 @@ def register_known_routes(app: FastAPI) -> dict:
         "ok": r1["ok"] + r2["ok"],
         "skipped": r1["skipped"] + r2["skipped"],
         "skipped_names": r1["skipped_names"] + r2["skipped_names"],
+        "mounted_names": r1["mounted_names"] + r2["mounted_names"],
         # Stage A4 — logical route-tree grouping (no physical file moves; 68
         # route modules cross-import each other so grouping is expressed as a
         # classifier rather than a package reshuffle).

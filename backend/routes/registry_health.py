@@ -55,14 +55,17 @@ def critical_router_readiness() -> dict[str, Any]:
     from core.routes_registry import KNOWN_ROUTES, KNOWN_ROUTES_WITH_PREFIX
 
     registered = {entry[0] for entry in (*KNOWN_ROUTES, *KNOWN_ROUTES_WITH_PREFIX)}
-    skipped = {
-        str(failure).split(" ", 1)[0]
-        for failure in _LAST_REPORT.get("skipped_names", ())
-    }
-    missing = sorted((CRITICAL_BOOT_ROUTERS - registered) | (CRITICAL_BOOT_ROUTERS & skipped))
-    checked = bool(_LAST_REPORT.get("at")) and (
+    # A declared route is not a mounted route. Require positive evidence of
+    # actual FastAPI registration from the current boot, not merely absence
+    # from the skipped list (which could be truncated or malformed).
+    mounted = _LAST_REPORT.get("mounted_names")
+    observed_mounts = {
+        item for item in mounted if isinstance(item, str)
+    } if isinstance(mounted, list) else set()
+    checked = bool(_LAST_REPORT.get("at")) and isinstance(mounted, list) and (
         int(_LAST_REPORT.get("ok", 0)) + int(_LAST_REPORT.get("skipped", 0)) > 0
     )
+    missing = sorted(CRITICAL_BOOT_ROUTERS - (registered & observed_mounts))
     return {"ok": checked and not missing, "missing": missing, "report_available": checked}
 
 
