@@ -93,7 +93,9 @@ def _matches_expression(doc, expression):
         raise AssertionError("unsupported Mongo expression")
     operation, arguments = next(iter(expression.items()))
     if operation == "$or":
-        return any(_matches_expression(doc, expression) for expression in arguments)
+        return any(_matches_expression(doc, item) for item in arguments)
+    if operation == "$and":
+        return all(_matches_expression(doc, item) for item in arguments)
     if operation in {"$gt", "$lte", "$eq"}:
         if not isinstance(arguments, list) or len(arguments) != 2:
             raise AssertionError("unsupported Mongo comparison")
