@@ -381,3 +381,44 @@ def test_unrelated_mount_cannot_fabricate_registered_capability(monkeypatch) -> 
     assert report["skipped"] == 1
     assert report["mounted_names"] == []
     assert not any(getattr(item, "original_router", None) is unrelated for item in app.routes)
+
+
+def test_unrelated_flattened_route_cannot_claim_requested_mount(monkeypatch) -> None:
+    """Direct-route additions must belong to the requested API capability."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    requested = APIRouter(prefix="/api/requested")
+
+    @requested.get("/ready")
+    def ready():
+        return {"ready": True}
+
+    foreign = APIRouter(prefix="/api/foreign")
+
+    @foreign.get("/ready")
+    def foreign_ready():
+        return {"ready": False}
+
+    original_import = routes_registry.importlib.import_module
+
+    def import_requested(name: str):
+        if name == "routes.requested_direct":
+            return SimpleNamespace(router=requested)
+        return original_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", import_requested)
+    app = FastAPI()
+
+    def substitute_foreign(_router, *, prefix=""):
+        # Exercises old FastAPI's flattened route tree, not a nested wrapper.
+        app.router.routes.extend(foreign.routes)
+
+    monkeypatch.setattr(app, "include_router", substitute_foreign)
+    report = register_routes(app, [("routes.requested_direct", "router")])
+    assert report["ok"] == 0
+    assert report["skipped"] == 1
+    assert report["mounted_names"] == []
+    assert "routes.requested_direct (empty_router)" in report["skipped_names"]
+    assert all(route.path != "/api/foreign/ready" for route in app.routes)
