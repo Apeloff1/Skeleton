@@ -2265,7 +2265,13 @@ def native_production_analyze_campaign(
         "original_campaign_digest": campaign.digest,
         "chapter_paths": jsonable_encoder(graph_report(chapters)),
         "challenge": challenge_report(director),
-        "stages": [{"stage": index + 1, "routes": document} for index, document in enumerate(reports)],
+        # RoutePortfolio is a frozen dataclass containing tuple path evidence.
+        # The public API and independent replay verifier require JSON arrays;
+        # normalize at this boundary instead of leaking Python tuples.
+        "stages": [
+            {"stage": index + 1, "routes": jsonable_encoder(document)}
+            for index, document in enumerate(reports)
+        ],
         "claim": "solver-derived challenge and branching; no human player enjoyment certified",
     }
 
