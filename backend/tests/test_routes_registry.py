@@ -214,7 +214,10 @@ def test_partial_router_mount_is_rolled_back_and_later_router_can_mount(monkeypa
     assert report["skipped"] == 1
     assert report["mounted_names"] == ["routes.working_mount"]
     assert "routes.partial_mount (import_failed RuntimeError)" in report["skipped_names"]
-    assert [route.path for route in app.routes].count("/registered") == 1
+    # FastAPI may preserve the router as an included wrapper with no .path.
+    # Verify the registered endpoint from the authenticated registry report.
+    assert report["mounted_paths"]["routes.working_mount"].count("/registered") == 1
+    assert len(app.routes) == 5
 
 def test_critical_router_with_wrong_path_is_not_marked_ready(monkeypatch) -> None:
     mounted_paths = {
@@ -239,3 +242,224 @@ def test_expected_critical_paths_are_unique_and_canonical() -> None:
     assert frozenset(CRITICAL_ROUTE_PATHS) == CRITICAL_BOOT_ROUTERS
     assert len(set(CRITICAL_ROUTE_PATHS.values())) == len(CRITICAL_BOOT_ROUTERS)
     assert all(path.startswith("/api/") for path in CRITICAL_ROUTE_PATHS.values())
+
+
+
+def test_nested_fastapi_router_mount_reports_real_leaf_paths(monkeypatch) -> None:
+    """Modern FastAPI mounts router wrappers rather than flattening routes."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    leaf = APIRouter(prefix="/api/leaf")
+
+    @leaf.get("/status")
+    def status():
+        return {"ok": True}
+
+    original_import = routes_registry.importlib.import_module
+
+    def import_leaf(name: str):
+        if name == "routes.synthetic_leaf":
+            return SimpleNamespace(router=leaf)
+        return original_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", import_leaf)
+    app = FastAPI()
+
+    def nested_include(router, *, prefix=""):
+        app.router.routes.append(
+            SimpleNamespace(original_router=router, prefix=prefix)
+        )
+
+    monkeypatch.setattr(app, "include_router", nested_include)
+    report = register_routes(app, [("routes.synthetic_leaf", "router", "/nested")])
+    assert report["ok"] == 1, report
+    assert report["skipped"] == 0
+    assert report["mounted_paths"]["routes.synthetic_leaf"] == [
+        "/nested/api/leaf/status"
+    ]
+
+
+def test_noop_router_inclusion_never_claims_a_capability(monkeypatch) -> None:
+    """Declaring endpoints is not proof that FastAPI mounted anything."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    leaf = APIRouter(prefix="/api/leaf")
+
+    @leaf.get("/status")
+    def status():
+        return {"ok": True}
+
+    original_import = routes_registry.importlib.import_module
+
+    def import_leaf(name: str):
+        if name == "routes.unmounted_leaf":
+            return SimpleNamespace(router=leaf)
+        return original_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", import_leaf)
+    app = FastAPI()
+    monkeypatch.setattr(app, "include_router", lambda *_args, **_kwargs: None)
+    report = register_routes(app, [("routes.unmounted_leaf", "router")])
+    assert report["ok"] == 0
+    assert report["skipped"] == 1
+    assert report["mounted_names"] == []
+    assert "routes.unmounted_leaf (empty_router)" in report["skipped_names"]
+    assert not any(getattr(item, "original_router", None) is leaf for item in app.routes)
+
+
+
+def test_nested_include_context_preserves_each_parent_prefix(monkeypatch) -> None:
+    """Every preserved FastAPI include_context prefix composes into the URL."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    leaf = APIRouter(prefix="/api/leaf")
+
+    @leaf.get("/status")
+    def status():
+        return {"ok": True}
+
+    middle = SimpleNamespace(routes=[
+        SimpleNamespace(
+            original_router=leaf,
+            include_context=SimpleNamespace(prefix="/middle"),
+        ),
+    ])
+    original_import = routes_registry.importlib.import_module
+
+    def import_nested(name: str):
+        if name == "routes.synthetic_nested":
+            return SimpleNamespace(router=middle)
+        return original_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", import_nested)
+    app = FastAPI()
+
+    def nested_include(router, *, prefix=""):
+        app.router.routes.append(
+            SimpleNamespace(original_router=router, include_context=SimpleNamespace(prefix=prefix))
+        )
+
+    monkeypatch.setattr(app, "include_router", nested_include)
+    report = register_routes(app, [("routes.synthetic_nested", "router", "/outer")])
+    assert report["ok"] == 1
+    assert report["mounted_paths"]["routes.synthetic_nested"] == [
+        "/outer/middle/api/leaf/status"
+    ]
+
+
+def test_unrelated_mount_cannot_fabricate_registered_capability(monkeypatch) -> None:
+    """Appending a different router does not prove the requested router mounted."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    requested = APIRouter(prefix="/api/real")
+
+    @requested.get("/ready")
+    def ready():
+        return {"ok": True}
+
+    unrelated = APIRouter(prefix="/api/unrelated")
+    original_import = routes_registry.importlib.import_module
+
+    def import_requested(name: str):
+        if name == "routes.requested_only":
+            return SimpleNamespace(router=requested)
+        return original_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", import_requested)
+    app = FastAPI()
+    monkeypatch.setattr(
+        app, "include_router",
+        lambda *_args, **_kwargs: app.router.routes.append(SimpleNamespace(original_router=unrelated)),
+    )
+    report = register_routes(app, [("routes.requested_only", "router")])
+    assert report["ok"] == 0
+    assert report["skipped"] == 1
+    assert report["mounted_names"] == []
+    assert not any(getattr(item, "original_router", None) is unrelated for item in app.routes)
+
+
+def test_unrelated_flattened_route_cannot_claim_requested_mount(monkeypatch) -> None:
+    """Direct-route additions must belong to the requested API capability."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    requested = APIRouter(prefix="/api/requested")
+
+    @requested.get("/ready")
+    def ready():
+        return {"ready": True}
+
+    foreign = APIRouter(prefix="/api/foreign")
+
+    @foreign.get("/ready")
+    def foreign_ready():
+        return {"ready": False}
+
+    original_import = routes_registry.importlib.import_module
+
+    def import_requested(name: str):
+        if name == "routes.requested_direct":
+            return SimpleNamespace(router=requested)
+        return original_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", import_requested)
+    app = FastAPI()
+
+    def substitute_foreign(_router, *, prefix=""):
+        # Exercises old FastAPI's flattened route tree, not a nested wrapper.
+        app.router.routes.extend(foreign.routes)
+
+    monkeypatch.setattr(app, "include_router", substitute_foreign)
+    report = register_routes(app, [("routes.requested_direct", "router")])
+    assert report["ok"] == 0
+    assert report["skipped"] == 1
+    assert report["mounted_names"] == []
+    assert "routes.requested_direct (empty_router)" in report["skipped_names"]
+    assert all(route.path != "/api/foreign/ready" for route in app.routes)
+
+
+def test_flattened_foreign_route_with_same_path_cannot_claim_target(monkeypatch) -> None:
+    """The same URL must not attest a different router's endpoint."""
+    from fastapi import APIRouter
+    from types import SimpleNamespace
+    from core import routes_registry
+
+    wanted = APIRouter(prefix="/api/studio")
+
+    @wanted.get("/ready")
+    def wanted_ready():
+        return {"ready": True}
+
+    foreign = APIRouter(prefix="/api/studio")
+
+    @foreign.get("/ready")
+    def foreign_ready():
+        return {"ready": False}
+
+    initial_import = routes_registry.importlib.import_module
+
+    def fake_import(name: str):
+        if name == "routes.requested_identity":
+            return SimpleNamespace(router=wanted)
+        return initial_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", fake_import)
+    app = FastAPI()
+    monkeypatch.setattr(
+        app, "include_router",
+        lambda _router, **_kwargs: app.router.routes.extend(foreign.routes),
+    )
+
+    report = register_routes(app, [("routes.requested_identity", "router")])
+    assert report["ok"] == 0
+    assert report["skipped_names"] == ["routes.requested_identity (empty_router)"]
+    assert all(route.path != "/api/studio/ready" for route in app.routes)

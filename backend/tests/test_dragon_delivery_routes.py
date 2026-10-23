@@ -177,3 +177,29 @@ def test_delivery_does_not_consume_unrelated_practice_lesson(configured):
     result=client.post('/api/dragon-academy/delivery/generate',json=body)
     assert result.status_code==403,result.text
     assert client.get('/api/dragon-academy/status').json()['native_attempts']==[]
+
+
+def test_knowledge_context_does_not_mask_native_practice_database_failures(configured):
+    """A nested practice outage must retain its exception domain."""
+    from routes import dragon_delivery as delivery_route
+
+    with pytest.raises(sqlite3.OperationalError, match="native practice locked"):
+        with delivery_route._delivery():
+            raise sqlite3.OperationalError("native practice locked")
+
+
+def test_knowledge_context_reports_only_its_own_open_failure(configured, monkeypatch):
+    """A failed knowledge acquisition remains an explicitly scoped 503."""
+    from fastapi import HTTPException
+    from routes import dragon_delivery as delivery_route
+
+    def unavailable(*_args, **_kwargs):
+        raise sqlite3.OperationalError("private knowledge path")
+
+    monkeypatch.setattr(delivery_route, "ReviewedKnowledgeStore", unavailable)
+    with pytest.raises(HTTPException) as error:
+        with delivery_route._delivery():
+            raise AssertionError("unreachable")
+    assert error.value.status_code == 503
+    assert error.value.detail == "Dragon knowledge storage unavailable"
+    assert "private knowledge path" not in str(error.value.detail)
