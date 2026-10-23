@@ -182,3 +182,25 @@ def test_destination_only_files_are_reported_but_governed_overlays_are_retained(
     _, retained_conflicts = plan_mirrors(tmp_path, manifest, tracked)
     assert retained_conflicts == []
     assert orphan.read_text() == "OWNER = 'unknown'\n"
+
+
+def test_staged_copy_is_digest_checked_before_publish(tmp_path: Path, monkeypatch):
+    """A source mutation mid-copy must never become an authorized mirror."""
+    from scripts import sync_ai_file_tree_mirrors as mirror_sync
+
+    manifest, tracked = _fixture(tmp_path)
+    additions, conflicts = plan_mirrors(tmp_path, manifest, tracked)
+    assert not conflicts
+    original_copy = mirror_sync.shutil.copyfileobj
+
+    def corrupted_copy(source, destination, *args, **kwargs):
+        original_copy(source, destination, *args, **kwargs)
+        destination.seek(0)
+        destination.write(b"RESULT = 999\\n")
+        destination.truncate()
+
+    monkeypatch.setattr(mirror_sync.shutil, "copyfileobj", corrupted_copy)
+    with pytest.raises(ValueError, match="staged mirror differs"):
+        apply_mirrors(tmp_path, additions)
+    assert not (tmp_path / DEST).exists()
+    assert (tmp_path / SOURCE).read_text(encoding="utf-8") == "RESULT = 7\\n"
