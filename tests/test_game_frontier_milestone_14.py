@@ -37,3 +37,20 @@ def test_between_slice():
 def test_between_rejects_bad_range():
     with pytest.raises(HistoryQueryError):
         between(_history(2), 1, 1)
+
+
+
+def test_between_rejects_corrupt_head_and_missing_history():
+    history = _history(3)
+    history.head = "0" * 64
+    with pytest.raises(HistoryQueryError, match="verify"):
+        between(history, 0, 2)
+    with pytest.raises(HistoryQueryError, match="verify"):
+        between(SnapshotHistory(), 0, 1)
+
+
+def test_between_rejects_boolean_and_nonnumeric_bounds():
+    history = _history(3)
+    for start, end in ((True, 2), (0, True), ("0", 2), (0, 2.0)):
+        with pytest.raises(HistoryQueryError):
+            between(history, start, end)
