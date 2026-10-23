@@ -141,7 +141,9 @@ def test_destination_is_not_clobbered_after_plan(tmp_path: Path):
 
 
 def test_unsafe_paths_are_rejected(tmp_path: Path):
-    for path in ("../secret", "/tmp/secret", "skeleton\\secret"):
+    for path in ("../secret", "/tmp/secret", "skeleton\\secret",
+                 "skeleton//ai/x.py", "skeleton/./ai/x.py",
+                 "./skeleton/ai/x.py", "skeleton/ai/../x.py"):
         with pytest.raises(ValueError):
             _safe_path(tmp_path, path)
 
@@ -203,4 +205,4 @@ def test_staged_copy_is_digest_checked_before_publish(tmp_path: Path, monkeypatc
     with pytest.raises(ValueError, match="staged mirror differs"):
         apply_mirrors(tmp_path, additions)
     assert not (tmp_path / DEST).exists()
-    assert (tmp_path / SOURCE).read_text(encoding="utf-8") == "RESULT = 7\\n"
+    assert (tmp_path / SOURCE).read_text(encoding="utf-8") == "RESULT = 7\n"

@@ -30,7 +30,8 @@ def _safe_path(root: Path, name: str) -> Path:
     if not isinstance(name, str) or not name or "\\" in name:
         raise ValueError("invalid manifest path")
     candidate = PurePosixPath(name)
-    if candidate.is_absolute() or any(p in {"", ".", ".."} for p in candidate.parts):
+    # Validate raw path segments before PurePosixPath collapses "." or "//".
+    if candidate.is_absolute() or any(p in {"", ".", ".."} for p in name.split("/")):
         raise ValueError("unsafe manifest path")
     path = root.joinpath(*candidate.parts)
     if not path.resolve().is_relative_to(root.resolve()):
