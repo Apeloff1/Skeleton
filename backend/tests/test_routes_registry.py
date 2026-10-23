@@ -160,3 +160,45 @@ def test_empty_router_does_not_report_successful_mount(monkeypatch) -> None:
     assert report["ok"] == 0
     assert report["skipped"] == 1
     assert report["mounted_names"] == []
+
+
+def test_partial_router_mount_is_rolled_back_and_later_router_can_mount(monkeypatch) -> None:
+    """A router failure must not leave privileged or misleading partial routes."""
+    from types import SimpleNamespace
+    from fastapi import APIRouter
+    from core import routes_registry
+
+    router = APIRouter()
+    @router.get("/registered")
+    def registered() -> dict[str, bool]:
+        return {"ok": True}
+
+    actual_import = routes_registry.importlib.import_module
+
+    def fake_import(name: str):
+        if name in {"routes.partial_mount", "routes.working_mount"}:
+            return SimpleNamespace(router=router)
+        return actual_import(name)
+
+    monkeypatch.setattr(routes_registry.importlib, "import_module", fake_import)
+    app = FastAPI()
+    actual_include = app.include_router
+    calls = 0
+
+    def include_once_then_fail(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        actual_include(*args, **kwargs)
+        if calls == 1:
+            raise RuntimeError("simulated partial mount failure")
+
+    monkeypatch.setattr(app, "include_router", include_once_then_fail)
+    report = register_routes(
+        app,
+        [("routes.partial_mount", "router"), ("routes.working_mount", "router")],
+    )
+    assert report["ok"] == 1
+    assert report["skipped"] == 1
+    assert report["mounted_names"] == ["routes.working_mount"]
+    assert "routes.partial_mount (import_failed RuntimeError)" in report["skipped_names"]
+    assert [route.path for route in app.routes].count("/registered") == 1

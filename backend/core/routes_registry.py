@@ -57,6 +57,9 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
         else:
             skipped_names.append(f"<malformed entry: {entry!r}>")
             continue
+        # Roll back partial FastAPI registrations if a router fails while
+        # being included: a skipped capability must expose no half-mounted API.
+        prior_routes: int | None = None
         try:
             mod = importlib.import_module(module_path)
             router = getattr(mod, attr, None)
@@ -74,6 +77,8 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             mounted_names.append(module_path)
             ok += 1
         except Exception as exc:
+            if prior_routes is not None:
+                del app.router.routes[prior_routes:]
             # Import exceptions can contain credentials, tokens, filesystem paths
             # and even raw remote payloads. Report only the exception class;
             # skipped_names may reach status endpoints and log aggregation.
