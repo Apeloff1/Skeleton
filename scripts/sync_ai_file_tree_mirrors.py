@@ -195,6 +195,11 @@ def apply_mirrors(root: Path, additions: list[dict[str, str]]) -> int:
                 temp_name = temp.name
                 with src.open("rb") as stream:
                     shutil.copyfileobj(stream, temp)
+            # The canonical file may have changed between the pre-copy digest
+            # and streaming the bytes. Verify the staged artifact itself before
+            # exposing its path; never publish bytes that lack plan authority.
+            if _checksum(Path(temp_name)) != entry["source_sha256"]:
+                raise ValueError("staged mirror differs from planned source digest")
             os.chmod(temp_name, stat.S_IMODE(src.stat().st_mode))
             # A hard link creates the name exclusively and atomically on the
             # same filesystem; an existing destination is never clobbered.
