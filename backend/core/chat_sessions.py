@@ -185,17 +185,43 @@ def checked_command(
 
 
 async def read_prepared(
-    *, thread, user_message, tenant_id: str, owner_id: str, expected_request_digest: str | None = None
+    *,
+    thread,
+    user_message,
+    tenant_id: str,
+    owner_id: str,
+    expected_request_digest: str | None = None,
+    authority: Any | None = None,
 ):
-    refs = await conversation_authority.user_request_refs(
+    """Read the frozen command from the same canonical conversation owner.
+
+    In production the default and the route authority are identical. Passing
+    the admission owner explicitly preserves that invariant in isolated
+    recovery, deterministic SQLite fixtures and alternate deployments; never
+    silently switch to a different database for a prepared turn.
+    """
+    owner = conversation_authority if authority is None else authority
+    refs_lookup = getattr(owner, "user_request_refs", None)
+    if refs_lookup is None:
+        # Persisted user request refs are authoritative only when storage
+        # supports that separate collection. SQLite reference repositories
+        # persist them immutably on the canonical message itself.
+        refs = tuple(user_message.attachment_refs or ())
+    else:
+        refs = await refs_lookup(
         thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
     )
     if refs != user_message.attachment_refs:
         from dataclasses import replace
 
         user_message = replace(user_message, attachment_refs=refs)
-    metadata = await conversation_authority.chat_execution(
-        thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
+    execution_lookup = getattr(owner, "chat_execution", None)
+    metadata = (
+        await execution_lookup(
+            thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
+        )
+        if execution_lookup is not None
+        else None
     )
     if metadata is None:
         if "chat-prepared-execution:v1" in user_message.attachment_refs:
