@@ -4654,14 +4654,19 @@ def _run_artifact_command(build: dict, arguments: list[str], cwd: str, env: dict
     deadline = min(
         _build_clock.monotonic() + timeout, float(build.get("_bg_deadline_monotonic", float("inf")))
     )
-    options = (
-        {"start_new_session": True}
-        if os.name == "posix"
-        else {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
-    )
-    process = subprocess.Popen(
-        arguments, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options
-    )
+    # Use explicit platform-specific subprocess parameters: the process safety
+    # checker must be able to prove no shell or caller-supplied kwargs exist.
+    if os.name == "posix":
+        process = subprocess.Popen(
+            arguments, cwd=cwd, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, start_new_session=True,
+        )
+    else:
+        process = subprocess.Popen(
+            arguments, cwd=cwd, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        )
     stdout = bytearray()
     stderr = bytearray()
     reader_errors = []
