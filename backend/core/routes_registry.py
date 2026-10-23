@@ -130,6 +130,10 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
                     router, mount_prefix=prefix or "",
                 )
             if not registered_paths:
+                # A router that exposes no reachable endpoints must leave no
+                # mount behind. This also removes unrelated wrappers inserted
+                # by an incorrect include_router adapter.
+                del app.router.routes[prior_routes:]
                 skipped_names.append(f"{module_path} (empty_router)")
                 continue
             mounted_paths[module_path] = registered_paths
