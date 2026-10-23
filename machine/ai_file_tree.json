@@ -6310,7 +6310,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 180-mapping current-main payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 182-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -6630,7 +6630,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "180_mapping_plus_178_native_owner_current_main_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
+  "validation_state": "182_mapping_plus_178_native_owner_current_main_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7603,7 +7603,7 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 180,
+    "current_mapping_count": 182,
     "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
@@ -7753,14 +7753,14 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 180,
+    "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 127,
+    "retained_outside_ai_tree_count": 157,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
       "B2-domain-build": 14,
-      "B4-research-quarantine": 56,
+      "B4-research-quarantine": 58,
       "B3-compat-convergence": 28
     },
     "fresh_object_audit_required": true,
