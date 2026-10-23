@@ -779,6 +779,7 @@ async def _replayed_cooperation(*, thread, user_message, assistant_message, tena
     try:
         if policy is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
             if command is None:
@@ -855,6 +856,7 @@ async def _terminal_chat_evidence(
             code = None
         if command is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
         cooperation = cooperation_progress_projection(status, command=command)
@@ -1653,6 +1655,7 @@ async def _prepare_new_chat_execution(
         ]
     dependencies = await inherit_history_dependencies(
         dependencies,
+        authority=conversation_authority,
         thread=thread,
         transcript=transcript,
         selected_segments=context.selected_segments,
@@ -1693,7 +1696,7 @@ async def _prepare_new_chat_execution(
     metadata = prepare_metadata(
         command, request_digest=_chat_request_digest(request), dependencies=dependencies
     )
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     return message, metadata
 
 
@@ -1970,6 +1973,7 @@ async def ai_chat(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread,
         user_message=user_message,
         tenant_id=tenant_id,
@@ -2008,7 +2012,8 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -2186,7 +2191,8 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
-                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                        authority=conversation_authority,
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -2581,7 +2587,8 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
-                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                authority=conversation_authority,
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -2846,6 +2853,7 @@ async def get_ai_chat_turn(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if prepared_command is not None and chat_turn is None:
@@ -3090,7 +3098,8 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
     try:
         _validate_chat_handoff_binding(
@@ -3595,6 +3604,7 @@ async def cancel_ai_chat_turn(
         }
 
     metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if metadata is not None:
@@ -4087,6 +4097,7 @@ async def resume_ai_chat_turn(
         raise HTTPException(status_code=404, detail="Chat turn not found")
     require_writable_tip(thread, transcript, message)
     metadata, command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id
     )
     if command is None:
@@ -4111,7 +4122,7 @@ async def resume_ai_chat_turn(
             "server_resume_available": False,
             "cancellation_requested": True,
         }
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     if command_expired(command):
         raise HTTPException(
             status_code=409,
@@ -4159,7 +4170,7 @@ async def resume_ai_chat_turn(
             await conversation_authority.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id),
             message,
         )
-        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
         await chat_turn_lifecycle.advance(
             turn,
             TurnState.MODEL_RUNNING,
