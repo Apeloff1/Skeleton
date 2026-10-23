@@ -2012,8 +2012,9 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
             authority=conversation_authority,
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -2191,8 +2192,9 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
+                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
                         authority=conversation_authority,
-                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -2587,8 +2589,9 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
+                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
                 authority=conversation_authority,
-                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -3098,8 +3101,9 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
             authority=conversation_authority,
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+
         )
     try:
         _validate_chat_handoff_binding(
