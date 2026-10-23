@@ -52,9 +52,18 @@ def _within(relative: str, exclusions: set[str]) -> bool:
     return any(relative == item or relative.startswith(item + "/") for item in exclusions)
 
 
+def _checksum(path: Path) -> str:
+    """Bound memory consumption even for large tracked binary assets."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def _equivalent(source: Path, target: Path) -> bool:
     """Treat reformatted Python mirrors as equal if their ASTs are equal."""
-    if source.read_bytes() == target.read_bytes():
+    if source.stat().st_size == target.stat().st_size and _checksum(source) == _checksum(target):
         return True
     if source.suffix == ".py" and target.suffix == ".py":
         try:
@@ -152,7 +161,7 @@ def plan_mirrors(
                         "reason": "existing destination differs; never overwrite",
                     }
                 continue
-            digest = hashlib.sha256(original.read_bytes()).hexdigest()
+            digest = _checksum(original)
             entry = {
                 "source": src_rel, "destination": dest_rel,
                 "source_sha256": digest, "mapping": identity,
@@ -173,7 +182,7 @@ def apply_mirrors(root: Path, additions: list[dict[str, str]]) -> int:
     for entry in additions:
         src = _safe_path(root, entry["source"])
         dst = _safe_path(root, entry["destination"])
-        if hashlib.sha256(src.read_bytes()).hexdigest() != entry["source_sha256"]:
+        if _checksum(src) != entry["source_sha256"]:
             raise ValueError("source changed since plan was computed")
         if dst.exists() or dst.is_symlink():
             raise FileExistsError("destination changed since plan")
