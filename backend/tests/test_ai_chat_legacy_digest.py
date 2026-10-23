@@ -63,7 +63,7 @@ def test_original_v1_digest_binds_ephemeral_context_exactly():
         {"max_output_tokens": 256},
         {"temperature": 0.5},
         {"crawler_context": {"query": "public information"}},
-        {"cooperation": {"mode": "single"}},
+        {"cooperation": {"schema_version": "skeleton.ai.cooperation.v1", "roles": {"draft": {"provider_id": "local", "model_id": "model-a"}}}},
         {"memory_references": [{"memory_id": "prior-memory"}]},
     ],
 )
