@@ -31,6 +31,8 @@ def compact(history: SnapshotHistory, bound: HistoryBound) -> int:
 
     Returns the number removed. The head is recomputed.
     """
+    if not history.verify():
+        raise HistoryQueryError("history must verify before compaction")
     overflow = len(history) - bound.max_entries
     if overflow <= 0:
         return 0
@@ -52,15 +54,15 @@ def compact(history: SnapshotHistory, bound: HistoryBound) -> int:
 
 def at(history: SnapshotHistory, index: int) -> ArchiveSnapshot:
     """Return the snapshot at a zero-based index."""
-    if not history.entries:
-        raise HistoryQueryError("history is empty")
-    if not 0 <= index < len(history.entries):
+    if not history.verify():
+        raise HistoryQueryError("history must verify before lookup")
+    if type(index) is not int or not 0 <= index < len(history.entries):
         raise HistoryQueryError("index out of range")
     return history.entries[index]
 
 
 def latest(history: SnapshotHistory) -> ArchiveSnapshot:
     """Return the most recent snapshot."""
-    if not history.entries:
-        raise HistoryQueryError("history is empty")
+    if not history.verify():
+        raise HistoryQueryError("history must verify before lookup")
     return history.entries[-1]
