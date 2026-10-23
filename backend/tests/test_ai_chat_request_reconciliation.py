@@ -162,17 +162,21 @@ async def test_replay_key_with_changed_request_identity_is_rejected(monkeypatch)
 
     original = _request()
     changed = original.model_copy(update={"message": "Different content"})
-    _thread, user_message, reply = _canonical_completed_turn(
+    thread, user_message, reply = _canonical_completed_turn(
         original, tenant_id="default", owner_id="replay@example.org",
     )
 
     async def transcript(*_args, **_kwargs):
         return (user_message, reply)
 
+    async def get_thread(*_args, **_kwargs):
+        return thread
+
     async def persisted_request_refs(*_args, **_kwargs):
         return user_message.attachment_refs
 
     monkeypatch.setattr(ai_routes.conversation_authority, "active_transcript", transcript)
+    monkeypatch.setattr(ai_routes.conversation_authority, "get_thread", get_thread)
     monkeypatch.setattr(ai_routes.conversation_authority, "user_request_refs", persisted_request_refs)
     with pytest.raises(HTTPException) as error:
         await ai_routes.ai_chat(changed, user={"email": "replay@example.org"})
