@@ -102,6 +102,35 @@ class ContinuityBookPaths(Sequence[str]):
                 f"{phase}/{campaign}/{chronicle}/{epoch}/{continuity}.md")
 
 
+    @staticmethod
+    def _rank_path(value: object) -> int | None:
+        """Validate path identity without scanning the 900M-volume index."""
+        prefix = "game_studio_5000000000000/"
+        if type(value) is not str or len(value) > 512:
+            return None
+        if not value.startswith(prefix) or not value.endswith(".md"):
+            return None
+        parts = value[len(prefix):-3].split("/")
+        if len(parts) != 9:
+            return None
+        try:
+            return number(*parts)
+        except (StudioError, TypeError, ValueError):
+            return None
+
+    def __contains__(self, value: object) -> bool:
+        return self._rank_path(value) is not None
+
+    def index(self, value: object, start: int = 0, stop: int | None = None) -> int:
+        """O(1) exact source-path lookup with ordinary Sequence slice bounds."""
+        if type(start) is not int or (stop is not None and type(stop) is not int):
+            raise TypeError("continuity lookup bounds must be integers")
+        rank = self._rank_path(value)
+        if rank is None or rank not in range(*slice(start, stop).indices(len(self))):
+            raise ValueError("continuity handbook identity is absent from selected range")
+        return rank
+
+
 CONTINUITY_BOOK_PATHS = ContinuityBookPaths()
 
 

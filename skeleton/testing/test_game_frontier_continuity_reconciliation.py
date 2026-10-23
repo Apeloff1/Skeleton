@@ -248,3 +248,27 @@ def test_continuity_book_has_repeatable_digest_and_comparable_variants():
     assert ranked["compared"] == 10
     assert len({item["continuity"] for item in ranked["items"]}) == 10
     assert all(item["content_sha256"] for item in ranked["items"])
+
+
+def test_virtual_handbook_membership_and_rank_are_constant_space():
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import (
+        CONTINUITY_BOOK_PATHS, BOOK_COUNT,
+    )
+
+    paths = CONTINUITY_BOOK_PATHS
+    first = paths[0]
+    last = paths[BOOK_COUNT - 1]
+    assert first in paths
+    assert last in paths
+    assert paths.index(first) == 0
+    assert paths.index(last) == BOOK_COUNT - 1
+    assert paths.index(last, BOOK_COUNT - 1) == BOOK_COUNT - 1
+    assert "../secret.md" not in paths
+    assert "game_studio_5000000000000/../../secret.md" not in paths
+    assert 10 not in paths
+    with pytest.raises(ValueError):
+        paths.index(first, 1)
+    with pytest.raises(ValueError):
+        paths.index("unknown")
+    with pytest.raises(TypeError):
+        paths.index(last, True)
