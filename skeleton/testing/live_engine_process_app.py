@@ -123,6 +123,13 @@ class _DeterministicRegistry:
             raise AssertionError("the test registry cannot select an alternate provider")
         return self.require_active()
 
+    def runtime_serving_engines(self):
+        # The harness injects a hosted deterministic fake, not a local engine.
+        return ()
+
+    def runtime_serving_routes(self):
+        return ()
+
 
 def _verification(_request, candidate, _context_digest):
     if not isinstance(candidate, str) or not candidate.strip():
