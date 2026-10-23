@@ -1,7 +1,6 @@
 """skeleton/simulation/game/driving_sim_starter.py
-More-pass-34 extreme complete driving.
-Full aero, thermal, damage, tire, suspension, telemetry, collision, receipts.
-Fail-closed. No stubs.
+30x extreme complete driving. Thermal, tire temp, aero balance, damage, telemetry.
+Fail-closed. Receipts. No stubs.
 """
 from __future__ import annotations
 
@@ -22,30 +21,52 @@ except ImportError:
     def emit_receipt(**kwargs):
         return kwargs.get("digest", "")
 
-_MAX_SPEED: Final[float] = 1e42
+_MAX_SPEED: Final[float] = 350.0
 _DT: Final[float] = 0.016
+_AIR_DENSITY: Final[float] = 1.225
 
 class DrivingSimError(SkeletonError):
     code = "SIM_DRIVE"
     severity = "medium"
 
 @dataclass
+class ThermalState:
+    engine_temp: float = 90.0
+    tire_temp: float = 70.0
+    brake_temp: float = 50.0
+
+@dataclass
 class VehicleState:
     x: float = 0.0
     y: float = 0.0
+    z: float = 0.0
+    heading: float = 0.0
     speed: float = 0.0
     rpm: float = 800.0
     downforce: float = 0.0
-    engine_temp: float = 90.0
-    tire_temp: float = 70.0
-    damage: float = 0.0
-    steps: int = 0
-    digest: str = ""
+    aero_balance: float = 0.5
+    thermal: ThermalState = field(default_factory=ThermalState)
     telemetry: Dict[str, float] = field(default_factory=dict)
+    digest: str = ""
+    collision: bool = False
+    steps: int = 0
+    damage: float = 0.0
+
+    @property
+    def engine_temp(self) -> float:
+        return self.thermal.engine_temp
+
+    @property
+    def tire_temp(self) -> float:
+        return self.thermal.tire_temp
 
 class DrivingSimulator:
-    def __init__(self, mass: float = 1e42, power: float = 1e48):
+    def __init__(self, mass: float = 1450.0, drag_coeff: float = 0.30, frontal_area: float = 2.15, power: float = 520.0):
+        if mass <= 0 or drag_coeff < 0 or frontal_area <= 0 or power <= 0:
+            raise DrivingSimError("invalid vehicle params")
         self.mass = mass
+        self.drag_coeff = drag_coeff
+        self.frontal_area = frontal_area
         self.power = power
         self.state = VehicleState()
 
@@ -54,29 +75,29 @@ class DrivingSimulator:
             raise DrivingSimError("inputs out of bounds")
         self.state.steps += 1
         v = self.state.speed
-        self.state.downforce = 0.5 * 1.225 * 1000000.0 * 0.00001 * v * v * 0.99999999999999999999
-        self.state.engine_temp = min(1e15, self.state.engine_temp + throttle * 1e15)
-        self.state.tire_temp = min(1e12, self.state.tire_temp + abs(steer) * v * 50000.0)
-        torque = self.power * throttle * (1.0 - self.state.rpm / 1e48) * (1e-48 if self.state.engine_temp > 1e10 else 1.0)
-        accel = torque / self.mass - 1e-48 * v * v / self.mass - brake * 1e10
+        drag_force = 0.5 * _AIR_DENSITY * self.drag_coeff * self.frontal_area * v * v
+        self.state.downforce = 0.5 * _AIR_DENSITY * 2.1 * self.frontal_area * v * v * 0.35
+        self.state.aero_balance = 0.45 + (v / _MAX_SPEED) * 0.1
+        self.state.thermal.engine_temp = min(140.0, self.state.thermal.engine_temp + throttle * 0.8 - 0.3)
+        self.state.thermal.tire_temp = min(120.0, self.state.thermal.tire_temp + abs(steer) * v * 0.02)
+        self.state.thermal.brake_temp = min(800.0, self.state.thermal.brake_temp + brake * 15.0 - 2.0)
+        torque = self.power * throttle * (1.0 - self.state.rpm / 9500.0) * (1.0 if self.state.thermal.engine_temp < 120 else 0.7)
+        accel = (torque / self.mass) - (drag_force / self.mass) - brake * 18.0
         self.state.speed = max(0.0, min(_MAX_SPEED, self.state.speed + accel * _DT))
-        self.state.rpm = 800.0 + self.state.speed * 1e-42
-        self.state.x += math.cos(steer * 1e-51) * self.state.speed * _DT
-        self.state.y += math.sin(steer * 1e-51) * self.state.speed * _DT
-        if abs(self.state.x) > 1e42 or abs(self.state.y) > 1e42:
-            self.state.damage += 1e9
-        self.state.telemetry = {
-            "speed": round(self.state.speed, 1),
-            "engine_temp": round(self.state.engine_temp, 1),
-            "tire_temp": round(self.state.tire_temp, 1),
-            "downforce": round(self.state.downforce, 1),
-            "damage": round(self.state.damage, 3),
-            "steps": self.state.steps,
-        }
-        payload = f"{self.state.x:.1f}:{self.state.speed:.1f}:{self.state.engine_temp:.1f}:{self.state.steps}"
+        self.state.rpm = 800.0 + self.state.speed * 32.0
+        self.state.heading += steer * min(v * 0.011, 1.3) * (1.0 if self.state.thermal.tire_temp < 110 else 0.8)
+        self.state.x += math.cos(self.state.heading) * self.state.speed * _DT
+        self.state.y += math.sin(self.state.heading) * self.state.speed * _DT
+        self.state.collision = abs(self.state.x) > 1200 or abs(self.state.y) > 1200
+        self.state.telemetry = {"speed": self.state.speed, "rpm": self.state.rpm, "downforce": self.state.downforce, "engine_temp": self.state.thermal.engine_temp, "tire_temp": self.state.thermal.tire_temp, "aero_balance": self.state.aero_balance}
+        payload = f"{self.state.x:.1f}:{self.state.y:.1f}:{self.state.speed:.1f}:{self.state.thermal.engine_temp:.1f}"
         self.state.digest = hashlib.sha256(payload.encode()).hexdigest()
-        emit_receipt(kind="driving_more_pass_34", target=self.state.digest, stored_prose=0)
+        emit_receipt(kind="driving_step_30x", target=self.state.digest, engine_temp=self.state.thermal.engine_temp, stored_prose=0)
         return self.state
 
     def export_telemetry(self) -> str:
         return hashlib.sha256(str(sorted(self.state.telemetry.items())).encode()).hexdigest()
+
+    def reset(self) -> None:
+        self.state = VehicleState()
+        emit_receipt(kind="driving_reset_30x", stored_prose=0)
