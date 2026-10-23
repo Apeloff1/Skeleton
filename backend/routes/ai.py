@@ -1655,6 +1655,7 @@ async def _prepare_new_chat_execution(
         ]
     dependencies = await inherit_history_dependencies(
         dependencies,
+        authority=conversation_authority,
         thread=thread,
         transcript=transcript,
         selected_segments=context.selected_segments,
@@ -1695,7 +1696,7 @@ async def _prepare_new_chat_execution(
     metadata = prepare_metadata(
         command, request_digest=_chat_request_digest(request), dependencies=dependencies
     )
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     return message, metadata
 
 
@@ -2011,6 +2012,7 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
+            authority=conversation_authority,
             prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
         )
         if retrying_incomplete_turn:
@@ -2189,6 +2191,7 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
+                        authority=conversation_authority,
                         prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
                     )
                     if command_expired(command):
@@ -2584,6 +2587,7 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
+                authority=conversation_authority,
                 prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
             )
         except BaseException:
@@ -3094,6 +3098,7 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
+            authority=conversation_authority,
             prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
         )
     try:
@@ -4117,7 +4122,7 @@ async def resume_ai_chat_turn(
             "server_resume_available": False,
             "cancellation_requested": True,
         }
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     if command_expired(command):
         raise HTTPException(
             status_code=409,
@@ -4165,7 +4170,7 @@ async def resume_ai_chat_turn(
             await conversation_authority.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id),
             message,
         )
-        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
         await chat_turn_lifecycle.advance(
             turn,
             TurnState.MODEL_RUNNING,
