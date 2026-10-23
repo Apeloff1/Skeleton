@@ -113,9 +113,17 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             else:
                 app.include_router(router)
             newly_mounted = app.routes[prior_routes:]
+            # A caller or integration shim might append an unrelated direct
+            # route while discarding the requested router. A changed route
+            # count is not sufficient proof: the exposed path must also be
+            # declared by the exact requested source router.
+            declared_paths = set(
+                _declared_route_paths(router, mount_prefix=prefix or "")
+            )
             registered_paths = [
                 route.path for route in newly_mounted
                 if isinstance(getattr(route, "path", None), str)
+                and route.path in declared_paths
             ]
             # FastAPI 0.137+ mounts a single non-path wrapper for a complete
             # router. Only resolve its declared child paths after a real app
