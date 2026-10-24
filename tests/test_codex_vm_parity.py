@@ -1,0 +1,139 @@
+"""Acceptance tests for exact tracked Git/VM parity without external network."""
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+import subprocess
+import sys
+
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "audit_codex_vm_parity.py"
+spec = importlib.util.spec_from_file_location("audit_codex_vm_parity", SCRIPT)
+assert spec and spec.loader
+parity = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(parity)
+
+
+def git(repo, *args):
+    result = subprocess.run(["git", "-C", str(repo), *args], check=True,
+                            text=True, capture_output=True)
+    return result.stdout.strip()
+
+
+def fixture(tmp_path):
+    remote = tmp_path / "upstream.git"
+    checkout = tmp_path / "vm"
+    git(tmp_path, "init", "--bare", str(remote))
+    git(tmp_path, "init", "-b", "main", str(checkout))
+    git(checkout, "config", "user.name", "Audit Test")
+    git(checkout, "config", "user.email", "audit@example.invalid")
+    (checkout / "plain.txt").write_bytes(b"original\n")
+    (checkout / "filename with space.txt").write_bytes(b" spaced\n")
+    git(checkout, "add", ".")
+    git(checkout, "commit", "-m", "baseline")
+    git(checkout, "remote", "add", "origin", str(remote))
+    git(checkout, "push", "-u", "origin", "main")
+    return checkout
+
+
+def scan(repo, **kwargs):
+    return parity.audit(repo, remote="origin", branch="main", refresh=True,
+                        include_ignored=False, **kwargs)
+
+
+def test_clean_checkout_is_exactly_identical(tmp_path):
+    repo = fixture(tmp_path)
+    report = scan(repo)
+    assert report["status"] == "identical"
+    assert report["main_sha"] == report["local_head_sha"]
+    assert report["tracked_paths"] == 2
+
+
+def test_uncommitted_change_and_untracked_file_fail_closed(tmp_path):
+    repo = fixture(tmp_path)
+    (repo / "plain.txt").write_bytes(b"secret uncommitted change\n")
+    (repo / "new.txt").write_bytes(b"not yet pushed\n")
+    report = scan(repo)
+    assert report["status"] == "diverged"
+    assert "plain.txt" in report["findings"]["worktree_mismatch"]
+    assert "new.txt" in report["findings"]["untracked"]
+
+
+def test_local_committed_changes_fail_canonical_main_comparison(tmp_path):
+    repo = fixture(tmp_path)
+    (repo / "plain.txt").write_text("new committed content", encoding="utf-8")
+    git(repo, "commit", "-am", "VM has unpushed changes")
+    report = scan(repo)
+    assert report["status"] == "diverged"
+    assert "plain.txt" in report["findings"]["head_tree_difference"]
+
+
+def test_stale_local_checkout_detected_after_remote_advances(tmp_path):
+    repo = fixture(tmp_path)
+    clone = tmp_path / "other"
+    git(tmp_path, "clone", "-b", "main", str(tmp_path / "upstream.git"), str(clone))
+    git(clone, "config", "user.name", "Audit Test")
+    git(clone, "config", "user.email", "audit@example.invalid")
+    (clone / "plain.txt").write_text("upstream advanced\n", encoding="utf-8")
+    git(clone, "commit", "-am", "upstream changed")
+    git(clone, "push", "origin", "main")
+    report = scan(repo)
+    assert report["status"] == "diverged"
+    assert report["main_sha"] != report["local_head_sha"]
+    assert "plain.txt" in report["findings"]["worktree_mismatch"]
+
+
+def test_wrong_expected_main_sha_fails(tmp_path):
+    repo = fixture(tmp_path)
+    import pytest
+    with pytest.raises(RuntimeError, match="not pinned expected main"):
+        scan(repo, expected_sha="0" * 40)
+
+
+def test_ignored_files_option_is_strict(tmp_path):
+    repo = fixture(tmp_path)
+    (repo / ".gitignore").write_text("*.cache\n", encoding="utf-8")
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-m", "ignore cache")
+    git(repo, "push", "origin", "main")
+    (repo / "output.cache").write_text("ephemeral", encoding="utf-8")
+    assert scan(repo)["status"] == "identical"
+    result = parity.audit(repo, remote="origin", branch="main", refresh=True,
+                          include_ignored=True)
+    assert result["status"] == "diverged"
+    assert "output.cache" in result["findings"]["ignored"]
+
+
+def test_symlink_target_and_executable_mode_are_verified(tmp_path):
+    import os
+    import pytest
+    if os.name == "nt":
+        pytest.skip("POSIX executable mode and symlink requirements")
+    repo = fixture(tmp_path)
+    link = repo / "linked.txt"
+    link.symlink_to("plain.txt")
+    run = repo / "run.sh"
+    run.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    run.chmod(0o755)
+    git(repo, "add", "linked.txt", "run.sh")
+    git(repo, "commit", "-m", "add source link and executable")
+    git(repo, "push", "origin", "main")
+    assert scan(repo)["status"] == "identical"
+    link.unlink()
+    link.symlink_to("filename with space.txt")
+    run.chmod(0o644)
+    report = scan(repo)
+    assert "linked.txt" in report["findings"]["worktree_mismatch"]
+    assert any("run.sh" in x for x in report["findings"]["unexpected_type_or_mode"])
+
+
+def test_tracking_ref_without_fetch_never_claims_live_parity(tmp_path):
+    repo = fixture(tmp_path)
+    report = parity.audit(repo, remote="origin", branch="main", refresh=False,
+                          include_ignored=False)
+    assert report["status"] == "identical"  # Local tree is identical to cached ref.
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--repo", str(repo)],
+        check=False, text=True, capture_output=True,
+    )
+    assert result.returncode == 2
+    assert '"status": "unverified_tracking_ref"' in result.stdout
