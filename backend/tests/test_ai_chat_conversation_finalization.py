@@ -538,7 +538,9 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
 
     first = captured_commands[0]
     execution_id = first.execution_request.execution_id
-    assert waited_execution_ids == [execution_id, execution_id]
+    # Reconciliation checks the stored terminal engine status, not a second
+    # submission or duplicate wait for a fresh result.
+    assert waited_execution_ids == [execution_id]
     assert first.resource_budget["max_elapsed_seconds"] == 30.0
     assert response["ai_result_id"] == "engine-result:" + execution_id
 
