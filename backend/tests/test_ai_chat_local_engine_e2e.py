@@ -111,6 +111,14 @@ class SQLiteAsyncConversationAuthority:
             thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
         )
 
+    async def chat_dispatch(
+        self, thread_id, message_id, *, tenant_id, owner_id, record_digest, action="read"
+    ):
+        return self.repository.chat_dispatch(
+            thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
+            record_digest=record_digest, action=action,
+        )
+
     async def dragon_context_segments(self, thread, query):
         # The E2E runs without reviewed Dragon sources; do not synthesize any.
         return ()
