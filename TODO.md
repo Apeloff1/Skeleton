@@ -123,6 +123,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-113 Extend the existing RPG Studio to produce double-verified build-progress receipts from true placed prefab assets and stable IDs.
 - [x] GF-P0-114 Focused regressions passed for 141 tests including surveyed fixes, privacy, GPS spoof/replay rejection and 80 continuous GDD-linked frames.
 - [ ] GF-P0-115 Install compatible Expo SDK 54 native foreground location provider with permission config and actually verify Android/iOS device acquisition and revocation.
+  - Note (2026-10-24, GF-J): code landed — expo-location ~19.0.8 (SDK 54) foreground-only adapter + FrontierLocationProvider/useFrontierLocation (`frontend/src/product/location/`), iOS NSLocationWhenInUseUsageDescription, Android FINE/COARSE (background blocked), jest tests with mocked expo-location. On-device Android/iOS acquisition and revocation verification is PENDING (needs hardware); item stays open.
 - [ ] GF-P0-116 Wire frame chunk A/B verifiers and temporal context to actual *rendered* frames in all historical and modern native engine runtimes.
 - [ ] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay.
 - [ ] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
