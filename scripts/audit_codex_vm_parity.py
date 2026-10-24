@@ -112,6 +112,23 @@ def audit(repo: Path, *, remote: str, branch: str, refresh: bool, include_ignore
         findings["ignored"] = paths_from_null(git(repo, "ls-files", "--others", "--ignored", "--exclude-standard", "-z"))
     for relative, (mode, kind, digest) in expected.items():
         path = repo / relative
+        # Do not follow a substituted parent symlink outside this checkout.
+        # Checking only the leaf file's digest is not enough, because an
+        # attacker can supply identical bytes from a different filesystem.
+        ancestor = repo
+        invalid_ancestor = False
+        for component in relative.split("/")[:-1]:
+            ancestor = ancestor / component
+            try:
+                if not stat.S_ISDIR(ancestor.lstat().st_mode):
+                    invalid_ancestor = True
+                    break
+            except OSError:
+                invalid_ancestor = True
+                break
+        if invalid_ancestor:
+            findings["unexpected_type_or_mode"].append(relative + ": non-directory or symlink ancestor")
+            continue
         if not os.path.lexists(path):
             findings["missing_worktree_file"].append(relative)
             continue

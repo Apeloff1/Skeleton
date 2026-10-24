@@ -70,6 +70,10 @@ the one-checkout checker asserts `identical` only relative to its freshly
 fetched, pinned Git main. Neither checks running image digests, memory state,
 model weights, or services. Neither certifies unpublished private Codex edits.
 
+Both auditors explicitly reject a symlink substituted for any ancestor
+directory of a tracked source path, even if that symlink leads to identical
+bytes outside the checkout. Such a path is never a positive parity witness.
+
 ## Separate runtime acceptance (required for a running VM)
 
 - Read back the deployed VM's actual Git HEAD and working tree.

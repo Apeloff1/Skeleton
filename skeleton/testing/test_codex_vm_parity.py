@@ -116,3 +116,24 @@ def test_identical_corrupted_bytes_cannot_masquerade_as_main(pair):
     run(vm, "update-index", "--skip-worktree", "file.py")
     with pytest.raises(mod.ParityError, match="bytes differ from Git blob"):
         mod.compare(src, vm, sha)
+
+
+def test_symlinked_directory_ancestor_fails_even_if_status_is_suppressed(pair, tmp_path, monkeypatch):
+    src, vm, sha = pair
+    original = tmp_path / "moved-tracked-directory"
+    (vm / "nested").rename(original)
+    external = tmp_path / "external-directory"
+    external.mkdir()
+    (external / "receipt.json").write_bytes((original / "receipt.json").read_bytes())
+    (vm / "nested").symlink_to(external, target_is_directory=True)
+
+    real_git = mod.git
+
+    def status_suppressed(root, *args):
+        if args and args[0] == "status":
+            return b""
+        return real_git(root, *args)
+
+    monkeypatch.setattr(mod, "git", status_suppressed)
+    with pytest.raises(mod.ParityError, match="ancestor"):
+        mod.compare(src, vm, sha)

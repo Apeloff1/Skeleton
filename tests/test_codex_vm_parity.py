@@ -198,3 +198,27 @@ def test_receipt_is_reproducible_and_json_must_not_contaminate_checkout(tmp_path
     assert result.returncode != 0
     assert "receipt must be outside" in result.stderr
     assert not (repo / "audit.json").exists()
+
+
+def test_symlinked_parent_directory_cannot_appeal_to_identical_external_bytes(tmp_path):
+    repo = fixture(tmp_path)
+    nested = repo / "nested"
+    nested.mkdir()
+    (nested / "record.bin").write_bytes(b"same committed bytes\n")
+    git(repo, "add", "nested/record.bin")
+    git(repo, "commit", "-m", "nested source")
+    git(repo, "push", "origin", "main")
+
+    stored = tmp_path / "saved-dir"
+    nested.rename(stored)
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "record.bin").write_bytes((stored / "record.bin").read_bytes())
+    nested.symlink_to(external, target_is_directory=True)
+
+    report = scan(repo)
+    assert report["status"] == "diverged"
+    assert any(
+        "nested/record.bin" in finding and "ancestor" in finding
+        for finding in report["findings"]["unexpected_type_or_mode"]
+    )

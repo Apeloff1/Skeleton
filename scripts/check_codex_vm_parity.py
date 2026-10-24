@@ -76,6 +76,15 @@ def inspect(root: Path, required_sha: str) -> dict[str, tuple[str, str]]:
             raise ParityError("Git tree path is not safe and canonical")
         name = root / relative
         try:
+            # A tracked regular file may not be reached through an untracked
+            # symlinked parent. Git skip-worktree can conceal that substitution
+            # from porcelain status, even if the target bytes still hash to
+            # the committed Git object.
+            ancestor = root
+            for component in relative.split("/")[:-1]:
+                ancestor = ancestor / component
+                if not stat.S_ISDIR(ancestor.lstat().st_mode):
+                    raise ParityError("tracked checkout ancestor is not a real directory: " + relative)
             info = name.lstat()
             if mode == b"120000":
                 if not stat.S_ISLNK(info.st_mode):
