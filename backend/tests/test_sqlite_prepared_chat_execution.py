@@ -15,6 +15,7 @@ from skeleton.contracts.conversation import ConversationAuthorType, Conversation
 from skeleton.persistence.conversation_repository import (
     ConversationAuthorizationError,
     ConversationConflict,
+    ConversationNotFound,
     SQLiteConversationRepository,
 )
 
@@ -182,7 +183,7 @@ def test_failed_version_cannot_orphan_prepared_command(tmp_path):
     assert repo.active_transcript(
         thread.thread_id, tenant_id="tenant-a", owner_id="alice",
     ) == ()
-    with pytest.raises(Exception):
+    with pytest.raises(ConversationNotFound):
         repo.chat_execution(
             thread.thread_id, user.message_id, tenant_id="tenant-a", owner_id="alice",
         )
