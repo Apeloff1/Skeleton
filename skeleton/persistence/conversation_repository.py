@@ -860,14 +860,16 @@ class SQLiteConversationRepository:
         ):
             raise ConversationConflict("chat dispatch record digest is invalid")
         with self._lock:
-            row = self._thread_row(thread_id)
-            if row is None:
-                raise ConversationNotFound(thread_id)
-            thread = self._thread_from_row(row)
-            self._authorize(thread, tenant_id, owner_id)
             if action != "read":
                 self._connection.execute("BEGIN IMMEDIATE")
             try:
+                # Recheck owner scope inside the write lock; another SQLite
+                # connection must not change custody between auth and CAS.
+                row = self._thread_row(thread_id)
+                if row is None:
+                    raise ConversationNotFound(thread_id)
+                thread = self._thread_from_row(row)
+                self._authorize(thread, tenant_id, owner_id)
                 message = self._message_row(message_id)
                 if (
                     message is None
@@ -900,9 +902,14 @@ class SQLiteConversationRepository:
                             state = None
                         else:
                             old = stored["dispatch_state"]
-                            cancel = bool(stored["cancel_requested"])
-                            if old not in {"ready", "submitting", "admitted", "withdrawn"}:
+                            cancel_flag = stored["cancel_requested"]
+                            if (
+                                old not in {"ready", "submitting", "admitted", "withdrawn"}
+                                or type(cancel_flag) is not int
+                                or cancel_flag not in (0, 1)
+                            ):
                                 raise ConversationRepositoryCorruption("chat dispatch state is invalid")
+                            cancel = bool(cancel_flag)
                             if action == "claim" and old in {"ready", "submitting"} and not cancel:
                                 old = "submitting"
                             elif action == "admitted" and old in {"submitting", "admitted"}:
