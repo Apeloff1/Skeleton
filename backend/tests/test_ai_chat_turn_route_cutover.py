@@ -238,9 +238,19 @@ def _configure_prepared_engine(fake_client):
             return result["value"]
         return await prior_terminal(**kwargs)
 
+    async def status(**_kwargs):
+        if result["value"] is None:
+            raise EngineNotFoundError("execution has not been admitted")
+        return {"execution_state": "completed"}
+
+    async def terminal_result_if_available(**_kwargs):
+        return result["value"]
+
     fake_client.submit = submit
     fake_client._validate_ack_identity = verify_ack
     fake_client.wait_for_terminal = terminal
+    fake_client.status = status
+    fake_client.terminal_result_if_available = terminal_result_if_available
 
 
 
