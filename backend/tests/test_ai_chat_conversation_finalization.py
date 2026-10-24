@@ -97,6 +97,21 @@ def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assist
         assert message_id == state["user"].message_id
         return state["metadata"]
 
+    dispatch_state = "ready"
+
+    async def chat_dispatch(_thread_id, message_id, *, record_digest, action="read", **_kwargs):
+        nonlocal dispatch_state
+        assert state["user"] is not None
+        assert state["user"].message_id == message_id
+        assert state["metadata"]["record_digest"] == record_digest
+        if action == "claim" and dispatch_state in {"ready", "submitting"}:
+            dispatch_state = "submitting"
+        elif action == "admitted" and dispatch_state in {"submitting", "admitted"}:
+            dispatch_state = "admitted"
+        elif action != "read":
+            raise AssertionError("unexpected dispatch transition")
+        return {"state": dispatch_state, "cancel_requested": False}
+
     async def no_segments(*_args, **_kwargs):
         return ()
 
@@ -139,6 +154,7 @@ def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assist
         get_thread=get_thread,
         append_message=append_message,
         chat_execution=chat_execution,
+        chat_dispatch=chat_dispatch,
         dragon_context_segments=no_segments,
         chat_history_dependencies=no_segments,
         commit_assistant_message=commit_assistant_message,
@@ -148,6 +164,32 @@ def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assist
     monkeypatch.setattr(route, "model_catalog", fixture_catalog)
     monkeypatch.setattr(route, "chat_turn_lifecycle", ChatTurnLifecycle(AsyncTurnAuthority()))
     return authority
+
+
+def _enable_prepared_engine_submit(fake_client, *, wait_after_submit=False):
+    """Record a single submission with a digest-bound acknowledgement."""
+    result = {"value": None}
+
+    async def submit(command):
+        result["value"] = await fake_client.execute(command)
+        return SimpleNamespace(
+            operation_id=command.operation.operation_id,
+            execution_id=command.execution_request.execution_id,
+        )
+
+    def validate(ack, command):
+        assert ack.operation_id == command.operation.operation_id
+        assert ack.execution_id == command.execution_request.execution_id
+
+    async def terminal(**_kwargs):
+        assert result["value"] is not None
+        return result["value"]
+
+    fake_client.submit = submit
+    fake_client._validate_ack_identity = validate
+    if wait_after_submit:
+        fake_client.wait_for_terminal = terminal
+
 
 
 @pytest.mark.asyncio
@@ -229,6 +271,7 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _enable_prepared_engine_submit(fake_client, wait_after_submit=True)
 
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
@@ -291,6 +334,7 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _enable_prepared_engine_submit(fake_client)
 
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
@@ -401,6 +445,7 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _enable_prepared_engine_submit(fake_client)
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
