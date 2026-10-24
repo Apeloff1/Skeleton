@@ -538,30 +538,6 @@ def test_memory_opt_in_without_canonical_engine_fails_closed(
     monkeypatch,
 ):
     initial = _thread()
-    user_message = ConversationMessage(
-        message_id=str(uuid4()),
-        thread_id=initial.thread_id,
-        branch_id=initial.active_branch_id,
-        sequence=1,
-        author_type=ConversationAuthorType.USER,
-        created_at=_now(),
-        idempotency_key="memory-no-engine",
-        content="remember this",
-    )
-    after_user = ConversationThread(
-        thread_id=initial.thread_id,
-        tenant_id=initial.tenant_id,
-        owner_id=initial.owner_id,
-        created_at=initial.created_at,
-        updated_at=_now(),
-        version=2,
-        message_sequence=1,
-        active_branch_id=initial.active_branch_id,
-        state=initial.state,
-        title=initial.title,
-        data_class=initial.data_class,
-    )
-
     calls = {"append": 0, "commit": 0, "provider": 0}
 
     async def append_user_message(*_args, **_kwargs):
