@@ -82,6 +82,39 @@ def test_stale_local_checkout_detected_after_remote_advances(tmp_path):
     assert "plain.txt" in report["findings"]["worktree_mismatch"]
 
 
+def test_same_tree_different_commit_is_not_vm_parity(tmp_path):
+    repo = fixture(tmp_path)
+    original = git(repo, "rev-parse", "HEAD")
+    git(repo, "commit", "--allow-empty", "-m", "metadata only, tree unchanged")
+    assert git(repo, "rev-parse", "HEAD") != original
+    report = scan(repo)
+    assert report["status"] == "diverged"
+    assert report["findings"]["head_tree_difference"] == []
+    assert report["findings"]["head_commit_difference"] == [
+        git(repo, "rev-parse", "HEAD")
+    ]
+
+
+def test_fresh_fetch_without_independent_main_pin_does_not_certify(tmp_path):
+    repo = fixture(tmp_path)
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--repo", str(repo), "--fetch"],
+        check=False, text=True, capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "--expected-main-sha" in result.stderr
+    sha = git(repo, "rev-parse", "HEAD")
+    pinned = subprocess.run(
+        [
+            sys.executable, str(SCRIPT), "--repo", str(repo),
+            "--fetch", "--expected-main-sha", sha,
+        ],
+        check=False, text=True, capture_output=True,
+    )
+    assert pinned.returncode == 0, pinned.stderr
+    assert '"status": "identical"' in pinned.stdout
+
+
 def test_wrong_expected_main_sha_fails(tmp_path):
     repo = fixture(tmp_path)
     import pytest
