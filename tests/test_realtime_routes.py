@@ -30,15 +30,14 @@ def test_realtime_prefixes_are_written_gate_domains_not_open_routes():
 
 
 def test_create_app_mounts_realtime_routes_and_hub():
+    """Must not skip (Jenkins S2-7). FastAPI >= 0.142 includes routers lazily
+    (``_IncludedRouter`` entries with ``path=None``), so walk the composed
+    route table with the cortex mount guard's ``iter_route_paths``."""
+    from skeleton.api.cortex_mount_guard import iter_route_paths
     from skeleton.api.server import create_app
 
-    try:
-        app = create_app()
-    except RuntimeError as exc:  # newer FastAPI lazily includes routers locally
-        if "uninspectable" in str(exc):
-            pytest.skip("FastAPI build exposes lazy router includes; CI pins 0.136.1")
-        raise
-    paths = {getattr(r, "path", None) for r in app.routes}
+    app = create_app()
+    paths = set(iter_route_paths(app))
     assert {"/api/v1/events", "/api/v1/presence", "/api/v1/events/slo"} <= paths
     assert "/api/v1/engine/executions/{execution_id}/events" in paths
     assert isinstance(app.state.realtime_hub, RealtimeHub)

@@ -120,7 +120,7 @@ def test_stream_reset_invokes_callback_and_moves_cursor():
         frames = client.frames()
         (reset,) = await _take(frames, 1)
         assert reset.type == "stream.reset" and resets == [reset]
-        assert client.last_event_id == hub.head_id
+        assert client.last_event_id == hub.cursor_for(hub.head_id)  # epoch cursor (S2-6)
         client.close()
         await frames.aclose()
 
