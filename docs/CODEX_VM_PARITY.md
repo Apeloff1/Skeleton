@@ -26,7 +26,9 @@ The verifier:
    the same checkout twice, a wrong HEAD, unsupported Git entries, and dirty
    or untracked Git paths.
 2. Traverses every tracked Git entry and compares actual checkout bytes
-   using SHA-256, executable-mode bits, and literal symlink targets.
+   using SHA-256, executable-mode bits, and literal symlink targets. It also
+   matches each file's actual bytes to the committed Git blob SHA-1, so two
+   equally corrupted or `skip-worktree`-hidden files cannot pass.
 3. Fails closed with a nonzero exit and `verdict=not_verified` on missing
    evidence, source drift or any error. The receipt does not expose file
    contents or credentials.
