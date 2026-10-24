@@ -7,6 +7,8 @@ boundaries; the model admission validator tests metadata content separately.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import json
 from uuid import uuid4
 
 import pytest
@@ -45,15 +47,23 @@ def _user(thread, *, message_id=None, prepared=True):
     )
 
 
-def _metadata():
-    return {
+def _digest(value):
+    return hashlib.sha256(json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+
+
+def _metadata(*, request="stable"):
+    payload = {
         "schema_version": "backend.ai.chat-execution.v1",
         "request_digest": "a" * 64,
-        "command_digest": "b" * 64,
-        "record_digest": "c" * 64,
-        "command": {"request": "stable", "version": 1},
+        "command": {"request": request, "version": 1},
         "dependencies": {},
     }
+    payload["command_digest"] = _digest(payload["command"])
+    payload["record_digest"] = _digest(payload)
+    return payload
 
 
 def test_atomic_prepared_command_survives_restart(tmp_path):
@@ -97,7 +107,7 @@ def test_prepared_command_cannot_be_replaced_or_dropped_under_same_key(tmp_path)
         expected_thread_version=thread.version, execution_metadata=original,
     )
     assert replay_thread.version == next_thread.version
-    changed = {**original, "request_digest": "f" * 64}
+    changed = _metadata(request="changed")
     with pytest.raises(ConversationConflict, match="replayed execution metadata differs"):
         repo.append_message(
             user, tenant_id="tenant-a", owner_id="alice",
@@ -133,6 +143,45 @@ def test_unprepared_user_remains_legacy_and_cannot_claim_prepared_command(tmp_pa
     assert repo.chat_execution(
         thread.thread_id, user.message_id, tenant_id="tenant-a", owner_id="alice",
     ) is None
+    repo.close()
+
+
+def test_tampered_command_digest_is_rejected_without_user_commit(tmp_path):
+    repo = SQLiteConversationRepository(tmp_path / "tamper.sqlite")
+    thread = _thread(repo)
+    user = _user(thread)
+    invalid = {**_metadata(), "command_digest": "f" * 64}
+    with pytest.raises(ConversationConflict, match="prepared execution digest differs"):
+        repo.append_message(
+            user, tenant_id="tenant-a", owner_id="alice",
+            expected_thread_version=thread.version,
+            execution_metadata=invalid,
+        )
+    assert repo.active_transcript(
+        thread.thread_id, tenant_id="tenant-a", owner_id="alice",
+    ) == ()
+    repo.close()
+
+
+def test_mismatched_request_binding_cannot_publish_user(tmp_path):
+    repo = SQLiteConversationRepository(tmp_path / "request-binding.sqlite")
+    thread = _thread(repo)
+    user = _user(thread)
+    invalid = _metadata()
+    invalid["request_digest"] = "f" * 64
+    invalid["record_digest"] = _digest({
+        key: value for key, value in invalid.items()
+        if key != "record_digest"
+    })
+    with pytest.raises(ConversationConflict, match="request identity differs"):
+        repo.append_message(
+            user, tenant_id="tenant-a", owner_id="alice",
+            expected_thread_version=thread.version,
+            execution_metadata=invalid,
+        )
+    assert repo.active_transcript(
+        thread.thread_id, tenant_id="tenant-a", owner_id="alice",
+    ) == ()
     repo.close()
 
 
