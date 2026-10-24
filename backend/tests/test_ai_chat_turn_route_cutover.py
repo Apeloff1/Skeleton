@@ -217,11 +217,12 @@ def _conversation_authority(thread, user, monkeypatch, *, allow_commit=True, leg
 
 def _configure_prepared_engine(fake_client):
     """Share real submit/ack/terminal identities across five chat route cases."""
-    result = {"value": None}
+    result = {"value": None, "command": None}
     prior_terminal = fake_client.wait_for_terminal
 
     async def submit(command):
         value = await fake_client.execute(command)
+        result["command"] = command
         result["value"] = value
         return {
             "operation_id": command.operation.operation_id,
@@ -246,9 +247,24 @@ def _configure_prepared_engine(fake_client):
     async def terminal_result_if_available(**_kwargs):
         return result["value"]
 
+    async def status(*_args, **_kwargs):
+        if result["value"] is None:
+            raise EngineNotFoundError("original submission not yet admitted")
+        return {"execution_state": "completed", "cancellation_requested": False}
+
+    async def terminal_if_available(**_kwargs):
+        return result["value"]
+
+    async def handoff_binding(*_args, **_kwargs):
+        assert result["command"] is not None
+        return result["command"].compiled_context
+
     fake_client.submit = submit
     fake_client._validate_ack_identity = verify_ack
     fake_client.wait_for_terminal = terminal
+    fake_client.status = status
+    fake_client.terminal_result_if_available = terminal_if_available
+    fake_client.handoff_binding = handoff_binding
     fake_client.status = status
     fake_client.terminal_result_if_available = terminal_result_if_available
 
@@ -479,6 +495,14 @@ async def test_live_chat_event_page_supports_digest_bound_reconnect(
     thread, user = _thread_and_user()
     authority = _conversation_authority(thread, user, monkeypatch)
     monkeypatch.setattr(route, "conversation_authority", authority)
+
+    # The shared SQLite test journal has durable reconstruction, but its
+    # older async adapter exposed only events and leases. Exercise the route's
+    # real reconstruction path against the same repository.
+    async def reconstruct(operation_id, **kwargs):
+        return ai_chat_turn_test_authority.repo.reconstruct(operation_id, **kwargs)
+
+    monkeypatch.setattr(ai_chat_turn_test_authority, "reconstruct", reconstruct, raising=False)
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
             service_principal="codedock-backend",
