@@ -237,3 +237,51 @@ def test_failed_version_cannot_orphan_prepared_command(tmp_path):
             thread.thread_id, user.message_id, tenant_id="tenant-a", owner_id="alice",
         )
     repo.close()
+
+
+def test_selected_history_returns_only_real_prepared_causal_user(tmp_path):
+    repo = SQLiteConversationRepository(tmp_path / "causal.sqlite")
+    thread = _thread(repo)
+    message = _user(thread)
+    metadata = _metadata()
+    repo.append_message(
+        message, tenant_id="tenant-a", owner_id="alice",
+        expected_thread_version=thread.version, execution_metadata=metadata,
+    )
+    rows = repo.chat_history_dependencies(
+        thread.thread_id, {message.message_id},
+        tenant_id="tenant-a", owner_id="alice",
+    )
+    assert len(rows) == 1
+    assert rows[0][0].message_id == message.message_id
+    assert rows[0][1] == metadata
+    assert rows[0][2] is None  # SQLite cannot fabricate legacy engine commands
+    assert repo.chat_history_dependencies(
+        thread.thread_id, set(), tenant_id="tenant-a", owner_id="alice",
+    ) == []
+    with pytest.raises(ConversationConflict, match="lineage is incomplete"):
+        repo.chat_history_dependencies(
+            thread.thread_id, {str(uuid4())}, tenant_id="tenant-a", owner_id="alice",
+        )
+    with pytest.raises(ConversationAuthorizationError):
+        repo.chat_history_dependencies(
+            thread.thread_id, {message.message_id},
+            tenant_id="tenant-b", owner_id="alice",
+        )
+    repo.close()
+
+
+def test_legacy_causal_history_has_no_invented_command(tmp_path):
+    repo = SQLiteConversationRepository(tmp_path / "legacy-causal.sqlite")
+    thread = _thread(repo)
+    user = _user(thread, prepared=False)
+    repo.append_message(
+        user, tenant_id="tenant-a", owner_id="alice",
+        expected_thread_version=thread.version,
+    )
+    rows = repo.chat_history_dependencies(
+        thread.thread_id, {user.message_id}, tenant_id="tenant-a", owner_id="alice",
+    )
+    assert len(rows) == 1 and rows[0][0].message_id == user.message_id
+    assert rows[0][1:] == (None, None)
+    repo.close()
