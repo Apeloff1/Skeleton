@@ -145,3 +145,137 @@ class AIModelRegistry:
             ]
         result.sort(key=lambda item: item.registry_id)
         return tuple(result)
+
+
+# --- GF-P0-15: model-weight readiness, rights and VRAM capability discovery ---
+
+import os as _os
+import shutil as _shutil
+import subprocess as _subprocess
+
+
+class ModelNotReadyError(RuntimeError):
+    """Raised when a model may not be invoked (weights, rights or VRAM)."""
+
+
+@dataclass(frozen=True)
+class ModelCapability:
+    """Operator-declared readiness facts for one registered model.
+
+    Deny-by-default: an unknown model, unready weights, a missing licence or a
+    use outside ``allowed_uses`` all fail closed in :meth:`check`.
+    """
+
+    weights_ready: bool = False
+    weights_digest: str | None = None
+    license_id: str | None = None
+    allowed_uses: frozenset[str] = frozenset()
+    vram_required_mb: int = 0
+
+    def __post_init__(self) -> None:
+        if self.vram_required_mb < 0:
+            raise ValueError("vram_required_mb must be non-negative")
+        object.__setattr__(self, "allowed_uses", frozenset(self.allowed_uses))
+
+    def check(self, *, use: str, available_vram_mb: int | None) -> None:
+        if not self.weights_ready or not self.weights_digest:
+            raise ModelNotReadyError("model weights are not ready")
+        if not self.license_id:
+            raise ModelNotReadyError("model rights are not declared")
+        if use not in self.allowed_uses:
+            raise ModelNotReadyError(f"model rights do not permit use: {use}")
+        if self.vram_required_mb:
+            if available_vram_mb is None:
+                raise ModelNotReadyError("VRAM capacity is unknown")
+            if available_vram_mb < self.vram_required_mb:
+                raise ModelNotReadyError("insufficient VRAM for model")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "weights_ready": self.weights_ready,
+            "weights_digest": self.weights_digest,
+            "license_id": self.license_id,
+            "allowed_uses": sorted(self.allowed_uses),
+            "vram_required_mb": self.vram_required_mb,
+        }
+
+
+def discover_vram_mb(*, runner=None) -> int | None:
+    """Best-effort free-VRAM discovery in MiB; ``None`` when unknown.
+
+    ``SKELETON_VRAM_MB`` overrides discovery. Otherwise ``nvidia-smi`` is
+    queried with a short timeout; failures return ``None`` (fail closed).
+    """
+
+    override = _os.getenv("SKELETON_VRAM_MB", "").strip()
+    if override:
+        try:
+            value = int(override)
+        except ValueError:
+            return None
+        return value if value >= 0 else None
+    if runner is None:
+        if _shutil.which("nvidia-smi") is None:
+            return None
+
+        def runner() -> str:
+            return _subprocess.run(
+                ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=5, check=True,
+            ).stdout
+
+    try:
+        lines = [line.strip() for line in str(runner()).splitlines() if line.strip()]
+        values = [int(float(line)) for line in lines]
+    except Exception:
+        return None
+    return max(values) if values else None
+
+
+def _registry_set_capability(
+    self: AIModelRegistry, registry_id: str, capability: ModelCapability
+) -> None:
+    with self._lock:
+        if registry_id not in self._items:
+            raise KeyError(registry_id)
+        caps = self.__dict__.setdefault("_capabilities", {})
+        caps[registry_id] = capability
+
+
+def _registry_capability(self: AIModelRegistry, registry_id: str) -> ModelCapability | None:
+    with self._lock:
+        return self.__dict__.get("_capabilities", {}).get(registry_id)
+
+
+def _registry_require_ready(
+    self: AIModelRegistry,
+    registry_id: str,
+    *,
+    use: str,
+    available_vram_mb: int | None = None,
+) -> RegisteredModel:
+    with self._lock:
+        history = self._items.get(registry_id)
+        if not history:
+            raise ModelNotReadyError("model is not registered")
+        current = history[-1]
+        if not current.active:
+            raise ModelNotReadyError("model is not active")
+        capability = self.__dict__.get("_capabilities", {}).get(registry_id)
+    if capability is None:
+        raise ModelNotReadyError("model capability is not declared")
+    capability.check(use=use, available_vram_mb=available_vram_mb)
+    return current
+
+
+def _registry_capability_report(self: AIModelRegistry) -> dict[str, dict[str, object]]:
+    with self._lock:
+        caps = dict(self.__dict__.get("_capabilities", {}))
+        ids = sorted(self._items)
+    return {rid: (caps[rid].to_dict() if rid in caps else {"declared": False}) for rid in ids}
+
+
+AIModelRegistry.set_capability = _registry_set_capability
+AIModelRegistry.capability = _registry_capability
+AIModelRegistry.require_ready = _registry_require_ready
+AIModelRegistry.capability_report = _registry_capability_report

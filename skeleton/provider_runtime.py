@@ -3935,10 +3935,94 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
         return default
 
 
+# --- GF-P0-15: readiness/rights/VRAM gate for model invocation ---
+
+
+class ModelReadinessGate:
+    """Binds a provider/model identity to an ``AIModelRegistry`` readiness check."""
+
+    def __init__(
+        self,
+        registry: Any,
+        *,
+        use: str = "model-inference",
+        vram_probe: Callable[[], int | None] | None = None,
+    ) -> None:
+        from skeleton.shells.ai.model_registry import discover_vram_mb
+
+        self._registry = registry
+        self._use = use
+        self._vram_probe = vram_probe or discover_vram_mb
+
+    def check(self, provider_id: str, model: str | None, *, use: str | None = None) -> None:
+        from skeleton.shells.ai.model_registry import ModelNotReadyError
+
+        registry_id = f"{provider_id}:{model}"
+        try:
+            self._registry.require_ready(
+                registry_id,
+                use=use or self._use,
+                available_vram_mb=self._vram_probe(),
+            )
+        except ModelNotReadyError as exc:
+            raise ProviderPolicyError(f"model {registry_id} denied: {exc}") from exc
+
+
+class GatedProviderAdapter(ProviderAdapter):
+    """Wraps an adapter so every invocation passes the readiness gate first.
+
+    The inner adapter is held in a name-mangled private attribute and attribute
+    access is not proxied, so normal callers cannot reach an ungated method.
+    """
+
+    def __init__(self, inner: ProviderAdapter, gate: ModelReadinessGate) -> None:
+        self.__inner = inner
+        self.__gate = gate
+        self.provider_id = inner.provider_id
+        self.model = getattr(inner, "model", None)
+
+    def _check(self, use: str | None = None) -> None:
+        self.__gate.check(self.provider_id, self.model, use=use)
+
+    @property
+    def available(self) -> bool:
+        return self.__inner.available
+
+    def status(self) -> dict[str, Any]:
+        return dict(self.__inner.status(), gated=True)
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        self._check(request.purpose)
+        return await self.__inner.generate(request)
+
+    async def stream(self, request: ProviderRequest) -> AsyncIterator[ProviderDelta]:
+        self._check(request.purpose)
+        async for delta in self.__inner.stream(request):
+            yield delta
+
+    async def generate_image(self, request: ProviderImageRequest) -> ProviderImageResponse:
+        self._check("image-generation")
+        return await self.__inner.generate_image(request)
+
+    async def create_image_variation(self, image: bytes, **kwargs: Any) -> ProviderImageResponse:
+        self._check("image-generation")
+        return await self.__inner.create_image_variation(image, **kwargs)
+
+    async def edit_image(self, image: bytes, **kwargs: Any) -> ProviderImageResponse:
+        self._check("image-generation")
+        return await self.__inner.edit_image(image, **kwargs)
+
+    async def synthesize_speech(self, request: ProviderSpeechRequest) -> ProviderSpeechResponse:
+        self._check("speech-synthesis")
+        return await self.__inner.synthesize_speech(request)
+
+
 __all__ = [
     "AIMessage",
     "FailoverProviderAdapter",
     "FinishReason",
+    "GatedProviderAdapter",
+    "ModelReadinessGate",
     "OpenAICompatibleSecondaryAdapter",
     "OpenAIProviderAdapter",
     "OpenAISyncProviderAdapter",
