@@ -185,6 +185,14 @@ def _enable_prepared_engine_submit(fake_client, *, wait_after_submit=False):
         assert result["value"] is not None
         return result["value"]
 
+    # The canonical memory boundary imports engine governance callbacks at
+    # module load. The finalization cases do not request memory writes, but
+    # their fake client must still satisfy that real initialization contract.
+    async def forbid_memory_write(*_args, **_kwargs):
+        raise AssertionError("unexpected governed memory write")
+
+    fake_client.admit_storage_write = forbid_memory_write
+    fake_client.reconcile_governed_write = forbid_memory_write
     fake_client.submit = submit
     fake_client._validate_ack_identity = validate
     if wait_after_submit:
