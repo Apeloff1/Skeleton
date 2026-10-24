@@ -15,7 +15,6 @@ import importlib.util
 import json
 import math
 import sys
-import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -23,6 +22,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from skeleton.foundation.journal import EventJournal, ReplayEngine
 from skeleton.school.replay import JeevesReplay, ReplaySnapshot
+from skeleton.quality.deterministic_time import DeterministicClock, as_monotonic, budget_within
 
 
 def _load_cognition_replay() -> Any:
@@ -181,21 +181,39 @@ def _placeholder_manifest(scenario_id: str = "invalid-manifest") -> ScenarioMani
     )
 
 
+_PERF_TOLERANCE_KEYS = ("frame_ms", "alloc_bytes", "load_ms")
+_PERF_TOLERANCE_MAX = {"frame_ms": MAX_TIME_BUDGET_MS, "alloc_bytes": float(2**53), "load_ms": MAX_TIME_BUDGET_MS}
+
+
 @dataclass(frozen=True, slots=True)
 class Tolerances:
     duration_ms: float = 0.0
     duration_rel: float = 0.0
+    frame_ms: float | None = None
+    alloc_bytes: float | None = None
+    load_ms: float | None = None
 
     def to_mapping(self) -> dict[str, float]:
-        return {"duration_ms": self.duration_ms, "duration_rel": self.duration_rel}
+        out = {"duration_ms": self.duration_ms, "duration_rel": self.duration_rel}
+        for key in _PERF_TOLERANCE_KEYS:
+            value = getattr(self, key)
+            if value is not None:
+                out[key] = value
+        return out
 
     @classmethod
     def from_mapping(cls, payload: object | None) -> Tolerances:
         if payload is None:
             return cls()
         data = _require_mapping(payload, "tolerances")
-        _reject_unknown(data, {"duration_ms", "duration_rel"}, "tolerances")
+        _reject_unknown(data, {"duration_ms", "duration_rel", *_PERF_TOLERANCE_KEYS}, "tolerances")
+        perf = {
+            key: _bounded_float(data[key], key, minimum=0.0, maximum=_PERF_TOLERANCE_MAX[key])
+            for key in _PERF_TOLERANCE_KEYS
+            if data.get(key) is not None
+        }
         return cls(
+            **perf,
             duration_ms=_bounded_float(
                 data.get("duration_ms", 0.0), "duration_ms", minimum=0.0, maximum=MAX_TIME_BUDGET_MS
             ),
@@ -636,6 +654,28 @@ def _envelope(manifest: ScenarioManifest, observed: Sequence[float]) -> dict[str
     }
 
 
+def _perf_envelope(tolerances: Tolerances, observed_perf: Mapping[str, Any]) -> dict[str, Any]:
+    """Compare observed frame/alloc/load samples to tolerances; missing samples fail closed."""
+    data = _require_mapping(observed_perf, "observed_perf")
+    _reject_unknown(data, set(_PERF_TOLERANCE_KEYS), "observed_perf")
+    metrics: dict[str, Any] = {}
+    within_all = True
+    for key in _PERF_TOLERANCE_KEYS:
+        budget = getattr(tolerances, key)
+        raw = data.get(key, ())
+        if not isinstance(raw, (list, tuple)):
+            raise QualityEvidenceError(f"observed_perf.{key} must be a list")
+        samples = [
+            _bounded_float(v, key, minimum=0.0, maximum=_PERF_TOLERANCE_MAX[key]) for v in raw
+        ]
+        if budget is None:
+            continue
+        ok = bool(samples) and all(budget_within(v, budget) for v in samples)
+        within_all = within_all and ok
+        metrics[key] = {"budget": budget, "observed": samples, "within": ok}
+    return {"metrics": metrics, "within": within_all}
+
+
 def run_harness(
     manifest: ScenarioManifest | Mapping[str, Any],
     *,
@@ -643,6 +683,7 @@ def run_harness(
     candidates: Sequence[Any] | None = None,
     observed_duration_ms: Sequence[float] | None = None,
     clock: Callable[[], float] | None = None,
+    observed_perf: Mapping[str, Any] | None = None,
 ) -> EvidenceReport:
     """Produce pass/fail quality evidence from a deterministic scenario manifest."""
     if not isinstance(manifest, ScenarioManifest):
@@ -662,10 +703,11 @@ def run_harness(
         baseline_digest = actual_baseline_digest
         payloads = _candidate_payloads(manifest, candidate, candidates)
         durations = _durations(manifest, observed_duration_ms)
+        perf = None if observed_perf is None else _perf_envelope(manifest.tolerances, observed_perf)
     except QualityEvidenceError as exc:
         return _corrupt_report(str(exc), manifest=manifest)
 
-    now = clock or time.monotonic
+    now = as_monotonic(clock)
     started = now()
     digests: list[str] = []
     reasons: list[str] = []
@@ -723,6 +765,12 @@ def run_harness(
                 reasons.append("performance envelope exceeded")
             if envelope["run_within"] and not all(envelope["run_within"]) and any(envelope["run_within"]):
                 reasons.append("non-reproducible performance envelope")
+        if perf is not None:
+            envelope = {**(envelope or {}), "perf": perf}
+            if not perf["within"]:
+                reasons.append("perf budget exceeded")
+    elif perf is not None:
+        reasons.append("perf observations require performance kind")
 
     unique_digests = set(digests)
     if len(unique_digests) > 1:
@@ -871,6 +919,7 @@ def verify_evidence(payload: Mapping[str, Any]) -> EvidenceReport:
 
 __all__ = [
     "SCHEMA_ID",
+    "DeterministicClock",
     "EvidenceReport",
     "QualityEvidenceError",
     "ReplayTape",
