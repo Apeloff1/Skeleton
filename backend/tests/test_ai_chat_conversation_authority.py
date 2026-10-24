@@ -380,17 +380,22 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
 
 
 def test_chat_version_conflict_maps_to_409(route, client, monkeypatch):
+    """A stale version is rejected before chat admission, with no storage mutation."""
     async def active_transcript(*args, **kwargs):
         return ()
 
+    async def get_thread(*args, **kwargs):
+        return _thread(version=1)
+
     async def append_user_message(*args, **kwargs):
-        raise ConversationConflict("thread version conflict")
+        raise AssertionError("stale version must not append a message")
 
     monkeypatch.setattr(
         route,
         "conversation_authority",
         SimpleNamespace(
             active_transcript=active_transcript,
+            get_thread=get_thread,
             append_user_message=append_user_message,
         ),
     )
@@ -410,7 +415,7 @@ def test_chat_version_conflict_maps_to_409(route, client, monkeypatch):
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "thread version conflict"
+    assert response.json()["detail"] == "conversation version changed or is not writable"
 
 
 def test_provider_failure_keeps_user_message_canonical_for_retry(
