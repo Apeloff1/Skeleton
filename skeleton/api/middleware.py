@@ -301,9 +301,19 @@ class RequestSealMiddleware:
     Open probes skip credential check (health/ready).
     """
 
-    def __init__(self, app, *, policy: Optional[GatePolicy] = None) -> None:
+    def __init__(
+        self,
+        app,
+        *,
+        policy: Optional[GatePolicy] = None,
+        replay_cache: Any = None,
+    ) -> None:
+        from skeleton.api.hmac_seal import InMemoryReplayCache
+
         self.app = app
         self.policy = policy or GatePolicy()
+        # Seal v2 nonce store (pluggable port; in-memory per process by default).
+        self.replay_cache = replay_cache if replay_cache is not None else InMemoryReplayCache()
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -345,7 +355,12 @@ class RequestSealMiddleware:
             await resp(scope, receive, send_with_seal)
             return
         try:
-            attester = verify_seal(request.headers.get("x-gf-seal"))
+            attester = verify_seal(
+                request.headers.get("x-gf-seal"),
+                domain=self.policy.required_domain(path),
+                replay_cache=self.replay_cache,
+                enforce_domain=True,
+            )
         except AuthError:
             resp = _json_response(401, {"error": "invalid_seal"})
             await resp(scope, receive, send_with_seal)
@@ -578,6 +593,7 @@ def install_gate(
     max_body_bytes: Optional[int] = None,
     write_gate: Any = None,
     write_governor: Any = None,
+    replay_cache: Any = None,
 ) -> Any:
     """Wire Gate stack outer→inner onto a Starlette/FastAPI app.
 
@@ -606,7 +622,7 @@ def install_gate(
         gate=write_gate,
         governor=write_governor,
     )
-    app.add_middleware(RequestSealMiddleware, policy=policy)
+    app.add_middleware(RequestSealMiddleware, policy=policy, replay_cache=replay_cache)
     app.add_middleware(HeaderBoundMiddleware)
     # Expose the live policy so extend-only mount helpers (install_agent_edge)
     # can charter their prefix on the same gate stack.
