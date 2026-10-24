@@ -96,6 +96,11 @@ def audit(repo: Path, *, remote: str, branch: str, refresh: bool, include_ignore
         # An empty commit or metadata-only revision must not certify parity.
         "head_commit_difference": [] if head == target else [head],
         "head_tree_difference": distinct_tree,
+        # Staged but unpublished changes are separate from both HEAD and
+        # physical working-tree bytes (e.g. stage a file, then restore it).
+        "staged_index_difference": paths_from_null(
+            git(repo, "diff", "--cached", "--name-only", "-z", "--no-ext-diff")
+        ),
         "worktree_mismatch": [],
         "missing_worktree_file": [],
         "unexpected_type_or_mode": [],
