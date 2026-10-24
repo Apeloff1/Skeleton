@@ -373,6 +373,9 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
     monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
     monkeypatch.setattr(route, "model_catalog", fixture_catalog)
     monkeypatch.setattr(route, "chat_turn_lifecycle", ChatTurnLifecycle(turn_owner))
+    # Preserve the originating exception in this hermetic fixture instead of
+    # masking a contract regression behind the production HTTP 500 projection.
+    monkeypatch.setattr(route, "_chat_error", lambda exc: exc)
 
     request = route.AIChatRequest(
         message="Keep this answer for later.",
