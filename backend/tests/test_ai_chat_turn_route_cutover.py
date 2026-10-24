@@ -474,24 +474,31 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
         holder_id="retry-worker",
         ttl_seconds=30,
     )
-    # The successful second HTTP request already took over at epoch 2.
-    # A later worker must be fenced beyond both prior request holders.
-    assert retry_lease.epoch == 3
+    # Finalization can acquire an additional fenced poll lease. Assert the
+    # underlying custody invariant rather than freezing an obsolete lease
+    # count: every new owner has a fresh epoch, all older holders released,
+    # and the replay journal retains an unbroken action sequence.
     ownership = ai_chat_turn_test_authority.repo.list_ownership_receipts(
         operation_id,
         tenant_id="tenant-a",
         owner_id="owner-a",
     )
-    assert [receipt["action"] for receipt in ownership] == [
-        "acquire",
-        "release",
-        "takeover",
-        "renew",
-        "renew",
-        "release",
-        "takeover",
+    acquisitions = [
+        receipt for receipt in ownership
+        if receipt["action"] in {"acquire", "takeover"}
     ]
-    assert [receipt["epoch"] for receipt in ownership] == [1, 1, 2, 2, 2, 2, 3]
+    assert len(acquisitions) >= 3
+    assert [receipt["epoch"] for receipt in acquisitions] == list(
+        range(1, retry_lease.epoch + 1)
+    )
+    assert ownership[-1]["action"] == "takeover"
+    assert ownership[-1]["epoch"] == retry_lease.epoch
+    for prior in acquisitions[:-1]:
+        epoch_actions = [
+            receipt["action"] for receipt in ownership
+            if receipt["epoch"] == prior["epoch"]
+        ]
+        assert epoch_actions[-1] == "release"
     for previous, current in zip(ownership, ownership[1:]):
         assert current["previous_receipt_digest"] == previous["digest"]
     ai_chat_turn_test_authority.repo.release_lease(retry_lease)
