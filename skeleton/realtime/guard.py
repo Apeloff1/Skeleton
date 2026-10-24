@@ -14,8 +14,9 @@ Hardening (Jenkins S2-3, #4128 review):
   ``aws_secret_access_key`` and ``X-Session-Id`` are all caught;
 * string values that hold JSON objects/arrays are parsed and scanned
   recursively (a scrubbed value is re-serialised);
-* percent-encoded (repeatedly, to a fixpoint, max 3 rounds) and
-  base64-looking values are decoded before the credential
+* percent-encoded and base64-looking values are decoded, interleaved, in
+  one bounded loop (max 3 layers); a value that still decodes past the bound
+  is redacted whole (refused in reject mode). Decoding happens before the credential
   patterns run; a hit replaces the whole encoded value;
 * non-string scalars (``int``, ``float``, ``bool``) are scanned by their
   ``str()`` form; any other non-JSON-native type is refused with
@@ -32,7 +33,7 @@ import binascii
 import json
 import re
 from collections.abc import Mapping
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 from urllib.parse import unquote
 
 from skeleton.observability.redaction import REDACTED, SENSITIVE_KEYS, redact_text
@@ -84,7 +85,8 @@ _MAX_DECODE_ROUNDS = 3
 #: to a preceding alphanumeric (``xghp_...``, ``tokenghp_...``) still matches.
 _TOKEN_PREFIX_PATTERNS: Tuple[Any, ...] = (
     re.compile(r"(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{60,})"),
-    re.compile(r"sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}"),
+    # sk- keeps a leading boundary: ``ask-...`` / ``risk-...`` are prose.
+    re.compile(r"(?<![A-Za-z0-9])sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}"),
     re.compile(r"(?:AKIA|ASIA)[A-Z0-9]{16}"),
     re.compile(r"xox[abprs]-[A-Za-z0-9-]{10,}"),
     re.compile(r"AIza[0-9A-Za-z_-]{35}"),
@@ -131,36 +133,57 @@ def _patterns_hit(value: str) -> Tuple[str, int]:
     return cleaned2, hits
 
 
-def _decoded_variants(value: str) -> list:
-    """Percent- and base64-decoded forms of ``value`` worth re-scanning."""
-    out = []
+def _b64_step(value: str) -> Optional[str]:
+    compact = value.strip()
+    if not _B64_RE.match(compact):
+        return None
+    padded = compact + "=" * (-len(compact) % 4)
+    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+        try:
+            raw = decoder(padded)
+        except (binascii.Error, ValueError):
+            continue
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if text and text.isprintable() and text != value:
+            return text
+    return None
+
+
+def _decode_step(value: str) -> Optional[str]:
+    """One decode layer (percent first, else base64), or ``None`` at a fixpoint."""
+    if _PCT_RE.search(value):
+        decoded = unquote(value)
+        if decoded != value:
+            return decoded
+    return _b64_step(value)
+
+
+def _decode_chain(value: str) -> Tuple[list, bool]:
+    """Interleaved percent/base64 decode layers of ``value``, bounded.
+
+    Returns ``(variants, exhausted)``; ``exhausted`` is ``True`` when the value
+    still decodes after :data:`_MAX_DECODE_ROUNDS` layers, or is too large to
+    decode. Such values are never stored in cleartext (Jenkins #4253 review).
+    """
+    out: list = []
     if len(value) > _MAX_DECODE_CHARS:
-        return out
+        return out, _decode_step(value[:_MAX_DECODE_CHARS]) is not None
     current = value
     for _ in range(_MAX_DECODE_ROUNDS):
-        if not _PCT_RE.search(current):
-            break
-        decoded = unquote(current)
-        if decoded == current:
-            break
-        out.append(decoded)
-        current = decoded
-    compact = value.strip()
-    if _B64_RE.match(compact):
-        padded = compact + "=" * (-len(compact) % 4)
-        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
-            try:
-                raw = decoder(padded)
-            except (binascii.Error, ValueError):
-                continue
-            try:
-                text = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                continue
-            if text and text.isprintable():
-                out.append(text)
-                break
-    return out
+        nxt = _decode_step(current)
+        if nxt is None:
+            return out, False
+        out.append(nxt)
+        current = nxt
+    return out, _decode_step(current) is not None
+
+
+def _decoded_variants(value: str) -> list:
+    """Decoded forms of ``value`` worth re-scanning (see :func:`_decode_chain`)."""
+    return _decode_chain(value)[0]
 
 
 class PayloadSecretGuard:
@@ -199,7 +222,12 @@ class PayloadSecretGuard:
             if n:
                 hits += n
                 return cleaned
-            for variant in _decoded_variants(item):
+            variants, exhausted = _decode_chain(item)
+            if exhausted:
+                # Still changing after the decode bound: never store as-is.
+                hits += 1
+                return REDACTED
+            for variant in variants:
                 if variant.strip()[:1] in ("{", "["):
                     before = hits
                     scan_text(variant, depth + 1)

@@ -109,7 +109,7 @@ Main has no harness that runs a materialised Godot project headless and records 
 
 ### Realtime SSE hub (`skeleton/realtime`, Jenkins #4128 S2-4/S2-5)
 
-Single process, in-memory hub. Env overrides are read in `skeleton/api/server.py::_realtime_limits`.
+Single process, in-memory hub. Env overrides are read in `skeleton/realtime/limits.py::realtime_limits_from_env`.
 
 | Budget | Value | Enforced by |
 |---|---|---|

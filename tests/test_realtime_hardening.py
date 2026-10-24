@@ -310,7 +310,6 @@ def test_guard_catches_multi_percent_encoded_tokens(value):
     [
         f"x{_FAKE_GH}",
         f"tokenghp_{'B' * 36}",
-        f"abc123sk-{'c' * 24}",
         f"zAKIA{'D' * 16}",
     ],
 )
@@ -341,3 +340,54 @@ def test_realtime_limits_from_env(monkeypatch):
     limits = realtime_limits_from_env()
     assert limits["max_streams_per_principal"] == 3
     assert limits["presence_max_members_per_scope"] == 256
+
+
+def _b64(text):
+    return base64.b64encode(text.encode()).decode()
+
+
+def test_guard_redacts_values_still_decoding_past_the_bound():
+    from urllib.parse import quote
+
+    deep = "a b"
+    for _ in range(6):  # six %-layers: still decoding after the 3-layer bound
+        deep = quote(deep, safe="")
+    clean, hits = PayloadSecretGuard().scrub({"note": deep})
+    assert hits and clean["note"] != deep
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": deep})
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        _b64(f"token%3D{_FAKE_GH}"),  # base64(%-enc)
+        _b64(f"x {_FAKE_GH}").replace("=", "%3D"),  # %-enc(base64)
+        _b64(_b64(f"note {_FAKE_GH}")),  # double base64
+        _b64(_b64("password=s3cr3tvalue")),  # double base64, key=value
+    ],
+)
+def test_guard_catches_interleaved_percent_and_base64_layers(value):
+    clean, hits = PayloadSecretGuard().scrub({"blob": value})
+    assert hits and clean["blob"] != value
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"blob": value})
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "ask-a-question-about-the-build-pipeline",
+        "risk-assessment-for-the-quarterly-release",
+        "task-" + "a" * 30,
+    ],
+)
+def test_guard_keeps_prose_containing_sk_dash(value):
+    clean, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits == 0 and clean["note"] == value
+
+
+def test_guard_still_catches_standalone_sk_key():
+    value = "key sk-" + "c" * 24
+    clean, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits and "sk-" + "c" * 24 not in clean["note"]
