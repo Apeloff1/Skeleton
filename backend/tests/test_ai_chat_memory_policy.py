@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from dataclasses import replace
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -191,15 +192,52 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
     captured = []
     commits = []
 
-    transcript_calls = 0
+    # A prepared USER and the exact engine command must commit together.
+    # The former fake modelled an unprepared legacy message and was correctly
+    # rejected by the current fail-closed route.
+    admitted = False
+    stored_metadata = None
+    initial_thread = replace(thread, version=1, message_sequence=0)
 
     async def active_transcript(*_args, **_kwargs):
-        nonlocal transcript_calls
-        transcript_calls += 1
-        return () if transcript_calls == 1 else (user_message,)
+        return (user_message,) if admitted else ()
 
-    async def append_user_message(*_args, **_kwargs):
-        return thread, user_message
+    async def get_thread(*_args, **_kwargs):
+        return thread if admitted else initial_thread
+
+    async def append_message(candidate, *, execution_metadata, **_kwargs):
+        nonlocal admitted, user_message, stored_metadata
+        assert not admitted
+        assert "chat-prepared-execution:v1" in candidate.attachment_refs
+        assert ("chat-request-sha256:" + execution_metadata["request_digest"]) in candidate.attachment_refs
+        stored_metadata = execution_metadata
+        user_message = candidate
+        admitted = True
+        return thread, candidate
+
+    async def chat_execution(*_args, **_kwargs):
+        assert admitted
+        return stored_metadata
+
+    dispatch_state = "ready"
+
+    async def chat_dispatch(_thread_id, message_id, *, record_digest, action="read", **_kwargs):
+        nonlocal dispatch_state
+        assert admitted and message_id == user_message.message_id
+        assert record_digest == stored_metadata["record_digest"]
+        if action == "claim" and dispatch_state in {"ready", "submitting"}:
+            dispatch_state = "submitting"
+        elif action == "admitted" and dispatch_state in {"submitting", "admitted"}:
+            dispatch_state = "admitted"
+        elif action != "read":
+            raise AssertionError("unexpected dispatch transition")
+        return {"state": dispatch_state, "cancel_requested": False}
+
+    async def dragon_context_segments(*_args, **_kwargs):
+        return ()
+
+    async def chat_history_dependencies(*_args, **_kwargs):
+        return ()
 
     async def commit_assistant_message(thread_id, **kwargs):
         commits.append({"thread_id": thread_id, **kwargs})
@@ -240,7 +278,12 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
 
     fake_authority = SimpleNamespace(
         active_transcript=active_transcript,
-        append_user_message=append_user_message,
+        get_thread=get_thread,
+        append_message=append_message,
+        chat_execution=chat_execution,
+        chat_dispatch=chat_dispatch,
+        dragon_context_segments=dragon_context_segments,
+        chat_history_dependencies=chat_history_dependencies,
         commit_assistant_message=commit_assistant_message,
     )
     fake_engine = SimpleNamespace(
@@ -264,9 +307,72 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
             artifact_refs=(),
         )
 
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
+    from core.model_catalog import CATALOG_SCHEMA
+    from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
+
+    submitted_result = None
+
+    async def submit(command):
+        nonlocal submitted_result
+        submitted_result = await execute(command)
+        return SimpleNamespace(
+            operation_id=command.operation.operation_id,
+            execution_id=command.execution_request.execution_id,
+        )
+
+    def validate_ack(ack, command):
+        assert ack.operation_id == command.operation.operation_id
+        assert ack.execution_id == command.execution_request.execution_id
+
+    async def wait_for_terminal(**_kwargs):
+        assert submitted_result is not None
+        return submitted_result
+
+    async def initialized():
+        return None
+
+    async def fixture_catalog(*_args, **_kwargs):
+        return {
+            "schema_version": CATALOG_SCHEMA,
+            "available": True,
+            "automatic_available": True,
+            "models": [{
+                "provider_id": "local",
+                "model_id": "test-local-memory",
+                "active": True,
+                "fallback": False,
+                "selectable": True,
+                "tokenizer": "utf8_" + "bytes_upper_bound",
+                "context_window": 8192,
+                "max_output_tokens": 2048,
+                "default_output_tokens": 512,
+                "supports_temperature": False,
+            }],
+        }
+
+    class AsyncTurnAuthority:
+        def __init__(self):
+            self.repository = SQLiteChatTurnRepository()
+
+        def __getattr__(self, name):
+            target = getattr(self.repository, name)
+
+            async def invoke(*args, **kwargs):
+                return target(*args, **kwargs)
+
+            return invoke
+
     fake_engine.execute = execute
+    fake_engine.submit = submit
+    fake_engine._validate_ack_identity = validate_ack
+    fake_engine.wait_for_terminal = wait_for_terminal
+    turn_owner = AsyncTurnAuthority()
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_engine)
+    monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
+    monkeypatch.setattr(route, "model_catalog", fixture_catalog)
+    monkeypatch.setattr(route, "chat_turn_lifecycle", ChatTurnLifecycle(turn_owner))
 
     request = route.AIChatRequest(
         message="Keep this answer for later.",
