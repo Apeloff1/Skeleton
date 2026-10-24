@@ -219,6 +219,20 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
         assert admitted
         return stored_metadata
 
+    dispatch_state = "ready"
+
+    async def chat_dispatch(_thread_id, message_id, *, record_digest, action="read", **_kwargs):
+        nonlocal dispatch_state
+        assert admitted and message_id == user_message.message_id
+        assert record_digest == stored_metadata["record_digest"]
+        if action == "claim" and dispatch_state in {"ready", "submitting"}:
+            dispatch_state = "submitting"
+        elif action == "admitted" and dispatch_state in {"submitting", "admitted"}:
+            dispatch_state = "admitted"
+        elif action != "read":
+            raise AssertionError("unexpected dispatch transition")
+        return {"state": dispatch_state, "cancel_requested": False}
+
     async def dragon_context_segments(*_args, **_kwargs):
         return ()
 
@@ -267,6 +281,7 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
         get_thread=get_thread,
         append_message=append_message,
         chat_execution=chat_execution,
+        chat_dispatch=chat_dispatch,
         dragon_context_segments=dragon_context_segments,
         chat_history_dependencies=chat_history_dependencies,
         commit_assistant_message=commit_assistant_message,
@@ -292,13 +307,27 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
             artifact_refs=(),
         )
 
-    from core.engine_client import EngineNotFoundError
     from core.chat_turn_lifecycle import ChatTurnLifecycle
     from core.model_catalog import CATALOG_SCHEMA
     from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
 
-    async def not_submitted(**_kwargs):
-        raise EngineNotFoundError("not submitted")
+    submitted_result = None
+
+    async def submit(command):
+        nonlocal submitted_result
+        submitted_result = await execute(command)
+        return SimpleNamespace(
+            operation_id=command.operation.operation_id,
+            execution_id=command.execution_request.execution_id,
+        )
+
+    def validate_ack(ack, command):
+        assert ack.operation_id == command.operation.operation_id
+        assert ack.execution_id == command.execution_request.execution_id
+
+    async def wait_for_terminal(**_kwargs):
+        assert submitted_result is not None
+        return submitted_result
 
     async def initialized():
         return None
@@ -335,7 +364,9 @@ async def test_chat_memory_policy_reaches_delegated_engine_command(
             return invoke
 
     fake_engine.execute = execute
-    fake_engine.wait_for_terminal = not_submitted
+    fake_engine.submit = submit
+    fake_engine._validate_ack_identity = validate_ack
+    fake_engine.wait_for_terminal = wait_for_terminal
     turn_owner = AsyncTurnAuthority()
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_engine)
