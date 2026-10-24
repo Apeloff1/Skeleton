@@ -1159,6 +1159,10 @@ def create_app() -> Any:
     app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
     app.include_router(engine_router, prefix="/api/v1")
+    # skeleton.projects.v1 (Internal Systems, #4097): seal via install_gate + session.
+    # Restored: dropped by the stale-base merge of #4139.
+    from skeleton.api.projects_routes import router as projects_router
+    app.include_router(projects_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     # Realtime transport (ADR-realtime-transport, #4101): canonical SSE stream
@@ -1280,8 +1284,15 @@ def create_app() -> Any:
     # Cortex's historical register_routes() contains unchartered GET/POST
     # /api/v1/secrets endpoints. Validate the final assembled HTTP routes,
     # not merely today's static import graph, before exposing the app.
-    from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes
+    from skeleton.api.cortex_mount_guard import (
+        CortexRouteGuardMiddleware,
+        reject_cortex_secret_routes,
+    )
     reject_cortex_secret_routes(app)
+    # On by default (Jenkins #4129 B5): re-walk the full route graph at ASGI
+    # lifespan startup and on every request, so late or nested additions to
+    # live included routers are refused too. Outermost, so nothing bypasses it.
+    app.add_middleware(CortexRouteGuardMiddleware, guarded_app=app)
     return app
 
 
