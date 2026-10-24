@@ -7,7 +7,6 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from core.engine_client import EngineUnavailableError
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
