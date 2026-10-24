@@ -58,6 +58,128 @@ def _matching_request_ref(
 
 
 
+def _install_prepared_chat_fixture(
+    route, monkeypatch, *, initial, after_user, user_message, prior,
+    commit_assistant_message, engine, captured=None,
+):
+    """Mirror the production atomic USER/command contract for route tests.
+
+    The historical mocks used a prepublished unprepared USER and a legacy
+    append method; this fixture instead admits one exact digest-bound command.
+    """
+    from dataclasses import replace
+    import uuid as native_uuid
+    from core.model_catalog import CATALOG_SCHEMA
+
+    existing = tuple(prior)
+    first_thread = replace(initial, message_sequence=len(existing))
+    state = {"user": None, "metadata": None, "dispatch": "ready", "result": None}
+    recorded = {} if captured is None else captured
+
+    class PinnedMessageUuid:
+        def __getattr__(self, name):
+            return getattr(native_uuid, name)
+
+        def uuid4(self):
+            return native_uuid.UUID(user_message.message_id)
+
+    async def get_thread(*_args, **_kwargs):
+        return first_thread if state["user"] is None else after_user
+
+    async def active_transcript(thread_id, **kwargs):
+        recorded["transcript"] = {"thread_id": thread_id, **kwargs}
+        return existing if state["user"] is None else (*existing, state["user"])
+
+    async def append_message(candidate, *, execution_metadata, **kwargs):
+        assert state["user"] is None
+        assert candidate.message_id == user_message.message_id
+        assert "chat-prepared-execution:v1" in candidate.attachment_refs
+        assert ("chat-request-sha256:" + execution_metadata["request_digest"]) in candidate.attachment_refs
+        recorded["append"] = kwargs
+        state["user"] = candidate
+        state["metadata"] = execution_metadata
+        return after_user, candidate
+
+    async def chat_execution(_thread_id, message_id, **_kwargs):
+        assert state["user"] is not None and state["user"].message_id == message_id
+        return state["metadata"]
+
+    async def chat_dispatch(_thread_id, message_id, *, record_digest, action="read", **_kwargs):
+        assert state["user"] is not None
+        assert message_id == state["user"].message_id
+        assert record_digest == state["metadata"]["record_digest"]
+        old = state["dispatch"]
+        if action == "claim" and old in {"ready", "submitting"}:
+            state["dispatch"] = "submitting"
+        elif action == "admitted" and old in {"submitting", "admitted"}:
+            state["dispatch"] = "admitted"
+        elif action != "read":
+            raise AssertionError("invalid test dispatch transition")
+        return {"state": state["dispatch"], "cancel_requested": False}
+
+    async def empty_sources(*_args, **_kwargs):
+        return ()
+
+    async def initialized():
+        return None
+
+    async def catalog(*_args, **_kwargs):
+        return {
+            "schema_version": CATALOG_SCHEMA,
+            "available": True,
+            "automatic_available": True,
+            "models": [{
+                "provider_id": "local", "model_id": "test-authority",
+                "active": True, "fallback": False, "selectable": True,
+                "tokenizer": "utf8_" + "bytes_upper_bound",
+                "context_window": 8192, "max_output_tokens": 2048,
+                "default_output_tokens": 512, "supports_temperature": False,
+            }],
+        }
+
+    async def no_memory_write(*_args, **_kwargs):
+        raise AssertionError("chat fixture must not write persistent model memory")
+
+    async def submit(command):
+        state["result"] = await engine.execute(command)
+        return {
+            "operation_id": command.operation.operation_id,
+            "execution_id": command.execution_request.execution_id,
+            "state": "admitted",
+        }
+
+    def validate_ack(ack, command):
+        assert ack["operation_id"] == command.operation.operation_id
+        assert ack["execution_id"] == command.execution_request.execution_id
+
+    async def terminal(**_kwargs):
+        if state["result"] is None:
+            from core.engine_client import EngineNotFoundError
+            raise EngineNotFoundError("command not yet executed")
+        return state["result"]
+
+    engine.admit_storage_write = no_memory_write
+    engine.reconcile_governed_write = no_memory_write
+    engine.submit = submit
+    engine._validate_ack_identity = validate_ack
+    engine.wait_for_terminal = terminal
+
+    monkeypatch.setattr(route, "uuid", PinnedMessageUuid())
+    monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
+    monkeypatch.setattr(route, "model_catalog", catalog)
+    monkeypatch.setattr(
+        route, "conversation_authority",
+        SimpleNamespace(
+            get_thread=get_thread, active_transcript=active_transcript,
+            append_message=append_message, chat_execution=chat_execution,
+            chat_dispatch=chat_dispatch, dragon_context_segments=empty_sources,
+            chat_history_dependencies=empty_sources,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: engine)
+
+
 def _thread(thread_id: str | None = None, *, version: int = 1, sequence: int = 0):
     return ConversationThread(
         thread_id=thread_id or str(uuid4()),
@@ -253,6 +375,13 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         route.EngineClient,
         "from_env",
         lambda: FakeEngineClient(),
+    )
+
+    _install_prepared_chat_fixture(
+        route, monkeypatch, initial=initial, after_user=after_user,
+        user_message=user_message, prior=(prior_user, prior_assistant),
+        commit_assistant_message=commit_assistant_message,
+        engine=FakeEngineClient(), captured=captured,
     )
 
     response = client.post(
@@ -502,6 +631,13 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
         lambda: OfflineEngineClient(),
     )
 
+    _install_prepared_chat_fixture(
+        route, monkeypatch, initial=initial, after_user=after_user,
+        user_message=user_message, prior=(),
+        commit_assistant_message=commit_assistant_message,
+        engine=OfflineEngineClient(),
+    )
+
     response = client.post(
         "/ai/chat",
         json={
@@ -723,6 +859,13 @@ def test_chat_compiles_immutable_context_and_keeps_ephemeral_context_untrusted(
         route.EngineClient,
         "from_env",
         lambda: FakeEngineClient(),
+    )
+
+    _install_prepared_chat_fixture(
+        route, monkeypatch, initial=initial, after_user=after_user,
+        user_message=user_message, prior=(),
+        commit_assistant_message=commit_assistant_message,
+        engine=FakeEngineClient(), captured=captured,
     )
 
     response = client.post(
