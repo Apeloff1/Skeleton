@@ -58,6 +58,20 @@ def test_uncommitted_change_and_untracked_file_fail_closed(tmp_path):
     assert "new.txt" in report["findings"]["untracked"]
 
 
+def test_staged_change_is_not_hidden_by_restored_worktree(tmp_path):
+    repo = fixture(tmp_path)
+    original = (repo / "plain.txt").read_bytes()
+    (repo / "plain.txt").write_bytes(b"staged unpublished edit\n")
+    git(repo, "add", "plain.txt")
+    # The working tree now matches HEAD, but the index still differs.
+    (repo / "plain.txt").write_bytes(original)
+    report = scan(repo)
+    assert report["main_sha"] == report["local_head_sha"]
+    assert report["findings"]["worktree_mismatch"] == []
+    assert report["findings"]["staged_index_difference"] == ["plain.txt"]
+    assert report["status"] == "diverged"
+
+
 def test_local_committed_changes_fail_canonical_main_comparison(tmp_path):
     repo = fixture(tmp_path)
     (repo / "plain.txt").write_text("new committed content", encoding="utf-8")
