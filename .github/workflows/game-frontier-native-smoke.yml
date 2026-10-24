@@ -24,6 +24,8 @@ on:
       - "scripts/build_original_campaign.py"
       - "tests/test_original_expedition_cli.py"
       - "skeleton/game/production_native_quality.py"
+      - "scripts/run_game_frontier_gfd_native_checks.py"
+      - "tests/test_game_frontier_gfd_native_checks.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
 
 permissions:
@@ -61,6 +63,32 @@ jobs:
           chmod 700 "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64"
           echo "FRONTIER_GODOT=$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
           echo "FRONTIER_GODOT_SHA=$(sha256sum "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      # GF-D (GF-P0-38/74/96/134): emitted-scene --headless --import with
+      # GDScript parse gating, then a fixed-tick RigidBody3D slope/contact and
+      # pinned SoftBody3D probe on the pinned binary. Dummy renderer only: no
+      # screenshot, shadow-caster or GPU timestep equivalence is claimed.
+      - name: GF-D targeted unit tests
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=7.0.0"
+          python -m pytest -q -p no:cacheprovider tests/test_game_frontier_gfd_native_checks.py
+      - name: GF-D headless import + RigidBody3D/SoftBody3D native probe
+        env:
+          PYTHONPATH: "."
+        run: |
+          python scripts/run_game_frontier_gfd_native_checks.py \
+            --godot "$FRONTIER_GODOT" \
+            --project "$RUNNER_TEMP/gfd-project" \
+            --log-dir "$RUNNER_TEMP/gfd-logs" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload GF-D Godot logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gfd-godot-logs-${{ github.run_id }}
+          path: ${{ runner.temp }}/gfd-logs
+          if-no-files-found: warn
+          retention-days: 7
       - name: Play and independently replay the original sky-island expedition on real Godot
         shell: bash
         env:
