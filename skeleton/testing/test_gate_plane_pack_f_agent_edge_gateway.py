@@ -250,6 +250,9 @@ SERVER_PY_ALLOWED_LINES = frozenset({
     "if _omnifabric_api_enabled():",
     "from skeleton.api.omnifabric_routes import router as omnifabric_router",
     'app.include_router(omnifabric_router, prefix="/api/v1")',
+    # Realtime hub limits moved to skeleton/realtime/limits.py by Walt's #4253.
+    "from skeleton.realtime import RealtimeHub, realtime_limits_from_env, sealed_principal_authorizer",
+    "realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer, **realtime_limits_from_env())",
 })
 _SERVER_PY_FORBIDDEN_TOKENS = ("on_event", "lifespan", "startup", "shutdown")
 
