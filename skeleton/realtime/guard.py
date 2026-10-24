@@ -38,18 +38,20 @@ from urllib.parse import unquote
 from skeleton.observability.redaction import REDACTED, SENSITIVE_KEYS, redact_text
 
 # Realtime-specific additions on top of the shared telemetry key set.
-EXTRA_SENSITIVE_KEYS = frozenset({
-    "seal",
-    "x_gf_seal",
-    "gf_seal_secret",
-    "private_key",
-    "id_token",
-    "session_token",
-    "bearer",
-    "auth_token",
-    "github_token",
-    "service_token",
-})
+EXTRA_SENSITIVE_KEYS = frozenset(
+    {
+        "seal",
+        "x_gf_seal",
+        "gf_seal_secret",
+        "private_key",
+        "id_token",
+        "session_token",
+        "bearer",
+        "auth_token",
+        "github_token",
+        "service_token",
+    }
+)
 #: Substring tokens: a normalised key containing any of these is sensitive.
 SENSITIVE_KEY_TOKENS: Tuple[str, ...] = (
     "token",
@@ -189,7 +191,9 @@ class PayloadSecretGuard:
                     before = hits
                     cleaned_obj = visit(embedded, depth + 1)
                     if hits != before:
-                        return json.dumps(cleaned_obj, separators=(",", ":"), sort_keys=True)
+                        return json.dumps(
+                            cleaned_obj, separators=(",", ":"), sort_keys=True
+                        )
                     return item
             cleaned, n = _patterns_hit(item)
             if n:
@@ -227,7 +231,9 @@ class PayloadSecretGuard:
                 out = {}
                 for key, child in item.items():
                     if not isinstance(key, str):
-                        raise RealtimeSecretError(f"payload keys must be strings, got {type(key).__name__}")
+                        raise RealtimeSecretError(
+                            f"payload keys must be strings, got {type(key).__name__}"
+                        )
                     if is_sensitive_key(key):
                         if child not in (None, "", REDACTED):
                             hits += 1
@@ -243,7 +249,9 @@ class PayloadSecretGuard:
 
         clean = visit(dict(payload), 0)
         if hits and self.mode == "reject":
-            raise RealtimeSecretError(f"payload carried {hits} secret value(s); publish refused")
+            raise RealtimeSecretError(
+                f"payload carried {hits} secret value(s); publish refused"
+            )
         return clean, hits
 
 

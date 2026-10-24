@@ -9,9 +9,18 @@ import json
 import pytest
 
 from skeleton.realtime import PayloadSecretGuard, RealtimeHub, RealtimeSecretError
-from skeleton.realtime.envelope import ControlEvent, EnvelopeError, RealtimeEvent, parse_resume_cursor
+from skeleton.realtime.envelope import (
+    ControlEvent,
+    EnvelopeError,
+    RealtimeEvent,
+    parse_resume_cursor,
+)
 from skeleton.realtime.guard import is_sensitive_key
-from skeleton.realtime.hub import RealtimeCapacityError, RealtimeLimitError, sealed_principal_authorizer
+from skeleton.realtime.hub import (
+    RealtimeCapacityError,
+    RealtimeLimitError,
+    sealed_principal_authorizer,
+)
 from skeleton.realtime.sse import SSEParser, iter_frames, sse_body, sse_message_to_frame
 
 REDACTED_MARK = "REDACTED"
@@ -24,7 +33,11 @@ def _hub(**kw):
 
 
 def _events(frames):
-    return [f for f in frames if isinstance(f, RealtimeEvent) and f.type != "presence.snapshot"]
+    return [
+        f
+        for f in frames
+        if isinstance(f, RealtimeEvent) and f.type != "presence.snapshot"
+    ]
 
 
 # -- S2-1 presence bounds ------------------------------------------------------
@@ -41,10 +54,19 @@ def test_presence_2mb_meta_rejected_before_anything_is_stored():
 def test_giant_meta_cannot_break_later_presence_subscriptions():
     hub = _hub()
     with pytest.raises(RealtimeLimitError):
-        hub.presence("join", client_id="c1", principal="alice", meta={"blob": "x" * (2 * 1024 * 1024)})
+        hub.presence(
+            "join",
+            client_id="c1",
+            principal="alice",
+            meta={"blob": "x" * (2 * 1024 * 1024)},
+        )
     hub.presence("join", client_id="c2", principal="alice", meta={"ok": 1})
     sub = hub.subscribe(["presence"], principal="alice")
-    snap = [f for f in sub.drain() if isinstance(f, RealtimeEvent) and f.type == "presence.snapshot"]
+    snap = [
+        f
+        for f in sub.drain()
+        if isinstance(f, RealtimeEvent) and f.type == "presence.snapshot"
+    ]
     assert snap and [m["client_id"] for m in snap[0].payload["members"]] == ["c2"]
 
 
@@ -67,15 +89,30 @@ def test_presence_scope_visibility_follows_scope_authorizer():
     hub.presence("join", client_id="alice-1", principal="alice", scope="room-1")
     assert [e.type for e in _events(bob.drain())] == ["presence.joined"]
     assert _events(mallory.drain()) == []
-    assert [m["client_id"] for m in hub.presence_snapshot("room-1", principal="bob")["members"]] == ["alice-1"]
+    assert [
+        m["client_id"]
+        for m in hub.presence_snapshot("room-1", principal="bob")["members"]
+    ] == ["alice-1"]
     assert hub.presence_snapshot("room-1", principal="mallory")["members"] == []
     late = hub.subscribe(["presence"], principal="bob", cursor=1000)
     frames = late.drain()
-    assert any(isinstance(f, RealtimeEvent) and f.type == "presence.joined" for f in frames)
+    assert any(
+        isinstance(f, RealtimeEvent) and f.type == "presence.joined" for f in frames
+    )
 
 
 # -- S2-3 secret guard ---------------------------------------------------------
-@pytest.mark.parametrize("key", ["x-api-key", "X-Api-Key", "accessToken", "aws_secret_access_key", "sessionId", "dbCredential"])
+@pytest.mark.parametrize(
+    "key",
+    [
+        "x-api-key",
+        "X-Api-Key",
+        "accessToken",
+        "aws_secret_access_key",
+        "sessionId",
+        "dbCredential",
+    ],
+)
 def test_guard_normalizes_and_matches_key_tokens(key):
     assert is_sensitive_key(key)
     clean, hits = PayloadSecretGuard().scrub({key: "value-123"})
@@ -83,7 +120,9 @@ def test_guard_normalizes_and_matches_key_tokens(key):
 
 
 def test_guard_scans_json_embedded_in_string():
-    clean, hits = PayloadSecretGuard().scrub({"note": json.dumps({"password": "hunter2", "ok": 1})})
+    clean, hits = PayloadSecretGuard().scrub(
+        {"note": json.dumps({"password": "hunter2", "ok": 1})}
+    )
     assert hits >= 1 and "hunter2" not in json.dumps(clean)
 
 
@@ -111,7 +150,13 @@ def test_guard_scans_non_string_scalars_by_str():
 
 def test_envelope_refuses_non_json_native_payload():
     with pytest.raises(EnvelopeError):
-        RealtimeEvent(id="1", ts="2026-10-24T16:00:00.000Z", channel="build", type="build.log", payload={"x": object()})
+        RealtimeEvent(
+            id="1",
+            ts="2026-10-24T16:00:00.000Z",
+            channel="build",
+            type="build.log",
+            payload={"x": object()},
+        )
 
 
 # -- S2-4 stream lifetime ------------------------------------------------------
@@ -140,12 +185,21 @@ def test_sdk_client_reconnects_immediately_on_reauth():
         async def sleep(d):
             sleeps.append(d)
 
-        client = RealtimeClient(InProcessTransport(hub, principal="p"), channels=("build",), sleep=sleep)
+        client = RealtimeClient(
+            InProcessTransport(hub, principal="p"), channels=("build",), sleep=sleep
+        )
         hub.publish("build", "build.log", {"n": 1}, owner="p")
         seen = []
         async for frame in client.frames():
             seen.append(frame)
-            if sum(1 for f in seen if isinstance(f, ControlEvent) and f.type == "stream.reauth") >= 2:
+            if (
+                sum(
+                    1
+                    for f in seen
+                    if isinstance(f, ControlEvent) and f.type == "stream.reauth"
+                )
+                >= 2
+            ):
                 client.close()
         return client, sleeps
 
@@ -174,7 +228,10 @@ def test_per_client_cap_returns_429_with_retry_after():
     app.include_router(router, prefix="/api/v1")
     app.state.realtime_hub = _hub(max_streams_per_principal=1)
     app.state.realtime_hub.subscribe(["build"], principal="alice")
-    r = TestClient(app).get("/api/v1/events?channels=build&max_events=1", headers={"x-zaibatsu-attester": "alice"})
+    r = TestClient(app).get(
+        "/api/v1/events?channels=build&max_events=1",
+        headers={"x-zaibatsu-attester": "alice"},
+    )
     assert r.status_code == 429 and int(r.headers["retry-after"]) >= 1
     assert r.json()["detail"]["error"] == "too_many_streams"
 
@@ -185,7 +242,10 @@ def test_foreign_epoch_cursor_gets_stream_reset():
     hub.publish("build", "build.log", {"n": 1}, owner="p")
     sub = hub.subscribe(["build"], principal="p", cursor=1000, cursor_epoch="bbbb0002")
     (frame,) = sub.drain()
-    assert frame.type == "stream.reset" and frame.payload["reason"] == "cursor_foreign_instance"
+    assert (
+        frame.type == "stream.reset"
+        and frame.payload["reason"] == "cursor_foreign_instance"
+    )
     own = hub.subscribe(["build"], principal="p", cursor=1000, cursor_epoch="aaaa0001")
     assert [e.payload for e in _events(own.drain())] == [{"n": 1}]
 
@@ -247,7 +307,12 @@ def test_guard_catches_multi_percent_encoded_tokens(value):
 
 @pytest.mark.parametrize(
     "value",
-    [f"x{_FAKE_GH}", f"tokenghp_{'B' * 36}", f"abc123sk-{'c' * 24}", f"zAKIA{'D' * 16}"],
+    [
+        f"x{_FAKE_GH}",
+        f"tokenghp_{'B' * 36}",
+        f"abc123sk-{'c' * 24}",
+        f"zAKIA{'D' * 16}",
+    ],
 )
 def test_guard_catches_tokens_glued_to_leading_alphanumeric(value):
     clean, hits = PayloadSecretGuard().scrub({"note": value})

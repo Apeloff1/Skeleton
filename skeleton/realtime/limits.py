@@ -25,10 +25,18 @@ def _num(name: str, default: Any, cast: Callable[[str], Any] = int) -> Any:
 def realtime_limits_from_env() -> Dict[str, Any]:
     """Keyword arguments for :class:`RealtimeHub` bounds; invalid env -> default."""
     return {
-        "presence_meta_max_bytes": _num("SKELETON_REALTIME_PRESENCE_META_MAX_BYTES", 2048),
-        "presence_max_members_per_scope": _num("SKELETON_REALTIME_PRESENCE_MAX_MEMBERS", 256),
-        "max_streams_per_principal": _num("SKELETON_REALTIME_MAX_STREAMS_PER_PRINCIPAL", 8),
-        "max_stream_lifetime_s": _num("SKELETON_REALTIME_MAX_STREAM_LIFETIME_S", 900.0, float),
+        "presence_meta_max_bytes": _num(
+            "SKELETON_REALTIME_PRESENCE_META_MAX_BYTES", 2048
+        ),
+        "presence_max_members_per_scope": _num(
+            "SKELETON_REALTIME_PRESENCE_MAX_MEMBERS", 256
+        ),
+        "max_streams_per_principal": _num(
+            "SKELETON_REALTIME_MAX_STREAMS_PER_PRINCIPAL", 8
+        ),
+        "max_stream_lifetime_s": _num(
+            "SKELETON_REALTIME_MAX_STREAM_LIFETIME_S", 900.0, float
+        ),
     }
 
 
