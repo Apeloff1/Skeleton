@@ -177,12 +177,17 @@ class BuildService:
 
     def submit(self, project_id: str, *, target: str = "", options: Optional[Mapping[str, Any]] = None,
                correlation_id: str = "", idempotency_key: Optional[str] = None,
-               max_attempts: int = 2) -> Build:
+               max_attempts: int = 2, actor_id: str = "", tenant_id: str = "") -> Build:
         build = self.builds.create_build(project_id, target)
         job = self.queue.enqueue(BUILD_JOB_KIND, {"build_id": build.build_id, "project_id": project_id,
                                                    "target": target, "options": dict(options or {})},
                                  max_attempts=max_attempts, correlation_id=correlation_id,
                                  idempotency_key=idempotency_key)
+        if actor_id or tenant_id:
+            # Submitting principal; BuildJobRunner stamps it on every event envelope.
+            with self.queue.db.tx() as c:
+                c.execute("UPDATE jobs SET actor_id=?, tenant_id=? WHERE job_id=? AND actor_id='' AND tenant_id=''",
+                          (actor_id, tenant_id, job.job_id))
         return self.builds.set_status(build.build_id, "queued", job_id=job.job_id)
 
     def cancel(self, build_id: str) -> bool:
@@ -204,9 +209,20 @@ class BuildJobRunner:
         self.publisher: JobEventPublisher = publisher or NullJobEventPublisher()
         self.lease_s, self.retry_delay_s = lease_s, retry_delay_s
 
+    def _owner(self, job_id: str) -> tuple[str, str]:
+        try:
+            rows = self.queue.db.query("SELECT actor_id, tenant_id FROM jobs WHERE job_id=?", (job_id,))
+        except Exception:  # pre-v7 schema: no ownership columns
+            return "", ""
+        if not rows:
+            return "", ""
+        return str(rows[0]["actor_id"] or ""), str(rows[0]["tenant_id"] or "")
+
     def _emit(self, type_: str, job: Job, build_id: str, payload: Mapping[str, Any]) -> None:
+        actor_id, tenant_id = self._owner(job.job_id)
         env = make_envelope("build", type_, {"build_id": build_id, **payload},
-                            correlation_id=job.correlation_id, job_id=job.job_id)
+                            correlation_id=job.correlation_id, job_id=job.job_id,
+                            actor_id=actor_id, tenant_id=tenant_id)
         try:
             self.publisher.publish(env)
         except Exception:  # pragma: no cover - sinks must never break builds

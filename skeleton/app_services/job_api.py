@@ -213,7 +213,8 @@ class JobService:
             self.publisher.publish(make_envelope(
                 "build", type_, {"build_id": ctx.execution_id, "execution_id": ctx.execution_id,
                                  "kind": ctx.kind, **payload},
-                correlation_id=ctx.correlation_id, job_id=ctx.job_id))
+                correlation_id=ctx.correlation_id, job_id=ctx.job_id,
+                actor_id=ctx.actor_id, tenant_id=ctx.tenant_id))
         except Exception:  # sinks never break jobs
             _log.debug("job event sink failed", exc_info=True)
 
