@@ -285,3 +285,126 @@ def test_legacy_causal_history_has_no_invented_command(tmp_path):
     assert len(rows) == 1 and rows[0][0].message_id == user.message_id
     assert rows[0][1:] == (None, None)
     repo.close()
+
+
+def test_dispatch_claim_admit_and_cancel_are_original_command_bound(tmp_path):
+    repo = SQLiteConversationRepository(tmp_path / "dispatch.sqlite")
+    thread = _thread(repo)
+    user = _user(thread)
+    metadata = _metadata()
+    repo.append_message(
+        user, tenant_id="tenant-a", owner_id="alice",
+        expected_thread_version=thread.version, execution_metadata=metadata,
+    )
+    args = {
+        "tenant_id": "tenant-a", "owner_id": "alice",
+        "record_digest": metadata["record_digest"],
+    }
+    read = repo.chat_dispatch(thread.thread_id, user.message_id, **args)
+    assert read == {"state": "ready", "cancel_requested": False}
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **{**args, "record_digest": "f" * 64},
+        action="claim",
+    ) is None
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args,
+    ) == read
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="claim",
+    ) == {"state": "submitting", "cancel_requested": False}
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="admitted",
+    ) == {"state": "admitted", "cancel_requested": False}
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="cancel",
+    ) == {"state": "admitted", "cancel_requested": True}
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="claim",
+    ) is None
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args,
+    ) == {"state": "admitted", "cancel_requested": True}
+    repo.close()
+
+
+def test_dispatch_cancel_before_claim_withdraws_command(tmp_path):
+    repo = SQLiteConversationRepository(tmp_path / "withdraw.sqlite")
+    thread = _thread(repo)
+    user = _user(thread)
+    metadata = _metadata()
+    repo.append_message(
+        user, tenant_id="tenant-a", owner_id="alice",
+        expected_thread_version=thread.version, execution_metadata=metadata,
+    )
+    args = {
+        "tenant_id": "tenant-a", "owner_id": "alice",
+        "record_digest": metadata["record_digest"],
+    }
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="cancel",
+    ) == {"state": "withdrawn", "cancel_requested": True}
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="claim",
+    ) is None
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="admitted",
+    ) is None
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args,
+    ) == {"state": "withdrawn", "cancel_requested": True}
+    repo.close()
+
+
+def test_dispatch_owner_scope_and_restart_custody(tmp_path):
+    path = tmp_path / "dispatch-restart.sqlite"
+    repo = SQLiteConversationRepository(path)
+    thread = _thread(repo)
+    user = _user(thread)
+    metadata = _metadata()
+    repo.append_message(
+        user, tenant_id="tenant-a", owner_id="alice",
+        expected_thread_version=thread.version, execution_metadata=metadata,
+    )
+    args = {
+        "tenant_id": "tenant-a", "owner_id": "alice",
+        "record_digest": metadata["record_digest"],
+    }
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="claim",
+    ) == {"state": "submitting", "cancel_requested": False}
+    with pytest.raises(ConversationAuthorizationError):
+        repo.chat_dispatch(
+            thread.thread_id, user.message_id,
+            tenant_id="tenant-a", owner_id="mallory",
+            record_digest=metadata["record_digest"], action="cancel",
+        )
+    with pytest.raises(ValueError, match="unsupported chat dispatch transition"):
+        repo.chat_dispatch(
+            thread.thread_id, user.message_id, **args, action="invent",
+        )
+    repo.close()
+    reopened = SQLiteConversationRepository(path)
+    assert reopened.chat_dispatch(
+        thread.thread_id, user.message_id, **args,
+    ) == {"state": "submitting", "cancel_requested": False}
+    assert reopened.chat_dispatch(
+        thread.thread_id, user.message_id, **args, action="claim",
+    ) == {"state": "submitting", "cancel_requested": False}
+    reopened.close()
+
+
+def test_unprepared_legacy_user_has_no_dispatch_custody(tmp_path):
+    repo = SQLiteConversationRepository(tmp_path / "legacy-dispatch.sqlite")
+    thread = _thread(repo)
+    user = _user(thread, prepared=False)
+    repo.append_message(
+        user, tenant_id="tenant-a", owner_id="alice",
+        expected_thread_version=thread.version,
+    )
+    assert repo.chat_dispatch(
+        thread.thread_id, user.message_id,
+        tenant_id="tenant-a", owner_id="alice",
+        record_digest="a" * 64,
+        action="claim",
+    ) is None
+    repo.close()
