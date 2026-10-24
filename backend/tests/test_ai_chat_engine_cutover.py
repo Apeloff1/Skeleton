@@ -666,7 +666,10 @@ def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
         return user_message, assistant
 
     async def append_user_message(*_args, **_kwargs):
-        return initial, user_message
+        raise AssertionError("completed replay must not append USER")
+
+    async def get_thread(*_args, **_kwargs):
+        return initial
 
     class EngineMustNotRun:
         config = EngineClientConfig(
@@ -689,6 +692,7 @@ def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
         SimpleNamespace(
             append_user_message=append_user_message,
             active_transcript=active_transcript,
+            get_thread=get_thread,
         ),
     )
 
