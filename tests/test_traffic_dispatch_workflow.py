@@ -93,7 +93,9 @@ class TrafficDispatchWorkflowTests(unittest.TestCase):
                 timeout=10,
             )
             if completed.returncode != 0:
-                self.fail(f"Dispatch shell failed syntax validation: {completed.stderr}")
+                self.fail(
+                    f"Dispatch shell failed syntax validation: {completed.stderr}"
+                )
             completed = subprocess.run(
                 ["bash", str(script_path)],
                 cwd=directory,
