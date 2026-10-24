@@ -62,7 +62,9 @@ def _request(route, thread_id: str):
 
 
 
-def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assistant_message):
+def _install_prepared_authority(
+    route, monkeypatch, after_user, *, expected_user_id, commit_assistant_message
+):
     """Exercise the real atomic-command contract, not a legacy USER-only fake.
 
     The fake preserves the application's exact USER/request/command identity
@@ -75,6 +77,22 @@ def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assist
 
     initial = replace(after_user, version=1, message_sequence=0)
     state = {"user": None, "metadata": None}
+    import uuid as original_uuid
+
+    # Keep the prebuilt test assertion's message identity bound to the actual
+    # freshly prepared USER, rather than an unrelated fake historical message.
+    class FirstPreparedUserUuid:
+        def __init__(self):
+            self.used = False
+
+        def __getattr__(self, name):
+            return getattr(original_uuid, name)
+
+        def uuid4(self):
+            if not self.used:
+                self.used = True
+                return original_uuid.UUID(expected_user_id)
+            return original_uuid.uuid4()
 
     async def get_thread(*_args, **_kwargs):
         return initial if state["user"] is None else after_user
@@ -159,6 +177,7 @@ def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assist
         chat_history_dependencies=no_segments,
         commit_assistant_message=commit_assistant_message,
     )
+    monkeypatch.setattr(route, "uuid", FirstPreparedUserUuid())
     monkeypatch.setattr(route, "conversation_authority", authority)
     monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
     monkeypatch.setattr(route, "model_catalog", fixture_catalog)
@@ -168,9 +187,10 @@ def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assist
 
 def _enable_prepared_engine_submit(fake_client, *, wait_after_submit=False):
     """Record a single submission with a digest-bound acknowledgement."""
-    result = {"value": None}
+    result = {"value": None, "command": None}
 
     async def submit(command):
+        result["command"] = command
         result["value"] = await fake_client.execute(command)
         return SimpleNamespace(
             operation_id=command.operation.operation_id,
@@ -191,6 +211,41 @@ def _enable_prepared_engine_submit(fake_client, *, wait_after_submit=False):
     async def forbid_memory_write(*_args, **_kwargs):
         raise AssertionError("unexpected governed memory write")
 
+    async def status(*_args, **_kwargs):
+        if result["value"] is None:
+            raise EngineNotFoundError("execution has not been admitted")
+        return {"execution_state": "completed", "cancellation_requested": False}
+
+    async def terminal_result_if_available(**_kwargs):
+        return result["value"]
+
+    async def handoff_binding(*_args, **_kwargs):
+        from core.engine_client import EngineContextBinding
+
+        command = result["command"]
+        assert command is not None
+        context = command.compiled_context
+        return EngineContextBinding(
+            operation_id=command.operation.operation_id,
+            execution_id=command.execution_request.execution_id,
+            turn_id=context.turn_id,
+            tenant_id=command.operation.tenant_id,
+            actor_id=command.operation.actor_id,
+            context_id=context.context_id,
+            context_digest=context.context_digest,
+            compiler_version=context.compiler_version,
+            source_snapshot=context.source_snapshot,
+            data_class=context.data_class,
+            purpose=context.purpose,
+            handoff_digest=context.handoff_digest,
+            capability=command.operation.capability,
+            idempotency_key=command.operation.idempotency_key,
+            trace_id=command.operation.trace_id,
+        )
+
+    fake_client.status = status
+    fake_client.terminal_result_if_available = terminal_result_if_available
+    fake_client.handoff_binding = handoff_binding
     fake_client.admit_storage_write = forbid_memory_write
     fake_client.reconcile_governed_write = forbid_memory_write
     fake_client.submit = submit
@@ -253,7 +308,8 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
         return committed, message
 
     fake_authority = _install_prepared_authority(
-        route, monkeypatch, thread, commit_assistant_message=commit_assistant_message,
+        route, monkeypatch, thread, expected_user_id=user_message.message_id,
+        commit_assistant_message=commit_assistant_message,
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -276,7 +332,6 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
             provider_receipts=("provider:test:terminal",),
         )
 
-    fake_client.wait_for_terminal = wait_for_terminal
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
     _enable_prepared_engine_submit(fake_client, wait_after_submit=True)
@@ -325,7 +380,8 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
         raise AssertionError("assistant commit must not run after engine failure")
 
     fake_authority = _install_prepared_authority(
-        route, monkeypatch, thread, commit_assistant_message=forbidden_commit,
+        route, monkeypatch, thread, expected_user_id=user_message.message_id,
+        commit_assistant_message=forbidden_commit,
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -417,7 +473,8 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
         return committed, assistant
 
     fake_authority = _install_prepared_authority(
-        route, monkeypatch, thread, commit_assistant_message=commit_assistant_message,
+        route, monkeypatch, thread, expected_user_id=user_message.message_id,
+        commit_assistant_message=commit_assistant_message,
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
