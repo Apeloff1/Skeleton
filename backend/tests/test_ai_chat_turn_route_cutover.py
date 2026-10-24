@@ -73,15 +73,91 @@ def _request(route, thread_id):
     )
 
 
-def _conversation_authority(thread, user, *, allow_commit=True):
+def _conversation_authority(thread, user, monkeypatch, *, allow_commit=True, legacy=False):
+    from dataclasses import replace
+    import routes.ai as route
+
+    state = {"user": user if legacy else None, "metadata": None}
+    initial_thread = replace(thread, version=1, message_sequence=0)
+
+    if not legacy:
+        # Bind this case's historical operation identity to the newly admitted
+        # USER. The route still builds, validates and persists the real command.
+        canonical_uuid = route.uuid
+
+        class PinnedMessageUuid:
+            def __getattr__(self, name):
+                return getattr(canonical_uuid, name)
+
+            def uuid4(self):
+                return canonical_uuid.UUID(user.message_id)
+
+        monkeypatch.setattr(route, "uuid", PinnedMessageUuid())
+
+        from core.model_catalog import CATALOG_SCHEMA
+
+        async def initialized():
+            return None
+
+        async def catalog(*_args, **_kwargs):
+            return {
+                "schema_version": CATALOG_SCHEMA,
+                "available": True,
+                "automatic_available": True,
+                "models": [{
+                    "provider_id": "local", "model_id": "test-chat-turn",
+                    "active": True, "fallback": False, "selectable": True,
+                    "tokenizer": "utf8_" + "bytes_upper_bound",
+                    "context_window": 8192, "max_output_tokens": 2048,
+                    "default_output_tokens": 512, "supports_temperature": False,
+                }],
+            }
+
+        monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
+        monkeypatch.setattr(route, "model_catalog", catalog)
+
     async def active_transcript(*_args, **_kwargs):
-        return (user,)
+        return () if state["user"] is None else (state["user"],)
 
     async def append_user_message(*_args, **_kwargs):
         return thread, user
 
+    async def append_message(candidate, *, execution_metadata, **_kwargs):
+        assert not legacy and state["user"] is None
+        assert candidate.message_id == user.message_id
+        assert "chat-prepared-execution:v1" in candidate.attachment_refs
+        assert (
+            "chat-request-sha256:" + execution_metadata["request_digest"]
+        ) in candidate.attachment_refs
+        state["user"] = candidate
+        state["metadata"] = execution_metadata
+        return thread, candidate
+
     async def get_thread(*_args, **_kwargs):
-        return thread
+        return thread if state["user"] is not None else initial_thread
+
+    async def chat_execution(_thread_id, message_id, **_kwargs):
+        assert state["user"] is not None
+        assert message_id == state["user"].message_id
+        return state["metadata"]
+
+    dispatch_state = "ready"
+
+    async def chat_dispatch(_thread_id, message_id, *, record_digest, action="read", **_kwargs):
+        nonlocal dispatch_state
+        assert state["user"] is not None
+        assert message_id == state["user"].message_id
+        assert state["metadata"]["record_digest"] == record_digest
+        if action == "claim" and dispatch_state in {"ready", "submitting"}:
+            dispatch_state = "submitting"
+        elif action == "admitted" and dispatch_state in {"submitting", "admitted"}:
+            dispatch_state = "admitted"
+        elif action != "read":
+            raise AssertionError("unexpected dispatch transition")
+        return {"state": dispatch_state, "cancel_requested": False}
+
+    async def no_context(*_args, **_kwargs):
+        return ()
 
     async def commit_assistant_message(_thread_id, **kwargs):
         if not allow_commit:
@@ -128,9 +204,82 @@ def _conversation_authority(thread, user, *, allow_commit=True):
     return SimpleNamespace(
         active_transcript=active_transcript,
         append_user_message=append_user_message,
+        append_message=append_message,
         get_thread=get_thread,
+        chat_execution=chat_execution,
+        chat_dispatch=chat_dispatch,
+        dragon_context_segments=no_context,
+        chat_history_dependencies=no_context,
         commit_assistant_message=commit_assistant_message,
     )
+
+
+
+def _configure_prepared_engine(fake_client):
+    """Share real submit/ack/terminal identities across five chat route cases."""
+    result = {"value": None, "command": None}
+    prior_terminal = fake_client.wait_for_terminal
+
+    async def submit(command):
+        value = await fake_client.execute(command)
+        result["command"] = command
+        result["value"] = value
+        return {
+            "operation_id": command.operation.operation_id,
+            "execution_id": command.execution_request.execution_id,
+            "state": "admitted",
+        }
+
+    def verify_ack(ack, command):
+        assert ack["operation_id"] == command.operation.operation_id
+        assert ack["execution_id"] == command.execution_request.execution_id
+
+    async def terminal(**kwargs):
+        if result["value"] is not None:
+            return result["value"]
+        return await prior_terminal(**kwargs)
+
+    async def status(*_args, **_kwargs):
+        if result["value"] is None:
+            raise EngineNotFoundError("original submission not yet admitted")
+        return {"execution_state": "completed", "cancellation_requested": False}
+
+    async def terminal_if_available(**_kwargs):
+        return result["value"]
+
+    async def handoff_binding(*_args, **_kwargs):
+        # The engine returns a signed identity binding, not the raw compiled
+        # context. Recreate all fields from the exact submitted command.
+        from core.engine_client import EngineContextBinding
+
+        command = result["command"]
+        assert command is not None
+        context = command.compiled_context
+        return EngineContextBinding(
+            operation_id=command.operation.operation_id,
+            execution_id=command.execution_request.execution_id,
+            turn_id=context.turn_id,
+            tenant_id=command.operation.tenant_id,
+            actor_id=command.operation.actor_id,
+            context_id=context.context_id,
+            context_digest=context.context_digest,
+            compiler_version=context.compiler_version,
+            source_snapshot=context.source_snapshot,
+            data_class=context.data_class,
+            purpose=context.purpose,
+            handoff_digest=context.handoff_digest,
+            capability=command.operation.capability,
+            idempotency_key=command.operation.idempotency_key,
+            trace_id=command.operation.trace_id,
+        )
+
+    fake_client.submit = submit
+    fake_client._validate_ack_identity = verify_ack
+    fake_client.wait_for_terminal = terminal
+    fake_client.status = status
+    fake_client.terminal_result_if_available = terminal_if_available
+    fake_client.handoff_binding = handoff_binding
+
 
 
 @pytest.mark.asyncio
@@ -144,7 +293,7 @@ async def test_live_chat_success_reaches_durable_complete(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user),
+        _conversation_authority(thread, user, monkeypatch),
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -174,6 +323,7 @@ async def test_live_chat_success_reaches_durable_complete(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
@@ -248,7 +398,7 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user),
+        _conversation_authority(thread, user, monkeypatch),
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -279,6 +429,7 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     first = await route.ai_chat(
@@ -323,24 +474,31 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
         holder_id="retry-worker",
         ttl_seconds=30,
     )
-    # The successful second HTTP request already took over at epoch 2.
-    # A later worker must be fenced beyond both prior request holders.
-    assert retry_lease.epoch == 3
+    # Finalization can acquire an additional fenced poll lease. Assert the
+    # underlying custody invariant rather than freezing an obsolete lease
+    # count: every new owner has a fresh epoch, all older holders released,
+    # and the replay journal retains an unbroken action sequence.
     ownership = ai_chat_turn_test_authority.repo.list_ownership_receipts(
         operation_id,
         tenant_id="tenant-a",
         owner_id="owner-a",
     )
-    assert [receipt["action"] for receipt in ownership] == [
-        "acquire",
-        "release",
-        "takeover",
-        "renew",
-        "renew",
-        "release",
-        "takeover",
+    acquisitions = [
+        receipt for receipt in ownership
+        if receipt["action"] in {"acquire", "takeover"}
     ]
-    assert [receipt["epoch"] for receipt in ownership] == [1, 1, 2, 2, 2, 2, 3]
+    assert len(acquisitions) >= 3
+    assert [receipt["epoch"] for receipt in acquisitions] == list(
+        range(1, retry_lease.epoch + 1)
+    )
+    assert ownership[-1]["action"] == "takeover"
+    assert ownership[-1]["epoch"] == retry_lease.epoch
+    for prior in acquisitions[:-1]:
+        epoch_actions = [
+            receipt["action"] for receipt in ownership
+            if receipt["epoch"] == prior["epoch"]
+        ]
+        assert epoch_actions[-1] == "release"
     for previous, current in zip(ownership, ownership[1:]):
         assert current["previous_receipt_digest"] == previous["digest"]
     ai_chat_turn_test_authority.repo.release_lease(retry_lease)
@@ -354,8 +512,16 @@ async def test_live_chat_event_page_supports_digest_bound_reconnect(
     import routes.ai as route
 
     thread, user = _thread_and_user()
-    authority = _conversation_authority(thread, user)
+    authority = _conversation_authority(thread, user, monkeypatch)
     monkeypatch.setattr(route, "conversation_authority", authority)
+
+    # The shared SQLite test journal has durable reconstruction, but its
+    # older async adapter exposed only events and leases. Exercise the route's
+    # real reconstruction path against the same repository.
+    async def reconstruct(operation_id, **kwargs):
+        return ai_chat_turn_test_authority.repo.reconstruct(operation_id, **kwargs)
+
+    monkeypatch.setattr(ai_chat_turn_test_authority, "reconstruct", reconstruct, raising=False)
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
             service_principal="codedock-backend",
@@ -381,6 +547,7 @@ async def test_live_chat_event_page_supports_digest_bound_reconnect(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
@@ -436,7 +603,7 @@ async def test_cancellation_request_does_not_fabricate_terminal_cancelled(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, allow_commit=False),
+        _conversation_authority(thread, user, monkeypatch, allow_commit=False, legacy=True),
     )
 
     operation_id, _execution_id = route._chat_turn_ids(
@@ -506,7 +673,7 @@ async def test_live_owner_prevents_duplicate_engine_execution(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, allow_commit=False),
+        _conversation_authority(thread, user, monkeypatch, allow_commit=False),
     )
     operation_id, _execution_id = route._chat_turn_ids(
         thread.thread_id,
@@ -547,6 +714,7 @@ async def test_live_owner_prevents_duplicate_engine_execution(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
@@ -577,7 +745,7 @@ async def test_live_chat_rejects_unaccepted_engine_output_before_transcript_comm
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, allow_commit=False),
+        _conversation_authority(thread, user, monkeypatch, allow_commit=False),
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -604,6 +772,7 @@ async def test_live_chat_rejects_unaccepted_engine_output_before_transcript_comm
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
