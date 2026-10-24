@@ -1182,6 +1182,11 @@ def create_app() -> Any:
         body_limits=_gate_body_limits(),
     )
     install_gate(app, policy=gate_policy)
+    # #3622 follow-up (TD: create_app is the only HTTP entry): fold a registered
+    # agent_edge gateway in behind the same install_gate stack.
+    # Restored: dropped by the stale-base merge of #4139.
+    from skeleton.api.agent_edge_mount import install_registered_agent_edge
+    install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(
@@ -1289,9 +1294,9 @@ def create_app() -> Any:
         reject_cortex_secret_routes,
     )
     reject_cortex_secret_routes(app)
-    # On by default (Jenkins #4129 B5): re-walk the full route graph at ASGI
-    # lifespan startup and on every request, so late or nested additions to
-    # live included routers are refused too. Outermost, so nothing bypasses it.
+    # On by default (Jenkins #4129 B5): the guard middleware re-walks the route
+    # graph when the ASGI server boots and whenever the route table changes, so
+    # late or nested additions to live included routers are refused too.
     app.add_middleware(CortexRouteGuardMiddleware, guarded_app=app)
     return app
 

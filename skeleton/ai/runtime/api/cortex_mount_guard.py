@@ -8,6 +8,12 @@ from skeleton.api.cortex_mount_guard import (
     CortexRouteGuardMiddleware,
     iter_route_paths,
     reject_cortex_secret_routes,
+    route_table_fingerprint,
 )
 
-__all__ = ("CortexRouteGuardMiddleware", "iter_route_paths", "reject_cortex_secret_routes")
+__all__ = (
+    "CortexRouteGuardMiddleware",
+    "iter_route_paths",
+    "reject_cortex_secret_routes",
+    "route_table_fingerprint",
+)

@@ -28,15 +28,31 @@ Fail-closed contract (Jenkins #4129 review, blockers B1-B7):
 * B6  ``_low_priority_routes`` (e.g. ``frontend()`` groups) is walked on every
       router; entries outside the allowlist raise.
 * B7  A cycle in the route graph raises.
+
+Follow-up (Jenkins #4256 review):
+
+* Endpoints are unwrapped through ``functools.partial`` (``.func``), bound
+  methods (``__func__``) and ``__wrapped__``, recursively.
+* A leaf/mount whose ``path_regex``/``path_format`` disagree with its
+  ``path`` (e.g. ``.path`` reassigned after construction) is refused.
+* ``StaticFiles`` at or above a protected prefix (``/``, ``/api``,
+  ``/api/v1``, ``/api/v1/secrets``...) is refused.
+* The per-request re-check compares a cheap route-table fingerprint and only
+  reruns the full walk when the table changed.
+
+Residual risk: a wrapper defined in another module that does not use
+``functools.wraps`` hides the cortex handler from the module check; only
+the path checks apply to it.
 """
 
 from __future__ import annotations
 
+import functools
 import posixpath
 import unicodedata
 from urllib.parse import unquote
 
-from starlette.routing import Host, Mount, Route, WebSocketRoute
+from starlette.routing import Host, Mount, Route, WebSocketRoute, compile_path
 from starlette.staticfiles import StaticFiles
 
 try:  # FastAPI is optional for pure-Starlette callers.
@@ -107,17 +123,53 @@ def _reject_secret_path(path: str) -> None:
         )
 
 
+def _unwrap_targets(endpoint: object):
+    """Yield every callable reachable through partial/.func, __func__, __wrapped__."""
+    pending = [endpoint]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if current is None or id(current) in seen:
+            continue
+        if len(seen) >= 64:
+            raise RuntimeError(_UNINSPECTABLE + " (endpoint wrapper chain too deep)")
+        seen.add(id(current))
+        yield current
+        if isinstance(current, functools.partial):
+            pending.append(current.func)
+        for attr in ("func", "__func__", "__wrapped__"):
+            inner = getattr(current, attr, None)
+            if inner is not None and callable(inner):
+                pending.append(inner)
+
+
 def _reject_cortex_endpoint(route: object, path: str) -> None:
-    endpoint = getattr(route, "endpoint", None)
-    seen = 0
-    while endpoint is not None and seen < 16:
-        if getattr(endpoint, "__module__", None) in _CORTEX_MODULES:
+    for target in _unwrap_targets(getattr(route, "endpoint", None)):
+        if getattr(target, "__module__", None) in _CORTEX_MODULES:
             raise RuntimeError(
                 f"unchartered cortex HTTP route is forbidden ({path}): "
                 "keep cortex_routes unmounted"
             )
-        endpoint = getattr(endpoint, "__wrapped__", None)
-        seen += 1
+
+
+def _check_compiled(route: object, path: str, *, mount: bool) -> None:
+    """Refuse a route whose path_regex/path_format disagree with its path."""
+    regex = getattr(route, "path_regex", None)
+    fmt = getattr(route, "path_format", None)
+    if regex is None and fmt is None:
+        return
+    source = (path.rstrip("/") + "/{path:path}") if mount else path
+    expected_regex, expected_fmt, _ = compile_path(source)
+    if getattr(regex, "pattern", None) != expected_regex.pattern or fmt != expected_fmt:
+        raise RuntimeError(_UNINSPECTABLE + f" (path/path_regex disagree for {path!r})")
+
+
+def _static_above_protected(full: str) -> bool:
+    segs = tuple(_segments(full))
+    n = len(_SECRETS)
+    if tuple(segs[:n]) == _SECRETS[: len(segs[:n])] and len(segs) <= n:
+        return True  # at or above /api/v1/secrets (incl. "/")
+    return any(tuple(segs[i:i + n]) == _SECRETS for i in range(len(segs) - n + 1))
 
 
 def _app_tables(obj: object) -> list[object] | None:
@@ -173,6 +225,7 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
             path = getattr(route, "path", None)
             if not isinstance(path, str):
                 raise RuntimeError(_UNINSPECTABLE)  # noqa: TRY004
+            _check_compiled(route, path, mount=False)
             full = _join(prefix, path)
             _reject_cortex_endpoint(route, full)
             yield full
@@ -181,6 +234,7 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
             path = getattr(route, "path", None)
             if not isinstance(path, str):
                 raise RuntimeError(_UNINSPECTABLE)  # noqa: TRY004
+            _check_compiled(route, path, mount=True)
             full = _join(prefix, path)
             yield full
             base = getattr(route, "_base_app", None) or getattr(route, "app", None)
@@ -189,6 +243,10 @@ def _iter_paths(routes: object, prefix: str, stack: tuple[int, ...]):
             tables = _app_tables(base)
             if tables is None:
                 if isinstance(base, StaticFiles) and "{" not in full:
+                    if _static_above_protected(full):
+                        raise RuntimeError(
+                            _UNINSPECTABLE + f" (StaticFiles at or above a protected prefix: {full})"
+                        )
                     continue
                 raise RuntimeError(_UNINSPECTABLE + f" (opaque mount at {full})")
             yield from _walk_tables(tables, full, here + (id(base),))
@@ -219,28 +277,87 @@ def reject_cortex_secret_routes(app: object) -> None:
         _reject_secret_path(path)
 
 
+def _fp_children(route: object) -> list[object]:
+    if _INCLUDED is not None and isinstance(route, _INCLUDED):
+        original = getattr(route, "original_router", None)
+        ctx = getattr(route, "include_context", None)
+        return [("inc", getattr(ctx, "prefix", None)), original]
+    if isinstance(route, (Mount, Host)):
+        return [getattr(route, "_base_app", None) or getattr(route, "app", None)]
+    return []
+
+
+def route_table_fingerprint(app: object) -> tuple | None:
+    """Cheap identity/shape fingerprint of the whole route graph.
+
+    Captures every table (identity + length) and every route's identity,
+    type, ``path``, ``path_regex`` / ``path_format`` and endpoint identity,
+    so mutations anywhere (appends, path reassignment, endpoint swap) change
+    it. Returns ``None`` when it cannot be computed (forces a full walk).
+    """
+    out: list[object] = []
+    seen: set[int] = set()
+    pending: list[object] = [app]
+    try:
+        while pending:
+            node = pending.pop()
+            if isinstance(node, tuple):
+                out.append(node)
+                continue
+            if node is None or id(node) in seen:
+                out.append(("ref", id(node)))
+                continue
+            seen.add(id(node))
+            if len(seen) > 100_000:
+                return None
+            tables = _app_tables(node)
+            out.append(("node", id(node), type(node), tables is None))
+            for table in tables or ():
+                out.append(("table", id(table), len(table)))
+                for route in table:
+                    regex = getattr(route, "path_regex", None)
+                    out.append((
+                        id(route), type(route), getattr(route, "path", None),
+                        id(regex), getattr(regex, "pattern", None),
+                        getattr(route, "path_format", None),
+                        id(getattr(route, "endpoint", None)),
+                    ))
+                    pending.extend(_fp_children(route))
+    except Exception:  # noqa: BLE001 - unknown shape: force the full walk
+        return None
+    return tuple(out)
+
+
 class CortexRouteGuardMiddleware:
     """Full re-walk at lifespan startup and on every HTTP/WebSocket request.
 
     Installed by default in ``create_app``. Any exception while walking counts
     as a violation: startup fails, HTTP gets 503, WebSocket is closed (1011).
+    Per request, the full walk reruns only when ``route_table_fingerprint``
+    differs from the last fingerprint that passed a full walk.
     """
 
     def __init__(self, app, *, guarded_app: object) -> None:
         self.app = app
         self.guarded_app = guarded_app
+        self._clean_fingerprint: tuple | None = None
 
-    def _violation(self) -> str | None:
+    def _violation(self, *, force: bool = False) -> str | None:
+        fingerprint = route_table_fingerprint(self.guarded_app)
+        if not force and fingerprint is not None and fingerprint == self._clean_fingerprint:
+            return None
         try:
             reject_cortex_secret_routes(self.guarded_app)
         except Exception as exc:  # noqa: BLE001 - fail closed on anything
+            self._clean_fingerprint = None
             return str(exc) or type(exc).__name__
+        self._clean_fingerprint = fingerprint
         return None
 
     async def __call__(self, scope, receive, send):
         kind = scope.get("type")
         if kind == "lifespan":
-            error = self._violation()
+            error = self._violation(force=True)
             if error is None:
                 await self.app(scope, receive, send)
                 return
@@ -264,4 +381,9 @@ class CortexRouteGuardMiddleware:
         await send({"type": "http.response.body", "body": body})
 
 
-__all__ = ["CortexRouteGuardMiddleware", "iter_route_paths", "reject_cortex_secret_routes"]
+__all__ = [
+    "CortexRouteGuardMiddleware",
+    "iter_route_paths",
+    "reject_cortex_secret_routes",
+    "route_table_fingerprint",
+]
