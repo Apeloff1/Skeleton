@@ -243,6 +243,10 @@ class SQLiteConversationRepository:
                     thread_id TEXT NOT NULL,
                     message_id TEXT NOT NULL,
                     metadata_json TEXT NOT NULL,
+                    dispatch_state TEXT NOT NULL DEFAULT 'ready'
+                        CHECK(dispatch_state IN ('ready', 'submitting', 'admitted', 'withdrawn')),
+                    cancel_requested INTEGER NOT NULL DEFAULT 0
+                        CHECK(cancel_requested IN (0, 1)),
                     PRIMARY KEY(namespace, message_id),
                     FOREIGN KEY(namespace, thread_id)
                         REFERENCES conversation_thread(namespace, thread_id)
@@ -277,6 +281,19 @@ class SQLiteConversationRepository:
                 if column not in columns:
                     self._connection.execute(
                         f"ALTER TABLE conversation_message ADD COLUMN {declaration}"
+                    )
+            dispatch_columns = {
+                row["name"] for row in self._connection.execute(
+                    "PRAGMA table_info(conversation_chat_execution)"
+                ).fetchall()
+            }
+            for column, declaration in (
+                ("dispatch_state", "dispatch_state TEXT NOT NULL DEFAULT 'ready'"),
+                ("cancel_requested", "cancel_requested INTEGER NOT NULL DEFAULT 0"),
+            ):
+                if column not in dispatch_columns:
+                    self._connection.execute(
+                        f"ALTER TABLE conversation_chat_execution ADD COLUMN {declaration}"
                     )
 
     @staticmethod
@@ -817,6 +834,103 @@ class SQLiteConversationRepository:
             if not isinstance(value, dict):
                 raise ConversationRepositoryCorruption("prepared chat metadata has invalid shape")
             return value
+
+    def chat_dispatch(
+        self,
+        thread_id: str,
+        message_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        record_digest: str,
+        action: str = "read",
+    ) -> dict[str, object] | None:
+        """Serialize exact-command submission and cancellation in SQLite.
+
+        A claim is permitted only for the original digest-bound command.
+        Read, claim, cancel and admitted mirror Mongo's fail-closed transition
+        semantics, without fabricating a missing prepared command or custody.
+        """
+        if action not in {"read", "claim", "cancel", "admitted"}:
+            raise ValueError("unsupported chat dispatch transition")
+        if (
+            not isinstance(record_digest, str)
+            or len(record_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in record_digest)
+        ):
+            raise ConversationConflict("chat dispatch record digest is invalid")
+        with self._lock:
+            row = self._thread_row(thread_id)
+            if row is None:
+                raise ConversationNotFound(thread_id)
+            thread = self._thread_from_row(row)
+            self._authorize(thread, tenant_id, owner_id)
+            if action != "read":
+                self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                message = self._message_row(message_id)
+                if (
+                    message is None
+                    or message["thread_id"] != thread_id
+                    or message["author_type"] != ConversationAuthorType.USER.value
+                    or message["sequence"] > thread.message_sequence
+                ):
+                    state = None
+                else:
+                    stored = self._connection.execute(
+                        """
+                        SELECT metadata_json, dispatch_state, cancel_requested
+                        FROM conversation_chat_execution
+                        WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                        """,
+                        (self.namespace, thread_id, message_id),
+                    ).fetchone()
+                    state = None
+                    if stored is not None:
+                        try:
+                            metadata = json.loads(stored["metadata_json"])
+                        except (TypeError, ValueError) as exc:
+                            raise ConversationRepositoryCorruption(
+                                "prepared chat command is unreadable"
+                            ) from exc
+                        if (
+                            not isinstance(metadata, dict)
+                            or metadata.get("record_digest") != record_digest
+                        ):
+                            state = None
+                        else:
+                            old = stored["dispatch_state"]
+                            cancel = bool(stored["cancel_requested"])
+                            if old not in {"ready", "submitting", "admitted", "withdrawn"}:
+                                raise ConversationRepositoryCorruption("chat dispatch state is invalid")
+                            if action == "claim" and old in {"ready", "submitting"} and not cancel:
+                                old = "submitting"
+                            elif action == "admitted" and old in {"submitting", "admitted"}:
+                                old = "admitted"
+                            elif action == "cancel":
+                                if old == "ready":
+                                    old = "withdrawn"
+                                cancel = True
+                            elif action in {"claim", "admitted"}:
+                                old = None
+                            if old is not None:
+                                if action != "read":
+                                    self._connection.execute(
+                                        """
+                                        UPDATE conversation_chat_execution
+                                        SET dispatch_state = ?, cancel_requested = ?
+                                        WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                                        """,
+                                        (old, int(cancel), self.namespace, thread_id, message_id),
+                                    )
+                                state = {"state": old, "cancel_requested": cancel}
+                if action != "read":
+                    self._connection.execute("COMMIT")
+                return state
+            except BaseException:
+                if action != "read":
+                    self._connection.execute("ROLLBACK")
+                raise
 
     def chat_history_dependencies(
         self,
