@@ -137,7 +137,13 @@ def audit(repo: Path, *, remote: str, branch: str, refresh: bool, include_ignore
     # The full path list is included in the file; truncate stdout separately.
     counts = {key: len(value) for key, value in findings.items()}
     identical = all(value == 0 for value in counts.values())
+    canonical_receipt = json.dumps(
+        {"target": target, "head": head, "object_format": algorithm,
+         "tracked_paths": len(expected), "findings": findings},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+    ).encode("utf-8")
     return {
+        "evidence_sha256": hashlib.sha256(canonical_receipt).hexdigest(),
         "schema": "skeleton.codex-vm-byte-parity.v1",
         "status": "identical" if identical else "diverged",
         "scope": "git tree, tracked physical bytes/modes/symlinks, submodules, and untracked files"
@@ -171,6 +177,13 @@ def main() -> int:
         parser.error("--expected-main-sha must be a full Git SHA")
     if args.max_detail < 0:
         parser.error("--max-detail must not be negative")
+    if args.json:
+        try:
+            root = Path(os.fsdecode(git(args.repo, "rev-parse", "--show-toplevel").strip())).resolve()
+            if args.json.resolve().is_relative_to(root):
+                parser.error("--json receipt must be outside the audited checkout")
+        except (RuntimeError, OSError) as exc:
+            parser.error("cannot establish auditable repository root: " + str(exc)[:500])
     try:
         result = audit(args.repo, remote=args.remote, branch=args.branch,
                        refresh=args.fetch, include_ignored=args.include_ignored,
