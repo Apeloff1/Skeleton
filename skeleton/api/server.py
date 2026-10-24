@@ -1075,28 +1075,6 @@ def _gate_body_limits() -> tuple[tuple[str, int], ...]:
     )
 
 
-def _realtime_limits() -> dict:
-    """Realtime hub bounds (Jenkins S2-1/S2-4/S2-5); env overrides, documented
-    in ``docs/engineering/PERFORMANCE_BUDGETS.md``."""
-
-    def _num(name: str, default: float, cast: Any = int) -> Any:
-        raw = os.environ.get(name, "").strip()
-        if not raw:
-            return default
-        try:
-            value = cast(raw)
-        except ValueError:
-            return default
-        return value if value > 0 else default
-
-    return {
-        "presence_meta_max_bytes": _num("SKELETON_REALTIME_PRESENCE_META_MAX_BYTES", 2048),
-        "presence_max_members_per_scope": _num("SKELETON_REALTIME_PRESENCE_MAX_MEMBERS", 256),
-        "max_streams_per_principal": _num("SKELETON_REALTIME_MAX_STREAMS_PER_PRINCIPAL", 8),
-        "max_stream_lifetime_s": _num("SKELETON_REALTIME_MAX_STREAM_LIFETIME_S", 900.0, float),
-    }
-
-
 def _bind_realtime(app: Any, state: Any) -> None:
     """Wire the realtime hub into observability and the jobs fan-out.
 
@@ -1186,10 +1164,10 @@ def create_app() -> Any:
     # Realtime transport (ADR-realtime-transport, #4101): canonical SSE stream
     # GET /api/v1/events + POST /api/v1/presence, hub lifecycle owned here.
     from skeleton.api.realtime_routes import router as realtime_router
-    from skeleton.realtime import RealtimeHub, sealed_principal_authorizer
+    from skeleton.realtime import RealtimeHub, realtime_limits_from_env, sealed_principal_authorizer
     # Hub default is deny-all; the gate-verified principal opens channels and
     # per-event owner / job-grant checks decide delivery (Jenkins S1-1).
-    realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer, **_realtime_limits())
+    realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer, **realtime_limits_from_env())
     app.state.realtime_hub = realtime_hub
     app.state.realtime_unsubscribe = None
     app.include_router(realtime_router, prefix="/api/v1")
