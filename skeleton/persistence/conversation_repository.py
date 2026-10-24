@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -577,6 +578,44 @@ class SQLiteConversationRepository:
                 raise ConversationConflict("prepared execution metadata is not canonical JSON") from exc
             if len(encoded_execution.encode("utf-8")) > 2 * 1024 * 1024:
                 raise ConversationConflict("prepared execution metadata exceeds its byte bound")
+            # The portable owner shares the same canonical, digest-sealed
+            # envelope as Mongo. Full engine-command semantic checks happen
+            # at preparation/read; malformed envelopes cannot be published.
+            mandatory = {
+                "schema_version", "request_digest", "command",
+                "dependencies", "command_digest", "record_digest",
+            }
+            if (
+                set(execution_metadata) != mandatory
+                or execution_metadata["schema_version"] != "backend.ai.chat-execution.v1"
+                or not isinstance(execution_metadata["command"], dict)
+                or not isinstance(execution_metadata["dependencies"], dict)
+            ):
+                raise ConversationConflict("prepared execution envelope is invalid")
+            request_digest = execution_metadata["request_digest"]
+            if (
+                not isinstance(request_digest, str)
+                or len(request_digest) != 64
+                or any(digit not in "0123456789abcdef" for digit in request_digest)
+                or "chat-request-sha256:" + request_digest not in message.attachment_refs
+            ):
+                raise ConversationConflict("prepared execution request identity differs")
+            def canonical_digest(value: object) -> str:
+                data = json.dumps(
+                    value, ensure_ascii=False, allow_nan=False,
+                    sort_keys=True, separators=(",", ":"),
+                ).encode("utf-8")
+                return hashlib.sha256(data).hexdigest()
+            if (
+                execution_metadata["command_digest"]
+                != canonical_digest(execution_metadata["command"])
+                or execution_metadata["record_digest"]
+                != canonical_digest({
+                    key: value for key, value in execution_metadata.items()
+                    if key != "record_digest"
+                })
+            ):
+                raise ConversationConflict("prepared execution digest differs")
         elif "chat-prepared-execution:v1" in message.attachment_refs:
             raise ConversationConflict("prepared USER requires its original execution metadata")
         with self._lock:
