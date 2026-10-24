@@ -227,3 +227,52 @@ def test_verified_tenant_subscription_gets_own_tenant_events_live_and_replay():
     assert _events(other_tenant.drain()) == []
     bob = hub.subscribe(["build"], principal="carol", tenant="t1", cursor=1000)
     assert _events(bob.drain()) == []
+
+
+_FAKE_GH = "ghp_" + "A" * 36
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        f"token%253D{_FAKE_GH}",  # double-%-encoded '='
+        f"token%25253D{_FAKE_GH}",  # triple-%-encoded '='
+        f"note%2520{_FAKE_GH}",  # double-%-encoded space
+    ],
+)
+def test_guard_catches_multi_percent_encoded_tokens(value):
+    clean, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits and _FAKE_GH not in json.dumps(clean)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [f"x{_FAKE_GH}", f"tokenghp_{'B' * 36}", f"abc123sk-{'c' * 24}", f"zAKIA{'D' * 16}"],
+)
+def test_guard_catches_tokens_glued_to_leading_alphanumeric(value):
+    clean, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits and clean["note"] != value
+
+
+def test_guard_reject_mode_refuses_glued_and_double_encoded_tokens():
+    guard = PayloadSecretGuard(mode="reject")
+    for value in (f"x{_FAKE_GH}", f"token%253D{_FAKE_GH}"):
+        with pytest.raises(RealtimeSecretError):
+            guard.scrub({"note": value})
+
+
+def test_guard_percent_decoding_is_bounded():
+    from skeleton.realtime.guard import _MAX_DECODE_ROUNDS, _decoded_variants
+
+    deep = "%25" * 10 + "41"
+    assert len(_decoded_variants(deep)) <= _MAX_DECODE_ROUNDS
+
+
+def test_realtime_limits_from_env(monkeypatch):
+    from skeleton.realtime import realtime_limits_from_env
+
+    monkeypatch.setenv("SKELETON_REALTIME_MAX_STREAMS_PER_PRINCIPAL", "3")
+    monkeypatch.setenv("SKELETON_REALTIME_PRESENCE_MAX_MEMBERS", "-1")
+    limits = realtime_limits_from_env()
+    assert limits["max_streams_per_principal"] == 3
+    assert limits["presence_max_members_per_scope"] == 256

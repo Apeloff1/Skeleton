@@ -14,7 +14,8 @@ Hardening (Jenkins S2-3, #4128 review):
   ``aws_secret_access_key`` and ``X-Session-Id`` are all caught;
 * string values that hold JSON objects/arrays are parsed and scanned
   recursively (a scrubbed value is re-serialised);
-* percent-encoded and base64-looking values are decoded before the credential
+* percent-encoded (repeatedly, to a fixpoint, max 3 rounds) and
+  base64-looking values are decoded before the credential
   patterns run; a hit replaces the whole encoded value;
 * non-string scalars (``int``, ``float``, ``bool``) are scanned by their
   ``str()`` form; any other non-JSON-native type is refused with
@@ -74,6 +75,19 @@ _CAMEL_2 = re.compile(r"([a-z0-9])([A-Z])")
 _SEP = re.compile(r"[^a-z0-9]+")
 _B64_RE = re.compile(r"^[A-Za-z0-9+/_-]{16,}={0,2}$")
 _PCT_RE = re.compile(r"%[0-9A-Fa-f]{2}")
+#: Max percent-decode rounds (``%253D`` -> ``%3D`` -> ``=``); decode stops
+#: early at a fixpoint (Jenkins #4253 review, blocker 1).
+_MAX_DECODE_ROUNDS = 3
+#: Realtime-local token-prefix shapes with *no* leading ``\b`` so a token glued
+#: to a preceding alphanumeric (``xghp_...``, ``tokenghp_...``) still matches.
+_TOKEN_PREFIX_PATTERNS: Tuple[Any, ...] = (
+    re.compile(r"(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{60,})"),
+    re.compile(r"sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}"),
+    re.compile(r"(?:AKIA|ASIA)[A-Z0-9]{16}"),
+    re.compile(r"xox[abprs]-[A-Za-z0-9-]{10,}"),
+    re.compile(r"AIza[0-9A-Za-z_-]{35}"),
+    re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
+)
 
 
 class RealtimeSecretError(ValueError):
@@ -109,6 +123,9 @@ def _patterns_hit(value: str) -> Tuple[str, int]:
         return REDACTED, 1
     if kinds and cleaned2 != cleaned:
         hits += len(kinds)
+    for pattern in _TOKEN_PREFIX_PATTERNS:
+        cleaned2, n = pattern.subn(REDACTED, cleaned2)
+        hits += n
     return cleaned2, hits
 
 
@@ -117,10 +134,15 @@ def _decoded_variants(value: str) -> list:
     out = []
     if len(value) > _MAX_DECODE_CHARS:
         return out
-    if _PCT_RE.search(value):
-        decoded = unquote(value)
-        if decoded != value:
-            out.append(decoded)
+    current = value
+    for _ in range(_MAX_DECODE_ROUNDS):
+        if not _PCT_RE.search(current):
+            break
+        decoded = unquote(current)
+        if decoded == current:
+            break
+        out.append(decoded)
+        current = decoded
     compact = value.strip()
     if _B64_RE.match(compact):
         padded = compact + "=" * (-len(compact) % 4)
