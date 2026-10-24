@@ -223,6 +223,51 @@ def test_priority_header_cannot_claim_control(w):
     assert r.status_code == 429
 
 
+# Exact (stripped) server.py lines allowed to differ from origin/main. Full-line
+# matches only: no substrings, so nothing else can ride along. Comments and blank
+# lines are always allowed; lifespan/startup/shutdown tokens never are.
+SERVER_PY_ALLOWED_LINES = frozenset({
+    # #3622 follow-up: registered agent edge behind install_gate (restored after #4139).
+    "from skeleton.api.agent_edge_mount import install_registered_agent_edge",
+    "install_registered_agent_edge(app)",
+    # skeleton.projects.v1 (#4097), restored after #4139.
+    "from skeleton.api.projects_routes import router as projects_router",
+    'app.include_router(projects_router, prefix="/api/v1")',
+    # Cortex route guard wiring (Jenkins #4129 / #4256).
+    "from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes",
+    "from skeleton.api.cortex_mount_guard import CortexRouteGuardMiddleware, reject_cortex_secret_routes",
+    "app.add_middleware(CortexRouteGuardMiddleware, guarded_app=app)",
+    # OmniFabric surface restored by Jenkins's #4266 (dropped by #4139).
+    "def _omnifabric_api_enabled() -> bool:",
+    '"""OmniFabric HTTP surface toggle (default on).',
+    "``SKELETON_OMNIFABRIC_API`` set to ``0``/``false``/``no``/``off`` keeps the",
+    "router unmounted. When mounted it sits behind the HMAC gate like every",
+    "other ``/api/v1`` route; it is never added to the open prefixes.",
+    '"""',
+    'return os.environ.get("SKELETON_OMNIFABRIC_API", "1").strip().lower() not in {',
+    '"0", "false", "no", "off",',
+    "}",
+    "if _omnifabric_api_enabled():",
+    "from skeleton.api.omnifabric_routes import router as omnifabric_router",
+    'app.include_router(omnifabric_router, prefix="/api/v1")',
+})
+_SERVER_PY_FORBIDDEN_TOKENS = ("on_event", "lifespan", "startup", "shutdown")
+
+
+def disallowed_server_py_lines(diff_text: str) -> list[str]:
+    """Changed server.py lines (from a ``git diff -U0``) outside the exact allowlist."""
+    bad = []
+    for raw in diff_text.splitlines():
+        if raw[:1] not in "+-" or raw.startswith(("+++", "---")):
+            continue
+        text = raw[1:].strip()
+        if any(t in text for t in _SERVER_PY_FORBIDDEN_TOKENS):
+            bad.append(raw)
+        elif text and not text.startswith("#") and text not in SERVER_PY_ALLOWED_LINES:
+            bad.append(raw)
+    return bad
+
+
 def test_server_py_not_modified():
     """Pack F never touches the server lifespan.
 
@@ -233,16 +278,25 @@ def test_server_py_not_modified():
     import subprocess
 
     out = subprocess.run(["git", "diff", "-U0", "origin/main", "--", "skeleton/api/server.py"], capture_output=True, text=True)
-    changed = [
-        line[1:]
-        for line in out.stdout.splitlines()
-        if line[:1] in "+-" and not line.startswith(("+++", "---"))
-    ]
-    for line in changed:
-        text = line.strip()
-        assert not any(t in text for t in ("on_event", "lifespan", "startup", "shutdown")), line
-        # Extend-only exceptions: the cortex route guard wiring (Jenkins #4129)
-        # and the projects_router include restored after #4139.
-        allowed = ("agent_edge", "cortex_mount_guard", "CortexRouteGuardMiddleware",
-                   "reject_cortex_secret_routes", "projects_router", ")")
-        assert not text or any(a in text for a in allowed) or text.startswith("#"), line
+    assert disallowed_server_py_lines(out.stdout) == []
+
+
+@pytest.mark.parametrize("line", [
+    "+    app.include_router(cortex_router)",
+    '+    app.include_router(cortex_router, prefix="/api/v1")',
+    "+    from skeleton.api.cortex_routes import router as cortex_router",
+    '+    app.mount("/", StaticFiles(directory="."))',
+    '+    app.mount("/", StaticFiles(directory="static"), name="root")',
+    "+    )",
+    "+    install_registered_agent_edge(app); app.include_router(cortex_router)",
+    "+    # lifespan tweak",
+    "-    install_gate(app, policy=gate_policy)",
+])
+def test_server_py_check_rejects_unlisted_changes(line):
+    diff = "--- a/skeleton/api/server.py\n+++ b/skeleton/api/server.py\n@@ -1,0 +1 @@\n" + line + "\n"
+    assert disallowed_server_py_lines(diff) == [line]
+
+
+def test_server_py_check_accepts_exact_allowlisted_lines():
+    diff = "\n".join("+    " + line for line in sorted(SERVER_PY_ALLOWED_LINES)) + "\n+\n+    # comment\n"
+    assert disallowed_server_py_lines(diff) == []

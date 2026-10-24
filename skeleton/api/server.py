@@ -1289,10 +1289,7 @@ def create_app() -> Any:
     # Cortex's historical register_routes() contains unchartered GET/POST
     # /api/v1/secrets endpoints. Validate the final assembled HTTP routes,
     # not merely today's static import graph, before exposing the app.
-    from skeleton.api.cortex_mount_guard import (
-        CortexRouteGuardMiddleware,
-        reject_cortex_secret_routes,
-    )
+    from skeleton.api.cortex_mount_guard import CortexRouteGuardMiddleware, reject_cortex_secret_routes
     reject_cortex_secret_routes(app)
     # On by default (Jenkins #4129 B5): the guard middleware re-walks the route
     # graph when the ASGI server boots and whenever the route table changes, so
