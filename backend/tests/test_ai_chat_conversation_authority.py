@@ -245,6 +245,14 @@ def _prepare_fake_engine(client):
     async def terminal(**_kwargs):
         return result["value"]
 
+    # Context preparation resolves the engine's governed-memory boundary
+    # even for chats which never request a write. Test clients must supply
+    # its explicit fail-closed methods rather than raising AttributeError.
+    async def reject_unexpected_memory_write(*_args, **_kwargs):
+        raise AssertionError("unexpected governed memory mutation")
+
+    client.admit_storage_write = reject_unexpected_memory_write
+    client.reconcile_governed_write = reject_unexpected_memory_write
     client.submit = submit
     client._validate_ack_identity = validate
     client.wait_for_terminal = terminal
