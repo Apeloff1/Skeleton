@@ -45,3 +45,49 @@ def score(c: WorldCandidate, budget_ms: float,
 
 def rank(cands: Sequence[WorldCandidate], budget_ms: float, constraints: Any = None) -> list[ArenaScore]:
     return sorted((score(c, budget_ms, constraints) for c in cands), key=lambda s: (-s.passed, -s.total, s.world_id))
+
+
+# --- Pacing and encounter spacing (Wally review on #4268) ---
+
+def pacing_score(intensity: Sequence[float], max_plateau: int = 3) -> float:
+    """1.0 for a rising-with-relief curve; penalise flat plateaus and no climax.
+
+    ``intensity`` is per-segment along the critical path (0..1).
+    """
+    if len(intensity) < 2:
+        return 0.0
+    plateaus = run = 0
+    for a, b in zip(intensity, intensity[1:]):
+        run = run + 1 if abs(a - b) < 1e-9 else 0
+        if run >= max_plateau:
+            plateaus += 1
+    peak_late = intensity.index(max(intensity)) >= len(intensity) // 2
+    reliefs = sum(1 for a, b in zip(intensity, intensity[1:]) if b < a)
+    score = 0.5 * peak_late + 0.5 * min(1.0, reliefs / max(1, len(intensity) // 4))
+    return round(max(0.0, score - 0.1 * plateaus), 6)
+
+
+def encounter_spacing_score(positions: Sequence[float], min_gap: float, max_gap: float) -> float:
+    """Fraction of consecutive encounter gaps within [min_gap, max_gap]."""
+    pts = sorted(positions)
+    if len(pts) < 2:
+        return 0.0
+    gaps = [b - a for a, b in zip(pts, pts[1:])]
+    return round(sum(min_gap <= g <= max_gap for g in gaps) / len(gaps), 6)
+
+
+PACED_WEIGHTS = {"reachability": 0.3, "variety": 0.15, "performance": 0.15,
+                 "constraints": 0.15, "pacing": 0.15, "encounter_spacing": 0.1}
+
+
+def score_paced(c: WorldCandidate, budget_ms: float, intensity: Sequence[float],
+                encounters: Sequence[float], gap: tuple[float, float] = (2.0, 8.0),
+                constraints: Mapping[str, Callable[[WorldCandidate], bool]] | None = None) -> ArenaScore:
+    base = score(c, budget_ms, constraints)
+    parts = dict(base.parts)
+    parts["pacing"] = pacing_score(intensity)
+    parts["encounter_spacing"] = encounter_spacing_score(encounters, *gap)
+    fails = base.failures + (("flat_pacing",) if parts["pacing"] < 0.5 else ()) \
+        + (("encounter_spacing",) if parts["encounter_spacing"] < 0.5 else ())
+    total = round(sum(PACED_WEIGHTS[k] * v for k, v in parts.items()), 6)
+    return ArenaScore(c.world_id, total, parts, not fails, fails)
