@@ -115,6 +115,49 @@ class SQLiteAsyncConversationAuthority:
         # The E2E runs without reviewed Dragon sources; do not synthesize any.
         return ()
 
+    async def chat_history_dependencies(
+        self, thread_id, message_ids, *, tenant_id, owner_id
+    ):
+        """Read exact, owner-bound canonical history and its frozen commands."""
+        ids = set(message_ids)
+        if len(ids) > 256:
+            raise ConversationConflict("selected chat history exceeds causal dependency bounds")
+        thread = self.repository.get_thread(
+            thread_id, tenant_id=tenant_id, owner_id=owner_id,
+        )
+        if not ids:
+            return []
+        messages = self.repository.active_transcript(
+            thread_id, tenant_id=tenant_id, owner_id=owner_id,
+        )
+        indexed = {
+            message.message_id: message
+            for message in messages
+            if message.author_type is ConversationAuthorType.USER
+            and message.sequence <= thread.message_sequence
+        }
+        if not ids.issubset(indexed):
+            raise ConversationConflict("selected chat causal user lineage is incomplete")
+        rows = [
+            (
+                indexed[message_id],
+                self.repository.chat_execution(
+                    thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
+                ),
+                None,
+            )
+            for message_id in sorted(ids)
+        ]
+        import json
+        encoded = json.dumps(
+            [metadata for _message, metadata, _legacy in rows],
+            sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        if len(encoded) > 8 * 1024 * 1024:
+            raise ConversationConflict("selected chat execution metadata exceeds its byte bound")
+        return rows
+
     async def append_user_message(
         self,
         thread_id: str,
