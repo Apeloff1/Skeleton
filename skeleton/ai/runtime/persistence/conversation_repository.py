@@ -818,6 +818,56 @@ class SQLiteConversationRepository:
                 raise ConversationRepositoryCorruption("prepared chat metadata has invalid shape")
             return value
 
+    def chat_history_dependencies(
+        self,
+        thread_id: str,
+        message_ids: Iterable[str],
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> list[tuple[ConversationMessage, dict[str, object] | None, None]]:
+        """Read exact owner-bound causal USER messages and original commands.
+
+        The reference SQLite authority has no legacy command storage. The
+        caller must treat an unprepared USER as legacy evidence and must never
+        fabricate an absent original engine command.
+        """
+        ids = set(message_ids)
+        if len(ids) > 256:
+            raise ConversationConflict("selected chat history exceeds causal dependency bounds")
+        with self._lock:
+            row = self._thread_row(thread_id)
+            if row is None:
+                raise ConversationNotFound(thread_id)
+            thread = self._thread_from_row(row)
+            self._authorize(thread, tenant_id, owner_id)
+            result: list[tuple[ConversationMessage, dict[str, object] | None, None]] = []
+            encoded_bytes = 0
+            for message_id in sorted(ids):
+                if not isinstance(message_id, str):
+                    raise ConversationConflict("selected chat causal user identity is invalid")
+                message_row = self._message_row(message_id)
+                if (
+                    message_row is None
+                    or message_row["thread_id"] != thread_id
+                    or message_row["author_type"] != ConversationAuthorType.USER.value
+                    or message_row["sequence"] > thread.message_sequence
+                ):
+                    raise ConversationConflict("selected chat causal user lineage is incomplete")
+                message = self._message_from_row(message_row)
+                metadata = self.chat_execution(
+                    thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
+                )
+                if metadata is not None:
+                    encoded_bytes += len(json.dumps(
+                        metadata, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8"))
+                if encoded_bytes > 8 * 1024 * 1024:
+                    raise ConversationConflict("selected chat execution metadata exceeds its byte bound")
+                result.append((message, metadata, None))
+            return result
+
     def list_messages(
         self,
         thread_id: str,
