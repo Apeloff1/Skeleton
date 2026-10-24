@@ -273,6 +273,7 @@ jobs:
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
+          tests/test_traffic_dispatch_workflow.py
           skeleton/testing/test_bot_manager.py
           skeleton/testing/test_architecture_index_completeness.py
           skeleton/testing/test_consensus.py
