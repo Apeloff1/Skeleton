@@ -392,17 +392,19 @@ runtime release readiness. All inference/training keeps existing authority.
 
 GF-N sync 2026-10-24 (Jenkins). Work only in open draft PRs; NOT ticked until it lands on `feature/game-frontier-p0-p3-20261019` or `main`.
 
+**Item count (GF-N, 2026-10-24):** TODO.md tracks **361** items (151 `[x]`, 210 `[ ]`; P0 194, P1 65, P2 51, P3 51), not the 344 stated in the dispatch plan.
+
 - GF-P0-14, GF-P0-36, GF-P0-99, GF-P0-117, GF-P0-148 — [#4246](https://github.com/Apeloff1/Skeleton/pull/4246) GF-B: game save plane (paged receipts, save/restore/migrate/rollback, replay journal) (draft, base `main`, head `168814b03`)
 - GF-P0-58, GF-P0-118, GF-P0-131 — [#4248](https://github.com/Apeloff1/Skeleton/pull/4248) feat(gf-f): frontier nav controls + surveyed-control approval (GF-P0-131, GF-P0-118) (draft, base `main`, head `deb3ce427`)
 - GF-P0-115 — [#4249](https://github.com/Apeloff1/Skeleton/pull/4249) GF-J: Expo SDK 54 foreground location provider (GF-P0-115, device verification pending) (draft, base `main`, head `14a696b05`)
 - no TODO.md item ID cited in PR (not mapped) — [#4250](https://github.com/Apeloff1/Skeleton/pull/4250) feat(game-frontier): weather + 30/50/60/120 FPS + LOD in native runtime loop (#4167) (draft, base `feature/game-frontier-p0-p3-20261019`, head `c226726b2`)
-- GF-P0-17, GF-P0-38, GF-P0-134 — [#4252](https://github.com/Apeloff1/Skeleton/pull/4252) ci(GF-D): headless import + physics probe in Godot 4.7.2 native smoke (draft, base `main`, head `a852ba253`)
+- GF-P0-17, GF-P0-38, GF-P0-134 — [#4252](https://github.com/Apeloff1/Skeleton/pull/4252) ci(GF-D): headless import + physics probe in Godot 4.7.2 native smoke (draft, base `main`, head `a852ba253`) — **OWNER of GF-P0-17, GF-P0-38, GF-P0-134** (Studio Manager ruling, 2026-10-24 19:23 Europe/Oslo).
 - GF-P0-130, GF-P0-132 — [#4254](https://github.com/Apeloff1/Skeleton/pull/4254) feat(GF-H): GPS frame hooks and NPC route grounding (skeleton/frontier_nav) (draft, base `main`, head `989777a37`)
 - GF-P0-13, GF-P0-35, GF-P0-57, GF-P0-60, GF-P0-61, GF-P0-165 — [#4257](https://github.com/Apeloff1/Skeleton/pull/4257) feat(gf-i/art): art-direction visual acceptance contract for renderer screenshot-reference (draft, base `main`, head `1db4e2b59`)
 - no TODO.md item ID cited in PR (not mapped) — [#4258](https://github.com/Apeloff1/Skeleton/pull/4258) feat(sandbox): guarded tool executor + B086 injection fuzz corpus (draft, base `main`, head `6c67c4aca`)
 - no TODO.md item ID cited in PR (not mapped) — [#4259](https://github.com/Apeloff1/Skeleton/pull/4259) feat(repo-intel): #807 B001-B010 build-lane structural evidence audit (draft, base `main`, head `260b33e80`)
 - no TODO.md item ID cited in PR (not mapped) — [#4261](https://github.com/Apeloff1/Skeleton/pull/4261) [B040] Game creation eval arena: QA plan (draft, base `main`, head `9b6cd0a34`)
-- GF-P0-17, GF-P0-38, GF-P0-74, GF-P0-96, GF-P0-134, GF-P0-195 — [#4262](https://github.com/Apeloff1/Skeleton/pull/4262) test(qa): GF-D real Godot headless import + parse certification [draft, Shirt 1] (draft, base `main`, head `f5f510add`)
+- GF-P0-17, GF-P0-38, GF-P0-74, GF-P0-96, GF-P0-134, GF-P0-195 — [#4262](https://github.com/Apeloff1/Skeleton/pull/4262) test(qa): GF-D real Godot headless import + parse certification [draft, Shirt 1] (draft, base `main`, head `f5f510add`) — **Duplicate claim on GF-P0-17, GF-P0-38, GF-P0-134; frozen pending BB keep/close decision** (Studio Manager ruling, 2026-10-24 19:23 Europe/Oslo). GF-P0-74, GF-P0-96, GF-P0-195 unaffected.
 - no TODO.md item ID cited in PR (not mapped) — [#4263](https://github.com/Apeloff1/Skeleton/pull/4263) feat(gameforge): #807 B038 AI generation provenance (seam for B039) (draft, base `main`, head `143d6fae1`)
 - no TODO.md item ID cited in PR (not mapped) — [#4265](https://github.com/Apeloff1/Skeleton/pull/4265) feat(gf-b020): natural-language iterative repair (B020) (draft, base `main`, head `db57d4401`)
 
