@@ -172,7 +172,7 @@ def render_handbook(domain: str,treatment: str,director: str,
                                              _actions(domain,treatment,director,worldline)),1):
         if base not in WORLDLINE_ACTIONS:
             raise StudioError("handbook contains an unregistered game production contract")
-        command_rows.append(f"| {i} | \`{archetype}\` | \`{base}\` |")
+        command_rows.append(f"| {i} | `{archetype}` | `{base}` |")
     sys_lines=[]
     for i,game in enumerate(GAMEPLAY_LAYERS):
         example=(
@@ -183,10 +183,10 @@ def render_handbook(domain: str,treatment: str,director: str,
             raise StudioError("handbook references unimplemented gameplay contract")
         sys_lines.append(
             f"### System {i+1}: {game}\n\n"
-            f"Playable source action: \`{example}\`.\n\n"
-            f"Run original \`{' + '.join(steps)}\` producers, then the \`{game}\` "
-            f"gameplay spatial/sensor layer, the \`{director}\` director and "
-            f"the \`{FINISHES[i]}\` final pass. Add \`{worldline}\` worldline "
+            f"Playable source action: `{example}`.\n\n"
+            f"Run original `{' + '.join(steps)}` producers, then the `{game}` "
+            f"gameplay spatial/sensor layer, the `{director}` director and "
+            f"the `{FINISHES[i]}` final pass. Add `{worldline}` worldline "
             "geometry and an independent observed event proposal. Confirm "
             "the source digest changes and that unrelated story records remain intact.\n"
         )
@@ -200,9 +200,9 @@ def render_handbook(domain: str,treatment: str,director: str,
     doc=(
         f"# Production volume {m['volume']}/10,000 — {domain} / "
         f"{treatment} / {director} / {worldline}\n\n"
-        f"**Exact identity:** \`{m['path']}\` · **Production contracts:** "
+        f"**Exact identity:** `{m['path']}` · **Production contracts:** "
         f"{m['covered_commands']:,} · **Generator:** "
-        "\`skeleton/forge/game_frontier_studio_worldline_handbooks.py\`\n\n"
+        "`skeleton/forge/game_frontier_studio_worldline_handbooks.py`\n\n"
         "## Actual production intent\n\n"
         f"**Domain:** {domain}; **treatment:** {treatment}; **director:** "
         f"{director}; **worldline:** {worldline}. {direct_purpose}. "
@@ -215,11 +215,11 @@ def render_handbook(domain: str,treatment: str,director: str,
         "## Ten gameplay-system constructions\n\n"+"\n".join(sys_lines)+"\n"
         "## Ten final production passes\n\n"+"\n".join(finish_lines)+"\n\n"
         "## Observed runtime interaction\n\n"
-        f"Worldline sensors: \`{effects[0]}\` {effects[1]} {effects[2]} and "
-        f"\`{effects[3]}\` {effects[4]} {effects[5]}. Only when these **observed** "
+        f"Worldline sensors: `{effects[0]}` {effects[1]} {effects[2]} and "
+        f"`{effects[3]}` {effects[4]} {effects[5]}. Only when these **observed** "
         f"conditions are satisfied may the native runtime consider the typed "
-        f"\`{effects[6]}\` proposal on channel \`{effects[7]}\` and target "
-        f"\`{effects[8]}\`. The authoring editor does not execute world mutations.\n\n"
+        f"`{effects[6]}` proposal on channel `{effects[7]}` and target "
+        f"`{effects[8]}`. The authoring editor does not execute world mutations.\n\n"
         "## Authoring and persistence sequence\n\n"
         "1. Inspect the authenticated game project, actual source SHA-256 and revision.\n"
         "2. Confirm the real selected MapLayer, floor/wall palette, prefab and quest IDs.\n"

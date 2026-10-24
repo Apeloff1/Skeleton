@@ -630,6 +630,18 @@ def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
         created_at=_now(),
         idempotency_key="replay-local",
         content="question",
+        # Replays must carry the immutable semantics bound when the USER was
+        # originally admitted. A missing binding is correctly rejected 409.
+        attachment_refs=(
+            route._chat_request_identity_ref(
+                route.AIChatRequest(
+                    message="question",
+                    thread_id=initial.thread_id,
+                    idempotency_key="replay-local",
+                    expected_thread_version=1,
+                )
+            ),
+        ),
     )
     operation_id = str(uuid4())
     assistant = ConversationMessage(
@@ -654,7 +666,10 @@ def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
         return user_message, assistant
 
     async def append_user_message(*_args, **_kwargs):
-        return initial, user_message
+        raise AssertionError("completed replay must not append USER")
+
+    async def get_thread(*_args, **_kwargs):
+        return initial
 
     class EngineMustNotRun:
         config = EngineClientConfig(
@@ -677,6 +692,7 @@ def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
         SimpleNamespace(
             append_user_message=append_user_message,
             active_transcript=active_transcript,
+            get_thread=get_thread,
         ),
     )
 

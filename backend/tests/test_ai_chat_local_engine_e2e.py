@@ -96,12 +96,38 @@ class SQLiteAsyncConversationAuthority:
         tenant_id: str,
         owner_id: str,
         expected_thread_version: int,
+        execution_metadata=None,
     ):
         return self.repository.append_message(
             message,
             tenant_id=tenant_id,
             owner_id=owner_id,
             expected_thread_version=expected_thread_version,
+            execution_metadata=execution_metadata,
+        )
+
+    async def chat_execution(self, thread_id, message_id, *, tenant_id, owner_id):
+        return self.repository.chat_execution(
+            thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
+        )
+
+    async def chat_dispatch(
+        self, thread_id, message_id, *, tenant_id, owner_id, record_digest, action="read"
+    ):
+        return self.repository.chat_dispatch(
+            thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
+            record_digest=record_digest, action=action,
+        )
+
+    async def dragon_context_segments(self, thread, query):
+        # The E2E runs without reviewed Dragon sources; do not synthesize any.
+        return ()
+
+    async def chat_history_dependencies(
+        self, thread_id, message_ids, *, tenant_id, owner_id
+    ):
+        return self.repository.chat_history_dependencies(
+            thread_id, message_ids, tenant_id=tenant_id, owner_id=owner_id,
         )
 
     async def append_user_message(
@@ -238,6 +264,51 @@ def _load_backend_ai_route(monkeypatch):
         monkeypatch.setitem(sys.modules, "routes.gameforge_auth", auth)
 
     route = importlib.import_module("routes.ai")
+
+    # This fixture uses an in-process operator callable, not an on-disk model.
+    # Only the model-selection projection is synthetic: read the real engine
+    # inventory and verify its active local identity/limits instead of forging
+    # an artifact receipt. Production catalog validation remains unchanged and
+    # is independently covered by its own fail-closed tests.
+    from core.model_catalog import CATALOG_SCHEMA
+
+    async def fixture_callable_catalog(client, *, actor_id, tenant_id):
+        inventory = await client.provider_status(tenant_id=tenant_id)
+        assert inventory["active"] == "local" and inventory["available"] is True
+        rows = [
+            row for row in inventory["providers"]
+            if row["id"] == "local" and row.get("active") is True
+        ]
+        assert len(rows) == 1
+        source = rows[0]
+        assert source["architecture_acknowledged"] is True
+        assert source["available"] is True and source["model"]
+        assert source["execution_mode"] == "local"
+        return {
+            "schema_version": CATALOG_SCHEMA,
+            "engine": "skeleton-engine",
+            "available": True,
+            "automatic_available": True,
+            "models": [{
+                "provider_id": "local",
+                "model_id": source["model"],
+                "active": True,
+                "fallback": False,
+                "selectable": True,
+                "available": True,
+                "credential_free": True,
+                "execution_mode": "local",
+                "tokenizer": source["tokenizer"],
+                "context_window": source["context_window"],
+                "max_output_tokens": source["max_output_tokens"],
+                "default_output_tokens": source["default_output_tokens"],
+                "supports_temperature": False,
+                "capabilities": list(source["capabilities"]),
+            }],
+            "active": {"provider_id": "local", "model_id": source["model"]},
+        }
+
+    monkeypatch.setattr(route, "model_catalog", fixture_callable_catalog)
 
     # Product chat now journals every turn through a durable authority. These
     # tests deliberately replace production Mongo conversation storage with
@@ -514,7 +585,7 @@ def test_backend_chat_request_identity_changes_with_execution_semantics(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_backend_chat_incomplete_user_without_engine_execution_submits_once(
+async def test_backend_chat_unprepared_legacy_user_does_not_submit_a_new_engine_command(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -584,32 +655,31 @@ async def test_backend_chat_incomplete_user_without_engine_execution_submits_onc
     )
     monkeypatch.setattr(route, "conversation_authority", authority)
 
-    recovered = await route.ai_chat(
-        route.AIChatRequest(
-            message=request.message,
-            thread_id=request.thread_id,
-            idempotency_key=request.idempotency_key,
-            expected_thread_version=thread.version,
-            context=request.context,
-        ),
-        user={"email": OWNER, "tenant_id": TENANT},
-    )
+    # An existing USER without an atomically prepared engine command is not
+    # eligible for reconstruction. Resubmitting here would violate the exact
+    # original-command and single-execution guarantees.
+    with pytest.raises(HTTPException) as rejected:
+        await route.ai_chat(
+            route.AIChatRequest(
+                message=request.message,
+                thread_id=request.thread_id,
+                idempotency_key=request.idempotency_key,
+                expected_thread_version=thread.version,
+                context=request.context,
+            ),
+            user={"email": OWNER, "tenant_id": TENANT},
+        )
 
-    assert recovered["success"] is True
-    assert recovered["response"] == "Assembled local engine answer."
-    assert recovered["engine_runtime_provider"] == "local"
-    assert len(local_calls) == 1
-    assert execution_repository.result(recovered["engine_execution_id"]) is not None
+    assert rejected.value.status_code == 409
+    assert rejected.value.detail["code"] == "legacy_command_not_admitted"
+    assert local_calls == []
 
     transcript = conversations.active_transcript(
         thread.thread_id,
         tenant_id=TENANT,
         owner_id=OWNER,
     )
-    assert [item.author_type.value for item in transcript] == [
-        "user",
-        "assistant",
-    ]
+    assert [item.author_type.value for item in transcript] == ["user"]
 
     await coordinator.shutdown()
     conversations.close()
