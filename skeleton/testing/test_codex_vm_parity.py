@@ -104,3 +104,15 @@ def test_reject_unsafe_required_sha(pair):
     src, vm, _sha = pair
     with pytest.raises(mod.ParityError, match="full lowercase"):
         mod.compare(src, vm, "main")
+
+
+def test_identical_corrupted_bytes_cannot_masquerade_as_main(pair):
+    src, vm, sha = pair
+    for path in (src / "file.py", vm / "file.py"):
+        path.write_text("same wrong bytes\n", encoding="utf-8")
+    # Skip-worktree can hide modifications from ordinary Git status; the
+    # immutable Git blob identity is still required for both checkouts.
+    run(src, "update-index", "--skip-worktree", "file.py")
+    run(vm, "update-index", "--skip-worktree", "file.py")
+    with pytest.raises(mod.ParityError, match="bytes differ from Git blob"):
+        mod.compare(src, vm, sha)
