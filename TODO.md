@@ -137,9 +137,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-127 Export visible Godot virtual GPS coordinate and bounded route HUD explicitly without OS sensor access.
 - [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance.
 - [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source.
-- [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era.
+- [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era. (GF-H `2a81c848c`: hub in skeleton/frontier_nav/gps.py; stays open until GF-A engine wiring feeds real frames)
 - [ ] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
-- [ ] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes.
+- [x] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes. (GF-H `2a81c848c`: skeleton/frontier_nav/route_grounding.py)
 
 - [ ] GF-P0-134 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
 - [x] GF-P0-135 Implement source-hashed evidence records for every registered-era mesh chunk with 3D bounds, triangle IDs, vertex IDs and deterministic ordering.
