@@ -74,14 +74,48 @@ async def test_regenerate_route_runs_engine_then_commits_new_branch(
     thread, user_message, assistant = _conversation()
     engine_commands = []
     regeneration_calls = []
+    stored = {"request": None, "result": None}
+    dispatch = {"state": "ready", "cancel_requested": False}
+    active_thread = thread
+
+    async def regeneration_request(*_args, **_kwargs):
+        return stored["request"]
+
+    async def authorize_active_thread(*_args, **_kwargs):
+        return active_thread
 
     async def get_thread(*_args, **_kwargs):
-        return thread
+        return active_thread
 
-    async def list_messages(*_args, **_kwargs):
+    async def active_transcript(*_args, **_kwargs):
         return (user_message, assistant)
 
+    async def bind_regeneration_request(_thread_id, _message_id, *, record, **_kwargs):
+        assert stored["request"] is None, "only one immutable regeneration request"
+        assert record["request_digest"] and record["record_digest"]
+        stored["request"] = record
+        return record
+
+    async def assistant_message_for_operation(*_args, **_kwargs):
+        return stored["result"]
+
+    async def regeneration_dispatch_state(*_args, **_kwargs):
+        return dict(dispatch)
+
+    async def transition_regeneration_dispatch(*_args, admitted=False, **_kwargs):
+        if admitted:
+            assert dispatch["state"] == "submitting"
+            dispatch["state"] = "admitted"
+        else:
+            assert dispatch["state"] in {"ready", "submitting"}
+            dispatch["state"] = "submitting"
+        return dict(dispatch)
+
+    async def chat_history_dependencies(*_args, **_kwargs):
+        return ()
+
     async def regenerate(thread_id, prior_id, **kwargs):
+        nonlocal active_thread
         regeneration_calls.append(
             {"thread_id": thread_id, "prior_id": prior_id, **kwargs}
         )
@@ -98,6 +132,7 @@ async def test_regenerate_route_runs_engine_then_commits_new_branch(
             title=thread.title,
             data_class=thread.data_class,
         )
+        active_thread = committed_thread
         regenerated = ConversationMessage(
             message_id=str(uuid4()),
             thread_id=thread.thread_id,
@@ -118,11 +153,19 @@ async def test_regenerate_route_runs_engine_then_commits_new_branch(
             context_compiler_version=kwargs["context_compiler_version"],
             data_class=assistant.data_class,
         )
+        stored["result"] = regenerated
         return committed_thread, regenerated
 
     authority = SimpleNamespace(
+        regeneration_request=regeneration_request,
+        authorize_active_thread=authorize_active_thread,
         get_thread=get_thread,
-        list_messages=list_messages,
+        active_transcript=active_transcript,
+        bind_regeneration_request=bind_regeneration_request,
+        assistant_message_for_operation=assistant_message_for_operation,
+        regeneration_dispatch_state=regeneration_dispatch_state,
+        transition_regeneration_dispatch=transition_regeneration_dispatch,
+        chat_history_dependencies=chat_history_dependencies,
         regenerate_assistant_message=regenerate,
     )
     fake_engine = SimpleNamespace(
@@ -132,17 +175,68 @@ async def test_regenerate_route_runs_engine_then_commits_new_branch(
         )
     )
 
-    async def execute(command):
+    from core.engine_client import EngineNotFoundError
+    import core.chat_sessions as sessions
+    import core.model_catalog as catalog_module
+
+    async def fixture_catalog(*_args, **_kwargs):
+        from core.model_catalog import CATALOG_SCHEMA
+
+        return {
+            "schema_version": CATALOG_SCHEMA,
+            "automatic_available": True,
+            "available": True,
+            "models": [{
+                "provider_id": "local",
+                "model_id": "regeneration-test-model",
+                "active": True,
+                "fallback": False,
+                "selectable": True,
+                "tokenizer": "utf8_" + "bytes_upper_bound",
+                "context_window": 8192,
+                "max_output_tokens": 2048,
+                "default_output_tokens": 512,
+                "supports_temperature": False,
+            }],
+        }
+
+    async def submit(command):
         engine_commands.append(command)
-        return SimpleNamespace(
+        stored["engine_result"] = SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Regenerated verified answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:regen",
             evidence_refs=("evidence:regen",),
+            provider_receipts=("provider:test:regeneration",),
+            tool_receipts=(),
+            memory_refs=(),
+            artifact_refs=(),
+        )
+        return SimpleNamespace(
+            operation_id=command.operation.operation_id,
+            execution_id=command.execution_request.execution_id,
         )
 
-    fake_engine.execute = execute
+    def validate_ack(ack, command):
+        assert ack.operation_id == command.operation.operation_id
+        assert ack.execution_id == command.execution_request.execution_id
 
+    async def terminal_result_if_available(**_kwargs):
+        if "engine_result" not in stored:
+            raise EngineNotFoundError("regeneration not submitted")
+        return stored["engine_result"]
+
+    async def wait_for_terminal(**_kwargs):
+        return stored["engine_result"]
+
+    fake_engine.submit = submit
+    fake_engine._validate_ack_identity = validate_ack
+    fake_engine.terminal_result_if_available = terminal_result_if_available
+    fake_engine.wait_for_terminal = wait_for_terminal
+
+    monkeypatch.setattr(catalog_module, "model_catalog", fixture_catalog)
+    monkeypatch.setattr(sessions, "conversation_authority", authority)
     monkeypatch.setattr(route, "conversation_authority", authority)
     monkeypatch.setattr(
         engine_client.EngineClient,
