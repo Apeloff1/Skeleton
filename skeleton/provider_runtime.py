@@ -4017,9 +4017,50 @@ class GatedProviderAdapter(ProviderAdapter):
         return await self.__inner.synthesize_speech(request)
 
 
+# --- GF-P0-18: sustainable deadlines and resource envelopes ---
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceEnvelope:
+    """Hard per-invocation deadline plus a byte budget for retained buffers."""
+
+    max_seconds: float = 60.0
+    max_buffer_bytes: int = 64 * 1024 * 1024
+
+    def __post_init__(self) -> None:
+        if not (0 < self.max_seconds <= 3600):
+            raise ValueError("max_seconds must be in (0, 3600]")
+        if not (0 < self.max_buffer_bytes <= 4 * 1024**3):
+            raise ValueError("max_buffer_bytes must be in (0, 4GiB]")
+
+    async def run(self, awaitable: Any) -> Any:
+        try:
+            return await asyncio.wait_for(awaitable, timeout=self.max_seconds)
+        except TimeoutError as exc:
+            raise ProviderInvocationError("provider call exceeded resource envelope deadline") from exc
+
+
+class EnvelopedProviderAdapter(GatedProviderAdapter):
+    """Gated adapter that also bounds each non-streaming call by a deadline."""
+
+    def __init__(self, inner: ProviderAdapter, gate: ModelReadinessGate, envelope: ResourceEnvelope) -> None:
+        super().__init__(inner, gate)
+        self.envelope = envelope
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        return await self.envelope.run(super().generate(request))
+
+    async def generate_image(self, request: ProviderImageRequest) -> ProviderImageResponse:
+        return await self.envelope.run(super().generate_image(request))
+
+    async def synthesize_speech(self, request: ProviderSpeechRequest) -> ProviderSpeechResponse:
+        return await self.envelope.run(super().synthesize_speech(request))
+
+
 __all__ = [
     "AIMessage",
     "FailoverProviderAdapter",
+    "EnvelopedProviderAdapter",
     "FinishReason",
     "GatedProviderAdapter",
     "ModelReadinessGate",
@@ -4046,6 +4087,7 @@ __all__ = [
     "ProviderToolDefinition",
     "ProviderUnavailableError",
     "ProviderUsage",
+    "ResourceEnvelope",
     "normalize_history",
     "provider_context_selection",
     "provider_context_temperature",

@@ -96,19 +96,33 @@ class HoldoutSplit:
 class BoundedRecordBuffer:
     """FIFO record store capped by item count; evicts oldest on overflow."""
 
-    def __init__(self, *, max_items: int) -> None:
+    def __init__(self, *, max_items: int, max_bytes: int | None = None) -> None:
         if max_items <= 0:
             raise ValueError("max_items must be positive")
+        if max_bytes is not None and max_bytes <= 0:
+            raise ValueError("max_bytes must be positive")
         self.max_items = max_items
+        self.max_bytes = max_bytes
+        self.retained_bytes = 0
         self._records: deque[ReplayRecord] = deque()
         self._lock = threading.RLock()
         self.evicted = 0
 
+    @staticmethod
+    def _size(record: ReplayRecord) -> int:
+        return len(json.dumps(record.payload, sort_keys=True, default=str).encode("utf-8"))
+
     def _append(self, record: ReplayRecord) -> None:
+        size = self._size(record)
+        if self.max_bytes is not None and size > self.max_bytes:
+            raise ValueError("record exceeds buffer byte envelope")
         with self._lock:
             self._records.append(record)
-            while len(self._records) > self.max_items:
-                self._records.popleft()
+            self.retained_bytes += size
+            while len(self._records) > self.max_items or (
+                self.max_bytes is not None and self.retained_bytes > self.max_bytes
+            ):
+                self.retained_bytes -= self._size(self._records.popleft())
                 self.evicted += 1
 
     def __len__(self) -> int:
@@ -124,8 +138,8 @@ class BoundedRecordBuffer:
 
 
 class HoldoutBuffer(BoundedRecordBuffer):
-    def __init__(self, split: HoldoutSplit, *, max_items: int) -> None:
-        super().__init__(max_items=max_items)
+    def __init__(self, split: HoldoutSplit, *, max_items: int, max_bytes: int | None = None) -> None:
+        super().__init__(max_items=max_items, max_bytes=max_bytes)
         self.split = split
 
     def add(self, record: ReplayRecord) -> None:
@@ -137,8 +151,8 @@ class HoldoutBuffer(BoundedRecordBuffer):
 class DeterministicReplayBuffer(BoundedRecordBuffer):
     """Training replay; rejects holdout ids and samples reproducibly from a seed."""
 
-    def __init__(self, split: HoldoutSplit, *, max_items: int) -> None:
-        super().__init__(max_items=max_items)
+    def __init__(self, split: HoldoutSplit, *, max_items: int, max_bytes: int | None = None) -> None:
+        super().__init__(max_items=max_items, max_bytes=max_bytes)
         self.split = split
 
     def add(self, record: ReplayRecord) -> None:
@@ -150,6 +164,21 @@ class DeterministicReplayBuffer(BoundedRecordBuffer):
         items = self.records()
         rng = random.Random(f"{seed}:{self.digest()}")
         return tuple(rng.sample(items, min(k, len(items))))
+
+
+def buffers_for_envelope(
+    split: HoldoutSplit, envelope: Any, *, max_items: int, holdout_share: float = 0.25
+) -> tuple[DeterministicReplayBuffer, HoldoutBuffer]:
+    """Split a ``ResourceEnvelope.max_buffer_bytes`` budget across replay/holdout."""
+
+    if not 0.0 < holdout_share < 1.0:
+        raise ValueError("holdout_share must be in (0, 1)")
+    hold_bytes = max(1, int(envelope.max_buffer_bytes * holdout_share))
+    replay_bytes = max(1, envelope.max_buffer_bytes - hold_bytes)
+    return (
+        DeterministicReplayBuffer(split, max_items=max_items, max_bytes=replay_bytes),
+        HoldoutBuffer(split, max_items=max_items, max_bytes=hold_bytes),
+    )
 
 
 def route_records(
@@ -180,7 +209,7 @@ def replay_episode(
 
 
 __all__ = [
-    "BoundedRecordBuffer", "DeterministicReplayBuffer", "EnvironmentIdentity",
+    "BoundedRecordBuffer", "buffers_for_envelope", "DeterministicReplayBuffer", "EnvironmentIdentity",
     "EnvironmentMismatchError", "ExactEnvironmentRegistry", "HoldoutBuffer",
     "HoldoutLeakError", "HoldoutSplit", "ReplayRecord", "make_record",
     "replay_episode", "route_records",
