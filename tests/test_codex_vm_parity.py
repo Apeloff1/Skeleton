@@ -137,3 +137,17 @@ def test_tracking_ref_without_fetch_never_claims_live_parity(tmp_path):
     )
     assert result.returncode == 2
     assert '"status": "unverified_tracking_ref"' in result.stdout
+
+
+def test_receipt_is_reproducible_and_json_must_not_contaminate_checkout(tmp_path):
+    repo = fixture(tmp_path)
+    a, b = scan(repo), scan(repo)
+    assert a["evidence_sha256"] == b["evidence_sha256"]
+    assert len(a["evidence_sha256"]) == 64
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--repo", str(repo), "--fetch", "--json", str(repo / "audit.json")],
+        check=False, text=True, capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "receipt must be outside" in result.stderr
+    assert not (repo / "audit.json").exists()
