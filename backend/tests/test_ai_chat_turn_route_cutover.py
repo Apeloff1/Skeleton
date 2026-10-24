@@ -248,8 +248,30 @@ def _configure_prepared_engine(fake_client):
         return result["value"]
 
     async def handoff_binding(*_args, **_kwargs):
-        assert result["command"] is not None
-        return result["command"].compiled_context
+        # The engine returns a signed identity binding, not the raw compiled
+        # context. Recreate all fields from the exact submitted command.
+        from core.engine_client import EngineContextBinding
+
+        command = result["command"]
+        assert command is not None
+        context = command.compiled_context
+        return EngineContextBinding(
+            operation_id=command.operation.operation_id,
+            execution_id=command.execution_request.execution_id,
+            turn_id=context.turn_id,
+            tenant_id=command.operation.tenant_id,
+            actor_id=command.operation.actor_id,
+            context_id=context.context_id,
+            context_digest=context.context_digest,
+            compiler_version=context.compiler_version,
+            source_snapshot=context.source_snapshot,
+            data_class=context.data_class,
+            purpose=context.purpose,
+            handoff_digest=context.handoff_digest,
+            capability=command.operation.capability,
+            idempotency_key=command.operation.idempotency_key,
+            trace_id=command.operation.trace_id,
+        )
 
     fake_client.submit = submit
     fake_client._validate_ack_identity = verify_ack
