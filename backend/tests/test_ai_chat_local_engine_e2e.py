@@ -514,7 +514,7 @@ def test_backend_chat_request_identity_changes_with_execution_semantics(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_backend_chat_incomplete_user_without_engine_execution_submits_once(
+async def test_backend_chat_unprepared_legacy_user_does_not_submit_a_new_engine_command(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -584,32 +584,31 @@ async def test_backend_chat_incomplete_user_without_engine_execution_submits_onc
     )
     monkeypatch.setattr(route, "conversation_authority", authority)
 
-    recovered = await route.ai_chat(
-        route.AIChatRequest(
-            message=request.message,
-            thread_id=request.thread_id,
-            idempotency_key=request.idempotency_key,
-            expected_thread_version=thread.version,
-            context=request.context,
-        ),
-        user={"email": OWNER, "tenant_id": TENANT},
-    )
+    # An existing USER without an atomically prepared engine command is not
+    # eligible for reconstruction. Resubmitting here would violate the exact
+    # original-command and single-execution guarantees.
+    with pytest.raises(HTTPException) as rejected:
+        await route.ai_chat(
+            route.AIChatRequest(
+                message=request.message,
+                thread_id=request.thread_id,
+                idempotency_key=request.idempotency_key,
+                expected_thread_version=thread.version,
+                context=request.context,
+            ),
+            user={"email": OWNER, "tenant_id": TENANT},
+        )
 
-    assert recovered["success"] is True
-    assert recovered["response"] == "Assembled local engine answer."
-    assert recovered["engine_runtime_provider"] == "local"
-    assert len(local_calls) == 1
-    assert execution_repository.result(recovered["engine_execution_id"]) is not None
+    assert rejected.value.status_code == 409
+    assert rejected.value.detail["code"] == "legacy_command_not_admitted"
+    assert local_calls == []
 
     transcript = conversations.active_transcript(
         thread.thread_id,
         tenant_id=TENANT,
         owner_id=OWNER,
     )
-    assert [item.author_type.value for item in transcript] == [
-        "user",
-        "assistant",
-    ]
+    assert [item.author_type.value for item in transcript] == ["user"]
 
     await coordinator.shutdown()
     conversations.close()
