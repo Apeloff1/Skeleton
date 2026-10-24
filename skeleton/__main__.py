@@ -52,6 +52,7 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+                run --probe [--backend URL] [--middleware URL] [--json]
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -65,6 +66,8 @@ Commands:
     walk        Prove spawn→extract on the emitted door graph
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
+    chat        Chat with the backend AI: chat <message> [--thread ID --version N] [--json]
+    agent       Run a backend agent/system: agent <task> --agent ID|--system ID|--list
     creator     Canonical typed creator command surface (create/edit/test/preview/export)
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -497,6 +500,22 @@ def _cmd_doctor(rest: List[str]) -> int:
     return run_doctor(rest)
 
 
+def _cmd_chat(rest: List[str]) -> int:
+    from skeleton.forge.standalone_cli import run_chat
+    return run_chat(rest)
+
+
+def _cmd_agent(rest: List[str]) -> int:
+    from skeleton.forge.standalone_cli import run_agent
+    return run_agent(rest)
+
+
+def _cmd_run(rest: List[str]) -> int:
+    from skeleton.forge.standalone_cli import FALL_THROUGH, run_probe
+    code = run_probe(rest)
+    return _cmd_gameforge_run(rest) if code == FALL_THROUGH else code
+
+
 def _load_run_answers(source: str, *, file_path: bool = False) -> Dict[str, str]:
     """Read bounded questionnaire answers (inline JSON, @file or --answers-file).
 
@@ -735,7 +754,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd in ("wiki", "seed", "caps", "lattice", "pulse", "orch", "season", "scoreboard", "hot", "coverage", "decade", "bank", "switch", "witness", "gov", "cage", "rot", "fieldcov", "enact", "day", "week", "calendar", "conductor", "ctx", "live", "observe", "stacks", "mix", "satellites", "path", "bound", "fieldwalk", "dump", "orgwalk", "sleep", "forget", "helix", "recall"):
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
-    if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "run": return _cmd_run(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
@@ -756,6 +775,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "cockpit": return _cmd_cockpit(rest)
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "doctor": return _cmd_doctor(rest)
+    if cmd == "chat": return _cmd_chat(rest)
+    if cmd == "agent": return _cmd_agent(rest)
     if cmd == "creator": return _cmd_creator(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
