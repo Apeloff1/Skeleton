@@ -562,18 +562,26 @@ def test_memory_opt_in_without_canonical_engine_fails_closed(
         data_class=initial.data_class,
     )
 
+    calls = {"append": 0, "commit": 0, "provider": 0}
+
     async def append_user_message(*_args, **_kwargs):
-        return after_user, user_message
+        calls["append"] += 1
+        raise AssertionError("offline engine must never publish an unprepared USER")
+
+    async def get_thread(*_args, **_kwargs):
+        return initial
 
     async def active_transcript(*_args, **_kwargs):
-        return (user_message,)
+        return ()
 
     async def forbidden_commit(*_args, **_kwargs):
+        calls["commit"] += 1
         raise AssertionError(
             "memory opt-in must not commit without canonical engine"
         )
 
     async def forbidden_provider(*_args, **_kwargs):
+        calls["provider"] += 1
         raise AssertionError(
             "memory opt-in must not use legacy/local provider path"
         )
@@ -588,6 +596,7 @@ def test_memory_opt_in_without_canonical_engine_fails_closed(
         "conversation_authority",
         SimpleNamespace(
             append_user_message=append_user_message,
+            get_thread=get_thread,
             active_transcript=active_transcript,
             commit_assistant_message=forbidden_commit,
         ),
@@ -608,11 +617,12 @@ def test_memory_opt_in_without_canonical_engine_fails_closed(
         },
     )
 
-    assert response.status_code == 200
+    # Engine readiness is checked before atomic USER admission. This is a
+    # scoped 503, never a successful empty chat or an invented legacy response.
+    assert response.status_code == 503
     body = response.json()
-    assert body["success"] is False
-    assert body["error_code"] == "memory_persistence_unavailable"
-    assert body["ai_generated"] is False
+    assert body["detail"]["code"] == "engine_unavailable"
+    assert calls == {"append": 0, "commit": 0, "provider": 0}
 
 
 def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
