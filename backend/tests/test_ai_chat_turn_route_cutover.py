@@ -73,15 +73,91 @@ def _request(route, thread_id):
     )
 
 
-def _conversation_authority(thread, user, *, allow_commit=True):
+def _conversation_authority(thread, user, monkeypatch, *, allow_commit=True, legacy=False):
+    from dataclasses import replace
+    import routes.ai as route
+
+    state = {"user": user if legacy else None, "metadata": None}
+    initial_thread = replace(thread, version=1, message_sequence=0)
+
+    if not legacy:
+        # Bind this case's historical operation identity to the newly admitted
+        # USER. The route still builds, validates and persists the real command.
+        canonical_uuid = route.uuid
+
+        class PinnedMessageUuid:
+            def __getattr__(self, name):
+                return getattr(canonical_uuid, name)
+
+            def uuid4(self):
+                return canonical_uuid.UUID(user.message_id)
+
+        monkeypatch.setattr(route, "uuid", PinnedMessageUuid())
+
+        from core.model_catalog import CATALOG_SCHEMA
+
+        async def initialized():
+            return None
+
+        async def catalog(*_args, **_kwargs):
+            return {
+                "schema_version": CATALOG_SCHEMA,
+                "available": True,
+                "automatic_available": True,
+                "models": [{
+                    "provider_id": "local", "model_id": "test-chat-turn",
+                    "active": True, "fallback": False, "selectable": True,
+                    "tokenizer": "utf8_" + "bytes_upper_bound",
+                    "context_window": 8192, "max_output_tokens": 2048,
+                    "default_output_tokens": 512, "supports_temperature": False,
+                }],
+            }
+
+        monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
+        monkeypatch.setattr(route, "model_catalog", catalog)
+
     async def active_transcript(*_args, **_kwargs):
-        return (user,)
+        return () if state["user"] is None else (state["user"],)
 
     async def append_user_message(*_args, **_kwargs):
         return thread, user
 
+    async def append_message(candidate, *, execution_metadata, **_kwargs):
+        assert not legacy and state["user"] is None
+        assert candidate.message_id == user.message_id
+        assert "chat-prepared-execution:v1" in candidate.attachment_refs
+        assert (
+            "chat-request-sha256:" + execution_metadata["request_digest"]
+        ) in candidate.attachment_refs
+        state["user"] = candidate
+        state["metadata"] = execution_metadata
+        return thread, candidate
+
     async def get_thread(*_args, **_kwargs):
-        return thread
+        return thread if state["user"] is not None else initial_thread
+
+    async def chat_execution(_thread_id, message_id, **_kwargs):
+        assert state["user"] is not None
+        assert message_id == state["user"].message_id
+        return state["metadata"]
+
+    dispatch_state = "ready"
+
+    async def chat_dispatch(_thread_id, message_id, *, record_digest, action="read", **_kwargs):
+        nonlocal dispatch_state
+        assert state["user"] is not None
+        assert message_id == state["user"].message_id
+        assert state["metadata"]["record_digest"] == record_digest
+        if action == "claim" and dispatch_state in {"ready", "submitting"}:
+            dispatch_state = "submitting"
+        elif action == "admitted" and dispatch_state in {"submitting", "admitted"}:
+            dispatch_state = "admitted"
+        elif action != "read":
+            raise AssertionError("unexpected dispatch transition")
+        return {"state": dispatch_state, "cancel_requested": False}
+
+    async def no_context(*_args, **_kwargs):
+        return ()
 
     async def commit_assistant_message(_thread_id, **kwargs):
         if not allow_commit:
@@ -128,7 +204,12 @@ def _conversation_authority(thread, user, *, allow_commit=True):
     return SimpleNamespace(
         active_transcript=active_transcript,
         append_user_message=append_user_message,
+        append_message=append_message,
         get_thread=get_thread,
+        chat_execution=chat_execution,
+        chat_dispatch=chat_dispatch,
+        dragon_context_segments=no_context,
+        chat_history_dependencies=no_context,
         commit_assistant_message=commit_assistant_message,
     )
 
@@ -144,7 +225,7 @@ async def test_live_chat_success_reaches_durable_complete(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user),
+        _conversation_authority(thread, user, monkeypatch),
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -248,7 +329,7 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user),
+        _conversation_authority(thread, user, monkeypatch),
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -436,7 +517,7 @@ async def test_cancellation_request_does_not_fabricate_terminal_cancelled(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, allow_commit=False),
+        _conversation_authority(thread, user, monkeypatch, allow_commit=False),
     )
 
     operation_id, _execution_id = route._chat_turn_ids(
@@ -506,7 +587,7 @@ async def test_live_owner_prevents_duplicate_engine_execution(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, allow_commit=False),
+        _conversation_authority(thread, user, monkeypatch, allow_commit=False),
     )
     operation_id, _execution_id = route._chat_turn_ids(
         thread.thread_id,
@@ -577,7 +658,7 @@ async def test_live_chat_rejects_unaccepted_engine_output_before_transcript_comm
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, allow_commit=False),
+        _conversation_authority(thread, user, monkeypatch, allow_commit=False),
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
