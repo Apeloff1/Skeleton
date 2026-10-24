@@ -92,6 +92,9 @@ def audit(repo: Path, *, remote: str, branch: str, refresh: bool, include_ignore
     current = tree(repo, head)
     distinct_tree = sorted(p for p in expected.keys() | current.keys() if expected.get(p) != current.get(p))
     findings: dict[str, list[str]] = {
+        # Equal trees do not imply the VM has the same exact commit.
+        # An empty commit or metadata-only revision must not certify parity.
+        "head_commit_difference": [] if head == target else [head],
         "head_tree_difference": distinct_tree,
         "worktree_mismatch": [],
         "missing_worktree_file": [],
@@ -175,6 +178,11 @@ def main() -> int:
     args = parser.parse_args()
     if args.expected_main_sha and not HEX_SHA.fullmatch(args.expected_main_sha):
         parser.error("--expected-main-sha must be a full Git SHA")
+    # A Git remote named origin is not itself proof of GitHub main. Do not
+    # promote a freshly fetched local or misconfigured remote to authority
+    # unless its exact SHA was independently checked before invocation.
+    if args.fetch and not args.expected_main_sha:
+        parser.error("--fetch requires an independently verified --expected-main-sha")
     if args.max_detail < 0:
         parser.error("--max-detail must not be negative")
     if args.json:
