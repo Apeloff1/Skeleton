@@ -61,6 +61,95 @@ def _request(route, thread_id: str):
     )
 
 
+
+def _install_prepared_authority(route, monkeypatch, after_user, *, commit_assistant_message):
+    """Exercise the real atomic-command contract, not a legacy USER-only fake.
+
+    The fake preserves the application's exact USER/request/command identity
+    while leaving engine and assistant-commit failure injection test-owned.
+    """
+    from dataclasses import replace
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
+    from core.model_catalog import CATALOG_SCHEMA
+    from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
+
+    initial = replace(after_user, version=1, message_sequence=0)
+    state = {"user": None, "metadata": None}
+
+    async def get_thread(*_args, **_kwargs):
+        return initial if state["user"] is None else after_user
+
+    async def active_transcript(*_args, **_kwargs):
+        return () if state["user"] is None else (state["user"],)
+
+    async def append_message(candidate, *, execution_metadata, **_kwargs):
+        assert state["user"] is None
+        assert "chat-prepared-execution:v1" in candidate.attachment_refs
+        assert (
+            "chat-request-sha256:" + execution_metadata["request_digest"]
+        ) in candidate.attachment_refs
+        state["user"] = candidate
+        state["metadata"] = execution_metadata
+        return after_user, candidate
+
+    async def chat_execution(_thread_id, message_id, **_kwargs):
+        assert state["user"] is not None
+        assert message_id == state["user"].message_id
+        return state["metadata"]
+
+    async def no_segments(*_args, **_kwargs):
+        return ()
+
+    async def initialized():
+        return None
+
+    async def fixture_catalog(*_args, **_kwargs):
+        return {
+            "schema_version": CATALOG_SCHEMA,
+            "available": True,
+            "automatic_available": True,
+            "models": [{
+                "provider_id": "local",
+                "model_id": "test-local-finalization",
+                "active": True,
+                "fallback": False,
+                "selectable": True,
+                "tokenizer": "utf8_" + "bytes_upper_bound",
+                "context_window": 8192,
+                "max_output_tokens": 2048,
+                "default_output_tokens": 512,
+                "supports_temperature": False,
+            }],
+        }
+
+    class AsyncTurnAuthority:
+        def __init__(self):
+            self.repository = SQLiteChatTurnRepository()
+
+        def __getattr__(self, name):
+            target = getattr(self.repository, name)
+
+            async def invoke(*args, **kwargs):
+                return target(*args, **kwargs)
+
+            return invoke
+
+    authority = SimpleNamespace(
+        active_transcript=active_transcript,
+        get_thread=get_thread,
+        append_message=append_message,
+        chat_execution=chat_execution,
+        dragon_context_segments=no_segments,
+        chat_history_dependencies=no_segments,
+        commit_assistant_message=commit_assistant_message,
+    )
+    monkeypatch.setattr(route, "conversation_authority", authority)
+    monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
+    monkeypatch.setattr(route, "model_catalog", fixture_catalog)
+    monkeypatch.setattr(route, "chat_turn_lifecycle", ChatTurnLifecycle(AsyncTurnAuthority()))
+    return authority
+
+
 @pytest.mark.asyncio
 async def test_chat_commits_assistant_only_from_successful_engine_result(
     monkeypatch,
@@ -113,10 +202,8 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
         )
         return committed, message
 
-    fake_authority = SimpleNamespace(
-        append_user_message=append_user_message,
-        active_transcript=active_transcript,
-        commit_assistant_message=commit_assistant_message,
+    fake_authority = _install_prepared_authority(
+        route, monkeypatch, thread, commit_assistant_message=commit_assistant_message,
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -186,10 +273,8 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
         commit_calls.append((args, kwargs))
         raise AssertionError("assistant commit must not run after engine failure")
 
-    fake_authority = SimpleNamespace(
-        append_user_message=append_user_message,
-        active_transcript=active_transcript,
-        commit_assistant_message=forbidden_commit,
+    fake_authority = _install_prepared_authority(
+        route, monkeypatch, thread, commit_assistant_message=forbidden_commit,
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -267,8 +352,8 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
             created_at=_now(),
             idempotency_key=kwargs["idempotency_key"],
             content=kwargs["content"],
-            parent_message_id=user_message.message_id,
-            causal_user_message_id=user_message.message_id,
+            parent_message_id=kwargs["causal_user_message_id"],
+            causal_user_message_id=kwargs["causal_user_message_id"],
             operation_id=kwargs["operation_id"],
             ai_result_id=kwargs["ai_result_id"],
             context_id=kwargs["context_id"],
@@ -279,10 +364,8 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
         )
         return committed, assistant
 
-    fake_authority = SimpleNamespace(
-        append_user_message=append_user_message,
-        active_transcript=active_transcript,
-        commit_assistant_message=commit_assistant_message,
+    fake_authority = _install_prepared_authority(
+        route, monkeypatch, thread, commit_assistant_message=commit_assistant_message,
     )
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
