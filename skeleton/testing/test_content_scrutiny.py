@@ -1,6 +1,14 @@
-"""Labyrinthine content scrutiny engine tests."""
-from skeleton.ai.runtime.learning_foundation.content_retrieval import ContentScrutinyEngine
+"""Regression coverage for bounded, read-only multimodal content scrutiny."""
+
+import pytest
+
+from skeleton.ai.runtime.learning_foundation.content_retrieval import (
+    ContentScrutinyEngine,
+    ContentScrutinyError,
+    ScrutinyEvidence,
+)
 from skeleton.ai.runtime.learning_foundation.multimodal import MultimodalCorpus
+
 
 def test_scrutiny_nested_bounds_and_summary():
     engine = ContentScrutinyEngine(max_depth=4)
@@ -13,12 +21,6 @@ def test_scrutiny_nested_bounds_and_summary():
     assert summary["all_bounds_ok"] is True
     assert summary["max_depth_seen"] >= 0
 
-import pytest
-
-from skeleton.ai.runtime.learning_foundation.content_retrieval import (
-    ContentScrutinyError,
-    ScrutinyEvidence,
-)
 
 
 @pytest.mark.parametrize("depth", [-1, 9, True, 3.25])
