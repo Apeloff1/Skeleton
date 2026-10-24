@@ -257,6 +257,8 @@ It is not a native Godot import or a measured physics performance run.
 Current tracked P0–P3 To-Do: **199** milestones, with 73 checked as committed
 source and 126 remaining.
 
+> **GF-N status correction (2026-10-24, Jenkins):** the counts above are stale. `TODO.md` on `feature/game-frontier-p0-p3-20261019` @ `1dc834eb6` tracks **361** items (P0 194, P1 65, P2 51, P3 51): **151** checked (all P0), **210** open. Evidence: `grep -c` of `- [x] GF-P` / `- [ ] GF-P` in TODO.md at that commit. Open drafts are listed under `## Pending in draft` in TODO.md.
+
 Required next steps: Godot 4 headless parse and screenshot of indexed
 SoftBody3D, direct bone/pin attachment, collision+skin volume preservation,
 multi-material tissue rig, world authority dispatch of RPG actions,

@@ -16,192 +16,192 @@ runtime release readiness. All inference/training keeps existing authority.
 
 ## P0 — Durable engine foundation / correctness first
 
-- [x] GF-P0-01 Genie-inspired deterministic wind-field primitives with altitude interpolation, turbulence, temporal/spatial coherence.
-- [x] GF-P0-02 Adaptive clouds with midpoint wind advection, shear-based stretch, per-cloud orientation, optional world wrapping.
-- [x] GF-P0-03 LingBot-inspired exact presentation clocks at **30, 50, 60, 120 FPS** with bounded catchup and physics-clock isolation.
-- [x] GF-P0-04 World-axis generation for terrain, temperature, humidity, verticality, sky islands, volatility, biomes.
-- [x] GF-P0-05 HY-World-inspired skeletal-bone-to-polygon meshes; reduce polygon counts by engine era and available triangle budget.
-- [x] GF-P0-06 TRELLIS-inspired simulation-ready mesh data with bone influences, collision capsules, animation sample transforms.
-- [x] GF-P0-07 SIMA-inspired evidence-linked cinematic shots plus inspect/approach/interact proposals (never autonomous mutation).
-- [x] GF-P0-08 Muse-inspired bounded speculative user-motion prediction with no input firing.
-- [x] GF-P0-09 Candidate-only shared composition façade with content-addressed receipts.
-- [x] GF-P0-133 Add primitive and integration regressions; targeted CI execution has passed.
-- [x] GF-P0-19 Add candidate-only model checkpoint, frame throughput and simulation-ready 3D evidence contracts.
-- [x] GF-P0-20 Add independent license allowlist, external receipt identity, measured-versus-requested FPS checks.
-- [x] GF-P0-21 Add opt-in 30/50/60/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests.
-- [x] GF-P0-22 Add **60 FPS**, preserving 30/50/60/120 and canonical physics tick rates.
-- [x] GF-P0-23 Eight distinct world-variant generation transforms: inverse, mirror, elemental, ethereal, mythic, lensed, shadow, celestial.
-- [x] GF-P0-24 Top-down, platformer, full 3D and depth-weighted 2.5D/2.6D/2.7D/2.8D/2.9D projection candidates.
-- [x] GF-P0-25 Skin elasticity, cloth and hair soft-node spring motion; wetness/mass/wind damping and anchor displacement reference solver.
-- [x] GF-P0-26 Weather-aware player motion, traction, wind load, body temperature, rain and snow interaction.
-- [x] GF-P0-27 Adaptive character-plane collision, material restitution, recorded impact impulse and damage candidates.
-- [x] GF-P0-28 Environment soil saturation/erosion/foliage/snow/debris adaptation with simulated impacts.
-- [x] GF-P0-29 Construction progress, house integrity, long-term climate damage, natural growth and explicit maintenance.
-- [x] GF-P0-30 Liquid-aware hair, clothing, boots; protection/thermal and slip-risk character cognition.
-- [x] GF-P0-31 CPU shadow ray intersections for character and environment occluders plus area-light, wet-surface specular.
-- [x] GF-P0-32 Scene-candidate composition exports projection, variants, impacts, wear, awareness and ray-lighting evidence.
-- [x] GF-P0-33 Path-scoped frontier CI verified: 57 tests passed on source commit `586028081cd740fb153378422eb04f78c944cbf8` (GitHub Actions run `39186433511`).
+- [x] GF-P0-01 Genie-inspired deterministic wind-field primitives with altitude interpolation, turbulence, temporal/spatial coherence. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-02 Adaptive clouds with midpoint wind advection, shear-based stretch, per-cloud orientation, optional world wrapping. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-03 LingBot-inspired exact presentation clocks at **30, 50, 60, 120 FPS** with bounded catchup and physics-clock isolation. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-04 World-axis generation for terrain, temperature, humidity, verticality, sky islands, volatility, biomes. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-05 HY-World-inspired skeletal-bone-to-polygon meshes; reduce polygon counts by engine era and available triangle budget. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-06 TRELLIS-inspired simulation-ready mesh data with bone influences, collision capsules, animation sample transforms. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-07 SIMA-inspired evidence-linked cinematic shots plus inspect/approach/interact proposals (never autonomous mutation). — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-08 Muse-inspired bounded speculative user-motion prediction with no input firing. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-09 Candidate-only shared composition façade with content-addressed receipts. — tick `79d8b2f54` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-133 Add primitive and integration regressions; targeted CI execution has passed. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-19 Add candidate-only model checkpoint, frame throughput and simulation-ready 3D evidence contracts. — tick `471abe2d1` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-20 Add independent license allowlist, external receipt identity, measured-versus-requested FPS checks. — tick `471abe2d1` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-21 Add opt-in 30/50/60/120 FPS bridge to canonical per-era simulation timing, with cross-mode tests. — tick `026e4a8c9` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-22 Add **60 FPS**, preserving 30/50/60/120 and canonical physics tick rates. — tick `8b0db381f` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-23 Eight distinct world-variant generation transforms: inverse, mirror, elemental, ethereal, mythic, lensed, shadow, celestial. — tick `8b0db381f` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-24 Top-down, platformer, full 3D and depth-weighted 2.5D/2.6D/2.7D/2.8D/2.9D projection candidates. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-25 Skin elasticity, cloth and hair soft-node spring motion; wetness/mass/wind damping and anchor displacement reference solver. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-26 Weather-aware player motion, traction, wind load, body temperature, rain and snow interaction. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-27 Adaptive character-plane collision, material restitution, recorded impact impulse and damage candidates. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-28 Environment soil saturation/erosion/foliage/snow/debris adaptation with simulated impacts. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-29 Construction progress, house integrity, long-term climate damage, natural growth and explicit maintenance. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-30 Liquid-aware hair, clothing, boots; protection/thermal and slip-risk character cognition. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-31 CPU shadow ray intersections for character and environment occluders plus area-light, wet-surface specular. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-32 Scene-candidate composition exports projection, variants, impacts, wear, awareness and ray-lighting evidence. — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-33 Path-scoped frontier CI verified: 57 tests passed on source commit `586028081cd740fb153378422eb04f78c944cbf8` (GitHub Actions run `39186433511`). — tick `1a3f9e2de` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-34 Wire reference soft-body, weather, lifecycle and character collision outputs into authoritative Godot/era runtime.
 - [ ] GF-P0-35 Convert projected polygons and character-aware ray shadows into visible graphics with native renderer reference screenshots.
 - [ ] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups.
-- [x] GF-P0-37 Extend existing Forge Godot overlay with Y-up/Z-forward conversion, shadow-casting clouds, 60fps, variant luminance and top-down/platformer/pseudo-depth cameras.
+- [x] GF-P0-37 Extend existing Forge Godot overlay with Y-up/Z-forward conversion, shadow-casting clouds, 60fps, variant luminance and top-down/platformer/pseudo-depth cameras. — tick `9a09db37a` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-38 Run real Godot headless parse, emitted scene import and screenshot smoke; inspect shadow caster geometry, camera and collision fidelity.
-- [x] GF-P0-39 Add conflict-safe Godot project overlay attachment preserving existing main level and imports.
-- [x] GF-P0-40 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths.
-- [x] GF-P0-41 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script.
-- [x] GF-P0-42 Sample altitude/heat/moist air density and visibility with ISA troposphere reference at 830 metres / 2723 feet.
-- [x] GF-P0-43 Separate physical fog extinction from air density, rain freshness proxy and optional cold-wind response.
-- [x] GF-P0-44 Add solar/lunar harmonic tide phase, height, current and rise-rate calculations.
-- [x] GF-P0-45 Add bounded conservative liquid grid flux with volume receipts and immersion/buoyancy/drag character calculations.
-- [x] GF-P0-46 Add atmosphere/rain/fog/occlusion/tide aware environmental audio delay/gain/filter/ambience candidates.
-- [x] GF-P0-47 Implement motion-coherent animated leaf geometry with independently ray-verified receiver-plane shadow area.
-- [x] GF-P0-48 Add 3D source distance inverse-square lighting with per-occluder transmittance, fog/rain/cloud optical dampening and wet-material highlight.
-- [x] GF-P0-49 Add wind- and character-impact responsive shrub/pebble reference physics integrated into same-frame 3D occlusion.
-- [x] GF-P0-50 Build real 3D indexed meshes from original 2D source sprites with old-era and modern outputs retaining the same asset digest.
-- [x] GF-P0-51 Build chunked triangle mesh partitioning and dual SHA-256 identity/topology reconstruction verification for every registered engine era.
-- [x] GF-P0-52 Add declarative multi-era RPG game editor backend for tile maps, prefabs, event pages, quests, cinematics, RPG systems and world/weather/physics parameters.
-- [x] GF-P0-53 Integrate reference atmosphere, tide, fluid, foliage, 3D lighting, mesh evolution and per-era chunk verification in one game scene candidate.
-- [x] GF-P0-54 Extend Godot Forge overlay with fog, scene light dampening, shadow polygons, water surface and shrub/rock geometry.
-- [x] GF-P0-55 Cross-system regression verified: 74 tests passed on source commit `e5cd4fe9c4026b6e090b349ffea600bd1b560dda` (run `39188618020`).
+- [x] GF-P0-39 Add conflict-safe Godot project overlay attachment preserving existing main level and imports. — tick `586028081` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-40 Export Godot overlay scene with posed polygons, generated bone capsules, sky islands and source-wind cloud animation paths. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-41 Add exporter custody/regression tests and apply 30/50/60/120 requested FPS cap to preview script. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-42 Sample altitude/heat/moist air density and visibility with ISA troposphere reference at 830 metres / 2723 feet. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-43 Separate physical fog extinction from air density, rain freshness proxy and optional cold-wind response. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-44 Add solar/lunar harmonic tide phase, height, current and rise-rate calculations. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-45 Add bounded conservative liquid grid flux with volume receipts and immersion/buoyancy/drag character calculations. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-46 Add atmosphere/rain/fog/occlusion/tide aware environmental audio delay/gain/filter/ambience candidates. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-47 Implement motion-coherent animated leaf geometry with independently ray-verified receiver-plane shadow area. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-48 Add 3D source distance inverse-square lighting with per-occluder transmittance, fog/rain/cloud optical dampening and wet-material highlight. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-49 Add wind- and character-impact responsive shrub/pebble reference physics integrated into same-frame 3D occlusion. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-50 Build real 3D indexed meshes from original 2D source sprites with old-era and modern outputs retaining the same asset digest. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-51 Build chunked triangle mesh partitioning and dual SHA-256 identity/topology reconstruction verification for every registered engine era. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-52 Add declarative multi-era RPG game editor backend for tile maps, prefabs, event pages, quests, cinematics, RPG systems and world/weather/physics parameters. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-53 Integrate reference atmosphere, tide, fluid, foliage, 3D lighting, mesh evolution and per-era chunk verification in one game scene candidate. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-54 Extend Godot Forge overlay with fog, scene light dampening, shadow polygons, water surface and shrub/rock geometry. — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-55 Cross-system regression verified: 74 tests passed on source commit `e5cd4fe9c4026b6e090b349ffea600bd1b560dda` (run `39188618020`). — tick `927ecddb2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-56 Integrate double-verifier chunking in every *actual* registered native engine runtime and guarantee seamless spatial streaming.
 - [ ] GF-P0-57 Run live Godot weather/water/leaf-shadow/rock/character physics simulation with per-frame coherence and screenshot proof.
 - [ ] GF-P0-58 Surface all new RPG-style editors in Galaxy Studio/Jeeves cockpit and connect event actions through authorized game runtime.
 - [ ] GF-P0-59 Bind conservative water solver to native moving-boundary shorelines, 3D collision and persistent coastal terrain.
 - [ ] GF-P0-60 Bind atmospheric audio cues and proper audio assets to playable mixer buses, occlusion and audio engine.
 - [ ] GF-P0-61 Profile production GPU 3D ray/path lighting and physically measured leaf-shadow alignment on low/high hardware.
-- [x] GF-P0-62 Implement SI-unit reference terminal velocity using atmosphere density, gravity, body mass, area and drag coefficient.
-- [x] GF-P0-63 Add 3D lee-side aerodynamic drafting with downwind wake distance, width and shielding factors.
-- [x] GF-P0-64 Add hot thermals, sinking air, vertical wind and turbulence with deterministic time/seed/position coherence.
-- [x] GF-P0-65 Add bounded substep aerodynamic integration with gravity, lift, drag, mechanical energy and drag dissipation.
-- [x] GF-P0-66 Implement wet/icy/loose gravel traction, weighted cargo, slope force balance, climbing skill and foothold/rope checks.
-- [x] GF-P0-67 Add mass/inertia-aware rigid-body impulse resolution with tangential Coulomb friction, angular motion, material restitution and energy/momentum receipts.
-- [x] GF-P0-68 Add continuous collision detection for high-speed sphere–sphere and sphere–terrain/plane sweeps.
-- [x] GF-P0-69 Evolve microclimate rain, freeze/thaw, solar drying, erosion, sediment, pressure shear and convective uplift into actual climbing surface/airflow inputs.
-- [x] GF-P0-70 Add 14-domain realism/coherence auditor with measurable invariants and content-addressed evidence; never award self-certified physics quality scores.
-- [x] GF-P0-71 Wire opt-in advanced aerodynamic, traction, impact and weather candidates into the existing source-hashed Jeeves scene.
-- [x] GF-P0-72 Export Godot native RigidBody3D candidate with mass/collider/restitution, live per-fixed-tick wind-relative drag and wet/ice-adjusted contact material.
-- [x] GF-P0-73 Add focused regression source and CI tests for terminal speed, lee-wake, thermals, climbing, collision momentum/energy, CCD, air/terrain integration and scene compatibility.
+- [x] GF-P0-62 Implement SI-unit reference terminal velocity using atmosphere density, gravity, body mass, area and drag coefficient. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-63 Add 3D lee-side aerodynamic drafting with downwind wake distance, width and shielding factors. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-64 Add hot thermals, sinking air, vertical wind and turbulence with deterministic time/seed/position coherence. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-65 Add bounded substep aerodynamic integration with gravity, lift, drag, mechanical energy and drag dissipation. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-66 Implement wet/icy/loose gravel traction, weighted cargo, slope force balance, climbing skill and foothold/rope checks. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-67 Add mass/inertia-aware rigid-body impulse resolution with tangential Coulomb friction, angular motion, material restitution and energy/momentum receipts. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-68 Add continuous collision detection for high-speed sphere–sphere and sphere–terrain/plane sweeps. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-69 Evolve microclimate rain, freeze/thaw, solar drying, erosion, sediment, pressure shear and convective uplift into actual climbing surface/airflow inputs. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-70 Add 14-domain realism/coherence auditor with measurable invariants and content-addressed evidence; never award self-certified physics quality scores. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-71 Wire opt-in advanced aerodynamic, traction, impact and weather candidates into the existing source-hashed Jeeves scene. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-72 Export Godot native RigidBody3D candidate with mass/collider/restitution, live per-fixed-tick wind-relative drag and wet/ice-adjusted contact material. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-73 Add focused regression source and CI tests for terminal speed, lee-wake, thermals, climbing, collision momentum/energy, CCD, air/terrain integration and scene compatibility. — tick `7f4bcf841` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-74 Verify native Godot RigidBody3D/headless import, GPU/physics timestep equivalence and actual slope/impact behavior.
 - [ ] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
 - [ ] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
 - [ ] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
-- [x] GF-P0-78 Add segmented limb/torso/cargo mass distribution with content-addressed centre of mass and inertia tensors.
-- [x] GF-P0-79 Implement stance support polygon, foot-load sharing, acceleration-induced balance offset and grip-force stability checks.
-- [x] GF-P0-80 Implement ElasticBodySkin3D source rig wrapper with topology-linked spring/shear nodes, pinned bone pose and movable mesh vertices.
-- [x] GF-P0-81 Make elastic 3D skin weather/wetness, air temperature, collision and impact-responsive with bounded timestep.
-- [x] GF-P0-82 Export optional native Godot SoftBody3D using indexed shared topology and original rig vertex pin constraints.
-- [x] GF-P0-83 Add simulated integrated gyroscope with angular rate, drift, bias and horizon tilt measurement.
-- [x] GF-P0-84 Add calibrated compass with explicit magnetic declination, dip and local anomaly/interference checks.
-- [x] GF-P0-85 Add line-of-sight natural-horizon sextant angles with horizon dip, index error and refraction corrections.
-- [x] GF-P0-86 Add bubble sextant independent of natural horizon, with gyro attitude/bubble tilt and acceleration error models.
-- [x] GF-P0-87 Add hypsometric barometric altimeter calibrated to pressure/temperature/sea-level reference.
-- [x] GF-P0-88 Add baseline/elevation-angle trigonometric altimeter, optional curvature/refraction and SI/imperial output.
-- [x] GF-P0-89 Add deterministic navigation instrument panel receipts and Godot inspector, clearly labeled simulated not geolocation.
-- [x] GF-P0-90 Add condition-driven RPG environmental triggers for climate, wind, tides, collisions, strain, cargo, body COM, sensors and world events.
-- [x] GF-P0-91 Add RPG event priority, edge-crossing, hysteresis, cooldown and conflict suppression without native world mutation.
-- [x] GF-P0-92 Expand existing RPG Studio authoring surface with physical editors and environmental event pages.
-- [x] GF-P0-93 Integrate optional body distribution, skin and navigation triggers into Jeeves canonical scene and Forge export.
-- [x] GF-P0-94 Add detailed source regression tests and path-scoped CI for skin, navigation, weight, RPG and scene export.
-- [x] GF-P0-95 Add bounded elastic mesh link projection to limit runaway strain while preserving pinned rig nodes.
+- [x] GF-P0-78 Add segmented limb/torso/cargo mass distribution with content-addressed centre of mass and inertia tensors. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-79 Implement stance support polygon, foot-load sharing, acceleration-induced balance offset and grip-force stability checks. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-80 Implement ElasticBodySkin3D source rig wrapper with topology-linked spring/shear nodes, pinned bone pose and movable mesh vertices. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-81 Make elastic 3D skin weather/wetness, air temperature, collision and impact-responsive with bounded timestep. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-82 Export optional native Godot SoftBody3D using indexed shared topology and original rig vertex pin constraints. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-83 Add simulated integrated gyroscope with angular rate, drift, bias and horizon tilt measurement. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-84 Add calibrated compass with explicit magnetic declination, dip and local anomaly/interference checks. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-85 Add line-of-sight natural-horizon sextant angles with horizon dip, index error and refraction corrections. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-86 Add bubble sextant independent of natural horizon, with gyro attitude/bubble tilt and acceleration error models. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-87 Add hypsometric barometric altimeter calibrated to pressure/temperature/sea-level reference. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-88 Add baseline/elevation-angle trigonometric altimeter, optional curvature/refraction and SI/imperial output. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-89 Add deterministic navigation instrument panel receipts and Godot inspector, clearly labeled simulated not geolocation. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-90 Add condition-driven RPG environmental triggers for climate, wind, tides, collisions, strain, cargo, body COM, sensors and world events. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-91 Add RPG event priority, edge-crossing, hysteresis, cooldown and conflict suppression without native world mutation. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-92 Expand existing RPG Studio authoring surface with physical editors and environmental event pages. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-93 Integrate optional body distribution, skin and navigation triggers into Jeeves canonical scene and Forge export. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-94 Add detailed source regression tests and path-scoped CI for skin, navigation, weight, RPG and scene export. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-95 Add bounded elastic mesh link projection to limit runaway strain while preserving pinned rig nodes. — tick `b106646e5` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-96 Run real Godot headless import and active SoftBody3D skin pin/mass/collision/animation validation.
 - [ ] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
 - [ ] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
 - [ ] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
-- [x] GF-P0-100 Implement consent-bound foreground GPS fix ingestion with typed WGS84 position, accuracy, provider and monotone timestamp contracts.
-- [x] GF-P0-101 Add browser real device GPS watcher and foreground Start/Stop/Clear user interface without automatic collection, logs or network uploads.
-- [x] GF-P0-102 Reject absent/expired GPS permission, stale/future/low-accuracy/replayed or physically implausible fixes.
-- [x] GF-P0-103 Implement WGS84 surveyed position from user-verified fixed control stations and bearing line intersection with geometry/residual checks.
-- [x] GF-P0-104 Cross-check independent surveyed and live GPS position differences within declared combined uncertainty; do not silently blend mismatched fixes.
-- [x] GF-P0-105 Publish redacted scene/analytics receipts only, never raw GPS/survey coordinates in hashed GDD, model prompts, game manifests or logs.
-- [x] GF-P0-106 Integrate with existing signed story-bible/GDD source validator and immutable world-law digest rather than creating another canon authority.
-- [x] GF-P0-107 Partition each build frame into spatial actor/prefab chunks with deterministic moving-entity membership at 30/50/60/120 FPS.
-- [x] GF-P0-108 Independent frame verifier A authenticates SHA-256 chunk payload, source object identity and frame receipt linkage.
-- [x] GF-P0-109 Independent frame verifier B checks temporal continuity, chunk membership, signed-GDD law linkage, object conservation and movement envelopes.
-- [x] GF-P0-110 Add strictly bounded between-frame AI/human/engine notes that cite signed GDD world-law indices and never auto-promote generated canon.
-- [x] GF-P0-111 Expose verified frame design context for Jeeves provider callers without invoking LLMs or fabricating model weights.
-- [x] GF-P0-112 Implement bounded constant-memory GDD context cursor with hash-chain lineage to support months-long frame histories.
-- [x] GF-P0-113 Extend the existing RPG Studio to produce double-verified build-progress receipts from true placed prefab assets and stable IDs.
-- [x] GF-P0-114 Focused regressions passed for 141 tests including surveyed fixes, privacy, GPS spoof/replay rejection and 80 continuous GDD-linked frames.
+- [x] GF-P0-100 Implement consent-bound foreground GPS fix ingestion with typed WGS84 position, accuracy, provider and monotone timestamp contracts. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-101 Add browser real device GPS watcher and foreground Start/Stop/Clear user interface without automatic collection, logs or network uploads. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-102 Reject absent/expired GPS permission, stale/future/low-accuracy/replayed or physically implausible fixes. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-103 Implement WGS84 surveyed position from user-verified fixed control stations and bearing line intersection with geometry/residual checks. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-104 Cross-check independent surveyed and live GPS position differences within declared combined uncertainty; do not silently blend mismatched fixes. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-105 Publish redacted scene/analytics receipts only, never raw GPS/survey coordinates in hashed GDD, model prompts, game manifests or logs. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-106 Integrate with existing signed story-bible/GDD source validator and immutable world-law digest rather than creating another canon authority. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-107 Partition each build frame into spatial actor/prefab chunks with deterministic moving-entity membership at 30/50/60/120 FPS. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-108 Independent frame verifier A authenticates SHA-256 chunk payload, source object identity and frame receipt linkage. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-109 Independent frame verifier B checks temporal continuity, chunk membership, signed-GDD law linkage, object conservation and movement envelopes. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-110 Add strictly bounded between-frame AI/human/engine notes that cite signed GDD world-law indices and never auto-promote generated canon. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-111 Expose verified frame design context for Jeeves provider callers without invoking LLMs or fabricating model weights. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-112 Implement bounded constant-memory GDD context cursor with hash-chain lineage to support months-long frame histories. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-113 Extend the existing RPG Studio to produce double-verified build-progress receipts from true placed prefab assets and stable IDs. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-114 Focused regressions passed for 141 tests including surveyed fixes, privacy, GPS spoof/replay rejection and 80 continuous GDD-linked frames. — tick `732a71c52` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-115 Install compatible Expo SDK 54 native foreground location provider with permission config and actually verify Android/iOS device acquisition and revocation.
 - [ ] GF-P0-116 Wire frame chunk A/B verifiers and temporal context to actual *rendered* frames in all historical and modern native engine runtimes.
 - [ ] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay.
 - [ ] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
-- [x] GF-P0-119 Create game-only fictional map XYZ, metric tiles, rotation, realm coordinates and explicitly non-Earth latitude/longitude-style display.
-- [x] GF-P0-120 Simulate deterministic range measurements from four-plus authored virtual 3D beacons without device GPS.
-- [x] GF-P0-121 Resolve game avatar 3D position by uncertainty-aware beacon multilateration and independent residual/geometry checks.
-- [x] GF-P0-122 Compute independent virtual survey fixes from GDD-approved landmarks, sightings and optional vertical angles.
-- [x] GF-P0-123 Reject contradictory fictional survey/GPS fixes using independent uncertainties and block incoherent map tiles.
-- [x] GF-P0-124 Implement deterministic obstacle-aware virtual game-map waypoint routing and realm-specific map identity.
-- [x] GF-P0-125 Bind game GPS to actual double-verified frame actor positions and signed GDD source, blocking fake frame/entity positions.
-- [x] GF-P0-126 Integrate virtual map authoring, same-frame navigation receipts and provisional AI GDD design context into RPG Studio.
-- [x] GF-P0-127 Export visible Godot virtual GPS coordinate and bounded route HUD explicitly without OS sensor access.
-- [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance.
-- [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source.
+- [x] GF-P0-119 Create game-only fictional map XYZ, metric tiles, rotation, realm coordinates and explicitly non-Earth latitude/longitude-style display. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-120 Simulate deterministic range measurements from four-plus authored virtual 3D beacons without device GPS. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-121 Resolve game avatar 3D position by uncertainty-aware beacon multilateration and independent residual/geometry checks. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-122 Compute independent virtual survey fixes from GDD-approved landmarks, sightings and optional vertical angles. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-123 Reject contradictory fictional survey/GPS fixes using independent uncertainties and block incoherent map tiles. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-124 Implement deterministic obstacle-aware virtual game-map waypoint routing and realm-specific map identity. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-125 Bind game GPS to actual double-verified frame actor positions and signed GDD source, blocking fake frame/entity positions. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-126 Integrate virtual map authoring, same-frame navigation receipts and provisional AI GDD design context into RPG Studio. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-127 Export visible Godot virtual GPS coordinate and bounded route HUD explicitly without OS sensor access. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source. — tick `6494e757d` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era.
 - [ ] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
 - [ ] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes.
 
 - [ ] GF-P0-134 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
-- [x] GF-P0-135 Implement source-hashed evidence records for every registered-era mesh chunk with 3D bounds, triangle IDs, vertex IDs and deterministic ordering.
-- [x] GF-P0-136 Record per-chunk independent mesh verifier A content authenticity and verifier B source topology/centroid reconstruction.
-- [x] GF-P0-137 Implement exact-once original face coverage receipts and independently re-verified whole-mesh evidence roots.
-- [x] GF-P0-138 Add signed-GDD frame-per-chunk evidence with immutable actor IDs, source asset digests, source frame hash and note/law anchors.
-- [x] GF-P0-139 Add per-chunk unchanged/moved/arrived/departed actor receipts and source-backed cross-chunk migration conservation.
-- [x] GF-P0-140 Preserve tombstone/retirement receipts for chunks whose last object leaves during frame updates.
-- [x] GF-P0-141 Add optional chained previous-chunk evidence root and reject forged predecessor actor/asset identities even with recomputed receipt hashes.
-- [x] GF-P0-142 Export complete frame/mesh chunk evidence receipts through canonical Jeeves scenes and RPG Studio frame progress.
-- [x] GF-P0-143 Root AI between-frame context in exact chunk evidence digest and signed GDD without automatic canon promotion.
-- [x] GF-P0-144 Extend independent scene auditor to recheck mesh/frame evidence hashes, migration accounting, source links and A/B flags.
-- [x] GF-P0-145 Add Godot chunk receipt inspector with source-only proof root, chunk counts, migration and signed GDD note counts.
-- [x] GF-P0-146 Add adversarial and 30/50/60/120 FPS receipt tests including mesh corruption, retired cells and chained 40-frame review.
+- [x] GF-P0-135 Implement source-hashed evidence records for every registered-era mesh chunk with 3D bounds, triangle IDs, vertex IDs and deterministic ordering. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-136 Record per-chunk independent mesh verifier A content authenticity and verifier B source topology/centroid reconstruction. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-137 Implement exact-once original face coverage receipts and independently re-verified whole-mesh evidence roots. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-138 Add signed-GDD frame-per-chunk evidence with immutable actor IDs, source asset digests, source frame hash and note/law anchors. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-139 Add per-chunk unchanged/moved/arrived/departed actor receipts and source-backed cross-chunk migration conservation. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-140 Preserve tombstone/retirement receipts for chunks whose last object leaves during frame updates. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-141 Add optional chained previous-chunk evidence root and reject forged predecessor actor/asset identities even with recomputed receipt hashes. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-142 Export complete frame/mesh chunk evidence receipts through canonical Jeeves scenes and RPG Studio frame progress. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-143 Root AI between-frame context in exact chunk evidence digest and signed GDD without automatic canon promotion. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-144 Extend independent scene auditor to recheck mesh/frame evidence hashes, migration accounting, source links and A/B flags. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-145 Add Godot chunk receipt inspector with source-only proof root, chunk counts, migration and signed GDD note counts. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-146 Add adversarial and 30/50/60/120 FPS receipt tests including mesh corruption, retired cells and chained 40-frame review. — tick `1e6ec74a4` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-147 Make real native era engines emit authoritative render/physics chunk evidence rather than source-only candidate estimates.
 - [ ] GF-P0-148 Persist full per-chunk receipts in existing canonical content-addressed durable checkpoint/rollback plane with pagination.
 - [ ] GF-P0-149 Add explicit chunk-level shader/light/shadow/terrain/weather and vertex-diff source reference receipts on game world edits.
-- [x] GF-P0-150 Add SQLite WAL full-fidelity frame and content-addressed chunk receipt journal with atomic single-frame commits.
-- [x] GF-P0-151 Reconstruct stored canonical typed FrameReceipt and source chunk receipts from hashed durable blobs with independently checked signed-GDD inputs.
-- [x] GF-P0-152 Reject invalid/missing frames, source-GDD changes, duplicated frame indices, altered hashes and impossible actor motion without partial journal advances.
-- [x] GF-P0-153 Reopen/replay verified source frame histories after restart and report recorded source/evidence chain heads.
-- [x] GF-P0-154 Add non-destructive rollback by forking a verified journal prefix and deduplicating common SHA source blobs.
-- [x] GF-P0-155 Add opt-in Godot 4 fixed-tick RigidBody3D observation serializer with scene/GDD/asset IDs, measured game XYZ and monotonic engine clock.
-- [x] GF-P0-156 Add strict allowlisted native-observation importer with actor/source/scene/fps/timestamp checking and bounded JSONL processing.
-- [x] GF-P0-157 Transactionally retain native Godot sample JSON alongside full independent A/B frame and chunk evidence; replay checks native candidate/timing continuity.
-- [x] GF-P0-158 Create an operator-run CLI for signed-GDD Godot JSONL ingestion, verification and journal prefix fork.
-- [x] GF-P0-159 Implement per-frame changed-actor and touched/retired-chunk delta format with GDD source and parent frame identity.
-- [x] GF-P0-160 Reconstitute deltas into full source frames and recheck exact original digest, GDD and two independent verifiers.
-- [x] GF-P0-161 Optionally persist compact source deltas alongside full frames in one WAL transaction and validate both during replay/fork.
-- [x] GF-P0-162 Add focused 30/50/60/120 FPS, 80-frame replay, native capture, script CLI, corruption, rollback and compact-delta regressions.
-- [x] GF-P0-163 Run the generated Godot scene through a real version-pinned Godot 4 headless import with actual physics-tick capture and no GDScript parse errors. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
+- [x] GF-P0-150 Add SQLite WAL full-fidelity frame and content-addressed chunk receipt journal with atomic single-frame commits. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-151 Reconstruct stored canonical typed FrameReceipt and source chunk receipts from hashed durable blobs with independently checked signed-GDD inputs. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-152 Reject invalid/missing frames, source-GDD changes, duplicated frame indices, altered hashes and impossible actor motion without partial journal advances. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-153 Reopen/replay verified source frame histories after restart and report recorded source/evidence chain heads. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-154 Add non-destructive rollback by forking a verified journal prefix and deduplicating common SHA source blobs. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-155 Add opt-in Godot 4 fixed-tick RigidBody3D observation serializer with scene/GDD/asset IDs, measured game XYZ and monotonic engine clock. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-156 Add strict allowlisted native-observation importer with actor/source/scene/fps/timestamp checking and bounded JSONL processing. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-157 Transactionally retain native Godot sample JSON alongside full independent A/B frame and chunk evidence; replay checks native candidate/timing continuity. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-158 Create an operator-run CLI for signed-GDD Godot JSONL ingestion, verification and journal prefix fork. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-159 Implement per-frame changed-actor and touched/retired-chunk delta format with GDD source and parent frame identity. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-160 Reconstitute deltas into full source frames and recheck exact original digest, GDD and two independent verifiers. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-161 Optionally persist compact source deltas alongside full frames in one WAL transaction and validate both during replay/fork. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-162 Add focused 30/50/60/120 FPS, 80-frame replay, native capture, script CLI, corruption, rollback and compact-delta regressions. — tick `d5a6e55d2` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-163 Run the generated Godot scene through a real version-pinned Godot 4 headless import with actual physics-tick capture and no GDScript parse errors. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff) — tick `62a3e302e` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-164 Reconcile actual rendered/GPU/physics output with native capture, journal source and per-chunk evidence on target hardware.
 - [ ] GF-P0-165 Wire native recorder activation through the approved installer, user-run game creation UI, save slots and multi-entity controllers.
 - [ ] GF-P0-166 Add game authoritative telemetry source adapters for real collision normals/forces, lighting, audio and streamed mesh LOD per chunk.
-- [x] GF-P0-167 Provide a version-hash-pinned local Godot 4 headless import/play driver with bounded frame/time budgets, source asset validation and hashed subprocess logs.
-- [x] GF-P0-168 Validate the native Godot operator harness against missing assets, corrupt scene schema, changed executable, process failures and reported parser errors.
-- [x] GF-P0-169 Execute Godot 4 import/play with a real trusted binary, capture live RigidBody3D ticks and inspect actual emitted game-frame evidence for signoff. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
-- [x] GF-P0-170 Export all actors from a signed double-verified source game frame, preserving source asset identity and explicit reference-proxy classifications.
-- [x] GF-P0-171 Implement opt-in multi-actor Godot 4 physics body generation and capture of position, velocity and bounded contact counts.
-- [x] GF-P0-172 Add frame-local native chunk memberships from game coordinates, including negative cell boundaries and exactly-once actor source coverage.
-- [x] GF-P0-173 Independently reconstruct and verify reported native chunk membership, actor source identity, bounded physics values and candidate-only evidence SHA.
-- [x] GF-P0-174 Commit source native-physics chunk receipts alongside frame, GDD, game source and native observations atomically in the durable journal.
-- [x] GF-P0-175 Recheck native chunk source reports during full replay and fork/restore; reject even hash-matched but source-inconsistent reports.
-- [x] GF-P0-176 Add resumed multi-actor JSONL import that reuses only exactly matching committed frames and rejects altered history.
-- [x] GF-P0-177 Build bounded frame/chunk/native/notes evidence page iterator for GDD-aware game studio inspection, temporal filters and source digests.
-- [x] GF-P0-178 Expose paginated game chunk evidence timeline, actor and chunk filters, replay and resumable capture in the operator CLI.
-- [x] GF-P0-179 Bind verified imported native actor frames into fictional world-map GPS and surveyed navigation with GDD and chunk native evidence links.
-- [x] GF-P0-180 Create deterministic safe two-actor signed-GDD native Godot project fixture generator and executable smoke build driver.
-- [x] GF-P0-181 Add specialized real-Godot-4.7.2 native headless import/capture/ingest/replay workflow with official SHA-256 pinned release archive.
-- [x] GF-P0-182 Add source regression tests for 3-actor 4-rate chunk capture, native contact bounds, hostile partitions, virtual navigation and interrupted replay.
-- [x] GF-P0-183 Run specialized Godot workflow successfully with true headless generated scene parsing, runtime observed native physics and import receipts. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
+- [x] GF-P0-167 Provide a version-hash-pinned local Godot 4 headless import/play driver with bounded frame/time budgets, source asset validation and hashed subprocess logs. — tick `be203fdcc` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-168 Validate the native Godot operator harness against missing assets, corrupt scene schema, changed executable, process failures and reported parser errors. — tick `be203fdcc` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-169 Execute Godot 4 import/play with a real trusted binary, capture live RigidBody3D ticks and inspect actual emitted game-frame evidence for signoff. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff) — tick `62a3e302e` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-170 Export all actors from a signed double-verified source game frame, preserving source asset identity and explicit reference-proxy classifications. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-171 Implement opt-in multi-actor Godot 4 physics body generation and capture of position, velocity and bounded contact counts. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-172 Add frame-local native chunk memberships from game coordinates, including negative cell boundaries and exactly-once actor source coverage. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-173 Independently reconstruct and verify reported native chunk membership, actor source identity, bounded physics values and candidate-only evidence SHA. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-174 Commit source native-physics chunk receipts alongside frame, GDD, game source and native observations atomically in the durable journal. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-175 Recheck native chunk source reports during full replay and fork/restore; reject even hash-matched but source-inconsistent reports. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-176 Add resumed multi-actor JSONL import that reuses only exactly matching committed frames and rejects altered history. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-177 Build bounded frame/chunk/native/notes evidence page iterator for GDD-aware game studio inspection, temporal filters and source digests. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-178 Expose paginated game chunk evidence timeline, actor and chunk filters, replay and resumable capture in the operator CLI. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-179 Bind verified imported native actor frames into fictional world-map GPS and surveyed navigation with GDD and chunk native evidence links. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-180 Create deterministic safe two-actor signed-GDD native Godot project fixture generator and executable smoke build driver. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-181 Add specialized real-Godot-4.7.2 native headless import/capture/ingest/replay workflow with official SHA-256 pinned release archive. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-182 Add source regression tests for 3-actor 4-rate chunk capture, native contact bounds, hostile partitions, virtual navigation and interrupted replay. — tick `7792389c3` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-183 Run specialized Godot workflow successfully with true headless generated scene parsing, runtime observed native physics and import receipts. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff) — tick `62a3e302e` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-184 Complete multi-actor native semantic physics using real game NPC/controller instead of bounded reference proxies.
 - [ ] GF-P0-185 Feed qualified native physics/event evidence to authorized playable game scenes with real Godot rendered-world QA.
-- [x] GF-P0-186 Add native physics actor motion/contact-count and chunk-enter/exit/retirement receipts computed independently from reported observations.
-- [x] GF-P0-187 Persist native chunk-transition receipts atomically beside Godot actor observations and double-verified signed-GDD frame records.
-- [x] GF-P0-188 Reconstruct native frame transitions and reject forged motion/chunk ledger data during source replay.
-- [x] GF-P0-189 Carry native transition evidence across verified rollback forks and expose its source SHA and observed contacts to timeline clients.
-- [x] GF-P0-190 Record native physics contact counts and game-chunk reports for multiple explicit authored frame actors.
-- [x] GF-P0-191 Resume interrupted native multi-actor JSONL capture only if every earlier observation and chunk proof matches persisted records.
-- [x] GF-P0-192 Add actual Godot trace acceptance requiring native fixed ticks, monotone clock, controlled body movement, contacts and correct spatial partitions.
-- [x] GF-P0-193 Connect native trace acceptance as mandatory pre-ingest step in specialized pinned Godot smoke workflow.
-- [x] GF-P0-194 Add adversarial native-frame source, chunk migration, timing, contact, corruption and 30/50/60/120 fps regressions.
+- [x] GF-P0-186 Add native physics actor motion/contact-count and chunk-enter/exit/retirement receipts computed independently from reported observations. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-187 Persist native chunk-transition receipts atomically beside Godot actor observations and double-verified signed-GDD frame records. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-188 Reconstruct native frame transitions and reject forged motion/chunk ledger data during source replay. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-189 Carry native transition evidence across verified rollback forks and expose its source SHA and observed contacts to timeline clients. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-190 Record native physics contact counts and game-chunk reports for multiple explicit authored frame actors. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-191 Resume interrupted native multi-actor JSONL capture only if every earlier observation and chunk proof matches persisted records. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-192 Add actual Godot trace acceptance requiring native fixed ticks, monotone clock, controlled body movement, contacts and correct spatial partitions. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-193 Connect native trace acceptance as mandatory pre-ingest step in specialized pinned Godot smoke workflow. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
+- [x] GF-P0-194 Add adversarial native-frame source, chunk migration, timing, contact, corruption and 30/50/60/120 fps regressions. — tick `2ec0c9535` (on tracking branch; docs-only tick commit, delivering code SHA not independently mapped)
 - [ ] GF-P0-195 Confirm real pinned-Godot smoke and exact-head focused tests pass; fix any GDScript compile or native-motion issues before native acceptance.
 - [ ] GF-P0-196 Extend reference physics proxies to actual NPC/gear/interaction controllers with signed event authority.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
@@ -387,6 +387,24 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P3-49 Independently certify multi-actor native physics and virtual position/survey uncertainty through all game world-axis transitions.
 - [ ] GF-P3-50 Longform project recovery and canon/AI context/signoff evidence after merges and journal forks.
 - [ ] GF-P3-51 Benchmark high-density native actor transitions/contact evidence at 30/50/60/120Hz across weeks of replay and persistent GDD context.
+
+## Pending in draft
+
+GF-N sync 2026-10-24 (Jenkins). Work only in open draft PRs; NOT ticked until it lands on `feature/game-frontier-p0-p3-20261019` or `main`.
+
+- GF-P0-14, GF-P0-36, GF-P0-99, GF-P0-117, GF-P0-148 — [#4246](https://github.com/Apeloff1/Skeleton/pull/4246) GF-B: game save plane (paged receipts, save/restore/migrate/rollback, replay journal) (draft, base `main`, head `168814b03`)
+- GF-P0-58, GF-P0-118, GF-P0-131 — [#4248](https://github.com/Apeloff1/Skeleton/pull/4248) feat(gf-f): frontier nav controls + surveyed-control approval (GF-P0-131, GF-P0-118) (draft, base `main`, head `deb3ce427`)
+- GF-P0-115 — [#4249](https://github.com/Apeloff1/Skeleton/pull/4249) GF-J: Expo SDK 54 foreground location provider (GF-P0-115, device verification pending) (draft, base `main`, head `14a696b05`)
+- no TODO.md item ID cited in PR (not mapped) — [#4250](https://github.com/Apeloff1/Skeleton/pull/4250) feat(game-frontier): weather + 30/50/60/120 FPS + LOD in native runtime loop (#4167) (draft, base `feature/game-frontier-p0-p3-20261019`, head `c226726b2`)
+- GF-P0-17, GF-P0-38, GF-P0-134 — [#4252](https://github.com/Apeloff1/Skeleton/pull/4252) ci(GF-D): headless import + physics probe in Godot 4.7.2 native smoke (draft, base `main`, head `a852ba253`)
+- GF-P0-130, GF-P0-132 — [#4254](https://github.com/Apeloff1/Skeleton/pull/4254) feat(GF-H): GPS frame hooks and NPC route grounding (skeleton/frontier_nav) (draft, base `main`, head `989777a37`)
+- GF-P0-13, GF-P0-35, GF-P0-57, GF-P0-60, GF-P0-61, GF-P0-165 — [#4257](https://github.com/Apeloff1/Skeleton/pull/4257) feat(gf-i/art): art-direction visual acceptance contract for renderer screenshot-reference (draft, base `main`, head `1db4e2b59`)
+- no TODO.md item ID cited in PR (not mapped) — [#4258](https://github.com/Apeloff1/Skeleton/pull/4258) feat(sandbox): guarded tool executor + B086 injection fuzz corpus (draft, base `main`, head `6c67c4aca`)
+- no TODO.md item ID cited in PR (not mapped) — [#4259](https://github.com/Apeloff1/Skeleton/pull/4259) feat(repo-intel): #807 B001-B010 build-lane structural evidence audit (draft, base `main`, head `260b33e80`)
+- no TODO.md item ID cited in PR (not mapped) — [#4261](https://github.com/Apeloff1/Skeleton/pull/4261) [B040] Game creation eval arena: QA plan (draft, base `main`, head `9b6cd0a34`)
+- GF-P0-17, GF-P0-38, GF-P0-74, GF-P0-96, GF-P0-134, GF-P0-195 — [#4262](https://github.com/Apeloff1/Skeleton/pull/4262) test(qa): GF-D real Godot headless import + parse certification [draft, Shirt 1] (draft, base `main`, head `f5f510add`)
+- no TODO.md item ID cited in PR (not mapped) — [#4263](https://github.com/Apeloff1/Skeleton/pull/4263) feat(gameforge): #807 B038 AI generation provenance (seam for B039) (draft, base `main`, head `143d6fae1`)
+- no TODO.md item ID cited in PR (not mapped) — [#4265](https://github.com/Apeloff1/Skeleton/pull/4265) feat(gf-b020): natural-language iterative repair (B020) (draft, base `main`, head `db57d4401`)
 
 ## Source references
 
