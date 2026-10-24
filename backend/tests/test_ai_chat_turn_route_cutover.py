@@ -214,6 +214,36 @@ def _conversation_authority(thread, user, monkeypatch, *, allow_commit=True, leg
     )
 
 
+
+def _configure_prepared_engine(fake_client):
+    """Share real submit/ack/terminal identities across five chat route cases."""
+    result = {"value": None}
+    prior_terminal = fake_client.wait_for_terminal
+
+    async def submit(command):
+        value = await fake_client.execute(command)
+        result["value"] = value
+        return {
+            "operation_id": command.operation.operation_id,
+            "execution_id": command.execution_request.execution_id,
+            "state": "admitted",
+        }
+
+    def verify_ack(ack, command):
+        assert ack["operation_id"] == command.operation.operation_id
+        assert ack["execution_id"] == command.execution_request.execution_id
+
+    async def terminal(**kwargs):
+        if result["value"] is not None:
+            return result["value"]
+        return await prior_terminal(**kwargs)
+
+    fake_client.submit = submit
+    fake_client._validate_ack_identity = verify_ack
+    fake_client.wait_for_terminal = terminal
+
+
+
 @pytest.mark.asyncio
 async def test_live_chat_success_reaches_durable_complete(
     monkeypatch,
@@ -255,6 +285,7 @@ async def test_live_chat_success_reaches_durable_complete(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
@@ -360,6 +391,7 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     first = await route.ai_chat(
@@ -435,7 +467,7 @@ async def test_live_chat_event_page_supports_digest_bound_reconnect(
     import routes.ai as route
 
     thread, user = _thread_and_user()
-    authority = _conversation_authority(thread, user)
+    authority = _conversation_authority(thread, user, monkeypatch)
     monkeypatch.setattr(route, "conversation_authority", authority)
     fake_client = SimpleNamespace(
         config=SimpleNamespace(
@@ -462,6 +494,7 @@ async def test_live_chat_event_page_supports_digest_bound_reconnect(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
@@ -517,7 +550,7 @@ async def test_cancellation_request_does_not_fabricate_terminal_cancelled(
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        _conversation_authority(thread, user, monkeypatch, allow_commit=False),
+        _conversation_authority(thread, user, monkeypatch, allow_commit=False, legacy=True),
     )
 
     operation_id, _execution_id = route._chat_turn_ids(
@@ -628,6 +661,7 @@ async def test_live_owner_prevents_duplicate_engine_execution(
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
@@ -685,6 +719,7 @@ async def test_live_chat_rejects_unaccepted_engine_output_before_transcript_comm
 
     fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
+    _configure_prepared_engine(fake_client)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
     response = await route.ai_chat(
