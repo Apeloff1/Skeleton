@@ -35,6 +35,7 @@ _COMMANDS = [
     "command",
     "status",
     "config",
+    "deploy",
     "help",
 ]
 

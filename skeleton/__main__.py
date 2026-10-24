@@ -107,6 +107,8 @@ Commands:
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
+    deploy      Self-host deployment: profiles/validate/env/check/probe/manifest/units/boot
+                Use `deploy boot` for the one-command local boot path
     help        Show this help message
 """
 
@@ -706,6 +708,11 @@ def _cmd_creator(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_deploy(rest: List[str]) -> int:
+    from skeleton.deployment.cli import run_deploy_cli
+    return run_deploy_cli(rest)
+
+
 def _cmd_test(_rest: List[str]) -> int:
     """Run the configured pytest suite, with unittest discovery as a fallback."""
     try:
@@ -763,6 +770,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
+    if cmd == "deploy":
+        return _cmd_deploy(rest)
     if cmd in ("help", "-h", "--help"): print(__doc__); return 0
     print(f"Unknown command: {cmd}"); print(__doc__); return 1
 
