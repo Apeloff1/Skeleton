@@ -34,17 +34,19 @@ def _data_lines(text: str) -> str:
     return "".join(f"data: {line}\n" for line in text.split("\n"))
 
 
-def format_sse_event(event: RealtimeEvent) -> str:
-    return f"id: {event.id}\nevent: {event.type}\n{_data_lines(event.to_json())}\n"
+def format_sse_event(event: RealtimeEvent, epoch: Optional[str] = None) -> str:
+    """``id:`` is ``<envelope.id>-<hub epoch>`` when the hub epoch is known (S2-6)."""
+    sse_id = f"{event.id}-{epoch}" if epoch else event.id
+    return f"id: {sse_id}\nevent: {event.type}\n{_data_lines(event.to_json())}\n"
 
 
 def format_sse_control(frame: ControlEvent) -> str:
     return f"event: {frame.type}\n{_data_lines(frame.to_json())}\n"
 
 
-def format_sse(frame: Frame) -> str:
+def format_sse(frame: Frame, epoch: Optional[str] = None) -> str:
     if isinstance(frame, RealtimeEvent):
-        return format_sse_event(frame)
+        return format_sse_event(frame, epoch)
     return format_sse_control(frame)
 
 
@@ -120,7 +122,7 @@ def sse_message_to_frame(msg: SSEMessage) -> Optional[Frame]:
     if msg.event in CONTROL_TYPES:
         return ControlEvent.from_dict(json.loads(msg.data))
     event = RealtimeEvent.from_json(msg.data)
-    if msg.id is not None and msg.id != event.id:
+    if msg.id is not None and msg.id.split("-", 1)[0] != event.id:
         raise EnvelopeError("SSE id line does not match envelope id")
     return event
 
@@ -137,7 +139,9 @@ async def iter_frames(
 
     Records delivery latency for live events, heartbeats sent / late
     heartbeats (event-loop stalls) and the disconnect reason, and always
-    unsubscribes on exit.
+    unsubscribes on exit. When the subscription's max lifetime elapses
+    (Jenkins S2-4) a ``stream.reauth`` control frame is yielded and the
+    stream ends so the client reconnects with a fresh seal.
     """
     interval = hub.heartbeat_interval_s if heartbeat_interval_s is None else float(heartbeat_interval_s)
     delivered = 0
@@ -148,8 +152,14 @@ async def iter_frames(
             if is_disconnected is not None and await is_disconnected():
                 reason = "client_gone"
                 return
+            remaining = sub.remaining_lifetime() if hasattr(sub, "remaining_lifetime") else None
+            if remaining is not None and remaining <= 0:
+                reason = "max_lifetime"
+                yield hub.reauth_event(sub)
+                return
+            wait = interval if remaining is None else max(0.0, min(interval, remaining))
             try:
-                frame = await sub.next(timeout=interval)
+                frame = await sub.next(timeout=wait)
             except EOFError:
                 reason = "server_closed"
                 return
@@ -158,6 +168,8 @@ async def iter_frames(
                 hub.slo.record_heartbeat_miss()
             last_write = now
             if frame is None:
+                if remaining is not None and sub.remaining_lifetime() <= 0:
+                    continue
                 hub.slo.record_heartbeat_sent()
                 yield None
                 continue
@@ -165,6 +177,7 @@ async def iter_frames(
                 if frame.seq > sub.head_at_connect:
                     hub.slo.record_delivered(frame.channel, time.time() * 1000.0 - ts_to_ms(frame.ts))
                 delivered += 1
+                sub.last_delivered_id = frame.id
             yield frame
             if max_events is not None and delivered >= max_events:
                 reason = "max_events"
@@ -176,8 +189,9 @@ async def iter_frames(
 async def sse_body(hub: Any, sub: Any, *, retry_ms: int = DEFAULT_RETRY_MS, **kwargs: Any) -> AsyncIterator[str]:
     """Async iterator of SSE text chunks for a ``StreamingResponse``."""
     yield format_retry(retry_ms)
+    epoch = getattr(hub, "epoch", None)
     async for frame in iter_frames(hub, sub, **kwargs):
-        yield HEARTBEAT_COMMENT if frame is None else format_sse(frame)
+        yield HEARTBEAT_COMMENT if frame is None else format_sse(frame, epoch)
 
 
 def sse_headers() -> dict:
