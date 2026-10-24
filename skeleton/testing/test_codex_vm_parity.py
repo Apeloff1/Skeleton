@@ -137,3 +137,23 @@ def test_symlinked_directory_ancestor_fails_even_if_status_is_suppressed(pair, t
     monkeypatch.setattr(mod, "git", status_suppressed)
     with pytest.raises(mod.ParityError, match="ancestor"):
         mod.compare(src, vm, sha)
+
+
+@pytest.mark.parametrize("unexpected_mode", [0o654, 0o645])
+def test_group_or_other_only_executable_bits_fail_even_if_git_status_is_suppressed(
+    pair, unexpected_mode, monkeypatch
+):
+    if os.name == "nt":
+        pytest.skip("POSIX executable bits required")
+    src, vm, sha = pair
+    os.chmod(vm / "file.py", unexpected_mode)
+    original_git = mod.git
+
+    def status_suppressed(root, *args):
+        if args and args[0] == "status":
+            return b""
+        return original_git(root, *args)
+
+    monkeypatch.setattr(mod, "git", status_suppressed)
+    with pytest.raises(mod.ParityError, match="executable mode"):
+        mod.compare(src, vm, sha)

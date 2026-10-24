@@ -94,7 +94,7 @@ def inspect(root: Path, required_sha: str) -> dict[str, tuple[str, str]]:
             else:
                 if not stat.S_ISREG(info.st_mode):
                     raise ParityError("tracked regular file missing or replaced")
-                if bool(info.st_mode & stat.S_IXUSR) != (mode == b"100755"):
+                if bool(info.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)) != (mode == b"100755"):
                     raise ParityError("tracked executable mode differs from Git")
                 digest = hashlib.sha256()
                 # Match the original Git blob as well as the other checkout.
