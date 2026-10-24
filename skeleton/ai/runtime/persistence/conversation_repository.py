@@ -236,6 +236,20 @@ class SQLiteConversationRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_conversation_message_thread
                 ON conversation_message(namespace, thread_id, sequence);
+
+                CREATE TABLE IF NOT EXISTS conversation_chat_execution (
+                    namespace TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL,
+                    PRIMARY KEY(namespace, message_id),
+                    FOREIGN KEY(namespace, thread_id)
+                        REFERENCES conversation_thread(namespace, thread_id)
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(namespace, message_id)
+                        REFERENCES conversation_message(namespace, message_id)
+                        ON DELETE CASCADE
+                );
                 """
             )
             columns = {
@@ -542,9 +556,29 @@ class SQLiteConversationRepository:
         owner_id: str,
         expected_thread_version: int,
         activate_branch: bool = True,
+        execution_metadata: dict[str, object] | None = None,
     ) -> tuple[ConversationThread, ConversationMessage]:
         if not isinstance(message, ConversationMessage):
             raise TypeError("message must be a ConversationMessage")
+        encoded_execution = None
+        if execution_metadata is not None:
+            if (
+                message.author_type is not ConversationAuthorType.USER
+                or "chat-prepared-execution:v1" not in message.attachment_refs
+                or not isinstance(execution_metadata, dict)
+            ):
+                raise ConversationConflict("prepared execution must be bound to a canonical USER")
+            try:
+                encoded_execution = json.dumps(
+                    execution_metadata, ensure_ascii=False, allow_nan=False,
+                    sort_keys=True, separators=(",", ":"),
+                )
+            except (TypeError, ValueError, RecursionError, OverflowError) as exc:
+                raise ConversationConflict("prepared execution metadata is not canonical JSON") from exc
+            if len(encoded_execution.encode("utf-8")) > 2 * 1024 * 1024:
+                raise ConversationConflict("prepared execution metadata exceeds its byte bound")
+        elif "chat-prepared-execution:v1" in message.attachment_refs:
+            raise ConversationConflict("prepared USER requires its original execution metadata")
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
@@ -556,10 +590,26 @@ class SQLiteConversationRepository:
                 if not thread.writable:
                     raise ConversationConflict("thread is not writable")
 
+                # A replay may not replace or drop the frozen engine command
+                # under the same immutable USER/idempotency identity.
+                def matching_execution(existing_id: str) -> bool:
+                    stored = self._connection.execute(
+                        """
+                        SELECT metadata_json FROM conversation_chat_execution
+                        WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                        """,
+                        (self.namespace, message.thread_id, existing_id),
+                    ).fetchone()
+                    if encoded_execution is None:
+                        return stored is None
+                    return stored is not None and stored["metadata_json"] == encoded_execution
+
                 by_id = self._message_row(message.message_id)
                 if by_id is not None:
                     existing = self._message_from_row(by_id)
                     if self._same_message_identity(existing, message):
+                        if not matching_execution(existing.message_id):
+                            raise ConversationConflict("replayed execution metadata differs")
                         self._connection.execute("COMMIT")
                         return thread, existing
                     raise ConversationConflict("message_id was reused with different content")
@@ -574,6 +624,8 @@ class SQLiteConversationRepository:
                 if idem is not None:
                     existing = self._message_from_row(idem)
                     if self._same_message_identity(existing, message):
+                        if not matching_execution(existing.message_id):
+                            raise ConversationConflict("replayed execution metadata differs")
                         self._connection.execute("COMMIT")
                         return thread, existing
                     raise ConversationConflict("idempotency_key was reused with different content")
@@ -650,6 +702,15 @@ class SQLiteConversationRepository:
                         message.schema_version,
                     ),
                 )
+                if encoded_execution is not None:
+                    self._connection.execute(
+                        """
+                        INSERT INTO conversation_chat_execution(
+                            namespace, thread_id, message_id, metadata_json
+                        ) VALUES (?, ?, ?, ?)
+                        """,
+                        (self.namespace, message.thread_id, message.message_id, encoded_execution),
+                    )
                 now = _utc()
                 next_thread = replace(
                     thread,
@@ -683,6 +744,40 @@ class SQLiteConversationRepository:
             except BaseException:
                 self._connection.execute("ROLLBACK")
                 raise
+
+    def chat_execution(
+        self,
+        thread_id: str,
+        message_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> dict[str, object] | None:
+        """Read only the frozen command belonging to an authorized USER."""
+        with self._lock:
+            row = self._thread_row(thread_id)
+            if row is None:
+                raise ConversationNotFound(thread_id)
+            self._authorize(self._thread_from_row(row), tenant_id, owner_id)
+            message_row = self._message_row(message_id)
+            if message_row is None or message_row["thread_id"] != thread_id:
+                raise ConversationNotFound(message_id)
+            stored = self._connection.execute(
+                """
+                SELECT metadata_json FROM conversation_chat_execution
+                WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                """,
+                (self.namespace, thread_id, message_id),
+            ).fetchone()
+            if stored is None:
+                return None
+            try:
+                value = json.loads(stored["metadata_json"])
+            except (TypeError, ValueError, UnicodeError) as exc:
+                raise ConversationRepositoryCorruption("prepared chat metadata is unreadable") from exc
+            if not isinstance(value, dict):
+                raise ConversationRepositoryCorruption("prepared chat metadata has invalid shape")
+            return value
 
     def list_messages(
         self,
