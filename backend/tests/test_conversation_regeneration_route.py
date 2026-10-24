@@ -249,18 +249,22 @@ async def test_regenerate_route_rejects_user_message_source(
 
     thread, user_message, _assistant = _conversation()
 
-    async def get_thread(*_args, **_kwargs):
+    async def regeneration_request(*_args, **_kwargs):
+        return None
+
+    async def authorize_active_thread(*_args, **_kwargs):
         return thread
 
-    async def list_messages(*_args, **_kwargs):
+    async def active_transcript(*_args, **_kwargs):
         return (user_message,)
 
     monkeypatch.setattr(
         route,
         "conversation_authority",
         SimpleNamespace(
-            get_thread=get_thread,
-            list_messages=list_messages,
+            regeneration_request=regeneration_request,
+            authorize_active_thread=authorize_active_thread,
+            active_transcript=active_transcript,
         ),
     )
 
@@ -276,7 +280,7 @@ async def test_regenerate_route_rejects_user_message_source(
         )
 
     assert exc.value.status_code == 409
-    assert "only assistant messages" in exc.value.detail
+    assert "only causal assistant messages" in exc.value.detail
 
 
 @pytest.mark.asyncio
