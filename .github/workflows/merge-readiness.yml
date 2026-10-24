@@ -204,6 +204,12 @@ jobs:
           skeleton/pr_automation
           skeleton/automation
           skeleton/repo_machine
+      # Run the isolated custody test before the long automation matrix.
+      # The complete matrix may be cancelled by unrelated repository pressure.
+      - name: Verify fail-closed traffic dispatch custody
+        env:
+          PYTHONPATH: "."
+        run: python -m unittest discover -s tests -p "test_traffic_dispatch_workflow.py" -v
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
       - name: Validate runner v2 privileged contract
