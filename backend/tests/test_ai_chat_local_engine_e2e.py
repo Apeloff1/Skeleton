@@ -96,13 +96,24 @@ class SQLiteAsyncConversationAuthority:
         tenant_id: str,
         owner_id: str,
         expected_thread_version: int,
+        execution_metadata=None,
     ):
         return self.repository.append_message(
             message,
             tenant_id=tenant_id,
             owner_id=owner_id,
             expected_thread_version=expected_thread_version,
+            execution_metadata=execution_metadata,
         )
+
+    async def chat_execution(self, thread_id, message_id, *, tenant_id, owner_id):
+        return self.repository.chat_execution(
+            thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
+        )
+
+    async def dragon_context_segments(self, thread, query):
+        # The E2E runs without reviewed Dragon sources; do not synthesize any.
+        return ()
 
     async def append_user_message(
         self,
@@ -238,6 +249,51 @@ def _load_backend_ai_route(monkeypatch):
         monkeypatch.setitem(sys.modules, "routes.gameforge_auth", auth)
 
     route = importlib.import_module("routes.ai")
+
+    # This fixture uses an in-process operator callable, not an on-disk model.
+    # Only the model-selection projection is synthetic: read the real engine
+    # inventory and verify its active local identity/limits instead of forging
+    # an artifact receipt. Production catalog validation remains unchanged and
+    # is independently covered by its own fail-closed tests.
+    from core.model_catalog import CATALOG_SCHEMA
+
+    async def fixture_callable_catalog(client, *, actor_id, tenant_id):
+        inventory = await client.provider_status(tenant_id=tenant_id)
+        assert inventory["active"] == "local" and inventory["available"] is True
+        rows = [
+            row for row in inventory["providers"]
+            if row["id"] == "local" and row.get("active") is True
+        ]
+        assert len(rows) == 1
+        source = rows[0]
+        assert source["architecture_acknowledged"] is True
+        assert source["available"] is True and source["model"]
+        assert source["execution_mode"] == "local"
+        return {
+            "schema_version": CATALOG_SCHEMA,
+            "engine": "skeleton-engine",
+            "available": True,
+            "automatic_available": True,
+            "models": [{
+                "provider_id": "local",
+                "model_id": source["model"],
+                "active": True,
+                "fallback": False,
+                "selectable": True,
+                "available": True,
+                "credential_free": True,
+                "execution_mode": "local",
+                "tokenizer": source["tokenizer"],
+                "context_window": source["context_window"],
+                "max_output_tokens": source["max_output_tokens"],
+                "default_output_tokens": source["default_output_tokens"],
+                "supports_temperature": False,
+                "capabilities": list(source["capabilities"]),
+            }],
+            "active": {"provider_id": "local", "model_id": source["model"]},
+        }
+
+    monkeypatch.setattr(route, "model_catalog", fixture_callable_catalog)
 
     # Product chat now journals every turn through a durable authority. These
     # tests deliberately replace production Mongo conversation storage with
