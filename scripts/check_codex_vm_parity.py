@@ -64,7 +64,7 @@ def inspect(root: Path, required_sha: str) -> dict[str, tuple[str, str]]:
             continue
         try:
             header, path_bytes = record.split(b"\t", 1)
-            mode, kind, _oid = header.split(b" ", 2)
+            mode, kind, oid = header.split(b" ", 2)
             relative = path_bytes.decode("utf-8", "strict")
         except (ValueError, UnicodeError) as exc:
             raise ParityError("Git tree contains an unreadable path") from exc
@@ -81,19 +81,31 @@ def inspect(root: Path, required_sha: str) -> dict[str, tuple[str, str]]:
                 if not stat.S_ISLNK(info.st_mode):
                     raise ParityError("tracked symbolic link not present as a symbolic link")
                 raw = os.fsencode(os.readlink(name))
+                git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
             else:
                 if not stat.S_ISREG(info.st_mode):
                     raise ParityError("tracked regular file missing or replaced")
                 if bool(info.st_mode & stat.S_IXUSR) != (mode == b"100755"):
                     raise ParityError("tracked executable mode differs from Git")
                 digest = hashlib.sha256()
+                # Match the original Git blob as well as the other checkout.
+                # A suppressed dirty status or identically modified checkouts
+                # must not forge a positive GitHub main attestation.
+                # LFS smudge replacements need separate custody evidence.
+                git_blob_digest = hashlib.sha1()
                 flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
                 with os.fdopen(os.open(name, flags), "rb") as stream:
-                    if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                    info_open = os.fstat(stream.fileno())
+                    if not stat.S_ISREG(info_open.st_mode):
                         raise ParityError("tracked file changed type during read")
+                    git_blob_digest.update(b"blob " + str(info_open.st_size).encode("ascii") + b"\0")
                     while chunk := stream.read(1024 * 1024):
                         digest.update(chunk)
+                        git_blob_digest.update(chunk)
+                git_blob = git_blob_digest.hexdigest()
                 raw = None
+            if git_blob != oid.decode("ascii"):
+                raise ParityError("tracked checkout bytes differ from Git blob: " + relative)
         except (OSError, UnicodeError) as exc:
             raise ParityError("tracked checkout file cannot be read: " + relative) from exc
         entries[relative] = (
