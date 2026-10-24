@@ -239,14 +239,6 @@ def _configure_prepared_engine(fake_client):
             return result["value"]
         return await prior_terminal(**kwargs)
 
-    async def status(**_kwargs):
-        if result["value"] is None:
-            raise EngineNotFoundError("execution has not been admitted")
-        return {"execution_state": "completed"}
-
-    async def terminal_result_if_available(**_kwargs):
-        return result["value"]
-
     async def status(*_args, **_kwargs):
         if result["value"] is None:
             raise EngineNotFoundError("original submission not yet admitted")
@@ -265,8 +257,6 @@ def _configure_prepared_engine(fake_client):
     fake_client.status = status
     fake_client.terminal_result_if_available = terminal_if_available
     fake_client.handoff_binding = handoff_binding
-    fake_client.status = status
-    fake_client.terminal_result_if_available = terminal_result_if_available
 
 
 
