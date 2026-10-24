@@ -337,20 +337,25 @@ async def test_chat_memory_policy_fails_closed_without_canonical_engine(
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: None)
     monkeypatch.setattr(route, "call_llm", forbidden_legacy)
 
-    response = await route.ai_chat(
-        route.AIChatRequest(
-            message="Keep this answer for later.",
-            thread_id=thread.thread_id,
-            idempotency_key="memory-policy-turn-1",
-            expected_thread_version=1,
-            memory_policy={
-                "persist_verified_response": True,
-                "kind": "semantic",
-            },
-        ),
-        user={"tenant_id": "tenant-a", "email": "owner-a"},
-    )
+    # The canonical engine is a prerequisite to creating a durable USER row,
+    # including memory opt-in: there can be no deferred memory write without
+    # an admitted engine command. This must fail before storage/legacy fallback.
+    with pytest.raises(HTTPException) as rejected:
+        await route.ai_chat(
+            route.AIChatRequest(
+                message="Keep this answer for later.",
+                thread_id=thread.thread_id,
+                idempotency_key="memory-policy-turn-1",
+                expected_thread_version=1,
+                memory_policy={
+                    "persist_verified_response": True,
+                    "kind": "semantic",
+                },
+            ),
+            user={"tenant_id": "tenant-a", "email": "owner-a"},
+        )
 
-    assert response["success"] is False
-    assert response["error_code"] == "memory_persistence_unavailable"
+    assert rejected.value.status_code == 503
+    assert rejected.value.detail["code"] == "engine_unavailable"
+    assert transcript_calls == 1
     assert calls == {"legacy": 0, "commit": 0}
