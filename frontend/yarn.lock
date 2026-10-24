@@ -4003,6 +4003,11 @@ expo-linking@~8.0.12:
     expo-constants "~18.0.13"
     invariant "^2.2.4"
 
+expo-location@~19.0.8:
+  version "19.0.8"
+  resolved "https://registry.npmjs.org/expo-location/-/expo-location-19.0.8.tgz"
+  integrity sha512-H/FI75VuJ1coodJbbMu82pf+Zjess8X8Xkiv9Bv58ZgPKS/2ztjC1YO1/XMcGz7+s9DrbLuMIw22dFuP4HqneA==
+
 expo-modules-autolinking@3.0.27:
   version "3.0.27"
   resolved "https://registry.yarnpkg.com/expo-modules-autolinking/-/expo-modules-autolinking-3.0.27.tgz#5aded71d782cbd750986547d366f66279d5c0d4d"
