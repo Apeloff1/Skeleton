@@ -180,7 +180,7 @@ async def test_regenerate_route_runs_engine_then_commits_new_branch(
 
 
 @pytest.mark.asyncio
-async def test_regenerate_route_never_commits_when_engine_unavailable(
+async def test_regenerate_route_without_engine_never_commits(
     monkeypatch,
 ) -> None:
     import core.engine_client as engine_client
@@ -189,10 +189,13 @@ async def test_regenerate_route_never_commits_when_engine_unavailable(
     thread, user_message, assistant = _conversation()
     regeneration_calls = []
 
-    async def get_thread(*_args, **_kwargs):
+    async def regeneration_request(*_args, **_kwargs):
+        return None
+
+    async def authorize_active_thread(*_args, **_kwargs):
         return thread
 
-    async def list_messages(*_args, **_kwargs):
+    async def active_transcript(*_args, **_kwargs):
         return (user_message, assistant)
 
     async def forbidden_regenerate(*args, **kwargs):
@@ -202,28 +205,16 @@ async def test_regenerate_route_never_commits_when_engine_unavailable(
         )
 
     authority = SimpleNamespace(
-        get_thread=get_thread,
-        list_messages=list_messages,
+        regeneration_request=regeneration_request,
+        authorize_active_thread=authorize_active_thread,
+        active_transcript=active_transcript,
         regenerate_assistant_message=forbidden_regenerate,
     )
-    fake_engine = SimpleNamespace(
-        config=SimpleNamespace(
-            service_principal="codedock-backend",
-            execution_timeout_s=30.0,
-        )
-    )
-
-    async def execute(_command):
-        raise EngineUnavailableError("engine unavailable")
-
-    fake_engine.execute = execute
 
     monkeypatch.setattr(route, "conversation_authority", authority)
-    monkeypatch.setattr(
-        engine_client.EngineClient,
-        "from_env",
-        lambda: fake_engine,
-    )
+    # The current endpoint verifies causal lineage before resolving its only
+    # permitted execution owner; no engine means no command or branch mutation.
+    monkeypatch.setattr(engine_client.EngineClient, "from_env", lambda: None)
 
     with pytest.raises(HTTPException) as exc:
         await route.regenerate_assistant_message(
