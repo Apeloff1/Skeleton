@@ -174,3 +174,88 @@ def test_http_plain_stream_other_actor_sees_nothing(app):
     r = TestClient(app).get("/api/v1/events?channels=build&cursor=1000&max_events=1",
                             headers={"x-zaibatsu-attester": "alice"})
     assert r.status_code == 200 and '"n":7' in r.text and '"n":8' not in r.text
+
+
+# -- follow-ups: owner cache, same-tx ownership, agent.* ownership -----------
+
+def test_build_job_runner_caches_owner_per_job(monkeypatch):
+    db = _db()
+    from skeleton.persistence.app_foundation.repositories import SqliteBuildRepository
+    builds, queue, sink = SqliteBuildRepository(db), SqliteJobQueue(db), Sink()
+    BuildService(builds, queue).submit(_project(db), actor_id="alice", tenant_id="t1")
+    runner = BuildJobRunner(queue, builds, lambda ctx: ([ctx.log(str(i)) for i in range(5)], {})[1], publisher=sink)
+    selects = []
+    real = db.query
+    monkeypatch.setattr(db, "query", lambda sql, args=(): (selects.append(sql) if "actor_id, tenant_id" in sql else None, real(sql, args))[1])
+    runner.drain()
+    assert len(sink.events) == 7 and len(selects) == 1
+
+
+def test_build_submit_records_owner_atomically_with_enqueue():
+    db = _db()
+    queue = SqliteJobQueue(db)
+    job = queue.enqueue("game.build", {}, actor_id="alice", tenant_id="t1")
+    row = db.query("SELECT actor_id, tenant_id FROM jobs WHERE job_id=?", (job.job_id,))[0]
+    assert (row["actor_id"], row["tenant_id"]) == ("alice", "t1")
+
+
+def test_agent_envelopes_carry_owner_top_level_not_payload():
+    from skeleton.app_services.jobs import AgentEventEmitter
+    sink = Sink()
+    ag = AgentEventEmitter(sink, actor_id="alice", tenant_id="t1", job_id="j1")
+    ag.started("coder")
+    ag.step("coder", "plan", {"actor_id": "mallory", "tenant": "evil"})
+    ag.completed("coder")
+    assert [e["type"] for e in sink.events] == ["agent.started", "agent.step", "agent.completed"]
+    for e in sink.events:
+        assert (e["actor_id"], e["tenant_id"], e["job_id"]) == ("alice", "t1", "j1")
+        assert not set(OWNERSHIP) & set(e["payload"])
+
+
+def test_agent_emitter_unowned_default_keeps_v1_shape():
+    from skeleton.app_services.jobs import AgentEventEmitter
+    sink = Sink()
+    AgentEventEmitter(sink).started("coder")
+    assert set(sink.events[0]) == {"v", "id", "ts", "channel", "type", "payload"}
+
+
+def test_job_context_agent_events_delivered_to_grant_holder_only():
+    hub = _hub()
+    svc = JobService(_db(), publisher=HubJobEventSink(hub), visibility_timeout_s=30)
+
+    def handler(ctx, p):
+        ag = ctx.agent_events()
+        ag.started("coder")
+        ag.step("coder", "plan")
+        ag.completed("coder")
+        return {}
+
+    svc.register_handler("game.build", handler)
+    h = svc.enqueue("game.build", {}, actor_id="alice", tenant_id="t1")
+    JobWorker(svc, worker_id="w").drain()
+    agent_access = {(a.owner, a.tenant) for seq, a in hub._access.items()}
+    assert agent_access == {("alice", "t1")}
+    granted = hub.subscribe(["agent"], principal="alice", job_id=h.job_id, job_grant=h.job_id, cursor=1000)
+    other_job = hub.subscribe(["agent"], principal="alice", job_id="j-other", job_grant="j-other", cursor=1000)
+    other_actor = hub.subscribe(["agent"], principal="bob", cursor=1000)
+    got = _events(granted)
+    assert [e.type for e in got] == ["agent.started", "agent.step", "agent.completed"]
+    assert all(e.job_id == h.job_id for e in got)
+    assert _events(other_job) == [] and _events(other_actor) == []
+
+
+def test_build_context_agent_events_owned_and_cross_tenant_denied_over_http(app):
+    hub = app.state.realtime_hub
+    db = _db()
+    from skeleton.persistence.app_foundation.repositories import SqliteBuildRepository
+    builds, queue = SqliteBuildRepository(db), SqliteJobQueue(db)
+    b = BuildService(builds, queue).submit(_project(db), actor_id="alice", tenant_id="t1")
+    BuildJobRunner(queue, builds, lambda ctx: (ctx.agent_events().started("coder"), {})[1],
+                   publisher=HubJobEventSink(hub)).drain()
+    client = TestClient(app)
+    ok = client.get(f"/api/v1/events?channels=agent&job_id={b.job_id}&actor_id=alice&tenant_id=t1&cursor=1000&max_events=1",
+                    headers={"x-zaibatsu-attester": "alice"})
+    assert ok.status_code == 200 and "agent.started" in ok.text
+    cross = client.get(f"/api/v1/events?channels=agent&job_id={b.job_id}&actor_id=bob&tenant_id=t2&cursor=1000&max_events=1",
+                       headers={"x-zaibatsu-attester": "bob"})
+    assert cross.status_code == 403

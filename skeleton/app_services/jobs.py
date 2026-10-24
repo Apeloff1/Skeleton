@@ -10,6 +10,8 @@ Event emit points (envelope v1, see ``events.py``) all go through
 from __future__ import annotations
 
 import json
+import logging
+import sqlite3
 import time
 import uuid
 from typing import Any, Callable, Mapping, Optional, Sequence
@@ -22,6 +24,8 @@ from skeleton.app_services.events import (
 )
 from skeleton.app_services.ports import Build, BuildRepository, Job
 from skeleton.observability.redaction import safe_exception_text
+
+_log = logging.getLogger(__name__)
 
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "dead", "cancelled")
 BUILD_JOB_KIND = "game.build"
@@ -52,7 +56,8 @@ class SqliteJobQueue:
 
     def enqueue(self, kind: str, payload: Mapping[str, Any], *, max_attempts: int = 3,
                 delay_s: float = 0.0, correlation_id: str = "",
-                idempotency_key: Optional[str] = None) -> Job:
+                idempotency_key: Optional[str] = None, actor_id: str = "",
+                tenant_id: str = "") -> Job:
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
         now = self.clock()
@@ -68,6 +73,11 @@ class SqliteJobQueue:
                 " VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (jid, kind, "queued", json.dumps(dict(payload), sort_keys=True), max_attempts,
                  now + delay_s, correlation_id, idempotency_key, now, now))
+            if actor_id or tenant_id:
+                # Same transaction as the INSERT: a worker can never claim this
+                # job before its owner is recorded (no unowned events).
+                c.execute("UPDATE jobs SET actor_id=?, tenant_id=? WHERE job_id=?",
+                          (actor_id, tenant_id, jid))
         return self.get(jid)  # type: ignore[return-value]
 
     def claim(self, worker_id: str, *, kinds: Optional[Sequence[str]] = None,
@@ -165,6 +175,10 @@ class BuildContext:
         self._runner._emit("build.log", self.job, self.build_id,
                            {"line": line[:2000], "level": level})
 
+    def agent_events(self) -> "AgentEventEmitter":
+        """agent.* emitter carrying this build's submitting principal."""
+        return self._runner.agent_emitter(self.job)
+
 
 BuildExecutor = Callable[[BuildContext], Mapping[str, Any]]
 
@@ -182,12 +196,7 @@ class BuildService:
         job = self.queue.enqueue(BUILD_JOB_KIND, {"build_id": build.build_id, "project_id": project_id,
                                                    "target": target, "options": dict(options or {})},
                                  max_attempts=max_attempts, correlation_id=correlation_id,
-                                 idempotency_key=idempotency_key)
-        if actor_id or tenant_id:
-            # Submitting principal; BuildJobRunner stamps it on every event envelope.
-            with self.queue.db.tx() as c:
-                c.execute("UPDATE jobs SET actor_id=?, tenant_id=? WHERE job_id=? AND actor_id='' AND tenant_id=''",
-                          (actor_id, tenant_id, job.job_id))
+                                 idempotency_key=idempotency_key, actor_id=actor_id, tenant_id=tenant_id)
         return self.builds.set_status(build.build_id, "queued", job_id=job.job_id)
 
     def cancel(self, build_id: str) -> bool:
@@ -208,15 +217,29 @@ class BuildJobRunner:
         self.worker_id = worker_id or f"wrk_{uuid.uuid4().hex[:12]}"
         self.publisher: JobEventPublisher = publisher or NullJobEventPublisher()
         self.lease_s, self.retry_delay_s = lease_s, retry_delay_s
+        self._owners: dict[str, tuple[str, str]] = {}
 
     def _owner(self, job_id: str) -> tuple[str, str]:
+        """Submitting principal for ``job_id``; one SELECT per job, cached."""
+        cached = self._owners.get(job_id)
+        if cached is not None:
+            return cached
         try:
             rows = self.queue.db.query("SELECT actor_id, tenant_id FROM jobs WHERE job_id=?", (job_id,))
-        except Exception:  # pre-v7 schema: no ownership columns
+        except sqlite3.OperationalError:  # pre-v7 schema: no ownership columns
+            _log.warning("job %s: ownership columns unavailable; events will be unowned", job_id)
             return "", ""
-        if not rows:
-            return "", ""
-        return str(rows[0]["actor_id"] or ""), str(rows[0]["tenant_id"] or "")
+        owner = (str(rows[0]["actor_id"] or ""), str(rows[0]["tenant_id"] or "")) if rows else ("", "")
+        if len(self._owners) > 1024:
+            self._owners.clear()
+        self._owners[job_id] = owner
+        return owner
+
+    def agent_emitter(self, job: Job) -> "AgentEventEmitter":
+        """AgentEventEmitter bound to ``job``'s submitting principal and job_id."""
+        actor_id, tenant_id = self._owner(job.job_id)
+        return AgentEventEmitter(self.publisher, actor_id=actor_id, tenant_id=tenant_id,
+                                 job_id=job.job_id, correlation_id=job.correlation_id)
 
     def _emit(self, type_: str, job: Job, build_id: str, payload: Mapping[str, Any]) -> None:
         actor_id, tenant_id = self._owner(job.job_id)
@@ -263,12 +286,19 @@ class BuildJobRunner:
 class AgentEventEmitter:
     """Optional helper for agent runs to emit agent.* envelopes on the same sink."""
 
-    def __init__(self, publisher: Optional[JobEventPublisher] = None) -> None:
+    def __init__(self, publisher: Optional[JobEventPublisher] = None, *, actor_id: str = "",
+                 tenant_id: str = "", job_id: str = "", correlation_id: str = "") -> None:
         self.publisher: JobEventPublisher = publisher or NullJobEventPublisher()
+        # Submitting principal of the work this agent runs for; stamped
+        # top-level on every agent.* envelope (never in payload).
+        self.actor_id, self.tenant_id = actor_id, tenant_id
+        self.job_id, self.correlation_id = job_id, correlation_id
 
     def _emit(self, type_: str, payload: Mapping[str, Any], correlation_id: str, job_id: str) -> None:
         self.publisher.publish(make_envelope("agent", type_, payload,
-                                             correlation_id=correlation_id, job_id=job_id))
+                                             correlation_id=correlation_id or self.correlation_id,
+                                             job_id=job_id or self.job_id,
+                                             actor_id=self.actor_id, tenant_id=self.tenant_id))
 
     def started(self, agent: str, *, correlation_id: str = "", job_id: str = "") -> None:
         self._emit("agent.started", {"agent": agent}, correlation_id, job_id)

@@ -109,6 +109,12 @@ class JobContext:
         self.heartbeat(progress=f, message=message)
         self._svc._emit("build.progress", self, {"progress": f, "message": message})
 
+    def agent_events(self):
+        """agent.* emitter carrying this job's submitting principal (top-level, not payload)."""
+        from skeleton.app_services.jobs import AgentEventEmitter
+        return AgentEventEmitter(self._svc.publisher, actor_id=self.actor_id, tenant_id=self.tenant_id,
+                                 job_id=self.job_id, correlation_id=self.correlation_id)
+
     def log(self, line: str, level: str = "info") -> None:
         self.heartbeat()
         self._svc._emit("build.log", self, {"line": str(line)[:2000], "level": level})
