@@ -48,7 +48,9 @@ except Exception:  # noqa: BLE001
     _editor = _viewer
 
 _ARTIFACTS = str(DEFAULT_ARTIFACTS_ROOT)
-os.makedirs(_ARTIFACTS, exist_ok=True)
+# Import must never create directories: production /app may be read-only.
+# _artifact_build() performs guarded, explicit allocation only for a requested
+# native export; governed web/source delivery writes via the canonical store.
 
 
 def _artifact_retention_seconds() -> int:
