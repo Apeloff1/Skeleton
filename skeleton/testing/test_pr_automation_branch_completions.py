@@ -444,11 +444,15 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
         assert "pull_requests[0]" not in text, f"{name} must not treat pull_requests[0] as identity"
 
     pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
-    assert "workflow_run:" in pr_automation
-    assert "types: [completed]" in pr_automation
-    assert "branches-ignore:\n      - main" in pr_automation
-    assert expected not in pr_automation
+    # The index is manual-only; never restore a second privileged automatic
+    # workflow_run fanout just to satisfy a stale consumer contract.
+    trigger_block = pr_automation.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+    assert "\n  workflow_dispatch:\n" in trigger_block
+    assert "\n  workflow_run:" not in trigger_block
+    assert "\n  schedule:" not in trigger_block
     assert "pull_requests[0]" not in pr_automation
+    assert "group: pr-automation-index" in pr_automation
+    assert "cancel-in-progress: false" in pr_automation
 
     idle = (workflows / "idle-studio.yml").read_text(encoding="utf-8")
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in idle
