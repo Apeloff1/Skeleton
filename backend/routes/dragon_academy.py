@@ -2265,6 +2265,9 @@ def native_production_analyze_campaign(
         "original_campaign_digest": campaign.digest,
         "chapter_paths": jsonable_encoder(graph_report(chapters)),
         "challenge": challenge_report(director),
+        # RoutePortfolio is a frozen dataclass containing tuple path evidence.
+        # The public API and independent replay verifier require JSON arrays;
+        # normalize at this boundary instead of leaking Python tuples.
         "stages": [
             {"stage": index + 1, "routes": jsonable_encoder(document)}
             for index, document in enumerate(reports)
@@ -2308,7 +2311,10 @@ def native_production_multiple_routes(
         raise HTTPException(
             status_code=422, detail="Original puzzle board could not produce bounded proven route analysis"
         ) from None
-    return {"ok": True, **route_report(routes)}
+    # Keep direct Python and HTTP responses in the same JSON-compatible
+    # schema. The independent path verifier requires arrays, not Python
+    # tuple fields leaked through dataclasses.asdict.
+    return {"ok": True, **jsonable_encoder(route_report(routes))}
 
 
 @router.post("/native/production/puzzle/current-hint")

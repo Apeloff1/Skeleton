@@ -244,7 +244,8 @@ async def _save_build(build):
             "_swarm_discourse",
             "_bg_deadline_monotonic",
         }
-        save_doc = {k: v for k, v in build.items() if k not in _heavy}
+        # Mongo owns _id; never attempt to mutate it in an upsert/update.
+        save_doc = {k: v for k, v in build.items() if k not in _heavy and k != "_id"}
         if isinstance(save_doc.get("_artifact_job"), dict):
             save_doc["_artifact_job"] = {
                 key: value for key, value in save_doc["_artifact_job"].items() if not key.startswith("_")
@@ -3475,8 +3476,13 @@ async def start_background_build(req: StartBuildRequest):
     }
     try:
         await asyncio.to_thread(_check_build_resources, preflight)
-    except GalaxyBuildStopped as exc:
-        raise HTTPException(503, f"Build admission refused: {exc.reason}.") from None
+    except GalaxyBuildStopped:
+        # The stop reason is retained in build state; never echo exception data
+        # through an unauthenticated 5xx admission response.
+        raise HTTPException(
+            status_code=503,
+            detail="Build admission refused by resource or execution safeguards.",
+        ) from None
     # No await between the final custody check and reserving the slot.
     if _build_has_live_work(req.build_id):
         return {"build_id": req.build_id, "status": "already_running"}
@@ -4800,14 +4806,19 @@ def _run_artifact_command(build: dict, arguments: list[str], cwd: str, env: dict
     deadline = min(
         _build_clock.monotonic() + timeout, float(build.get("_bg_deadline_monotonic", float("inf")))
     )
-    options = (
-        {"start_new_session": True}
-        if os.name == "posix"
-        else {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
-    )
-    process = subprocess.Popen(
-        arguments, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options
-    )
+    # Use explicit platform-specific subprocess parameters: the process safety
+    # checker must be able to prove no shell or caller-supplied kwargs exist.
+    if os.name == "posix":
+        process = subprocess.Popen(
+            arguments, cwd=cwd, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, start_new_session=True,
+        )
+    else:
+        process = subprocess.Popen(
+            arguments, cwd=cwd, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        )
     stdout = bytearray()
     stderr = bytearray()
     reader_errors = []

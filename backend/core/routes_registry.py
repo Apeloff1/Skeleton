@@ -38,6 +38,55 @@ from fastapi import Depends, FastAPI
 RouteEntry = Union[Tuple[str, str], Tuple[str, str, str]]
 
 
+def _declared_route_bindings(
+    router, *, mount_prefix: str = ""
+) -> list[tuple[str, object]]:
+    """Walk declared endpoints and preserve the exact target callable.
+
+    In newer FastAPI, nested included routers are represented by wrappers.
+    In older versions the mounted routes are copies with the *same* endpoint
+    function. A path alone is not identity: a foreign router may use that URL.
+    """
+    bindings: list[tuple[str, object]] = []
+    pending: list[tuple[object, str, frozenset[int]]] = [
+        (router, mount_prefix, frozenset())
+    ]
+    while pending:
+        current, prefix, ancestors = pending.pop()
+        if id(current) in ancestors:
+            continue
+        ancestors = ancestors | {id(current)}
+        for route in getattr(current, "routes", ()):
+            path = getattr(route, "path", None)
+            if isinstance(path, str):
+                endpoint = getattr(route, "endpoint", None)
+                if endpoint is None:
+                    endpoint = getattr(route, "app", None)
+                if endpoint is not None:
+                    bindings.append((prefix + path, endpoint))
+                continue
+            nested = getattr(route, "original_router", None)
+            include_context = getattr(route, "include_context", None)
+            nested_prefix = getattr(include_context, "prefix", None)
+            if not isinstance(nested_prefix, str):
+                nested_prefix = getattr(route, "prefix", "")
+            if (
+                nested is not None
+                and nested is not current
+                and isinstance(nested_prefix, str)
+                and hasattr(nested, "routes")
+            ):
+                pending.append((nested, prefix + nested_prefix, ancestors))
+    return bindings
+
+
+def _declared_route_paths(router, *, mount_prefix: str = "") -> list[str]:
+    return [
+        path for path, _endpoint in _declared_route_bindings(
+            router, mount_prefix=mount_prefix
+        )
+    ]
+
 def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
     """
     Register each router in ``entries`` on the given FastAPI app.
@@ -46,6 +95,8 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
     """
     started = time.time()
     ok = 0
+    mounted_names: List[str] = []
+    mounted_paths: dict[str, list[str]] = {}
     skipped_names: List[str] = []
     for entry in entries:
         if len(entry) == 2:
@@ -56,6 +107,9 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
         else:
             skipped_names.append(f"<malformed entry: {entry!r}>")
             continue
+        # Roll back partial FastAPI registrations if a router fails while
+        # being included: a skipped capability must expose no half-mounted API.
+        prior_routes: int | None = None
         try:
             mod = importlib.import_module(module_path)
             router = getattr(mod, attr, None)
@@ -70,12 +124,59 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
                 from routes.galaxy_studio_access import galaxy_request_access
 
                 admission["dependencies"] = [Depends(galaxy_request_access)]
+            prior_routes = len(app.routes)
             if prefix:
                 app.include_router(router, prefix=prefix, **admission)
             else:
                 app.include_router(router, **admission)
+            newly_mounted = app.routes[prior_routes:]
+            # A caller or integration shim might append an unrelated direct
+            # route while discarding the requested router. A changed route
+            # count is not sufficient proof: the exposed path must also be
+            # declared by the exact requested source router.
+            declared = {
+                (path, id(endpoint))
+                for path, endpoint in _declared_route_bindings(
+                    router, mount_prefix=prefix or ""
+                )
+            }
+            registered_paths = [
+                route.path for route in newly_mounted
+                if isinstance(getattr(route, "path", None), str)
+                and (
+                    route.path,
+                    id(
+                        getattr(route, "endpoint", None)
+                        if getattr(route, "endpoint", None) is not None
+                        else getattr(route, "app", None)
+                    ),
+                ) in declared
+            ]
+            # FastAPI 0.137+ mounts a single non-path wrapper for a complete
+            # router. Only resolve its declared child paths after a real app
+            # route-tree change; the empty-router and failed-include checks
+            # remain fail-closed.
+            if (
+                newly_mounted
+                and not registered_paths
+                and any(getattr(mounted, "original_router", None) is router for mounted in newly_mounted)
+            ):
+                registered_paths = _declared_route_paths(
+                    router, mount_prefix=prefix or "",
+                )
+            if not registered_paths:
+                # A router that exposes no reachable endpoints must leave no
+                # mount behind. This also removes unrelated wrappers inserted
+                # by an incorrect include_router adapter.
+                del app.router.routes[prior_routes:]
+                skipped_names.append(f"{module_path} (empty_router)")
+                continue
+            mounted_paths[module_path] = registered_paths
+            mounted_names.append(module_path)
             ok += 1
         except Exception as exc:
+            if prior_routes is not None:
+                del app.router.routes[prior_routes:]
             # Import exceptions can contain credentials, tokens, filesystem paths
             # and even raw remote payloads. Report only the exception class;
             # skipped_names may reach status endpoints and log aggregation.
@@ -92,7 +193,11 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
         flush=True,
         file=sys.stderr,
     )
-    return {"ok": ok, "skipped": len(skipped_names), "skipped_names": skipped_names}
+    return {
+        "ok": ok, "skipped": len(skipped_names),
+        "skipped_names": skipped_names, "mounted_names": mounted_names,
+        "mounted_paths": mounted_paths,
+    }
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -329,6 +434,7 @@ KNOWN_ROUTES_WITH_PREFIX: List[RouteEntry] = [
     ("routes.game_console_build", "router", "/api"),
     ("routes.game_studio_review", "router", "/api"),
     ("routes.game_console_studio", "router", "/api"),
+    ("routes.game_frontier_authoring", "router", "/api"),
     ("routes.game_successor", "router", "/api"),
     ("routes.game_studio_learning", "router", "/api"),
     ("routes.game_studio_tools", "router", "/api"),
@@ -460,6 +566,8 @@ def register_known_routes(app: FastAPI) -> dict:
         "ok": r1["ok"] + r2["ok"],
         "skipped": r1["skipped"] + r2["skipped"],
         "skipped_names": r1["skipped_names"] + r2["skipped_names"],
+        "mounted_names": r1["mounted_names"] + r2["mounted_names"],
+        "mounted_paths": {**r1["mounted_paths"], **r2["mounted_paths"]},
         # Stage A4 — logical route-tree grouping (no physical file moves; 68
         # route modules cross-import each other so grouping is expressed as a
         # classifier rather than a package reshuffle).

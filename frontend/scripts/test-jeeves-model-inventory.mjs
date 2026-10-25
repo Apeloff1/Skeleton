@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const read = relativePath => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 const inventory = read('../app/ai-models.tsx');
-const readinessHook = read('../src/product/useChatReadiness.ts');
+const observedReadinessHook = read('../src/product/useChatReadiness.ts');
 const readiness = read('../src/features/Jeeves/JeevesRuntimeStatus.tsx');
 const catalog = read('../src/product/productCatalog.ts');
 const client = read('../src/product/chatSessionClient.ts');
@@ -13,8 +13,9 @@ test('observed model inventory is a real authenticated Expo screen', () => {
   assert.equal(existsSync(new URL('../app/ai-models.tsx', import.meta.url)), true);
   assert.match(inventory, /StudioLoginGate[^>]*requireAuthenticated/);
   assert.match(inventory, /useChatReadiness\(\)/);
-  assert.match(readinessHook, /getChatReadiness\(controller\.signal\)/);
-  assert.match(readinessHook, /token === getAuthToken\(\)/);
+  assert.match(observedReadinessHook, /getChatReadiness\(controller\.signal\)/);
+  assert.match(observedReadinessHook, /request\.current\?\.abort\(\)/);
+  assert.match(observedReadinessHook, /token === getAuthToken\(\)/);
   assert.match(inventory, /model\.readiness\.message/);
   assert.match(inventory, /readiness\.models\.models\.map\(/);
   assert.match(inventory, /No model has been reported/);

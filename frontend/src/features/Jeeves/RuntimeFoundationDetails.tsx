@@ -44,7 +44,13 @@ export function InferenceExecutionDetails({ model }: { model: RuntimeServingStat
     const protocols = array(contract.protocols, 3).map(value => text(value, 32));
     demand(protocols.length > 0 && new Set(protocols).size === protocols.length && protocols.every(value => ['text-generation', 'tool-calls', 'structured-output'].includes(value)));
     const basis = text(accounting.basis, 64);
-    demand(['native_tokenizer', 'utf8_byte_tokens', 'reference_tokens', 'conservative_utf8_bytes', 'backend_token_counter'].includes(basis) && (accounting.exact === null || typeof accounting.exact === 'boolean') && typeof accounting.prepared_input === 'boolean');
+    demand([
+      'native_tokenizer',
+      'utf8_byte_tokens',
+      'reference_tokens',
+      'conservative_utf8_bytes',
+      'backend_token_counter'
+    ].includes(basis) && (accounting.exact === null || typeof accounting.exact === 'boolean') && typeof accounting.prepared_input === 'boolean');
     demand(basis === 'backend_token_counter' ? accounting.exact === null : accounting.exact === (basis !== 'conservative_utf8_bytes'));
     const active = integer(capacity.max_concurrency, 1, 32), queued = integer(capacity.max_queue_size, 0, 65536), batch = integer(capacity.max_batch_size, 1, 4096);
     const batchTokens = capacity.max_batch_tokens === null ? null : integer(capacity.max_batch_tokens, 1);

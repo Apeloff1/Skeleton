@@ -632,6 +632,31 @@ def _chat_request_digest_candidates(request: AIChatRequest) -> set[str]:
                 ).encode()
             ).hexdigest()
         )
+        # The original v1 request identity omitted optional execution selectors
+        # altogether. Only accept that exact historical form when no extra
+        # semantics are supplied; otherwise it could alias distinct requests.
+        if (
+            not request.attachment_refs
+            and request.provider_id is None
+            and request.model_id is None
+            and request.max_output_tokens is None
+            and request.temperature is None
+        ):
+            original_payload = {
+                "schema_version": "backend.ai.chat-request.v1",
+                "message": request.message,
+                "idempotency_key": request.idempotency_key,
+                "context_sha256": payload["context_sha256"],
+                "memory_policy": payload["memory_policy"],
+            }
+            candidates.add(
+                hashlib.sha256(
+                    json.dumps(
+                        original_payload, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+            )
     return candidates
 
 
@@ -754,6 +779,7 @@ async def _replayed_cooperation(*, thread, user_message, assistant_message, tena
     try:
         if policy is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
             if command is None:
@@ -830,6 +856,7 @@ async def _terminal_chat_evidence(
             code = None
         if command is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
         cooperation = cooperation_progress_projection(status, command=command)
@@ -1628,6 +1655,7 @@ async def _prepare_new_chat_execution(
         ]
     dependencies = await inherit_history_dependencies(
         dependencies,
+        authority=conversation_authority,
         thread=thread,
         transcript=transcript,
         selected_segments=context.selected_segments,
@@ -1668,7 +1696,7 @@ async def _prepare_new_chat_execution(
     metadata = prepare_metadata(
         command, request_digest=_chat_request_digest(request), dependencies=dependencies
     )
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     return message, metadata
 
 
@@ -1945,6 +1973,7 @@ async def ai_chat(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread,
         user_message=user_message,
         tenant_id=tenant_id,
@@ -1953,8 +1982,19 @@ async def ai_chat(
     )
     if prepared_command is None:
         # Validate an existing legacy binding, but never synthesize a replacement
-        # for the old USER-before-command crash window.
-        await conversation_authority.user_engine_command(
+        # for the old USER-before-command crash window. Reference authorities
+        # without a legacy command store must fail closed, not crash with
+        # AttributeError or silently start a second engine execution.
+        legacy_command_reader = getattr(conversation_authority, "user_engine_command", None)
+        if not callable(legacy_command_reader):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "legacy_command_not_admitted",
+                    "message": "The exact original legacy command is unavailable; it cannot be reconstructed or replaced.",
+                },
+            )
+        await legacy_command_reader(
             thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
         )
         try:
@@ -1983,7 +2023,8 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -2161,7 +2202,8 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
-                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                        authority=conversation_authority,
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -2556,7 +2598,8 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
-                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                authority=conversation_authority,
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -2821,6 +2864,7 @@ async def get_ai_chat_turn(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if prepared_command is not None and chat_turn is None:
@@ -3065,7 +3109,8 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
     try:
         _validate_chat_handoff_binding(
@@ -3570,6 +3615,7 @@ async def cancel_ai_chat_turn(
         }
 
     metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if metadata is not None:
@@ -3920,7 +3966,7 @@ async def configure_ai_learning_checkpoint(
 
 @router.get("/workflow-templates")
 async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
-    """Project bounded draft settings without starting or authorizing work."""
+    """Expose scoped draft settings without granting execution authority."""
     from skeleton.contracts.ai_workflows import workflow_template_catalog
 
     tenant_id, actor_id = _chat_identity(user)
@@ -4077,6 +4123,7 @@ async def resume_ai_chat_turn(
         raise HTTPException(status_code=404, detail="Chat turn not found")
     require_writable_tip(thread, transcript, message)
     metadata, command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id
     )
     if command is None:
@@ -4101,7 +4148,7 @@ async def resume_ai_chat_turn(
             "server_resume_available": False,
             "cancellation_requested": True,
         }
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     if command_expired(command):
         raise HTTPException(
             status_code=409,
@@ -4149,7 +4196,7 @@ async def resume_ai_chat_turn(
             await conversation_authority.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id),
             message,
         )
-        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
         await chat_turn_lifecycle.advance(
             turn,
             TurnState.MODEL_RUNNING,

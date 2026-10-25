@@ -21,6 +21,7 @@ def test_mirror_room_registry_mount_exposes_read_only_observatory_routes() -> No
         "/api/mirror-room/file-tree",
         "/api/mirror-room/observatory",
     }
+    assert expected <= set(report["mounted_paths"]["routes.mirror_room"])
     assert expected <= paths.keys()
     for path in expected:
         assert set(paths[path]) == {"get"}, f"observatory route is not read-only: {path}"

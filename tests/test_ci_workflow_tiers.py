@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -12,6 +13,21 @@ from scripts.check_ci_workflow_tiers import ROOT, audit, events
 class WorkflowTierTests(unittest.TestCase):
     def test_repo_tiers_are_consistent(self):
         self.assertEqual(audit(ROOT), [])
+
+    def test_masterplan_workflow_references_resolve(self):
+        """Signed masterplan evidence paths must continue to name real workflows."""
+        masterplan = json.loads(
+            (ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8")
+        )
+        referenced = set(re.findall(
+            r"\.github/workflows/[A-Za-z0-9._-]+\.ya?ml",
+            json.dumps(masterplan),
+        ))
+        self.assertTrue(referenced, "masterplan must retain workflow evidence")
+        missing = sorted(
+            path for path in referenced if not (ROOT / path).is_file()
+        )
+        self.assertEqual(missing, [], "masterplan references missing workflows")
 
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})

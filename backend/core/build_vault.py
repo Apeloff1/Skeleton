@@ -59,14 +59,18 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
 # plenty of headroom. Override by setting GALAXY_BUILDS_VAULT_DIR in .env
 # if you really want persistence across restarts.
 #
-# ★ 2026-05 FIX: switched default to PERSISTENT location at
-# /app/backend/data/builds_vault. User explicitly wants files preserved
+# ★ 2026-10 FIX: durable default matches backend_data:/app/data mount.
+# /app/backend/data was on the read-only image filesystem and silently
+# redirected the vault to the 64 MiB /tmp tmpfs. Admission required 64 MiB
+# free and could therefore never start a real build.
+# Switched default to PERSISTENT location at
+# /app/data/builds_vault. User explicitly wants files preserved
 # across pod restarts ("Build does not find files" → root-caused to /tmp
 # eviction). Compression keeps space cost low (~10:1, ~190 MB per 31k-file
 # build). If disk pressure becomes a problem we can add TTL cleanup or
 # move shards to S3. NEVER ship /tmp default again.
 BUILDS_ROOT = _resolve_writable_dir(
-    os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/backend/data/builds_vault"),
+    os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/data/builds_vault"),
     "/tmp/galaxy_builds_vault",
 )
 

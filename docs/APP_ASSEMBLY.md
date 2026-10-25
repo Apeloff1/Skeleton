@@ -128,6 +128,16 @@ python -m skeleton app doctor
 python -m skeleton app doctor --live --json
 ```
 
+On a live full installation, the installer now requires both reachable service
+health endpoints and the backend's canonical critical-router inventory. The
+`critical-api-routes` receipt phase fails if any designated first-party API
+router failed to mount or registration cannot be observed. Inspect
+`/api/health/registry` and `app doctor --live --json`: the
+`critical_routes.observed` and `critical_routes.ready` fields must both be
+`true`, with `critical_routes.missing` empty and `services_ready` true.
+This is separate from trained-model availability, crawler admission, native
+Windows binary verification, and first-install/playthrough acceptance.
+
 The installer does not silently install Docker or elevate privileges. Missing
 host dependencies fail closed with a remediation message. Setup writes only to
 the ignored local `.env` file; installer receipts contain key names and phase

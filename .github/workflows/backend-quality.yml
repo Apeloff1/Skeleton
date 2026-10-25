@@ -182,6 +182,28 @@ jobs:
             skeleton/testing/test_operation_runtime.py
           python scripts/check_jeeves_agent_mirror.py
 
+      - name: Jeeves source-bound asset compilers and exact Godot candidate checks
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python -m compileall -q \
+            skeleton/jeeves/ai/studio_world_chunks.py \
+            skeleton/jeeves/ai/studio_world_spatial_index.py \
+            skeleton/jeeves/ai/studio_world_streamer_godot.py
+          python -m pytest -q --noconftest \
+            skeleton/testing/test_jeeves_studio_asset_compilers_2026.py \
+            skeleton/testing/test_jeeves_studio_mesh_lod_2026.py \
+            skeleton/testing/test_jeeves_studio_mesh_physics_2026.py \
+            skeleton/testing/test_jeeves_studio_mesh_placements_2026.py \
+            skeleton/testing/test_jeeves_studio_native_mesh_probe_2026.py \
+            skeleton/testing/test_jeeves_studio_world_spatial_index_2026.py \
+            skeleton/testing/test_jeeves_studio_world_chunks_2026.py \
+            skeleton/testing/test_jeeves_studio_world_streamer_2026.py \
+            skeleton/testing/test_jeeves_studio_world_streaming_activation_2026.py \
+            skeleton/testing/test_jeeves_studio_world_streaming_native_probe_2026.py
       - name: Frontier expedition playable multi-route world and Forge Studio
         if: steps.scope.outputs.full == 'true'
         working-directory: .
@@ -275,7 +297,9 @@ jobs:
             tests/test_game_frontier_campaign_seven_audits.py \
             tests/test_game_frontier_navigation_advanced.py \
             tests/test_game_frontier_world_assurance.py \
-            tests/test_game_frontier_postproduction.py
+            tests/test_game_frontier_postproduction.py \
+            tests/test_game_frontier_campaign_delivery.py \
+            tests/test_original_campaign_cli.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .

@@ -15,12 +15,12 @@ on:
 permissions:
   contents: read
 
-# Each PR retains an isolated merge-critical required check. Main pushes share
-# one integration lane, so superseded commits cannot accumulate stale runs.
-# Independent security/provenance checks remain unchanged.
+# An updated PR may supersede only its own prior checks. Main SHA runs keep
+# independent immutable evidence: cancelling one must never erase a main
+# verification required for provenance and rollback.
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: merge-readiness-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTHON_VERSION: "3.11.16"
@@ -137,8 +137,6 @@ jobs:
           tests/test_model_runtime.py
           tests/test_model_routing.py
           skeleton/testing/test_frontier_observability_correlation.py
-          --deselect tests/test_cross_subsystem_integration.py::test_boundary_api__retrieval__rag__fusion__provenance_happy_path
-          --deselect tests/test_cross_subsystem_integration.py::test_boundary_api_gate__retrieval_state_rejects_invalid_seal_without_mutation
 
   quality_security:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
@@ -206,6 +204,12 @@ jobs:
           skeleton/pr_automation
           skeleton/automation
           skeleton/repo_machine
+      # Run the isolated custody test before the long automation matrix.
+      # The complete matrix may be cancelled by unrelated repository pressure.
+      - name: Verify fail-closed traffic dispatch custody
+        env:
+          PYTHONPATH: "."
+        run: python -m unittest discover -s tests -p "test_traffic_dispatch_workflow.py" -v
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
       - name: Validate runner v2 privileged contract
@@ -275,6 +279,7 @@ jobs:
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
+          tests/test_traffic_dispatch_workflow.py
           skeleton/testing/test_bot_manager.py
           skeleton/testing/test_architecture_index_completeness.py
           skeleton/testing/test_consensus.py
@@ -339,10 +344,8 @@ jobs:
 
   advisory_known_reds:
     # NOT a Merge Readiness lane (deliberately absent from readiness.needs), so
-    # it never gates merges. It keeps the two pre-existing reds that #4109's
-    # restored lanes surfaced visible while their owners fix them:
-    #   https://github.com/Apeloff1/Skeleton/issues/4131 (Unit, until 2026-10-24)
-    #   https://github.com/Apeloff1/Skeleton/issues/4132 (Integration Smoke, until #4129)
+    # it never gates merges. Keep only the unresolved #4131 Unit advisory;
+    # retrieval startup (#4132) is restored to required Integration Smoke.
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Advisory Known Reds
     runs-on: ubuntu-latest
@@ -373,15 +376,6 @@ jobs:
         run: >-
           .advisory/bin/python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_engine_handoff_recovery.py --tb=short
-      - name: "Advisory #4132: boundary API retrieval startup tests (Integration Smoke)"
-        if: ${{ !cancelled() }}
-        env:
-          PYTHONPATH: "."
-          GF_SEAL_SECRET: "integration-matrix-ci-secret"
-        run: >-
-          .advisory/bin/python -m pytest -q --noconftest
-          "tests/test_cross_subsystem_integration.py::test_boundary_api__retrieval__rag__fusion__provenance_happy_path"
-          "tests/test_cross_subsystem_integration.py::test_boundary_api_gate__retrieval_state_rejects_invalid_seal_without_mutation"
 
   readiness:
     name: Merge Readiness

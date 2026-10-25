@@ -187,6 +187,9 @@ def ai_chat_turn_test_authority(request: pytest.FixtureRequest, monkeypatch):
         async def get_operation(self, operation_id, **kwargs):
             return self.repo.get_operation(operation_id, **kwargs)
 
+        async def reconstruct(self, operation_id, **kwargs):
+            return self.repo.reconstruct(operation_id, **kwargs)
+
         async def append_event(self, event, **kwargs):
             return self.repo.append_event(event, **kwargs)
 

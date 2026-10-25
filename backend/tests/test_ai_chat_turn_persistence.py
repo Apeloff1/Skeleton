@@ -73,7 +73,7 @@ def _expression_operand(doc, operand, now):
 
 
 def _matches_expression(doc, expression):
-    # Mongo evaluates $NOW at the server's comparison point. Tests freeze the
+    # Mongo evaluates $$NOW at the server's comparison point. Tests freeze the
     # authority clock, so the fake storage uses that same deterministic clock.
     from core import chat_turns as chat_turn_module
 
@@ -884,3 +884,12 @@ async def test_future_preparation_is_retained_for_inspection():
     with pytest.raises(ChatTurnCorruption, match="sequence gap"):
         await authority.get_operation(turn.snapshot.operation_id, tenant_id=TENANT, owner_id=OWNER)
     assert authority.events.docs[prepared["_id"]] == prepared
+
+
+def test_fake_mongo_server_clock_uses_double_dollar_now():
+    """Lease fences must compare against server time, not a missing field."""
+    from core import chat_turns as turn_module
+
+    doc = {"lease_expires_at": turn_module._utcnow() + timedelta(seconds=10)}
+    assert _expression_operand(doc, "$$NOW", turn_module._utcnow()) is not None
+    assert _expression_operand(doc, "$NOW", turn_module._utcnow()) is None

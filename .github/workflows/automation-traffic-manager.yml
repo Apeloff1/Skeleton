@@ -186,7 +186,25 @@ jobs:
             echo "::error::Admission identity differs from traffic decision custody."
             exit 1
           }
-          expected_fingerprint=$(python -c 'import os; from skeleton.automation.traffic_manager import decision_identity_fingerprint; print(decision_identity_fingerprint(os.environ["GITHUB_REPOSITORY"], os.environ["TRAFFIC_DECISION_BASE_SHA"], int(os.environ["TRAFFIC_DECISION_OBSERVED_AT"])))')
+          # Keep the actions:write dispatch runner checkout-free. Verify the
+          # admission fingerprint with the standard library and the exact
+          # canonical format used by traffic_manager.decision_identity_fingerprint.
+          expected_fingerprint=$(python - <<'PY'
+          import hashlib
+          import json
+          import os
+
+          payload = {
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "base_sha": os.environ["TRAFFIC_DECISION_BASE_SHA"].lower(),
+              "observed_at": int(os.environ["TRAFFIC_DECISION_OBSERVED_AT"]),
+          }
+          canonical = json.dumps(
+              payload, sort_keys=True, separators=(",", ":")
+          ).encode("utf-8")
+          print(hashlib.sha256(canonical).hexdigest())
+          PY
+          )
           test "$expected_fingerprint" = "$TRAFFIC_DECISION_FINGERPRINT" || {
             echo "::error::Traffic decision fingerprint failed independent verification."
             exit 1

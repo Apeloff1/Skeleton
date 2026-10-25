@@ -1,99 +1,928 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from uuid import NAMESPACE_URL, uuid4, uuid5
+
 import pytest
-from backend.tests.chat_runtime_fixtures import chat_http_client as chat_http_client
-from backend.tests.chat_runtime_fixtures import chat_runtime as chat_runtime
-from fastapi import HTTPException
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-from core.engine_client import EngineUnavailableError
+from core.engine_client import EngineClientConfig, EngineNotFoundError, EngineUnavailableError
+from skeleton.contracts.conversation import (
+    ConversationAuthorType,
+    ConversationMessage,
+    ConversationThread,
+    ConversationThreadState,
+)
 
 
-def test_configured_chat_routes_through_engine_and_commits_engine_lineage(chat_runtime, chat_http_client, monkeypatch):
-    h = chat_runtime
+def _now():
+    return datetime(2026, 9, 25, 7, 0, tzinfo=timezone.utc)
 
-    async def forbidden_legacy(*args, **kwargs):
-        raise AssertionError("backend provider must not execute")
 
-    monkeypatch.setattr(h.route, "call_llm", forbidden_legacy)
-    response = chat_http_client.post("/ai/chat", json=h.request().model_dump(mode="json"))
-    assert response.status_code == 200, response.text
-    result = response.json()
-    assert result["success"] and result["provider"] == "skeleton-engine"
-    command = h.engine.commands[0]
-    assistant = h.transcript()[-1]
-    assert assistant.operation_id == command.operation.operation_id
-    assert assistant.ai_result_id == "engine-result:" + command.execution_request.execution_id
-    assert assistant.provider_receipt_refs == h.engine.provider_receipts
-    assert command.operation.tenant_id == "tenant-a" and command.operation.actor_id == "owner-a"
+def _thread(*, version: int = 1, sequence: int = 0) -> ConversationThread:
+    return ConversationThread(
+        thread_id=str(uuid4()),
+        tenant_id="default",
+        owner_id="anonymous",
+        created_at=_now(),
+        updated_at=_now(),
+        version=version,
+        message_sequence=sequence,
+        active_branch_id=str(uuid4()),
+        state=ConversationThreadState.ACTIVE,
+        title="Engine cutover",
+    )
+
+
+@pytest.fixture
+def route(monkeypatch):
+    import routes.ai as ai
+    import routes.gameforge_auth as auth
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
+    from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
+
+    class _AsyncChatTurnAuthority:
+        def __init__(self, repository):
+            self.repository = repository
+
+        def __getattr__(self, name):
+            target = getattr(self.repository, name)
+
+            async def invoke(*args, **kwargs):
+                return target(*args, **kwargs)
+
+            return invoke
+
+    turn_repository = SQLiteChatTurnRepository()
+    monkeypatch.setattr(auth, "_enforced", lambda: False)
+    monkeypatch.setattr(
+        ai,
+        "chat_turn_lifecycle",
+        ChatTurnLifecycle(_AsyncChatTurnAuthority(turn_repository)),
+    )
+    yield ai
+    turn_repository.close()
+
+
+@pytest.fixture
+def client(route):
+    app = FastAPI()
+    app.include_router(route.router)
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def _install_prepared_cutover(
+    route, monkeypatch, *, initial, after_user, user_message, prior,
+    commit_assistant_message, engine,
+):
+    """Keep these engine tests on the new atomic admission/replay boundary."""
+    from dataclasses import replace
+    import uuid as native_uuid
+    from core.model_catalog import CATALOG_SCHEMA
+
+    past = tuple(prior)
+    first_thread = replace(initial, message_sequence=len(past))
+    state = {"user": None, "metadata": None, "dispatch": "ready", "terminal": None}
+
+    class PinnedUserIdentity:
+        def __getattr__(self, name):
+            return getattr(native_uuid, name)
+
+        def uuid4(self):
+            return native_uuid.UUID(user_message.message_id)
+
+    async def get_thread(*_args, **_kwargs):
+        return first_thread if state["user"] is None else after_user
+
+    async def active_transcript(*_args, **_kwargs):
+        return past if state["user"] is None else (*past, state["user"])
+
+    async def append_message(message, *, execution_metadata, **_kwargs):
+        assert state["user"] is None
+        assert message.message_id == user_message.message_id
+        assert "chat-prepared-execution:v1" in message.attachment_refs
+        assert ("chat-request-sha256:" + execution_metadata["request_digest"]) in message.attachment_refs
+        state["user"], state["metadata"] = message, execution_metadata
+        return after_user, message
+
+    async def chat_execution(_thread_id, message_id, **_kwargs):
+        assert state["user"] is not None
+        assert message_id == state["user"].message_id
+        return state["metadata"]
+
+    async def chat_dispatch(_thread_id, message_id, *, record_digest, action="read", **_kwargs):
+        assert state["user"] is not None
+        assert state["user"].message_id == message_id
+        assert state["metadata"]["record_digest"] == record_digest
+        if action == "claim" and state["dispatch"] in {"ready", "submitting"}:
+            state["dispatch"] = "submitting"
+        elif action == "admitted" and state["dispatch"] in {"submitting", "admitted"}:
+            state["dispatch"] = "admitted"
+        elif action != "read":
+            raise AssertionError("invalid dispatch transition")
+        return {"state": state["dispatch"], "cancel_requested": False}
+
+    async def empty(*_args, **_kwargs):
+        return ()
+
+    async def initialized():
+        return None
+
+    async def catalog(*_args, **_kwargs):
+        return {
+            "schema_version": CATALOG_SCHEMA,
+            "available": True,
+            "automatic_available": True,
+            "models": [{
+                "provider_id": "local", "model_id": "cutover-fixture",
+                "active": True, "fallback": False, "selectable": True,
+                "tokenizer": "utf8_" + "bytes_upper_bound",
+                "context_window": 8192, "max_output_tokens": 2048,
+                "default_output_tokens": 512, "supports_temperature": False,
+            }],
+        }
+
+    async def no_direct_memory(*_args, **_kwargs):
+        raise AssertionError("test engine must not directly admit memory storage")
+
+    async def submit(command):
+        state["terminal"] = await engine.execute(command)
+        return {
+            "operation_id": command.operation.operation_id,
+            "execution_id": command.execution_request.execution_id,
+            "state": "admitted",
+        }
+
+    def validate_ack(ack, command):
+        assert ack["operation_id"] == command.operation.operation_id
+        assert ack["execution_id"] == command.execution_request.execution_id
+
+    async def terminal(**_kwargs):
+        if state["terminal"] is None:
+            raise EngineNotFoundError("not submitted")
+        return state["terminal"]
+
+    engine.admit_storage_write = no_direct_memory
+    engine.reconcile_governed_write = no_direct_memory
+    engine.submit = submit
+    engine._validate_ack_identity = validate_ack
+    engine.wait_for_terminal = terminal
+    monkeypatch.setattr(route, "uuid", PinnedUserIdentity())
+    monkeypatch.setattr(route, "initialize_chat_runtime", initialized)
+    monkeypatch.setattr(route, "model_catalog", catalog)
+    monkeypatch.setattr(
+        route, "conversation_authority",
+        SimpleNamespace(
+            get_thread=get_thread, active_transcript=active_transcript,
+            append_message=append_message, chat_execution=chat_execution,
+            chat_dispatch=chat_dispatch, dragon_context_segments=empty,
+            chat_history_dependencies=empty,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+    monkeypatch.setattr(
+        route.EngineClient, "from_env", classmethod(lambda cls, **_kwargs: engine)
+    )
+
+
+def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    prior_user = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="prior-user",
+        content="prior question",
+    )
+    prior_assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="prior-assistant",
+        content="prior answer",
+        parent_message_id=prior_user.message_id,
+        causal_user_message_id=prior_user.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="provider-result:legacy:prior",
+    )
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=3,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="engine-client-1",
+        content="new question",
+        parent_message_id=prior_assistant.message_id,
+    )
+    after_user = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=_now(),
+        version=2,
+        message_sequence=3,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    operation_id = str(
+        uuid5(
+            NAMESPACE_URL,
+            "skeleton-ai-chat:" + initial.thread_id + ":" + user_message.message_id,
+        )
+    )
+    execution_id = str(
+        uuid5(
+            NAMESPACE_URL,
+            "skeleton-ai-chat-execution:" + operation_id,
+        )
+    )
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=4,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="engine-client-1:assistant",
+        content="engine answer",
+        parent_message_id=user_message.message_id,
+        causal_user_message_id=user_message.message_id,
+        operation_id=operation_id,
+        ai_result_id="engine-result:" + execution_id,
+        provider_receipt_refs=("provider:local:response-1",),
+    )
+    committed = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=_now(),
+        version=3,
+        message_sequence=4,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    captured = {}
+
+    async def append_user_message(*args, **kwargs):
+        return after_user, user_message
+
+    async def active_transcript(*args, **kwargs):
+        return prior_user, prior_assistant, user_message
+
+    async def commit_assistant_message(thread_id, **kwargs):
+        captured["commit"] = {"thread_id": thread_id, **kwargs}
+        return committed, assistant
+
+    async def legacy_provider_must_not_run(*args, **kwargs):
+        raise AssertionError(
+            "configured engine path must not execute backend provider facade"
+        )
+
+    class FakeEngineClient:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_principal="codedock-backend",
+            execution_timeout_s=5,
+        )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
+
+        async def execute(self, command):
+            captured["command"] = command
+            return SimpleNamespace(
+                operation_id=command.operation.operation_id,
+                execution_id=command.execution_request.execution_id,
+                final_output="engine answer",
+                verification="verification:engine-test",
+                evidence_refs=("evidence:engine-test",),
+                provider_receipts=("provider:local:response-1",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
+            )
+
+    fake_client = FakeEngineClient()
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: fake_client),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+    monkeypatch.setattr(route, "call_llm", legacy_provider_must_not_run)
+
+    _install_prepared_cutover(
+        route, monkeypatch, initial=initial, after_user=after_user,
+        user_message=user_message, prior=(prior_user, prior_assistant),
+        commit_assistant_message=commit_assistant_message,
+        engine=FakeEngineClient(),
+    )
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "new question",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "engine-client-1",
+            "expected_thread_version": 1,
+            "context": "ephemeral code evidence",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    command = captured["command"]
+    assert command.operation.operation_id == operation_id
+    assert command.execution_request.execution_id == execution_id
+    assert command.operation.actor_id == "anonymous"
+    assert command.operation.tenant_id == "default"
     assert command.operation.capability == "assistant.chat"
     assert command.execution_request.context_policy["verification_profile"] == "assistant_proposal"
     assert command.delegated_authority.service_principal == "codedock-backend"
-    assert command.compiled_context.context_id == result["context"]["context_id"]
-    assert command.compiled_context.context_digest == result["context"]["context_digest"]
-    assert "conversation:" + h.thread.thread_id in command.context_seed_refs
-    assert command.compiled_context.prompt == h.request().message
-    assert "memory_write_intent" not in command.execution_request.context_policy
+    assert command.compiled_context.context_id == body["context"]["context_id"]
+    assert command.compiled_context.context_digest == body["context"]["context_digest"]
+    assert command.compiled_context.history[:2] == (
+        ("user", "prior question"),
+        ("assistant", "prior answer"),
+    )
+    assert len(command.compiled_context.history) == 3
+    evidence_role, evidence_text = command.compiled_context.history[2]
+    assert evidence_role == "user"
+    assert "BEGIN UNTRUSTED CONTEXT DATA" in evidence_text
+    assert "kind=artifact" in evidence_text
+    assert "ephemeral code evidence" in evidence_text
+    assert "END UNTRUSTED CONTEXT DATA" in evidence_text
+    assert "conversation:" + initial.thread_id in command.context_seed_refs
+    assert any(
+        ref.startswith("ephemeral-context-sha256:")
+        for ref in command.context_seed_refs
+    )
+    assert captured["commit"]["ai_result_id"] == "engine-result:" + execution_id
+    assert captured["commit"]["operation_id"] == operation_id
+    assert captured["commit"]["provider_receipt_refs"] == (
+        "provider:local:response-1",
+    )
+    assert body["success"] is True
+    assert body["response"] == "engine answer"
+    assert body["provider"] == "skeleton-engine"
+    assert body["model"] == "engine-routed"
+    assert body["provider_request_id"] is None
+    assert body["engine_execution_id"] == execution_id
+    assert body["engine_verification"] == "verification:engine-test"
+    assert body["engine_evidence_refs"] == ["evidence:engine-test"]
+    assert body["engine_provider_receipts"] == [
+        "provider:local:response-1"
+    ]
+    assert body["engine_runtime_provider"] == "local"
+    assert body["assistant_message"]["provider_receipt_refs"] == [
+        "provider:local:response-1"
+    ]
+    assert "memory_write_intent" not in (
+        command.execution_request.context_policy
+    )
     assert "engine:memory" not in command.delegated_authority.scopes
-    assert result["model"] == "engine-routed" and result["provider_request_id"] is None
-    assert result["engine_execution_id"] == command.execution_request.execution_id
 
 
-@pytest.mark.asyncio
-async def test_configured_engine_outage_never_falls_back_to_backend_provider(chat_runtime, monkeypatch):
+def test_configured_engine_outage_never_falls_back_to_backend_provider(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="engine-outage",
+        content="question",
+    )
+    after_user = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=_now(),
+        version=2,
+        message_sequence=1,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    committed = {"assistant": 0, "legacy": 0}
+
+    async def append_user_message(*args, **kwargs):
+        return after_user, user_message
+
+    async def active_transcript(*args, **kwargs):
+        return (user_message,)
+
+    async def commit_assistant_message(*args, **kwargs):
+        committed["assistant"] += 1
+        raise AssertionError("failed engine execution must not commit assistant")
+
+    async def legacy_provider(*args, **kwargs):
+        committed["legacy"] += 1
+        raise AssertionError("engine outage must not invoke local provider")
+
+    class OfflineEngineClient:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            execution_timeout_s=5,
+        )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
+
+        async def execute(self, command):
+            raise EngineUnavailableError("offline")
+
+    offline = OfflineEngineClient()
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: offline),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+    monkeypatch.setattr(route, "call_llm", legacy_provider)
+
+    _install_prepared_cutover(
+        route, monkeypatch, initial=initial, after_user=after_user,
+        user_message=user_message, prior=(),
+        commit_assistant_message=commit_assistant_message,
+        engine=OfflineEngineClient(),
+    )
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "question",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "engine-outage",
+            "expected_thread_version": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_code"] == "engine_unavailable"
+    assert body["provider"] == "skeleton-engine"
+    assert committed["assistant"] == 0
+    assert committed["legacy"] == 0
+    assert body["user_message"]["message_id"] == user_message.message_id
+    assert body["thread"]["version"] == 2
+
+
+
+def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="memory-opt-in",
+        content="remember my preference",
+    )
+    after_user = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=_now(),
+        version=2,
+        message_sequence=1,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    captured = {}
+
+    async def append_user_message(*_args, **_kwargs):
+        return after_user, user_message
+
+    async def active_transcript(*_args, **_kwargs):
+        return (user_message,)
+
+    async def commit_assistant_message(thread_id, **kwargs):
+        captured["commit"] = {"thread_id": thread_id, **kwargs}
+        assistant = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=initial.thread_id,
+            branch_id=initial.active_branch_id,
+            sequence=2,
+            author_type=ConversationAuthorType.ASSISTANT,
+            created_at=_now(),
+            idempotency_key=kwargs["idempotency_key"],
+            content=kwargs["content"],
+            parent_message_id=user_message.message_id,
+            causal_user_message_id=user_message.message_id,
+            operation_id=kwargs["operation_id"],
+            ai_result_id=kwargs["ai_result_id"],
+            memory_refs=tuple(kwargs.get("memory_refs") or ()),
+        )
+        committed = ConversationThread(
+            thread_id=initial.thread_id,
+            tenant_id=initial.tenant_id,
+            owner_id=initial.owner_id,
+            created_at=initial.created_at,
+            updated_at=_now(),
+            version=3,
+            message_sequence=2,
+            active_branch_id=initial.active_branch_id,
+            state=initial.state,
+            title=initial.title,
+            data_class=initial.data_class,
+        )
+        return committed, assistant
+
+    class FakeEngineClient:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_principal="codedock-backend",
+            execution_timeout_s=5,
+        )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
+
+        async def execute(self, command):
+            captured["command"] = command
+            return SimpleNamespace(
+                operation_id=command.operation.operation_id,
+                execution_id=command.execution_request.execution_id,
+                final_output="You prefer concise answers.",
+                verification="verification:memory-policy",
+                evidence_refs=(),
+                provider_receipts=("provider:local:memory-policy",),
+                tool_receipts=(),
+                memory_refs=("memory:preference-1",),
+                artifact_refs=(),
+            )
+
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: FakeEngineClient()),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+
+    _install_prepared_cutover(
+        route, monkeypatch, initial=initial, after_user=after_user,
+        user_message=user_message, prior=(),
+        commit_assistant_message=commit_assistant_message,
+        engine=FakeEngineClient(),
+    )
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "remember my preference",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "memory-opt-in",
+            "expected_thread_version": 1,
+            "memory_policy": {
+                "persist_verified_response": True,
+                "kind": "preference",
+                "namespace": "assistant",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    command = captured["command"]
+    intent = command.execution_request.context_policy[
+        "memory_write_intent"
+    ]
+    assert intent["subject_id"] == "anonymous"
+    assert intent["namespace"] == "assistant"
+    assert intent["kind"] == "preference"
+    assert intent["content_from"] == "verified_final_output"
+    assert (
+        "user-policy:verified-response-memory"
+        in intent["provenance_refs"]
+    )
+    assert "engine:memory" in command.delegated_authority.scopes
+    assert captured["commit"]["memory_refs"] == (
+        "memory:preference-1",
+    )
+    assert response.json()["assistant_message"]["memory_refs"] == [
+        "memory:preference-1"
+    ]
+
+
+def test_memory_opt_in_without_canonical_engine_fails_closed(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    calls = {"append": 0, "commit": 0, "provider": 0}
+
+    async def append_user_message(*_args, **_kwargs):
+        calls["append"] += 1
+        raise AssertionError("offline engine must never publish an unprepared USER")
+
+    async def get_thread(*_args, **_kwargs):
+        return initial
+
+    async def active_transcript(*_args, **_kwargs):
+        return ()
+
+    async def forbidden_commit(*_args, **_kwargs):
+        calls["commit"] += 1
+        raise AssertionError(
+            "memory opt-in must not commit without canonical engine"
+        )
+
+    async def forbidden_provider(*_args, **_kwargs):
+        calls["provider"] += 1
+        raise AssertionError(
+            "memory opt-in must not use legacy/local provider path"
+        )
+
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: None),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            get_thread=get_thread,
+            active_transcript=active_transcript,
+            commit_assistant_message=forbidden_commit,
+        ),
+    )
+    monkeypatch.setattr(route, "call_llm", forbidden_provider)
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "remember this",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "memory-no-engine",
+            "expected_thread_version": 1,
+            "memory_policy": {
+                "persist_verified_response": True,
+                "kind": "semantic",
+            },
+        },
+    )
+
+    # Engine readiness is checked before atomic USER admission. This is a
+    # scoped 503, never a successful empty chat or an invented legacy response.
+    assert response.status_code == 503
+    body = response.json()
+    assert body["detail"]["code"] == "engine_unavailable"
+    assert calls == {"append": 0, "commit": 0, "provider": 0}
+
+
+def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread(version=3, sequence=2)
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="replay-local",
+        content="question",
+        # Replays must carry the immutable semantics bound when the USER was
+        # originally admitted. A missing binding is correctly rejected 409.
+        attachment_refs=(
+            route._chat_request_identity_ref(
+                route.AIChatRequest(
+                    message="question",
+                    thread_id=initial.thread_id,
+                    idempotency_key="replay-local",
+                    expected_thread_version=1,
+                )
+            ),
+        ),
+    )
+    operation_id = str(uuid4())
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="replay-local:assistant",
+        content="persisted local answer",
+        parent_message_id=user_message.message_id,
+        causal_user_message_id=user_message.message_id,
+        operation_id=operation_id,
+        ai_result_id="engine-result:replay-local",
+        provider_receipt_refs=(
+            "provider:local:persisted-response",
+        ),
+    )
+
+    async def active_transcript(*_args, **_kwargs):
+        return user_message, assistant
+
+    async def append_user_message(*_args, **_kwargs):
+        raise AssertionError("completed replay must not append USER")
+
+    async def get_thread(*_args, **_kwargs):
+        return initial
+
+    class EngineMustNotRun:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_principal="codedock-backend",
+            execution_timeout_s=5,
+        )
+
+        async def execute(self, _command):
+            raise AssertionError("replayed canonical assistant must not rerun engine")
+
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: EngineMustNotRun()),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            get_thread=get_thread,
+        ),
+    )
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "question",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "replay-local",
+            "expected_thread_version": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["replayed"] is True
+    assert body["response"] == "persisted local answer"
+    assert body["engine_runtime_provider"] == "local"
+    assert body["engine_provider_receipts"] == [
+        "provider:local:persisted-response"
+    ]
+    assert body["assistant_message"]["provider_receipt_refs"] == [
+        "provider:local:persisted-response"
+    ]
+
+
+# Consumer runtime regression scenarios retain shared durable authority
+# alongside upstream receipt-aware fixtures. Their helpers remain independent.
+from backend.tests.chat_runtime_fixtures import chat_http_client as chat_http_client
+from backend.tests.chat_runtime_fixtures import chat_runtime as chat_runtime
+from fastapi import HTTPException
+from core.engine_client import EngineUnavailableError
+
+def test_configured_chat_routes_through_engine_and_commits_engine_lineage_consumer_runtime(chat_runtime, chat_http_client, monkeypatch):
     h = chat_runtime
 
     async def forbidden_legacy(*args, **kwargs):
-        raise AssertionError("engine outage must not activate backend provider")
+        raise AssertionError('backend provider must not execute')
+    monkeypatch.setattr(h.route, 'call_llm', forbidden_legacy)
+    response = chat_http_client.post('/ai/chat', json=h.request().model_dump(mode='json'))
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['success'] and result['provider'] == 'skeleton-engine'
+    command = h.engine.commands[0]
+    assistant = h.transcript()[-1]
+    assert assistant.operation_id == command.operation.operation_id
+    assert assistant.ai_result_id == 'engine-result:' + command.execution_request.execution_id
+    assert assistant.provider_receipt_refs == h.engine.provider_receipts
+    assert command.operation.tenant_id == 'tenant-a' and command.operation.actor_id == 'owner-a'
+    assert command.operation.capability == 'assistant.chat'
+    assert command.execution_request.context_policy['verification_profile'] == 'assistant_proposal'
+    assert command.delegated_authority.service_principal == 'codedock-backend'
+    assert command.compiled_context.context_id == result['context']['context_id']
+    assert command.compiled_context.context_digest == result['context']['context_digest']
+    assert 'conversation:' + h.thread.thread_id in command.context_seed_refs
+    assert command.compiled_context.prompt == h.request().message
+    assert 'memory_write_intent' not in command.execution_request.context_policy
+    assert 'engine:memory' not in command.delegated_authority.scopes
+    assert result['model'] == 'engine-routed' and result['provider_request_id'] is None
+    assert result['engine_execution_id'] == command.execution_request.execution_id
 
-    monkeypatch.setattr(h.route, "call_llm", forbidden_legacy)
-    h.engine.submit_error = EngineUnavailableError("offline")
+
+@pytest.mark.asyncio
+async def test_configured_engine_outage_never_falls_back_to_backend_provider_consumer_runtime(chat_runtime, monkeypatch):
+    h = chat_runtime
+
+    async def forbidden_legacy(*args, **kwargs):
+        raise AssertionError('engine outage must not activate backend provider')
+    monkeypatch.setattr(h.route, 'call_llm', forbidden_legacy)
+    h.engine.submit_error = EngineUnavailableError('offline')
     result = await h.route.ai_chat(h.request(), user=h.user)
-    assert result["success"] is False
+    assert result['success'] is False
     assert len(h.transcript()) == 1
 
 
 @pytest.mark.asyncio
-async def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs(chat_runtime):
+async def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs_consumer_runtime(chat_runtime):
     h = chat_runtime
-    h.engine.memory_refs = ("memory:canonical-1",)
-    result = await h.route.ai_chat(
-        h.request(
-            memory_policy={
-                "persist_verified_response": True,
-                "kind": "semantic",
-                "namespace": "assistant",
-            }
-        ),
-        user=h.user,
-    )
-    assert result["success"]
+    h.engine.memory_refs = ('memory:canonical-1',)
+    result = await h.route.ai_chat(h.request(memory_policy={'persist_verified_response': True, 'kind': 'semantic', 'namespace': 'assistant'}), user=h.user)
+    assert result['success']
     command = h.engine.commands[0]
-    assert "engine:memory" in command.delegated_authority.scopes
-    intent = command.execution_request.context_policy["memory_write_intent"]
-    assert intent["subject_id"] == "owner-a" and intent["content_from"] == "verified_final_output"
+    assert 'engine:memory' in command.delegated_authority.scopes
+    intent = command.execution_request.context_policy['memory_write_intent']
+    assert intent['subject_id'] == 'owner-a' and intent['content_from'] == 'verified_final_output'
     assert h.transcript()[-1].memory_refs == h.engine.memory_refs
-    assert result["engine_memory_refs"] == list(h.engine.memory_refs)
+    assert result['engine_memory_refs'] == list(h.engine.memory_refs)
 
 
 @pytest.mark.asyncio
-async def test_memory_opt_in_without_canonical_engine_fails_closed(chat_runtime, monkeypatch):
+async def test_memory_opt_in_without_canonical_engine_fails_closed_consumer_runtime(chat_runtime, monkeypatch):
     h = chat_runtime
-    monkeypatch.setattr(h.route.EngineClient, "from_env", lambda: None)
+    monkeypatch.setattr(h.route.EngineClient, 'from_env', lambda: None)
     with pytest.raises(HTTPException) as error:
-        await h.route.ai_chat(h.request(memory_policy={"persist_verified_response": True}), user=h.user)
+        await h.route.ai_chat(h.request(memory_policy={'persist_verified_response': True}), user=h.user)
     assert error.value.status_code == 503
-    assert error.value.detail["code"] == "engine_unavailable"
+    assert error.value.detail['code'] == 'engine_unavailable'
     assert h.transcript() == ()
 
 
 @pytest.mark.asyncio
-async def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(chat_runtime, monkeypatch):
+async def test_replayed_chat_preserves_local_provider_provenance_without_engine_call_consumer_runtime(chat_runtime, monkeypatch):
     h = chat_runtime
-    h.engine.provider_receipts = ("provider:local:response-1",)
+    h.engine.provider_receipts = ('provider:local:response-1',)
     first = await h.route.ai_chat(h.request(), user=h.user)
-    monkeypatch.setattr(h.route.EngineClient, "from_env", lambda: None)
+    monkeypatch.setattr(h.route.EngineClient, 'from_env', lambda: None)
     replay = await h.route.ai_chat(h.request(), user=h.user)
-    assert replay["replayed"]
-    assert replay["engine_runtime_provider"] == "local"
-    assert replay["engine_provider_receipts"] == first["engine_provider_receipts"]
+    assert replay['replayed']
+    assert replay['engine_runtime_provider'] == 'local'
+    assert replay['engine_provider_receipts'] == first['engine_provider_receipts']
     assert len(h.engine.commands) == 1
