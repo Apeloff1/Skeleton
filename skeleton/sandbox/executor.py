@@ -419,19 +419,37 @@ class GuardedExecutor:
                               redactions=sorted(set(kinds_out) | set(kinds_err)), truncated=result.truncated,
                               duration_s=result.duration_s)
         if self._policy.scan_output and out:
-            report = detect(out, context="prompt")
-            outcome.output_report = report.to_record()
-            outcome.output_flagged = report.score >= self._policy.output_block_threshold
+            try:
+                report = detect(out, context="prompt")
+            except SanitizerError:
+                # The process may have finished, but unscannable output is
+                # not an authorized model input. Retain a bounded audit
+                # outcome rather than bubbling out without a receipt.
+                outcome.status = STATUS_BLOCKED
+                outcome.reason = "tool output could not be safely scanned"
+                outcome.output_report = {"error": "unscannable"}
+                outcome.output_flagged = True
+            else:
+                outcome.output_report = report.to_record()
+                outcome.output_flagged = report.score >= self._policy.output_block_threshold
         return outcome
 
     def _finish(self, request: ToolRequest, outcome: ToolOutcome) -> ToolOutcome:
         safe_args = [redact_secrets(sanitize_text(a[:512], keep_newlines=False))[0] if isinstance(a, str) else "<invalid>" for a in tuple(request.args)[:64]]
+        # Source labels and exception reasons can be controlled by callers.
+        # Apply the same sanitization as argv *before* storing custody data.
+        safe_source = redact_secrets(
+            sanitize_text(str(request.source)[:4096], keep_newlines=False)
+        )[0][:64]
+        safe_reason = redact_secrets(
+            sanitize_text(str(outcome.reason)[:4096], keep_newlines=False)
+        )[0][:200]
         event = {
             "ts": round(time.time(), 3),
             "tool": outcome.tool,
-            "source": str(request.source)[:64],
+            "source": safe_source,
             "status": outcome.status,
-            "reason": outcome.reason[:200],
+            "reason": safe_reason,
             "argv_display": shell_quote(safe_args)[:2048],
             "stdin_sha256": None if request.stdin is None else hashlib.sha256(bytes(request.stdin)).hexdigest(),
             "stdout_sha256": hashlib.sha256(outcome.stdout.encode("utf-8")).hexdigest() if outcome.stdout else None,
