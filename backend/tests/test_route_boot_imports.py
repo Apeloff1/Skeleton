@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import importlib
+import stat
 from pathlib import Path
 
 import pytest
@@ -113,6 +115,39 @@ def test_gameforge_auth_dependency_fails_closed() -> None:
     assert module._viewer is not module._editor
     assert module._viewer.__module__ == "routes.gameforge_auth"
     assert module._editor.__module__ == "routes.gameforge_auth"
+
+
+@pytest.mark.parametrize("kind", ["web", "source"])
+def test_governed_web_and_source_stage_privately_and_cleanup(monkeypatch, kind: str) -> None:
+    from routes import gameforge_build as build
+
+    staged: list[Path] = []
+
+    def guarded_artifact_builder(game_name, **options):
+        assert game_name == "read-only-image"
+        root = Path(options["artifacts_root"])
+        assert root.is_dir()
+        assert root != Path(build._ARTIFACTS)
+        assert stat.S_IMODE(root.stat().st_mode) == 0o700
+        assert options["tenant_id"] == "tenant-isolated"
+        assert options["governed_store"] is sentinel
+        staged.append(root)
+        return {"ok": True, "download_url": "/api/gameforge/build/download/fixture"}
+
+    sentinel = object()
+    with monkeypatch.context() as scoped:
+        scoped.setattr(build, "_governed_store", lambda: sentinel)
+        scoped.setattr(
+            build, "build_web_artifact" if kind == "web" else "build_source_artifact",
+            guarded_artifact_builder,
+        )
+        body = build.BuildBody(game_name="read-only-image")
+        endpoint = build._build_web_for_user if kind == "web" else build._build_source_for_user
+        result = asyncio.run(endpoint(body, {"tenant_id": "tenant-isolated"}))
+
+    assert result["ok"] is True
+    assert len(staged) == 1
+    assert not staged[0].exists()  # cleanup holds on all nonexceptional exits
 
 
 def test_cold_storage_import_does_not_contact_mongo() -> None:
