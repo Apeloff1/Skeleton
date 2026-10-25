@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 import hashlib
 import json
 import os
@@ -53,6 +55,11 @@ def _deployment(tmp_path: Path) -> tuple[Path, Path, Path]:
     model.parent.mkdir()
     model.write_bytes(
         struct.pack("<4sIQQ", b"GGUF", 3, 2, 1)
+        + struct.pack("<Q", len(b"general.architecture"))
+        + b"general.architecture"
+        + struct.pack("<I", 8)
+        + struct.pack("<Q", len(b"llama"))
+        + b"llama"
         + b"operator-owned-model-v1"
     )
     manifest = tmp_path / "deployment.json"
@@ -373,4 +380,3 @@ def test_qualification_rejects_truncated_response(tmp_path: Path) -> None:
             result,
             prompt="qualification",
         )
-

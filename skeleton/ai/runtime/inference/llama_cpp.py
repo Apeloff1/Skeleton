@@ -303,7 +303,9 @@ class LlamaCppConfig:
                     item == flag or item.startswith(flag + "=") for flag in _REMOTE_ACQUISITION_SHORT_FLAGS
                 )
             if remote:
-                raise ValueError(f"extra_args may not enable network access {item}")
+                raise ValueError(
+                    f"extra_args may not enable remote model acquisition or network access {item}"
+                )
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
 

@@ -756,6 +756,11 @@ class GamePlayAuthority:
 
     async def get(self, scope, identifier):
         row = await self._read(scope, identifier)
+        if row["status"] == "queued" and not row.get("cancel_requested"):
+            # A prior dispatch can observe a credit still held by a stopping
+            # player. Reconcile that accepted intent on the owner's next poll;
+            # _schedule still deduplicates tasks and _run claims real capacity.
+            await self._schedule(identifier, scope)
         projection = await self.frames.find_one(
             {
                 "_id": "play:" + identifier,
@@ -781,7 +786,7 @@ class GamePlayAuthority:
             row = await self.plays.find_one(
                 {"_id": identifier, **scope, "status": "queued", "cancel_requested": False}
             )
-            if row is None:
+            if row is None or identifier in self.tasks or len(self.tasks) >= 8:
                 return
             task = asyncio.create_task(self._run(identifier, scope))
             self.tasks[identifier] = task

@@ -11,6 +11,8 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
@@ -27,6 +29,22 @@ def _backend(seed: int = 41) -> NativeRuntimeLocalModel:
         dim=8, ctx=96, seed=seed, n_heads=2, n_layers=2, d_ff=16,
     ))
     return NativeRuntimeLocalModel(runtime)
+
+
+def _gguf_backend_fixture(directory: str):
+    """Bind a tiny real GGUF header; inference itself remains patched per case."""
+    import struct
+    import sys
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppConfig, LlamaCppModel
+
+    model_path = Path(directory) / "fixture.gguf"
+    model_path.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 1, 0))
+    return LlamaCppModel(LlamaCppConfig(
+        executable=sys.executable,
+        model_path=str(model_path),
+        model_id="test-gguf",
+        context_size=1024,
+    ))
 
 
 class OfflineDesktopPersistenceTests(unittest.TestCase):
@@ -225,11 +243,7 @@ class OfflineDesktopPersistenceTests(unittest.TestCase):
     def test_gguf_backend_persists_local_model_bound_answer_and_restarts(self):
         from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
         from skeleton.ai.runtime.inference.local import LocalInferenceResult
-        gguf = object.__new__(LlamaCppModel)
-        gguf.config = SimpleNamespace(context_size=1024)
-        gguf.model_id = "test-gguf"
-        gguf._model = SimpleNamespace(sha256="c" * 64)
-        gguf._runtime = SimpleNamespace(sha256="d" * 64)
+        gguf = _gguf_backend_fixture(self.temp.name)
 
         def fake_gguf(request, cancel):
             return LocalInferenceResult(
@@ -271,11 +285,7 @@ class OfflineDesktopPersistenceTests(unittest.TestCase):
     def test_gguf_missing_process_receipt_is_rejected_and_not_committed(self):
         from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
         from skeleton.ai.runtime.inference.local import LocalInferenceResult
-        gguf = object.__new__(LlamaCppModel)
-        gguf.config = SimpleNamespace(context_size=1024)
-        gguf.model_id = "test-gguf"
-        gguf._model = SimpleNamespace(sha256="c" * 64)
-        gguf._runtime = SimpleNamespace(sha256="d" * 64)
+        gguf = _gguf_backend_fixture(self.temp.name)
         def forged(request, cancel):
             return LocalInferenceResult(
                 text="not bound to subprocess",

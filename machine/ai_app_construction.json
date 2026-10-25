@@ -438,7 +438,10 @@
         "ResumeToken",
         "ChildExecutionRequest",
         "child join policy",
-        "interactive steering command"
+        "interactive steering command",
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS",
+        "bounded admin learner checkpoint export/import/reset/last-healthy restore under exact tenant/model/state+policy CAS with canonical audit receipts; exact named local model cooperation and per-model serving controls",
+        "Admin runtime-control full policy catalog, bounded retained numeric dataset export and exact generation/failure/source-pinned maintenance circuit reset under existing sealed service/tenant boundary"
       ],
       "construction": [
         "make steps idempotent",
@@ -467,7 +470,7 @@
         "child budget/authority/depth tests",
         "interactive interrupt/replace tests"
       ],
-      "failure_mode": "checkpoint and stop safely"
+      "failure_mode": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden"
     },
     {
       "id": "reasoning-verification",
@@ -5604,6 +5607,19 @@
         },
         "validation": "User requests building without tests: source compilation and narrow static checks only; do not run application/model/crawler/build workloads, advance closure evidence or claim runtime/enterprise qualification.",
         "storage_and_authority": "No new durable store, service, provider boundary, capability owner, model promotion or grant. Existing mirror/facade ownership rules remain."
+      },
+      "consumer_installation_verification": {
+        "status": "implementation_candidate",
+        "session_date": "2026-10-23",
+        "report": "docs/ai/CONSUMER_READINESS_2026-10-23.md",
+        "authorization": "The operator explicitly requested installation, all tests, live user workflows and repairs; prior source-only/no-tests observations remain historical.",
+        "scope": [
+          "Fresh authenticated production Compose installation using existing Mongo/engine/backend/frontend owners and persistent volumes",
+          "Existing provider governance/admission/accounting and context compilation; bounded native artifact reads and physical queue custody",
+          "Existing Galaxy role/owner authorization, explicit artifact file limits and persistent build vault; no additional authority or store",
+          "Actual local-model chat/replay, reviewed response stages, scoped crawler capture, studio editing/training/play/export and restart observations"
+        ],
+        "qualification_rule": "Implementation and bounded successful workflows do not establish a clean full-suite result, patched dependency gate, arbitrary console support, transformer quality or enterprise certification. Keep unmet release gates explicit."
       }
     }
   },

@@ -36,3 +36,6 @@
 backend/data/
 backend/artifacts/
 backend/artifacts_media/
+
+# Local runtime journals must never enter an application image.
+**/.runtime/

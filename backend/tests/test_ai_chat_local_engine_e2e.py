@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib
+import json
 import sys
 import threading
 from datetime import datetime, timezone
@@ -12,8 +13,8 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
 import pytest
+from backend.tests.chat_runtime_fixtures import SQLiteAsyncConversationAuthority
 from fastapi import FastAPI, HTTPException
-
 from skeleton.ai.runtime.inference import (
     CallableLocalModel,
     LocalInferenceCancelled,
@@ -21,6 +22,7 @@ from skeleton.ai.runtime.inference import (
     LocalInferenceRequest,
     LocalInferenceResult,
     LocalModelAdapter,
+    ReferenceNGramModel,
 )
 from skeleton.api import engine_routes
 from skeleton.api.engine_authority import (
@@ -38,15 +40,13 @@ from skeleton.contracts.conversation import (
 )
 from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
 from skeleton.persistence.conversation_repository import (
-    ConversationConflict,
-    ConversationNotFound,
     ConversationRepositoryError,
     SQLiteConversationRepository,
 )
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_runtime import ProviderRegistry
 from skeleton.skills.tool_runtime import AsyncToolRuntime
-
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
 
 SERVICE_TOKEN = "local-engine-e2e-" + ("x" * 48)
 TENANT = "default"
@@ -55,157 +55,6 @@ OWNER = "local-e2e@example.invalid"
 
 class ConversationStorageUnavailable(ConversationRepositoryError):
     pass
-
-
-class SQLiteAsyncConversationAuthority:
-    """Async facade over the canonical SQLite conversation reference authority."""
-
-    def __init__(self, repository: SQLiteConversationRepository) -> None:
-        self.repository = repository
-
-    async def active_transcript(
-        self,
-        thread_id: str,
-        *,
-        tenant_id: str,
-        owner_id: str,
-    ):
-        return self.repository.active_transcript(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-
-    async def get_thread(
-        self,
-        thread_id: str,
-        *,
-        tenant_id: str,
-        owner_id: str,
-    ):
-        return self.repository.get_thread(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-
-    async def append_message(
-        self,
-        message,
-        *,
-        tenant_id: str,
-        owner_id: str,
-        expected_thread_version: int,
-    ):
-        return self.repository.append_message(
-            message,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            expected_thread_version=expected_thread_version,
-        )
-
-    async def append_user_message(
-        self,
-        thread_id: str,
-        *,
-        tenant_id: str,
-        owner_id: str,
-        content: str,
-        idempotency_key: str,
-        expected_thread_version: int,
-        parent_message_id: str | None = None,
-        branch_id: str | None = None,
-        supersedes_message_id: str | None = None,
-        attachment_refs: tuple[str, ...] = (),
-        data_class: str = "confidential",
-    ):
-        thread = self.repository.get_thread(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-        message = ConversationMessage(
-            message_id=str(uuid4()),
-            thread_id=thread_id,
-            branch_id=branch_id or thread.active_branch_id,
-            sequence=thread.message_sequence + 1,
-            author_type=ConversationAuthorType.USER,
-            created_at=datetime.now(timezone.utc),
-            idempotency_key=idempotency_key,
-            content=content,
-            parent_message_id=parent_message_id,
-            supersedes_message_id=supersedes_message_id,
-            attachment_refs=attachment_refs,
-            data_class=thread.data_class,
-        )
-        return self.repository.append_message(
-            message,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            expected_thread_version=expected_thread_version,
-        )
-
-    async def commit_assistant_message(
-        self,
-        thread_id: str,
-        *,
-        tenant_id: str,
-        owner_id: str,
-        content: str,
-        idempotency_key: str,
-        expected_thread_version: int,
-        causal_user_message_id: str,
-        operation_id: str,
-        ai_result_id: str,
-        context_id: str | None = None,
-        context_digest: str | None = None,
-        context_source_snapshot: tuple[tuple[str, str], ...] = (),
-        context_compiler_version: str | None = None,
-        branch_id: str | None = None,
-        supersedes_message_id: str | None = None,
-        tool_receipt_refs: tuple[str, ...] = (),
-        provider_receipt_refs: tuple[str, ...] = (),
-        memory_refs: tuple[str, ...] = (),
-        citation_refs: tuple[str, ...] = (),
-        artifact_refs: tuple[str, ...] = (),
-        data_class: str = "confidential",
-    ):
-        thread = self.repository.get_thread(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-        message = ConversationMessage(
-            message_id=str(uuid4()),
-            thread_id=thread_id,
-            branch_id=branch_id or thread.active_branch_id,
-            sequence=thread.message_sequence + 1,
-            author_type=ConversationAuthorType.ASSISTANT,
-            created_at=datetime.now(timezone.utc),
-            idempotency_key=idempotency_key,
-            content=content,
-            parent_message_id=causal_user_message_id,
-            supersedes_message_id=supersedes_message_id,
-            causal_user_message_id=causal_user_message_id,
-            operation_id=operation_id,
-            ai_result_id=ai_result_id,
-            context_id=context_id,
-            context_digest=context_digest,
-            context_source_snapshot=context_source_snapshot,
-            context_compiler_version=context_compiler_version,
-            tool_receipt_refs=tool_receipt_refs,
-            provider_receipt_refs=provider_receipt_refs,
-            memory_refs=memory_refs,
-            citation_refs=citation_refs,
-            artifact_refs=artifact_refs,
-            data_class=thread.data_class,
-        )
-        return self.repository.append_message(
-            message,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            expected_thread_version=expected_thread_version,
-        )
 
 
 class FailAssistantCommitOnceAuthority(SQLiteAsyncConversationAuthority):
@@ -243,8 +92,9 @@ def _load_backend_ai_route(monkeypatch):
     # tests deliberately replace production Mongo conversation storage with
     # SQLite, so isolate the turn journal as well; otherwise the module-global
     # Motor authority can retain an event loop from a previous pytest case.
-    from core.chat_turn_lifecycle import ChatTurnLifecycle
     from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
+
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
 
     class _AsyncChatTurnAuthority:
         def __init__(self, repository):
@@ -268,9 +118,26 @@ def _load_backend_ai_route(monkeypatch):
     return route
 
 
+def _local_fixture_identity(model_id, corpus):
+    """Serialize a tiny real artifact; controlled runners remain test doubles."""
+    model = ReferenceNGramModel.train([corpus], model_id=model_id)
+    artifact = (json.dumps(model.to_dict(), sort_keys=True, separators=(",", ":")) + "\n").encode()
+    artifact_digest = hashlib.sha256(artifact).hexdigest()
+    return model.model_digest, {
+        "schema": "skeleton.reference_ngram.v1",
+        "model_id": model.model_id,
+        "model_digest": model.model_digest,
+        "artifact_sha256": artifact_digest,
+        "artifact_bytes": len(artifact),
+        "reference": "local-model-artifact:" + artifact_digest,
+    }
+
+
 def _local_registry() -> tuple[ProviderRegistry, list[LocalInferenceRequest]]:
     calls: list[LocalInferenceRequest] = []
-    model_digest = hashlib.sha256(b"backend-chat-local-engine-e2e-v1").hexdigest()
+    model_digest, artifact_status = _local_fixture_identity(
+        "backend-chat-local-e2e", "Assembled local engine answer.",
+    )
 
     def runner(
         request: LocalInferenceRequest,
@@ -295,7 +162,8 @@ def _local_registry() -> tuple[ProviderRegistry, list[LocalInferenceRequest]]:
                 model_digest=model_digest,
                 runner=runner,
             )
-        )
+        ),
+        artifact_status=artifact_status,
     )
     return ProviderRegistry([adapter], active="local"), calls
 
@@ -304,9 +172,9 @@ def _gated_local_registry():
     calls: list[LocalInferenceRequest] = []
     entered = threading.Event()
     release = threading.Event()
-    model_digest = hashlib.sha256(
-        b"backend-chat-local-engine-deferred-v1"
-    ).hexdigest()
+    model_digest, artifact_status = _local_fixture_identity(
+        "backend-chat-local-deferred", "Deferred local engine answer.",
+    )
 
     def runner(
         request: LocalInferenceRequest,
@@ -335,7 +203,8 @@ def _gated_local_registry():
                 model_digest=model_digest,
                 runner=runner,
             )
-        )
+        ),
+        artifact_status=artifact_status,
     )
     return (
         ProviderRegistry([adapter], active="local"),
@@ -348,9 +217,9 @@ def _gated_local_registry():
 def _cancel_then_answer_registry():
     calls: list[LocalInferenceRequest] = []
     first_entered = threading.Event()
-    model_digest = hashlib.sha256(
-        b"backend-chat-local-engine-cancel-v1"
-    ).hexdigest()
+    model_digest, artifact_status = _local_fixture_identity(
+        "backend-chat-local-cancel", "Conversation continued after cancellation.",
+    )
 
     def runner(
         request: LocalInferenceRequest,
@@ -379,7 +248,8 @@ def _cancel_then_answer_registry():
                 model_digest=model_digest,
                 runner=runner,
             )
-        )
+        ),
+        artifact_status=artifact_status,
     )
     return ProviderRegistry([adapter], active="local"), calls, first_entered
 
@@ -514,9 +384,11 @@ def test_backend_chat_request_identity_changes_with_execution_semantics(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_backend_chat_incomplete_user_without_engine_execution_submits_once(
+@pytest.mark.parametrize("prepared", [False, True])
+async def test_backend_chat_recovers_only_original_prepared_unsubmitted_command(
     tmp_path,
     monkeypatch,
+    prepared,
 ) -> None:
     route = _load_backend_ai_route(monkeypatch)
     monkeypatch.setenv(
@@ -557,12 +429,10 @@ async def test_backend_chat_incomplete_user_without_engine_execution_submits_onc
         attachment_refs=refs,
         data_class=thread.data_class,
     )
-    conversations.append_message(
-        user_message,
-        tenant_id=TENANT,
-        owner_id=OWNER,
-        expected_thread_version=thread.version,
-    )
+    if not prepared:
+        conversations.append_message(
+            user_message, tenant_id=TENANT, owner_id=OWNER, expected_thread_version=thread.version,
+        )
     authority = SQLiteAsyncConversationAuthority(conversations)
 
     registry, local_calls = _local_registry()
@@ -584,6 +454,41 @@ async def test_backend_chat_incomplete_user_without_engine_execution_submits_onc
     )
     monkeypatch.setattr(route, "conversation_authority", authority)
 
+    if prepared:
+        refs = route._chat_context_attachment_refs(
+            request, route._chat_request_digest(request), include_prepared=True,
+        )
+        user_message, metadata = await route._prepare_new_chat_execution(
+            request, {"email": OWNER, "tenant_id": TENANT}, thread=thread, transcript=(),
+            tenant_id=TENANT, owner_id=OWNER, attachment_refs=refs,
+        )
+        await authority.append_message(
+            user_message, tenant_id=TENANT, owner_id=OWNER,
+            expected_thread_version=thread.version, execution_metadata=metadata,
+        )
+        conversations.close()
+        conversations = SQLiteConversationRepository(tmp_path / "presubmit-conversation.sqlite3")
+        authority = SQLiteAsyncConversationAuthority(conversations)
+        monkeypatch.setattr(route, "conversation_authority", authority)
+        assert await authority.chat_execution(
+            thread.thread_id, user_message.message_id, tenant_id=TENANT, owner_id=OWNER,
+        ) == metadata
+        assert await authority.chat_dispatch(
+            thread.thread_id, user_message.message_id, tenant_id=TENANT, owner_id=OWNER,
+            record_digest=metadata["record_digest"],
+        ) == {"state": "ready", "cancel_requested": False}
+    else:
+        with pytest.raises(HTTPException) as error:
+            await route.ai_chat(request, user={"email": OWNER, "tenant_id": TENANT})
+        assert error.value.status_code == 409
+        assert error.value.detail["code"] == "legacy_command_not_admitted"
+        assert local_calls == []
+        await coordinator.shutdown()
+        conversations.close()
+        execution_repository.close()
+        submissions.close()
+        return
+
     recovered = await route.ai_chat(
         route.AIChatRequest(
             message=request.message,
@@ -600,6 +505,13 @@ async def test_backend_chat_incomplete_user_without_engine_execution_submits_onc
     assert recovered["engine_runtime_provider"] == "local"
     assert len(local_calls) == 1
     assert execution_repository.result(recovered["engine_execution_id"]) is not None
+    assert await authority.chat_execution(
+        thread.thread_id, user_message.message_id, tenant_id=TENANT, owner_id=OWNER,
+    ) == metadata
+    assert (await authority.chat_dispatch(
+        thread.thread_id, user_message.message_id, tenant_id=TENANT, owner_id=OWNER,
+        record_digest=metadata["record_digest"],
+    ))["state"] == "admitted"
 
     transcript = conversations.active_transcript(
         thread.thread_id,

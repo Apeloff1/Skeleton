@@ -8,7 +8,7 @@ and produces compact evidence describing the committed terminal transaction.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -19,6 +19,16 @@ from uuid import NAMESPACE_URL, uuid5
 
 from skeleton.ai.runtime.inference import LocalModelAdapter
 from skeleton.contracts.ai_execution import AIExecutionRequest, ExecutionState
+from skeleton.contracts.context import (
+    ContextBudget,
+    ContextEnvelope,
+    ContextKind,
+    ContextSegment,
+    ContextTrust,
+)
+from skeleton.context.compiler import ContextCompiler, project_provider_context
+from skeleton.context.policy import ContextCompilePolicy
+from skeleton.intelligence.admission import ResourceBudget
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     ExecutionFinalizationBindings,
@@ -64,7 +74,8 @@ class FunctionalAIRequest:
     max_model_turns: int = 8
     max_tool_calls: int = 16
     max_repeat_tool_batches: int = 1
-    created_at: datetime = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    compiled_context: ContextEnvelope = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         for name in ("request_id", "objective", "prompt", "instructions", "tenant_id"):
@@ -95,6 +106,59 @@ class FunctionalAIRequest:
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise ValueError("created_at must be timezone-aware")
         object.__setattr__(self, "created_at", instant.astimezone(timezone.utc))
+        # The supplied digest is source provenance. Only the existing context
+        # compiler creates provider context identity, snapshots and digests.
+        turn_id = str(uuid5(NAMESPACE_URL, "skeleton-vs001-context-turn:" + self.request_id))
+        segments = tuple(
+            ContextSegment.from_content(
+                segment_id=str(uuid5(NAMESPACE_URL, f"skeleton-vs001-context:{self.request_id}:{name}")),
+                kind=kind,
+                source_type=source_type,
+                source_id=turn_id if name == "prompt" else self.operation_id + ":" + name,
+                content=content,
+                trust_level=trust,
+                data_class=self.data_class,
+                tenant_id=self.tenant_id.strip(),
+                purpose="model-inference",
+                priority=priority,
+                relevance=1.0,
+                created_at=self.created_at,
+                provenance=("functional-source-context:" + self.context_digest,),
+                retention_class="operation",
+                mandatory=trust is ContextTrust.TRUSTED_CONTROL,
+            )
+            for name, kind, source_type, content, trust, priority in (
+                ("instructions", ContextKind.PRODUCT_INSTRUCTION, "operation", self.instructions,
+                 ContextTrust.TRUSTED_CONTROL, 1000),
+                ("objective", ContextKind.OPERATION_OBJECTIVE, "operation", self.objective,
+                 ContextTrust.TRUSTED_CONTROL, 900),
+                ("prompt", ContextKind.USER_MESSAGE, "conversation", self.prompt,
+                 ContextTrust.AUTHORIZED_USER_DATA, 800),
+            )
+        )
+        envelope = ContextCompiler(
+            policy=ContextCompilePolicy(max_data_class=self.data_class)
+        ).compile(
+            operation_id=self.operation_id,
+            execution_id=self.execution_id,
+            turn_id=turn_id,
+            tenant_id=self.tenant_id.strip(),
+            purpose="model-inference",
+            budget=ContextBudget(
+                max_context_tokens=16_384,
+                reserved_output_tokens=4_096,
+                reserved_tool_result_tokens=2_048,
+                reserved_policy_tokens=2_048,
+                safety_margin_tokens=256,
+                max_segment_tokens=8_192,
+                max_artifact_tokens=0,
+                max_tool_result_tokens=2_048,
+            ),
+            segments=segments,
+            tools_enabled=bool(tools),
+            compiled_at=self.created_at,
+        )
+        object.__setattr__(self, "compiled_context", envelope)
 
     @property
     def execution_id(self) -> str:
@@ -113,6 +177,14 @@ class FunctionalAIRequest:
                 "tenant_id": self.tenant_id.strip(),
                 "data_class": self.data_class,
                 "capability": "vs001.functional_ai",
+                "context_id": self.compiled_context.context_id,
+                "context_digest": self.compiled_context.context_digest,
+                "compiler_version": self.compiled_context.compiler_version,
+                "source_snapshot": [list(item) for item in self.compiled_context.source_snapshot],
+                # Unknown tokenizer usage is charged conservatively by the
+                # cognitive owner. Bound each reservation so a first tool
+                # proposal cannot consume the whole multi-turn input grant.
+                "provider_input_limit": ResourceBudget().max_input_tokens // self.max_model_turns,
             },
             tool_policy={
                 "tenant_id": self.tenant_id.strip(),
@@ -332,16 +404,21 @@ class FunctionalAIRuntime:
             raise TypeError("request must be FunctionalAIRequest")
         self._assert_local_identity()
         self._assert_startup_qualification_identity()
+        context = project_provider_context(request.compiled_context)
         result = await self.runtime.start(
             request.to_execution_request(),
-            instructions=request.instructions,
-            prompt=request.prompt,
-            context_digest=request.context_digest,
+            instructions=context.instructions,
+            prompt=context.prompt,
+            context_digest=context.context_digest,
             now=request.created_at,
         )
         self._assert_local_identity()
         if result.state is not ExecutionState.COMPLETED or result.result is None:
-            raise RuntimeError(f"VS-001 did not complete: {result.state.value}")
+            error_code = (
+                None if result.result is None else result.result.usage.get("error_code")
+            )
+            reason = result.state.value if error_code is None else str(error_code)
+            raise RuntimeError(f"VS-001 did not complete: {reason}")
         terminal = result.result
         if terminal.status != "completed" or terminal.final_output is None:
             raise RuntimeError("VS-001 terminal result is not completed")

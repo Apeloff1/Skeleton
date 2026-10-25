@@ -35,7 +35,7 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
-    return datetime(2026, 9, 23, 19, 30, tzinfo=timezone.utc)
+    return datetime.now(timezone.utc)
 
 
 def _request(
@@ -62,6 +62,9 @@ def _request(
         resource_budget=budget
         or {
             "max_model_turns": 6,
+            # Each ordinary provider turn conservatively reserves up to two
+            # transport attempts; the fixture grants six complete turns.
+            "max_provider_attempts": 12,
             "max_tool_calls": 8,
         },
         stop_policy=stop_policy or {"max_repeat_tool_batches": 1},
@@ -99,6 +102,8 @@ def _text_response(text: str, *, response_id: str) -> ProviderResponse:
             input_tokens=10,
             output_tokens=5,
             total_tokens=15,
+            billed_cost="0",
+            currency="USD",
             usage_source="provider",
         ),
     )
@@ -129,6 +134,8 @@ def _tool_response(
             input_tokens=8,
             output_tokens=3,
             total_tokens=11,
+            billed_cost="0",
+            currency="USD",
             usage_source="provider",
         ),
     )
@@ -621,7 +628,9 @@ async def test_crash_after_provider_checkpoint_resumes_without_second_provider_c
 
 
 @pytest.mark.asyncio
-async def test_crash_after_tool_effect_resumes_without_duplicate_tool_effect() -> None:
+async def test_crash_after_tool_effect_resumes_without_duplicate_tool_effect(
+    monkeypatch,
+) -> None:
     repo = SQLiteExecutionRepository()
     tools = AsyncToolRuntime()
     effects = []
@@ -631,14 +640,21 @@ async def test_crash_after_tool_effect_resumes_without_duplicate_tool_effect() -
         return "artifact:read"
 
     await tools.register(_manifest(), handler)
-    first_provider = FakeProvider(
-        [
-            _tool_response("call-1"),
-            RuntimeError("simulated crash after tool checkpoint"),
-        ]
-    )
+    first_provider = FakeProvider([_tool_response("call-1")])
     runtime = _runtime(repo, first_provider, tools)
     request = _request(allowed_tools=("repo.read",))
+    real_drive = runtime._drive
+
+    async def crash_after_tool_checkpoint(execution_id, *, approval_refs, now=None):
+        if effects and repo.get(execution_id).state is ExecutionState.PROVIDER_PENDING:
+            checkpoint = repo.latest_checkpoint(execution_id)
+            assert checkpoint is not None
+            assert checkpoint.payload["tool_calls"] == 1
+            assert checkpoint.payload["pending_tool_calls"] == []
+            raise RuntimeError("simulated crash after tool checkpoint")
+        return await real_drive(execution_id, approval_refs=approval_refs, now=now)
+
+    monkeypatch.setattr(runtime, "_drive", crash_after_tool_checkpoint)
 
     with pytest.raises(RuntimeError, match="simulated crash"):
         await runtime.start(
@@ -651,6 +667,9 @@ async def test_crash_after_tool_effect_resumes_without_duplicate_tool_effect() -
 
     assert effects and len(effects) == 1
     assert repo.get("exec-1").state is ExecutionState.PROVIDER_PENDING
+    # Recovery starts a new provider turn only because no second dispatch
+    # occurred before the crash; an ambiguous dispatched attempt is not retried.
+    assert len(first_provider.requests) == 1
 
     restarted_tools = AsyncToolRuntime()
 
@@ -778,7 +797,7 @@ async def test_cancellation_during_provider_io_fences_late_result() -> None:
         async def generate(self, request):
             self.requests.append(request)
             started.set()
-            await release.wait()
+            await asyncio.wait_for(release.wait(), timeout=5.0)
             return _text_response(
                 "must-not-become-final-output",
                 response_id="resp-late-cancel",
@@ -796,7 +815,7 @@ async def test_cancellation_during_provider_io_fences_late_result() -> None:
         )
     )
 
-    await started.wait()
+    await asyncio.wait_for(started.wait(), timeout=5.0)
     current = repo.get("exec-1")
     repo.request_cancel(
         "exec-1",
@@ -804,7 +823,7 @@ async def test_cancellation_during_provider_io_fences_late_result() -> None:
         now=_now(),
     )
     release.set()
-    result = await task
+    result = await asyncio.wait_for(task, timeout=5.0)
 
     assert result.state is ExecutionState.CANCELLED
     assert result.result is not None
@@ -828,8 +847,10 @@ async def test_cooperative_provider_cancellation_aborts_inflight_provider() -> N
     provider_cancelled = asyncio.Event()
 
     class CooperativeProvider:
-        provider_id = "local"
-        model = "local-model"
+        # Exercise the provider-neutral cooperative transport contract without
+        # claiming activation of a local artifact that this fixture does not own.
+        provider_id = "fake"
+        model = "fake-model"
         supports_cooperative_cancellation = True
 
         async def generate(self, _request):
@@ -851,7 +872,7 @@ async def test_cooperative_provider_cancellation_aborts_inflight_provider() -> N
         )
     )
 
-    await started.wait()
+    await asyncio.wait_for(started.wait(), timeout=5.0)
     current = repo.get("exec-1")
     repo.request_cancel(
         "exec-1",
@@ -918,7 +939,8 @@ async def test_deadline_during_provider_io_cancels_provider_and_fails_durably() 
 
     provider = SlowProvider()
     runtime = _runtime(repo, provider, tools)
-    deadline = _now() + timedelta(milliseconds=50)
+    # Allow setup to admit a real in-flight call before testing its deadline.
+    deadline = _now() + timedelta(seconds=1)
     request = _request(
         stop_policy={
             "max_repeat_tool_batches": 1,
@@ -1251,6 +1273,7 @@ async def test_cognitive_runtime_meters_checkpoint_turn_and_terminal_storage() -
         tools,
         storage_meter=meter,
     )
+    instant = _now()
     result = await runtime.start(
         _request(
             context_policy={
@@ -1261,7 +1284,7 @@ async def test_cognitive_runtime_meters_checkpoint_turn_and_terminal_storage() -
         instructions="Answer.",
         prompt="Return a bounded answer.",
         context_digest="d" * 64,
-        now=_now(),
+        now=instant,
     )
 
     assert result.completed is True
@@ -1281,7 +1304,7 @@ async def test_cognitive_runtime_meters_checkpoint_turn_and_terminal_storage() -
 
     for _resource_id, _write_id, payload, meter_now in events:
         assert payload is not None
-        assert meter_now == _now()
+        assert meter_now == instant
 
 
 @pytest.mark.asyncio
@@ -1479,12 +1502,13 @@ async def test_reversible_tool_action_without_independent_verifier_fails_closed(
     assert result.completed is True
     assert result.result is not None
     assert result.result.status == "failed"
-    assert result.result.usage["error_code"] == "verification_blocked"
-    receipt = result.result.verification_receipt
-    assert receipt["claim_kind"] == "action_outcome"
-    assert receipt["policy"]["require_postcondition"] is True
-    assert receipt["disposition"] == "block"
-    assert "independent_origin_requirement_unsatisfied" in receipt["issues"]
+    assert result.result.usage["error_code"] == "semantic_verifier_unavailable"
+    assert result.result.final_output is None
+    # No acceptance receipt can be materialized when the independent verifier
+    # needed for this action outcome is unavailable, despite the tool receipt.
+    assert result.result.verification is None
+    assert result.result.verification_receipt is None
+    assert len(result.result.tool_receipts) == 1
 
 @pytest.mark.asyncio
 async def test_provider_response_id_cannot_alias_different_turn_payloads() -> None:
@@ -1570,7 +1594,7 @@ async def test_provider_response_must_match_bound_adapter_identity() -> None:
 
     with pytest.raises(
         CognitiveExecutionError,
-        match="does not match bound adapter",
+        match="does not match a pinned declared provider/model route",
     ):
         await runtime.start(
             _request(execution_id="exec-provider-drift"),

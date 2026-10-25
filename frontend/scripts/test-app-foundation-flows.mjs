@@ -6,6 +6,8 @@
  * product modules that drive each flow.
  * Tier 2 (live, opt-in): set SKELETON_E2E_BASE_URL (e.g. http://localhost:8001)
  * to drive the real backend HTTP flow end to end. Skipped otherwise.
+ * Build mutation steps require SKELETON_E2E_OPERATOR_TOKEN_FILE pointing to a
+ * private token file. Publicly registered consumers must remain viewers.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -180,6 +182,10 @@ test('F5-03 all journeys resolve to shipped routes (no dead links in the core sh
 // ── Tier 2: live backend flow (opt-in) ───────────────────────────────────
 const BASE = (process.env.SKELETON_E2E_BASE_URL || '').replace(/\/+$/, '');
 const live = { skip: BASE ? false : 'set SKELETON_E2E_BASE_URL to run the live flow' };
+const operatorTokenFile = process.env.SKELETON_E2E_OPERATOR_TOKEN_FILE;
+const operatorToken = operatorTokenFile ? readFileSync(operatorTokenFile, 'utf8').trim() : '';
+if (operatorTokenFile) assert.ok(operatorToken, 'operator token file must not be empty');
+const buildLive = { skip: operatorToken ? false : 'set SKELETON_E2E_OPERATOR_TOKEN_FILE for authorized build mutation steps' };
 async function call(method, path, body, token) {
   const r = await fetch(`${BASE}${path}`, {
     method,
@@ -191,7 +197,7 @@ async function call(method, path, body, token) {
   try { data = await r.json(); } catch {}
   return { ok: r.ok, status: r.status, data };
 }
-test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch → open', live, async (t) => {
+test('LIVE F1-F5: bootstrap → register/sign-in → bounded build → retain partial result', live, async (t) => {
   const ctx = {};
   const need = (k) => assert.ok(ctx[k], `precondition missing: ${k} (an earlier live case failed)`);
   await t.test('F1-04 bootstrap names the application', async () => {
@@ -210,6 +216,10 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     assert.ok(login.data?.access_token, 'login must return a token');
     const me = await call('GET', '/api/auth/me', undefined, login.data.access_token);
     assert.equal(me.data?.authenticated, true);
+    assert.equal(me.data?.enforced, true, 'live permission checks require enforced authentication');
+    assert.equal(me.data?.user?.role, 'viewer', 'public registration must not grant game creation authority');
+    const forbidden = await call('POST', '/api/galaxy-studio/create', { title: 'Unauthorized consumer probe', genre: 'Action' }, login.data.access_token);
+    assert.equal(forbidden.status, 403, 'public viewers must not create builds');
     const bad = await call('POST', '/api/auth/login', { email, password: 'wrong-password' });
     assert.equal(bad.status, 401, `wrong password must be 401, got ${bad.status}`);
     const anon = await call('GET', '/api/auth/me');
@@ -217,32 +227,54 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     assert.equal(anon.data?.authenticated, false, 'no token must not be authenticated');
     ctx.token = login.data.access_token;
   });
-  await t.test('F3-03 create from brief and start the build', async () => {
-    need('token');
-    const brief = { title: 'QA Foundation Probe', genre: 'Action', description: 'Small arena brawler used by the QA foundation suite.' };
-    const created = await call('POST', '/api/galaxy-studio/create', brief, ctx.token);
+  await t.test('F3-03 create from brief and start the build', buildLive, async () => {
+    const operator = await call('GET', '/api/auth/me', undefined, operatorToken);
+    assert.equal(operator.ok, true, `operator identity HTTP ${operator.status}`);
+    assert.equal(operator.data?.authenticated, true, 'operator token must be authenticated');
+    assert.ok(['editor', 'admin'].includes(operator.data?.user?.role), 'build steps need explicit creation authority');
+    ctx.buildToken = operatorToken;
+    const brief = { title: 'QA Foundation Budget Probe', genre: 'rpg', target_files: 3, description: 'A bounded three-file install probe; a partial result is expected.' };
+    const created = await call('POST', '/api/galaxy-studio/create', brief, ctx.buildToken);
     assert.equal(created.ok, true, `create HTTP ${created.status}`);
     const buildId = validBuildId(created.data?.build_id);
     assert.ok(buildId, 'create must return a safe build_id');
-    const started = await call('POST', '/api/galaxy-studio/start-build', { build_id: buildId, build_duration_minutes: 1 }, ctx.token);
+    const started = await call('POST', '/api/galaxy-studio/start-build', { build_id: buildId, build_duration_minutes: 1 }, ctx.buildToken);
     assert.equal(started.ok, true, `start-build HTTP ${started.status}`);
     ctx.buildId = buildId;
   });
-  await t.test('F4-05 watch the live build to completed', async () => {
+  await t.test('F4-05 enforce the exact live file cap and retain an honest partial result', buildLive, async () => {
     need('buildId');
     const maxChecks = Number(process.env.SKELETON_E2E_MAX_CHECKS || 120);
     const outcome = await watchBuildJob(async () => {
-      const s = await call('GET', `/api/galaxy-studio/status/${ctx.buildId}`, undefined, ctx.token);
+      const s = await call('GET', `/api/galaxy-studio/status/${ctx.buildId}`, undefined, ctx.buildToken);
       return s.ok ? { data: s.data } : { ok: false };
     }, { intervalMs: 2_000, maxIntervalMs: 10_000, maxChecks });
     t.diagnostic(`watch outcome: ${outcome.phase} after ${outcome.checks} checks`);
-    assert.equal(outcome.phase, 'completed', outcome.message);
-    ctx.completed = true;
+    assert.equal(outcome.phase, 'failed', 'a three-file budget cannot attest the full mandatory pipeline');
+    const final = await call('GET', `/api/galaxy-studio/status/${ctx.buildId}`, undefined, ctx.buildToken);
+    assert.equal(final.ok, true, `final build status HTTP ${final.status}`);
+    assert.equal(final.data?.status, 'failed');
+    assert.equal(final.data?.bg_status, 'failed');
+    assert.equal(final.data?.target_files, 3);
+    assert.equal(final.data?.file_count, 3, 'the build must retain exactly the authorized file count');
+    assert.equal(final.data?.completed_phases, 0, 'a partial first batch must not fabricate finished phases');
+    const execution = final.data?.execution;
+    assert.equal(execution?.stop_reason, 'artifact_file_budget_exhausted');
+    assert.equal(execution?.runner_live, false);
+    assert.equal(execution?.physical_workers, 0);
+    assert.equal(execution?.drain_pending, false);
+    assert.equal(execution?.unflushed_files, 0);
+    assert.equal(execution?.storage_failed, false);
+    assert.equal(execution?.partial_artifacts, true);
+    assert.equal(execution?.stop_requested, true);
   });
-  await t.test('F5-04 new build appears in the library', async () => {
+  await t.test('F5-04 the retained partial build appears in the library', buildLive, async () => {
     need('buildId');
-    const lib = await call('GET', '/api/galaxy-studio/my-builds?limit=100', undefined, ctx.token);
+    const lib = await call('GET', '/api/galaxy-studio/my-builds?limit=100', undefined, ctx.buildToken);
     assert.equal(lib.ok, true, `my-builds HTTP ${lib.status}`);
-    assert.ok((lib.data?.builds || []).some((b) => b.build_id === ctx.buildId), 'new build must appear in the library');
+    const retained = (lib.data?.builds || []).find((b) => b.build_id === ctx.buildId);
+    assert.ok(retained, 'retained partial build must appear in the library');
+    assert.equal(retained.status, 'failed');
+    assert.equal(retained.file_count, 3);
   });
 });

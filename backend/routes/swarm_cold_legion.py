@@ -4,9 +4,11 @@ Cold-storage API & Legion discourse endpoints.
 All prefixed /api/galaxy-studio/swarm/*  to stay under the existing hub.
 """
 from __future__ import annotations
+import asyncio
 from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from routes.galaxy_studio_access import visible_build_rows
 
 from core import cold_storage as cs
 from core import collection_agents as ca
@@ -421,8 +423,9 @@ def agent_by_number(number: int) -> dict:
 
 # ── Agent Ledger (per-agent notebook) ──────────────────────────────────
 @router.get("/ledger/notebook/{agent_code}")
-def ledger_notebook(agent_code: str, limit: int = 30) -> dict:
-    return {"agent_code": agent_code, "entries": ledger.notebook(agent_code, min(max(limit, 1), 500))}
+async def ledger_notebook(agent_code: str, limit: int = 30) -> dict:
+    rows = await asyncio.to_thread(ledger.notebook, agent_code, min(max(limit, 1), 500))
+    return {"agent_code": agent_code, "entries": await visible_build_rows(rows)}
 
 
 @router.get("/ledger/stats")
@@ -437,8 +440,9 @@ def ledger_for_build(build_id: str, limit: int = 200) -> dict:
 
 # ── Whisper Network ────────────────────────────────────────────────────
 @router.get("/whispers/recent/{recipient_code}")
-def whispers_recent(recipient_code: str, limit: int = 20) -> dict:
-    return {"recipient_code": recipient_code, "whispers": whispers.recent(recipient_code, min(max(limit, 1), 200))}
+async def whispers_recent(recipient_code: str, limit: int = 20) -> dict:
+    rows = await asyncio.to_thread(whispers.recent, recipient_code, min(max(limit, 1), 200))
+    return {"recipient_code": recipient_code, "whispers": await visible_build_rows(rows)}
 
 
 @router.get("/whispers/build/{build_id}")

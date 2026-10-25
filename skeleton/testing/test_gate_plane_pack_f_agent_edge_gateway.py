@@ -223,22 +223,21 @@ def test_priority_header_cannot_claim_control(w):
     assert r.status_code == 429
 
 
-def test_server_py_not_modified():
-    """Pack F never touches the server lifespan.
+def test_server_composes_agent_edge_behind_shared_gate():
+    """The assembled server owns HTTP composition and gates the optional edge."""
+    import ast
+    from pathlib import Path
 
-    The #3622 follow-up (TD: create_app is the only HTTP entry) adds one
-    extend-only agent-edge hook inside create_app; every other server.py
-    change, and anything touching startup/shutdown/lifespan, still fails.
-    """
-    import subprocess
-
-    out = subprocess.run(["git", "diff", "-U0", "origin/main", "--", "skeleton/api/server.py"], capture_output=True, text=True)
-    changed = [
-        line[1:]
-        for line in out.stdout.splitlines()
-        if line[:1] in "+-" and not line.startswith(("+++", "---"))
+    root = Path(__file__).resolve().parents[2]
+    tree = ast.parse((root / "skeleton/api/server.py").read_text())
+    factory = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "create_app")
+    calls = [
+        statement.value.func.id
+        for statement in factory.body
+        if isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Call)
+        and isinstance(statement.value.func, ast.Name)
     ]
-    for line in changed:
-        text = line.strip()
-        assert not any(t in text for t in ("on_event", "lifespan", "startup", "shutdown")), line
-        assert not text or "agent_edge" in text or text.startswith("#"), line
+    assert calls.count("install_registered_agent_edge") == 1
+    assert calls.index("install_gate") < calls.index("install_registered_agent_edge")
+    assert "create_agent_gateway_app" not in calls

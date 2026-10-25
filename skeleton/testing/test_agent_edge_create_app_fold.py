@@ -50,7 +50,9 @@ def _ready(app):
 
 
 def _paths(app):
-    return {getattr(r, "path", "") for r in app.routes}
+    # Recent FastAPI versions retain included routers lazily. OpenAPI is the
+    # public route contract and includes those nested paths consistently.
+    return set(app.openapi()["paths"])
 
 
 # -- create_app wiring -----------------------------------------------------------------

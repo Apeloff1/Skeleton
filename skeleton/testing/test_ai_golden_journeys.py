@@ -103,6 +103,12 @@ class _UnavailableRegistry:
     def require_active(self):
         raise ProviderUnavailableError("deterministic outage")
 
+    def require_for_context(self, _context_policy):
+        return self.require_active()
+
+    def runtime_serving_engines(self):
+        return ()
+
 
 class _Registry:
     def __init__(self, provider) -> None:
@@ -110,6 +116,12 @@ class _Registry:
 
     def require_active(self):
         return self.provider
+
+    def require_for_context(self, _context_policy):
+        return self.require_active()
+
+    def runtime_serving_engines(self):
+        return ()
 
 
 def _service(tmp_path, *, prefix: str = "golden") -> EngineExecutionService:

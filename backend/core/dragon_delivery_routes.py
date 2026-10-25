@@ -51,7 +51,14 @@ def _reviewed_delivery() -> Iterator[DragonDelivery]:
         raise HTTPException(status_code=503, detail="Reviewed knowledge storage unavailable")
     try:
         with ReviewedKnowledgeStore(path) as library:
-            yield DragonDelivery(DragonAlmanacs(library))
+            delivery = DragonDelivery(DragonAlmanacs(library))
+            try:
+                yield delivery
+            except PermissionError as exc:
+                # Policy denial from the caller's operation is not a failed
+                # database open. Convert it before the outer OSError handler,
+                # since PermissionError is itself an OSError subclass.
+                raise _error(exc) from None
     except (sqlite3.DatabaseError, OSError):
         raise HTTPException(status_code=503, detail="Reviewed knowledge storage unavailable") from None
 

@@ -63,7 +63,6 @@ class SimulatedStep: step_id:str; scenario:str; outcome:str
 class SimulationFinding: scenario:str; risk:str
 @dataclass(frozen=True,slots=True)
 class PlanSimulation: steps:tuple[SimulatedStep,...]; findings:tuple[SimulationFinding,...]
-@property
 def _production_evidence(self): return False
 PlanSimulation.production_evidence=property(_production_evidence)
 def simulate_plan(step_ids):

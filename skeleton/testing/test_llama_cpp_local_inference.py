@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 import asyncio
 from datetime import datetime, timezone
 import hashlib
@@ -23,9 +25,6 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_runtime import ProviderRequest
 from skeleton.skills.tool_contract import ToolEffect, ToolManifest
 from skeleton.skills.tool_runtime import AsyncToolRuntime
-
-
-NOW = datetime(2026, 10, 2, 20, 0, tzinfo=timezone.utc)
 
 
 _FAKE_RUNTIME = r'''#!/usr/bin/env python3
@@ -132,6 +131,7 @@ def _config(tmp_path: Path, **overrides) -> LlamaCppConfig:
         "executable": str(runtime),
         "model_path": str(model),
         "timeout_seconds": 5.0,
+        "context_size": 2048,
         "max_output_bytes": 16 * 1024,
         "max_stderr_bytes": 8 * 1024,
     }
@@ -314,7 +314,9 @@ def _verification(_request, candidate: str, context_digest: str) -> ExecutionVer
 async def test_vs001_crosses_real_local_process_boundary_and_recovers(
     tmp_path: Path,
 ) -> None:
-    config = _config(tmp_path)
+    # The second turn includes the governed tool protocol and its recorded
+    # result alongside an output reserve; admit that complete rendered input.
+    config = _config(tmp_path, context_size=8192)
     database = tmp_path / "vs001-subprocess.sqlite3"
     repo = SQLiteExecutionRepository(database)
     tools = AsyncToolRuntime()
@@ -349,7 +351,7 @@ async def test_vs001_crosses_real_local_process_boundary_and_recovers(
         instructions="Use only the local model and explicitly governed tools.",
         context_digest=hashlib.sha256(b"vs001-subprocess-context").hexdigest(),
         allowed_tool_ids=("repo.read",),
-        created_at=NOW,
+        created_at=datetime.now(timezone.utc),
     )
     runtime = FunctionalAIRuntime(
         repo,
