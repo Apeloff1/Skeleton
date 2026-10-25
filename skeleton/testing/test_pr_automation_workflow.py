@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,13 +17,10 @@ def test_privileged_workflow_is_manual_only_on_trusted_default_branch():
     # Only YAML events under `on` can trigger a job. References to historical
     # workflow_run payloads in dormant shell steps are not enabled triggers.
     triggers = text.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
-    assert "  workflow_dispatch:\n" in triggers
-    for forbidden in (
-        "workflow_run", "schedule", "pull_request", "pull_request_target",
-        "pull_request_review", "pull_request_review_comment", "push",
-        "issues", "issue_comment",
-    ):
-        assert f"\n  {forbidden}:" not in triggers
+    # Capture *every* YAML event at indent 2, including the first item.
+    # A leading workflow_run must never bypass a newline-based substring check.
+    events = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", triggers, re.MULTILINE)
+    assert events == ["workflow_dispatch"]
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head" not in text
@@ -42,9 +40,8 @@ def test_privileged_python_executes_only_staged_package_in_isolated_mode():
 def test_manual_index_has_bounded_single_writer_and_no_ci_fanout():
     text = _workflow()
     triggers = text.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
-    assert "workflow_dispatch:" in triggers
-    assert "workflow_run:" not in triggers
-    assert "schedule:" not in triggers
+    events = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", triggers, re.MULTILINE)
+    assert events == ["workflow_dispatch"]
     assert "types: [requested, in_progress, completed]" not in triggers
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
