@@ -354,7 +354,12 @@ class GuardedExecutor:
 
     def _limits(self, spec: ToolSpec) -> tuple[ProcessLimits, bool]:
         if spec.network_hosts:
-            return replace(spec.limits, network="inherit"), False
+            # The process boundary only offers full network access or total
+            # isolation. A mediator's grant for host A must never silently
+            # become unrestricted egress to hosts B..Z.
+            raise ProcessPolicyError(
+                "host-scoped networking unavailable (fail closed)"
+            )
         if network_isolation_available():
             return replace(spec.limits, network="deny"), True
         if self._policy.require_network_isolation:
