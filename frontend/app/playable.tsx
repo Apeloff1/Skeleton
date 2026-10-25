@@ -23,6 +23,8 @@ import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 import { awardXp } from '../src/utils/liveops';
 import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
 import { creatorRequestCurrent, resolveCreatorPrincipal } from '../src/product/creatorIdentity';
+import { classifyBuildJob, watchBuildJob } from '../src/product/buildJobLifecycle';
+import { openPlayableJobObservation, playableJobUnconfirmed, type PlayableJobObservation, type PlayableJobObservationStore } from '../src/product/playableJobObservation';
 import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -126,8 +128,40 @@ function PlayableContent() {
   const haptics = useHaptics();
   const tweakRef = React.useRef<React.ElementRef<typeof TextInput>>(null);
   const [brief, setBrief] = React.useState('A one-thumb arcade game where you tap to make a glowing orb hop between rising platforms — go as high as you can without falling.');
-  const [busy, setBusy] = React.useState(false);
+  const [working, setBusy] = React.useState(false);
+  const [savedJob, setSavedJob] = React.useState<PlayableJobObservation | null>(null);
+  const [observingJob, setObservingJob] = React.useState(false);
+  const [restoringJob, setRestoringJob] = React.useState(true);
+  const [observationReady, setObservationReady] = React.useState(false);
+  const [observationMessage, setObservationMessage] = React.useState('');
+  const observationStore = React.useRef<PlayableJobObservationStore | null>(null);
+  const observationRequest = React.useRef<AbortController | null>(null);
+  const pageActive = React.useRef(true);
+  const busy = working || !observationReady || !!savedJob;
   const [busyLabel, setBusyLabel] = React.useState('Building your game…');
+  React.useEffect(() => {
+    const request = new AbortController();
+    pageActive.current = true;
+    void (async () => {
+      try {
+        const store = await openPlayableJobObservation(request.signal);
+        if (request.signal.aborted || !pageActive.current) { store.dispose(); return; }
+        observationStore.current = store;
+        const retained = await store.get();
+        if (request.signal.aborted || !pageActive.current || !store.current()) return;
+        setSavedJob(retained); setObservationReady(true);
+        if (retained) setObservationMessage('A saved job is awaiting observation. Resume checks this original job without starting another build.');
+      } catch {
+        if (!request.signal.aborted && pageActive.current) setObservationMessage('Sign in and reopen this page to verify saved build observations before starting another job.');
+      } finally {
+        if (!request.signal.aborted && pageActive.current) setRestoringJob(false);
+      }
+    })();
+    return () => {
+      pageActive.current = false; request.abort(); observationRequest.current?.abort();
+      observationStore.current?.dispose(); observationStore.current = null;
+    };
+  }, []);
   const [polish, setPolish] = React.useState<{ step: number; total: number } | null>(null);
   const [game, setGame] = React.useState<Playable | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -441,23 +475,75 @@ function PlayableContent() {
     }
   }, [autoCoverPid, game?.playable_id, makeCover]);
 
-  // Shared job poller (used by generate / remix / sequel / competitor / prequel /
-  // expansion / variants). Rigorous quality refinement chains several LLM rounds,
-  // and Expansion (3× volume) can run 15+ min, so allow a very generous window.
-  const pollJob = React.useCallback(async (jobId: string) => {
-    const deadline = Date.now() + 2_400_000;
-    while (Date.now() < deadline) {
-      await new Promise((res) => setTimeout(res, 3000));
-      const j = await api.get<any>(`/api/playable/job/${jobId}`, { timeoutMs: 15_000 });
-      const d = j.data;
-      if (!j.ok || !d) continue;
-      if (d.job_status === 'running' && d.kind === 'polish' && d.step) {
-        const tot = d.step_total || 3;
-        setBusyLabel(`✨ Polishing ${d.step}/${tot}${d.step_label ? ' · ' + d.step_label : ''}…`);
+  // Observation is a GET-only view of the existing job, not a build lease or
+  // permission to repeat its generating POST. Keep its owner-scoped receipt.
+  const pollJob = React.useCallback(async (jobId: string, readOnly = false) => {
+    if (observationRequest.current) return;
+    const store = observationStore.current;
+    if (!store?.current() || !/^[A-Za-z0-9_-]{1,128}$/.test(jobId)) return;
+    const epoch = getAuthEpoch(), controller = new AbortController();
+    observationRequest.current = controller;
+    const current = () => pageActive.current && epoch === getAuthEpoch() && store.current()
+      && observationRequest.current === controller;
+    let retained: PlayableJobObservation = { jobId };
+    let terminal: any = null;
+    let unconfirmed = false;
+    setSavedJob(retained); setObservingJob(true); setBusy(true);
+    setObservationMessage('Observing the saved job. Leaving this page does not cancel it.');
+    try {
+      const previous = await store.get();
+      if (!current()) return;
+      if (previous && previous.jobId !== jobId) throw new Error('A different job is already retained.');
+      retained = previous || retained;
+      await store.set(retained);
+      if (!current()) return;
+      setSavedJob(retained);
+      const outcome = await watchBuildJob(async signal => {
+        const response = await api.get<any>(`/api/playable/job/${jobId}`, { signal, timeoutMs: 15_000, retries: 0 });
+        if (!current()) throw new Error('Observation detached.');
+        const d = response.data;
+        if (response.ok && d && (d.job_id === undefined || d.job_id === jobId)) {
+          const waiting = playableJobUnconfirmed(response);
+          if (waiting) {
+            retained = { ...retained, ...waiting };
+            await store.set(retained);
+            if (!current()) throw new Error('Observation detached.');
+            setSavedJob(retained); unconfirmed = true; controller.abort();
+          } else if (classifyBuildJob(response) !== 'pending') terminal = d;
+          if (d.job_status === 'running' && d.kind === 'polish' && d.step) {
+            setBusyLabel(`Polishing ${d.step}/${d.step_total || 3}${d.step_label ? ' · ' + d.step_label : ''}…`);
+          }
+        } else if (response.ok) throw new Error('The job response identity was not verified.');
+        return response;
+      }, { signal: controller.signal, intervalMs: 3_000, maxIntervalMs: 15_000,
+        maxChecks: 60, requestTimeoutMs: 15_000, maxConsecutiveErrors: 3 });
+      if (!current()) return;
+      if (unconfirmed) {
+        setObservationMessage('The model execution is not confirmed. The original job is retained. Resume only checks this same job; it does not restart generation or guarantee recovery.');
+        return;
       }
+      if (!terminal || ['timeout', 'disconnected', 'aborted'].includes(outcome.phase)) {
+        setObservationMessage(outcome.phase === 'timeout'
+          ? 'Observation timed out. The backend job may still be running; its original reference is retained. Resume observation instead of starting another build.'
+          : 'Job status is not confirmed. The original reference is retained. Resume observation to check the same job again.');
+        return;
+      }
+      const cleared = await store.clear(jobId);
+      if (!current()) return;
+      if (!cleared) {
+        const latest = await store.get();
+        if (!current()) return;
+        setSavedJob(latest);
+        if (latest) {
+          setObservationMessage('A different job reference is now retained. Resume observes that saved job without starting another build.');
+          return;
+        }
+      }
+      setSavedJob(null); setObservationMessage('');
+      const d = terminal;
       if (d.job_status === 'done' && d.kind === 'series') {
         setSeries(d.series || []); loadRecent(); setBusy(false); haptics.notify('success');
-        if (autoCoverRef.current) {
+        if (autoCoverRef.current && !readOnly) {
           const ids = (d.series || []).filter((s: any) => s.status === 'ready' && s.playable_id).map((s: any) => s.playable_id);
           (async () => {
             for (const id of ids) {
@@ -470,7 +556,7 @@ function PlayableContent() {
       }
       if (d.job_status === 'done' && d.kind === 'variants') {
         setVariants(d.variants || []); loadRecent(); setBusy(false); haptics.notify('success');
-        if (autoCoverRef.current) {
+        if (autoCoverRef.current && !readOnly) {
           const ids = (d.variants || []).filter((v: any) => v.status === 'ready' && v.playable_id).map((v: any) => v.playable_id);
           (async () => {
             for (const id of ids) {
@@ -519,7 +605,7 @@ function PlayableContent() {
       }
       if (d.job_status === 'done' && d.status === 'ready') {
         setGame(d as Playable); setWebKey((k) => k + 1); loadRecent(); setBusy(false); haptics.notify('success');
-        if (autoCoverRef.current) setAutoCoverPid((d as Playable).playable_id);
+        if (autoCoverRef.current && !readOnly) setAutoCoverPid((d as Playable).playable_id);
         return;
       }
       if (d.job_status === 'done' && d.status === 'failed') {
@@ -529,17 +615,44 @@ function PlayableContent() {
       if (d.job_status === 'error') {
         setError(d.error || 'generation failed'); setBusy(false); haptics.notify('error'); return;
       }
+      if (['cancelled', 'canceled'].includes(d.job_status)) setError('The backend confirmed this job was cancelled.');
+      else setError('The backend finished this job without a runnable playable result.');
+    } catch {
+      if (current()) setObservationMessage('The job reference or its latest status could not be verified. Keep this page open; resume checks the original job without submitting another build.');
+    } finally {
+      if (current()) { setBusy(false); setObservingJob(false); observationRequest.current = null; }
     }
-    setError('Timed out building the game. Please try again.');
-    setBusy(false); haptics.notify('error');
   }, [loadRecent, haptics]);
+
+  const dismissJobObservation = React.useCallback(async () => {
+    const retained = savedJob, store = observationStore.current;
+    if (!retained || !store?.current()) return;
+    observationRequest.current?.abort(); observationRequest.current = null;
+    try {
+      const cleared = await store.clear(retained.jobId);
+      if (!pageActive.current || !store.current()) return;
+      if (!cleared) {
+        const latest = await store.get();
+        if (!pageActive.current || !store.current()) return;
+        setSavedJob(latest); setObservingJob(false); setBusy(false);
+        setObservationMessage(latest ? 'A different job reference is now retained. It has not been dismissed.' : '');
+        return;
+      }
+      setSavedJob(null); setObservationMessage(''); setObservingJob(false); setBusy(false);
+    } catch {
+      if (pageActive.current && store.current()) {
+        setObservingJob(false); setBusy(false);
+        setObservationMessage('The saved observation could not be dismissed. Its job reference is still retained.');
+      }
+    }
+  }, [savedJob]);
 
   const generate = React.useCallback(async () => {
     if (brief.trim().length < 8 || busy) return;
     haptics.selection();
     setBusy(true); setBusyLabel(depth === 'fast' ? 'Quick-building your game…' : 'Crafting a studio-grade game…'); setError(null); setGame(null);
     const kick = await api.post<{ job_id?: string; error?: string }>(
-      '/api/playable/generate/async', { brief, depth }, { timeoutMs: 20_000, retries: 1 });
+      '/api/playable/generate/async', { brief, depth }, { timeoutMs: 20_000, retries: 0 });
     const jobId = kick.data?.job_id;
     if (!kick.ok || !jobId) {
       setError(kick.data?.error || kick.error || `HTTP ${kick.status}`); setBusy(false); return;
@@ -763,6 +876,20 @@ function PlayableContent() {
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.subtitle}>🕹️ Brief → real, self-contained game you play right here.</Text>
 
+          {(savedJob || observationMessage || restoringJob) && <View testID="pl-job-observation" style={styles.panel}>
+            <Text style={styles.panelTitle}>Saved build observation</Text>
+            {savedJob && <Text testID="pl-job-id" selectable style={styles.panelEmpty}>Job: {savedJob.jobId}</Text>}
+            <Text testID="pl-job-status" accessibilityLiveRegion="polite" style={styles.panelEmpty}>{restoringJob ? 'Checking this account’s saved job reference…' : observationMessage}</Text>
+            {savedJob?.errorCode && <Text style={styles.panelEmpty}>Status: {savedJob.errorCode}</Text>}
+            {savedJob?.engineRequestKey && <Text selectable style={styles.panelEmpty}>Engine request: {savedJob.engineRequestKey}</Text>}
+            {observingJob && <ActivityIndicator color="#a78bfa" accessibilityLabel="Observing the saved job" />}
+            {savedJob && <View style={styles.toolbar}>
+              <TouchableOpacity testID="pl-job-resume" style={styles.toolBtn} disabled={observingJob || restoringJob} onPress={() => { void pollJob(savedJob.jobId, true); }}><Text style={styles.toolBtnTxt}>Resume observation</Text></TouchableOpacity>
+              <TouchableOpacity testID="pl-job-dismiss" style={styles.toolBtn} onPress={() => { void dismissJobObservation(); }}><Text style={styles.toolBtnTxt}>Dismiss saved observation</Text></TouchableOpacity>
+            </View>}
+            {savedJob && <Text style={styles.panelEmpty}>Dismissing forgets this saved reference. It does not cancel the backend job.</Text>}
+          </View>}
+
           <View style={styles.toolbar}>
             <TouchableOpacity testID="pl-import-toggle" style={styles.toolBtn} onPress={() => { haptics.selection(); loadImportBuilds(); setShowImport((s) => !s); }}>
               <Text style={styles.toolBtnTxt}>📦 Import from Vault</Text>
@@ -849,14 +976,14 @@ function PlayableContent() {
             />
           </View>
           <TouchableOpacity testID="pl-generate" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={generate} disabled={busy}>
-            {busy ? (
+            {working ? (
               <View style={styles.busyRow}><ActivityIndicator color="#fff" /><Text style={styles.ctaTxt}>  {busyLabel}</Text></View>
-            ) : <Text style={styles.ctaTxt}>🎮 Generate & Play →</Text>}
+            ) : <Text style={styles.ctaTxt}>{restoringJob ? 'Checking saved observation…' : !observationReady ? 'Sign in to verify saved jobs' : savedJob ? 'Resume or dismiss the saved job above' : '🎮 Generate & Play →'}</Text>}
           </TouchableOpacity>
-          {busy ? <Text style={styles.hint}>{depth === 'fast' ? 'Fast mode: one focused, runnable game, gate-checked (~1 min).' : 'Studio mode: a richly intricate game, auto-repaired, judge-scored, then quality-refined (~3-5 min).'}</Text> : null}
+          {working ? <Text style={styles.hint}>{depth === 'fast' ? 'Fast mode: one focused, runnable game, gate-checked (~1 min).' : 'Studio mode: a richly intricate game, auto-repaired, judge-scored, then quality-refined (~3-5 min).'}</Text> : null}
           {error ? <Text testID="pl-error" style={styles.err}>{error}</Text> : null}
 
-          {busy && !game ? <GeneratingPreview label={busyLabel} /> : null}
+          {working && !savedJob && !game ? <GeneratingPreview label={busyLabel} /> : null}
 
           {game ? (
             <View testID="pl-result">
@@ -1114,7 +1241,7 @@ function PlayableContent() {
                   <Text style={styles.forgedTxt}>🌍 Forged from {(game as any).forged_from}</Text>
                 </View>
               ) : null}
-              {busy ? (
+              {working ? (
                 <View testID="pl-busy" style={styles.busyBanner}>
                   {polish ? (
                     <View style={styles.polishSteps}>

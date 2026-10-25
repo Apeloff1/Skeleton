@@ -289,6 +289,7 @@ test('actual playable screen keys private content to the canonical external auth
     '../src/features/Playable/GamePreview': { __esModule: true, default: 'GamePreview' }, '../src/hooks/useHaptics': {},
     '../src/utils/safeStorage': {}, '../src/utils/liveops': { awardXp() {} }, '../src/auth/gameforgeAuth': identity.owner,
     '../src/product/creatorIdentity': identity, '../src/theme/tokens': { __esModule: true, default: {} },
+    '../src/product/buildJobLifecycle': {}, '../src/product/playableJobObservation': {},
   }).default;
   const first = Screen(); assert.equal(first.type.name, 'PlayableContent'); assert.equal(first.key, 0);
   identity.change(); const second = Screen(); assert.equal(second.type, first.type); assert.equal(second.key, 1);

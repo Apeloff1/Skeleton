@@ -7,9 +7,10 @@ This review did not change packages, the lockfile, security gates or images.
 The current static dependency gate remains **failed**. There is no published
 patched `node-forge` release. The previously reported `braces` advisory has
 officially been withdrawn, so it must not be described as an active advisory.
-An additional installed-dependency mitigation check fails for
-`http-cache-semantics`; that failure remains separate from package-version
-advisory matching and from deployed application exposure.
+An additional installed-dependency mitigation check initially failed for
+`http-cache-semantics`. The narrow source repair and passing verification are
+recorded below; package-version advisory matching and deployed application
+exposure remain separate questions.
 
 ## Current versions and official advisory status
 
@@ -58,13 +59,13 @@ installation produced these results:
 | `verifyHttpCacheMaxStaleGuard()` | **Failed**: `http-cache-semantics@4.3.0` reused the security-zeroed response through `max-stale`. |
 | Complete `verify-no-release-npm-security.js` | **Exit 1**, stopping at the cache check before its forge check. The guards were then executed individually without modifying their definitions. |
 
-The source inconsistency is specific:
+The initial source inconsistency was specific:
 `frontend/scripts/patch-node-modules.js` returns early for cache version
 `4.3.0` as supposedly already patched, while its following exact-version
 allowlist and existing `this.maxAge() > 0` mitigation still support that same
-version and source shape. Installed `4.3.0` retains the unguarded
+version and source shape. Installed `4.3.0` initially retained the unguarded
 `if (allowsStaleWithoutRevalidation)` branch. Consequently the existing
-compensating-control verifier cannot currently be reported as successful.
+compensating-control verifier could not pass before the follow-up repair below.
 This observation does not extend GitHub's published affected-version range
 or establish exposure in the installed application.
 
@@ -123,20 +124,22 @@ now been withdrawn. No alert was dismissed or suppressed.
    policy's advisory state explicitly in a coordinated follow-up. Retain the
    defensive depth guard. This is a withdrawal-state correction, not a claim
    that `braces@3.0.3` received a new security release.
-3. Before claiming the compensating-control gate passes, resolve the cache
-   verifier inconsistency. The smallest source candidate is to remove the
-   `4.3.0` early skip and apply the already present exact-version max-stale
-   guard, followed by its behavior regression and full verifier. This review
-   made no such change; frontend sources were frozen for the pending build.
+3. **Resolved in the installation follow-up:** remove the erroneous `4.3.0`
+   early skip and apply the existing exact-version max-stale guard. Five
+   real-package regressions passed, including reproduction before the guard,
+   rejection afterward, retained legitimate caching, idempotency and drift
+   rejection. The full `verify-no-release-npm-security.js` then exited **0**.
+   No package, lockfile, advisory policy or version gate changed.
 4. An account or integration with Dependabot-alert read permission must identify
    the three reported alerts before their closure can be assessed. Public
    advisory metadata cannot substitute for that repository-specific inventory.
 
 Functional build/testing can proceed with the current frozen inputs, but this
 evidence does **not** support a clean dependency-security or enterprise
-production-readiness claim. The active forge advisory, failed cache mitigation
-check, stale withdrawal policy and unavailable repository alert inventory are
-specific outstanding qualification items.
+production-readiness claim. The active forge advisory, stale withdrawal policy
+and unavailable repository alert inventory remain outstanding qualification
+items. The cache compensating-control failure has been repaired; it does not
+clear the separate published-version gate.
 
 ## Evidence identity
 
@@ -152,3 +155,12 @@ output and isolated mitigation results. The separate
 `dependabot-read-access-limit.json` and `.md` record the API permission limit.
 These local evidence paths are session artifacts; official URLs above are the
 portable external references. No credentials were captured in the evidence.
+
+The subsequent cache repair was verified at approximately 08:01 UTC. Its
+source regression is `frontend/scripts/test-http-cache-max-stale-patch.cjs`;
+the production postinstall hook remains `frontend/scripts/patch-node-modules.js`.
+Secret-free command logs and the five-case behavior receipt are retained under
+`/workspace/scratch/consumer-readiness-2026-10-25/frontend-integrated/` as
+`http-cache-max-stale-regression.log`, `http-cache-guard-evidence.json` and
+`no-release-security-final.log`. Final production-image qualification is recorded
+separately in the installation report.
