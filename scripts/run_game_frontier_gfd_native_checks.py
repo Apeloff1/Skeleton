@@ -210,25 +210,70 @@ def evaluate(records: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "gpu_attested": False, "screenshot_attested": False}
 
 
+def _invoke_godot(godot: str, args: list[str], timeout: int) -> tuple[int, str]:
+    """Run a pinned headless engine, retaining bounded failure diagnostics."""
+    try:
+        proc = subprocess.run(
+            [godot, "--headless", *args], capture_output=True, text=True,
+            timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout or b""
+        stderr = exc.stderr or b""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        return 124, str(stdout)[-2000:] + "\\n" + str(stderr)[-2000:] + "\\nGodot timed out"
+    except OSError as exc:
+        return 127, "Godot launch failed: " + type(exc).__name__
+    return proc.returncode, proc.stdout + "\\n" + proc.stderr
+
+
 def run(godot: str, project: Path, log_dir: Path, timeout: int = 120) -> dict[str, Any]:
     log_dir.mkdir(parents=True, exist_ok=True)
     digests = emit_project(project)
-    imp = subprocess.run([godot, "--headless", "--path", str(project), "--import"],
-                         capture_output=True, text=True, timeout=timeout, check=False)
-    imp_out = imp.stdout + "\n" + imp.stderr
+    imp_code, imp_out = _invoke_godot(
+        godot, ["--path", str(project), "--import"], timeout,
+    )
     (log_dir / "gfd-import.log").write_text(imp_out, encoding="utf-8")
-    play = subprocess.run([godot, "--headless", "--path", str(project), "--quit-after", "600"],
-                          capture_output=True, text=True, timeout=timeout, check=False)
-    play_out = play.stdout + "\n" + play.stderr
+    # A broken import must not be followed by a pointless engine launch.
+    if imp_code == 0 and not script_errors(imp_out):
+        play_code, play_out = _invoke_godot(
+            godot, ["--path", str(project), "--quit-after", "600"], timeout,
+        )
+    else:
+        play_code, play_out = 125, "Native playback skipped because import failed"
     (log_dir / "gfd-probe.log").write_text(play_out, encoding="utf-8")
     errors = script_errors(imp_out) + script_errors(play_out)
-    if imp.returncode != 0 or play.returncode != 0 or errors:
-        raise AssertionError(f"godot failed import={imp.returncode} play={play.returncode} errors={errors[:5]}")
-    report = evaluate(parse_probe(play_out))
-    report["source_sha256"] = digests
-    (log_dir / "gfd-report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    report: dict[str, Any] = {
+        "source_sha256": digests,
+        "engine_exits": {"import": imp_code, "play": play_code},
+        "gpu_attested": False,
+        "screenshot_attested": False,
+    }
+    if imp_code != 0 or play_code != 0 or errors:
+        report.update({
+            "passed": False,
+            "failure_kind": "engine_import_or_playback",
+            "error_lines": errors[:10],
+        })
+    else:
+        try:
+            report.update(evaluate(parse_probe(play_out)))
+        except (AssertionError, ValueError, KeyError, TypeError) as exc:
+            report.update({
+                "passed": False,
+                "failure_kind": "invalid_native_probe",
+                "error_type": type(exc).__name__,
+            })
+    (log_dir / "gfd-report.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True), encoding="utf-8",
+    )
     if not report["passed"]:
-        raise AssertionError(f"GF-D native checks failed: {report['checks']}")
+        raise AssertionError(
+            f"GF-D native checks failed: {report.get('failure_kind', report.get('checks'))}"
+        )
     return report
 
 
