@@ -302,3 +302,50 @@ def test_deferred_165_loader_matches_literal_handlers() -> None:
     assert len(expected) == 10
     assert named == expected
     assert SCANNER.violations(path) == []
+
+
+def test_local_ai_seam_dispatch_covers_index_and_two_hundred_numbered_targets() -> None:
+    file = ROOT / "skeleton/local_ai/gap_filler.py"
+    tree = ast.parse(file.read_text(encoding="utf-8"))
+    loader = next(
+        node.value for node in tree.body if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "_REGISTERED_SEAM_LOADERS" for target in node.targets)
+    )
+    assert isinstance(loader, ast.Dict)
+    imported = {
+        node.args[0].value for node in ast.walk(loader)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "import_module" and node.args
+        and isinstance(node.args[0], ast.Constant)
+    }
+    index_tree = ast.parse((ROOT / "skeleton/local_ai/local_ai_index.py").read_text(encoding="utf-8"))
+    listed = next(
+        ast.literal_eval(node.value) for node in index_tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "SEAMS" for t in node.targets)
+    )
+    expected = {"skeleton.local_ai." + name for name in listed}
+    expected.update("skeleton.local_ai.seam_%03d" % i for i in range(200))
+    assert len(expected) == 245
+    assert imported == expected
+    assert SCANNER.violations(file) == []
+
+
+def test_repo_build_evidence_module_dispatch_matches_fixed_ten_batch_inventory() -> None:
+    file = ROOT / "skeleton/repo_intelligence/build_lane_evidence.py"
+    tree = ast.parse(file.read_text(encoding="utf-8"))
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_registered_build_module")
+    imports = {
+        n.args[0].value for n in ast.walk(fn)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "import_module" and n.args
+        and isinstance(n.args[0], ast.Constant)
+    }
+    assert imports == {
+        "skeleton.build.asset_pipeline", "skeleton.build.build_observability",
+        "skeleton.build.cache_contract", "skeleton.build.incremental_graph",
+        "skeleton.build.parallel_scheduler", "skeleton.build.release_graph",
+        "skeleton.build.remote_build", "skeleton.repo_intelligence.batch_plan",
+        "skeleton.repo_intelligence.git_index",
+    }
+    assert SCANNER.violations(file) == []
