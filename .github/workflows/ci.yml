@@ -333,6 +333,10 @@ jobs:
       - run: yarn typecheck
       - run: yarn test:operation-stream
       - run: yarn test:conversation
+      - run: yarn test:auth-transport
+      - run: yarn test:playable-preview
+      - run: yarn test:private-media
+      - run: yarn test:creator-identity
       - run: yarn test:metro-env-cache
       - run: yarn test:product-journeys
       - name: App-foundation contract regressions (consolidated from Merge Readiness)

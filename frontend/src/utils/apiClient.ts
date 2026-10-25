@@ -168,6 +168,8 @@ interface RequestOpts {
   cacheKey?: string;
   cacheTtlMs?: number;
   maxResponseChars?: number;
+  /** Preserve documents as text rather than interpreting JSON-looking bytes. */
+  responseType?: 'json' | 'text';
   /** Explicit opt-in only when server-side idempotent replay is verified. */
   serverDedupeVerified?: boolean;
 }
@@ -375,7 +377,7 @@ async function fetchInSession<T>(
   // session cache. Include the actual public endpoint in every eligible key.
   const publicHeaders = Object.keys(opts.headers || {}).every(key => ['accept', 'content-type', 'cache-control'].includes(key.toLowerCase()));
   const cacheKey = method === 'GET' && opts.cacheKey && publicHeaders && !session.authenticated && path.startsWith('/') && !/[?#]/.test(url)
-    ? `api:v2:${session.cacheNamespace}:${url}:${opts.cacheKey}` : null;
+    ? `api:v2:${session.cacheNamespace}:${opts.responseType ?? 'json'}:${url}:${opts.cacheKey}` : null;
 
   // Read sessionStorage cache (web only) — a hit needs no network/timer.
   if (cacheKey && typeof sessionStorage !== 'undefined') {
@@ -492,7 +494,8 @@ async function fetchInSession<T>(
       }
 
       let data: any = null;
-      try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      if (opts.responseType === 'text') data = text;
+      else { try { data = text ? JSON.parse(text) : null; } catch { data = text; } }
 
       const transient = retryableHttpStatus(res.status);
       if (!res.ok && transient && attempt < maxAttempts - 1) {

@@ -11,14 +11,18 @@ import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
   StyleSheet, SafeAreaView, Platform, KeyboardAvoidingView, Dimensions,
-  Animated, Easing, Image, Switch, Modal, Alert,
+  Animated, Easing, Switch, Modal, Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
+import PrivateImage, { savePrivateImage } from '../src/components/PrivateImage';
+import GamePreview from '../src/features/Playable/GamePreview';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
-import { awardXp, getVisitorId } from '../src/utils/liveops';
+import { awardXp } from '../src/utils/liveops';
+import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
+import { creatorRequestCurrent, resolveCreatorPrincipal } from '../src/product/creatorIdentity';
 import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -68,66 +72,6 @@ const genStyles = StyleSheet.create({
   sub: { color: '#7c6fb0', fontSize: 12, marginTop: 6, fontWeight: '600' },
 });
 
-// Cross-platform game preview: an <iframe> on Expo Web, the native
-// react-native-webview elsewhere (lazy-required so web bundling never breaks).
-let _WebView: any = null;
-function _tryLoadWebView() {
-  if (_WebView) return _WebView;
-  try {
-     
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _WebView = require('react-native-webview').WebView;
-  } catch {
-    _WebView = null;
-  }
-  return _WebView;
-}
-const GamePreview: React.FC<{ uri: string; testID?: string; onGameError?: (msg: string) => void }> = ({ uri, testID, onGameError }) => {
-  // Listen for runtime errors posted by the injected reporter (web iframe path).
-  React.useEffect(() => {
-    if (Platform.OS !== 'web' || !onGameError || typeof window === 'undefined') return;
-    const handler = (e: any) => {
-      const d = e?.data;
-      if (d && d.__pl_error) onGameError(String(d.message || 'Runtime error'));
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [onGameError]);
-
-  if (Platform.OS === 'web') {
-    return React.createElement('iframe', {
-      src: uri, title: 'game-preview', 'data-testid': testID,
-      style: { border: 0, background: '#000', width: '100%', height: '100%' },
-    });
-  }
-  const W = _tryLoadWebView();
-  if (!W) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-        <Text style={{ color: '#94a3b8', fontSize: 12 }}>Preview unavailable on this device</Text>
-      </View>
-    );
-  }
-  return (
-    <W
-      testID={testID}
-      source={{ uri }}
-      style={{ flex: 1, backgroundColor: '#000' }}
-      originWhitelist={['*']}
-      javaScriptEnabled
-      domStorageEnabled
-      scalesPageToFit={false}
-      allowsInlineMediaPlayback
-      mediaPlaybackRequiresUserAction={false}
-      onMessage={(e: any) => {
-        try {
-          const d = JSON.parse(e?.nativeEvent?.data || '{}');
-          if (d && d.__pl_error && onGameError) onGameError(String(d.message || 'Runtime error'));
-        } catch { /* ignore non-JSON messages */ }
-      }}
-    />
-  );
-};
 
 interface Evaluation {
   available?: boolean; overall?: number; verdict?: string;
@@ -153,7 +97,7 @@ interface ListItem {
 function MiniCover({ id, hasCover, size = 38 }: { id: string; hasCover?: boolean; size?: number }) {
   const [err, setErr] = React.useState(false);
   if (hasCover && !err) {
-    return <Image source={{ uri: `${BACKEND}/api/playable/${id}/cover.png` }} style={{ width: size, height: size, borderRadius: 8, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
+    return <PrivateImage uri={`${BACKEND}/api/playable/${id}/cover.png`} style={{ width: size, height: size, borderRadius: 8, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
   }
   return <View style={{ width: size, height: size, borderRadius: 8, backgroundColor: '#16203a', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: size * 0.45 }}>🎮</Text></View>;
 }
@@ -170,6 +114,12 @@ const POLISH_STEPS: { n: number; icon: string; label: string }[] = [
 ];
 
 export default function PlayableScreen() {
+  const epoch = React.useSyncExternalStore(subscribeAuthChanges, getAuthEpoch, getAuthEpoch);
+  // Private metadata and drafts belong to one account, as do rendered bytes.
+  return <PlayableContent key={epoch} />;
+}
+
+function PlayableContent() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; remix?: string; brief?: string; autopolish?: string }>();
   const autopolishedRef = React.useRef(false);
@@ -303,16 +253,11 @@ export default function PlayableScreen() {
   const shareCard = React.useCallback(async () => {
     if (!game) return;
     haptics.selection();
-    const base = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : BACKEND;
-    const url = `${base}/api/playable/${game.playable_id}/card.png`;
+    const url = `${BACKEND}/api/playable/${game.playable_id}/card.png`;
     try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).clipboard) {
-        await (navigator as any).clipboard.writeText(url);
-      } else {
-        await Clipboard.setStringAsync(url);
-      }
-      setCopied(true); haptics.notify('success'); setTimeout(() => setCopied(false), 2000);
-    } catch { setError('Could not copy card link.'); }
+      await savePrivateImage(url, `${game.playable_id}-card.png`);
+      haptics.notify('success');
+    } catch { setError('Could not save the card image. Sign in and try again.'); }
   }, [game, haptics]);
 
   // ── 📚 Save to Collection (Creator Marketplace) ──
@@ -332,13 +277,19 @@ export default function PlayableScreen() {
   const [reportMsg, setReportMsg] = React.useState('');
   const submitReport = React.useCallback(async (reason: string) => {
     if (!game) return;
+    const epoch = getAuthEpoch();
     haptics.selection();
     setReportBusy(true);
-    const visitor = await getVisitorId();
-    const r = await api.post('/api/governance/report', { playable_id: game.playable_id, reason, reporter_id: visitor }, { timeoutMs: 12_000 });
-    setReportBusy(false);
-    if (r.ok) { setReportMsg('✓ Thanks — our moderators will review this game.'); setTimeout(() => setReportModal(false), 1400); }
-    else setReportMsg('Could not submit report. Please try again.');
+    try {
+      const principal = await resolveCreatorPrincipal(undefined, epoch);
+      if (!creatorRequestCurrent(epoch)) return;
+      const r = await api.post('/api/governance/report', { playable_id: game.playable_id, reason, reporter_id: principal }, { timeoutMs: 12_000 });
+      if (!creatorRequestCurrent(epoch)) return;
+      if (r.ok) { setReportMsg('✓ Thanks — our moderators will review this game.'); setTimeout(() => setReportModal(false), 1400); }
+      else setReportMsg('Could not submit report. Please try again.');
+    } catch {
+      if (creatorRequestCurrent(epoch)) setReportMsg('Sign in and try submitting the report again.');
+    } finally { if (creatorRequestCurrent(epoch)) setReportBusy(false); }
   }, [game, haptics]);
 
   // ── ⚖️ Creator appeal (shown only when this game is restricted by moderation) ──
@@ -357,14 +308,20 @@ export default function PlayableScreen() {
   }, [game?.playable_id]);
   const submitAppeal = React.useCallback(async () => {
     if (!game || appealReason.trim().length < 10) { setAppealMsg('Please write at least 10 characters.'); return; }
+    const epoch = getAuthEpoch();
     haptics.selection();
     setAppealBusy(true);
-    const visitor = await getVisitorId();
-    const r = await api.post<{ appeal_id?: string; error?: string }>('/api/governance/appeal',
-      { playable_id: game.playable_id, reason: appealReason.trim(), creator_id: visitor }, { timeoutMs: 12_000 });
-    setAppealBusy(false);
-    if (r.ok && r.data?.appeal_id) { setAppealMsg('✓ Appeal submitted — a moderator will re-review your game.'); setTimeout(() => setAppealModal(false), 1500); }
-    else setAppealMsg(r.data?.error || 'Could not submit appeal.');
+    try {
+      const principal = await resolveCreatorPrincipal(undefined, epoch);
+      if (!creatorRequestCurrent(epoch)) return;
+      const r = await api.post<{ appeal_id?: string; error?: string }>('/api/governance/appeal',
+        { playable_id: game.playable_id, reason: appealReason.trim(), creator_id: principal }, { timeoutMs: 12_000 });
+      if (!creatorRequestCurrent(epoch)) return;
+      if (r.ok && r.data?.appeal_id) { setAppealMsg('✓ Appeal submitted — a moderator will re-review your game.'); setTimeout(() => setAppealModal(false), 1500); }
+      else setAppealMsg(r.data?.error || 'Could not submit appeal.');
+    } catch {
+      if (creatorRequestCurrent(epoch)) setAppealMsg('Sign in and try submitting the appeal again.');
+    } finally { if (creatorRequestCurrent(epoch)) setAppealBusy(false); }
   }, [game, appealReason, haptics]);
   const addToColl = React.useCallback(async (cid: string, name: string) => {
     if (!game) return;
@@ -904,10 +861,10 @@ export default function PlayableScreen() {
           {game ? (
             <View testID="pl-result">
               {!coverHidden ? (
-                <Image
+                <PrivateImage
                   key={`cover-${coverBust}`}
                   testID="pl-cover"
-                  source={{ uri: `${BACKEND}/api/playable/${game.playable_id}/cover.png?v=${coverBust}` }}
+                  uri={`${BACKEND}/api/playable/${game.playable_id}/cover.png?v=${coverBust}`}
                   style={styles.coverBanner}
                   resizeMode="cover"
                   onError={() => setCoverHidden(true)}
@@ -929,8 +886,8 @@ export default function PlayableScreen() {
                   <View style={styles.coverOptsRow}>
                     {coverOpts.map((idx) => (
                       <TouchableOpacity key={idx} testID={`pl-cover-opt-${idx}`} style={styles.coverOptWrap} onPress={() => selectCoverOption(idx)}>
-                        <Image
-                          source={{ uri: `${BACKEND}/api/playable/${game.playable_id}/cover/opt/${idx}.png` }}
+                        <PrivateImage
+                          uri={`${BACKEND}/api/playable/${game.playable_id}/cover/opt/${idx}.png`}
                           style={styles.coverOptImg}
                           resizeMode="cover"
                         />
@@ -1047,8 +1004,8 @@ export default function PlayableScreen() {
                   {(assetPack.assets || []).length > 0 ? (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
                       {(assetPack.assets || []).map((a: any) => (
-                        <Image key={a.asset_id} testID={`pl-ap-${a.asset_id}`}
-                          source={{ uri: `${BACKEND}/api/assets/genesis/${a.asset_id}.png` }}
+                        <PrivateImage key={a.asset_id} testID={`pl-ap-${a.asset_id}`}
+                          uri={`${BACKEND}/api/assets/genesis/${a.asset_id}.png`}
                           style={styles.apThumb} resizeMode="cover" />
                       ))}
                     </ScrollView>
