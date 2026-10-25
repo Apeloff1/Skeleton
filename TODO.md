@@ -390,6 +390,16 @@ runtime release readiness. All inference/training keeps existing authority.
 
 ## Pending in draft
 
+**Status correction — 2026-10-25:** The list below is a dated snapshot
+from 2026-10-24, not the current draft/ready classification. All 33 PRs
+were moved to *Ready for Review* on 2026-10-25; review and merge holds still
+apply. #4250 was subsequently merged into
+`feature/game-frontier-p0-p3-20261019` at
+`82067f20452423006097a0f2da7b1774215dc7ad`, **not into main**;
+GF-P0-34 remains partial and unticked pending GPU/Godot acceptance.
+The historic PR head and draft labels are retained below as timestamped
+evidence. No additional GF-P0 checklist items have been marked complete.
+
 GF-N sync 2026-10-24 (Jenkins). Work only in open draft PRs; NOT ticked until it lands on `feature/game-frontier-p0-p3-20261019` or `main`.
 
 **Item count (GF-N, 2026-10-24):** TODO.md tracks **361** items (151 `[x]`, 210 `[ ]`; P0 194, P1 65, P2 51, P3 51), not the 344 stated in the dispatch plan.
