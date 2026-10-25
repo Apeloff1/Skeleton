@@ -76,6 +76,28 @@ def test_missing_probe_records_fail_closed() -> None:
         gfd.evaluate(gfd.parse_probe("no probe output"))
 
 
+@pytest.mark.parametrize("message", [
+    "ERROR: Scene load failed",
+    "Failed loading resource res://gfd/broken.mesh",
+    "Cannot open file res://gfd/missing.scn",
+    "Resource file not found",
+])
+def test_engine_resource_errors_fail_even_with_success_exit(tmp_path, message) -> None:
+    assert gfd.script_errors("Godot booted\n" + message)
+    logs = tmp_path / "logs"
+    completed = [
+        subprocess.CompletedProcess(["godot"], 0, stdout="Godot booted", stderr=""),
+        subprocess.CompletedProcess(["godot"], 0, stdout=message, stderr=""),
+    ]
+    with patch.object(gfd.subprocess, "run", side_effect=completed):
+        with pytest.raises(AssertionError, match="engine_import_or_playback"):
+            gfd.run("godot", tmp_path / "project", logs)
+    report = json.loads((logs / "gfd-report.json").read_text(encoding="utf-8"))
+    assert report["passed"] is False
+    assert report["failure_kind"] == "engine_import_or_playback"
+    assert message in report["error_lines"][0]
+
+
 def test_script_errors_detected() -> None:
     out = 'SCRIPT ERROR: Parse Error: x\nERROR: Failed to load script "res://a.gd"\nok'
     assert len(gfd.script_errors(out)) == 2
