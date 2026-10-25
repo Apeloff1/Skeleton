@@ -203,6 +203,14 @@ def validate(
                 )
         if not isinstance(item.get("accountability_status"), str) or not item["accountability_status"].strip():
             errors.append(f"{item_id}: accountability_status must be non-empty")
+        # Planning and collecting evidence never constitutes signoff. A CI
+        # pending disposition is not a verified outcome, even when source
+        # paths and test/workflow references are already documented.
+        if item.get("status") in {"planned", "in_progress", "evidence_pending"}:
+            if checkbox is True:
+                errors.append(f"{item_id}: unverified item cannot claim completion")
+            if item.get("accountability_status") == "verified":
+                errors.append(f"{item_id}: unverified item cannot claim verified accountability")
 
     return errors
 
