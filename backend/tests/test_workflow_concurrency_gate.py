@@ -269,6 +269,40 @@ def test_main_ci_contract_rejects_legacy_ref_wide_cancellation() -> None:
     assert toolchain_contract.ci_preserves_main_run_evidence(no_cancellation)
 
 
+def test_nested_job_concurrency_cannot_mask_main_cancellation() -> None:
+    root = Path(__file__).resolve().parents[2]
+    current = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert toolchain_contract.ci_preserves_main_run_evidence(current)
+
+    legacy = current.replace(
+        "github.event.pull_request.number || github.sha",
+        "github.event.pull_request.number || github.ref",
+    ).replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
+    )
+    # A perfectly valid job-level override must not mask the unsafe workflow
+    # default. The old whole-file regex accepted this false negative.
+    nested = legacy.replace(
+        "  changes:\n",
+        "  changes:\n"
+        "    concurrency:\n"
+        "      group: safe-" + chr(36) + "{{ github.sha }}\n"
+        "      cancel-in-progress: false\n",
+        1,
+    )
+    assert nested != legacy
+    assert toolchain_contract.cancel_false(nested)
+    assert not toolchain_contract.ci_preserves_main_run_evidence(nested)
+
+    duplicated = current.replace(
+        "concurrency:\n",
+        "concurrency:\n  cancel-in-progress: false\n",
+        1,
+    )
+    assert not toolchain_contract.ci_preserves_main_run_evidence(duplicated)
+
+
 def test_reusable_ci_keeps_pr_cancellation_but_preserves_each_main_sha() -> None:
     root = Path(__file__).resolve().parents[2]
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
