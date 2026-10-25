@@ -45,3 +45,44 @@ def test_game_checkpoint_loads_are_explicitly_weights_only(name: str) -> None:
         assert values[0].value is True, (
             f"{name}:{node.lineno}: unsafe checkpoint deserialization forbidden"
         )
+
+
+def test_checkpoint_payload_remains_loadable_without_pickle_globals() -> None:
+    """The real checkpoint shapes must be supported without unsafe fallback."""
+    from collections import OrderedDict
+    from io import BytesIO
+
+    torch = pytest.importorskip("torch")
+    payload = {
+        "model": OrderedDict([("weight", torch.tensor([1, 2]))]),
+        "best_state": {"weight": torch.tensor([1, 2])},
+        "optimizer": {
+            "state": {},
+            "param_groups": [{"params": [0], "lr": 0.001, "betas": (0.9, 0.999)}],
+        },
+        "ratchet": {"margin": 0.1, "recent": [0, 1, 0]},
+        "replay": [("game-world", "training text")],
+        "sam_records": [{"text": "example", "approved": True}],
+        "domain_ema": {"rpg": 0.9},
+        "source_digest": None,
+    }
+    stream = BytesIO()
+    torch.save(payload, stream)
+    stream.seek(0)
+    safe = torch.load(stream, map_location="cpu", weights_only=True)
+    torch.testing.assert_close(safe["model"]["weight"], payload["model"]["weight"])
+    assert safe["replay"] == payload["replay"]
+    assert safe["optimizer"] == payload["optimizer"]
+
+
+def test_checkpoint_rejects_non_allowlisted_python_objects() -> None:
+    """A checkpoint with non-allowlisted Python globals must fail closed."""
+    import pickle
+    from io import BytesIO
+
+    torch = pytest.importorskip("torch")
+    stream = BytesIO()
+    torch.save({"unexpected_object": Path("untrusted")}, stream)
+    stream.seek(0)
+    with pytest.raises(pickle.UnpicklingError):
+        torch.load(stream, map_location="cpu", weights_only=True)
