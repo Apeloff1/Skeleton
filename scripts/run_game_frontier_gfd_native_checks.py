@@ -27,7 +27,11 @@ from pathlib import Path
 from typing import Any
 
 PROBE_TAG = "GFD_PROBE "
-ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error", "Failed to load script", "Compile Error")
+ERROR_MARKERS = (
+    "SCRIPT ERROR", "Parse Error", "Compile Error", "ERROR:",
+    "Failed to load script", "Failed loading resource",
+    "Cannot open file", "Resource file not found",
+)
 
 PROJECT_GODOT = """config_version=5
 
