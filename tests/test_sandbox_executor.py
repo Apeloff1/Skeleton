@@ -184,6 +184,21 @@ def test_nonmapping_environment_is_denied_before_launch_and_receipted(tmp_path: 
     launched.assert_not_called()
 
 
+def test_oversize_argv_is_rejected_before_iterating_untrusted_arguments(tmp_path: Path) -> None:
+    class DoNotIterate(list):
+        def __iter__(self):
+            raise AssertionError("oversize argv must be denied before value iteration")
+
+    ex = _executor(tmp_path)
+    with patch("skeleton.sandbox.executor.run_isolated") as launched:
+        out = ex.execute(ToolRequest("echo", DoNotIterate(["x"] * 300)))
+    assert out.status == "denied"
+    assert "too many arguments" in out.reason
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    launched.assert_not_called()
+
+
 def test_execution_budget(tmp_path: Path) -> None:
     ex = _executor(tmp_path, policy=ExecutorPolicy(require_network_isolation=False, max_executions=1))
     assert ex.execute(ToolRequest("echo", ("one",))).ok

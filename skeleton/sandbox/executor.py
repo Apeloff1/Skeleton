@@ -324,11 +324,13 @@ class GuardedExecutor:
     def _check_args(self, spec: ToolSpec, request: ToolRequest) -> tuple[str, ...]:
         # Refuse malformed and string-shaped argv, including non-iterables.
         # tuple("abc") would otherwise turn one untrusted argument into three.
-        if not isinstance(request.args, (tuple, list)) or any(not isinstance(value, str) for value in request.args):
+        if not isinstance(request.args, (tuple, list)):
+            raise ProcessPolicyError("tool arguments must be a list or tuple of strings")
+        if len(request.args) > spec.max_args:
+            raise ProcessPolicyError("too many arguments for tool", context={"tool": spec.name, "maximum": spec.max_args})
+        if any(not isinstance(value, str) for value in request.args):
             raise ProcessPolicyError("tool arguments must be a list or tuple of strings")
         args = tuple(request.args)
-        if len(args) > spec.max_args:
-            raise ProcessPolicyError("too many arguments for tool", context={"tool": spec.name, "maximum": spec.max_args})
         if args:
             check_argv(args)
         if request.cwd is not None and not isinstance(request.cwd, str):
