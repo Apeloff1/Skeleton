@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -17,7 +18,8 @@ from skeleton.sandbox import (
     ToolRequest,
     ToolSpec,
 )
-from skeleton.sandbox.errors import ProcessPolicyError
+from skeleton.sandbox.errors import ProcessPolicyError, SanitizerError
+from skeleton.sandbox.process import ProcessResult
 from skeleton.security.generated_code_sandbox import GeneratedCodeSandbox, SandboxCapability
 
 ECHO = shutil.which("echo") or "/bin/echo"
@@ -258,3 +260,47 @@ def test_audit_evidence_is_immutable_against_caller_and_sink_mutation() -> None:
     assert retained[0]["event"]["details"][0]["result"] == "denied"
     assert observed[0]["event"]["details"][0]["result"] == "tampered-by-sink"
     assert audit.verify()
+
+
+def test_unscannable_output_is_blocked_and_audited(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    spec = ToolSpec("echo", ECHO)
+    result = ProcessResult(
+        argv=(ECHO,), returncode=0, stdout=b"untrusted tool text",
+        stderr=b"", timed_out=False, truncated=False, duration_s=0.1,
+    )
+    with patch(
+        "skeleton.sandbox.executor.detect",
+        side_effect=SanitizerError("malformed output"),
+    ):
+        outcome = ex._scrub(spec, result)
+    assert outcome.status == "blocked"
+    assert outcome.output_flagged is True
+    assert outcome.output_report == {"error": "unscannable"}
+    assert "untrusted tool text" not in outcome.for_model()
+    ex._finish(ToolRequest("echo", source="scanner-regression"), outcome)
+    assert ex.audit.verify()
+    entries = ex.audit.entries()
+    assert entries[-1]["event"]["status"] == "blocked"
+    assert entries[-1]["event"]["output_flagged"] is True
+
+
+def test_untrusted_audit_source_and_reason_cannot_store_secrets(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    # Synthesize credential-shaped values at runtime (no token-like literals
+    # in Git history) and check both untrusted entry points.
+    synthetic_key = "AKIA" + "".join(chr(code) for code in range(ord("A"), ord("P") + 1))
+    request = ToolRequest("not-registered", source=f"source={synthetic_key}")
+    outcome = ex._finish(
+        request,
+        ToolOutcome(
+            "not-registered", "denied",
+            f"refusal reason carried source={synthetic_key}",
+        ),
+    )
+    assert outcome.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    entry = ex.audit.entries()[-1]["event"]
+    assert synthetic_key not in entry["source"]
+    assert synthetic_key not in entry["reason"]
+    assert synthetic_key not in ex.audit.export_jsonl()
