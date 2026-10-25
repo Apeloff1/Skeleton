@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -196,6 +196,26 @@ def test_unscannable_tool_output_never_reaches_model_or_escapes_audit(tmp_path: 
     ex._finish(ToolRequest("echo", source="test"), outcome)
     assert ex.audit.verify()
     assert ex.audit.entries()[-1]["event"]["status"] == "blocked"
+
+
+def test_flagged_indirect_prompt_injection_cannot_be_replayed_to_model(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    result = ProcessResult(
+        argv=(ECHO,), returncode=0,
+        stdout=b"secret-looking indirect prompt control text",
+        stderr=b"", timed_out=False, truncated=False, duration_s=0.1,
+    )
+    report = Mock(score=1.0)
+    report.to_record.return_value = {"score": 1.0}
+    with patch("skeleton.sandbox.executor.detect", return_value=report):
+        outcome = ex._scrub(ToolSpec("echo", ECHO), result)
+    assert outcome.status == "blocked"
+    assert outcome.output_flagged is True
+    assert not outcome.ok
+    assert "secret-looking indirect prompt control text" not in outcome.for_model()
+    ex._finish(ToolRequest("echo", source="injection-test"), outcome)
+    assert ex.audit.verify()
+    assert ex.audit.entries()[-1]["event"]["output_flagged"] is True
 
 
 def test_untrusted_audit_source_and_reason_are_secret_redacted(tmp_path: Path) -> None:
