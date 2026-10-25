@@ -280,3 +280,25 @@ def test_frozen_package_regression_uses_only_three_literal_import_targets() -> N
     }
     assert imports == {"skeleton.persist", "skeleton.storage", "skeleton.state"}
     assert SCANNER.violations(file) == []
+
+
+def test_deferred_165_loader_matches_literal_handlers() -> None:
+    from skeleton.ai.runtime.deferred.catalog import DEFERRED_165_SPECS
+
+    path = ROOT / "scripts/check_ai_deferred_165_runtime.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    loader = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_registered_handler_module"
+    )
+    named = {
+        node.args[0].value for node in ast.walk(loader)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute) and node.func.attr == "import_module"
+        and node.args and isinstance(node.args[0], ast.Constant)
+    }
+    expected = {row.handler.rsplit(".", 1)[0] for row in DEFERRED_165_SPECS}
+    assert len(DEFERRED_165_SPECS) == 165
+    assert len(expected) == 10
+    assert named == expected
+    assert SCANNER.violations(path) == []
