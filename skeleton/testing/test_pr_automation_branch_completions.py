@@ -447,7 +447,7 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
     # The index is manual-only; never restore a second privileged automatic
     # workflow_run fanout just to satisfy a stale consumer contract.
     trigger_block = pr_automation.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
-    assert "\n  workflow_dispatch:\n" in trigger_block
+    assert "  workflow_dispatch:\n" in trigger_block
     assert "\n  workflow_run:" not in trigger_block
     assert "\n  schedule:" not in trigger_block
     assert "pull_requests[0]" not in pr_automation
