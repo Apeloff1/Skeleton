@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import hashlib
 import importlib
+import json
 import stat
+from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
+from zipfile import ZipFile
 
 import pytest
 from fastapi import FastAPI
@@ -148,6 +153,67 @@ def test_governed_web_and_source_stage_privately_and_cleanup(monkeypatch, kind: 
     assert result["ok"] is True
     assert len(staged) == 1
     assert not staged[0].exists()  # cleanup holds on all nonexceptional exits
+
+
+def test_actual_governed_archive_builds_from_private_scratch(monkeypatch) -> None:
+    # Exercise the real ZIP builders and registry, not just mocked entrypoints.
+    # No live MongoDB, provider secret, writable /app, or native engine needed.
+    from core import gameforge_artifact_builder as impl
+    from routes import gameforge_build as routes
+
+    saved: dict[tuple[str, str], bytes] = {}
+    registered: list[dict] = []
+
+    class Store:
+        def write_bytes(self, *, tenant_id, artifact_id, payload, **kwargs):
+            assert tenant_id == "tenant-private"
+            assert kwargs["data_class"] == "internal"
+            assert "download" in kwargs["purposes"]
+            saved[(tenant_id, artifact_id)] = bytes(payload)
+            return SimpleNamespace(
+                record_id="record-" + artifact_id,
+                source_ref=f"artifact://{tenant_id}/{artifact_id}",
+                size_bytes=len(payload),
+                sha256=hashlib.sha256(payload).hexdigest(),
+            )
+
+    class Database:
+        def __getitem__(self, name):
+            assert name == "gameforge_builds"
+            return SimpleNamespace(
+                update_one=lambda query, operation, **kwargs:
+                    registered.append(operation["$set"]),
+            )
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(routes, "_governed_store", Store)
+        scoped.setattr(impl, "database", Database)
+        scoped.setattr(impl, "gamefiles", lambda _name: [
+            {"filename": "game.py", "content": "print('safe')", "metadata": {"kind": "source"}},
+        ])
+        body = routes.BuildBody(game_name="read-only-image")
+        web = asyncio.run(routes._build_web_for_user(body, {"tenant_id": "tenant-private"}))
+        src = asyncio.run(routes._build_source_for_user(body, {"tenant_id": "tenant-private"}))
+
+    assert web["ok"] and src["ok"]
+    assert len(saved) == 2 and len(registered) == 2
+    assert all(rec["path"] is None for rec in registered)
+    for rec in registered:
+        assert rec["tenant_id"] == "tenant-private"
+        assert rec["source_ref"].startswith("artifact://tenant-private/")
+        assert len(rec["sha256"]) == 64
+
+    web_zip = saved[("tenant-private", web["build_id"])]
+    with ZipFile(BytesIO(web_zip)) as archive:
+        assert set(archive.namelist()) == {"index.html", "game_data.json"}
+        data = json.loads(archive.read("game_data.json"))
+        assert data["files"][0]["filename"] == "game.py"
+
+    source_zip = saved[("tenant-private", src["build_id"])]
+    with ZipFile(BytesIO(source_zip)) as archive:
+        assert set(archive.namelist()) == {"manifest.json", "gamefiles/game.py"}
+        assert archive.read("gamefiles/game.py") == b"print('safe')"
+        assert json.loads(archive.read("manifest.json"))["file_count"] == 1
 
 
 def test_cold_storage_import_does_not_contact_mongo() -> None:
