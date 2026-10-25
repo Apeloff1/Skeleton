@@ -148,6 +148,24 @@ def main() -> int:
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
+    # CI receipts on 2026-10-25 showed three required long-form suites timing
+    # out at their previous 30/45/60-minute ceilings. Require bounded runway
+    # without permitting premature cancellation or an unbounded job.
+    for job_name, minimum in (
+        ("unit", 90),
+        ("quality_security", 120),
+        ("pr_automation", 90),
+    ):
+        configured = re.findall(
+            r"^    timeout-minutes:\s*(\d+)\s*$",
+            job_block(text, job_name),
+            re.MULTILINE,
+        )
+        require(
+            len(configured) == 1 and minimum <= int(configured[0]) <= 120,
+            f"{job_name} must have one bounded {minimum}-120-minute timeout",
+            failures,
+        )
     unit = job_block(text, "unit")
     normalized_unit = " ".join(unit.split())
     require(
