@@ -7121,6 +7121,11 @@
       "reason": "UI and presentation adapters remain frontend-owned pending wired, tested interfaces to the AI runtime"
     },
     {
+      "path": "skeleton/frontier_nav",
+      "owner": "Game Frontier virtual positioning and route-grounding domain",
+      "reason": "Canonical gameplay-facing virtual GPS, surveyed map fixes and NPC route grounding remain under skeleton/frontier_nav until an explicit tested AI-tree ownership cutover; virtual coordinates are not real-device location authority or completed native-engine evidence."
+    },
+    {
       "path": "skeleton/galaxy",
       "owner": "distributed compatibility boundary",
       "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"

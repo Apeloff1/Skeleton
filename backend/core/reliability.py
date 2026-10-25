@@ -345,7 +345,10 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if any(path == p or path.startswith(p + "/") or path.startswith(p) for p in self.NEVER_SHED):
+        if any(
+            path == p or path.startswith(p.rstrip("/") + "/")
+            for p in self.NEVER_SHED
+        ):
             return await call_next(request)
         try:
             shed = bool(getattr(request.app.state, "_shedding", False))
@@ -354,11 +357,20 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
                 try:
                     from core import build_watchdog as _bwd
 
-                    if (
-                        _bwd._tick_count > 0
-                        and (time.time() - getattr(_bwd, "_last_tick_at", time.time())) > self.wd_stale_sec
-                    ):
-                        shed = True
+                    # _tick_count increments at the START of a sweep. For
+                    # its first few milliseconds, _last_tick_at is still 0;
+                    # treating epoch zero as a completed heartbeat was
+                    # shedding healthy auth requests immediately on startup.
+                    # Once first-tick admission is visible, its start time
+                    # bounds the first sweep. Later use completed ticks only,
+                    # so a stalled watchdog still forces a 503.
+                    if _bwd._tick_count > 0:
+                        heartbeat = (
+                            getattr(_bwd, "_last_tick_at", 0.0)
+                            or getattr(_bwd, "_first_tick_started_at", 0.0)
+                        )
+                        if not heartbeat or time.time() - heartbeat > self.wd_stale_sec:
+                            shed = True
                 except Exception:
                     pass
         except Exception:
