@@ -537,7 +537,7 @@ def test_reusable_ci_preserves_immutable_main_sha_evidence() -> None:
     assert "group: " + expected_group in workflow
     cancel = "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}"
     assert cancel in workflow
-    assert check_toolchain_contract.pr_only_ref_scoped_cancellation(workflow)
+    assert check_toolchain_contract.ci_preserves_main_run_evidence(workflow)
     unsafe = workflow.replace(cancel, "cancel-in-progress: true")
     assert unsafe != workflow
-    assert not check_toolchain_contract.pr_only_ref_scoped_cancellation(unsafe)
+    assert not check_toolchain_contract.ci_preserves_main_run_evidence(unsafe)
