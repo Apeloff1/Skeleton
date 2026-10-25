@@ -58,6 +58,7 @@ STATUS_BLOCKED = "blocked"
 STATUSES = (STATUS_OK, STATUS_FAILED, STATUS_TIMEOUT, STATUS_DENIED, STATUS_BLOCKED)
 MAX_TOOL_NAME = 64
 MAX_AUDIT_ENTRIES = 10_000
+MAX_OUTPUT_CHARS = 200_000
 GENESIS_HASH = "0" * 64
 
 
@@ -96,10 +97,25 @@ class ToolSpec:
             raise ExecutorConfigError("tool executable is invalid", context={"tool": self.name})
         if self.arg_context not in CONTEXT_FAMILIES or (self.stdin_context is not None and self.stdin_context not in CONTEXT_FAMILIES):
             raise ExecutorConfigError("unknown injection context", context={"tool": self.name})
-        if not 0 < self.max_args <= 256 or any(i < 0 or i >= self.max_args for i in self.path_args):
+        if (
+            type(self.max_args) is not int
+            or not 1 <= self.max_args <= 256
+            or not isinstance(self.path_args, frozenset)
+            or any(
+                type(i) is not int or i < 0 or i >= self.max_args
+                for i in self.path_args
+            )
+        ):
             raise ExecutorConfigError("argument bounds are invalid", context={"tool": self.name})
-        if not 0.0 < self.block_threshold <= 1.0:
+        if type(self.block_threshold) not in (int, float) or not 0.0 < self.block_threshold <= 1.0:
             raise ExecutorConfigError("block threshold must be in (0, 1]", context={"tool": self.name})
+        if type(self.output_chars) is not int or not 1 <= self.output_chars <= MAX_OUTPUT_CHARS:
+            raise ExecutorConfigError(
+                "output cap must be a bounded positive integer",
+                context={"tool": self.name},
+            )
+        if not isinstance(self.limits, ProcessLimits):
+            raise ExecutorConfigError("process limits must be ProcessLimits", context={"tool": self.name})
 
 
 @dataclass(frozen=True)
@@ -119,6 +135,17 @@ class ExecutorPolicy:
     max_executions: int | None = None
     scan_output: bool = True
     output_block_threshold: float = 0.7
+
+    def __post_init__(self) -> None:
+        if self.max_executions is not None and (
+            type(self.max_executions) is not int or self.max_executions < 0
+        ):
+            raise ExecutorConfigError("execution budget must be a nonnegative integer")
+        if (
+            type(self.output_block_threshold) not in (int, float)
+            or not 0.0 < self.output_block_threshold <= 1.0
+        ):
+            raise ExecutorConfigError("output block threshold must be in (0, 1]")
 
 
 @dataclass
