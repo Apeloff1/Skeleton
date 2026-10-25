@@ -100,7 +100,7 @@ class _SequenceProvider:
 
 
 class _UnavailableRegistry:
-    def require_active(self):
+    def require_for_context(self, _context_policy):
         raise ProviderUnavailableError("deterministic outage")
 
 
@@ -108,7 +108,10 @@ class _Registry:
     def __init__(self, provider) -> None:
         self.provider = provider
 
-    def require_active(self):
+    def require_for_context(self, _context_policy):
+        # Stage-7 fixtures implement the current, context-scoped registry
+        # contract. The previously used require_active() was retired and
+        # caused the coordinator to fail before exercising any journey logic.
         return self.provider
 
 
