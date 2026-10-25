@@ -88,3 +88,48 @@ def test_governed_lazy_alias_mirrors_remain_byte_identical() -> None:
         ("skeleton/ai/runtime/inference/core/__init__.py", "skeleton/inference/__init__.py"),
     ):
         assert (ROOT / canonical).read_bytes() == (ROOT / mirror).read_bytes()
+
+
+TRUSTED_TWIN_PAIRS = (
+    ("skeleton/ai/learning/school/runtime_attestation.py", "skeleton/learning/school/runtime_attestation.py",
+     "_load_trusted_named_module", (
+         "skeleton.learning.school.decision_ledger", "skeleton.ai.learning.school.decision_ledger",
+         "skeleton.learning.school.runtime_replay", "skeleton.ai.learning.school.runtime_replay",
+         "skeleton.learning.school.runtime_attestation", "skeleton.ai.learning.school.runtime_attestation",
+     )),
+    ("skeleton/ai/learning/school/runtime_capsule.py", "skeleton/learning/school/runtime_capsule.py",
+     "_load_trusted_twin_module", (
+         "skeleton.ai.learning.school.decision_ledger", "skeleton.ai.learning.school.runtime_replay",
+     )),
+    ("skeleton/ai/learning/school/runtime_replay.py", "skeleton/learning/school/runtime_replay.py",
+     "_load_trusted_twin_module", (
+         "skeleton.ai.learning.school.decision_ledger", "skeleton.ai.learning.school.session_runtime",
+         "skeleton.ai.learning.school.runtime_replay",
+     )),
+    ("skeleton/ai/runtime/observability/slo.py", "skeleton/observability/slo.py",
+     "_load_trusted_slo_twin", (
+         "skeleton.ai.runtime.observability.slo", "skeleton.observability.slo",
+     )),
+)
+
+
+@pytest.mark.parametrize("canonical,mirror,helper,allowed", TRUSTED_TWIN_PAIRS)
+def test_trusted_type_mirrors_retain_identical_literal_imports(
+    canonical: str, mirror: str, helper: str, allowed: tuple[str, ...]
+) -> None:
+    source = (ROOT / canonical).read_bytes()
+    assert source == (ROOT / mirror).read_bytes()
+    tree = ast.parse(source.decode("utf-8"))
+    candidates = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == helper]
+    assert len(candidates) == 1
+    imported: set[str] = set()
+    for node in ast.walk(candidates[0]):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and (
+            node.func.attr == "import_module"
+        ):
+            assert isinstance(node.args[0], ast.Constant)
+            assert isinstance(node.args[0].value, str)
+            imported.add(node.args[0].value)
+    assert imported == set(allowed)
+    assert SCANNER.violations(ROOT / canonical) == []
+    assert SCANNER.violations(ROOT / mirror) == []
