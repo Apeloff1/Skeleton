@@ -30,49 +30,14 @@ class AntiPatternException:
   object.__setattr__(self,"pattern_id",_id(self.pattern_id,"pattern_id"));object.__setattr__(self,"owner_id",_id(self.owner_id,"owner_id"))
   if not isinstance(self.path,str) or not self.path.strip() or not isinstance(self.rationale,str) or not self.rationale.strip() or not isinstance(self.expires_tick,int) or isinstance(self.expires_tick,bool) or self.expires_tick<1:raise AntiPatternError("exception owner rationale and expiry required")
 class AntiPatternRegistry:
-    """Fail-closed detector and time-scoped exception registry."""
-
-    def __init__(self, patterns):
-        items = tuple(patterns)
-        if any(not isinstance(item, AntiPattern) for item in items):
-            raise AntiPatternError("registry needs AntiPattern entries")
-        ids = [item.pattern_id for item in items]
-        if len(ids) != len(set(ids)):
-            raise AntiPatternError("duplicate anti-pattern registry identity")
-        self.patterns = {item.pattern_id: item for item in items}
-        self._detectors = {
-            item.pattern_id: re.compile(item.detector_regex) for item in items
-        }
-
-    def scan(self, path, text):
-        if not isinstance(path, str) or not path.strip() or not isinstance(text, str):
-            raise AntiPatternError("scan path and text must be strings")
-        findings = []
-        for pattern_id, regex in self._detectors.items():
-            for line_no, line in enumerate(text.splitlines(), 1):
-                if regex.search(line):
-                    findings.append(
-                        AntiPatternFinding(pattern_id, path, line_no, line.strip())
-                    )
-        return tuple(sorted(findings, key=lambda item: (item.path, item.line, item.pattern_id)))
-
-    def unresolved(self, findings, exceptions, current_tick):
-        if type(current_tick) is not int or current_tick < 0:
-            raise AntiPatternError("current_tick must be a nonnegative integer")
-        active = set()
-        for item in exceptions:
-            if not isinstance(item, AntiPatternException):
-                raise AntiPatternError("exception must be a governed AntiPatternException")
-            if item.pattern_id not in self.patterns:
-                raise AntiPatternError(f"unknown anti-pattern exception: {item.pattern_id}")
-            if item.expires_tick >= current_tick:
-                active.add((item.pattern_id, item.path))
-        result = []
-        for item in findings:
-            if not isinstance(item, AntiPatternFinding):
-                raise AntiPatternError("finding must be a governed AntiPatternFinding")
-            if item.pattern_id not in self.patterns:
-                raise AntiPatternError(f"unknown anti-pattern finding: {item.pattern_id}")
-            if (item.pattern_id, item.path) not in active:
-                result.append(item)
-        return tuple(result)
+ def __init__(self,patterns):self.patterns={p.pattern_id:p for p in patterns}
+ def scan(self,path,text):
+  out=[]
+  for p in self.patterns.values():
+   rx=re.compile(p.detector_regex)
+   for n,line in enumerate(text.splitlines(),1):
+    if rx.search(line):out.append(AntiPatternFinding(p.pattern_id,path,n,line.strip()))
+  return tuple(sorted(out,key=lambda x:(x.path,x.line,x.pattern_id)))
+ def unresolved(self,findings,exceptions,current_tick):
+  active={(e.pattern_id,e.path) for e in exceptions if e.expires_tick>=current_tick}
+  return tuple(f for f in findings if (f.pattern_id,f.path) not in active)
