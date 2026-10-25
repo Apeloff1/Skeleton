@@ -824,3 +824,78 @@ async def audit_authored_walkable_routes(
     """Authenticated read-only source replay, not a native-game certification."""
     return await _call(studio.audit_walkable_routes(
         _scope(user), project_id, body.model_dump()))
+
+
+# --------------------------------------------------------------------------
+# GF-B: save / restore / replay (extend-only)
+# --------------------------------------------------------------------------
+from skeleton.kernel.checkpoint import CheckpointError as _CheckpointError  # noqa: E402
+from skeleton.kernel.game_save_plane import ReplayConflictError as _ReplayConflict  # noqa: E402
+
+
+class ChunkReceiptIn(Request):
+    chunk_id: str = Field(min_length=1, max_length=256)
+    body: dict[str, Any] = Field(default_factory=dict)
+
+
+class GameSave(Request):
+    sequence: int = Field(ge=0, le=2**63 - 1, strict=True)
+    sections: dict[str, dict[str, Any]] = Field(max_length=64)
+    receipts: list[ChunkReceiptIn] = Field(default_factory=list, max_length=10000)
+
+
+class ReplayFrameIn(Request):
+    frame: int = Field(ge=0, le=2**63 - 1, strict=True)
+    event: dict[str, Any]
+
+
+class ReplayRecord(Request):
+    frames: list[ReplayFrameIn] = Field(min_length=1, max_length=4096)
+
+
+async def _save_call(awaitable):
+    try:
+        return await _call(awaitable)
+    except _ReplayConflict as exc:
+        raise HTTPException(409, detail={"code": "replay_frame_conflict",
+                                         "message": str(exc)}) from exc
+    except _CheckpointError as exc:
+        raise HTTPException(409, detail={"code": "game_save_rejected",
+                                         "message": str(exc)}) from exc
+
+
+@router.post("/projects/{project_id}/saves/{slot}")
+async def save_game(project_id: str, slot: str, body: GameSave,
+                    user=Depends(get_current_user)):
+    data = body.model_dump()
+    return await _save_call(studio.save_game_state(
+        _write_scope(user), project_id, slot, data["sequence"],
+        data["sections"], data["receipts"]))
+
+
+@router.get("/projects/{project_id}/saves/{slot}")
+async def restore_game(project_id: str, slot: str, sequence: int | None = None,
+                       cursor: int = 0, limit: int = 100,
+                       user=Depends(get_current_user)):
+    if cursor < 0 or not 1 <= limit <= 500:
+        raise HTTPException(422, detail={"code": "invalid_receipt_page",
+                                         "message": "cursor>=0, 1<=limit<=500"})
+    return await _save_call(studio.restore_game_state(
+        _scope(user), project_id, slot, sequence=sequence,
+        receipt_cursor=cursor, receipt_limit=limit))
+
+
+@router.post("/projects/{project_id}/replays/{stream}")
+async def record_replay(project_id: str, stream: str, body: ReplayRecord,
+                        user=Depends(get_current_user)):
+    return await _save_call(studio.record_replay_frames(
+        _write_scope(user), project_id, stream, body.model_dump()["frames"]))
+
+
+@router.get("/projects/{project_id}/replays/{stream}")
+async def read_replay(project_id: str, stream: str, after: int = -1,
+                      upto: int | None = None, context_upto: int | None = None,
+                      user=Depends(get_current_user)):
+    return await _save_call(studio.replay_frames(
+        _scope(user), project_id, stream, after=after, upto=upto,
+        context_upto=context_upto))

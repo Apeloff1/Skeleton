@@ -42,6 +42,7 @@ _stopped = False
 _tick_count: int = 0
 _restart_history: list[float] = []  # epoch seconds of recent restarts
 _last_tick_at: float = 0.0
+_first_tick_started_at: float = 0.0
 _last_counts: dict[str, int] = {}
 
 
@@ -140,7 +141,13 @@ def _age_seconds(value: Any) -> float | None:
 
 async def _scan_once() -> dict:
     """One bounded sweep. Timed-out work increments stopped, never completed."""
-    global _tick_count, _restart_history
+    global _tick_count, _restart_history, _first_tick_started_at
+    # Publish an initial heartbeat *before* incrementing the tick counter.
+    # LoadSheddingMiddleware uses this only until the first sweep completes:
+    # a still-running first sweep is not incorrectly classified as 55 years
+    # stale, yet a wedged first sweep will fail closed after wd_stale_sec.
+    if not _first_tick_started_at:
+        _first_tick_started_at = time.time()
     _tick_count += 1
     counts = {
         "restarted": 0,
