@@ -193,7 +193,9 @@ def test_live_observation_compacts_large_rollups_without_losing_custody():
     with patch.object(supervisor, "_gh_json", side_effect=lambda args: changed if args[0] == "pr" else []):
         revised = supervisor.observe("Apeloff1/Skeleton")
     assert revised.fingerprint != observed.fingerprint
-    assert revised.pull_requests[0]["statusCheckRollup"] == pr["statusCheckRollup"]
+    assert revised.pull_requests[0]["statusCheckRollup"][:-1] == pr["statusCheckRollup"][:-1]
+    assert revised.pull_requests[0]["statusCheckRollup"][-1] == {"conclusion": "FAILURE"}
+    assert pr["statusCheckRollup"][-1] == {"conclusion": "SUCCESS"}
 
 
 def test_pr_rollup_invalid_shape_fails_closed():
@@ -259,3 +261,32 @@ def test_snapshot_fingerprint_matches_canonical_envelope_hash_on_small_input():
         ensure_ascii=True, allow_nan=False,
     ).encode("utf-8")
     assert observed.fingerprint == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize("tail_state,expected", [
+    ("FAILURE", "failing-ci"),
+    ("CANCELLED", "failing-ci"),
+    ("QUEUED", "awaiting-checks"),
+    ("PENDING", "awaiting-checks"),
+    ("UNKNOWN", "awaiting-checks"),
+    ("SUCCESS", "healthy"),
+])
+def test_worker_health_includes_checks_beyond_bounded_rollup(tail_state, expected):
+    checks = [{"name": str(i), "conclusion": "SUCCESS"} for i in range(80)]
+    checks[-1]["conclusion"] = tail_state
+    normalized = supervisor._normalize_pr_observation({
+        "number": 77,
+        "title": "bounded worker evidence",
+        "headRefName": "bot/specialist-builder-" + "a" * 16,
+        "baseRefName": "main",
+        "mergeStateStatus": "CLEAN",
+        "statusCheckRollup": checks,
+    })
+    assert len(normalized["statusCheckRollup"]) == 64
+    assert normalized["statusCheckRollupCount"] == 80
+    assert normalized["statusCheckRollup"][0] == {"conclusion": "SUCCESS"}
+    assert normalized["statusCheckRollup"][-1] == {"conclusion": tail_state}
+    health = supervisor.durable_worker_health(snapshot(prs=(normalized,)))
+    assert health["active_count"] == 1
+    assert health["active_workers"][0]["classification"] == expected
+    assert len(normalized["statusCheckRollupFingerprint"]) == 64
