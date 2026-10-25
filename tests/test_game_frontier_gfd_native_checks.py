@@ -26,6 +26,21 @@ def test_emit_project_writes_scene_and_script(tmp_path) -> None:
         assert f'type="{node}"' in scene
 
 
+def test_native_slope_geometry_descends_toward_negative_x() -> None:
+    # Godot's serialized Transform3D uses basis *columns*: the second
+    # component of the first axis is the local +X axis' world Y component.
+    # A positive component means the slope rises to +X, hence downhill -X.
+    scene = gfd.SCENE_TSCN.split('[node name="Slope" type="StaticBody3D" parent="."]', 1)[1]
+    transform = scene.split("transform = Transform3D(", 1)[1].split(")", 1)[0]
+    axes = [float(part.strip()) for part in transform.split(",")]
+    assert len(axes) == 12
+    assert axes[1] > 0.2, "native fixture slope must rise toward +X"
+    assert axes[3] < -0.2, "rotation must be a right-handed 15 degree incline"
+    assert axes[4] > 0.9
+    # Keep the independent motion assertion aligned with the fixture.
+    assert gfd.evaluate(gfd.parse_probe(_log()))["checks"]["rigid_down_slope"]
+
+
 def test_passing_probe_reports_no_gpu_or_screenshot_claims() -> None:
     report = gfd.evaluate(gfd.parse_probe(_log()))
     assert report["passed"]
