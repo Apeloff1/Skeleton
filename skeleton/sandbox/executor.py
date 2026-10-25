@@ -144,7 +144,12 @@ class ToolOutcome:
 
     def for_model(self) -> str:
         """Tool output fenced as untrusted data for an LLM prompt."""
-        body = self.stdout if self.ok or self.status == STATUS_FAILED else f"[{self.status}] {self.reason}"
+        # Flagged output is an indirect prompt-injection surface, not ordinary
+        # data to forward to the model, even when the process returned zero.
+        if self.output_flagged:
+            body = "[blocked] tool output withheld: possible injected instructions"
+        else:
+            body = self.stdout if self.ok or self.status == STATUS_FAILED else f"[{self.status}] {self.reason}"
         return quarantine(body, source=f"tool:{self.tool}")
 
     def to_record(self) -> dict[str, Any]:
@@ -165,6 +170,8 @@ class AuditLog:
     """Append-only, hash-chained record of executor decisions (bounded)."""
 
     def __init__(self, *, sink: Callable[[dict[str, Any]], None] | None = None, max_entries: int = MAX_AUDIT_ENTRIES) -> None:
+        if type(max_entries) is not int or not 1 <= max_entries <= MAX_AUDIT_ENTRIES:
+            raise ExecutorConfigError("audit capacity must be a bounded positive integer")
         self._entries: list[dict[str, Any]] = []
         self._lock = threading.Lock()
         self._sink = sink
@@ -354,7 +361,11 @@ class GuardedExecutor:
 
     def _limits(self, spec: ToolSpec) -> tuple[ProcessLimits, bool]:
         if spec.network_hosts:
-            return replace(spec.limits, network="inherit"), False
+            # The current process boundary offers "deny" or unrestricted
+            # "inherit", but has no host-scoped egress filter. A capability
+            # grant for one hostname cannot safely authorize all outbound
+            # traffic. Refuse until enforceable per-host isolation exists.
+            raise ProcessPolicyError("host-scoped networking unavailable (fail closed)")
         if network_isolation_available():
             return replace(spec.limits, network="deny"), True
         if self._policy.require_network_isolation:
