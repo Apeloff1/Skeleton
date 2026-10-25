@@ -73,6 +73,24 @@ def test_git_workspace_is_not_created_at_import(monkeypatch, tmp_path: Path) -> 
     assert root.is_dir()
 
 
+def test_gameforge_build_import_does_not_create_artifact_directory(monkeypatch) -> None:
+    # The production container has a read-only /app filesystem. Importing
+    # build endpoints must not try to initialize /app/backend/artifacts/builds.
+    module = importlib.import_module("routes.gameforge_build")
+
+    def reject_mkdir(*args, **kwargs):
+        raise AssertionError("GameForge build router wrote during import")
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(module.os, "makedirs", reject_mkdir)
+        reloaded = importlib.reload(module)
+
+    paths = {route.path for route in reloaded.router.routes}
+    assert {"/api/gameforge/build/web", "/api/gameforge/build/source",
+            "/api/gameforge/build/godot"}.issubset(paths)
+    assert reloaded._ARTIFACTS.endswith("/artifacts/builds")
+
+
 def test_cold_storage_import_does_not_contact_mongo() -> None:
     module = importlib.reload(importlib.import_module("core.cold_storage"))
     assert module._db_handle is None
