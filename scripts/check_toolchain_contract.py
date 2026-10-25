@@ -136,12 +136,18 @@ def ref_scoped_cancellation(workflow: str) -> bool:
     )
 
 
-def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
-    """Return true when PRs cancel superseded runs but branch pushes queue."""
+def pr_only_ref_or_sha_scoped_cancellation(workflow: str) -> bool:
+    """Require PR-only preemption and a group bounded to PR or immutable main SHA."""
     group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
     return bool(
         group
-        and "${{ github.event.pull_request.number || github.ref }}" in group.group(1)
+        and any(
+            fallback in group.group(1)
+            for fallback in (
+                "${{ github.event.pull_request.number || github.ref }}",
+                "${{ github.event.pull_request.number || github.sha }}",
+            )
+        )
         and re.search(
             r"^\s*cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*(?:#.*)?$",
             workflow,
@@ -149,6 +155,58 @@ def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
         )
         is not None
     )
+
+
+def ci_preserves_main_run_evidence(workflow: str) -> bool:
+    """Validate top-level reusable-CI concurrency, never nested job settings.
+
+    Main commits must not cancel one another. PR heads may supersede their
+    own checks; other events must retain an immutable SHA group or never
+    cancel. Reject ambiguous or duplicated top-level concurrency entries.
+    """
+    lines = workflow.splitlines()
+    # The YAML top-level key must be exactly unindented; scanning arbitrary
+    # group/cancel lines could accept an unsafe top-level setting if a nested
+    # job declared an unrelated safe-looking concurrency rule.
+    indices = [i for i, line in enumerate(lines) if line == "concurrency:"]
+    if len(indices) != 1:
+        return False
+
+    settings: dict[str, str] = {}
+    for line in lines[indices[0] + 1:]:
+        if line and not line[0].isspace() and not line.startswith("#"):
+            break
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = re.fullmatch(r"  (group|cancel-in-progress):\s*(.+)", line)
+        if match is None:
+            return False
+        key, value = match.groups()
+        if key in settings:
+            return False
+        settings[key] = value.strip()
+    if set(settings) != {"group", "cancel-in-progress"}:
+        return False
+
+    group = settings["group"]
+    cancellation = settings["cancel-in-progress"]
+    # A trailing YAML comment is not part of the actual GitHub group value.
+    # Never accept a safety-critical SHA token that appears only in a comment.
+    if "#" in group or "#" in cancellation:
+        return False
+    if cancellation == "false":
+        return True
+    if cancellation == "true":
+        return "${{ github.sha }}" in group
+    if cancellation == "${{ github.event_name == 'pull_request' }}":
+        return any(
+            term in group
+            for term in (
+                "${{ github.event.pull_request.number || github.sha }}",
+                "${{ github.event.pull_request.number || github.ref }}",
+            )
+        )
+    return False
 
 
 def pinned_action_count(workflow: str, action: str, generation: str) -> int:
@@ -416,10 +474,7 @@ def main() -> int:
         failures,
     )
     require(
-        cancel_false(ci)
-        or sha_scoped_cancellation(ci)
-        or ref_scoped_cancellation(ci)
-        or pr_only_ref_scoped_cancellation(ci),
+        ci_preserves_main_run_evidence(ci),
         "CI concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
