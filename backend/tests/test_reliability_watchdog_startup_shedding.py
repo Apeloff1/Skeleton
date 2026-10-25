@@ -88,6 +88,45 @@ def test_watchdog_sheds_only_stale_or_draining_requests(
         assert "x-skeleton-rejection-source" not in response.headers
 
 
+@pytest.mark.parametrize(
+    ("worker_done", "stopped", "expected"),
+    [
+        (None, False, 200),   # Optional watchdog has not been started yet.
+        (False, False, 200),  # Newly scheduled task is in first-tick grace.
+        (True, False, 503),   # Crashed task cannot claim first-tick grace.
+        (False, True, 503),   # Explicitly stopped task cannot admit traffic.
+        (True, True, 503),
+    ],
+)
+def test_worker_task_state_is_a_fail_closed_admission_boundary(
+    worker_done: bool | None, stopped: bool, expected: int
+) -> None:
+    app = FastAPI()
+    middleware = reliability.LoadSheddingMiddleware(app, wd_stale_sec=180.0)
+
+    class FakeTask:
+        def done(self) -> bool:
+            return bool(worker_done)
+
+    task = None if worker_done is None else FakeTask()
+
+    async def permitted(_request: Request) -> Response:
+        return Response("ok", status_code=200)
+
+    with (
+        patch.object(build_watchdog, "_watchdog_task", task),
+        patch.object(build_watchdog, "_stopped", stopped),
+        patch.object(build_watchdog, "_tick_count", 0),
+        patch.object(build_watchdog, "_first_tick_started_at", 0.0),
+        patch.object(build_watchdog, "_last_tick_at", 0.0),
+        patch.object(reliability.time, "time", return_value=1000.0),
+    ):
+        response = asyncio.run(middleware.dispatch(_request(app), permitted))
+    assert response.status_code == expected
+    if expected == 503:
+        assert response.headers["x-skeleton-rejection-source"] == "load-shedding"
+
+
 def test_first_watchdog_tick_has_start_timestamp_before_admission_count() -> None:
     import inspect
 
