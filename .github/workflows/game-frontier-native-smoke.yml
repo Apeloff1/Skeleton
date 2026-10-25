@@ -26,7 +26,6 @@ on:
       - "tests/test_original_expedition_cli.py"
       - "skeleton/game/production_native_quality.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
-      - ".github/workflows/gf-d-godot-import-cert.yml"
 
 permissions:
   contents: read
