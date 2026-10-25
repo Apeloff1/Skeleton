@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 from pathlib import Path
 
@@ -89,6 +90,29 @@ def test_gameforge_build_import_does_not_create_artifact_directory(monkeypatch) 
     assert {"/api/gameforge/build/web", "/api/gameforge/build/source",
             "/api/gameforge/build/godot"}.issubset(paths)
     assert reloaded._ARTIFACTS.endswith("/artifacts/builds")
+
+
+def test_gameforge_auth_dependency_fails_closed() -> None:
+    # Ensure a missing security module can never reintroduce the previous
+    # anonymous dev-admin fallback through an import-time try/except.
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "routes/gameforge_build.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    auth_imports = [
+        node for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "routes.gameforge_auth"
+        and any(alias.name == "require_role" for alias in node.names)
+    ]
+    assert len(auth_imports) == 1
+    assert not any(
+        isinstance(node, ast.FunctionDef) and node.name in {"_viewer", "_editor"}
+        for node in ast.walk(tree)
+    )
+    module = importlib.import_module("routes.gameforge_build")
+    assert module._viewer is not module._editor
+    assert module._viewer.__module__ == "routes.gameforge_auth"
+    assert module._editor.__module__ == "routes.gameforge_auth"
 
 
 def test_cold_storage_import_does_not_contact_mongo() -> None:
