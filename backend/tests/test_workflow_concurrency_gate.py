@@ -241,6 +241,34 @@ jobs: {}
     assert _scan(text, "ci.yml") == []
 
 
+def test_main_ci_contract_rejects_legacy_ref_wide_cancellation() -> None:
+    root = Path(__file__).resolve().parents[2]
+    current = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert toolchain_contract.ci_preserves_main_run_evidence(current)
+
+    # Regression: the archived/restored CI policy used this main-wide ref
+    # cancellation. Even if a generic ref-scoped workflow check accepts it,
+    # the reusable CI contract must reject it as evidence-destructive.
+    legacy = current.replace(
+        "github.event.pull_request.number || github.sha",
+        "github.event.pull_request.number || github.ref",
+    ).replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
+    )
+    assert legacy != current
+    assert toolchain_contract.ref_scoped_cancellation(legacy)
+    assert not toolchain_contract.ci_preserves_main_run_evidence(legacy)
+
+    # Main commits can opt out of preemption completely, or cancel only
+    # their exact SHA, without losing earlier main-run receipts.
+    no_cancellation = current.replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: false",
+    )
+    assert toolchain_contract.ci_preserves_main_run_evidence(no_cancellation)
+
+
 def test_reusable_ci_keeps_pr_cancellation_but_preserves_each_main_sha() -> None:
     root = Path(__file__).resolve().parents[2]
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
