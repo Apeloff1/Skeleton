@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from unittest.mock import patch
 
@@ -201,3 +202,60 @@ def test_pr_rollup_invalid_shape_fails_closed():
             "number": 1,
             "statusCheckRollup": {"unexpected": "map"},
         })
+
+
+def test_large_authorized_snapshot_keeps_full_canonical_hash():
+    # Forty individually bounded approved issue bodies plus PR title/CI data
+    # exceed the cross-job canonical JSON cap in aggregate. Fingerprinting
+    # must remain complete and sensitive to the entire observed state.
+    issues = tuple(
+        {"number": number, "title": "approved", "body": "x" * 6000,
+         "automation_authorized": True}
+        for number in range(1, 41)
+    )
+    prs = tuple(
+        {"number": number, "title": "p" * 500, "mergeStateStatus": "BLOCKED"}
+        for number in range(1, 41)
+    )
+    observed = supervisor.SupervisorSnapshot(
+        repository="Apeloff1/Skeleton", observed_at=1_700_000_000,
+        issues=issues, pull_requests=prs, workflow_runs=(),
+    )
+    payload = {
+        "repository": observed.repository,
+        "issues": observed.issues,
+        "pull_requests": observed.pull_requests,
+        "workflow_runs": observed.workflow_runs,
+    }
+    raw = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False,
+    ).encode("utf-8")
+    assert len(raw) > 256_000
+    assert observed.fingerprint == hashlib.sha256(raw).hexdigest()
+    # Existing bounded-envelope controls are unchanged: only the hash is
+    # streamed; oversized cross-job JSON must still fail closed.
+    with pytest.raises(supervisor.SupervisorError, match="control-plane budget"):
+        supervisor._canonical(payload)
+
+    mutated = tuple(dict(item) for item in issues)
+    altered = dict(mutated[-1])
+    altered["body"] = altered["body"][:-1] + "y"
+    mutated = (*mutated[:-1], altered)
+    revised = supervisor.SupervisorSnapshot(
+        observed.repository, observed.observed_at, mutated,
+        observed.pull_requests, observed.workflow_runs,
+    )
+    assert revised.fingerprint != observed.fingerprint
+
+
+def test_snapshot_fingerprint_matches_canonical_envelope_hash_on_small_input():
+    observed = snapshot(prs=({"number": 2, "title": "stable"},))
+    raw = json.dumps(
+        {"repository": observed.repository, "issues": observed.issues,
+         "pull_requests": observed.pull_requests,
+         "workflow_runs": observed.workflow_runs},
+        sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False,
+    ).encode("utf-8")
+    assert observed.fingerprint == hashlib.sha256(raw).hexdigest()
