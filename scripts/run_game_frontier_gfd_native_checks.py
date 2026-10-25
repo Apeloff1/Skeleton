@@ -203,6 +203,7 @@ def evaluate(records: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "soft_pin_held": bool(final["pinned"]) and float(final["pin_drift"]) < 1e-3,
         "soft_free_moved": float(final["free_drop"]) > 0.05,
         "camera_current": bool(ready["camera_current"]),
+        "native_tick_rate_60hz": int(ready["ticks_per_second"]) == 60,
         "fixed_ticks": int(final["ticks"]) >= 180,
     }
     return {"checks": checks, "passed": all(checks.values()), "ready": ready, "final": final,
