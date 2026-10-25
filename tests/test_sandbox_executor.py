@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -15,7 +16,10 @@ from skeleton.sandbox import (
     GuardedExecutor,
     ToolRequest,
     ToolSpec,
+    ToolOutcome,
 )
+from skeleton.sandbox.errors import ProcessPolicyError, SanitizerError
+from skeleton.sandbox.process import ProcessResult
 from skeleton.security.generated_code_sandbox import GeneratedCodeSandbox, SandboxCapability
 
 ECHO = shutil.which("echo") or "/bin/echo"
@@ -137,6 +141,79 @@ def test_execute_rejects_non_request(tmp_path: Path) -> None:
 def test_toolspec_validation(kwargs) -> None:
     with pytest.raises(ExecutorConfigError):
         ToolSpec(**kwargs)
+
+
+@pytest.mark.parametrize("spec_kw", [
+    {"max_args": True},
+    {"path_args": frozenset({True})},
+    {"path_args": (0,)},
+    {"block_threshold": True},
+    {"output_chars": 0},
+    {"output_chars": -1},
+    {"output_chars": 200_001},
+    {"output_chars": True},
+    {"output_chars": "unlimited"},
+    {"limits": object()},
+])
+def test_sandbox_output_bounds_and_argument_types_are_strict(spec_kw) -> None:
+    with pytest.raises(ExecutorConfigError):
+        ToolSpec("echo", ECHO, **spec_kw)
+
+
+@pytest.mark.parametrize("policy_kw", [
+    {"output_block_threshold": 0.0},
+    {"output_block_threshold": 1.01},
+    {"output_block_threshold": float("nan")},
+    {"output_block_threshold": True},
+    {"max_executions": -1},
+    {"max_executions": True},
+    {"max_executions": 1.5},
+])
+def test_sandbox_policy_cannot_disable_output_scanning_by_bad_limits(policy_kw) -> None:
+    with pytest.raises(ExecutorConfigError):
+        ExecutorPolicy(**policy_kw)
+
+
+def test_host_scoped_grant_does_not_enable_unrestricted_process_egress(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    spec = ToolSpec("echo", ECHO, network_hosts=("trusted.example",))
+    with pytest.raises(ProcessPolicyError, match="host-scoped networking unavailable"):
+        ex._limits(spec)
+
+
+def test_unscannable_tool_output_never_reaches_model_or_escapes_audit(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    result = ProcessResult(
+        argv=(ECHO,), returncode=0, stdout=b"untrusted output",
+        stderr=b"", timed_out=False, truncated=False, duration_s=0.1,
+    )
+    with patch("skeleton.sandbox.executor.detect", side_effect=SanitizerError("fault")):
+        outcome = ex._scrub(ToolSpec("echo", ECHO), result)
+    assert outcome.status == "blocked"
+    assert outcome.output_flagged is True
+    assert outcome.output_report == {"error": "unscannable"}
+    assert "untrusted output" not in outcome.for_model()
+    ex._finish(ToolRequest("echo", source="test"), outcome)
+    assert ex.audit.verify()
+    assert ex.audit.entries()[-1]["event"]["status"] == "blocked"
+
+
+def test_untrusted_audit_source_and_reason_are_secret_redacted(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    # Construct the synthetic credential only at runtime, not as a source
+    # literal that would contaminate Git history.
+    token = "AKIA" + "".join(chr(i) for i in range(65, 81))
+    outcome = ex._finish(
+        ToolRequest("invalid", source=f"source={token}"),
+        ToolOutcome("invalid", "denied", f"reason={token}"),
+    )
+    assert outcome.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    encoded = ex.audit.export_jsonl()
+    assert token not in encoded
+    entry = ex.audit.entries()[-1]["event"]
+    assert token not in entry["source"]
+    assert token not in entry["reason"]
 
 
 def test_duplicate_tool_and_bad_mediator_rejected(tmp_path: Path) -> None:
