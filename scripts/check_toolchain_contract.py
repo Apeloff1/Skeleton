@@ -137,11 +137,17 @@ def ref_scoped_cancellation(workflow: str) -> bool:
 
 
 def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
-    """Return true when PRs cancel superseded runs but branch pushes queue."""
+    """Require PR-only cancellation with a stable PR key and branch or SHA fallback."""
     group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
     return bool(
         group
-        and "${{ github.event.pull_request.number || github.ref }}" in group.group(1)
+        and any(
+            fallback in group.group(1)
+            for fallback in (
+                "${{ github.event.pull_request.number || github.ref }}",
+                "${{ github.event.pull_request.number || github.sha }}",
+            )
+        )
         and re.search(
             r"^\s*cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*(?:#.*)?$",
             workflow,
