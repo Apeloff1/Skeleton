@@ -1172,6 +1172,10 @@ def create_app() -> Any:
     app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
     app.include_router(engine_router, prefix="/api/v1")
+    # skeleton.projects.v1 (Internal Systems, #4097): seal via install_gate + session.
+    # Restored: dropped by the stale-base merge of #4139.
+    from skeleton.api.projects_routes import router as projects_router
+    app.include_router(projects_router, prefix="/api/v1")
     app.include_router(cockpit_router)
     if _omnifabric_api_enabled():
         # Lazy import keeps the kernel OmniFabric service off the import path
@@ -1198,6 +1202,11 @@ def create_app() -> Any:
         body_limits=_gate_body_limits(),
     )
     install_gate(app, policy=gate_policy)
+    # #3622 follow-up (TD: create_app is the only HTTP entry): fold a registered
+    # agent_edge gateway in behind the same install_gate stack.
+    # Restored: dropped by the stale-base merge of #4139.
+    from skeleton.api.agent_edge_mount import install_registered_agent_edge
+    install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(
@@ -1300,8 +1309,12 @@ def create_app() -> Any:
     # Cortex's historical register_routes() contains unchartered GET/POST
     # /api/v1/secrets endpoints. Validate the final assembled HTTP routes,
     # not merely today's static import graph, before exposing the app.
-    from skeleton.api.cortex_mount_guard import reject_cortex_secret_routes
+    from skeleton.api.cortex_mount_guard import CortexRouteGuardMiddleware, reject_cortex_secret_routes
     reject_cortex_secret_routes(app)
+    # On by default (Jenkins #4129 B5): the guard middleware re-walks the route
+    # graph when the ASGI server boots and whenever the route table changes, so
+    # late or nested additions to live included routers are refused too.
+    app.add_middleware(CortexRouteGuardMiddleware, guarded_app=app)
     return app
 
 
