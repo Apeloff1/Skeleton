@@ -255,12 +255,12 @@ def test_reusable_ci_keeps_pr_cancellation_but_preserves_each_main_sha() -> None
     assert findings == []
     assert toolchain_contract.pr_only_ref_or_sha_scoped_cancellation(workflow)
     # Never interpret unconditional cancellation as safe main-branch queuing.
-    assert not toolchain_contract.pr_only_ref_or_sha_scoped_cancellation(
-        workflow.replace(
-            "cancel-in-progress: \\u0024{{ github.event_name == 'pull_request' }}",
-            "cancel-in-progress: true",
-        )
+    unsafe = workflow.replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
     )
+    assert "cancel-in-progress: true" in unsafe
+    assert not toolchain_contract.pr_only_ref_or_sha_scoped_cancellation(unsafe)
 
 
 def test_rejects_sha_scoped_group_when_preemption_is_enabled() -> None:
