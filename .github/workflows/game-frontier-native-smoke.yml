@@ -9,6 +9,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "scripts/build_game_frontier_smoke.py"
+      - "scripts/certify_game_frontier_godot_import.py"
       - "scripts/build_game_frontier_quest_smoke_approvals.py"
       - "scripts/run_game_frontier_quest_tools.py"
       - "scripts/run_game_frontier_godot_dispatch.py"
@@ -25,6 +26,7 @@ on:
       - "tests/test_original_expedition_cli.py"
       - "skeleton/game/production_native_quality.py"
       - ".github/workflows/game-frontier-native-smoke.yml"
+      - ".github/workflows/gf-d-godot-import-cert.yml"
 
 permissions:
   contents: read
@@ -703,3 +705,47 @@ jobs:
             cat "$RUNNER_TEMP/frontier-comparison-${left}-${right}.json" >> "$GITHUB_STEP_SUMMARY"
             echo '~~~' >> "$GITHUB_STEP_SUMMARY"
           done
+
+  # Consolidated GF-D certification: native acceptance shares one trigger and
+  # workflow-run identity rather than consuming another automatic workflow.
+  godot-import-cert:
+    name: GF-D real Godot headless import + parse certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11.16"
+      - name: Install production source
+        run: python -m pip install --disable-pip-version-check -e .
+      - name: Fetch official pinned Godot 4.7.2 (sha256 verified)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot-bin"
+          curl --fail --location --show-error --retry 2 \
+            --output "$RUNNER_TEMP/godot-bin/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  $RUNNER_TEMP/godot-bin/godot.zip" | sha256sum --check
+          unzip -qq "$RUNNER_TEMP/godot-bin/godot.zip" -d "$RUNNER_TEMP/godot-bin"
+          chmod 700 "$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64"
+          echo "FRONTIER_GODOT=$RUNNER_TEMP/godot-bin/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Certify emitted smoke projects import and parse (30/60 Hz)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rc=0
+          for fps in 30 60; do
+            echo "::group::GF-D import cert ${fps} Hz"
+            project="$RUNNER_TEMP/gfd-project-${fps}"
+            mkdir -p "$project"
+            python scripts/build_game_frontier_smoke.py --output "$project" --fps "$fps" --frames 20
+            python scripts/certify_game_frontier_godot_import.py \
+              --godot "$FRONTIER_GODOT" --project "$project" \
+              | tee "$RUNNER_TEMP/gfd-cert-${fps}.json" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
