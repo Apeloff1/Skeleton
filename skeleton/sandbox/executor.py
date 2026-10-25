@@ -412,6 +412,12 @@ class GuardedExecutor:
             else:
                 outcome.output_report = report.to_record()
                 outcome.output_flagged = report.score >= self._policy.output_block_threshold
+                if outcome.output_flagged:
+                    # Quarantine alone is not execution authority. A score
+                    # above the explicit policy threshold must not be emitted
+                    # into a model prompt as a successful tool result.
+                    outcome.status = STATUS_BLOCKED
+                    outcome.reason = "tool output blocked by injection detector"
         return outcome
 
     def _finish(self, request: ToolRequest, outcome: ToolOutcome) -> ToolOutcome:
