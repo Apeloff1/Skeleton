@@ -233,6 +233,8 @@ def test_ai_file_tree_classifies_non_move_top_level_surfaces() -> None:
     assert retained["skeleton/acquired"]["owner"] == "quarantine/provenance"
     assert retained["skeleton/release"]["owner"] == "release engineering"
     assert retained["skeleton/ubuntu"]["owner"] == "deployment/platform support"
+    assert retained["skeleton/netcode"]["owner"] == "game-network transport and authoritative multiplayer runtime"
+    assert "no AI ownership cutover" in retained["skeleton/netcode"]["reason"].lower()
     assert retained["skeleton/__main__.py"]["owner"] == "package CLI shell"
 
 
