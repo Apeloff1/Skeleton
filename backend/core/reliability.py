@@ -364,7 +364,13 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
                     # Once first-tick admission is visible, its start time
                     # bounds the first sweep. Later use completed ticks only,
                     # so a stalled watchdog still forces a 503.
-                    if _bwd._tick_count > 0:
+                    task = getattr(_bwd, "_watchdog_task", None)
+                    # After at least one task existed, a stopped/crashed worker
+                    # is not a healthy first-tick grace period. Only a live
+                    # newly scheduled task may start with zero heartbeat ticks.
+                    if task is not None and (task.done() or getattr(_bwd, "_stopped", False)):
+                        shed = True
+                    elif _bwd._tick_count > 0:
                         heartbeat = (
                             getattr(_bwd, "_last_tick_at", 0.0)
                             or getattr(_bwd, "_first_tick_started_at", 0.0)
