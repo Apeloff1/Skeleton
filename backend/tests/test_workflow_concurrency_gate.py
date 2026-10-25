@@ -240,6 +240,20 @@ jobs: {}
     assert _scan(text, "ci.yml") == []
 
 
+def test_reusable_ci_keeps_pr_cancellation_but_preserves_each_main_sha() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    # PR number is stable across pushes, so a superseding head can cancel.
+    # Main has no PR number and must retain separate immutable SHA evidence.
+    assert (
+        "group: ci-\u0024{{ github.event_name }}-\u0024{{ github.event.pull_request.number || github.sha }}"
+        in workflow
+    )
+    assert "cancel-in-progress: \u0024{{ github.event_name == 'pull_request' }}" in workflow
+    _record, findings = concurrency.violations_from_text("ci.yml", workflow)
+    assert findings == []
+
+
 def test_rejects_sha_scoped_group_when_preemption_is_enabled() -> None:
     text = """name: ineffective-preemption
 on:
