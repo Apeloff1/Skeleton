@@ -37,15 +37,12 @@ from core.gameforge_artifact_builder import (
 
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
-try:
-    from routes.gameforge_auth import require_role
-    _viewer = require_role("viewer")
-    _editor = require_role("editor")
-except Exception:  # noqa: BLE001
-    def _viewer():  # type: ignore
-        return {"email": "anonymous", "role": "admin", "dev_mode": True}
+# A missing auth module must fail router admission, never silently turn
+# protected routes into anonymous admin endpoints.
+from routes.gameforge_auth import require_role
 
-    _editor = _viewer
+_viewer = require_role("viewer")
+_editor = require_role("editor")
 
 _ARTIFACTS = str(DEFAULT_ARTIFACTS_ROOT)
 # Import must never create directories: production /app may be read-only.
