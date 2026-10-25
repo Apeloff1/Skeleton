@@ -190,6 +190,10 @@ def ci_preserves_main_run_evidence(workflow: str) -> bool:
 
     group = settings["group"]
     cancellation = settings["cancel-in-progress"]
+    # A trailing YAML comment is not part of the actual GitHub group value.
+    # Never accept a safety-critical SHA token that appears only in a comment.
+    if "#" in group or "#" in cancellation:
+        return False
     if cancellation == "false":
         return True
     if cancellation == "true":
