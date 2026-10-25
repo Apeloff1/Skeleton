@@ -178,7 +178,7 @@ def ci_preserves_main_run_evidence(workflow: str) -> bool:
             break
         if not line.strip() or line.lstrip().startswith("#"):
             continue
-        match = re.fullmatch(r"  (group|cancel-in-progress):[ \\t]*(.+)", line)
+        match = re.fullmatch(r"  (group|cancel-in-progress):\s*(.+)", line)
         if match is None:
             return False
         key, value = match.groups()
