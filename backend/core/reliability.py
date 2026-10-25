@@ -376,7 +376,19 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
         except Exception:
             shed = False
         if shed:
-            return JSONResponse({"error": "service_unavailable", "reason": "load_shedding"}, status_code=503)
+            # This rejection happens ahead of the access logger and router.
+            # Make its origin distinguishable from proxy/auth/DB 503s, and
+            # give well-behaved clients bounded retry guidance during a drain.
+            # Never cache availability responses or echo any credentials.
+            return JSONResponse(
+                {"error": "service_unavailable", "reason": "load_shedding"},
+                status_code=503,
+                headers={
+                    "Retry-After": "5",
+                    "Cache-Control": "no-store",
+                    "X-Skeleton-Rejection-Source": "load-shedding",
+                },
+            )
         return await call_next(request)
 
 
