@@ -269,7 +269,7 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
                 # Run the project headless — imports resources and executes main scene.
                 run = subprocess.run([engine, "--headless", "--path", workdir, "--quit"],
                                      capture_output=True, text=True, timeout=90)
-                engine_validated = "GameForge Godot build" in (run.stdout or "") or run.returncode == 0
+                engine_validated = run.returncode == 0 and "GameForge Godot build" in (run.stdout or "")
                 engine_log = "engine_validated" if engine_validated else "engine_validation_failed"
             except Exception:  # noqa: BLE001
                 engine_log = "engine_run_failed"
@@ -291,7 +291,7 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
         rec["engine_validated"] = engine_validated
         rec["engine_version"] = engine_version
         rec["engine_log"] = engine_log
-        rec["headless_exported"] = engine_validated
+        rec["headless_exported"] = False  # native project import is not an export-template build
         rec["ok"] = True
         return rec
 
