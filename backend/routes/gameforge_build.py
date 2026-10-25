@@ -4,9 +4,10 @@ routes/gameforge_build.py — REAL build tool integration (/api/gameforge/build)
 Produces genuine, downloadable artifacts from a game's accepted gamefiles:
   • web  — a playable HTML5 bundle (index.html + payload) zipped on disk
   • source — a source zip of all gamefiles + manifest.json
-Both write real files to /app/backend/artifacts/builds and register them in Mongo
-(gameforge_builds) with real size + sha256. Native-engine exports (Godot/Unity/
-PyInstaller) are reported honestly as unavailable unless the toolchain is installed.
+Web/source archives are published through the governed artifact store
+with real size and sha256. Native Godot and PyInstaller builds use private
+temporary workspaces, clean up on failure, and publish archives through the
+same governed store. Toolchain availability is reported separately.
 """
 from __future__ import annotations
 
