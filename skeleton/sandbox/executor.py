@@ -331,6 +331,10 @@ class GuardedExecutor:
             raise ProcessPolicyError("too many arguments for tool", context={"tool": spec.name, "maximum": spec.max_args})
         if args:
             check_argv(args)
+        if request.cwd is not None and not isinstance(request.cwd, str):
+            raise ProcessPolicyError("cwd must be a string path inside the jail")
+        if request.env is not None and not isinstance(request.env, Mapping):
+            raise ProcessPolicyError("environment must be a mapping of strings")
         if request.stdin is not None:
             if not spec.allow_stdin:
                 raise ProcessPolicyError("tool does not accept stdin", context={"tool": spec.name})

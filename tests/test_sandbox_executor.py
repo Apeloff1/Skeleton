@@ -162,6 +162,28 @@ def test_nonstring_or_unhashable_tool_name_is_denied_and_audited(tmp_path: Path,
     launched.assert_not_called()
 
 
+@pytest.mark.parametrize("invalid_cwd", [17, ["relative"], {"dir": "relative"}])
+def test_malformed_cwd_is_denied_before_launch_and_receipted(tmp_path: Path, invalid_cwd: object) -> None:
+    ex = _executor(tmp_path)
+    with patch("skeleton.sandbox.executor.run_isolated") as launched:
+        out = ex.execute(ToolRequest("echo", ("ok",), cwd=invalid_cwd))
+    assert out.status == "denied"
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    launched.assert_not_called()
+
+
+@pytest.mark.parametrize("invalid_env", ["HOME=/tmp", [("HOME", "/tmp")], 42])
+def test_nonmapping_environment_is_denied_before_launch_and_receipted(tmp_path: Path, invalid_env: object) -> None:
+    ex = _executor(tmp_path)
+    with patch("skeleton.sandbox.executor.run_isolated") as launched:
+        out = ex.execute(ToolRequest("echo", ("ok",), env=invalid_env))
+    assert out.status == "denied"
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    launched.assert_not_called()
+
+
 def test_execution_budget(tmp_path: Path) -> None:
     ex = _executor(tmp_path, policy=ExecutorPolicy(require_network_isolation=False, max_executions=1))
     assert ex.execute(ToolRequest("echo", ("one",))).ok
