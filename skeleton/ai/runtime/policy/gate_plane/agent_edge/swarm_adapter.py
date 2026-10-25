@@ -65,7 +65,11 @@ class ModuleSwarmDirectory:
     function: str = DEFAULT_SWARM_FUNCTION
 
     def snapshot(self) -> Mapping[str, Any]:
-        mod = importlib.import_module(self.module)
+        # Caller-provided providers must use CallableSwarmDirectory. A
+        # module path is never an authorization mechanism for plugin loading.
+        if self.module != DEFAULT_SWARM_MODULE:
+            raise ValueError("unknown swarm module; inject a callable directory instead")
+        mod = importlib.import_module("skeleton.swarm.capabilities")
         fn = getattr(mod, self.function)
         out = fn()
         if not isinstance(out, Mapping):

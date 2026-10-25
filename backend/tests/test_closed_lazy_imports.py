@@ -357,3 +357,20 @@ def test_optional_decoder_negative_case_never_monkeypatches_global_import() -> N
     assert SCANNER.violations(file) == []
     assert "original_import(" not in file.read_text(encoding="utf-8")
     assert 'missing.setitem(sys.modules, "PIL", None)' in file.read_text(encoding="utf-8")
+
+
+def test_swarm_module_provider_uses_only_governed_literal_default() -> None:
+    from skeleton.gate_plane.agent_edge.swarm_adapter import ModuleSwarmDirectory
+
+    with pytest.raises(ValueError, match="unknown swarm module"):
+        ModuleSwarmDirectory(module="not.a.trusted.module").snapshot()
+    for file in (
+        ROOT / "skeleton/gate_plane/agent_edge/swarm_adapter.py",
+        ROOT / "skeleton/ai/runtime/policy/gate_plane/agent_edge/swarm_adapter.py",
+    ):
+        assert SCANNER.violations(file) == []
+        assert 'importlib.import_module("skeleton.swarm.capabilities")' in file.read_text(encoding="utf-8")
+    assert (
+        (ROOT / "skeleton/gate_plane/agent_edge/swarm_adapter.py").read_bytes()
+        == (ROOT / "skeleton/ai/runtime/policy/gate_plane/agent_edge/swarm_adapter.py").read_bytes()
+    )
