@@ -50,7 +50,12 @@ def _ready(app):
 
 
 def _paths(app):
-    return {getattr(r, "path", "") for r in app.routes}
+    # FastAPI >=0.141 retains included routers as lazy wrappers with no direct
+    # path attribute. Use the production fail-closed composed route inventory
+    # rather than silently missing protected endpoints behind wrappers.
+    from skeleton.api.cortex_mount_guard import iter_route_paths
+
+    return set(iter_route_paths(app))
 
 
 # -- create_app wiring -----------------------------------------------------------------
