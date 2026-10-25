@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -11,14 +12,15 @@ def _workflow() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
 
-def test_privileged_workflow_uses_only_trusted_default_branch_triggers():
+def test_privileged_workflow_is_manual_only_on_trusted_default_branch():
     text = _workflow()
-    assert "workflow_run:" in text
-    assert "schedule:" in text
-    assert "workflow_dispatch:" in text
-    assert "pull_request_target:" not in text
-    assert "pull_request_review:" not in text
-    assert "pull_request_review_comment:" not in text
+    # Only YAML events under `on` can trigger a job. References to historical
+    # workflow_run payloads in dormant shell steps are not enabled triggers.
+    triggers = text.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+    # Capture *every* YAML event at indent 2, including the first item.
+    # A leading workflow_run must never bypass a newline-based substring check.
+    events = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", triggers, re.MULTILINE)
+    assert events == ["workflow_dispatch"]
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head" not in text
@@ -35,22 +37,18 @@ def test_privileged_python_executes_only_staged_package_in_isolated_mode():
     assert "python -m skeleton.pr_automation.runner" not in text
 
 
-def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
+def test_manual_index_has_bounded_single_writer_and_no_ci_fanout():
     text = _workflow()
-    assert "types: [completed]" in text
-    assert "types: [requested, in_progress, completed]" not in text
-    assert "types: [requested]" not in text
-    assert "types: [in_progress]" not in text
-    assert "workflows:\n      - Merge Readiness" in text
-    assert "      - CI/CD" not in text
-    assert "      - Backend Quality" not in text
-    assert "      - Dependency Review" not in text
-    assert "      - Dependency Security" not in text
-    assert "      - CodeQL" not in text
+    triggers = text.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+    events = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", triggers, re.MULTILINE)
+    assert events == ["workflow_dispatch"]
+    assert "types: [requested, in_progress, completed]" not in triggers
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
-    assert "branches-ignore:\n      - main" in text
-    assert 'branches:\n      - "*"\n      - "**"' not in text
+    assert 'PR_AUTOMATION_MAX_MUTATIONS: "1"' in text
+    assert 'PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"' in text
+    # Keep the unused historical event branch fail-closed should an operator
+    # ever opt back into it under a separately reviewed change.
     assert "github.event.workflow_run.conclusion != 'cancelled'" in text
     assert "github.event_name != 'workflow_run'" in text
 
