@@ -28,9 +28,19 @@ def test_live_other_tenant_build_event_not_delivered():
 
 def test_replay_other_tenant_build_event_not_delivered():
     hub = _hub()
+    # Use a valid cursor from this hub instance. Cursor 0 is a foreign/stale
+    # cursor and triggers stream.reset instead of exercising replay filtering.
+    checkpoint = hub.head_seq
     hub.publish("build", "build.progress", {"m": "ALICE_SECRET_REPLAY"}, job_id="j1", owner="alice", tenant="t-alice")
-    mallory = hub.subscribe(["build"], principal="mallory", cursor=0)
+    mallory = hub.subscribe(["build"], principal="mallory", cursor=checkpoint)
+    assert mallory.replayed == 0
     assert not _seen(mallory, "ALICE_SECRET_REPLAY")
+
+    # A server-verified tenant + same actor is a legitimate subscription,
+    # so the positive control proves replay really ran.
+    alice = hub.subscribe(["build"], principal="alice", tenant="t-alice", cursor=checkpoint)
+    assert alice.replayed == 1
+    assert _seen(alice, "ALICE_SECRET_REPLAY")
 
 
 def test_unowned_event_denied_by_default():
