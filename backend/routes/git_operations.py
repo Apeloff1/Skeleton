@@ -15,39 +15,47 @@ import asyncio
 import os
 import re
 import tempfile
+import threading
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 router = APIRouter(prefix="/api/git", tags=["git"])
 
 # Resolved on first use. Import must not create /app or any other directory.
 _workspace_base: Path | None = None
+_workspace_lock = threading.Lock()
 
 
 def workspace_base() -> Path:
-    """Return the configured git sandbox, creating it only when a call needs it."""
+    """Return the process's singleton Git sandbox, allocating it lazily and safely."""
     global _workspace_base
     if _workspace_base is not None:
         return _workspace_base
-    configured = os.environ.get("GIT_WORKSPACE_BASE", "").strip()
-    preferred = Path(configured) if configured else Path("/app/backend/.git_workspaces")
-    try:
-        preferred.mkdir(parents=True, exist_ok=True)
-        # An exclusive, random probe must never overwrite a pre-existing file
-        # or follow a predictable .writable symlink in a shared workspace.
-        with tempfile.NamedTemporaryFile(
-            dir=preferred, prefix=".writable-", delete=True
-        ):
-            pass
-    except OSError:
-        if configured:
-            # Explicit operator configuration is authoritative: never silently
-            # divert repositories to an unrelated temporary storage location.
-            raise
-        # mkdtemp creates a private (0700), unpredictable per-process directory;
-        # a fixed /tmp path could expose one user's repository to another.
-        preferred = Path(tempfile.mkdtemp(prefix="skeleton-git-workspaces-"))
-    _workspace_base = preferred.resolve()
-    return _workspace_base
+    # Threadpool route handlers can resolve the first workspace concurrently.
+    # The fallback must be allocated exactly once for a process, not once per
+    # simultaneous request (which would split projects across repositories).
+    with _workspace_lock:
+        if _workspace_base is not None:
+            return _workspace_base
+        configured = os.environ.get("GIT_WORKSPACE_BASE", "").strip()
+        preferred = Path(configured) if configured else Path("/app/backend/.git_workspaces")
+        try:
+            preferred.mkdir(parents=True, exist_ok=True)
+            # Exclusive random probe: never clobber a pre-existing file or
+            # follow a predictable .writable symlink in a shared workspace.
+            with tempfile.NamedTemporaryFile(
+                dir=preferred, prefix=".writable-", delete=True
+            ):
+                pass
+        except OSError:
+            if configured:
+                # Explicit operator configuration is authoritative: do not
+                # redirect repositories to unrelated temporary storage.
+                raise
+            # mkdtemp creates an unpredictable owner-only (0700 on POSIX)
+            # fallback, instead of reusing a shared fixed /tmp path.
+            preferred = Path(tempfile.mkdtemp(prefix="skeleton-git-workspaces-"))
+        _workspace_base = preferred.resolve()
+        return _workspace_base
 
 # The "active" project repo (set by /init, defaults to a sandbox project).
 _active = {"project": "default"}
