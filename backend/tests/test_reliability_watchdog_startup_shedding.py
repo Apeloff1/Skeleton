@@ -70,6 +70,8 @@ def test_watchdog_sheds_only_stale_or_draining_requests(
         return Response("ok", status_code=200)
 
     with (
+        patch.object(build_watchdog, "_watchdog_task", None),
+        patch.object(build_watchdog, "_stopped", False),
         patch.object(build_watchdog, "_tick_count", ticks),
         patch.object(build_watchdog, "_first_tick_started_at", first_start),
         patch.object(build_watchdog, "_last_tick_at", last_completed),
