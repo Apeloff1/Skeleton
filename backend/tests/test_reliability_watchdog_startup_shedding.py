@@ -95,3 +95,62 @@ def test_first_watchdog_tick_has_start_timestamp_before_admission_count() -> Non
     start = source.index("_first_tick_started_at = time.time()")
     admitted = source.index("_tick_count += 1")
     assert start < admitted
+
+
+def test_watchdog_restart_refreshes_heartbeat_without_resetting_recovery_budget() -> None:
+    """An old, stopped task cannot poison the next worker's admission epoch."""
+
+    async def exercise() -> None:
+        app = FastAPI()
+        app.state._shedding = False
+        middleware = reliability.LoadSheddingMiddleware(app, wd_stale_sec=180.0)
+        history = [900.0, 950.0]
+
+        async def parked_worker() -> None:
+            await asyncio.Event().wait()
+
+        async def permitted(_request: Request) -> Response:
+            return Response("ok", status_code=200)
+
+        with (
+            patch.object(build_watchdog, "_watchdog_task", None),
+            patch.object(build_watchdog, "_stopped", True),
+            patch.object(build_watchdog, "_tick_count", 7),
+            patch.object(build_watchdog, "_first_tick_started_at", 100.0),
+            patch.object(build_watchdog, "_last_tick_at", 100.0),
+            patch.object(build_watchdog, "_last_counts", {"scanned": 3}),
+            patch.object(build_watchdog, "_restart_history", history),
+            patch.object(build_watchdog, "_loop", parked_worker),
+        ):
+            build_watchdog.start_watchdog()
+            task = build_watchdog._watchdog_task
+            assert task is not None
+            try:
+                # This is a new task, not a new recovery budget.
+                assert build_watchdog._tick_count == 0
+                assert build_watchdog._first_tick_started_at == 0.0
+                assert build_watchdog._last_tick_at == 0.0
+                assert build_watchdog._last_counts == {}
+                assert build_watchdog._restart_history is history
+                assert build_watchdog._stopped is False
+
+                with patch.object(reliability.time, "time", return_value=1000.0):
+                    response = await middleware.dispatch(_request(app), permitted)
+                assert response.status_code == 200
+
+                # Re-admitting the already-running task must retain its state.
+                build_watchdog._tick_count = 5
+                build_watchdog._last_tick_at = 950.0
+                build_watchdog.start_watchdog()
+                assert build_watchdog._watchdog_task is task
+                assert build_watchdog._tick_count == 5
+                assert build_watchdog._last_tick_at == 950.0
+                assert build_watchdog._restart_history == history
+            finally:
+                build_watchdog.stop_watchdog()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+    asyncio.run(exercise())
