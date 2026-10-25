@@ -132,3 +132,21 @@ def test_godot_engine_evidence_requires_exit_zero_and_scene_marker(
     assert result["engine_log"] == (
         "engine_validated" if expected else "engine_validation_failed"
     )
+
+
+def test_desktop_timeout_releases_private_workspace(monkeypatch):
+    roots, published = _instrument(monkeypatch)
+    monkeypatch.setattr(routes, "_has_pyinstaller", lambda: True)
+
+    def timed_out(command, **_kwargs):
+        raise subprocess.TimeoutExpired(command, 110)
+
+    monkeypatch.setattr(subprocess, "run", timed_out)
+    result = asyncio.run(
+        routes.build_desktop(routes.DesktopBody(game_name="QAStage"),
+                             user={"tenant_id": "test-tenant"})
+    )
+    assert result == {"ok": False, "error": "pyinstaller build timed out"}
+    assert len(roots) == 1
+    assert not roots[0].exists()
+    assert published == []
