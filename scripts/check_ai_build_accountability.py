@@ -204,8 +204,8 @@ def _historical_signature_distinct_from_priority_work(item: dict, record: dict, 
     """A signed older catalog does not complete new-head priority obligations.
 
     Only a pinned prior signature with an independently signed historic
-    verifier is recognized; a priority item remains unsigned and planned.
-    This does not promote it, waive signatures, or rewrite historic receipts.
+    verifier is recognized; the case itself remains unproven and planned.
+    Historic ACCOUNTABILITY checkmarks are not current-case proof.
     """
     impl = record.get("implementation_signoff")
     verify = record.get("verification_signoff")
@@ -215,9 +215,10 @@ def _historical_signature_distinct_from_priority_work(item: dict, record: dict, 
         and item.get("status") == "planned"
         and not item.get("evidence")
         and item.get("disposition") in (None, "")
-        and item.get("completion_checkbox") is False
-        and item.get("completion_checkbox_mark") == "[ ]"
-        and item.get("accountability_status") == "planned"
+        and item.get("completion_checkbox") is True
+        and item.get("completion_checkbox_mark") == "[x]"
+        and item.get("accountability_status") == "verified"
+        and item.get("case_completion_verified") is False
         and item.get("signing_required") is True
         and item.get("accepted_risk") is None
         and record.get("status") == "verified"
@@ -484,6 +485,10 @@ def validate() -> list[str]:
         historical_scope = _historical_signature_distinct_from_priority_work(
             item, rec, priority.get("verification_scopes")
         )
+        # Fail closed even when ordinary historical accountability fields
+        # match: case signoff remains a separate current-head obligation.
+        if not historical_scope:
+            errors.append(f"{item['id']}: historical accountability/current case proof boundary drifted")
         if item.get("completion_checkbox") != rec.get("checkbox") and not historical_scope:
             errors.append(f"{item['id']}: priority checkbox disagrees with ledger")
         if item.get("completion_checkbox_mark") != rec.get("checkbox_mark") and not historical_scope:

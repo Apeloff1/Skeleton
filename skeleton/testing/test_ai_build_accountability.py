@@ -190,7 +190,10 @@ def test_priority_new_scope_rejects_unsigned_and_forged_history() -> None:
         mutate(altered)
         assert not checker._historical_signature_distinct_from_priority_work(item, altered, scope)
     asserted = copy.deepcopy(item)
-    asserted["completion_checkbox"] = True
+    asserted["completion_checkbox"] = False
+    assert not checker._historical_signature_distinct_from_priority_work(asserted, record, scope)
+    asserted = copy.deepcopy(item)
+    asserted["case_completion_verified"] = True
     assert not checker._historical_signature_distinct_from_priority_work(asserted, record, scope)
     asserted = copy.deepcopy(item)
     asserted["status"] = "passing"
