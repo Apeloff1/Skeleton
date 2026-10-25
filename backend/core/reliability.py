@@ -370,6 +370,13 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
                     # newly scheduled task may start with zero heartbeat ticks.
                     if task is not None and (task.done() or getattr(_bwd, "_stopped", False)):
                         shed = True
+                    elif task is not None and _bwd._tick_count == 0:
+                        # Scheduling is not progress. Bound first-tick grace
+                        # if its event loop never executes the new task.
+                        scheduled = getattr(_bwd, "_watchdog_scheduled_at", 0.0)
+                        age = time.time() - scheduled if scheduled else float("inf")
+                        if age > self.wd_stale_sec or age < -self.wd_stale_sec:
+                            shed = True
                     elif _bwd._tick_count > 0:
                         heartbeat = (
                             getattr(_bwd, "_last_tick_at", 0.0)
