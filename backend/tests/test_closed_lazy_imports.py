@@ -253,3 +253,30 @@ def test_standalone_dragon_import_names_a_literal_isolated_namespace() -> None:
     assert isinstance(imports[0].args[0], ast.Constant)
     assert imports[0].args[0].value == "_dragon_native_standalone.dragon_native_puzzle"
     assert SCANNER.violations(file) == []
+
+
+def test_cs300_dispatch_matches_thirty_shipped_literal_strata() -> None:
+    file = ROOT / "skeleton/cs300/registry.py"
+    tree = ast.parse(file.read_text(encoding="utf-8"))
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_registered_stratum")
+    allowed = {
+        n.args[0].value for n in ast.walk(fn) if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute) and n.func.attr == "import_module"
+        and n.args and isinstance(n.args[0], ast.Constant)
+    }
+    expected = {"skeleton.cs300.strata.s%02d" % i for i in range(1, 31)}
+    assert allowed == expected
+    assert SCANNER.violations(file) == []
+
+
+def test_frozen_package_regression_uses_only_three_literal_import_targets() -> None:
+    file = ROOT / "skeleton/testing/test_persistence_freeze_guard.py"
+    tree = ast.parse(file.read_text(encoding="utf-8"))
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "test_frozen_packages_import_without_warnings")
+    imports = {
+        n.args[0].value for n in ast.walk(fn) if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute) and n.func.attr == "import_module"
+        and n.args and isinstance(n.args[0], ast.Constant)
+    }
+    assert imports == {"skeleton.persist", "skeleton.storage", "skeleton.state"}
+    assert SCANNER.violations(file) == []
