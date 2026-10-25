@@ -112,3 +112,42 @@ def test_concurrent_first_use_has_one_process_wide_workspace(
     assert list(tmp_path.iterdir()) == [root]
     if os.name == "posix":
         assert stat.S_IMODE(root.stat().st_mode) == 0o700
+
+
+def test_symlink_workspace_root_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, routes
+) -> None:
+    target = tmp_path / "existing-repositories"
+    target.mkdir()
+    sentinel = target / "important.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    link = tmp_path / "redirected-root"
+    link.symlink_to(target, target_is_directory=True)
+
+    monkeypatch.setenv("GIT_WORKSPACE_BASE", str(link))
+    with pytest.raises(PermissionError, match="workspace root"):
+        routes.workspace_base()
+    assert routes._workspace_base is None
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+    assert list(target.iterdir()) == [sentinel]
+
+
+def test_symlinked_default_workspace_uses_private_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, routes
+) -> None:
+    monkeypatch.delenv("GIT_WORKSPACE_BASE", raising=False)
+    monkeypatch.setattr(routes.tempfile, "tempdir", str(tmp_path))
+    original_is_symlink = Path.is_symlink
+
+    def redirect_default_only(path: Path) -> bool:
+        if path == Path("/app/backend/.git_workspaces"):
+            return True
+        return original_is_symlink(path)
+
+    monkeypatch.setattr(Path, "is_symlink", redirect_default_only)
+    root = routes.workspace_base()
+    assert root.parent == tmp_path.resolve()
+    assert root.name.startswith("skeleton-git-workspaces-")
+    assert root != Path("/app/backend/.git_workspaces")
+    if os.name == "posix":
+        assert stat.S_IMODE(root.stat().st_mode) == 0o700
