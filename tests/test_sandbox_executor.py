@@ -198,6 +198,27 @@ def test_unscannable_tool_output_never_reaches_model_or_escapes_audit(tmp_path: 
     assert ex.audit.entries()[-1]["event"]["status"] == "blocked"
 
 
+def test_unavailable_text_sanitizer_fails_closed_with_audit_receipt(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    result = ProcessResult(
+        argv=(ECHO,), returncode=0, stdout=b"raw untrusted stdout",
+        stderr=b"", timed_out=False, truncated=False, duration_s=0.1,
+    )
+    with patch(
+        "skeleton.sandbox.executor.sanitize_text",
+        side_effect=SanitizerError("output could not be sanitized"),
+    ):
+        outcome = ex._scrub(ToolSpec("echo", ECHO), result)
+    assert outcome.status == "blocked"
+    assert outcome.output_flagged
+    assert outcome.output_report == {"error": "unsanitizable"}
+    assert outcome.stdout == "" and outcome.stderr == ""
+    assert "raw untrusted stdout" not in outcome.for_model()
+    ex._finish(ToolRequest("echo", source="unavailable-sanitizer"), outcome)
+    assert ex.audit.verify()
+    assert ex.audit.entries()[-1]["event"]["status"] == "blocked"
+
+
 def test_flagged_indirect_prompt_injection_cannot_be_replayed_to_model(tmp_path: Path) -> None:
     ex = _executor(tmp_path)
     result = ProcessResult(
