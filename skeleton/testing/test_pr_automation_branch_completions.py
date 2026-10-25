@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any
 
 import pytest
@@ -447,9 +448,9 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
     # The index is manual-only; never restore a second privileged automatic
     # workflow_run fanout just to satisfy a stale consumer contract.
     trigger_block = pr_automation.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
-    assert "  workflow_dispatch:\n" in trigger_block
-    assert "\n  workflow_run:" not in trigger_block
-    assert "\n  schedule:" not in trigger_block
+    # Inspect complete event keys, including the first entry after `on:`.
+    event_keys = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", trigger_block, re.MULTILINE)
+    assert event_keys == ["workflow_dispatch"]
     assert "pull_requests[0]" not in pr_automation
     assert "group: pr-automation-index" in pr_automation
     assert "cancel-in-progress: false" in pr_automation
