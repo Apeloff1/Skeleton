@@ -176,8 +176,13 @@ def polynomial_roots(
     leading = coeffs[-1]
     monic = tuple(value / leading for value in coeffs)
     radius = 1.0 + max(abs(value) for value in monic[:-1])
+    # Equal-radius conjugate-symmetric seeds can trap Durand-Kerner in
+    # oscillating complex pairs even when every root is real (x^3 - 7x + 6).
+    # Deterministic radial/phase asymmetry breaks that symmetry without
+    # introducing randomness or altering the root authority checks.
     roots = [
-        radius * cmath.exp(2j * math.pi * (index + 0.5) / degree)
+        radius * (1.0 + 0.1 * index / degree)
+        * cmath.exp(2j * math.pi * (index + 0.3) / degree)
         for index in range(degree)
     ]
     maximum_update = math.inf

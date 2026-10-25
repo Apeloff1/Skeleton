@@ -101,3 +101,14 @@ def test_trilinear_interpolation_recovers_affine_volume() -> None:
     )
     result = trilinear_interpolate(xs, ys, zs, values, 0.25, 0.5, 1.0)
     assert result == pytest.approx(8.0)
+
+
+def test_polynomial_roots_avoid_conjugate_symmetric_fixed_point() -> None:
+    # This real cubic previously stagnated for all 500 iterations because
+    # symmetric initial roots trapped two real solutions as a complex pair.
+    report = polynomial_roots((6.0, -7.0, 0.0, 1.0), tolerance=1e-11, max_iterations=40)
+    assert report.converged
+    assert report.iterations <= 40
+    assert report.maximum_residual < 1e-9
+    assert sorted(root.real for root in report.roots) == pytest.approx((-3.0, 1.0, 2.0), abs=1e-9)
+    assert max(abs(root.imag) for root in report.roots) < 1e-9

@@ -608,7 +608,7 @@ def test_retrieval_mirror_refuses_body_changes_and_unlisted_modules(tmp_path: Pa
     canonical = tmp_path / "skeleton/ai/runtime/retrieval"
     legacy.mkdir(parents=True)
     canonical.mkdir(parents=True)
-    original = "from skeleton.retrieval.fusion import ScoredResult\\n\\ndef score():\\n    return 7\\n"
+    original = "from skeleton.retrieval.fusion import ScoredResult\n\ndef score():\n    return 7\n"
     expected = original.replace("from skeleton.retrieval.", "from skeleton.ai.runtime.retrieval.")
     for filename in ("index.py", "ingest.py", "pipeline.py", "query.py"):
         (legacy / filename).write_text(original, encoding="utf-8")
@@ -620,6 +620,6 @@ def test_retrieval_mirror_refuses_body_changes_and_unlisted_modules(tmp_path: Pa
     (canonical / "unreviewed.py").write_text(expected, encoding="utf-8")
     assert not module._retrieval_import_mirror_equivalent(legacy / "unreviewed.py", canonical / "unreviewed.py")
     # Rewriting inside a string/comment or modifying other imports is not allowed.
-    (legacy / "index.py").write_text('note = "from skeleton.retrieval.fusion"\\n', encoding="utf-8")
-    (canonical / "index.py").write_text('note = "from skeleton.ai.runtime.retrieval.fusion"\\n', encoding="utf-8")
+    (legacy / "index.py").write_text('note = "from skeleton.retrieval.fusion"\n', encoding="utf-8")
+    (canonical / "index.py").write_text('note = "from skeleton.ai.runtime.retrieval.fusion"\n', encoding="utf-8")
     assert not module._retrieval_import_mirror_equivalent(legacy / "index.py", canonical / "index.py")
