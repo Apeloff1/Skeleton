@@ -133,3 +133,58 @@ def test_trusted_type_mirrors_retain_identical_literal_imports(
     assert imported == set(allowed)
     assert SCANNER.violations(ROOT / canonical) == []
     assert SCANNER.violations(ROOT / mirror) == []
+
+
+CATALOG_EXPORTS = (
+    ("skeleton/ai/agents/jeeves/game_frontier_book_curriculum.py",
+     "skeleton/jeeves/game_frontier_book_curriculum.py", "GENERATIONS", "forge", "_load_known_forge_module"),
+    ("skeleton/ai/runtime/organism/operator_cli.py",
+     "skeleton/organism/operator_cli.py", "_VIEWS", "views", "_load_organism_view_module"),
+    ("skeleton/ai/webcrawler/dragon_mission_catalog.py",
+     None, "_SPECS", "mission", "_load_mission_catalog_module"),
+    ("skeleton/ai/webcrawler/game_scale_catalog.py",
+     None, "_GROUPS", "scale", "_load_game_scale_module"),
+)
+
+
+@pytest.mark.parametrize("path,mirror,registry,kind,helper", CATALOG_EXPORTS)
+def test_closed_catalog_dispatch_matches_complete_literal_registry(
+    path: str, mirror: str | None, registry: str, kind: str, helper: str
+) -> None:
+    src = (ROOT / path).read_bytes()
+    if mirror is not None:
+        assert src == (ROOT / mirror).read_bytes()
+        assert SCANNER.violations(ROOT / mirror) == []
+    tree = ast.parse(src.decode("utf-8"))
+    values = [
+        node.value for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == registry for t in node.targets)
+    ]
+    assert len(values) == 1
+    data = ast.literal_eval(values[0])
+    if kind == "forge":
+        expected = {"skeleton.forge." + row[1] for row in data}
+    elif kind == "views":
+        expected = {row[0] for row in data.values()}
+    elif kind == "mission":
+        expected = {"." + row[1] for row in data}
+    else:
+        expected = {"." + row[1] for row in data}
+    assert expected
+    dispatch = [
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == helper
+    ]
+    assert len(dispatch) == 1
+    imported = set()
+    for node in ast.walk(dispatch[0]):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if "import_module" not in node.func.id:
+            continue
+        assert node.args and isinstance(node.args[0], ast.Constant)
+        assert isinstance(node.args[0].value, str)
+        imported.add(node.args[0].value)
+    assert imported == expected
+    assert SCANNER.violations(ROOT / path) == []
