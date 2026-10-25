@@ -210,14 +210,16 @@ def validate(
                 )
         if not isinstance(item.get("accountability_status"), str) or not item["accountability_status"].strip():
             errors.append(f"{item_id}: accountability_status must be non-empty")
-        # Planning and collecting evidence never constitutes signoff. A CI
-        # pending disposition is not a verified outcome, even when source
-        # paths and test/workflow references are already documented.
-        if item.get("status") in {"planned", "in_progress", "evidence_pending"}:
-            if checkbox is True:
-                errors.append(f"{item_id}: unverified item cannot claim completion")
-            if item.get("accountability_status") == "verified":
-                errors.append(f"{item_id}: unverified item cannot claim verified accountability")
+        # A historically signed ACCOUNTABILITY entry is not evidence that
+        # this edge-case regression passed. Never erase authenticated ledger
+        # receipts or conflate their checkboxes with case completion.
+        case_verified = item.get("case_completion_verified")
+        if type(case_verified) is not bool:
+            errors.append(f"{item_id}: case_completion_verified must be boolean")
+        if item.get("status") in {"planned", "in_progress", "evidence_pending"} and case_verified is True:
+            errors.append(f"{item_id}: unverified case cannot claim completed test")
+        if case_verified is True and (not evidence or not isinstance(disposition, str) or not disposition.strip()):
+            errors.append(f"{item_id}: verified case requires admitted evidence and disposition")
 
     return errors
 
