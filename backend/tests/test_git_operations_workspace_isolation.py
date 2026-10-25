@@ -6,9 +6,9 @@ or fall back to a shared/predictable directory on read-only installations.
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import os
 import stat
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
