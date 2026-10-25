@@ -6,6 +6,7 @@ or fall back to a shared/predictable directory on read-only installations.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import os
 import stat
 from pathlib import Path
@@ -86,3 +87,28 @@ def test_explicit_workspace_path_failure_never_diverts(
         routes.workspace_base()
     assert routes._workspace_base is None
     assert not configured.exists()
+
+
+def test_concurrent_first_use_has_one_process_wide_workspace(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, routes
+) -> None:
+    monkeypatch.delenv("GIT_WORKSPACE_BASE", raising=False)
+    monkeypatch.setattr(routes.tempfile, "tempdir", str(tmp_path))
+    original_mkdir = Path.mkdir
+
+    def readonly_app(path: Path, *args, **kwargs) -> None:
+        if path == Path("/app/backend/.git_workspaces"):
+            raise PermissionError("read-only application installation")
+        original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", readonly_app)
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        roots = list(pool.map(lambda _: routes.workspace_base(), range(48)))
+
+    assert len(set(roots)) == 1
+    root = roots[0]
+    assert root.is_dir()
+    assert root.parent == tmp_path.resolve()
+    assert list(tmp_path.iterdir()) == [root]
+    if os.name == "posix":
+        assert stat.S_IMODE(root.stat().st_mode) == 0o700
