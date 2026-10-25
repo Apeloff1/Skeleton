@@ -144,3 +144,60 @@ def test_oversized_provider_plan_never_reaches_secretary_truncated():
     assert "a" * 100 not in plan
     assert len(plan.encode("utf-8")) <= supervisor.MAX_PLAN_BYTES
     assert supervisor.make_envelope(observed, plan, execution()).to_base64()
+
+
+def test_live_observation_compacts_large_rollups_without_losing_custody():
+    # 40 PRs with verbose check metadata used to exceed canonical_json's
+    # 256 KiB snapshot budget before the planner could compact anything.
+    statuses = [
+        {"name": "check-" + str(i), "conclusion": "SUCCESS",
+         "description": "untrusted-check-description-" + ("x" * 1400)}
+        for i in range(96)
+    ]
+    prs = [
+        {"number": number, "title": "safe PR", "headRefName": "feature/test",
+         "baseRefName": "main", "mergeStateStatus": "BLOCKED",
+         "statusCheckRollup": statuses}
+        for number in range(1, 41)
+    ]
+
+    def observed_gh(args):
+        if args[0] == "pr":
+            return prs
+        return []
+
+    with patch.object(supervisor, "_gh_json", side_effect=observed_gh):
+        observed = supervisor.observe("Apeloff1/Skeleton")
+
+    assert len(observed.fingerprint) == 64
+    assert len(observed.pull_requests) == 40
+    pr = observed.pull_requests[0]
+    assert pr["statusCheckRollupCount"] == 96
+    assert len(pr["statusCheckRollup"]) == 64
+    assert pr["statusCheckRollup"][0] == {"conclusion": "SUCCESS"}
+    assert "untrusted-check-description" not in json.dumps(pr)
+    assert len(pr["statusCheckRollupFingerprint"]) == 64
+    with patch.object(
+        supervisor, "_machine_repository_context",
+        return_value={"status": "available", "fingerprint": "f" * 64},
+    ):
+        plan = json.loads(supervisor.deterministic_plan(observed))
+    assert plan["snapshot_fingerprint"] == observed.fingerprint
+
+    # Modifying an unshown status still changes the custody identity.
+    changed = [dict(item) for item in prs]
+    changed[0] = dict(changed[0])
+    changed[0]["statusCheckRollup"] = [dict(s) for s in statuses]
+    changed[0]["statusCheckRollup"][-1]["conclusion"] = "FAILURE"
+    with patch.object(supervisor, "_gh_json", side_effect=lambda args: changed if args[0] == "pr" else []):
+        revised = supervisor.observe("Apeloff1/Skeleton")
+    assert revised.fingerprint != observed.fingerprint
+    assert revised.pull_requests[0]["statusCheckRollup"] == pr["statusCheckRollup"]
+
+
+def test_pr_rollup_invalid_shape_fails_closed():
+    with pytest.raises(supervisor.SupervisorError, match="invalid GitHub PR status"):
+        supervisor._normalize_pr_observation({
+            "number": 1,
+            "statusCheckRollup": {"unexpected": "map"},
+        })
