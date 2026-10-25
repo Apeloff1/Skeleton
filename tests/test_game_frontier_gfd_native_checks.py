@@ -30,18 +30,30 @@ def test_emit_project_writes_scene_and_script(tmp_path) -> None:
 
 
 def test_native_slope_geometry_descends_toward_negative_x() -> None:
-    # Godot's serialized Transform3D uses basis *columns*: the second
-    # component of the first axis is the local +X axis' world Y component.
-    # A positive component means the slope rises to +X, hence downhill -X.
+    # Actual pinned Godot 4.7.2 run 40164574435 observed +6.941987 X
+    # with the opposite transform signs. The native engine is the authority,
+    # not a guessed parameter-order interpretation. Reverse both signs and
+    # keep the same measurable -X downhill acceptance requirement.
     scene = gfd.SCENE_TSCN.split('[node name="Slope" type="StaticBody3D" parent="."]', 1)[1]
     transform = scene.split("transform = Transform3D(", 1)[1].split(")", 1)[0]
     axes = [float(part.strip()) for part in transform.split(",")]
     assert len(axes) == 12
-    assert axes[1] > 0.2, "native fixture slope must rise toward +X"
-    assert axes[3] < -0.2, "rotation must be a right-handed 15 degree incline"
+    assert axes[1] < -0.2, "native slope fixture must oppose measured +X drift"
+    assert axes[3] > 0.2, "basis rotation must be reversed from failed native run"
     assert axes[4] > 0.9
     # Keep the independent motion assertion aligned with the fixture.
     assert gfd.evaluate(gfd.parse_probe(_log()))["checks"]["rigid_down_slope"]
+    # Preserve the real native failure as a negative regression: a contact
+    # and substantial downward movement do not imply downhill -X movement.
+    actual_failed_native = _log({
+        "ball_start": [0.0, 2.0, 0.0],
+        "ball_end": [6.94198751449585, -0.829272925853729, 0.0],
+        "ball_max_contacts": 2,
+    })
+    failed = gfd.evaluate(gfd.parse_probe(actual_failed_native))
+    assert failed["checks"]["rigid_contact"]
+    assert not failed["checks"]["rigid_down_slope"]
+    assert not failed["passed"]
 
 
 def test_passing_probe_reports_no_gpu_or_screenshot_claims() -> None:
