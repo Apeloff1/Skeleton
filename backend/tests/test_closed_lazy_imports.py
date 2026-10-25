@@ -374,3 +374,40 @@ def test_swarm_module_provider_uses_only_governed_literal_default() -> None:
         (ROOT / "skeleton/gate_plane/agent_edge/swarm_adapter.py").read_bytes()
         == (ROOT / "skeleton/ai/runtime/policy/gate_plane/agent_edge/swarm_adapter.py").read_bytes()
     )
+
+
+def test_generated_cue_dispatch_is_exhaustive_and_fail_closed() -> None:
+    from skeleton.cue.gb46._dispatch import _IMPORTERS, load_organ_module
+    from skeleton.cue.gb46.caps import names
+
+    assert len(_IMPORTERS) == 2560
+    assert set(_IMPORTERS) == {module for _cid, _family, module in names()}
+    assert load_organ_module("c0001_house_001").Organ is not None
+    with pytest.raises(KeyError, match="unregistered cue capability"):
+        load_organ_module("../untrusted")
+
+
+def test_audio_era_dispatch_matches_first_capability_per_era() -> None:
+    from skeleton.audio.eras.conductor import _ERA_LOADERS
+    from skeleton.audio.eras.caps import names
+
+    first_by_era = {}
+    for _cid, era, module in names():
+        first_by_era.setdefault(era, module)
+    assert set(_ERA_LOADERS) == set(first_by_era.values())
+    assert len(_ERA_LOADERS) == 16
+    with pytest.raises(TypeError):
+        _ERA_LOADERS["arbitrary"] = lambda: None
+
+
+def test_formal_bindings_cannot_dynamically_import_unloaded_code() -> None:
+    from skeleton.contracts.formal_methods import FormalMethodError, ImplementationBinding
+
+    binding = ImplementationBinding(
+        contract_id="safe-binding",
+        module_path="untrusted_missing_impl_123",
+        symbol="target",
+        source_sha256="0" * 64,
+    )
+    with pytest.raises(FormalMethodError, match="not loaded"):
+        binding.resolve()
