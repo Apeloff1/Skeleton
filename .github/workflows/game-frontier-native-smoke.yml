@@ -3,32 +3,8 @@ name: Game Frontier Native Godot Smoke
 # Specialized native engine acceptance: actual Godot 4 binary, not a mock.
 # Keep resource cost scoped; cancel superseded PR commits.
 on:
+  workflow_call:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "scripts/build_game_frontier_smoke.py"
-      - "scripts/certify_game_frontier_godot_import.py"
-      - "scripts/run_game_frontier_gfd_native_checks.py"
-      - "tests/test_gf_d_godot_import_cert.py"
-      - "tests/test_game_frontier_gfd_native_checks.py"
-      - "scripts/build_game_frontier_quest_smoke_approvals.py"
-      - "scripts/run_game_frontier_quest_tools.py"
-      - "scripts/run_game_frontier_godot_dispatch.py"
-      - "scripts/run_game_frontier_endurance.py"
-      - "scripts/verify_game_frontier_instruments.py"
-      - "scripts/verify_game_frontier_dash.py"
-      - "scripts/qualify_game_frontier_godot.py"
-      - "scripts/run_game_frontier_capture.py"
-      - "scripts/validate_game_frontier_native_smoke.py"
-      - "skeleton/forge/game_frontier_godot.py"
-      - "skeleton/jeeves/game_frontier*.py"
-      - "scripts/build_original_expedition.py"
-      - "scripts/build_original_campaign.py"
-      - "tests/test_original_expedition_cli.py"
-      - "skeleton/game/production_native_quality.py"
-      - ".github/workflows/game-frontier-native-smoke.yml"
 
 permissions:
   contents: read
