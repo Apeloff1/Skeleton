@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 from unittest import mock
 
+from scripts import check_toolchain_contract as toolchain_contract
 from scripts import check_workflow_concurrency as concurrency
 
 
@@ -252,6 +253,14 @@ def test_reusable_ci_keeps_pr_cancellation_but_preserves_each_main_sha() -> None
     assert "cancel-in-progress: \u0024{{ github.event_name == 'pull_request' }}" in workflow
     _record, findings = concurrency.violations_from_text("ci.yml", workflow)
     assert findings == []
+    assert toolchain_contract.pr_only_ref_or_sha_scoped_cancellation(workflow)
+    # Never interpret unconditional cancellation as safe main-branch queuing.
+    assert not toolchain_contract.pr_only_ref_or_sha_scoped_cancellation(
+        workflow.replace(
+            "cancel-in-progress: \\u0024{{ github.event_name == 'pull_request' }}",
+            "cancel-in-progress: true",
+        )
+    )
 
 
 def test_rejects_sha_scoped_group_when_preemption_is_enabled() -> None:
