@@ -136,12 +136,18 @@ def ref_scoped_cancellation(workflow: str) -> bool:
     )
 
 
-def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
-    """Return true when PRs cancel superseded runs but branch pushes queue."""
+def pr_only_ref_or_sha_scoped_cancellation(workflow: str) -> bool:
+    """Require PR-only preemption and a group bounded to PR or immutable main SHA."""
     group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
     return bool(
         group
-        and "${{ github.event.pull_request.number || github.ref }}" in group.group(1)
+        and any(
+            fallback in group.group(1)
+            for fallback in (
+                "${{ github.event.pull_request.number || github.ref }}",
+                "${{ github.event.pull_request.number || github.sha }}",
+            )
+        )
         and re.search(
             r"^\s*cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*(?:#.*)?$",
             workflow,
@@ -419,7 +425,7 @@ def main() -> int:
         cancel_false(ci)
         or sha_scoped_cancellation(ci)
         or ref_scoped_cancellation(ci)
-        or pr_only_ref_scoped_cancellation(ci),
+        or pr_only_ref_or_sha_scoped_cancellation(ci),
         "CI concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
