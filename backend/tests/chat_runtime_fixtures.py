@@ -211,6 +211,7 @@ class SQLiteAsyncConversationAuthority:
                     tenant_id=tenant_id,
                     owner_id=owner_id,
                     expected_thread_version=expected_thread_version,
+                    execution_metadata=execution_metadata,
                 )
             finally:
                 repository._connection = connection

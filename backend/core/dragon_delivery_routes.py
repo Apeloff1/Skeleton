@@ -175,7 +175,7 @@ def register_delivery_routes(
                 return {"ok": True, **delivery.brief(
                     owner, design, body.query, now=_now(), authorized=True
                 )}
-        except (ValueError, PermissionError, TypeError) as exc:
+        except (ValueError, PermissionError, TypeError, sqlite3.DatabaseError, OSError) as exc:
             raise _error(exc) from None
 
     @router.post("/delivery/generate")
