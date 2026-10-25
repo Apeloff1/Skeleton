@@ -118,3 +118,29 @@ def test_immutable_oversize_cannot_be_truncated_or_admitted():
             },
             max_bytes=300,
         )
+
+
+
+def test_oversized_provider_plan_never_reaches_secretary_truncated():
+    observed = snapshot(prs=({"number": 7, "mergeStateStatus": "BLOCKED"},))
+    # The original branch cut the last bytes without validation. That could
+    # change an authorization constraint or produce an incomplete JSON plan.
+    oversized = '{"proposal":"' + ("a" * (supervisor.MAX_PLAN_BYTES + 1024)) + '"}'
+    with (
+        patch.object(supervisor, "FreeModelClient") as fake_client,
+        patch.object(
+            supervisor,
+            "_machine_repository_context",
+            return_value={"status": "available", "fingerprint": "f" * 64},
+        ),
+    ):
+        fake_client.return_value.chat.return_value = oversized
+        plan = supervisor.model_plan(observed)
+
+    parsed = json.loads(plan)
+    assert parsed["snapshot_fingerprint"] == observed.fingerprint
+    assert parsed["version"] == 1
+    assert parsed["priority_observations"]["blocked_pull_requests"][0]["number"] == 7
+    assert "a" * 100 not in plan
+    assert len(plan.encode("utf-8")) <= supervisor.MAX_PLAN_BYTES
+    assert supervisor.make_envelope(observed, plan, execution()).to_base64()
