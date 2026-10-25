@@ -201,7 +201,22 @@ class SupervisorSnapshot:
             "pull_requests": self.pull_requests,
             "workflow_runs": self.workflow_runs,
         }
-        return hashlib.sha256(_canonical(payload)).hexdigest()
+        # Hash the complete canonical observation incrementally. The
+        # control-plane JSON byte limit applies to payloads passed between
+        # jobs, not to a locally observed snapshot that may contain 40
+        # individually approved issue bodies. Preserve identical digests
+        # for ordinary snapshots without buffering over-budget JSON.
+        digest = hashlib.sha256()
+        encoder = json.JSONEncoder(
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            allow_nan=False,
+        )
+        try:
+            for fragment in encoder.iterencode(payload):
+                digest.update(fragment.encode("utf-8"))
+        except (TypeError, ValueError, UnicodeError) as exc:
+            raise SupervisorError("invalid canonical supervisor snapshot") from exc
+        return digest.hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
