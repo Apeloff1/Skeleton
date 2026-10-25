@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from unittest import mock
 
 from scripts import check_toolchain_contract as toolchain_contract
