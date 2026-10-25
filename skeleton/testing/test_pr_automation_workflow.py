@@ -16,7 +16,7 @@ def test_privileged_workflow_is_manual_only_on_trusted_default_branch():
     # Only YAML events under `on` can trigger a job. References to historical
     # workflow_run payloads in dormant shell steps are not enabled triggers.
     triggers = text.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
-    assert "\n  workflow_dispatch:\n" in triggers
+    assert "  workflow_dispatch:\n" in triggers
     for forbidden in (
         "workflow_run", "schedule", "pull_request", "pull_request_target",
         "pull_request_review", "pull_request_review_comment", "push",
