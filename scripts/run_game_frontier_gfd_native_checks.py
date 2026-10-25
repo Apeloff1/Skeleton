@@ -224,10 +224,10 @@ def _invoke_godot(godot: str, args: list[str], timeout: int) -> tuple[int, str]:
             stdout = stdout.decode("utf-8", errors="replace")
         if isinstance(stderr, bytes):
             stderr = stderr.decode("utf-8", errors="replace")
-        return 124, str(stdout)[-2000:] + "\\n" + str(stderr)[-2000:] + "\\nGodot timed out"
+        return 124, str(stdout)[-2000:] + "\n" + str(stderr)[-2000:] + "\nGodot timed out"
     except OSError as exc:
         return 127, "Godot launch failed: " + type(exc).__name__
-    return proc.returncode, proc.stdout + "\\n" + proc.stderr
+    return proc.returncode, proc.stdout + "\n" + proc.stderr
 
 
 def run(godot: str, project: Path, log_dir: Path, timeout: int = 120) -> dict[str, Any]:
