@@ -587,3 +587,39 @@ def test_every_tracked_ai_file_has_governed_owner() -> None:
         if not mapping_owned and not native_owned:
             unowned.append(path)
     assert unowned == []
+
+
+def test_retrieval_mirror_allows_only_four_exact_sibling_import_rewrites() -> None:
+    module = _module()
+    legacy = ROOT / "skeleton/retrieval"
+    canonical = ROOT / "skeleton/ai/runtime/retrieval"
+    assert module._compare(legacy, canonical, source_exclusions={"scatter10240"}) == []
+    for filename in ("index.py", "ingest.py", "pipeline.py", "query.py"):
+        src = legacy / filename
+        dst = canonical / filename
+        assert not module._content_equivalent(src, dst)
+        assert module._retrieval_import_mirror_equivalent(src, dst)
+
+
+def test_retrieval_mirror_refuses_body_changes_and_unlisted_modules(tmp_path: Path) -> None:
+    module = _module()
+    module.ROOT = tmp_path
+    legacy = tmp_path / "skeleton/retrieval"
+    canonical = tmp_path / "skeleton/ai/runtime/retrieval"
+    legacy.mkdir(parents=True)
+    canonical.mkdir(parents=True)
+    original = "from skeleton.retrieval.fusion import ScoredResult\\n\\ndef score():\\n    return 7\\n"
+    expected = original.replace("from skeleton.retrieval.", "from skeleton.ai.runtime.retrieval.")
+    for filename in ("index.py", "ingest.py", "pipeline.py", "query.py"):
+        (legacy / filename).write_text(original, encoding="utf-8")
+        (canonical / filename).write_text(expected, encoding="utf-8")
+        assert module._retrieval_import_mirror_equivalent(legacy / filename, canonical / filename)
+        (canonical / filename).write_text(expected.replace("return 7", "return 8"), encoding="utf-8")
+        assert not module._retrieval_import_mirror_equivalent(legacy / filename, canonical / filename)
+    (legacy / "unreviewed.py").write_text(original, encoding="utf-8")
+    (canonical / "unreviewed.py").write_text(expected, encoding="utf-8")
+    assert not module._retrieval_import_mirror_equivalent(legacy / "unreviewed.py", canonical / "unreviewed.py")
+    # Rewriting inside a string/comment or modifying other imports is not allowed.
+    (legacy / "index.py").write_text('note = "from skeleton.retrieval.fusion"\\n', encoding="utf-8")
+    (canonical / "index.py").write_text('note = "from skeleton.ai.runtime.retrieval.fusion"\\n', encoding="utf-8")
+    assert not module._retrieval_import_mirror_equivalent(legacy / "index.py", canonical / "index.py")
