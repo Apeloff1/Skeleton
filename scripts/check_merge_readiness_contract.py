@@ -157,6 +157,23 @@ def main() -> int:
         )
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
+    # Keep the full required test/security matrices within explicit bounded
+    # CI budgets, rather than truncating them at historic 30/45/60m limits.
+    for job_name, minimum in (
+        ("unit", 90),
+        ("quality_security", 120),
+        ("pr_automation", 90),
+    ):
+        configured = re.findall(
+            r"^    timeout-minutes:\s*(\d+)\s*$",
+            job_block(text, job_name),
+            re.MULTILINE,
+        )
+        require(
+            len(configured) == 1 and minimum <= int(configured[0]) <= 120,
+            f"{job_name} must have one bounded {minimum}-120-minute timeout",
+            failures,
+        )
     unit = job_block(text, "unit")
     normalized_unit = " ".join(unit.split())
     require(

@@ -54,7 +54,8 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Unit
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Required full-suite validation must have bounded nontruncating runway.
+    timeout-minutes: 90
     # Fail promptly on broken tests, without skipping any test on success.
     env:
       PYTEST_ADDOPTS: "--maxfail=1"
@@ -144,7 +145,8 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Required full-suite validation must have bounded nontruncating runway.
+    timeout-minutes: 120
     env:
       PYTHONPATH: ${{ github.workspace }}
       PYTEST_ADDOPTS: "--maxfail=1"
@@ -187,7 +189,8 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: PR Automation Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Required full-suite validation must have bounded nontruncating runway.
+    timeout-minutes: 90
     env:
       PYTEST_ADDOPTS: "--maxfail=1"
     steps:
