@@ -32,14 +32,20 @@ def workspace_base() -> Path:
     preferred = Path(configured) if configured else Path("/app/backend/.git_workspaces")
     try:
         preferred.mkdir(parents=True, exist_ok=True)
-        probe = preferred / ".writable"
-        probe.write_text("ok", encoding="utf-8")
-        probe.unlink()
+        # An exclusive, random probe must never overwrite a pre-existing file
+        # or follow a predictable .writable symlink in a shared workspace.
+        with tempfile.NamedTemporaryFile(
+            dir=preferred, prefix=".writable-", delete=True
+        ):
+            pass
     except OSError:
         if configured:
+            # Explicit operator configuration is authoritative: never silently
+            # divert repositories to an unrelated temporary storage location.
             raise
-        preferred = Path(tempfile.gettempdir()) / "skeleton-git-workspaces"
-        preferred.mkdir(parents=True, exist_ok=True)
+        # mkdtemp creates a private (0700), unpredictable per-process directory;
+        # a fixed /tmp path could expose one user's repository to another.
+        preferred = Path(tempfile.mkdtemp(prefix="skeleton-git-workspaces-"))
     _workspace_base = preferred.resolve()
     return _workspace_base
 
