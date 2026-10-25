@@ -269,6 +269,24 @@ def test_main_ci_contract_rejects_legacy_ref_wide_cancellation() -> None:
     assert toolchain_contract.ci_preserves_main_run_evidence(no_cancellation)
 
 
+def test_yaml_comment_cannot_spoof_sha_scoped_main_evidence() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert toolchain_contract.ci_preserves_main_run_evidence(workflow)
+    spoof = workflow.replace(
+        "group: ci-" + chr(36) +
+        "{{ github.event_name }}-" + chr(36) +
+        "{{ github.event.pull_request.number || github.sha }}",
+        "group: ci-" + chr(36) + "{{ github.ref }} # " +
+        chr(36) + "{{ github.sha }}",
+    ).replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
+    )
+    assert spoof != workflow
+    assert not toolchain_contract.ci_preserves_main_run_evidence(spoof)
+
+
 def test_nested_job_concurrency_cannot_mask_main_cancellation() -> None:
     root = Path(__file__).resolve().parents[2]
     current = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
