@@ -1914,5 +1914,10 @@
       "signing_required": true,
       "accountability_status": "planned"
     }
-  ]
+  ],
+  "verification_scopes": {
+    "historical_catalog": "signed_implementation_at_pinned_commit",
+    "priority_queue": "post_historical_exact_head_verification_pending",
+    "historical_verification_commit": "6dcb6c4b1445ef653ec3afef1e1a986b41034a6a"
+  }
 }

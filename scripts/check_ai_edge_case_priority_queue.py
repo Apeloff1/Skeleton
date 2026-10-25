@@ -65,6 +65,13 @@ def validate(
         errors.append("priority queue source_catalog path drifted")
     if queue.get("source_matrix") != "machine/ai_full_edge_case_matrix.json":
         errors.append("priority queue source_matrix path drifted")
+    required_scope = {
+        "historical_catalog": "signed_implementation_at_pinned_commit",
+        "priority_queue": "post_historical_exact_head_verification_pending",
+        "historical_verification_commit": "6dcb6c4b1445ef653ec3afef1e1a986b41034a6a",
+    }
+    if queue.get("verification_scopes") != required_scope:
+        errors.append("priority queue historical/current-head scope pin drifted")
     if set(queue.get("status_values") or []) != ALLOWED_STATUSES:
         errors.append("priority queue status_values drifted")
 

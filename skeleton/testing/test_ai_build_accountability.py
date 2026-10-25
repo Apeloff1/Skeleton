@@ -153,3 +153,48 @@ def test_accountability_rejects_completion_before_verification() -> None:
 
     assert "ACC-TEST: completed_at_utc predates verification signoff" in errors
 
+
+
+def test_priority_queue_pending_scope_preserves_signed_historical_records() -> None:
+    priority = json.loads(checker.PRIORITY.read_text(encoding="utf-8"))
+    ledger = _load()
+    records = {row["id"]: row for row in ledger["records"]}
+    assert priority["verification_scopes"] == checker._PRIORITY_VERIFICATION_SCOPES
+    assert len(priority["items"]) == 57
+    assert all(
+        checker._historical_signature_distinct_from_priority_work(
+            item, records[item["accountability_id"]], priority["verification_scopes"]
+        )
+        for item in priority["items"]
+    )
+    assert checker.validate() == []
+
+
+def test_priority_new_scope_rejects_unsigned_and_forged_history() -> None:
+    import copy
+
+    priority = json.loads(checker.PRIORITY.read_text(encoding="utf-8"))
+    ledger = _load()
+    item = priority["items"][0]
+    record = next(row for row in ledger["records"] if row["id"] == item["accountability_id"])
+    scope = priority["verification_scopes"]
+    assert checker._historical_signature_distinct_from_priority_work(item, record, scope)
+
+    for mutate in (
+        lambda r: r["verification_signoff"].update({"signed": False}),
+        lambda r: r["verification_signoff"].update({"git_sha": "0" * 40}),
+        lambda r: r["history"][-1].update({"to_status": "planned"}),
+        lambda r: r.update({"completed_at_utc": None}),
+    ):
+        altered = copy.deepcopy(record)
+        mutate(altered)
+        assert not checker._historical_signature_distinct_from_priority_work(item, altered, scope)
+    asserted = copy.deepcopy(item)
+    asserted["completion_checkbox"] = True
+    assert not checker._historical_signature_distinct_from_priority_work(asserted, record, scope)
+    asserted = copy.deepcopy(item)
+    asserted["status"] = "passing"
+    assert not checker._historical_signature_distinct_from_priority_work(asserted, record, scope)
+    assert not checker._historical_signature_distinct_from_priority_work(
+        item, record, dict(scope, historical_verification_commit="0" * 40)
+    )

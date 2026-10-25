@@ -192,6 +192,48 @@ def _historical_wave4_verification_pending_independent_scope(
     )
 
 
+_PINNED_PRIORITY_HISTORICAL_SHA = "6dcb6c4b1445ef653ec3afef1e1a986b41034a6a"
+_PRIORITY_VERIFICATION_SCOPES = {
+    "historical_catalog": "signed_implementation_at_pinned_commit",
+    "priority_queue": "post_historical_exact_head_verification_pending",
+    "historical_verification_commit": _PINNED_PRIORITY_HISTORICAL_SHA,
+}
+
+
+def _historical_signature_distinct_from_priority_work(item: dict, record: dict, scopes: object) -> bool:
+    """A signed older catalog does not complete new-head priority obligations.
+
+    Only a pinned prior signature with an independently signed historic
+    verifier is recognized; a priority item remains unsigned and planned.
+    This does not promote it, waive signatures, or rewrite historic receipts.
+    """
+    impl = record.get("implementation_signoff")
+    verify = record.get("verification_signoff")
+    history = record.get("history")
+    return (
+        scopes == _PRIORITY_VERIFICATION_SCOPES
+        and item.get("status") == "planned"
+        and not item.get("evidence")
+        and item.get("disposition") in (None, "")
+        and item.get("completion_checkbox") is False
+        and item.get("completion_checkbox_mark") == "[ ]"
+        and item.get("accountability_status") == "planned"
+        and item.get("signing_required") is True
+        and item.get("accepted_risk") is None
+        and record.get("status") == "verified"
+        and record.get("checkbox") is True
+        and record.get("checkbox_mark") == "[x]"
+        and isinstance(impl, dict) and isinstance(verify, dict)
+        and impl.get("signed") is True and verify.get("signed") is True
+        and impl.get("signer_id") != verify.get("signer_id")
+        and impl.get("git_sha") == _PINNED_PRIORITY_HISTORICAL_SHA
+        and verify.get("git_sha") == _PINNED_PRIORITY_HISTORICAL_SHA
+        and isinstance(history, list) and bool(history)
+        and history[-1].get("to_status") == "verified"
+        and bool(record.get("completed_at_utc"))
+    )
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     for path in (LEDGER, HUMAN, MASTER, QUEUE, P1, CATALOG, PRIORITY):
@@ -439,11 +481,15 @@ def validate() -> list[str]:
             continue
         if item.get("signing_required") is not True:
             errors.append(f"{item['id']}: priority signing_required must be true")
-        if item.get("completion_checkbox") != rec.get("checkbox"):
+        historical_scope = _historical_signature_distinct_from_priority_work(
+            item, rec, priority.get("verification_scopes")
+        )
+        if item.get("completion_checkbox") != rec.get("checkbox") and not historical_scope:
             errors.append(f"{item['id']}: priority checkbox disagrees with ledger")
-        if item.get("completion_checkbox_mark") != rec.get("checkbox_mark"):
+        if item.get("completion_checkbox_mark") != rec.get("checkbox_mark") and not historical_scope:
             errors.append(f"{item['id']}: priority checkbox mark disagrees with ledger")
-        if str(item.get("accountability_status", item.get("status", ""))).lower() != str(rec.get("status", "")).lower():
+        if (str(item.get("accountability_status", item.get("status", "")).lower())
+                != str(rec.get("status", "")).lower() and not historical_scope):
             errors.append(f"{item['id']}: priority accountability status disagrees with ledger")
 
     human = HUMAN.read_text(encoding="utf-8")
