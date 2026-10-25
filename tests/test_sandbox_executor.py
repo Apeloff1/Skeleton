@@ -13,8 +13,8 @@ from skeleton.sandbox import (
     ExecutorPolicy,
     FsJail,
     GuardedExecutor,
-    ToolRequest,
     ToolOutcome,
+    ToolRequest,
     ToolSpec,
 )
 from skeleton.sandbox.errors import ProcessPolicyError
@@ -203,3 +203,21 @@ def test_network_host_capability_never_grants_unrestricted_egress(tmp_path: Path
 def test_audit_capacity_rejects_invalid_bounds(value) -> None:
     with pytest.raises(ExecutorConfigError, match="audit capacity"):
         AuditLog(max_entries=value)
+
+
+def test_audit_evidence_is_immutable_against_caller_and_sink_mutation() -> None:
+    observed = []
+
+    def mutating_sink(entry):
+        observed.append(entry)
+        entry["event"]["details"][0]["result"] = "tampered-by-sink"
+
+    audit = AuditLog(sink=mutating_sink)
+    event = {"details": [{"result": "denied"}]}
+    audit.append(event)
+    event["details"][0]["result"] = "tampered-by-caller"
+
+    retained = audit.entries()
+    assert retained[0]["event"]["details"][0]["result"] == "denied"
+    assert observed[0]["event"]["details"][0]["result"] == "tampered-by-sink"
+    assert audit.verify()
