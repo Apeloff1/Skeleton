@@ -168,6 +168,7 @@ async def reflect(body: ReflectBody, scope=Depends(require_authenticated_identit
     routed = await route_complete(
         "reasoning", prompt, system=system, use_cache=False,
         tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
+        data_class="confidential",
     )
     insight = (routed.get("content") or "").strip()
     if not insight:

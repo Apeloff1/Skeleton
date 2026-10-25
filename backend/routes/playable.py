@@ -26,12 +26,17 @@ import time
 import json
 import uuid
 import asyncio
+import logging
 from datetime import datetime, timezone, timedelta
 
 from fastapi import HTTPException, Query
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, ConfigDict
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.engine_text import EngineTextError, EngineTextContextError
+from core.engine_client import EngineExecutionFailed, EngineAuthorizationError, EngineRequestRejectedError
+from core.model_catalog import ModelSelectionError
+from skeleton.vault.data_governance import DataGovernanceDenied
 from routes.llm_router import MODEL_CATALOG, ROUTING_POLICY
 from routes.playable_access import (
     assert_project_access, bind_project_source, project_identity, project_router,
@@ -41,6 +46,40 @@ from routes.playable_access import (
 router = project_router(prefix="/api/playable", tags=["playable"])
 _db = scoped_database(_SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")])
 PROJ = {"_id": 0}
+_log = logging.getLogger(__name__)
+
+
+class PlayableModelFailure(RuntimeError):
+    """Safe model failure that cannot authorize another generation attempt."""
+
+    def __init__(self, code: str, *, unconfirmed: bool = False, request_key: str | None = None):
+        self.code, self.unconfirmed, self.request_key = code, unconfirmed, request_key
+        super().__init__("Model execution could not be confirmed; retain this job." if unconfirmed
+                         else "Model generation is unavailable for this project.")
+
+    def public(self):
+        return {"error": str(self), "error_code": self.code, "retry_same_request": self.unconfirmed,
+                "engine_request_key": self.request_key}
+
+
+def _model_failure(error: EngineTextError, request_key: str | None):
+    causes = []
+    current = error
+    while current is not None and len(causes) < 8:
+        causes.append(current)
+        current = current.__cause__
+    if any(isinstance(item, (DataGovernanceDenied, EngineAuthorizationError, EngineRequestRejectedError)) for item in causes):
+        return PlayableModelFailure("project_model_transfer_denied", request_key=request_key)
+    if any(isinstance(item, (EngineTextContextError, ModelSelectionError)) for item in causes):
+        return PlayableModelFailure("project_model_context_unavailable", request_key=request_key)
+    if any(isinstance(item, EngineExecutionFailed) for item in causes):
+        return PlayableModelFailure("project_model_execution_failed", request_key=request_key)
+    return PlayableModelFailure("project_model_execution_unconfirmed", unconfirmed=True, request_key=request_key)
+
+
+def _require_model_content(routed):
+    if routed.get("error") or not isinstance(routed.get("content"), str) or not routed["content"].strip():
+        raise PlayableModelFailure("project_model_generation_failed")
 
 PLAYABILITY_THRESHOLD = int(os.environ.get("PLAYABLE_MIN_SCORE", "70"))
 # Provider-diverse codegen ensemble (mirrors the router's gameplay_code policy).
@@ -60,6 +99,10 @@ QUALITY_TARGET = int(os.environ.get("PLAYABLE_QUALITY_TARGET", "85"))
 # Adaptive latency guard: skip the (expensive) quality-refinement pass if the
 # build has already consumed this many seconds — keeps total wall time bounded.
 QUALITY_TIME_BUDGET = int(os.environ.get("PLAYABLE_QUALITY_TIME_BUDGET", "210"))
+# Complete HTML needs a different finite output envelope from ordinary chat.
+# Catalog, context, operation and physical runtime limits still validate it.
+CODEGEN_OUTPUT_TOKENS = 1024
+JUDGE_OUTPUT_TOKENS = 256
 
 # ── EXPANSION "DELUXE" CEILING-LIFT ──────────────────────────────────────────
 # Expansion is the flagship deluxe mode: bigger, richer, judge-elevated. Its
@@ -189,7 +232,7 @@ class GenerateBody(BaseModel):
     derive_mode: str = ""
 
 
-async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
+async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None) -> dict:
     """Run a provider-diverse LLM ensemble (fallback) WITHOUT touching the
     main-loop Mongo client — safe to drive from a fresh loop inside a thread."""
     from core.engine_chat import EngineChat, UserMessage
@@ -213,13 +256,27 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
                     instructions=system.strip(),
                 ),
             ).with_model(provider, model)
+            if max_output_tokens is not None:
+                chat.with_max_tokens(max_output_tokens)
             resp = await chat.send_message(UserMessage(text=prompt))
             reauthorize_project_principal(mutate=True, sources=True)
             content = resp.content if hasattr(resp, "content") else str(resp)
-            return {"content": content, "model": model, "provider": provider,
+            return {"content": content, "model": "engine-routed", "provider": "skeleton-engine",
+                    "operation_id": getattr(resp, "operation_id", None),
+                    "execution_id": getattr(resp, "execution_id", None),
+                    "context_id": getattr(resp, "context_id", None),
+                    "context_digest": getattr(resp, "context_digest", None),
+                    "provider_receipts": list(getattr(resp, "provider_receipts", ())),
                     "latency_ms": int((time.time() - t0) * 1000), "attempts": i + 1}
         except HTTPException:
             raise
+        except EngineTextError as exc:
+            # Canonical execution owns routing and uncertain-dispatch recovery.
+            # A typed failure cannot become a fresh provider or repair request.
+            request_key = chat._idempotency_key(prompt) if callable(getattr(chat, "_idempotency_key", None)) else None
+            failure = _model_failure(exc, request_key)
+            _log.warning("Playable model request failed code=%s exception=%s", failure.code, type(exc).__name__)
+            raise failure from exc
         except Exception:  # provider error → next in ensemble
             pass
     return {"content": "", "error": "llm_request_failed", "model": None, "provider": None}
@@ -229,7 +286,7 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
 _LLM_SEM = threading.Semaphore(int(os.environ.get("LLM_MAX_CONCURRENCY", "3")))
 
 
-def _llm_in_thread(prompt: str, system: str, ensemble: list) -> dict:
+def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None) -> dict:
     """Blocking entrypoint executed in a worker thread (own event loop) so the
     underlying LLM call never freezes the server's main event loop.
 
@@ -237,7 +294,7 @@ def _llm_in_thread(prompt: str, system: str, ensemble: list) -> dict:
     wire/polish jobs can't stampede the model providers or starve the thread pool.
     Threads simply wait their turn here — the event loop stays free."""
     with _LLM_SEM:
-        return asyncio.run(_llm_async(prompt, system, ensemble))
+        return asyncio.run(_llm_async(prompt, system, ensemble, max_output_tokens=max_output_tokens))
 
 
 async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str = "studio",
@@ -263,7 +320,9 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
     repairs_left, refines_left = max_repair, (0 if depth == "fast" else base_refine)
     t_start = time.time()
 
-    routed = await asyncio.to_thread(_llm_in_thread, prompt, system, _GAME_ENSEMBLE)
+    routed = await asyncio.to_thread(_llm_in_thread, prompt, system, _GAME_ENSEMBLE,
+                                     max_output_tokens=CODEGEN_OUTPUT_TOKENS)
+    _require_model_content(routed)
     html, removed = _sanitize(_extract_html(routed.get("content", "")))
     val = _validate(html)
     trail = [{"attempt": 1, "kind": "generate", "score": val["score"],
@@ -279,7 +338,9 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
             f"checks: {', '.join(best['val']['missing']) or 'none'}.\n\n"
             f"PREVIOUS HTML (fix it, return the FULL corrected document):\n{best['html'][:html_ctx] or '(empty output)'}"
         )
-        r2 = await asyncio.to_thread(_llm_in_thread, repair_prompt, _REPAIR_SYS, _GAME_ENSEMBLE)
+        r2 = await asyncio.to_thread(_llm_in_thread, repair_prompt, _REPAIR_SYS, _GAME_ENSEMBLE,
+                                    max_output_tokens=CODEGEN_OUTPUT_TOKENS)
+        _require_model_content(r2)
         h2, rem2 = _sanitize(_extract_html(r2.get("content", "")))
         v2 = _validate(h2)
         trail.append({"attempt": len(trail) + 1, "kind": "structural_repair", "score": v2["score"],
@@ -306,7 +367,9 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
                 f"Also strengthen any missing depth: {', '.join(best['val']['missing']) or 'none'}.\n\n"
                 f"CURRENT HTML (upgrade it, return the FULL document):\n{best['html'][:html_ctx]}"
             )
-            r3 = await asyncio.to_thread(_llm_in_thread, quality_prompt, _QUALITY_SYS, _GAME_ENSEMBLE)
+            r3 = await asyncio.to_thread(_llm_in_thread, quality_prompt, _QUALITY_SYS, _GAME_ENSEMBLE,
+                                        max_output_tokens=CODEGEN_OUTPUT_TOKENS)
+            _require_model_content(r3)
             h3, rem3 = _sanitize(_extract_html(r3.get("content", "")))
             v3 = _validate(h3)
             cand_ok = bool(h3) and v3["score"] >= PLAYABILITY_THRESHOLD
@@ -330,7 +393,8 @@ async def _judge_eval(html: str, brief: str) -> dict:
     if not html:
         return {"available": False, "reason": "no html to evaluate"}
     prompt = (f"BRIEF:\n{brief or '(none)'}\n\nGAME HTML (may be truncated):\n{html[:14000]}\n\nScore this game.")
-    routed = await asyncio.to_thread(_llm_in_thread, prompt, _JUDGE_SYS, _JUDGE_ENSEMBLE)
+    routed = await asyncio.to_thread(_llm_in_thread, prompt, _JUDGE_SYS, _JUDGE_ENSEMBLE,
+                                     max_output_tokens=JUDGE_OUTPUT_TOKENS)
     data = _extract_json(routed.get("content", ""))
     if not data:
         return {"available": False, "reason": routed.get("error") or "judge returned no JSON",
@@ -401,6 +465,11 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
         "provider": routed.get("provider"),
         "latency_ms": routed.get("latency_ms"),
         "llm_error": llm_error,
+        "engine_operation_id": routed.get("operation_id"),
+        "engine_execution_id": routed.get("execution_id"),
+        "engine_context_id": routed.get("context_id"),
+        "engine_context_digest": routed.get("context_digest"),
+        "engine_provider_receipts": routed.get("provider_receipts", []),
         "depth": depth,
         "forged_from": forged_from or None,
         "derive_mode": derive_mode or None,
@@ -487,7 +556,10 @@ async def generate(body: GenerateBody):
     if err:
         return {"error": err}
     await _assert_generation_sources(body)
-    return await _do_generate((body.brief or "").strip(), body.spec_id, body.title, body.depth, body.creator_id, body.forged_from, body.derive_mode)
+    try:
+        return await _do_generate((body.brief or "").strip(), body.spec_id, body.title, body.depth, body.creator_id, body.forged_from, body.derive_mode)
+    except PlayableModelFailure as exc:
+        raise HTTPException(503, exc.public()) from exc
 
 
 async def _run_job(job_id: str, coro):
@@ -499,6 +571,10 @@ async def _run_job(job_id: str, coro):
         out["job_id"] = job_id
         out["job_status"] = "done"
         await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": out})
+    except PlayableModelFailure as exc:
+        await reauthorize_project_context(mutate=True)
+        await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": {
+            **exc.public(), "job_status": "unconfirmed" if exc.unconfirmed else "error"}})
     except HTTPException:
         # Revoked/moved accounts and projects cannot publish a late result or
         # turn the failed authorization into a new job through an upsert.

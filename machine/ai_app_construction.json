@@ -10231,6 +10231,23 @@
     "production_promotion_authorized": false,
     "masterplan_completion_authorized": false,
     "runtime_selection_contract": "machine/ai_chat_runtime_selection.json",
+    "private_model_route_admission": {
+      "status": "implementation_candidate",
+      "catalog": "backend/core/route_policy_catalog.py",
+      "catalog_version": "2026-10-25.v4",
+      "existing_domain": "studio",
+      "authenticated_prefixes": [
+        "/api/playable", "/api/pipeline", "/api/graph", "/api/groupchat",
+        "/api/snowball", "/api/wins", "/api/camera", "/api/physics",
+        "/api/quality-control", "/api/assets/genesis", "/api/photoreal",
+        "/api/imagine", "/api/churn", "/api/agent-memory", "/api/memory-engine",
+        "/api/jeeves-core/memory", "/api/jeeves-core/co-coding", "/api/ai-logs"
+      ],
+      "authority": "Existing authenticated account/tenant and canonical source guards precede confidential model transfer. Worldforge and orchestrator retain their existing confidential-capable domains. No new provider, service, store or capability owner; no change to the INTERNAL legacy fallback or public/governance ceilings.",
+      "failure": "A canonical model denial cannot become a provider fallback or empty structural repair. Unconfirmed execution retains the exact request key and nonterminal job custody; successful artifacts retain canonical engine execution/context/provider receipt references.",
+      "feature_output_budget": "Playable HTML generation/structural repair/refinement requests at most 1024 output tokens; its judge requests 256. Existing canonical catalog/context/operation/phase/physical limits remain authoritative. No global model limit increase.",
+      "acceptance": "Real route privacy middleware plus EngineChat and EngineText bridge tests, authenticated/foreign/public negatives, and installed original-game generation are required. Source changes alone confer no quality or enterprise grade."
+    },
     "local_model_provisioning_contract": "machine/ai_local_model_provisioning.json",
     "session_evidence": "machine/ai_first_install_session_evidence_2026-10-15.json",
     "operator_guide": "docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md",
