@@ -157,6 +157,20 @@ def pr_only_ref_or_sha_scoped_cancellation(workflow: str) -> bool:
     )
 
 
+def ci_preserves_main_run_evidence(workflow: str) -> bool:
+    """Fail closed on legacy ref-wide cancellation of independent main commits.
+
+    Ref-scoped cancellation can be safe on a PR-only workflow, but in
+    reusable CI it silently cancels required main-SHA evidence. Preserve
+    evidence even if the workflow is renamed or callers change.
+    """
+    return (
+        cancel_false(workflow)
+        or sha_scoped_cancellation(workflow)
+        or pr_only_ref_or_sha_scoped_cancellation(workflow)
+    )
+
+
 def pinned_action_count(workflow: str, action: str, generation: str) -> int:
     """Count immutable action pins carrying the expected human-readable generation."""
     pattern = re.compile(
@@ -422,10 +436,7 @@ def main() -> int:
         failures,
     )
     require(
-        cancel_false(ci)
-        or sha_scoped_cancellation(ci)
-        or ref_scoped_cancellation(ci)
-        or pr_only_ref_or_sha_scoped_cancellation(ci),
+        ci_preserves_main_run_evidence(ci),
         "CI concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
