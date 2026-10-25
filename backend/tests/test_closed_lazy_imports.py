@@ -188,3 +188,68 @@ def test_closed_catalog_dispatch_matches_complete_literal_registry(
         imported.add(node.args[0].value)
     assert imported == expected
     assert SCANNER.violations(ROOT / path) == []
+
+
+def test_webcrawler_lazy_registry_includes_literal_and_derived_game_milestones() -> None:
+    crawler = ROOT / "skeleton/ai/webcrawler/__init__.py"
+    tree = ast.parse(crawler.read_text(encoding="utf-8"))
+    assignments = [
+        node.value for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "_SPINE_EXPORTS" for t in node.targets)
+    ]
+    assert len(assignments) == 1
+    primary = ast.literal_eval(assignments[0])
+    expected = set(primary.values())
+    literal_updates = []
+    derived_updates = []
+    for node in tree.body:
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+            continue
+        call = node.value
+        if not isinstance(call.func, ast.Attribute) or call.func.attr != "update":
+            continue
+        if not isinstance(call.func.value, ast.Name) or call.func.value.id != "_SPINE_EXPORTS":
+            continue
+        assert len(call.args) == 1
+        if isinstance(call.args[0], ast.Dict):
+            literal_updates.append(ast.literal_eval(call.args[0]))
+        else:
+            assert isinstance(call.args[0], ast.DictComp)
+            derived_updates.append(call.args[0])
+    assert len(literal_updates) == 1 and len(derived_updates) == 1
+    expected.update(literal_updates[0].values())
+    catalog = ast.parse((ROOT / "skeleton/ai/webcrawler/game_scale_catalog.py").read_text(encoding="utf-8"))
+    groups = next(
+        ast.literal_eval(node.value) for node in catalog.body
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "_GROUPS" for t in node.targets
+        )
+    )
+    expected.update("." + row[1] for row in groups)
+    loader = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_load_trusted_crawler_module"
+    )
+    found = {
+        node.args[0].value for node in ast.walk(loader)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "_crawler_import_module"
+        and node.args and isinstance(node.args[0], ast.Constant)
+    }
+    assert found == expected
+    assert SCANNER.violations(crawler) == []
+
+
+def test_standalone_dragon_import_names_a_literal_isolated_namespace() -> None:
+    file = ROOT / "skeleton/ai/webcrawler/dragon_native_release.py"
+    tree = ast.parse(file.read_text(encoding="utf-8"))
+    imports = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "import_module"
+    ]
+    assert len(imports) == 1
+    assert isinstance(imports[0].args[0], ast.Constant)
+    assert imports[0].args[0].value == "_dragon_native_standalone.dragon_native_puzzle"
+    assert SCANNER.violations(file) == []
