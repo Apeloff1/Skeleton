@@ -10,7 +10,8 @@ from scripts import run_game_frontier_gfd_native_checks as gfd
 
 def _log(final_overrides: dict | None = None) -> str:
     ready = {"kind": "ready", "engine": "4.7.2-stable (official)", "ball_mass": 2.5,
-             "cloth_mass": 1.5, "cloth_layer": 1, "camera_current": True}
+             "cloth_mass": 1.5, "cloth_layer": 1, "camera_current": True,
+             "ticks_per_second": 60}
     final = {"kind": "final", "ticks": 180, "ball_start": [0, 2, 0], "ball_end": [-6.9, -0.8, 0],
              "ball_max_contacts": 2, "soft_points": 64, "pin_drift": 0.0, "free_drop": 1.2,
              "pinned": True}
@@ -57,6 +58,15 @@ def test_passing_probe_reports_no_gpu_or_screenshot_claims() -> None:
 def test_failed_physics_checks_are_reported(override, check) -> None:
     report = gfd.evaluate(gfd.parse_probe(_log(override)))
     assert not report["passed"] and report["checks"][check] is False
+
+
+def test_native_probe_fails_if_engine_did_not_use_60hz() -> None:
+    baseline = _log()
+    corrupted = baseline.replace('"ticks_per_second": 60', '"ticks_per_second": 30', 1)
+    assert corrupted != baseline
+    report = gfd.evaluate(gfd.parse_probe(corrupted))
+    assert report["checks"]["native_tick_rate_60hz"] is False
+    assert report["passed"] is False
 
 
 def test_missing_probe_records_fail_closed() -> None:
