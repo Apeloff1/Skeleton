@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from .lifecycle import (
     LifecycleTransitionReceipt,
     ModelBillOfMaterials,
