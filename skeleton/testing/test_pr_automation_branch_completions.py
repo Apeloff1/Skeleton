@@ -428,21 +428,14 @@ def test_parse_pr_hints_json_fails_closed_on_malformed_payloads() -> None:
         parse_pr_hints_json("[0]")
 
 
-def test_workflow_run_consumers_match_every_completing_branch() -> None:
+def test_archived_workflow_run_consumers_stay_disabled_and_index_stays_manual() -> None:
     root = Path(__file__).resolve().parents[2]
     workflows = root / ".github" / "workflows"
-    expected = 'branches:\n      - "*"\n      - "**"'
-    consumers = {
-        "repair-intake.yml": "types: [completed]",
-        "idle-studio.yml": "types: [completed]",
-        "pr-obsolete-run-drain.yml": "types: [requested]",
-    }
-    for name, event_type in consumers.items():
-        text = (workflows / name).read_text(encoding="utf-8")
-        assert "workflow_run:" in text
-        assert event_type in text
-        assert expected in text, f"{name} must match every completing head"
-        assert "pull_requests[0]" not in text, f"{name} must not treat pull_requests[0] as identity"
+    # These legacy fan-out workflows were deliberately archived. Reinstating
+    # them solely to satisfy a stale test would multiply privileged automation
+    # and reintroduce congestion; only PR Automation Index remains manual.
+    for name in ("repair-intake.yml", "idle-studio.yml", "pr-obsolete-run-drain.yml"):
+        assert not (workflows / name).exists(), f"{name} must remain archived"
 
     pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
     # The index is manual-only; never restore a second privileged automatic
@@ -455,7 +448,4 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
     assert "group: pr-automation-index" in pr_automation
     assert "cancel-in-progress: false" in pr_automation
 
-    idle = (workflows / "idle-studio.yml").read_text(encoding="utf-8")
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in idle
-    assert "exceeded bounded identity scan" in idle
-    assert r"^[0-9a-f]{40}$" in idle
+
