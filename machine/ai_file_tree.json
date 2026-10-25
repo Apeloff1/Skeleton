@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "634e0576ce17dd2f3803f565e5f9b3587be0aa75",
+      "source_git_object_sha": "9940e3d305412790f85617bf13b6d991b9d74f6e",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "fe6288016fdd603e1cb2223e2036f550f10c84cb",
+      "source_git_object_sha": "836fcc2dd670a081924824ea62e5b67d4249888f",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1499,7 +1499,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "ddceb43f10ddd98c6c1f90a053c0535b5dc1e563",
+      "source_git_object_sha": "0b171d89b5d723aed186dd97c75654b1662d0cb7",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2282,7 +2282,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "a1a9573012fafda4d5229f29eecbe1b3bd4554a6",
+      "source_git_object_sha": "c5165a0051384b5600d34166ee31bbfa61c23907",
       "role": "Repository model, impact, workgraph, governance, stewardship, ownership-aware maintenance, and bounded cleanup authority for autonomous repository engineering.",
       "work_package_refs": [
         "WP-W11",
