@@ -23,7 +23,7 @@ on:
 # and never preempted, so every main tip keeps its CI/CD + GameForge evidence
 # (restores the #2393 queue-not-cancel rule lost in the ace886be archive).
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
