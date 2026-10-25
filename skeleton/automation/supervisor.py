@@ -361,6 +361,57 @@ def _planning_issues(
     return result
 
 
+def _normalize_pr_observation(item: dict[str, Any]) -> dict[str, Any]:
+    """Bound advisory check detail without weakening snapshot state custody.
+
+    GitHub statusCheckRollup can include huge nested histories and untrusted
+    names, URLs, and descriptions. Retain the first 64 *statuses* consumed by
+    worker health, plus the digest of the complete original rollup so even
+    status changes beyond the visible window change snapshot identity.
+    """
+    normalized: dict[str, Any] = {
+        "number": item.get("number"),
+        "title": redact_secrets(str(item.get("title", "")))[:500],
+        "headRefName": str(item.get("headRefName", ""))[:180],
+        "baseRefName": str(item.get("baseRefName", ""))[:180],
+        "isDraft": item.get("isDraft") is True,
+        "mergeStateStatus": str(item.get("mergeStateStatus", "UNKNOWN"))[:32],
+        "updatedAt": str(item.get("updatedAt", ""))[:64],
+    }
+    rollup = item.get("statusCheckRollup")
+    if rollup is not None and not isinstance(rollup, list):
+        raise SupervisorError("invalid GitHub PR status rollup")
+    statuses: list[dict[str, str]] = []
+    for raw in (rollup or [])[:64]:
+        if not isinstance(raw, dict):
+            continue
+        state = next(
+            (
+                value.strip().upper()[:32]
+                for key in ("conclusion", "status", "state")
+                if isinstance(value := raw.get(key), str) and value.strip()
+            ),
+            "UNKNOWN",
+        )
+        statuses.append({"conclusion": state})
+    normalized["statusCheckRollup"] = statuses
+    # Hash the *entire* observed rollup, never just the first 64 results.
+    # The digest preserves change sensitivity without embedding arbitrary
+    # untrusted descriptions or URLs into the immutable custody envelope.
+    try:
+        raw_bytes = json.dumps(
+            rollup or [], sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True, allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise SupervisorError("invalid canonical GitHub check rollup") from exc
+    normalized["statusCheckRollupFingerprint"] = hashlib.sha256(
+        raw_bytes
+    ).hexdigest()
+    normalized["statusCheckRollupCount"] = len(rollup or [])
+    return normalized
+
+
 def observe(repository: str) -> SupervisorSnapshot:
     """Capture bounded issues, PRs, and recent Actions runs."""
     if not repository or repository.count("/") != 1:
@@ -420,7 +471,7 @@ def observe(repository: str) -> SupervisorSnapshot:
         repository=repository,
         observed_at=int(time.time()),
         issues=safe_issues,
-        pull_requests=tuple(prs),
+        pull_requests=tuple(_normalize_pr_observation(item) for item in prs),
         workflow_runs=tuple(runs),
     )
 
