@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+from unittest.mock import patch
 
 import pytest
 
@@ -77,3 +79,51 @@ def test_missing_probe_records_fail_closed() -> None:
 def test_script_errors_detected() -> None:
     out = 'SCRIPT ERROR: Parse Error: x\nERROR: Failed to load script "res://a.gd"\nok'
     assert len(gfd.script_errors(out)) == 2
+
+
+def test_native_import_timeout_still_writes_a_failure_receipt(tmp_path) -> None:
+    err = subprocess.TimeoutExpired(
+        ["godot", "--headless", "--import"], 1,
+        output=b"partial engine stdout", stderr=b"partial engine stderr",
+    )
+    project = tmp_path / "project"
+    logs = tmp_path / "logs"
+    with patch.object(gfd.subprocess, "run", side_effect=err) as invoked:
+        with pytest.raises(AssertionError, match="engine_import_or_playback"):
+            gfd.run("godot", project, logs, timeout=1)
+    assert invoked.call_count == 1  # playback cannot continue after failed import
+    report = json.loads((logs / "gfd-report.json").read_text(encoding="utf-8"))
+    assert report["passed"] is False
+    assert report["failure_kind"] == "engine_import_or_playback"
+    assert report["engine_exits"] == {"import": 124, "play": 125}
+    assert report["gpu_attested"] is False
+    assert len(report["source_sha256"]) == 3
+    assert "partial engine stdout" in (logs / "gfd-import.log").read_text()
+    assert "Godot timed out" in (logs / "gfd-import.log").read_text()
+    assert (logs / "gfd-probe.log").is_file()
+
+
+def test_native_missing_binary_is_not_mistaken_for_a_green_probe(tmp_path) -> None:
+    logs = tmp_path / "logs"
+    with patch.object(gfd.subprocess, "run", side_effect=FileNotFoundError("missing engine")):
+        with pytest.raises(AssertionError, match="engine_import_or_playback"):
+            gfd.run("missing-godot", tmp_path / "project", logs)
+    report = json.loads((logs / "gfd-report.json").read_text(encoding="utf-8"))
+    assert report["passed"] is False
+    assert report["engine_exits"] == {"import": 127, "play": 125}
+    assert "FileNotFoundError" in (logs / "gfd-import.log").read_text()
+
+
+def test_native_missing_probe_records_still_preserve_structured_evidence(tmp_path) -> None:
+    logs = tmp_path / "logs"
+    good_exit = subprocess.CompletedProcess(["godot"], 0, stdout="Godot booted", stderr="")
+    with patch.object(gfd.subprocess, "run", return_value=good_exit) as invoked:
+        with pytest.raises(AssertionError, match="invalid_native_probe"):
+            gfd.run("godot", tmp_path / "project", logs)
+    assert invoked.call_count == 2
+    report = json.loads((logs / "gfd-report.json").read_text(encoding="utf-8"))
+    assert report["passed"] is False
+    assert report["failure_kind"] == "invalid_native_probe"
+    assert report["error_type"] == "AssertionError"
+    assert report["engine_exits"] == {"import": 0, "play": 0}
+    assert (logs / "gfd-probe.log").is_file()
