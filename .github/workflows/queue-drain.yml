@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     # Hourly recovery only; no workflow-run trigger cascade.
+    # Queue relief wake: 2026-10-25; existing exact-head safety checks unchanged.
     - cron: "7 * * * *"
   push:
     branches: [main]
