@@ -108,9 +108,10 @@ def test_real_engine_bridge_keeps_public_and_legacy_privacy_denials(bridge, path
     assert commands == [] and db.playables.rows == []
 
 
-def test_uncertain_engine_dispatch_is_not_retried_repaired_or_persisted(bridge):
+@pytest.mark.parametrize("error_type", [EngineUnavailableError, RuntimeError])
+def test_uncertain_engine_dispatch_is_not_retried_repaired_or_persisted(bridge, error_type):
     client, headers, db, engine, commands, _ = bridge
-    engine.failure = EngineUnavailableError("private transport detail")
+    engine.failure = error_type("private transport detail")
     response = client.post("/api/playable/generate", headers=headers["alice"],
                            json={"brief": "Original tiny square reaches green portal", "depth": "fast"})
     assert response.status_code == 503
@@ -121,14 +122,17 @@ def test_uncertain_engine_dispatch_is_not_retried_repaired_or_persisted(bridge):
     assert len(commands) == 1 and db.playables.rows == []
 
 
-def test_old_unconfirmed_job_is_observed_without_time_based_failure_or_replacement(bridge):
+@pytest.mark.parametrize("status", ["running", "unconfirmed"])
+def test_old_unconfirmed_job_is_observed_without_time_based_failure_or_replacement(bridge, status):
     client, headers, db, _, commands, _ = bridge
-    db.playable_jobs.rows.append({"job_id": "retained-job", "job_status": "unconfirmed",
+    db.playable_jobs.rows.append({"job_id": "retained-job", "job_status": status,
         "owner_id": "alice@example.test", "tenant_id": "tenant-a",
         "engine_request_key": "engine-chat:retained",
         "created_at": (datetime.now(timezone.utc)-timedelta(hours=2)).isoformat()})
     response = client.get("/api/playable/job/retained-job", headers=headers["alice"])
-    assert response.status_code == 200 and response.json()["job_status"] == "unconfirmed"
+    assert response.status_code == 200 and response.json()["job_status"] == status
+    if status == "running":
+        assert response.json()["observation_stale"] is True
     assert response.json()["engine_request_key"] == "engine-chat:retained"
     assert commands == [] and not any(call[0] == "update" for call in db.playable_jobs.calls)
 

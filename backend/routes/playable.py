@@ -81,6 +81,14 @@ def _require_model_content(routed):
     if routed.get("error") or not isinstance(routed.get("content"), str) or not routed["content"].strip():
         raise PlayableModelFailure("project_model_generation_failed")
 
+
+def _model_request_key(chat, prompt):
+    try:
+        key = chat._idempotency_key(prompt)
+        return key if isinstance(key, str) and 0 < len(key) <= 1024 else None
+    except Exception:
+        return None
+
 PLAYABILITY_THRESHOLD = int(os.environ.get("PLAYABLE_MIN_SCORE", "70"))
 # Provider-diverse codegen ensemble (mirrors the router's gameplay_code policy).
 _GAME_ENSEMBLE = ROUTING_POLICY.get("gameplay_code", ["claude-sonnet-4-6", "gpt-5.4", "gemini-3.1-pro-preview"])
@@ -233,8 +241,11 @@ class GenerateBody(BaseModel):
 
 
 async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None) -> dict:
-    """Run a provider-diverse LLM ensemble (fallback) WITHOUT touching the
-    main-loop Mongo client — safe to drive from a fresh loop inside a thread."""
+    """Execute canonical scoped model work from a worker's event loop.
+
+    Historical ensemble names remain advisory. Canonical engine routing owns
+    provider failover; feature code cannot retry an uncertain bridge failure.
+    """
     from core.engine_chat import EngineChat, UserMessage
     sid = f"playable-{uuid.uuid4().hex[:8]}"
     for i, model in enumerate(ensemble):
@@ -244,6 +255,8 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
         identity = project_identity()
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
+        chat = None
+        dispatch_started = False
         try:
             chat = EngineChat(
                 session_id=sid,
@@ -258,6 +271,7 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
             ).with_model(provider, model)
             if max_output_tokens is not None:
                 chat.with_max_tokens(max_output_tokens)
+            dispatch_started = True
             resp = await chat.send_message(UserMessage(text=prompt))
             reauthorize_project_principal(mutate=True, sources=True)
             content = resp.content if hasattr(resp, "content") else str(resp)
@@ -273,12 +287,19 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
         except EngineTextError as exc:
             # Canonical execution owns routing and uncertain-dispatch recovery.
             # A typed failure cannot become a fresh provider or repair request.
-            request_key = chat._idempotency_key(prompt) if callable(getattr(chat, "_idempotency_key", None)) else None
+            request_key = _model_request_key(chat, prompt)
             failure = _model_failure(exc, request_key)
             _log.warning("Playable model request failed code=%s exception=%s", failure.code, type(exc).__name__)
             raise failure from exc
-        except Exception:  # provider error → next in ensemble
-            pass
+        except Exception as exc:
+            # An unexpected bridge/receipt failure after dispatch is uncertain,
+            # regardless of whether its type is a recognized engine exception.
+            request_key = _model_request_key(chat, prompt)
+            failure = PlayableModelFailure(
+                "project_model_execution_unconfirmed" if dispatch_started else "project_model_configuration_unavailable",
+                unconfirmed=dispatch_started, request_key=request_key)
+            _log.warning("Playable bridge failed code=%s exception=%s", failure.code, type(exc).__name__)
+            raise failure from exc
     return {"content": "", "error": "llm_request_failed", "model": None, "provider": None}
 
 
@@ -785,20 +806,17 @@ async def get_job(job_id: str):
     doc = await _db.playable_jobs.find_one({"job_id": job_id}, PROJ)
     if not doc:
         return {"error": "not found", "job_status": "unknown"}
-    # self-heal orphaned jobs: an async task that was killed by a server restart
-    # leaves its doc stuck "running" forever — expire it so the UI stops spinning.
+    # Age is an observation gap, never proof that execution failed or drained.
+    # Preserve the original job/request identity after a slow call or restart.
     if doc.get("job_status") == "running":
         created = doc.get("created_at")
         try:
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(str(created))).total_seconds()
         except Exception:
             age = 0
-        if age > 480:  # 8 min hard ceiling — frees a stage if a forge task was killed by a restart
-            await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": {
-                "job_status": "error", "error": "job interrupted (likely a server restart) — please retry",
-                "swept_at": datetime.now(timezone.utc).isoformat()}})
-            doc["job_status"] = "error"
-            doc["error"] = "job interrupted (likely a server restart) — please retry"
+        if age > 480:
+            doc["observation_stale"] = True
+            doc["observation_code"] = "job_progress_unobserved"
     return doc
 
 

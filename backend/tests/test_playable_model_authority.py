@@ -20,7 +20,7 @@ class _Jobs:
 
 
 @pytest.mark.asyncio
-async def test_each_model_fallback_reauthorizes_and_binds_engine_identity(monkeypatch):
+async def test_unexpected_model_failure_keeps_scope_and_cannot_authorize_hint_fallback(monkeypatch):
     admissions, constructed = [], []
     monkeypatch.setattr(playable, "project_identity", lambda: dict(SCOPE))
     monkeypatch.setattr(playable, "reauthorize_project_principal", lambda **kwargs: admissions.append(kwargs))
@@ -35,10 +35,11 @@ async def test_each_model_fallback_reauthorizes_and_binds_engine_identity(monkey
                 raise RuntimeError("provider unavailable")
             return "bounded result"
     monkeypatch.setattr(engine_chat, "EngineChat", Chat)
-    result = await playable._llm_async("private project", "Bounded project instruction", ["first", "second"])
-    assert result["content"] == "bounded result"
-    assert admissions == [{"mutate": True, "sources": True}] * 3
-    assert len(constructed) == 2
+    with pytest.raises(playable.PlayableModelFailure) as failure:
+        await playable._llm_async("private project", "Bounded project instruction", ["first", "second"])
+    assert failure.value.unconfirmed is True
+    assert admissions == [{"mutate": True, "sources": True}]
+    assert len(constructed) == 1
     for kwargs in constructed:
         assert kwargs["tenant_id"] == SCOPE["tenant_id"]
         assert kwargs["actor_id"] == SCOPE["owner_id"]
@@ -62,7 +63,7 @@ async def test_revoked_model_attempt_is_not_converted_into_provider_fallback(mon
         def with_model(self, *args):
             return self
         async def send_message(self, message):
-            raise RuntimeError("provider unavailable")
+            return "authorized model result"
     monkeypatch.setattr(engine_chat, "EngineChat", Chat)
     with pytest.raises(HTTPException) as error:
         await playable._llm_async("private", "Bounded instruction", ["first", "second", "third"])
