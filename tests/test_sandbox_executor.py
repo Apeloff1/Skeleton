@@ -365,3 +365,36 @@ def test_audit_log_is_bounded_and_still_verifies() -> None:
     log2.append({"x": 1})
     assert len(log.entries()) == 3 and log.verify()
     assert len(seen) == 1
+
+
+@pytest.mark.parametrize("max_entries", [0, -1, True, 1.5, 10_001])
+def test_audit_log_rejects_invalid_retention_bounds(max_entries: object) -> None:
+    with pytest.raises(ExecutorConfigError, match="audit max_entries"):
+        AuditLog(max_entries=max_entries)
+
+
+def test_audit_log_bounds_retention_without_losing_chain_verification() -> None:
+    audit = AuditLog(max_entries=2)
+    digests = [audit.append({"event_id": n}) for n in range(5)]
+    retained = audit.entries()
+    assert len(retained) == 2
+    assert [row["seq"] for row in retained] == [3, 4]
+    assert retained[0]["prev"] == digests[2]
+    assert retained[-1]["hash"] == audit.head == digests[-1]
+    assert audit.verify()
+
+
+def test_audit_callback_cannot_mutate_nested_retained_chain_data() -> None:
+    callbacks: list[dict] = []
+
+    def sink(entry: dict) -> None:
+        callbacks.append(entry)
+        entry["event"]["findings"][0]["rule"] = "modified"
+        entry["event"]["findings"].append({"rule": "untrusted"})
+
+    audit = AuditLog(sink=sink, max_entries=2)
+    digest = audit.append({"findings": [{"rule": "original"}]})
+    assert callbacks
+    assert audit.entries()[0]["event"]["findings"] == [{"rule": "original"}]
+    assert audit.head == digest
+    assert audit.verify()

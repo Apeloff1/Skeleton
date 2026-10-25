@@ -185,6 +185,13 @@ class AuditLog:
     """Append-only, hash-chained record of executor decisions (bounded)."""
 
     def __init__(self, *, sink: Callable[[dict[str, Any]], None] | None = None, max_entries: int = MAX_AUDIT_ENTRIES) -> None:
+        # An invalid retention budget must fail during configuration, not on
+        # the first audited denial or execution. Keep retention strictly
+        # bounded to prevent accidental unbounded in-memory custody.
+        if type(max_entries) is not int or not 1 <= max_entries <= MAX_AUDIT_ENTRIES:
+            raise ExecutorConfigError("audit max_entries must be a bounded positive integer")
+        if sink is not None and not callable(sink):
+            raise ExecutorConfigError("audit sink must be callable")
         self._entries: list[dict[str, Any]] = []
         self._lock = threading.Lock()
         self._sink = sink
@@ -205,7 +212,9 @@ class AuditLog:
                 self._dropped += 1
                 self._anchor = self._entries[0]["prev"]
         if self._sink is not None:
-            self._sink(dict(entry))
+            # Never give callbacks aliases into a retained hash-chain entry:
+            # nested dict/list mutation through a sink would corrupt custody.
+            self._sink(json.loads(_canonical(entry)))
         return digest
 
     @property
