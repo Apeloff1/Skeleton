@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
+from routes.gameforge_auth import require_role
 from core.gameforge_artifact_builder import (
     DEFAULT_ARTIFACTS_ROOT,
     artifact_build as _artifact_build,
@@ -39,8 +40,6 @@ router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
 # A missing auth module must fail router admission, never silently turn
 # protected routes into anonymous admin endpoints.
-from routes.gameforge_auth import require_role
-
 _viewer = require_role("viewer")
 _editor = require_role("editor")
 
