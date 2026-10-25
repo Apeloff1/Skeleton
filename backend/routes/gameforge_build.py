@@ -22,8 +22,6 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
-from core.exec_guard import code_execution_enabled, execution_disabled_response
-from routes.gameforge_auth import require_role
 from core.gameforge_artifact_builder import (
     DEFAULT_ARTIFACTS_ROOT,
     artifact_build as _artifact_build,
@@ -35,6 +33,8 @@ from core.gameforge_artifact_builder import (
     resolve_under_dir as _resolve_under_dir,
     safe_segment as _safe_segment,
 )
+from core.exec_guard import code_execution_enabled, execution_disabled_response
+from routes.gameforge_auth import require_role
 
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
