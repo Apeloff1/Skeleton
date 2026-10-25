@@ -256,7 +256,7 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
                 f.write(content)
         with open(_resolve_under_dir(workdir, "gamefiles.json"), "w") as f:
             json.dump({"game": b.game_name, "files": files}, f, indent=2)
-    
+
         engine = _godot_bin()
         engine_validated = False
         engine_version = None
@@ -272,7 +272,7 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
                 engine_log = "engine_validated" if engine_validated else "engine_validation_failed"
             except Exception:  # noqa: BLE001
                 engine_log = "engine_run_failed"
-    
+
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
             for name in ("project.godot", "main.gd", "main.tscn", "gamefiles.json"):
                 z.write(_resolve_under_dir(workdir, name), name)
