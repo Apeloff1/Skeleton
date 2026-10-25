@@ -447,5 +447,3 @@ def test_archived_workflow_run_consumers_stay_disabled_and_index_stays_manual() 
     assert "pull_requests[0]" not in pr_automation
     assert "group: pr-automation-index" in pr_automation
     assert "cancel-in-progress: false" in pr_automation
-
-
