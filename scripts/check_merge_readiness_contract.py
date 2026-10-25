@@ -146,6 +146,15 @@ def main() -> int:
         failures,
     )
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
+    # Preserve full-suite coverage for a passing head, but expose the first
+    # failing test before the CI runner budget is exhausted.
+    for lane in ("unit", "quality_security", "pr_automation"):
+        block = job_block(text, lane)
+        require(
+            re.search(r'^      PYTEST_ADDOPTS: "--maxfail=1"$', block, re.MULTILINE) is not None,
+            f"{lane} must fail fast on the first pytest failure without masking it",
+            failures,
+        )
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
     unit = job_block(text, "unit")

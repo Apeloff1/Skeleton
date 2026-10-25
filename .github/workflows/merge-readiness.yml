@@ -55,6 +55,9 @@ jobs:
     name: Unit
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Fail promptly on broken tests, without skipping any test on success.
+    env:
+      PYTEST_ADDOPTS: "--maxfail=1"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -144,6 +147,7 @@ jobs:
     timeout-minutes: 60
     env:
       PYTHONPATH: ${{ github.workspace }}
+      PYTEST_ADDOPTS: "--maxfail=1"
     steps:
       - name: Check out full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -184,6 +188,8 @@ jobs:
     name: PR Automation Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PYTEST_ADDOPTS: "--maxfail=1"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
