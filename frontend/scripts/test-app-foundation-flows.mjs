@@ -189,7 +189,11 @@ async function call(method, path, body, token) {
   });
   let data = null;
   try { data = await r.json(); } catch {}
-  return { ok: r.ok, status: r.status, data };
+  // Keep diagnostic output bounded and independent of response bodies or tokens.
+  // The header is set only by the backend load-shedding boundary.
+  const rejectionSource = r.headers.get('x-skeleton-rejection-source') === 'load-shedding'
+    ? 'load-shedding' : 'unclassified';
+  return { ok: r.ok, status: r.status, data, rejectionSource };
 }
 test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch → open', live, async (t) => {
   const ctx = {};
@@ -213,7 +217,10 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     const bad = await call('POST', '/api/auth/login', { email, password: 'wrong-password' });
     assert.equal(bad.status, 401, `wrong password must be 401, got ${bad.status}`);
     const anon = await call('GET', '/api/auth/me');
-    assert.equal(anon.ok, true, `/me without token HTTP ${anon.status}`);
+    const failureReason = anon.data?.reason === 'load_shedding'
+      ? 'load_shedding' : 'unclassified';
+    assert.equal(anon.ok, true,
+      `/me without token HTTP ${anon.status} source=${anon.rejectionSource} reason=${failureReason}`);
     assert.equal(anon.data?.authenticated, false, 'no token must not be authenticated');
     ctx.token = login.data.access_token;
   });
