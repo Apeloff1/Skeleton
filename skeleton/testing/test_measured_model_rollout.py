@@ -7,6 +7,8 @@ from dataclasses import replace
 
 import pytest
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources  # noqa: F401
+
 from skeleton.ai.runtime.learning_foundation.lifecycle import (
     ModelLifecycleError,
     ModelLifecycleRegistry,

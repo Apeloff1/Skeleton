@@ -660,6 +660,11 @@ class GamePlayAuthority:
                 raise _error("policy_required", "Choose an admitted policy before AI takeover.")
             saved = await self.workspace._admitted_policy(scope, project_id, body["policy_id"])
             policy = saved["snapshot"]
+            if binding["episode_steps"] < policy["environment"]["max_episode_steps"]:
+                raise _error(
+                    "policy_environment_mismatch",
+                    "Play step limit is shorter than the policy's exact episode environment.",
+                )
             binding["episode_steps"] = min(
                 binding["episode_steps"], policy["environment"]["max_episode_steps"]
             )

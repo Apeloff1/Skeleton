@@ -18,6 +18,8 @@ Shares the codegen helpers + Mongo handle with routes.playable.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -32,7 +34,7 @@ from routes.playable import (
 from routes.asset_genesis import recompute_asset_status
 from routes.playable_htmlutils import inject_into_head
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 # render-relevant kinds + the JS key we expose them under (character → player alias)
 _KEY_ALIAS = {"character": "player"}

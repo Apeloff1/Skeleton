@@ -9,6 +9,8 @@ runnability. Mirrors routes/playable_artwire.py but for SYSTEMS+LORE instead of 
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import json
 import uuid
 import asyncio
@@ -21,7 +23,7 @@ from routes.playable import (
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
 )
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 _KB_SYS = _GAME_SYS + (
     "\n\nYou are in KB-SYNC MODE on an existing, working HTML5 game. You are given the game's "

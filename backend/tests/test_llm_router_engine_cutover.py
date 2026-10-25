@@ -31,5 +31,6 @@ def test_llm_router_failure_is_engine_bounded_without_provider_fallback() -> Non
     # the runtime catches it once instead of carrying duplicate branches.
     assert "except (EngineTextError, TimeoutError):" in SOURCE
     assert "except (EngineClientError, EngineTextError, ValueError, TypeError):" in SOURCE
-    assert '"error_code": "engine_unavailable"' in SOURCE
+    assert '"error_code": "engine_request_unconfirmed"' in SOURCE
+    assert '"retry_same_request": True' in SOURCE
     assert "adapter.generate(" not in SOURCE

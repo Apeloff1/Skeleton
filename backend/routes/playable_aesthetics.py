@@ -14,6 +14,8 @@ are fully guarded so the game never breaks if a call site is missing.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -26,7 +28,7 @@ from routes.playable import (
 )
 from routes.playable_htmlutils import inject_into_head
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 _NEURAL_FX = (
     "window.NEURAL_FX=(function(){var shake=0;"

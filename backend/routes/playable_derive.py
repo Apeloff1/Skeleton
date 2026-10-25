@@ -12,6 +12,8 @@ never shadow the GET /{pid} catch-all in routes.playable.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -25,7 +27,7 @@ from routes.playable import (
     EXPANSION_QUALITY_TARGET, EXPANSION_TIME_BUDGET, EXPANSION_HTML_CTX,
 )
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 # Remix — iterate on an existing game with a player's tweak instruction.
 _REMIX_SYS = _GAME_SYS + (

@@ -5,8 +5,9 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, BackgroundTasks
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
+from routes.gameforge_auth import require_authenticated_identity
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import os
@@ -14,7 +15,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 
-router = APIRouter(prefix="/ai-logs", tags=["AI Log Vault"])
+router = APIRouter(prefix="/ai-logs", tags=["AI Log Vault"], dependencies=[Depends(require_authenticated_identity)])
 
 # MongoDB connection
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
@@ -28,11 +29,26 @@ training_data_collection = db.training_data
 jeeves_memory_collection = db.jeeves_memory
 logscraper_runs_collection = db.logscraper_runs
 
+
+def _scope(scope) -> dict[str, str]:
+    if not isinstance(scope, dict) or set(scope) != {"tenant_id", "owner_id"} or any(
+        not isinstance(value, str) or not value or value != value.strip()
+        for value in scope.values()
+    ):
+        raise ValueError("Authenticated memory scope is required")
+    return dict(scope)
+
+
+def _owned(row, scope) -> bool:
+    return isinstance(row, dict) and all(row.get(key) == value for key, value in scope.items())
+
 # ============================================================================
 # DATA MODELS
 # ============================================================================
 
 class AIQueryLog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     query_type: str = Field(..., min_length=1, max_length=100)  # chat, code_gen, debug, explain, etc.
     user_input: str = Field(..., min_length=1, max_length=100000)
     ai_response: str = Field(..., min_length=1, max_length=100000)
@@ -45,6 +61,8 @@ class AIQueryLog(BaseModel):
     session_id: Optional[str] = None
 
 class UserActionLog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     action_type: str = Field(..., min_length=1, max_length=100)  # code_written, file_saved, challenge_completed, lesson_viewed, etc.
     action_data: Dict[str, Any] = Field(..., max_length=100)
     context: Optional[Dict[str, Any]] = None
@@ -70,13 +88,13 @@ class JeevesTrainingData(BaseModel):
 # ============================================================================
 
 @router.get("/info")
-async def get_log_vault_info():
+async def get_log_vault_info(scope=Depends(require_authenticated_identity)):
     """Get AI Log Vault system information"""
     # Get collection stats
-    ai_count = await ai_queries_collection.count_documents({})
-    actions_count = await user_actions_collection.count_documents({})
-    training_count = await training_data_collection.count_documents({})
-    memory_count = await jeeves_memory_collection.count_documents({})
+    ai_count = await ai_queries_collection.count_documents(dict(scope))
+    actions_count = await user_actions_collection.count_documents(dict(scope))
+    training_count = await training_data_collection.count_documents(dict(scope))
+    memory_count = await jeeves_memory_collection.count_documents(dict(scope))
     
     return {
         "name": "CodeDock AI Log Vault",
@@ -106,10 +124,11 @@ async def get_log_vault_info():
     }
 
 @router.post("/query")
-async def log_ai_query(log: AIQueryLog):
+async def log_ai_query(log: AIQueryLog, scope=Depends(require_authenticated_identity)):
     """Log an AI query for training"""
     log_doc = {
         **log.dict(),
+        **scope,
         "timestamp": datetime.utcnow(),
         "processed": False
     }
@@ -123,10 +142,11 @@ async def log_ai_query(log: AIQueryLog):
     }
 
 @router.post("/action")
-async def log_user_action(log: UserActionLog):
+async def log_user_action(log: UserActionLog, scope=Depends(require_authenticated_identity)):
     """Log a user action for learning"""
     log_doc = {
         **log.dict(),
+        **scope,
         "timestamp": datetime.utcnow(),
         "processed": False
     }
@@ -140,12 +160,16 @@ async def log_user_action(log: UserActionLog):
     }
 
 @router.post("/feedback/{log_id}")
-async def add_query_feedback(log_id: str, feedback: str, comment: Optional[str] = None):
+async def add_query_feedback(log_id: str, feedback: str, comment: Optional[str] = None, scope=Depends(require_authenticated_identity)):
     """Add feedback to an AI query for training improvement"""
     from bson import ObjectId
     
-    await ai_queries_collection.update_one(
-        {"_id": ObjectId(log_id)},
+    try:
+        native_id = ObjectId(log_id)
+    except Exception as exc:
+        raise HTTPException(422, "Invalid log ID") from exc
+    result = await ai_queries_collection.update_one(
+        {"_id": native_id, **scope},
         {
             "$set": {
                 "user_feedback": feedback,
@@ -154,6 +178,8 @@ async def add_query_feedback(log_id: str, feedback: str, comment: Optional[str] 
             }
         }
     )
+    if not result.matched_count:
+        raise HTTPException(404, "Log not found")
     
     return {
         "status": "feedback_added",
@@ -166,13 +192,13 @@ async def add_query_feedback(log_id: str, feedback: str, comment: Optional[str] 
 # ============================================================================
 
 @router.post("/scrape")
-async def run_logscraper(config: LogscraperConfig, background_tasks: BackgroundTasks):
+async def run_logscraper(config: LogscraperConfig, background_tasks: BackgroundTasks, scope=Depends(require_authenticated_identity)):
     """Run the logscraper to collect training data"""
     
     run_id = f"scrape_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
     
     # Start scraping in background
-    background_tasks.add_task(execute_logscraper, run_id, config)
+    background_tasks.add_task(execute_logscraper, run_id, config, scope=dict(scope))
     
     return {
         "status": "scraping_started",
@@ -181,9 +207,10 @@ async def run_logscraper(config: LogscraperConfig, background_tasks: BackgroundT
         "message": "Logscraper running in background. Check /scrape/status/{run_id} for progress."
     }
 
-async def execute_logscraper(run_id: str, config: LogscraperConfig):
+async def execute_logscraper(run_id: str, config: LogscraperConfig, *, scope=None):
     """Execute the logscraper process"""
     
+    scope = _scope(scope)
     start_time = datetime.utcnow()
     cutoff_time = start_time - timedelta(hours=config.time_range_hours)
     
@@ -197,10 +224,12 @@ async def execute_logscraper(run_id: str, config: LogscraperConfig):
     # Scrape AI queries
     if config.include_ai_queries:
         cursor = ai_queries_collection.find(
-            {"timestamp": {"$gte": cutoff_time}}
+            {**scope, "timestamp": {"$gte": cutoff_time}}
         ).limit(config.max_records)
         
         async for doc in cursor:
+            if not _owned(doc, scope):
+                continue
             doc["_id"] = str(doc["_id"])
             doc["timestamp"] = doc["timestamp"].isoformat()
             scraped_data["ai_queries"].append(doc)
@@ -208,10 +237,12 @@ async def execute_logscraper(run_id: str, config: LogscraperConfig):
     # Scrape user actions
     if config.include_user_actions:
         cursor = user_actions_collection.find(
-            {"timestamp": {"$gte": cutoff_time}}
+            {**scope, "timestamp": {"$gte": cutoff_time}}
         ).limit(config.max_records)
         
         async for doc in cursor:
+            if not _owned(doc, scope):
+                continue
             doc["_id"] = str(doc["_id"])
             doc["timestamp"] = doc["timestamp"].isoformat()
             scraped_data["user_actions"].append(doc)
@@ -222,6 +253,7 @@ async def execute_logscraper(run_id: str, config: LogscraperConfig):
     
     # Save run results
     run_doc = {
+        **scope,
         "run_id": run_id,
         "started_at": start_time,
         "completed_at": datetime.utcnow(),
@@ -240,6 +272,7 @@ async def execute_logscraper(run_id: str, config: LogscraperConfig):
     # Store training data
     if scraped_data["patterns"] or scraped_data["insights"]:
         training_doc = {
+            **scope,
             "run_id": run_id,
             "timestamp": datetime.utcnow(),
             "data": scraped_data,
@@ -319,24 +352,25 @@ def generate_insights(data: Dict) -> List[Dict]:
     return insights
 
 @router.get("/scrape/status/{run_id}")
-async def get_scrape_status(run_id: str):
+async def get_scrape_status(run_id: str, scope=Depends(require_authenticated_identity)):
     """Get logscraper run status"""
-    run = await logscraper_runs_collection.find_one({"run_id": run_id})
+    run = await logscraper_runs_collection.find_one({"run_id": run_id, **scope})
     
-    if not run:
+    if not _owned(run, scope) or run.get("run_id") != run_id:
         return {"status": "running", "run_id": run_id}
     
     run["_id"] = str(run["_id"])
     return run
 
 @router.get("/scrape/latest")
-async def get_latest_scrape():
+async def get_latest_scrape(scope=Depends(require_authenticated_identity)):
     """Get the latest logscraper run"""
     run = await logscraper_runs_collection.find_one(
+        dict(scope),
         sort=[("completed_at", -1)]
     )
     
-    if not run:
+    if not _owned(run, scope):
         return {"message": "No scraper runs found"}
     
     run["_id"] = str(run["_id"])
@@ -347,28 +381,29 @@ async def get_latest_scrape():
 # ============================================================================
 
 @router.post("/jeeves/train")
-async def train_jeeves(background_tasks: BackgroundTasks):
+async def train_jeeves(background_tasks: BackgroundTasks, scope=Depends(require_authenticated_identity)):
     """Train Jeeves from collected data"""
     
     training_id = f"train_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
     
     # Get latest training data
     training_data = await training_data_collection.find_one(
-        {"ready_for_training": True},
+        {"ready_for_training": True, **scope},
         sort=[("timestamp", -1)]
     )
     
-    if not training_data:
+    if not _owned(training_data, scope):
         return {
             "status": "no_data",
             "message": "No training data available. Run logscraper first."
         }
     
     # Process training
-    jeeves_knowledge = await process_jeeves_training(training_data)
+    jeeves_knowledge = await process_jeeves_training(training_data, scope=scope)
     
     # Store in Jeeves memory
     memory_doc = {
+        **scope,
         "training_id": training_id,
         "timestamp": datetime.utcnow(),
         "knowledge": jeeves_knowledge,
@@ -379,7 +414,7 @@ async def train_jeeves(background_tasks: BackgroundTasks):
     
     # Mark training data as processed
     await training_data_collection.update_one(
-        {"_id": training_data["_id"]},
+        {"_id": training_data["_id"], **scope},
         {"$set": {"ready_for_training": False, "processed_at": datetime.utcnow()}}
     )
     
@@ -390,9 +425,12 @@ async def train_jeeves(background_tasks: BackgroundTasks):
         "insights": len(jeeves_knowledge.get("insights", []))
     }
 
-async def process_jeeves_training(training_data: Dict) -> Dict:
+async def process_jeeves_training(training_data: Dict, *, scope=None) -> Dict:
     """Process training data for Jeeves"""
     
+    scope = _scope(scope)
+    if not _owned(training_data, scope):
+        raise ValueError("Training data owner mismatch")
     knowledge = {
         "patterns": [],
         "user_preferences": {},
@@ -409,6 +447,8 @@ async def process_jeeves_training(training_data: Dict) -> Dict:
     
     # Find effective responses (those with positive feedback)
     for query in data.get("ai_queries", []):
+        if not _owned(query, scope):
+            continue
         if query.get("user_feedback") == "helpful":
             knowledge["effective_responses"].append({
                 "query_type": query.get("query_type"),
@@ -423,15 +463,16 @@ async def process_jeeves_training(training_data: Dict) -> Dict:
     return knowledge
 
 @router.get("/jeeves/memory")
-async def get_jeeves_memory():
+async def get_jeeves_memory(scope=Depends(require_authenticated_identity)):
     """Get Jeeves' current learned knowledge"""
     
     # Get latest memory
     memory = await jeeves_memory_collection.find_one(
+        dict(scope),
         sort=[("timestamp", -1)]
     )
     
-    if not memory:
+    if not _owned(memory, scope):
         return {
             "status": "no_memory",
             "message": "Jeeves hasn't been trained yet"
@@ -441,10 +482,11 @@ async def get_jeeves_memory():
     return memory
 
 @router.post("/jeeves/remember")
-async def add_jeeves_memory(memory_type: str, content: Dict[str, Any]):
+async def add_jeeves_memory(memory_type: str, content: Dict[str, Any], scope=Depends(require_authenticated_identity)):
     """Add a specific memory to Jeeves"""
     
     memory_doc = {
+        **scope,
         "type": memory_type,
         "content": content,
         "timestamp": datetime.utcnow(),
@@ -464,7 +506,7 @@ async def add_jeeves_memory(memory_type: str, content: Dict[str, Any]):
 # ============================================================================
 
 @router.post("/startup-train")
-async def startup_training(background_tasks: BackgroundTasks):
+async def startup_training(background_tasks: BackgroundTasks, scope=Depends(require_authenticated_identity)):
     """Trigger training on app startup - scrapes all vaults and trains Jeeves"""
     
     startup_id = f"startup_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
@@ -479,7 +521,7 @@ async def startup_training(background_tasks: BackgroundTasks):
         max_records=50000
     )
     
-    background_tasks.add_task(execute_startup_training, startup_id, config)
+    background_tasks.add_task(execute_startup_training, startup_id, config, scope=dict(scope))
     
     return {
         "status": "startup_training_initiated",
@@ -487,23 +529,25 @@ async def startup_training(background_tasks: BackgroundTasks):
         "message": "Comprehensive vault scraping and Jeeves training started"
     }
 
-async def execute_startup_training(startup_id: str, config: LogscraperConfig):
+async def execute_startup_training(startup_id: str, config: LogscraperConfig, *, scope=None):
     """Execute comprehensive startup training"""
     
     # Run logscraper
-    await execute_logscraper(f"{startup_id}_scrape", config)
+    scope = _scope(scope)
+    await execute_logscraper(f"{startup_id}_scrape", config, scope=scope)
     
     # Get the training data
     training_data = await training_data_collection.find_one(
-        {"ready_for_training": True},
+        {"ready_for_training": True, **scope},
         sort=[("timestamp", -1)]
     )
     
-    if training_data:
+    if _owned(training_data, scope):
         # Process and store Jeeves knowledge
-        knowledge = await process_jeeves_training(training_data)
+        knowledge = await process_jeeves_training(training_data, scope=scope)
         
         memory_doc = {
+            **scope,
             "training_id": startup_id,
             "timestamp": datetime.utcnow(),
             "knowledge": knowledge,
@@ -515,7 +559,7 @@ async def execute_startup_training(startup_id: str, config: LogscraperConfig):
         
         # Mark as processed
         await training_data_collection.update_one(
-            {"_id": training_data["_id"]},
+            {"_id": training_data["_id"], **scope},
             {"$set": {"ready_for_training": False, "processed_at": datetime.utcnow()}}
         )
 
@@ -524,7 +568,7 @@ async def execute_startup_training(startup_id: str, config: LogscraperConfig):
 # ============================================================================
 
 @router.get("/stats")
-async def get_log_statistics():
+async def get_log_statistics(scope=Depends(require_authenticated_identity)):
     """Get comprehensive log statistics"""
     
     # Time ranges
@@ -535,25 +579,25 @@ async def get_log_statistics():
     
     stats = {
         "ai_queries": {
-            "total": await ai_queries_collection.count_documents({}),
-            "last_24h": await ai_queries_collection.count_documents({"timestamp": {"$gte": day_ago}}),
-            "last_7d": await ai_queries_collection.count_documents({"timestamp": {"$gte": week_ago}}),
-            "last_30d": await ai_queries_collection.count_documents({"timestamp": {"$gte": month_ago}})
+            "total": await ai_queries_collection.count_documents(dict(scope)),
+            "last_24h": await ai_queries_collection.count_documents({**scope, "timestamp": {"$gte": day_ago}}),
+            "last_7d": await ai_queries_collection.count_documents({**scope, "timestamp": {"$gte": week_ago}}),
+            "last_30d": await ai_queries_collection.count_documents({**scope, "timestamp": {"$gte": month_ago}})
         },
         "user_actions": {
-            "total": await user_actions_collection.count_documents({}),
-            "last_24h": await user_actions_collection.count_documents({"timestamp": {"$gte": day_ago}}),
-            "last_7d": await user_actions_collection.count_documents({"timestamp": {"$gte": week_ago}}),
-            "last_30d": await user_actions_collection.count_documents({"timestamp": {"$gte": month_ago}})
+            "total": await user_actions_collection.count_documents(dict(scope)),
+            "last_24h": await user_actions_collection.count_documents({**scope, "timestamp": {"$gte": day_ago}}),
+            "last_7d": await user_actions_collection.count_documents({**scope, "timestamp": {"$gte": week_ago}}),
+            "last_30d": await user_actions_collection.count_documents({**scope, "timestamp": {"$gte": month_ago}})
         },
-        "training_runs": await logscraper_runs_collection.count_documents({}),
-        "jeeves_memories": await jeeves_memory_collection.count_documents({})
+        "training_runs": await logscraper_runs_collection.count_documents(dict(scope)),
+        "jeeves_memories": await jeeves_memory_collection.count_documents(dict(scope))
     }
     
     return stats
 
 @router.get("/export")
-async def export_training_data(format: str = "json", limit: int = 1000):
+async def export_training_data(format: str = "json", limit: int = Query(1000, ge=1, le=10000), scope=Depends(require_authenticated_identity)):
     """Export training data for external use"""
     
     data = {
@@ -563,16 +607,18 @@ async def export_training_data(format: str = "json", limit: int = 1000):
     }
     
     # Get AI queries
-    cursor = ai_queries_collection.find().limit(limit)
+    cursor = ai_queries_collection.find(dict(scope)).limit(limit)
     async for doc in cursor:
+        if not _owned(doc, scope):
+            continue
         doc["_id"] = str(doc["_id"])
         if "timestamp" in doc:
             doc["timestamp"] = doc["timestamp"].isoformat()
         data["ai_queries"].append(doc)
     
     # Get latest patterns
-    training = await training_data_collection.find_one(sort=[("timestamp", -1)])
-    if training:
+    training = await training_data_collection.find_one(dict(scope), sort=[("timestamp", -1)])
+    if _owned(training, scope):
         data["patterns"] = training.get("data", {}).get("patterns", [])
     
     return data

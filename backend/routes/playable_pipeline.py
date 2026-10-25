@@ -12,11 +12,13 @@ design_specs, worldforge_worlds, asset_genesis) — read-only, no new writes.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 from fastapi import APIRouter
 
 from routes.playable import _db, PLAYABILITY_THRESHOLD
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 
 def _stage(key, label, icon, status, detail="", route=None):

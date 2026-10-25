@@ -12,6 +12,8 @@ Shares the codegen helpers + Mongo handle with routes.playable (single source of
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -24,7 +26,7 @@ from routes.playable import (
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
 )
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 _FINETUNE_SYS = _GAME_SYS + (
     "\n\nYou are FINE-TUNING an existing, working game. Apply EXACTLY the requested change and "

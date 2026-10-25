@@ -93,3 +93,28 @@ async def test_revoked_authority_cannot_reconcile_accepted_queued_play():
     assert failure.value.status == 403
     app._run.assert_not_awaited()
     assert not app.tasks
+
+
+@pytest.mark.asyncio
+async def test_shorter_play_limit_rejects_policy_before_storage_admission(monkeypatch):
+    app = authority()
+    app.indexes = AsyncMock()
+    app.plays.find_one = AsyncMock(return_value=None)
+    app.workspace._project = AsyncMock(return_value={"version": 1})
+    app.workspace._input = AsyncMock(return_value={"episode_steps": 8})
+    app.workspace.environment_request = AsyncMock(return_value={"kind": "studio"})
+    app.workspace._admitted_policy = AsyncMock(return_value={
+        "snapshot": {"environment": {"max_episode_steps": 16}},
+    })
+    app.workspace._admit = AsyncMock()
+    monkeypatch.setattr("core.game_play.resource_profiles", lambda: {"profiles": [{"available": True}]})
+    with pytest.raises(GameLearningError) as failure:
+        await app.create(OWNER, "project", {
+            "expected_version": 1, "idempotency_key": "shorter-play", "controller": "ai",
+            "policy_id": "policy", "max_steps": 8,
+        })
+    assert failure.value.code == "policy_environment_mismatch"
+    assert failure.value.status == 409
+    app.workspace._admit.assert_not_awaited()
+    app.workspace.environment_request.assert_awaited_once()
+    assert not app.tasks

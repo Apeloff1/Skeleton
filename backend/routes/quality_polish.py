@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import asyncio
+from fastapi import HTTPException
 
 from routes.quality import audit_quality, MIN_QUALITY, QUALITY_FACTORS
 from routes.playable import _GAME_ENSEMBLE, _llm_in_thread
@@ -98,6 +99,8 @@ async def polish_pass(kind: str, content, simulate: bool = False,
             if not candidate:
                 stale += 1
                 continue
+        except HTTPException:
+            raise
         except Exception:
             stale += 1
             if stale >= PLATEAU_TOLERANCE:

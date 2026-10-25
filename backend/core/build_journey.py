@@ -22,6 +22,8 @@ completion score, milestone-gated unlocks, a momentum streak, and a shareable
 """
 from __future__ import annotations
 
+from routes.playable_access import owned_galaxy_source, reauthorize_project_context, scoped_database
+
 import os
 import time
 from typing import Any
@@ -29,6 +31,7 @@ from typing import Any
 from core.databases import client as _MONGO
 
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 
 # ── 7 milestones (ordered industry pipeline). Each declares the artifact keys
@@ -169,7 +172,10 @@ async def compute(pid: str) -> dict:
     approvals = (kb or {}).get("approvals") or {}
 
     # live side-signals
+    galaxy_source = await owned_galaxy_source(pid)
     try:
+        if galaxy_source is None:
+            raise ValueError("No owned Galaxy source")
         from core import stage_builder as sb
         stg = sb.summary(pid)
         stage_built = int(stg.get("built_count", 0))
@@ -178,6 +184,8 @@ async def compute(pid: str) -> dict:
     except Exception:
         stage_built = stage_total = stage_gamefiles = 0
     try:
+        if galaxy_source is None:
+            raise ValueError("No owned Galaxy source")
         from core import construct_forge as cf
         forged = len(cf.build_assets(pid))
     except Exception:
@@ -241,6 +249,7 @@ async def compute(pid: str) -> dict:
                "icon": active["icon"], "cta": active["cta"],
                "route": active["route"], "tagline": active["tagline"]}
 
+    await reauthorize_project_context()
     return {
         "build_id": pid, "title": g.get("title", "Untitled Build"),
         "genre": g.get("genre", ""), "era": era_spec["key"],
