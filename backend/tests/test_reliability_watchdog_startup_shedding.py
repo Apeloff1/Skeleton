@@ -77,6 +77,15 @@ def test_watchdog_sheds_only_stale_or_draining_requests(
     ):
         response = asyncio.run(middleware.dispatch(_request(app, path), permitted))
     assert response.status_code == expected
+    if expected == 503:
+        # A reliability rejection is not an auth failure or an upstream 503.
+        # Clients must not cache it and must receive bounded retry guidance.
+        assert response.headers["retry-after"] == "5"
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["x-skeleton-rejection-source"] == "load-shedding"
+        assert response.body == b'{"error":"service_unavailable","reason":"load_shedding"}'
+    else:
+        assert "x-skeleton-rejection-source" not in response.headers
 
 
 def test_first_watchdog_tick_has_start_timestamp_before_admission_count() -> None:
