@@ -582,9 +582,11 @@ def model_plan(snapshot: SupervisorSnapshot) -> str:
     plan = redact_secrets(plan.strip())
     if not plan:
         return deterministic_plan(snapshot)
-    encoded = plan.encode("utf-8")
-    if len(encoded) > MAX_PLAN_BYTES:
-        plan = encoded[:MAX_PLAN_BYTES].decode("utf-8", errors="ignore")
+    # Never silently turn a complete model response into an arbitrary partial
+    # plan: truncation can cut a JSON object, a safety constraint or a policy
+    # explanation in half. The provider-independent bounded plan is safer.
+    if len(plan.encode("utf-8")) > MAX_PLAN_BYTES:
+        return deterministic_plan(snapshot)
     return plan
 
 
