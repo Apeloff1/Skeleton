@@ -182,7 +182,10 @@ class AuditLog:
 
     def append(self, event: Mapping[str, Any]) -> str:
         with self._lock:
-            entry = {"seq": len(self._entries) + self._dropped, "prev": self._head, "event": dict(event)}
+            # Seal the event payload before hashing so caller-owned nested
+            # lists/dicts cannot retroactively rewrite retained evidence.
+            captured = json.loads(_canonical(dict(event)))
+            entry = {"seq": len(self._entries) + self._dropped, "prev": self._head, "event": captured}
             digest = hashlib.sha256(_canonical(entry)).hexdigest()
             entry["hash"] = digest
             self._entries.append(entry)
@@ -192,7 +195,9 @@ class AuditLog:
                 self._dropped += 1
                 self._anchor = self._entries[0]["prev"]
         if self._sink is not None:
-            self._sink(dict(entry))
+            # Sinks receive an independent snapshot, not mutable aliases into
+            # the in-memory audit chain.
+            self._sink(json.loads(_canonical(entry)))
         return digest
 
     @property
