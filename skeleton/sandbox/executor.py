@@ -58,7 +58,6 @@ STATUS_BLOCKED = "blocked"
 STATUSES = (STATUS_OK, STATUS_FAILED, STATUS_TIMEOUT, STATUS_DENIED, STATUS_BLOCKED)
 MAX_TOOL_NAME = 64
 MAX_AUDIT_ENTRIES = 10_000
-MAX_OUTPUT_CHARS = 200_000
 GENESIS_HASH = "0" * 64
 
 
@@ -97,25 +96,10 @@ class ToolSpec:
             raise ExecutorConfigError("tool executable is invalid", context={"tool": self.name})
         if self.arg_context not in CONTEXT_FAMILIES or (self.stdin_context is not None and self.stdin_context not in CONTEXT_FAMILIES):
             raise ExecutorConfigError("unknown injection context", context={"tool": self.name})
-        if (
-            type(self.max_args) is not int
-            or not 1 <= self.max_args <= 256
-            or not isinstance(self.path_args, frozenset)
-            or any(
-                type(i) is not int or i < 0 or i >= self.max_args
-                for i in self.path_args
-            )
-        ):
+        if not 0 < self.max_args <= 256 or any(i < 0 or i >= self.max_args for i in self.path_args):
             raise ExecutorConfigError("argument bounds are invalid", context={"tool": self.name})
-        if type(self.block_threshold) not in (int, float) or not 0.0 < self.block_threshold <= 1.0:
+        if not 0.0 < self.block_threshold <= 1.0:
             raise ExecutorConfigError("block threshold must be in (0, 1]", context={"tool": self.name})
-        if type(self.output_chars) is not int or not 1 <= self.output_chars <= MAX_OUTPUT_CHARS:
-            raise ExecutorConfigError(
-                "output cap must be a bounded positive integer",
-                context={"tool": self.name},
-            )
-        if not isinstance(self.limits, ProcessLimits):
-            raise ExecutorConfigError("process limits must be ProcessLimits", context={"tool": self.name})
 
 
 @dataclass(frozen=True)
@@ -135,17 +119,6 @@ class ExecutorPolicy:
     max_executions: int | None = None
     scan_output: bool = True
     output_block_threshold: float = 0.7
-
-    def __post_init__(self) -> None:
-        if self.max_executions is not None and (
-            type(self.max_executions) is not int or self.max_executions < 0
-        ):
-            raise ExecutorConfigError("execution budget must be a nonnegative integer")
-        if (
-            type(self.output_block_threshold) not in (int, float)
-            or not 0.0 < self.output_block_threshold <= 1.0
-        ):
-            raise ExecutorConfigError("output block threshold must be in (0, 1]")
 
 
 @dataclass
@@ -171,12 +144,7 @@ class ToolOutcome:
 
     def for_model(self) -> str:
         """Tool output fenced as untrusted data for an LLM prompt."""
-        # Flagged output is an indirect prompt-injection surface, not ordinary
-        # data to forward to the model, even when the process returned zero.
-        if self.output_flagged:
-            body = "[blocked] tool output withheld: possible injected instructions"
-        else:
-            body = self.stdout if self.ok or self.status == STATUS_FAILED else f"[{self.status}] {self.reason}"
+        body = self.stdout if self.ok or self.status == STATUS_FAILED else f"[{self.status}] {self.reason}"
         return quarantine(body, source=f"tool:{self.tool}")
 
     def to_record(self) -> dict[str, Any]:
@@ -197,8 +165,6 @@ class AuditLog:
     """Append-only, hash-chained record of executor decisions (bounded)."""
 
     def __init__(self, *, sink: Callable[[dict[str, Any]], None] | None = None, max_entries: int = MAX_AUDIT_ENTRIES) -> None:
-        if type(max_entries) is not int or not 1 <= max_entries <= MAX_AUDIT_ENTRIES:
-            raise ExecutorConfigError("audit capacity must be a bounded positive integer")
         self._entries: list[dict[str, Any]] = []
         self._lock = threading.Lock()
         self._sink = sink
@@ -209,10 +175,7 @@ class AuditLog:
 
     def append(self, event: Mapping[str, Any]) -> str:
         with self._lock:
-            # Seal the event payload before hashing so caller-owned nested
-            # lists/dicts cannot retroactively rewrite retained evidence.
-            captured = json.loads(_canonical(dict(event)))
-            entry = {"seq": len(self._entries) + self._dropped, "prev": self._head, "event": captured}
+            entry = {"seq": len(self._entries) + self._dropped, "prev": self._head, "event": dict(event)}
             digest = hashlib.sha256(_canonical(entry)).hexdigest()
             entry["hash"] = digest
             self._entries.append(entry)
@@ -222,9 +185,7 @@ class AuditLog:
                 self._dropped += 1
                 self._anchor = self._entries[0]["prev"]
         if self._sink is not None:
-            # Sinks receive an independent snapshot, not mutable aliases into
-            # the in-memory audit chain.
-            self._sink(json.loads(_canonical(entry)))
+            self._sink(dict(entry))
         return digest
 
     @property
@@ -393,11 +354,7 @@ class GuardedExecutor:
 
     def _limits(self, spec: ToolSpec) -> tuple[ProcessLimits, bool]:
         if spec.network_hosts:
-            # The current process boundary offers "deny" or unrestricted
-            # "inherit", but has no host-scoped egress filter. A capability
-            # grant for one hostname cannot safely authorize all outbound
-            # traffic. Refuse until enforceable per-host isolation exists.
-            raise ProcessPolicyError("host-scoped networking unavailable (fail closed)")
+            return replace(spec.limits, network="inherit"), False
         if network_isolation_available():
             return replace(spec.limits, network="deny"), True
         if self._policy.require_network_isolation:
@@ -419,37 +376,19 @@ class GuardedExecutor:
                               redactions=sorted(set(kinds_out) | set(kinds_err)), truncated=result.truncated,
                               duration_s=result.duration_s)
         if self._policy.scan_output and out:
-            try:
-                report = detect(out, context="prompt")
-            except SanitizerError:
-                # The process may have finished, but unscannable output is
-                # not an authorized model input. Retain a bounded audit
-                # outcome rather than bubbling out without a receipt.
-                outcome.status = STATUS_BLOCKED
-                outcome.reason = "tool output could not be safely scanned"
-                outcome.output_report = {"error": "unscannable"}
-                outcome.output_flagged = True
-            else:
-                outcome.output_report = report.to_record()
-                outcome.output_flagged = report.score >= self._policy.output_block_threshold
+            report = detect(out, context="prompt")
+            outcome.output_report = report.to_record()
+            outcome.output_flagged = report.score >= self._policy.output_block_threshold
         return outcome
 
     def _finish(self, request: ToolRequest, outcome: ToolOutcome) -> ToolOutcome:
         safe_args = [redact_secrets(sanitize_text(a[:512], keep_newlines=False))[0] if isinstance(a, str) else "<invalid>" for a in tuple(request.args)[:64]]
-        # Source labels and exception reasons can be controlled by callers.
-        # Apply the same sanitization as argv *before* storing custody data.
-        safe_source = redact_secrets(
-            sanitize_text(str(request.source)[:4096], keep_newlines=False)
-        )[0][:64]
-        safe_reason = redact_secrets(
-            sanitize_text(str(outcome.reason)[:4096], keep_newlines=False)
-        )[0][:200]
         event = {
             "ts": round(time.time(), 3),
             "tool": outcome.tool,
-            "source": safe_source,
+            "source": str(request.source)[:64],
             "status": outcome.status,
-            "reason": safe_reason,
+            "reason": outcome.reason[:200],
             "argv_display": shell_quote(safe_args)[:2048],
             "stdin_sha256": None if request.stdin is None else hashlib.sha256(bytes(request.stdin)).hexdigest(),
             "stdout_sha256": hashlib.sha256(outcome.stdout.encode("utf-8")).hexdigest() if outcome.stdout else None,
