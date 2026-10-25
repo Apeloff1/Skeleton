@@ -345,7 +345,10 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if any(path == p or path.startswith(p + "/") or path.startswith(p) for p in self.NEVER_SHED):
+        if any(
+            path == p or path.startswith(p.rstrip("/") + "/")
+            for p in self.NEVER_SHED
+        ):
             return await call_next(request)
         try:
             shed = bool(getattr(request.app.state, "_shedding", False))
