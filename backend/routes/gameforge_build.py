@@ -303,25 +303,31 @@ class BuildBody(BaseModel):
 async def _build_web_for_user(b: BuildBody, user: Any):
     tenant = _tenant_id(user)
     timestamp = time.time()
-    return build_web_artifact(
-        b.game_name,
-        built_at=timestamp,
-        governed_store=_governed_store(),
-        tenant_id=tenant,
-        retention_until=timestamp + _artifact_retention_seconds(),
-    )
+    # ZIP assembly needs temporary files even when final storage is governed.
+    # Never allocate those intermediates under a read-only deployment image.
+    with tempfile.TemporaryDirectory(prefix="gameforge-web-") as scratch_dir:
+        return build_web_artifact(
+            b.game_name,
+            artifacts_root=scratch_dir,
+            built_at=timestamp,
+            governed_store=_governed_store(),
+            tenant_id=tenant,
+            retention_until=timestamp + _artifact_retention_seconds(),
+        )
 
 
 async def _build_source_for_user(b: BuildBody, user: Any):
     tenant = _tenant_id(user)
     timestamp = time.time()
-    return build_source_artifact(
-        b.game_name,
-        built_at=timestamp,
-        governed_store=_governed_store(),
-        tenant_id=tenant,
-        retention_until=timestamp + _artifact_retention_seconds(),
-    )
+    with tempfile.TemporaryDirectory(prefix="gameforge-source-") as scratch_dir:
+        return build_source_artifact(
+            b.game_name,
+            artifacts_root=scratch_dir,
+            built_at=timestamp,
+            governed_store=_governed_store(),
+            tenant_id=tenant,
+            retention_until=timestamp + _artifact_retention_seconds(),
+        )
 
 
 @router.post("/web")
