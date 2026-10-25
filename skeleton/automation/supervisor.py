@@ -71,6 +71,117 @@ def _canonical(value: object) -> bytes:
         raise SupervisorError(str(exc)) from exc
 
 
+
+def _bounded_planning_json(value: dict[str, object], *, max_bytes: int) -> str:
+    """Fit planning telemetry to its budget without corrupting JSON or authority.
+
+    Large machine inventories and GitHub status-rollups are advisory. Defer
+    those before touching any immutable snapshot/build authorization identity.
+    The complete source snapshot remains the input to its custody fingerprint.
+    """
+    try:
+        def encode(document: object) -> bytes:
+            return json.dumps(
+                document, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True, allow_nan=False,
+            ).encode("utf-8")
+
+        # Build an isolated JSON value so reduction never changes the captured
+        # source snapshot or the caller's original evidence.
+        document = json.loads(encode(value))
+        raw = encode(document)
+        if len(raw) > max_bytes:
+            scope = document.get("priority_observations", document)
+            if not isinstance(scope, dict):
+                raise SupervisorError("invalid planning observation shape")
+            machine = scope.get("machine_repository")
+            if isinstance(machine, dict):
+                deferred: list[str] = []
+                for field in (
+                    "context_shards", "governance", "reorganization",
+                    "hotspots", "growth_recommendations", "zone_budgets",
+                    "organization", "steward_plan", "health", "work_candidates",
+                ):
+                    if len(raw) <= max_bytes:
+                        break
+                    if field in machine:
+                        machine.pop(field)
+                        deferred.append(field)
+                        machine["deferred_fields"] = deferred
+                        raw = encode(document)
+
+            # A GitHub statusCheckRollup can contain hundreds of redundant CI
+            # receipts per PR. Keep IDs/states, not the untrusted bulk.
+            if len(raw) > max_bytes:
+                for name, fields in (
+                    ("blocked_pull_requests", (
+                        "number", "title", "headRefName", "baseRefName",
+                        "mergeStateStatus", "isDraft", "updatedAt",
+                    )),
+                    ("pull_requests", (
+                        "number", "title", "headRefName", "baseRefName",
+                        "mergeStateStatus", "isDraft", "updatedAt",
+                    )),
+                    ("failed_workflows", (
+                        "databaseId", "name", "headSha", "conclusion",
+                        "status", "updatedAt",
+                    )),
+                    ("workflow_runs", (
+                        "databaseId", "name", "headSha", "conclusion",
+                        "status", "updatedAt",
+                    )),
+                ):
+                    if len(raw) <= max_bytes:
+                        break
+                    records = scope.get(name)
+                    if isinstance(records, list):
+                        scope[name] = [
+                            {key: item[key] for key in fields if key in item}
+                            if isinstance(item, dict) else item
+                            for item in records
+                        ]
+                        scope.setdefault("reduced_observation_fields", []).append(name)
+                        raw = encode(document)
+
+            # Health is advisory: failure to fit cannot become worker authority.
+            for name in ("automation_health", "durable_automation_health"):
+                if len(raw) <= max_bytes:
+                    break
+                if name in scope:
+                    scope[name] = {"status": "deferred_for_plan_budget"}
+                    raw = encode(document)
+
+            if len(raw) > max_bytes:
+                for name in (
+                    "pull_requests", "workflow_runs", "blocked_pull_requests",
+                    "failed_workflows", "issues",
+                ):
+                    records = scope.get(name)
+                    if not isinstance(records, list):
+                        continue
+                    original_count = len(records)
+                    for allowed in (16, 8, 4, 2, 0):
+                        if len(raw) <= max_bytes:
+                            break
+                        if len(records) > allowed:
+                            scope[name] = records[:allowed]
+                            scope.setdefault("omitted_observation_counts", {})[name] = (
+                                original_count - len(scope[name])
+                            )
+                            raw = encode(document)
+
+        if len(raw) > max_bytes:
+            raise SupervisorError("planning JSON exceeds bounded output budget")
+        text = redact_secrets(raw.decode("utf-8"))
+        if len(text.encode("utf-8")) > max_bytes:
+            raise SupervisorError("redacted planning JSON exceeds bounded output budget")
+        # Redaction and size reduction must never publish malformed JSON.
+        json.loads(text)
+        return text
+    except (TypeError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        raise SupervisorError("planning JSON is not canonical and bounded") from exc
+
+
 @dataclass(frozen=True, slots=True)
 class SupervisorSnapshot:
     repository: str
@@ -384,12 +495,7 @@ def _context(snapshot: SupervisorSnapshot) -> str:
         "durable_automation_health": durable_worker_health(snapshot),
         "machine_repository": _machine_repository_context(),
     }
-    text = redact_secrets(_canonical(value).decode("utf-8"))
-    encoded = text.encode("utf-8")
-    if len(encoded) > MAX_CONTEXT_BYTES:
-        encoded = encoded[:MAX_CONTEXT_BYTES]
-        text = encoded.decode("utf-8", errors="ignore")
-    return text
+    return _bounded_planning_json(value, max_bytes=MAX_CONTEXT_BYTES)
 
 
 def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
@@ -440,7 +546,7 @@ def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
             "machine_repository": _machine_repository_context(),
         },
     }
-    return _canonical(payload).decode("utf-8")
+    return _bounded_planning_json(payload, max_bytes=MAX_PLAN_BYTES)
 
 
 def model_plan(snapshot: SupervisorSnapshot) -> str:
