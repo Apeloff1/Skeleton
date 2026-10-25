@@ -71,7 +71,7 @@ bounce = 0.1
 script = ExtResource("1")
 
 [node name="Slope" type="StaticBody3D" parent="."]
-transform = Transform3D(0.9659258, 0.2588190, 0, -0.2588190, 0.9659258, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(0.9659258, -0.2588190, 0, 0.2588190, 0.9659258, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="Shape" type="CollisionShape3D" parent="Slope"]
 shape = SubResource("slope_shape")
