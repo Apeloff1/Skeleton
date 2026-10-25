@@ -47,6 +47,11 @@ def _request(app: FastAPI, path: str = "/api/auth/me") -> Request:
         (3, 1000.0, 800.0, False, "/api/auth/me", 503),
         (3, 1000.0, 0.0, True, "/api/auth/me", 503),
         (3, 700.0, 700.0, True, "/api/health", 200),
+        (3, 700.0, 700.0, True, "/api/health/", 200),
+        (3, 700.0, 700.0, True, "/api/health/reliability", 200),
+        (3, 700.0, 700.0, True, "/api/healthcheck", 503),
+        (3, 700.0, 700.0, True, "/api/readiness-bypass", 503),
+        (3, 700.0, 700.0, True, "/api/liveness-bypass", 503),
     ],
 )
 def test_watchdog_sheds_only_stale_or_draining_requests(
