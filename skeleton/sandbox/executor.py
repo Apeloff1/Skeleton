@@ -452,7 +452,8 @@ class GuardedExecutor:
             "status": outcome.status,
             "reason": safe_reason,
             "argv_display": shell_quote(safe_args)[:2048],
-            "stdin_sha256": None if request.stdin is None else hashlib.sha256(bytes(request.stdin)).hexdigest(),
+            "stdin_sha256": (hashlib.sha256(bytes(request.stdin)).hexdigest()
+                             if isinstance(request.stdin, (bytes, bytearray)) else None),
             "stdout_sha256": hashlib.sha256(outcome.stdout.encode("utf-8")).hexdigest() if outcome.stdout else None,
             "returncode": outcome.returncode,
             "redactions": list(outcome.redactions),

@@ -120,6 +120,22 @@ def test_too_many_args_and_disallowed_stdin_are_denied(tmp_path: Path) -> None:
     assert ex.execute(ToolRequest("echo", ("a",), stdin=b"x")).status == "denied"
 
 
+@pytest.mark.parametrize("invalid_stdin", ["non-bytes input", 17, object()])
+def test_nonbytes_stdin_is_denied_with_an_audit_receipt(tmp_path: Path, invalid_stdin: object) -> None:
+    ex = _executor(tmp_path)
+    # Type-invalid input must fail closed *and* retain a custody record, not
+    # crash in _finish when a denied request reaches stdin_sha256 formatting.
+    out = ex.execute(ToolRequest("echo", ("ok",), stdin=invalid_stdin))
+    assert out.status == "denied"
+    assert "stdin must be bytes" in out.reason
+    assert out.returncode is None
+    assert out.audit_hash == ex.audit.head
+    events = ex.audit.entries()
+    assert len(events) == 1
+    assert events[0]["event"]["stdin_sha256"] is None
+    assert ex.audit.verify()
+
+
 def test_execution_budget(tmp_path: Path) -> None:
     ex = _executor(tmp_path, policy=ExecutorPolicy(require_network_isolation=False, max_executions=1))
     assert ex.execute(ToolRequest("echo", ("one",))).ok
