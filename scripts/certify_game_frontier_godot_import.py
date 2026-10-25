@@ -28,8 +28,24 @@ MISSING = re.compile(r"(Failed loading resource|Cannot open file|Resource file n
 
 
 def run(godot: str, args: list[str], cwd: Path, timeout: int) -> tuple[int, str]:
-    r = subprocess.run([godot, "--headless", *args], cwd=cwd, capture_output=True,
-                       text=True, timeout=timeout, check=False)
+    """Return bounded engine diagnostics, including timeouts and launch errors.
+
+    A timeout or missing binary must fail certification with machine-readable
+    evidence, not an unhandled traceback that loses the failing GFD case.
+    """
+    try:
+        r = subprocess.run([godot, "--headless", *args], cwd=cwd, capture_output=True,
+                           text=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout or b""
+        stderr = exc.stderr or b""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        return 124, str(stdout)[-1500:] + "\n" + str(stderr)[-1500:] + "\nGodot timed out"
+    except OSError as exc:
+        return 127, "Godot launch failed: " + type(exc).__name__
     return r.returncode, r.stdout + "\n" + r.stderr
 
 
