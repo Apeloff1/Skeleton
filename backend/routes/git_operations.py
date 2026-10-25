@@ -39,7 +39,15 @@ def workspace_base() -> Path:
         configured = os.environ.get("GIT_WORKSPACE_BASE", "").strip()
         preferred = Path(configured) if configured else Path("/app/backend/.git_workspaces")
         try:
+            # Do not permit an attacker-controlled workspace root to redirect
+            # an otherwise confined Git repository through a directory symlink.
+            # Explicit operator paths fail closed; the default falls back to a
+            # private directory if its configured location is compromised.
+            if preferred.is_symlink():
+                raise PermissionError("Git workspace root must not be a symlink")
             preferred.mkdir(parents=True, exist_ok=True)
+            if preferred.is_symlink():
+                raise PermissionError("Git workspace root became a symlink")
             # Exclusive random probe: never clobber a pre-existing file or
             # follow a predictable .writable symlink in a shared workspace.
             with tempfile.NamedTemporaryFile(
