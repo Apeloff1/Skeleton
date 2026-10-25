@@ -56,6 +56,10 @@ jobs:
     runs-on: ubuntu-latest
     # Complete canonical-domain test suite exceeded the prior 45-minute ceiling.
     timeout-minutes: 90
+    # Collect a bounded batch of real failures instead of running indefinitely
+    # after dozens of regressions. A fully passing run still executes all tests.
+    env:
+      PYTEST_ADDOPTS: "--maxfail=25"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
