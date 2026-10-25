@@ -349,3 +349,11 @@ def test_repo_build_evidence_module_dispatch_matches_fixed_ten_batch_inventory()
         "skeleton.repo_intelligence.git_index",
     }
     assert SCANNER.violations(file) == []
+
+
+def test_optional_decoder_negative_case_never_monkeypatches_global_import() -> None:
+    file = ROOT / "skeleton/testing/test_multimodal_media_validation.py"
+    tree = ast.parse(file.read_text(encoding="utf-8"))
+    assert SCANNER.violations(file) == []
+    assert "original_import(" not in file.read_text(encoding="utf-8")
+    assert 'missing.setitem(sys.modules, "PIL", None)' in file.read_text(encoding="utf-8")
