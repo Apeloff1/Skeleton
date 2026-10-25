@@ -52,7 +52,10 @@ def test_priority_queue_rejects_catalog_metadata_drift() -> None:
 def test_evidence_pending_requires_real_evidence_refs() -> None:
     queue, catalog = _payloads()
     mutated = json.loads(json.dumps(queue))
-    item = next(x for x in mutated["items"] if x["status"] == "evidence_pending")
+    item = next(x for x in mutated["items"] if x.get("supporting_refs"))
+    # Moving a planned item into evidence review cannot use mere references
+    # as verified evidence or invent a missing accountable disposition.
+    item["status"] = "evidence_pending"
     item["evidence"] = []
 
     errors = checker.validate(mutated, catalog)
@@ -71,18 +74,18 @@ def test_planned_item_cannot_claim_evidence() -> None:
     assert f"{item['id']}: planned item cannot claim evidence" in errors
 
 
-def test_queued_evidence_is_pending_not_signed_off() -> None:
+def test_unverified_references_cannot_claim_signed_evidence() -> None:
     queue, catalog = _payloads()
-    pending = [item for item in queue["items"] if item["status"] == "evidence_pending"]
-    planned = [item for item in queue["items"] if item["status"] == "planned"]
-
-    assert pending and planned
-    assert all(item["evidence"] and item["disposition"] for item in pending)
-    assert all(not item["evidence"] and item["disposition"] is None for item in planned)
+    supported = [item for item in queue["items"] if item.get("supporting_refs")]
+    unsupported = [item for item in queue["items"] if not item.get("supporting_refs")]
+    assert len(supported) == 34 and len(unsupported) == 23
+    assert all(item["status"] == "planned" for item in queue["items"])
+    assert all(item["evidence"] == [] and item["disposition"] is None for item in queue["items"])
+    assert all(item["proposed_disposition"] for item in supported)
     assert all(
         not item["completion_checkbox"]
         and item["completion_checkbox_mark"] == "[ ]"
-        and item["accountability_status"] == item["status"]
+        and item["accountability_status"] == "planned"
         for item in queue["items"]
     )
     assert checker.validate(queue, catalog) == []
@@ -92,7 +95,11 @@ def test_planned_or_evidence_pending_cannot_prematurely_claim_verification() -> 
     queue, catalog = _payloads()
     for status in ("planned", "evidence_pending"):
         mutated = json.loads(json.dumps(queue))
-        item = next(row for row in mutated["items"] if row["status"] == status)
+        item = next(row for row in mutated["items"] if row.get("supporting_refs"))
+        if status == "evidence_pending":
+            item["status"] = "evidence_pending"
+            item["evidence"] = list(item["supporting_refs"])
+            item["disposition"] = item["proposed_disposition"]
         item["completion_checkbox"] = True
         item["completion_checkbox_mark"] = "[x]"
         item["accountability_status"] = "verified"
