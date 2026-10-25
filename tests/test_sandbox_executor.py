@@ -141,6 +141,43 @@ def test_toolspec_validation(kwargs) -> None:
         ToolSpec(**kwargs)
 
 
+@pytest.mark.parametrize("override", [
+    {"max_args": True},
+    {"path_args": frozenset({True})},
+    {"path_args": (0,)},
+    {"block_threshold": True},
+    {"output_chars": -1},
+    {"output_chars": 0},
+    {"output_chars": 200_001},
+    {"output_chars": True},
+    {"output_chars": "unbounded"},
+    {"limits": object()},
+])
+def test_sandbox_execution_output_caps_and_thresholds_reject_bypass_values(override) -> None:
+    with pytest.raises(ExecutorConfigError):
+        ToolSpec("echo", ECHO, **override)
+
+
+@pytest.mark.parametrize("override", [
+    {"output_block_threshold": 1.01},
+    {"output_block_threshold": float("nan")},
+    {"output_block_threshold": 0.0},
+    {"output_block_threshold": True},
+    {"max_executions": -1},
+    {"max_executions": True},
+    {"max_executions": 1.5},
+])
+def test_executor_policy_refuses_disabled_output_detection_or_invalid_budget(override) -> None:
+    with pytest.raises(ExecutorConfigError):
+        ExecutorPolicy(**override)
+
+
+def test_explicit_bounded_security_policy_limits_are_accepted() -> None:
+    assert ToolSpec("echo", ECHO, output_chars=1, block_threshold=1.0).output_chars == 1
+    assert ToolSpec("echo", ECHO, output_chars=200_000).output_chars == 200_000
+    assert ExecutorPolicy(max_executions=0, output_block_threshold=1.0).max_executions == 0
+
+
 def test_duplicate_tool_and_bad_mediator_rejected(tmp_path: Path) -> None:
     jail = FsJail(tmp_path / "jail")
     with pytest.raises(ExecutorConfigError):
