@@ -127,19 +127,19 @@ _LAZY_EXPORTS = {
 
 def _load_trusted_lazy_module(module_name: str):
     """Import from the repository-owned export map using only literal targets."""
-    if module_name == ".content_retrieval":
+    if module_name == "content_retrieval":
         return import_module(".content_retrieval", __name__)
-    if module_name == ".learning":
+    if module_name == "learning":
         return import_module(".learning", __name__)
-    if module_name == ".lifecycle":
+    if module_name == "lifecycle":
         return import_module(".lifecycle", __name__)
-    if module_name == ".lifecycle_repository":
+    if module_name == "lifecycle_repository":
         return import_module(".lifecycle_repository", __name__)
-    if module_name == ".multimodal":
+    if module_name == "multimodal":
         return import_module(".multimodal", __name__)
-    if module_name == ".rollout":
+    if module_name == "rollout":
         return import_module(".rollout", __name__)
-    if module_name == ".temporal":
+    if module_name == "temporal":
         return import_module(".temporal", __name__)
     raise ImportError("unregistered lazy export module")
 
