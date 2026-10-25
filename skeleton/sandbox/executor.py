@@ -387,10 +387,27 @@ class GuardedExecutor:
         return replace(spec.limits, network="inherit"), False
 
     def _scrub(self, spec: ToolSpec, result: ProcessResult) -> ToolOutcome:
-        out = sanitize_text(result.stdout.decode("utf-8", errors="replace")[: spec.output_chars], normalize=None)
-        err = sanitize_text(result.stderr.decode("utf-8", errors="replace")[: spec.output_chars], normalize=None)
-        out, kinds_out = redact_secrets(out)
-        err, kinds_err = redact_secrets(err)
+        try:
+            out = sanitize_text(
+                result.stdout.decode("utf-8", errors="replace")[: spec.output_chars],
+                normalize=None,
+            )
+            err = sanitize_text(
+                result.stderr.decode("utf-8", errors="replace")[: spec.output_chars],
+                normalize=None,
+            )
+            out, kinds_out = redact_secrets(out)
+            err, kinds_err = redact_secrets(err)
+        except SanitizerError:
+            # No unsanitized stdout/stderr can reach model context. Retain
+            # bounded custody even if the sanitizer itself rejects output.
+            return ToolOutcome(
+                spec.name, STATUS_BLOCKED, "tool output could not be sanitized",
+                returncode=result.returncode,
+                output_report={"error": "unsanitizable"},
+                output_flagged=True, truncated=result.truncated,
+                duration_s=result.duration_s,
+            )
         if result.timed_out:
             status, reason = STATUS_TIMEOUT, "wall-clock limit reached"
         elif result.returncode == 0:
