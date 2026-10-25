@@ -285,7 +285,16 @@ def test_worker_health_includes_checks_beyond_bounded_rollup(tail_state, expecte
     assert len(normalized["statusCheckRollup"]) == 64
     assert normalized["statusCheckRollupCount"] == 80
     assert normalized["statusCheckRollup"][0] == {"conclusion": "SUCCESS"}
-    assert normalized["statusCheckRollup"][-1] == {"conclusion": tail_state}
+    # Overflow values are aggregated to a bounded, canonical vocabulary.
+    # CANCELLED is deliberately counted as FAILURE, and QUEUED as PENDING.
+    canonical = {
+        "FAILURE": "FAILURE", "CANCELLED": "FAILURE",
+        "QUEUED": "PENDING", "PENDING": "PENDING",
+        "UNKNOWN": "UNKNOWN", "SUCCESS": "SUCCESS",
+    }
+    assert normalized["statusCheckRollup"][-1] == {
+        "conclusion": canonical[tail_state]
+    }
     health = supervisor.durable_worker_health(snapshot(prs=(normalized,)))
     assert health["active_count"] == 1
     assert health["active_workers"][0]["classification"] == expected
