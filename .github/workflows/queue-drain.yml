@@ -29,7 +29,10 @@ jobs:
     # Place the Python-only cleanup worker on the ARM recovery pool instead
     # of competing with broad x64 PR validation. Safety comes from the
     # exact-head and stale-PR guards, not runner architecture.
-    runs-on: ubuntu-24.04-arm
+    # Queue recovery must remain schedulable when the ARM runner pool is
+    # saturated. This job uses only portable Python stdlib and Bash;
+    # the exact-head and security-safe cancellation rules are unchanged.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
