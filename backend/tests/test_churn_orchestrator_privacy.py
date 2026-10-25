@@ -402,4 +402,3 @@ async def test_daemon_revalidates_before_private_source_and_stops_after_revocati
     daemon = next(iter(churn._DAEMONS.values()))
     assert daemon["enabled"] is False and daemon["stop"].is_set()
     assert not h.db["galaxy_text_gamefiles"].queries and not h.db["galaxy_churn_runs"].writes
-
