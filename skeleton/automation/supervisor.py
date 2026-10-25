@@ -396,11 +396,14 @@ def _normalize_pr_observation(item: dict[str, Any]) -> dict[str, Any]:
     rollup = item.get("statusCheckRollup")
     if rollup is not None and not isinstance(rollup, list):
         raise SupervisorError("invalid GitHub PR status rollup")
-    statuses: list[dict[str, str]] = []
-    for raw in (rollup or [])[:64]:
+    # Worker-health consumes at most 64 statuses. A check failure beyond
+    # the first 64 must never be hidden by the bounded observation window.
+    # Keep the first 63 concrete statuses and reserve slot 64 for a
+    # conservative classification of the entire remaining check rollup.
+    def state_of(raw: object) -> str:
         if not isinstance(raw, dict):
-            continue
-        state = next(
+            return "UNKNOWN"
+        return next(
             (
                 value.strip().upper()[:32]
                 for key in ("conclusion", "status", "state")
@@ -408,7 +411,30 @@ def _normalize_pr_observation(item: dict[str, Any]) -> dict[str, Any]:
             ),
             "UNKNOWN",
         )
-        statuses.append({"conclusion": state})
+
+    observed = rollup or []
+    prefix = observed if len(observed) <= 64 else observed[:63]
+    statuses: list[dict[str, str]] = [
+        {"conclusion": state_of(raw)} for raw in prefix
+    ]
+    if len(observed) > 64:
+        tail_states = (state_of(raw) for raw in observed[63:])
+        failure = {
+            "FAILURE", "FAILED", "ERROR", "TIMED_OUT", "CANCELLED",
+            "ACTION_REQUIRED", "STARTUP_FAILURE",
+        }
+        pending = {"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED"}
+        success = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+        tail_kind = "SUCCESS"
+        for state in tail_states:
+            if state in failure:
+                tail_kind = "FAILURE"
+                break
+            if state in pending:
+                tail_kind = "PENDING"
+            elif state not in success and tail_kind == "SUCCESS":
+                tail_kind = "UNKNOWN"
+        statuses.append({"conclusion": tail_kind})
     normalized["statusCheckRollup"] = statuses
     # Hash the *entire* observed rollup, never just the first 64 results.
     # The digest preserves change sensitivity without embedding arbitrary
