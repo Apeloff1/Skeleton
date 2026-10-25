@@ -421,3 +421,20 @@ def test_native_platform_pr_runs_preempt_only_obsolete_heads() -> None:
         # Manual native-ROM contracts still require safe concurrency behavior.
         text = (active if active.is_file() else archived).read_text(encoding="utf-8")
         assert "  cancel-in-progress: false" in text, name
+
+def test_reusable_ci_preserves_immutable_main_sha_evidence() -> None:
+    from scripts import check_toolchain_contract
+
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    expected_group = (
+        "ci-" + chr(36) + "{{ github.event_name }}-"
+        + chr(36) + "{{ github.event.pull_request.number || github.sha }}"
+    )
+    assert "group: " + expected_group in workflow
+    cancel = "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}"
+    assert cancel in workflow
+    assert check_toolchain_contract.pr_only_ref_scoped_cancellation(workflow)
+    unsafe = workflow.replace(cancel, "cancel-in-progress: true")
+    assert unsafe != workflow
+    assert not check_toolchain_contract.pr_only_ref_scoped_cancellation(unsafe)
