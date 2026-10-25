@@ -387,14 +387,14 @@ def train_coherent_words(
     parameters = [item for item in model.parameters() if item.requires_grad]
     source_digest = None
     if ckpt_path.exists():
-        saved = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        saved = torch.load(ckpt_path, map_location="cpu", weights_only=True)
         if int(saved["hidden"]) != hidden:
             raise ValueError("checkpoint hidden size does not match")
         model.load_state_dict(saved["best_state"])
         _pin(model)
         source_digest = saved.get("source_digest")
     elif source is not None:
-        loaded = torch.load(source, map_location="cpu", weights_only=False)
+        loaded = torch.load(source, map_location="cpu", weights_only=True)
         if int(loaded["hidden"]) != hidden:
             raise ValueError("source checkpoint hidden size does not match")
         model.load_state_dict(loaded["best_state"])

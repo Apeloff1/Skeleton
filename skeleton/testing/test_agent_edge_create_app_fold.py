@@ -50,7 +50,10 @@ def _ready(app):
 
 
 def _paths(app):
-    return {getattr(r, "path", "") for r in app.routes}
+    # fastapi>=0.141 keeps included routers as _IncludedRouter (no top-level .path).
+    from skeleton.api.cortex_mount_guard import iter_route_paths
+
+    return set(iter_route_paths(app))
 
 
 # -- create_app wiring -----------------------------------------------------------------
