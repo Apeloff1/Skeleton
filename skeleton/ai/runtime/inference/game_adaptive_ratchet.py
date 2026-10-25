@@ -587,7 +587,7 @@ def train_budget(
     best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
     best_scores = _scores(model, tracks)
     if ckpt_path.exists():
-        saved = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        saved = torch.load(ckpt_path, map_location="cpu", weights_only=True)
         if int(saved["hidden"]) != hidden:
             raise ValueError("checkpoint hidden size does not match")
         model.load_state_dict(saved["best_state"])
