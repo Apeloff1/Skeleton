@@ -136,6 +136,32 @@ def test_nonbytes_stdin_is_denied_with_an_audit_receipt(tmp_path: Path, invalid_
     assert ex.audit.verify()
 
 
+
+@pytest.mark.parametrize("malformed_args", [None, "--version", b"--version", 7, {"arg": "hello"}, [object()]])
+def test_malformed_argv_envelope_is_denied_and_audited_without_running(tmp_path: Path, malformed_args: object) -> None:
+    ex = _executor(tmp_path)
+    with patch("skeleton.sandbox.executor.run_isolated") as launched:
+        out = ex.execute(ToolRequest("echo", malformed_args))
+    assert out.status == "denied"
+    assert "list or tuple of strings" in out.reason
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    assert len(ex.audit.entries()) == 1
+    launched.assert_not_called()
+
+
+@pytest.mark.parametrize("malformed_tool", [None, ["echo"], {"name": "echo"}, 17])
+def test_nonstring_or_unhashable_tool_name_is_denied_and_audited(tmp_path: Path, malformed_tool: object) -> None:
+    ex = _executor(tmp_path)
+    with patch("skeleton.sandbox.executor.run_isolated") as launched:
+        out = ex.execute(ToolRequest(malformed_tool, ("hello",)))
+    assert out.status == "denied"
+    assert "tool name must be a string" in out.reason
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    launched.assert_not_called()
+
+
 def test_execution_budget(tmp_path: Path) -> None:
     ex = _executor(tmp_path, policy=ExecutorPolicy(require_network_isolation=False, max_executions=1))
     assert ex.execute(ToolRequest("echo", ("one",))).ok

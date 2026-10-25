@@ -280,7 +280,11 @@ class GuardedExecutor:
     def execute(self, request: ToolRequest) -> ToolOutcome:
         if not isinstance(request, ToolRequest):
             raise TypeError("execute() needs a ToolRequest")
-        tool_name = str(request.tool)[:MAX_TOOL_NAME]
+        # A ToolRequest can originate from decoded untrusted data. Do not
+        # hash or stringify arbitrary objects before making a deny decision.
+        if not isinstance(request.tool, str):
+            return self._finish(request, ToolOutcome("<invalid>", STATUS_DENIED, "tool name must be a string"))
+        tool_name = request.tool[:MAX_TOOL_NAME]
         spec = self._tools.get(request.tool)
         if spec is None:
             return self._finish(request, ToolOutcome(tool_name, STATUS_DENIED, "unknown tool (deny by default)"))
@@ -318,6 +322,10 @@ class GuardedExecutor:
         return self._finish(request, outcome)
 
     def _check_args(self, spec: ToolSpec, request: ToolRequest) -> tuple[str, ...]:
+        # Refuse malformed and string-shaped argv, including non-iterables.
+        # tuple("abc") would otherwise turn one untrusted argument into three.
+        if not isinstance(request.args, (tuple, list)) or any(not isinstance(value, str) for value in request.args):
+            raise ProcessPolicyError("tool arguments must be a list or tuple of strings")
         args = tuple(request.args)
         if len(args) > spec.max_args:
             raise ProcessPolicyError("too many arguments for tool", context={"tool": spec.name, "maximum": spec.max_args})
@@ -438,7 +446,10 @@ class GuardedExecutor:
         return outcome
 
     def _finish(self, request: ToolRequest, outcome: ToolOutcome) -> ToolOutcome:
-        safe_args = [redact_secrets(sanitize_text(a[:512], keep_newlines=False))[0] if isinstance(a, str) else "<invalid>" for a in tuple(request.args)[:64]]
+        # Bad argument envelopes must still produce a custody receipt. Never
+        # iterate an unchecked None/string/dict or unbounded custom iterable.
+        raw_args = request.args if isinstance(request.args, (tuple, list)) else ()
+        safe_args = [redact_secrets(sanitize_text(a[:512], keep_newlines=False))[0] if isinstance(a, str) else "<invalid>" for a in raw_args[:64]]
         safe_source = redact_secrets(
             sanitize_text(str(request.source)[:4096], keep_newlines=False)
         )[0][:64]
