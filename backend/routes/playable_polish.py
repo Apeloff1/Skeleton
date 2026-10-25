@@ -9,6 +9,8 @@ the game. The job reports per-step progress so the UI can show a live checklist.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -20,7 +22,7 @@ from routes.playable_sentience import _do_sentience
 from routes.playable_physics import _do_physics
 from routes.playable_aesthetics import _do_aesthetics
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 _STEPS = [
     ("sentience", "👾 Living NPCs", _do_sentience),

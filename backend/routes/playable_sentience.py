@@ -13,6 +13,8 @@ game never breaks even if a call site is missing.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -25,7 +27,7 @@ from routes.playable import (
 )
 from routes.playable_htmlutils import inject_into_head
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 # ── the deterministic, self-contained NPC-brain engine injected into <head> ──
 _SENTIENCE_ENGINE = (

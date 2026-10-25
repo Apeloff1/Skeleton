@@ -193,12 +193,15 @@ test('account change during identity resolution prevents the next turn lookup', 
   assert.deepEqual(f.controller.getSnapshot().messages, []);
 });
 
-function transportFixture() {
+function transportFixture(owner = { getAuthToken: () => '', getAuthEpoch: () => 0,
+  initializeStoredToken: async () => {}, subscribeAuthChanges: () => () => {} }) {
   return load('src/utils/apiClient.ts', {
     './apiBase': { API_BASE: 'https://backend.test' },
     './requestRecoveryPolicy': policy,
     './breadcrumbs': { trail: { add() {} } },
     './bootTracer': { traceStep: async () => {} },
+    '../foundation/queryCache': { appQueryCache: { clear() {} } },
+    '../auth/gameforgeAuth': owner,
   });
 }
 function restoreGlobal(t, name, value) {

@@ -5,14 +5,17 @@ private Galaxy records to the authenticated tenant and account.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from contextvars import ContextVar
 
 from fastapi import Depends, HTTPException, Request
 
-from routes.gameforge_auth import get_current_user, require_role
+from routes.gameforge_auth import get_current_user, require_role, require_authenticated_identity, ROLE_RANK
 
 
 _request_user: ContextVar[dict | None] = ContextVar("galaxy_request_user", default=None)
+_work_principal: ContextVar[dict | None] = ContextVar("galaxy_work_principal", default=None)
+_work_cancelled: ContextVar[object | None] = ContextVar("galaxy_work_cancelled", default=None)
 _PUBLIC_READS = frozenset({
     "/manifest", "/genres", "/capabilities/catalog", "/pipeline/catalog",
     "/datasets/catalog", "/domains", "/agent-db-manifest",
@@ -79,6 +82,105 @@ async def visible_build_rows(rows) -> list[dict]:
     return visible
 
 
+def private_identity(*, mutation: bool = False) -> dict:
+    """Exact account scope for indirect build consumers, including local mode.
+
+    Existing Galaxy administrator visibility remains unchanged. Churn and
+    orchestration can dispatch private source and therefore require ownership.
+    """
+    user = _request_user.get()
+    captured = _work_principal.get()
+    if captured is not None:
+        from routes.gameforge_auth import _users
+
+        expected = require_authenticated_identity(captured)
+        account = ({"email": captured["email"]} if captured.get("email")
+                   else {"user_id": captured.get("user_id")})
+        try:
+            user = _users().find_one({**account, "disabled": {"$ne": True}},
+                                     {"_id": 0, "password_hash": 0})
+        except Exception:
+            raise HTTPException(503, "Account authority unavailable") from None
+        if not user or require_authenticated_identity(user) != expected:
+            raise HTTPException(403, "Account authority changed")
+        _request_user.set(user)
+    identity = require_authenticated_identity(user)
+    minimum = "editor" if mutation or captured is not None else "viewer"
+    if ROLE_RANK.get(user.get("role"), -1) < ROLE_RANK[minimum]:
+        raise HTTPException(403, f"Requires role >= {minimum}")
+    check = _work_cancelled.get()
+    if check is not None and check():
+        raise HTTPException(409, "Work cancelled")
+    return identity
+
+
+def capture_private_principal() -> dict:
+    private_identity(mutation=True)
+    user = _request_user.get()
+    return {key: user[key] for key in ("email", "user_id", "tenant_id", "role") if key in user}
+
+
+@contextmanager
+def private_work_scope(principal: dict, cancelled=None):
+    """Carry server identity into a raw thread, revalidating before each access."""
+    user_token = _request_user.set(dict(principal))
+    work_token = _work_principal.set(dict(principal))
+    cancel_token = _work_cancelled.set(cancelled)
+    try:
+        private_identity(mutation=True)
+        yield
+    finally:
+        _work_cancelled.reset(cancel_token)
+        _work_principal.reset(work_token)
+        _request_user.reset(user_token)
+
+
+def require_owned_build(build_id: str, *, mutation: bool = False) -> dict:
+    """Read canonical Galaxy metadata through its existing cache/Mongo owner.
+
+    Derived gamefiles, plans, runs, jobs and client-supplied ownership never
+    establish authority. Missing or unowned historical metadata fails closed.
+    """
+    identity = private_identity(mutation=mutation)
+    if not isinstance(build_id, str) or not build_id:
+        raise HTTPException(404, "Build not found")
+    from routes.galaxy_studio_state import _builds
+
+    build = _builds.get(build_id)
+    if build is None:
+        from core.databases import get_sync_db
+
+        try:
+            build = get_sync_db()["galaxy_builds"].find_one(
+                {"build_id": build_id, **identity}, {"_id": 0, "build_id": 1, "owner_id": 1, "tenant_id": 1})
+        except Exception:
+            raise HTTPException(503, "Build authority unavailable") from None
+    if not build or build.get("build_id") != build_id or any(build.get(key) != value for key, value in identity.items()):
+        raise HTTPException(404, "Build not found")
+    return identity
+
+
+async def private_build_access(request: Request, user=Depends(get_current_user)):
+    """Admission shared by independently mounted churn/orchestrator routers."""
+    if request.method in {"GET", "HEAD", "OPTIONS"} and request.url.path.rstrip("/") == "/api/churn/models":
+        yield
+        return
+    require_authenticated_identity(user)
+    token = _request_user.set(user)
+    try:
+        mutation = request.method not in {"GET", "HEAD", "OPTIONS"}
+        private_identity(mutation=mutation)
+        build_id = request.path_params.get("build_id")
+        if build_id:
+            # Synchronous metadata lookups stay off the ASGI event loop.
+            from starlette.concurrency import run_in_threadpool
+
+            await run_in_threadpool(require_owned_build, build_id, mutation=mutation)
+        yield
+    finally:
+        _request_user.reset(token)
+
+
 async def galaxy_request_access(request: Request, user=Depends(get_current_user)):
     relative = request.url.path.removeprefix("/api/galaxy-studio").rstrip("/") or "/"
     read = request.method in {"GET", "HEAD", "OPTIONS"}
@@ -124,4 +226,5 @@ async def galaxy_request_access(request: Request, user=Depends(get_current_user)
         _request_user.reset(token)
 
 
-__all__ = ["galaxy_request_access", "record_identity", "record_query", "record_visible", "visible_build_rows"]
+__all__ = ["galaxy_request_access", "record_identity", "record_query", "record_visible", "visible_build_rows",
+           "private_build_access", "private_identity", "capture_private_principal", "private_work_scope", "require_owned_build"]

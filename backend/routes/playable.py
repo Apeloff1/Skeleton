@@ -28,14 +28,18 @@ import uuid
 import asyncio
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Query
+from fastapi import HTTPException, Query
 from fastapi.responses import HTMLResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from core.databases import client as _SHARED_MONGO_CLIENT
 from routes.llm_router import MODEL_CATALOG, ROUTING_POLICY
+from routes.playable_access import (
+    assert_project_access, bind_project_source, project_identity, project_router,
+    reauthorize_project_context, reauthorize_project_principal, scoped_database,
+)
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
-_db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+router = project_router(prefix="/api/playable", tags=["playable"])
+_db = scoped_database(_SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")])
 PROJ = {"_id": 0}
 
 PLAYABILITY_THRESHOLD = int(os.environ.get("PLAYABLE_MIN_SCORE", "70"))
@@ -149,7 +153,9 @@ async def _resolve_brief(brief: str, spec_id: str) -> tuple:
     """Turn either a raw brief or a stored design-spec into the build prompt +
     title/genre. Returns (prompt, title, genre)."""
     if spec_id:
-        spec = await _db.design_specs.find_one({"spec_id": spec_id}, PROJ)
+        spec = await bind_project_source("design_specs", "spec_id", spec_id)
+        if not spec or not spec.get("gdd"):
+            raise HTTPException(404, "Design spec not found")
         if spec and spec.get("gdd"):
             g = spec["gdd"]
             mech = "; ".join(
@@ -172,6 +178,8 @@ async def _resolve_brief(brief: str, spec_id: str) -> tuple:
 
 
 class GenerateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     brief: str = ""
     spec_id: str = ""
     title: str = ""
@@ -187,11 +195,18 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
     from core.engine_chat import EngineChat, UserMessage
     sid = f"playable-{uuid.uuid4().hex[:8]}"
     for i, model in enumerate(ensemble):
+        # The worker thread carries the request context, but must revalidate the
+        # current account before every provider attempt, including fallbacks.
+        reauthorize_project_principal(mutate=True, sources=True)
+        identity = project_identity()
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
         try:
             chat = EngineChat(
                 session_id=sid,
+                tenant_id=identity["tenant_id"],
+                actor_id=identity["owner_id"],
+                data_class="confidential",
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.playable.generation",
                     version="1",
@@ -199,9 +214,12 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
                 ),
             ).with_model(provider, model)
             resp = await chat.send_message(UserMessage(text=prompt))
+            reauthorize_project_principal(mutate=True, sources=True)
             content = resp.content if hasattr(resp, "content") else str(resp)
             return {"content": content, "model": model, "provider": provider,
                     "latency_ms": int((time.time() - t0) * 1000), "attempts": i + 1}
+        except HTTPException:
+            raise
         except Exception:  # provider error → next in ensemble
             pass
     return {"content": "", "error": "llm_request_failed", "model": None, "provider": None}
@@ -350,7 +368,9 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
     """Shared pipeline: rigorous quality loop (codegen → structural repair →
     judge-driven quality refinement) → persist. Used by fresh generation."""
     gen_system = _GAME_SYS_FAST if depth == "fast" else _GAME_SYS
+    await reauthorize_project_context(mutate=True)
     gen = await _codegen_quality_loop(prompt, gen_system, remix_of_brief or brief, depth)
+    await reauthorize_project_context(mutate=True)
     routed, html, removed, val = gen["routed"], gen["html"], gen["removed"], gen["val"]
     llm_error = routed.get("error")
     structurally_ok = bool(html) and val["score"] >= PLAYABILITY_THRESHOLD
@@ -360,6 +380,7 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
 
     pid = uuid.uuid4().hex
     doc = {
+        **project_identity(),
         "playable_id": pid,
         "title": title,
         "genre": genre,
@@ -386,10 +407,7 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
         "created_at": datetime.now(timezone.utc).isoformat(),
         "version": 1,
     }
-    try:
-        await _db.playables.insert_one(dict(doc))
-    except Exception:
-        pass
+    await _db.playables.insert_one(dict(doc))
     # VII.5 auto-gate: deterministic content-policy scan at creation so unsafe
     # content never reaches the public catalogue. block→hidden, review→review.
     try:
@@ -405,6 +423,8 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
         if mod != "ok":
             await _audit("auto_scan", pid, "system",
                          {"verdict": scan["verdict"], "flags": len(scan["flags"]), "moderation_status": mod})
+    except HTTPException:
+        raise
     except Exception:
         pass
     out = {k: v for k, v in doc.items() if k != "html"}
@@ -414,15 +434,23 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
 
 async def _do_generate(brief: str, spec_id: str, title_override: str, depth: str = "studio", creator_id: str = "", forged_from: str = "", derive_mode: str = "") -> dict:
     """Fresh generation from a brief or design-spec."""
+    await reauthorize_project_context(mutate=True)
+    identity = project_identity()
+    if creator_id and creator_id != identity["owner_id"]:
+        raise HTTPException(403, "Creator identity mismatch")
+    if forged_from:
+        await assert_project_access(forged_from)
     prompt, title, genre = await _resolve_brief(brief, spec_id)
     if title_override:
         title = title_override
     # Per-creator Studio Preferences bias (additive; brief still wins).
     try:
         from routes.creator_prefs import preference_bias
-        bias = await preference_bias(creator_id)
+        bias = await preference_bias(identity["owner_id"])
         if bias:
             prompt = f"{prompt}{bias}"
+    except HTTPException:
+        raise
     except Exception:
         pass
     return await _persist(prompt, title, genre, brief, spec_id, "", "", depth, forged_from, derive_mode)
@@ -441,6 +469,16 @@ def _validate_body(body: "GenerateBody") -> str:
     return ""
 
 
+async def _assert_generation_sources(body: GenerateBody) -> None:
+    await reauthorize_project_context(mutate=True)
+    if body.creator_id and body.creator_id != project_identity()["owner_id"]:
+        raise HTTPException(403, "Creator identity mismatch")
+    if body.spec_id:
+        await _resolve_brief(body.brief, body.spec_id)
+    if body.forged_from:
+        await assert_project_access(body.forged_from)
+
+
 @router.post("/generate")
 async def generate(body: GenerateBody):
     """Generate synchronously (can run 60-180s with repair+eval). Prefer
@@ -448,19 +486,32 @@ async def generate(body: GenerateBody):
     err = _validate_body(body)
     if err:
         return {"error": err}
-    return await _do_generate((body.brief or "").strip(), body.spec_id, body.title, body.depth, body.creator_id)
+    await _assert_generation_sources(body)
+    return await _do_generate((body.brief or "").strip(), body.spec_id, body.title, body.depth, body.creator_id, body.forged_from, body.derive_mode)
 
 
 async def _run_job(job_id: str, coro):
     """Background runner — full generation never hits a request timeout."""
     try:
+        await reauthorize_project_context(mutate=True)
         out = await coro
+        await reauthorize_project_context(mutate=True)
         out["job_id"] = job_id
         out["job_status"] = "done"
-        await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": out}, upsert=True)
+        await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": out})
+    except HTTPException:
+        # Revoked/moved accounts and projects cannot publish a late result or
+        # turn the failed authorization into a new job through an upsert.
+        raise
     except Exception:
+        await reauthorize_project_context(mutate=True)
         await _db.playable_jobs.update_one(
-            {"job_id": job_id}, {"$set": {"job_status": "error", "error": "generation_failed"}}, upsert=True)
+            {"job_id": job_id}, {"$set": {"job_status": "error", "error": "generation_failed"}})
+    finally:
+        # An authorization failure before first await must not leave an already
+        # created coroutine pending or run its private work during cleanup.
+        if asyncio.iscoroutine(coro):
+            coro.close()
 
 
 @router.post("/generate/async")
@@ -470,8 +521,10 @@ async def generate_async(body: GenerateBody):
     err = _validate_body(body)
     if err:
         return {"error": err}
+    await _assert_generation_sources(body)
     job_id = uuid.uuid4().hex
     await _db.playable_jobs.insert_one({
+        **project_identity(),
         "job_id": job_id, "job_status": "running", "kind": "generate",
         "brief": (body.brief or "").strip()[:500],
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -483,6 +536,8 @@ async def generate_async(body: GenerateBody):
 
 
 class VoteBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     opponent_id: str = ""
     winner_id: str = ""
 
@@ -539,6 +594,8 @@ def _brief_from_build(b: dict) -> tuple:
 
 
 class ImportBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     build_id: str = ""
     depth: str = "studio"
 
@@ -547,12 +604,21 @@ async def _get_build(bid: str) -> dict:
     """Find a Galaxy build by id in the active collection or the archive
     (completed builds are moved to galaxy_build_archive by the watchdog)."""
     b = await _db.galaxy_builds.find_one({"build_id": bid}, {"_id": 0})
+    if b:
+        return await bind_project_source("galaxy_builds", "build_id", bid)
     if not b:
         b = await _db.galaxy_build_archive.find_one({"build_id": bid}, {"_id": 0})
+        if b:
+            return await bind_project_source("galaxy_build_archive", "build_id", bid)
     return b or {}
 
 
 async def _do_import(build: dict, depth: str) -> dict:
+    await reauthorize_project_context(mutate=True)
+    # A captured source document is not continuing authority after the request.
+    build = await _get_build(str(build.get("build_id") or ""))
+    if not build:
+        raise HTTPException(404, "Build not found")
     prompt, title, genre = _brief_from_build(build)
     brief = f"(imported from Galaxy build {build.get('build_id')})"
     out = await _persist(prompt, title, genre, brief, "", "", "", depth)
@@ -562,6 +628,8 @@ async def _do_import(build: dict, depth: str) -> dict:
             {"$set": {"source_build_id": build.get("build_id"), "imported": True}})
         out["source_build_id"] = build.get("build_id")
         out["imported"] = True
+    except HTTPException:
+        raise
     except Exception:
         pass
     return out
@@ -594,9 +662,10 @@ async def import_build_async(body: ImportBody):
         return {"error": "build_id required"}
     build = await _get_build(bid)
     if not build:
-        return {"error": "build not found in vault"}
+        raise HTTPException(404, "Build not found")
     job_id = uuid.uuid4().hex
     await _db.playable_jobs.insert_one({
+        **project_identity(),
         "job_id": job_id, "job_status": "running", "kind": "import",
         "source_build_id": bid, "created_at": datetime.now(timezone.utc).isoformat(),
     })

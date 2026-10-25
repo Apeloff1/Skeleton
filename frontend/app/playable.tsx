@@ -581,9 +581,8 @@ export default function PlayableScreen() {
     if (brief.trim().length < 8 || busy) return;
     haptics.selection();
     setBusy(true); setBusyLabel(depth === 'fast' ? 'Quick-building your game…' : 'Crafting a studio-grade game…'); setError(null); setGame(null);
-    const creatorId = await getVisitorId();
     const kick = await api.post<{ job_id?: string; error?: string }>(
-      '/api/playable/generate/async', { brief, depth, creator_id: creatorId }, { timeoutMs: 20_000, retries: 1 });
+      '/api/playable/generate/async', { brief, depth }, { timeoutMs: 20_000, retries: 1 });
     const jobId = kick.data?.job_id;
     if (!kick.ok || !jobId) {
       setError(kick.data?.error || kick.error || `HTTP ${kick.status}`); setBusy(false); return;

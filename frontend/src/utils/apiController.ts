@@ -5,8 +5,8 @@
  *   • Per-request timeout via AbortController.
  *   • Exponential-backoff retries with jitter on 5xx / network errors.
  *   • Request deduplication — identical GET in flight returns the same promise.
- *   • TTL-based response cache (in-memory + optional AsyncStorage persistence).
- *   • Offline detection (NetInfo) + retry-queue when back online.
+ *   • Account-scoped in-memory response cache.
+ *   • Offline detection (NetInfo) without deferred mutation replay.
  *   • Error normalisation — every failure returns the same shape.
  *   • Telemetry — request count, p50/p95 latency, error count, last error.
  *   • Pluggable Auth header hook.
@@ -22,6 +22,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from './apiBase';
+import { prepareApiRequest, subscribeApiSessionChanges } from './apiClient';
 
 // ─────────────────────────────────────────────────────────────────────
 // PUBLIC TYPES
@@ -43,7 +44,7 @@ export interface ApiOptions {
   retry?: Partial<RetryPolicy>;
   /** Cache TTL in ms (0 = disabled). Only applies to GET. */
   cacheTtlMs?: number;
-  /** If true, persist cache to AsyncStorage for cold-start replay. */
+  /** Retained for compatibility; account responses are never persisted. */
   cachePersist?: boolean;
   /** Extra request headers. */
   headers?: Record<string, string>;
@@ -188,7 +189,18 @@ function _normalizeError(input: any, url: string, retriedTimes: number, requestI
   return err;
 }
 
-async function _sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function _assertCurrent(current: () => boolean): void {
+  if (!current()) throw Object.assign(new Error('Account observation detached'), { name: 'AbortError' });
+}
+
+async function _sleep(ms: number, signal?: AbortSignal) {
+  if (signal?.aborted) throw Object.assign(new Error('Request aborted'), { name: 'AbortError' });
+  return new Promise<void>((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' })); };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve(); }, ms);
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}
 
 function _backoffWait(attempt: number, policy: RetryPolicy): number {
   const exp = Math.min(policy.capMs, policy.baseMs * Math.pow(2, attempt));
@@ -201,24 +213,13 @@ function _backoffWait(attempt: number, policy: RetryPolicy): number {
 // ─────────────────────────────────────────────────────────────────────
 const PERSIST_KEY = 'apiController:cache:v1';
 
-async function _persistCache() {
-  try {
-    const obj: Record<string, CacheEntry> = {};
-    _cache.forEach((v, k) => { if (v.expiresAt > Date.now()) obj[k] = v; });
-    await AsyncStorage.setItem(PERSIST_KEY, JSON.stringify(obj));
-  } catch {}
-}
-async function _rehydrateCache() {
-  try {
-    const raw = await AsyncStorage.getItem(PERSIST_KEY);
-    if (!raw) return;
-    const obj = JSON.parse(raw) as Record<string, CacheEntry>;
-    Object.entries(obj).forEach(([k, v]) => {
-      if (v.expiresAt > Date.now()) _cache.set(k, v);
-    });
-  } catch {}
-}
-_rehydrateCache(); // fire-and-forget at module load
+// Account responses stay in memory. Legacy cold-start rows had no identity
+// boundary and must never be rehydrated after a sign-in or account switch.
+void AsyncStorage.removeItem(PERSIST_KEY).catch(() => {});
+subscribeApiSessionChanges(() => {
+  _cache.clear();
+  _inflight.clear();
+});
 
 // ─────────────────────────────────────────────────────────────────────
 // OFFLINE DETECTION (optional dep — gracefully no-op if missing)
@@ -257,145 +258,93 @@ async function _request<T = any>(
   const url = _absUrl(path) + _qs(opts.params);
   const tag = opts.tag || new URL(url, 'http://x').pathname;
   const isGet = method === 'GET' || method === 'HEAD';
-  const cacheKey = isGet ? `${method} ${url}` : '';
   const ttl = opts.cacheTtlMs ?? CONFIG.defaultCacheTtlMs;
   const retry = { ...CONFIG.defaultRetry, ...(opts.retry || {}) };
+  if (!isGet) retry.max = 0; // No declared server-side mutation replay contract.
   const timeoutMs = opts.timeoutMs ?? CONFIG.defaultTimeoutMs;
-
-  _telemetry.totalRequests += 1;
-
-  // ── Cache hit ──
-  if (isGet && ttl > 0) {
-    const hit = _cache.get(cacheKey);
-    if (hit && hit.expiresAt > Date.now()) {
-      _telemetry.cacheHits += 1;
-      return hit.body as T;
-    }
-    _telemetry.cacheMisses += 1;
-  }
-
-  // ── Inflight dedupe (GET only) ──
-  if (isGet && _inflight.has(cacheKey)) {
-    return _inflight.get(cacheKey) as Promise<T>;
-  }
-
-  // ── Build auth + headers ──
-  const baseHeaders: Record<string, string> = {
-    Accept: 'application/json',
-    'X-Client': `expo-${Platform.OS}`,
-  };
-  if (body !== undefined && !(body instanceof FormData)) {
-    baseHeaders['Content-Type'] = 'application/json';
-  }
-  if (CONFIG.authHook) {
-    try {
-      const extra = await CONFIG.authHook();
-      Object.assign(baseHeaders, extra);
-    } catch {}
-  }
+  const baseHeaders: Record<string, string> = { Accept: 'application/json', 'X-Client': `expo-${Platform.OS}` };
+  if (body !== undefined && !(body instanceof FormData)) baseHeaders['Content-Type'] = 'application/json';
+  if (CONFIG.authHook) { try { Object.assign(baseHeaders, await CONFIG.authHook()); } catch {} }
   Object.assign(baseHeaders, opts.headers || {});
+  const session = await prepareApiRequest(url, baseHeaders, opts.signal);
+  const cacheKey = `${session.cacheNamespace}:${method} ${url}`;
+  const shareRead = isGet && !opts.signal && !CONFIG.authHook && !Object.keys(opts.headers || {}).length;
+  _telemetry.totalRequests += 1;
+  try {
+    _assertCurrent(session.current);
+    if (shareRead && ttl > 0) {
+      const hit = _cache.get(cacheKey);
+      if (hit && hit.expiresAt > Date.now()) {
+        _telemetry.cacheHits += 1;
+        return hit.body as T;
+      }
+      _telemetry.cacheMisses += 1;
+    }
+    if (shareRead && _inflight.has(cacheKey)) {
+      const value = await _inflight.get(cacheKey) as T;
+      _assertCurrent(session.current);
+      return value;
+    }
+    // A disconnected write is rejected, never replayed under a later account.
+    if (!_isOnline && !isGet) throw _normalizeError(new Error('Offline; request was not submitted'), url, 0);
 
-  // ── Offline queue (write requests only) ──
-  if (!_isOnline && !isGet) {
-    _telemetry.offlineQueued += 1;
-    return new Promise<T>((resolve, reject) => {
-      _offlineQueue.push(async () => {
-        try { resolve(await _request<T>(method, path, body, opts)); }
-        catch (e) { reject(e); }
-      });
-    });
-  }
-
-  // ── Attempt loop ──
-  const doAttempt = async (): Promise<T> => {
-    let attempt = 0;
-    let lastErr: ApiError | null = null;
-    while (attempt <= retry.max) {
-      const controller = new AbortController();
-      const signal = opts.signal || controller.signal;
-      const timer = setTimeout(() => {
-        try { controller.abort((Object.assign(new Error('timeout'), { code: 'TIMEOUT' }))); }
-        catch { controller.abort(); }
-      }, timeoutMs);
-      const t0 = Date.now();
-      let requestId: string | undefined;
-      try {
-        if (CONFIG.enabled === false) {
-          // Passthrough mode — just do a vanilla fetch.
+    const doAttempt = async (): Promise<T> => {
+      let attempt = 0;
+      while (true) {
+        _assertCurrent(session.current);
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        session.signal.addEventListener('abort', abort, { once: true });
+        if (session.signal.aborted) abort();
+        const timer = setTimeout(abort, timeoutMs);
+        const t0 = Date.now();
+        let requestId: string | undefined;
+        try {
           const res = await _internalFetch(url, {
-            method, headers: baseHeaders,
+            method, headers: session.headers,
             body: body == null ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-            signal,
+            signal: controller.signal, ...(session.redirect ? { redirect: session.redirect } : {}),
           });
-          clearTimeout(timer);
+          _assertCurrent(session.current);
+          if (controller.signal.aborted) throw Object.assign(new Error('Request timed out'), { code: 'TIMEOUT' });
+          requestId = res.headers.get('x-request-id') || undefined;
           const parsed = await _parseResponse(res);
+          _assertCurrent(session.current);
+          if (controller.signal.aborted) throw Object.assign(new Error('Request timed out'), { code: 'TIMEOUT' });
           if (!res.ok) throw { status: res.status, statusText: res.statusText, body: parsed };
+          _telemetry.successes += 1;
+          _recordLatency(Date.now() - t0, tag, true);
+          if (shareRead && ttl > 0) _cache.set(cacheKey, { body: parsed, status: res.status, expiresAt: Date.now() + ttl });
           return parsed as T;
-        }
-        const res = await _internalFetch(url, {
-          method,
-          headers: baseHeaders,
-          body: body == null ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-          signal,
-        });
-        clearTimeout(timer);
-        requestId = res.headers.get('x-request-id') || undefined;
-        const ms = Date.now() - t0;
-        const parsed = await _parseResponse(res);
-        if (!res.ok) {
-          // Retryable status?
-          if (retry.retryStatus.includes(res.status) && attempt < retry.max) {
+        } catch (e: any) {
+          _assertCurrent(session.current);
+          const retryable = e?.status ? retry.retryStatus.includes(e.status) : true;
+          if (CONFIG.enabled && retryable && attempt < retry.max) {
             _telemetry.retries += 1;
-            if (res.status === 429) _telemetry.rateLimitedHits += 1;
+            if (e?.status === 429) _telemetry.rateLimitedHits += 1;
             attempt += 1;
-            await _sleep(_backoffWait(attempt, retry));
+            await _sleep(_backoffWait(attempt, retry), session.signal);
             continue;
           }
           _telemetry.failures += 1;
-          _recordLatency(ms, tag, false);
-          throw _normalizeError({ status: res.status, statusText: res.statusText, body: parsed }, url, attempt, requestId);
+          _recordLatency(Date.now() - t0, tag, false);
+          throw _normalizeError(e, url, attempt, requestId);
+        } finally {
+          clearTimeout(timer);
+          session.signal.removeEventListener('abort', abort);
         }
-        _telemetry.successes += 1;
-        _recordLatency(ms, tag, true);
-        // ── Cache write ──
-        if (isGet && ttl > 0) {
-          _cache.set(cacheKey, { body: parsed, status: res.status, expiresAt: Date.now() + ttl });
-          if (opts.cachePersist) _persistCache();
-        }
-        return parsed as T;
-      } catch (e: any) {
-        clearTimeout(timer);
-        const isAbort = e?.name === 'AbortError' || e?.code === 'TIMEOUT';
-        const isNetwork = !e?.status && !isAbort;
-        // Network / timeout → retry (if budget remains)
-        if ((isNetwork || isAbort) && attempt < retry.max) {
-          _telemetry.retries += 1;
-          attempt += 1;
-          await _sleep(_backoffWait(attempt, retry));
-          continue;
-        }
-        _telemetry.failures += 1;
-        lastErr = _normalizeError(e, url, attempt, requestId);
-        throw lastErr;
       }
-    }
-    if (lastErr) throw lastErr;
-    throw _normalizeError(new Error('exhausted retries'), url, attempt);
-  };
-
-  // ── Register inflight (GET) ──
-  const promise = (async () => {
-    _telemetry.inFlight += 1;
-    await _acquireFetchSlot();
-    try { return await doAttempt(); }
-    finally {
-      _releaseFetchSlot();
-      _telemetry.inFlight = Math.max(0, _telemetry.inFlight - 1);
-      if (isGet) _inflight.delete(cacheKey);
-    }
-  })();
-  if (isGet) _inflight.set(cacheKey, promise);
-  return promise as Promise<T>;
+    };
+    const promise = (async () => {
+      _telemetry.inFlight += 1;
+      await _acquireFetchSlot();
+      try { return await doAttempt(); }
+      finally { _releaseFetchSlot(); _telemetry.inFlight = Math.max(0, _telemetry.inFlight - 1); }
+    })();
+    if (shareRead) _inflight.set(cacheKey, promise);
+    try { return await promise; }
+    finally { if (_inflight.get(cacheKey) === promise) _inflight.delete(cacheKey); }
+  } finally { session.dispose(); }
 }
 
 async function _parseResponse(res: Response): Promise<any> {
@@ -501,65 +450,82 @@ export async function apiFetch(
   const url = _absUrl(input);
   const tag = init?.tag || (() => { try { return new URL(url, 'http://x').pathname; } catch { return url; } })();
   const timeoutMs = init?.timeoutMs ?? 20_000;
-  const wantRetry = init?.retry === true || (init?.retry && typeof init.retry === 'object');
+  const method = (init?.method || 'GET').toUpperCase();
+  const wantRetry = (method === 'GET' || method === 'HEAD') && (init?.retry === true || (init?.retry && typeof init.retry === 'object'));
   const retryPolicy: RetryPolicy = wantRetry
     ? { ...CONFIG.defaultRetry, ...(typeof init?.retry === 'object' ? init!.retry : {}) }
     : { max: 0, baseMs: 0, capMs: 0, retryStatus: [] };
-
-  // Strip our extras from the init we pass to the real fetch.
   const { timeoutMs: _t, tag: _tg, retry: _r, ...passThru } = (init || {}) as any;
-
+  const headers: Record<string, string> = {};
+  new Headers(passThru.headers).forEach((value, key) => { headers[key] = value; });
+  const session = await prepareApiRequest(url, headers, passThru.signal);
   _telemetry.totalRequests += 1;
   _telemetry.inFlight += 1;
-
   await _acquireFetchSlot();
   let attempt = 0;
-  let lastErr: any = null;
+  let responseOwnsSession = false;
   try {
     while (true) {
+      _assertCurrent(session.current);
       const controller = new AbortController();
-      const signal = (passThru as any).signal || controller.signal;
-      const timer = setTimeout(() => {
-        try { controller.abort((Object.assign(new Error('timeout'), { code: 'TIMEOUT' }))); }
-        catch { controller.abort(); }
-      }, timeoutMs);
+      const abort = () => controller.abort();
+      session.signal.addEventListener('abort', abort, { once: true });
+      if (session.signal.aborted) abort();
+      let readerOwnsAttempt = false;
+      let timer: ReturnType<typeof setTimeout>;
+      const finish = () => { clearTimeout(timer); session.signal.removeEventListener('abort', abort); session.dispose(); };
+      timer = setTimeout(() => { abort(); finish(); }, timeoutMs);
       const t0 = Date.now();
       try {
-        const res = await _internalFetch(url, { ...passThru, signal });
-        clearTimeout(timer);
-        const ms = Date.now() - t0;
-
-        // Retry on transient 5xx/429 (only if retry enabled)
+        const res = await _internalFetch(url, { ...passThru, headers: session.headers, signal: controller.signal,
+          ...(session.redirect ? { redirect: session.redirect } : {}) });
+        _assertCurrent(session.current);
+        if (controller.signal.aborted) throw Object.assign(new Error('Request timed out'), { code: 'TIMEOUT' });
         if (wantRetry && retryPolicy.retryStatus.includes(res.status) && attempt < retryPolicy.max) {
           _telemetry.retries += 1;
           if (res.status === 429) _telemetry.rateLimitedHits += 1;
           attempt += 1;
-          await _sleep(_backoffWait(attempt, retryPolicy));
+          await _sleep(_backoffWait(attempt, retryPolicy), session.signal);
           continue;
         }
         if (res.ok) _telemetry.successes += 1; else _telemetry.failures += 1;
-        _recordLatency(ms, tag, res.ok);
+        _recordLatency(Date.now() - t0, tag, res.ok);
+        // Body readers remain tied to the admitted account even if a fetch
+        // adapter ignores abort while completing its response body.
+        for (const name of ['arrayBuffer', 'blob', 'formData', 'json', 'text'] as const) {
+          if (typeof res[name] !== 'function') continue;
+          const read = res[name].bind(res);
+          Object.defineProperty(res, name, { configurable: true, value: async () => {
+            try {
+              _assertCurrent(session.current);
+              const value = await read();
+              _assertCurrent(session.current);
+              if (controller.signal.aborted) throw Object.assign(new Error('Request timed out'), { code: 'TIMEOUT' });
+              return value;
+            } finally { finish(); }
+          } });
+        }
+        responseOwnsSession = true;
+        readerOwnsAttempt = true;
         return res;
       } catch (e: any) {
-        clearTimeout(timer);
-        const isAbort = e?.name === 'AbortError' || e?.code === 'TIMEOUT';
-        // Network/timeout error → optionally retry
+        _assertCurrent(session.current);
         if (wantRetry && attempt < retryPolicy.max) {
           _telemetry.retries += 1;
           attempt += 1;
-          await _sleep(_backoffWait(attempt, retryPolicy));
+          await _sleep(_backoffWait(attempt, retryPolicy), session.signal);
           continue;
         }
         _telemetry.failures += 1;
         _telemetry.lastError = { tag, message: e?.message || String(e), at: Date.now() };
         _recordLatency(Date.now() - t0, tag, false);
-        lastErr = isAbort
-          ? Object.assign(new Error('Request timed out'), { code: 'timeout', status: 0, url })
-          : Object.assign(new Error(e?.message || 'Network error'), { code: 'network', status: 0, url });
-        throw lastErr;
+        throw _normalizeError(e, url, attempt);
+      } finally {
+        if (!readerOwnsAttempt) { clearTimeout(timer); session.signal.removeEventListener('abort', abort); }
       }
     }
   } finally {
+    if (!responseOwnsSession) session.dispose();
     _telemetry.inFlight = Math.max(0, _telemetry.inFlight - 1);
     _releaseFetchSlot();
   }

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import wraps
+from inspect import signature
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 
 from skeleton.api.charter_gate import require_charter
 from skeleton.api.hmac_seal import require_seal
-from skeleton.api.idempotency import IdempotencyGuard
+from skeleton.api.idempotency import IdempotencyConflict, IdempotencyGuard
 from skeleton.api.server import get_state
 from skeleton.app.assembly import load_manifest
 from skeleton.jeeves.core import SessionMode
@@ -22,6 +24,44 @@ _APP_MANIFEST = load_manifest()
 # Idempotency for retry-sensitive POSTs (forge materialise, gameforge runs):
 # a client retry replays the first recorded response instead of re-executing.
 _idempotency = IdempotencyGuard()
+
+
+def _request_scope(http_request: Request, attester: str) -> tuple[str, str]:
+    from skeleton.forge.game_builder import _ID
+
+    tenant = http_request.headers.get("x-skeleton-tenant", "default")
+    if not isinstance(attester, str) or _ID.fullmatch(attester) is None:
+        raise HTTPException(status_code=403, detail="invalid charter actor")
+    if _ID.fullmatch(tenant) is None:
+        raise HTTPException(status_code=422, detail="invalid tenant identifier")
+    return attester, tenant
+
+
+def _forge_idempotent(fn):
+    """Bind the existing compatibility cache to the charter and exact request."""
+    call_signature = signature(fn)
+    @wraps(fn)
+    async def guarded(*args, **kwargs):
+        values = call_signature.bind(*args, **kwargs).arguments
+        http_request = values["http_request"]
+        body = values["request"]
+        headers = dict(http_request.headers)
+        try:
+            if not _idempotency._extract_key(headers):
+                return await fn(*args, **kwargs)
+            actor, tenant = _request_scope(http_request, values.get("attester"))
+            scope = (actor, tenant, http_request.method.upper(), http_request.url.path)
+            with _idempotency.operation(headers, scope=scope, body=body) as replay:
+                if replay is not None:
+                    return replay
+                response = await fn(*args, **kwargs)
+                _idempotency.complete(headers, response, scope=scope, body=body)
+                return response
+        except IdempotencyConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return guarded
 
 # Query fan-out caps. Requests above these bounds are rejected with HTTP 422
 # (``invalid_argument``) instead of being silently clamped, so a single call
@@ -1268,10 +1308,8 @@ async def forge_blueprint(request: Dict[str, Any], state=Depends(_state), attest
 
 
 @router.post("/forge/materialise")
+@_forge_idempotent
 async def forge_materialise(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "materialise"))) -> Dict[str, Any]:
-    replay = _idempotency.replay(dict(http_request.headers))
-    if replay is not None:
-        return replay  # type: ignore[return-value]
     forge = _require(state.forge, "Forge")
     bp = forge.new_blueprint(_text_field(request, "name", "unnamed"))
     _apply_forge_graph(forge, bp, request)
@@ -1295,7 +1333,6 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
         "verify_loop": artefact.get("verify_loop"),
         "repair": artefact.get("repair"),
     }
-    _idempotency.remember(dict(http_request.headers), response)
     return response
 
 
@@ -1311,10 +1348,8 @@ async def forge_eras() -> Dict[str, Any]:
 
 
 @router.post("/forge/archetype")
+@_forge_idempotent
 async def forge_archetype(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "archetype"))) -> Dict[str, Any]:
-    replay = _idempotency.replay(dict(http_request.headers))
-    if replay is not None:
-        return replay  # type: ignore[return-value]
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
     from skeleton.forge.archetypes import default_library
 
@@ -1337,7 +1372,6 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
         "verify_loop": artefact.get("verify_loop"),
         "repair": artefact.get("repair"),
     }
-    _idempotency.remember(dict(http_request.headers), response)
     return response
 
 
@@ -1440,14 +1474,6 @@ def run_gameforge_adapter(request: Dict[str, Any], state: Any) -> Dict[str, Any]
     return project_operator_http(result, include_files=_bool_field(request, "include_files", False))
 
 
-def _scope_id(value: str, fallback: str) -> str:
-    from skeleton.forge.game_builder import _ID
-
-    if isinstance(value, str) and _ID.fullmatch(value):
-        return value
-    return fallback
-
-
 def _game_build_ack(handle: Any) -> Dict[str, Any]:
     from skeleton.forge.game_builder import RUN_SCHEMA
 
@@ -1462,16 +1488,12 @@ def _game_build_ack(handle: Any) -> Dict[str, Any]:
 
 
 @router.post("/gameforge/run")
+@_forge_idempotent
 async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
-    del attester
-    replay = _idempotency.replay(dict(http_request.headers))
-    if replay is not None:
-        return replay  # type: ignore[return-value]
     try:
         out = await run_in_threadpool(run_gameforge_adapter, request, state)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    _idempotency.remember(dict(http_request.headers), out)
     return out
 
 
@@ -1484,11 +1506,8 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
     build on the event loop.
     """
     del state
-    replay = _idempotency.replay(dict(http_request.headers))
-    if replay is not None:
-        return JSONResponse(status_code=202, content=replay)
     _reject_remote_project_writes(request)
-    from skeleton.forge.game_build_queue import IdempotencyMismatch, enqueue_game_build, start_worker
+    from skeleton.forge.game_build_queue import BUILD_KIND, IdempotencyMismatch, enqueue_game_build, request_hash, start_worker
     from skeleton.forge.game_builder import DEFAULT_DEADLINE_S, _ID, coerce_brief
     from skeleton.forge.playtest import PLAYTEST_MODES
     from skeleton.forge.repair import REPAIR_MODES
@@ -1513,8 +1532,7 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
         if isinstance(raw_deadline, bool) or not isinstance(raw_deadline, (int, float)) or not 0 < float(raw_deadline) <= DEFAULT_DEADLINE_S:
             raise HTTPException(status_code=422, detail="deadline_s must be within (0, 120]")
         deadline_s = float(raw_deadline)
-    actor = _scope_id(str(attester or ""), "charter")
-    tenant = _scope_id(str(http_request.headers.get("x-skeleton-tenant") or "default"), "default")
+    actor, tenant = _request_scope(http_request, attester)
     for field, expected in (("actor_id", actor), ("tenant_id", tenant)):
         if field in request and request.get(field) not in (None, "", expected):
             raise HTTPException(status_code=422, detail=f"{field} comes from the charter session")
@@ -1534,12 +1552,8 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
         payload["era"] = _text_field(request, "era", "")
     if "archetype" in request:
         payload["archetype"] = _text_field(request, "archetype", "") or None
-    header_key = None
-    for key, value in http_request.headers.items():
-        if key.lower() in {"idempotency-key", "x-idempotency-key"}:
-            header_key = value
-            break
     try:
+        header_key = _idempotency._extract_key(dict(http_request.headers))
         handle = enqueue_game_build(
             payload,
             actor_id=actor,
@@ -1548,6 +1562,7 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
             idempotency_key=header_key,
             correlation_id=http_request.headers.get("x-request-id"),
             timeout_s=deadline_s,
+            request_digest=request_hash(BUILD_KIND, request),
         )
     except IdempotencyMismatch as exc:
         raise HTTPException(status_code=409, detail="idempotency key was already used with a different body") from exc
@@ -1555,28 +1570,25 @@ async def game_build(http_request: Request, request: Dict[str, Any], state=Depen
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     start_worker()
     ack = _game_build_ack(handle)
-    _idempotency.remember(dict(http_request.headers), ack)
     return JSONResponse(status_code=202, content=ack)
 
 
 @router.get("/game/build/{execution_id}")
-async def game_build_status(execution_id: str, state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+async def game_build_status(http_request: Request, execution_id: str, state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
     """Poll a build accepted by ``POST /api/v1/game/build``."""
-    del state, attester
+    del state
     from skeleton.forge.game_build_queue import execution_view
 
     try:
-        return execution_view(execution_id)
+        actor, tenant = _request_scope(http_request, attester)
+        return execution_view(execution_id, actor_id=actor, tenant_id=tenant)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="build not found") from exc
 
 
 @router.post("/gameforge/intake")
+@_forge_idempotent
 async def gameforge_intake(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "intake"))) -> Dict[str, Any]:
-    del attester
-    replay = _idempotency.replay(dict(http_request.headers))
-    if replay is not None:
-        return replay  # type: ignore[return-value]
     from skeleton.context.questionnaire import intake
 
     _reject_remote_project_writes(request)
@@ -1591,7 +1603,6 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     out["intake"] = taken.to_dict()
-    _idempotency.remember(dict(http_request.headers), out)
     return out
 
 

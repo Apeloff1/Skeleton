@@ -10,14 +10,17 @@ so the downstream codegen inherits a consistent canon.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from core.databases import client as _MONGO
 
-router = APIRouter(prefix="/api/modes", tags=["modes"])
+router = project_router(prefix="/api/modes", tags=["modes"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 # id, label, emoji, what it inherits, the creative directive layered on top
 MODES = [

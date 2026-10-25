@@ -9,6 +9,8 @@ world a living political backdrop. Mirrors the other wire passes (gate → injec
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -21,7 +23,7 @@ from routes.playable import (
 )
 from routes.playable_htmlutils import inject_into_head
 
-router = APIRouter(prefix="/api/playable", tags=["playable"])
+router = project_router(prefix="/api/playable", tags=["playable"])
 
 _FACTIONS_ENGINE = (
     "<script id=\"__factions\">"

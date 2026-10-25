@@ -4,6 +4,8 @@ canonical governed product-control seam.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 from dataclasses import asdict
 import os
 from datetime import datetime, timezone
@@ -29,8 +31,9 @@ from core.execution_receipts import ReceiptIntegrityError
 from core.product_control_runtime import get_product_control_plane as _control_plane
 from core.product_operations import OperationExecutionError, OperationRejected
 
-router = APIRouter(prefix="/api/admin/ops", tags=["ops"])
+router = project_router(prefix="/api/admin/ops", tags=["ops"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 _COLLECTIONS = ["playables", "playable_jobs", "marketplace_listings", "marketplace_purchases",
                 "payment_transactions", "tournaments", "tournament_rewards", "liveops_progress"]
 

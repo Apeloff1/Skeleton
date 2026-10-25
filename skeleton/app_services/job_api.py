@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Literal, Mapping, Optional
 
 from skeleton.app_services.events import JobEventPublisher, NullJobEventPublisher, make_envelope
-from skeleton.app_services.jobs import LeaseLost, SqliteJobQueue
+from skeleton.app_services.jobs import LeaseLost, OwnedJobConflict, SqliteJobQueue
 from skeleton.observability.redaction import safe_exception_text
 from skeleton.persistence.app_foundation.db import Database
 from skeleton.persistence.app_foundation.repositories import SqliteBuildRepository
@@ -69,6 +69,15 @@ class JobResult:
     status: JobStatusName
     result: Optional[dict]
     error: Optional[dict]  # {"code": str, "message": str}
+
+
+@dataclass(frozen=True)
+class JobIdentity:
+    job_id: str
+    execution_id: str
+    kind: str
+    actor_id: str
+    tenant_id: str
 
 
 def request_hash(kind: str, payload: Mapping[str, Any]) -> str:
@@ -141,36 +150,49 @@ class JobService:
     def enqueue(self, kind: str, payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
                 project_id: Optional[str] = None, idempotency_key: Optional[str] = None,
                 correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S,
-                max_attempts: int = 1) -> JobHandle:
+                max_attempts: int = 1, request_digest: Optional[str] = None) -> JobHandle:
         if not actor_id or not tenant_id:
             raise ValueError("actor_id and tenant_id are required")
         if not (0 < float(timeout_s) <= 6 * 3600):
             raise ValueError("timeout_s must be in (0, 21600]")
         payload = dict(payload)
-        rhash = request_hash(kind, payload)
-        scoped = f"{tenant_id}:{actor_id}:{kind}:{idempotency_key}" if idempotency_key else None
-        if scoped:
-            prior = self.db.query("SELECT * FROM jobs WHERE idempotency_key=?", (scoped,))
+        if request_digest is not None and (not isinstance(request_digest, str) or len(request_digest) != 64
+                or any(char not in "0123456789abcdef" for char in request_digest)):
+            raise ValueError("request_digest must be a SHA-256 hex digest")
+        rhash = request_digest if request_digest is not None else request_hash(kind, payload)
+        scoped = ("owned:" + hashlib.sha256(json.dumps([tenant_id, actor_id, kind, idempotency_key],
+                  separators=(",", ":")).encode()).hexdigest()) if idempotency_key else None
+        legacy = f"{tenant_id}:{actor_id}:{kind}:{idempotency_key}" if idempotency_key else None
+        for key in dict.fromkeys(k for k in (scoped, legacy) if k):
+            prior = self.db.query("SELECT * FROM jobs WHERE idempotency_key=?", (key,))
             if prior:
                 r = prior[0]
-                if r["request_hash"] and r["request_hash"] != rhash:
+                if (r["actor_id"] != actor_id or r["tenant_id"] != tenant_id or r["kind"] != kind
+                        or r["request_hash"] != rhash or r["project_id"] != project_id
+                        or not r["execution_id"]):
                     raise IdempotencyMismatch(idempotency_key)
-                return JobHandle(r["job_id"], r["execution_id"] or r["job_id"], _status_name(r["status"]), True)
-        execution_id = None
+                return JobHandle(r["job_id"], r["execution_id"], _status_name(r["status"]), True)
+        prepare_payload = None
         if kind in BUILD_KINDS_WITH_ROW and project_id:
-            build = self.builds.create_build(project_id, str(payload.get("target", "")))
-            execution_id = build.build_id
-            payload.setdefault("build_id", build.build_id)
-        job = self.queue.enqueue(kind, payload, max_attempts=max_attempts,
-                                 correlation_id=correlation_id or "", idempotency_key=scoped)
-        execution_id = execution_id or job.job_id
-        with self.db.tx() as c:
-            c.execute("UPDATE jobs SET actor_id=?, tenant_id=?, project_id=?, execution_id=?, timeout_s=?,"
-                      " request_hash=? WHERE job_id=?",
-                      (actor_id, tenant_id, project_id, execution_id, float(timeout_s), rhash, job.job_id))
-        if execution_id != job.job_id:
-            self.builds.set_status(execution_id, "queued", job_id=job.job_id)
-        return JobHandle(job.job_id, execution_id, "queued", False)
+            from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+            if ProjectsV1Store(self.db).get(actor_id, tenant_id, project_id) is None:
+                raise ValueError("project is not owned by the actor and tenant")
+            def prepare_payload(connection, job_id):
+                build = self.builds.create_build(project_id, str(payload.get("target", "")),
+                                                 job_id=job_id, transaction=connection)
+                prepared = dict(payload)
+                prepared["build_id"] = build.build_id
+                return prepared, build.build_id
+        try:
+            job, replayed = self.queue.enqueue_owned(
+                kind, payload, actor_id=actor_id, tenant_id=tenant_id, request_hash=rhash,
+                timeout_s=timeout_s, project_id=project_id, prepare_payload=prepare_payload,
+                max_attempts=max_attempts, correlation_id=correlation_id or "",
+                idempotency_key=scoped, legacy_key=legacy)
+        except OwnedJobConflict as exc:
+            raise IdempotencyMismatch(idempotency_key) from exc
+        execution_id = self.get_identity(job.job_id).execution_id
+        return JobHandle(job.job_id, execution_id, _status_name(job.status), replayed)
 
     def _row(self, job_id: str):
         rows = self.db.query("SELECT * FROM jobs WHERE job_id=?", (job_id,))
@@ -185,6 +207,15 @@ class JobService:
             status = "pending"
         return JobStatus(r["job_id"], status, float(r["progress"]), r["message"], r["started_at"],
                          float(r["updated_at"]), int(r["attempts"]))
+
+    def get_identity(self, job_id: str) -> JobIdentity:
+        """Read the durable owner projection before exposing job state or results."""
+        rows = self.db.query("SELECT job_id,execution_id,kind,actor_id,tenant_id FROM jobs WHERE job_id=?",
+                             (job_id,))
+        if not rows:
+            raise KeyError(job_id)
+        r = rows[0]
+        return JobIdentity(r["job_id"], r["execution_id"], r["kind"], r["actor_id"], r["tenant_id"])
 
     def get_result(self, job_id: str) -> JobResult:
         r = self._row(job_id)
@@ -343,14 +374,20 @@ def register_handler(kind: str, fn: Handler) -> None:
 
 def enqueue(kind: str, payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
             project_id: Optional[str] = None, idempotency_key: Optional[str] = None,
-            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S) -> JobHandle:
+            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S,
+            request_digest: Optional[str] = None) -> JobHandle:
     return get_job_service().enqueue(kind, payload, actor_id=actor_id, tenant_id=tenant_id,
                                      project_id=project_id, idempotency_key=idempotency_key,
-                                     correlation_id=correlation_id, timeout_s=timeout_s)
+                                     correlation_id=correlation_id, timeout_s=timeout_s,
+                                     request_digest=request_digest)
 
 
 def get_status(job_id: str) -> JobStatus:
     return get_job_service().get_status(job_id)
+
+
+def get_identity(job_id: str) -> JobIdentity:
+    return get_job_service().get_identity(job_id)
 
 
 def get_result(job_id: str) -> JobResult:
@@ -374,6 +411,6 @@ def start_worker(*, poll_s: float = 1.0) -> JobWorker:
 __all__ = [
     "DEFAULT_TIMEOUT_S", "Handler", "IdempotencyMismatch", "JobContext", "JobHandle", "JobResult",
     "JobService", "JobStatus", "JobStatusName", "JobTimeout", "JobWorker", "cancel", "enqueue",
-    "get_job_service", "get_result", "get_status", "register_handler", "request_hash",
+    "get_job_service", "get_result", "get_status", "get_identity", "JobIdentity", "register_handler", "request_hash",
     "set_job_service", "start_worker",
 ]

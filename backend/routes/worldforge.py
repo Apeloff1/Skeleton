@@ -20,20 +20,24 @@ import uuid
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import Query, HTTPException
 from pydantic import BaseModel, Field
 
 from core.databases import client as _MONGO
 from core.http_errors import internal_http_error
 from routes.llm_router import route_complete
+from routes.playable_access import (
+    assert_project_access, bind_project_source, project_identity, project_router,
+    reauthorize_project_context, scoped_database,
+)
 
-router = APIRouter(prefix="/api/worldforge", tags=["worldforge"])
+router = project_router(prefix="/api/worldforge", tags=["worldforge"])
 
 import os
 import logging
 _log = logging.getLogger("worldforge")
-_db = _MONGO[os.environ.get("DB_NAME", "test_database")]
-_vault = _MONGO.codedock_vault          # bridge to CodeDock Vault (asset entries)
+_db = scoped_database(_MONGO[os.environ.get("DB_NAME", "test_database")])
+_vault = scoped_database(_MONGO.codedock_vault)
 
 # ── World-gen engine moved to worldforge_core.py (2026-06 refactor). Re-exported
 # here so routes + PIL render funcs (and worldforge_publish) keep their imports. ──
@@ -269,7 +273,11 @@ async def region_lore(body: LoreBody):
               "overview that NAMES the Köppen class and reflects the biodiversity/hazard data; (3) ONE "
               "realistic exploration or fieldwork hook tied to a named place or the busiest trade "
               "corridor (survey, expedition, resource study — no quests for treasure/monsters). Under 120 words.")
-    routed = await route_complete("reasoning", prompt, system=system, use_cache=True)
+    scope = await reauthorize_project_context(mutate=True)
+    routed = await route_complete("reasoning", prompt, system=system, use_cache=True,
+                                  tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
+                                  data_class="confidential")
+    await reauthorize_project_context(mutate=True)
     lore = (routed.get("content") or "").strip()
     if not lore:
         return {"error": routed.get("error") or "lore model returned nothing", "name": r["name"]}
@@ -338,14 +346,39 @@ async def list_sources(limit: int = Query(30, ge=1, le=80)):
     ).sort("created_at", -1).limit(limit).to_list(limit)
     games = [{"source": "playable", "id": p["playable_id"], "title": p.get("title", "Untitled"),
               "genre": p.get("genre", ""), "brief": (p.get("brief") or "")[:140]} for p in playables]
-    galaxy = []
-    try:
-        gv = await _db.galaxy_vault.find({}, {"_id": 0}).sort("created_at", -1).limit(20).to_list(20)
-        galaxy = [{"source": "galaxy", "id": g.get("vault_id") or g.get("build_id"),
-                   "title": g.get("title", "Build"), "genre": g.get("genre", "")} for g in gv if g.get("title")]
-    except Exception:
-        galaxy = []
-    return {"games": games + galaxy, "count": len(games) + len(galaxy)}
+    vault = await _db.galaxy_vault.find({}, {"_id": 0}).sort("created_at", -1).limit(20).to_list(20)
+    for source in vault:
+        source_id = source.get("vault_id") or source.get("build_id")
+        if not source_id:
+            continue
+        try:
+            await _galaxy_source(source_id)
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                continue
+            raise
+        games.append({"source": "galaxy", "id": source_id,
+                      "title": source.get("title", "Build"), "genre": source.get("genre", "")})
+    return {"games": games, "count": len(games)}
+
+
+async def _galaxy_source(source_id: str) -> dict:
+    """Bind the existing owned Galaxy vault record, including its legacy alias."""
+    row = await _db.galaxy_vault.find_one(
+        {"$or": [{"vault_id": source_id}, {"build_id": source_id}]}, {"_id": 0})
+    if not row:
+        raise HTTPException(404, "Build not found")
+    key = "vault_id" if row.get("vault_id") == source_id else "build_id"
+    return await bind_project_source("galaxy_vault", key, source_id)
+
+
+async def _assert_world_source(doc: dict):
+    if doc.get("source") == "playable":
+        await assert_project_access(doc.get("source_id"))
+    elif doc.get("source") == "galaxy":
+        await _galaxy_source(doc.get("source_id"))
+    else:
+        raise HTTPException(404, "World source not found")
 
 
 class FromGameBody(BaseModel):
@@ -363,18 +396,21 @@ async def world_from_game(body: FromGameBody):
         raise HTTPException(400, "source_id required")
     title = genre = brief = code = ""
     if body.source == "playable":
+        await assert_project_access(gid, mutate=body.save)
         g = await _db.playables.find_one(
             {"playable_id": gid}, {"_id": 0, "title": 1, "genre": 1, "brief": 1, "html": 1})
         if not g:
             raise HTTPException(404, "game not found")
         title, genre, brief, code = g.get("title", ""), g.get("genre", ""), g.get("brief", ""), g.get("html", "")
+    elif body.source == "galaxy":
+        g = await _galaxy_source(gid)
+        title, genre = g.get("title", ""), g.get("genre", "")
+        brief = g.get("description") or g.get("title", "")
     else:
-        g = await _db.galaxy_vault.find_one({"$or": [{"vault_id": gid}, {"build_id": gid}]}, {"_id": 0})
-        if not g:
-            raise HTTPException(404, "build not found")
-        title, genre, brief = g.get("title", ""), g.get("genre", ""), g.get("title", "")
+        raise HTTPException(422, "Unknown world source")
     cfg = _config_from_game(gid, title, genre, brief, code)
     world = build_world(cfg)
+    await reauthorize_project_context(mutate=True)
     world_id = uuid.uuid4().hex
     doc = {
         "world_id": world_id, "source": body.source, "source_id": gid, "source_title": title,
@@ -397,11 +433,14 @@ async def world_from_game(body: FromGameBody):
                 "tags": ["WG", "WORLD GENERATED", "worldforge", world["scale"], body.source],
                 "metadata": {"world_id": world_id, "source_id": gid, "scale": world["scale"],
                              "stats": world["stats"]},
-                "user_id": "default_user", "created_at": datetime.now(timezone.utc).isoformat(),
+                "user_id": project_identity()["owner_id"], "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
+        except HTTPException:
+            raise
         except Exception as _e:
-            _log.warning("worldforge /from-game vault insert failed: %s", _e)
+            _log.warning("worldforge /from-game vault insert failed: %s", type(_e).__name__)
+    await reauthorize_project_context(mutate=True)
     return {"world_id": world_id, "vault_id": vault_id, "saved": bool(vault_id),
             "parsed_config": {"scale": cfg.scale, "palette": cfg.palette, "climate": cfg.climate,
                               "features": [k for k, v in cfg.features.items() if v], "seed": cfg.seed},
@@ -413,15 +452,24 @@ async def list_worlds(limit: int = Query(30, ge=1, le=80)):
     """List worlds generated from games (saved with the (WG) tag)."""
     rows = await _db.worldforge_worlds.find(
         {}, {"_id": 0, "grid": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-    return {"worlds": rows, "count": len(rows)}
+    current = []
+    for row in rows:
+        try:
+            await bind_project_source("worldforge_worlds", "world_id", row["world_id"])
+            await _assert_world_source(row)
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                continue
+            raise
+        current.append(row)
+    return {"worlds": current, "count": len(current)}
 
 
 @router.get("/worlds/{world_id}")
 async def get_world(world_id: str):
     """Fetch a saved (WG) world and regenerate its full grid from the stored config."""
-    doc = await _db.worldforge_worlds.find_one({"world_id": world_id}, {"_id": 0})
-    if not doc:
-        raise HTTPException(404, "world not found")
+    doc = await bind_project_source("worldforge_worlds", "world_id", world_id)
+    await _assert_world_source(doc)
     world = build_world(WorldConfig(**doc["config"]))
     return {"meta": doc, "world": world}
 
@@ -487,7 +535,7 @@ async def render_world(scale: str = Query("region"), seed: int = Query(1337),
         except Exception as e:
             raise internal_http_error("thematic render failed", e) from None
         return Response(content=png, media_type="image/png",
-                        headers={"Cache-Control": "public, max-age=3600"})
+                        headers={"Cache-Control": "private, no-store"})
     try:
         png = await __import__("asyncio").to_thread(_render_world_hi, cfg, mode)
         if master:
@@ -495,7 +543,7 @@ async def render_world(scale: str = Query("region"), seed: int = Query(1337),
     except Exception as e:
         raise internal_http_error("render failed", e) from None
     return Response(content=png, media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=3600"})
+                    headers={"Cache-Control": "private, no-store"})
 
 
 
@@ -519,22 +567,27 @@ async def render_gif(scale: str = Query("planet"), seed: int = Query(1337),
     cfg = _cfg_from_query("planet", seed, size, palette, climate, sea_level, mountain_level,
                           moisture_bias, temperature_bias, river_density, settlement_density, features)
     cfg.zoom = zoom
-    sig = f"{seed}|{size}|{palette}|{climate}|{sea_level}|{mountain_level}|{moisture_bias}|{temperature_bias}|{river_density}|{settlement_density}|{features}|{zoom}"
+    identity = project_identity()
+    sig = repr((identity["tenant_id"], identity["owner_id"], seed, size, palette, climate,
+                sea_level, mountain_level, moisture_bias, temperature_bias, river_density,
+                settlement_density, features, zoom))
     cached = _GIF_CACHE.get(sig)
     if cached is not None:
+        await reauthorize_project_context()
         _GIF_CACHE.move_to_end(sig)
         return Response(content=cached, media_type="image/gif",
-                        headers={"Cache-Control": "public, max-age=86400", "X-Cache": "HIT"})
+                        headers={"Cache-Control": "private, no-store", "X-Cache": "HIT"})
     try:
         gif = await __import__("asyncio").to_thread(_render_globe_gif, cfg)
     except Exception as e:
         raise internal_http_error("gif render failed", e) from None
+    await reauthorize_project_context()
     _GIF_CACHE[sig] = gif
     _GIF_CACHE.move_to_end(sig)
     while len(_GIF_CACHE) > _GIF_CACHE_MAX:
         _GIF_CACHE.popitem(last=False)
     return Response(content=gif, media_type="image/gif",
-                    headers={"Cache-Control": "public, max-age=86400", "X-Cache": "MISS"})
+                    headers={"Cache-Control": "private, no-store", "X-Cache": "MISS"})
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -565,7 +618,7 @@ async def export_world(scale: str = Query("region"), seed: int = Query(1337),
         raise internal_http_error("export failed", e) from None
     safe = re.sub(r"[^A-Za-z0-9_-]+", "_", cap)[:40] or "world"
     return Response(content=png, media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=3600",
+                    headers={"Cache-Control": "private, no-store",
                              "Content-Disposition": f'inline; filename="{safe}_worldforge.png"'})
 
 
@@ -640,7 +693,7 @@ async def heightmap(scale: str = Query("region"), seed: int = Query(1337),
     except Exception as e:
         raise internal_http_error("heightmap failed", e) from None
     return Response(content=png, media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=86400",
+                    headers={"Cache-Control": "private, no-store",
                              "Content-Disposition": 'inline; filename="heightmap_16bit.png"'})
 
 
