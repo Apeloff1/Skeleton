@@ -149,9 +149,8 @@ jobs:
     # Keep all fail-closed quality and security checks; do not terminate mid-suite.
     timeout-minutes: 120
     env:
-      PYTEST_ADDOPTS: "--maxfail=1"
-    env:
       PYTHONPATH: ${{ github.workspace }}
+      PYTEST_ADDOPTS: "--maxfail=1"
     steps:
       - name: Check out full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
