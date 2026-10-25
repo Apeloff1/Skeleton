@@ -98,3 +98,37 @@ def test_native_scratch_is_deleted_when_governed_publication_fails(monkeypatch):
                                user={"tenant_id": "test-tenant"})
         )
     assert roots and not roots[0].exists()
+
+
+@pytest.mark.parametrize(
+    ("exit_code", "output", "expected"),
+    [
+        (0, "GameForge Godot build", True),
+        (0, "", False),
+        (1, "GameForge Godot build", False),
+        (1, "", False),
+    ],
+)
+def test_godot_engine_evidence_requires_exit_zero_and_scene_marker(
+    monkeypatch, exit_code: int, output: str, expected: bool
+):
+    roots, published = _instrument(monkeypatch)
+    monkeypatch.setattr(routes, "_godot_bin", lambda: "/virtual/godot")
+
+    def fake_run(command, **kwargs):
+        if "--version" in command:
+            return subprocess.CompletedProcess(command, 0, stdout="4.3.stable", stderr="")
+        return subprocess.CompletedProcess(command, exit_code, stdout=output, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    result = asyncio.run(
+        routes.build_godot(routes.BuildBody(game_name="QAStage"),
+                           user={"tenant_id": "test-tenant"})
+    )
+    assert len(roots) == len(published) == 1
+    assert not roots[0].exists()
+    assert result["engine_validated"] is expected
+    assert result["headless_exported"] is False
+    assert result["engine_log"] == (
+        "engine_validated" if expected else "engine_validation_failed"
+    )
