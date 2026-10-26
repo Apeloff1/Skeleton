@@ -211,14 +211,15 @@ def test_installer_skip_python_runs_bounded_validation(tmp_path, monkeypatch):
     receipt = install_application(tmp_path, install_python=False, runner=runner)
 
     assert receipt.ok is True
-    assert [phase.name for phase in receipt.phases] == [
+    assert [phase.name for phase in receipt.phases if phase.name != "configuration-note"] == [
         "preload",
         "setup-runtime",
         "python-install",
         "runtime-preflight",
         "compose-config",
     ]
-    assert receipt.phases[2].required is False
+    assert all(not phase.required for phase in receipt.phases if phase.name == "configuration-note")
+    assert next(phase for phase in receipt.phases if phase.name == "python-install").required is False
     assert commands == [("docker", "compose", "config")]
 
 
@@ -274,7 +275,7 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
         "skeleton.app.installer.ensure_runtime_environment",
         lambda *args, **kwargs: type("Setup", (), {
             "created": False, "changed": False,
-            "env_path": tmp_path / ".env", "configured_keys": (),
+            "env_path": tmp_path / ".env", "configured_keys": (), "warnings": (),
         })(),
     )
     commands = []
@@ -389,6 +390,19 @@ def test_first_install_bootstraps_stable_forge_and_signing_secrets(tmp_path):
     for key in ("SKELETON_MASTER_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED", "GAMEFORGE_JWT_SECRET"):
         assert after[key] == before[key], f"{key} must survive generic secret rotation"
         assert key in repeat.preserved_keys
+
+
+def test_invalid_existing_gameforge_jwt_is_preserved_without_rotation(tmp_path):
+    (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
+    (tmp_path / ".env").write_text(
+        ENV_TEMPLATE + "GAMEFORGE_JWT_SECRET=operator-key-too-short\\n",
+        encoding="utf-8",
+    )
+    receipt = ensure_runtime_environment(tmp_path, rotate_secrets=True)
+    values = _read_values(tmp_path / ".env")
+    assert values["GAMEFORGE_JWT_SECRET"] == "operator-key-too-short"
+    assert "GAMEFORGE_JWT_SECRET" in receipt.preserved_keys
+    assert "GAMEFORGE_JWT_SECRET must contain 32 to 4096 characters" in receipt.warnings
 
 
 def test_invalid_existing_signing_seed_is_flagged_without_destruction(tmp_path):
