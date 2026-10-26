@@ -130,6 +130,7 @@ updates:
           - "react-dom"
           - "react-native"
           - "react-native-*"
+          - "@types/react"
           - "@react-navigation/*"
           - "@react-native-community/*"
           - "@react-native-async-storage/*"
