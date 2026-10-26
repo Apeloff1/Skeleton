@@ -31,6 +31,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import math
 import re
 from html import unescape as html_unescape
 from collections.abc import Mapping
@@ -256,7 +257,10 @@ class PayloadSecretGuard:
         def visit(item: Any, depth: int) -> Any:
             nonlocal hits
             if depth >= _MAX_DEPTH:
-                return "[TRUNCATED]"
+                # Truncation is a security decision, not a clean payload.
+                # Count it so reject mode never publishes unchecked subtrees.
+                hits += 1
+                return REDACTED
             if item is None:
                 return None
             if isinstance(item, str):
@@ -264,6 +268,9 @@ class PayloadSecretGuard:
             if isinstance(item, bool):
                 return item
             if isinstance(item, (int, float)):
+                if isinstance(item, float) and not math.isfinite(item):
+                    hits += 1
+                    return REDACTED
                 _, n = _patterns_hit(str(item))
                 if n:
                     hits += n
