@@ -466,7 +466,7 @@ class GuardedExecutor:
         raw_args = request.args if isinstance(request.args, (tuple, list)) else ()
         safe_args = [redact_secrets(sanitize_text(a[:512], keep_newlines=False))[0] if isinstance(a, str) else "<invalid>" for a in raw_args[:64]]
         safe_source = redact_secrets(
-            sanitize_text(str(request.source)[:4096], keep_newlines=False)
+            sanitize_text(request.source[:4096] if isinstance(request.source, str) else "<invalid>", keep_newlines=False)
         )[0][:64]
         safe_reason = redact_secrets(
             sanitize_text(str(outcome.reason)[:4096], keep_newlines=False)
