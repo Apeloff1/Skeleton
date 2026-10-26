@@ -298,7 +298,7 @@ class PayloadSecretGuard:
 
         if not isinstance(payload, Mapping):
             raise RealtimeSecretError("realtime payload must be a mapping")
-        clean = visit(dict(payload), 0)
+        clean = visit(payload, 0)
         if hits and self.mode == "reject":
             raise RealtimeSecretError(
                 f"payload carried {hits} secret value(s); publish refused"
