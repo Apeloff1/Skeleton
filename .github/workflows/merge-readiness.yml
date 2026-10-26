@@ -47,6 +47,10 @@ jobs:
         run: python scripts/check_required_checks_policy.py
       - name: Validate Expo SDK and native runtime pairing
         run: python scripts/check_expo_runtime_pairing.py
+      - name: Validate Expo SDK 54 bundled native dependency lockfile
+        run: node frontend/scripts/check-expo-native-compat.cjs
+      - name: Regress Expo SDK 54 native dependency drift detection
+        run: node --test frontend/scripts/test-expo-native-compat.cjs
       - name: Verify Expo CLI static path patch compatibility
         run: node --test frontend/scripts/test-expo-static-index-patch.cjs
       - name: Validate composed contract system
