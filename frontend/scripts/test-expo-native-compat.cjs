@@ -44,3 +44,29 @@ test("missing pinned lockfile selectors cannot claim compatibility", () => {
     assert.ok(validate(manifest, stripped).some(error => error.includes(selector)));
   }
 });
+
+
+test("a development pin cannot mask an upgraded production native runtime", () => {
+  const bad = JSON.parse(JSON.stringify(manifest));
+  bad.dependencies["react-native-reanimated"] = "~4.7.1";
+  bad.devDependencies["react-native-reanimated"] = "~4.1.1";
+  const errors = validate(bad, lock);
+  assert.ok(errors.some(error => error.includes("react-native-reanimated is duplicated")));
+  assert.ok(errors.some(error => error.includes("react-native-reanimated expected ~4.1.1")));
+});
+
+test("duplicate dependency keys fail even when both pins match", () => {
+  const bad = JSON.parse(JSON.stringify(manifest));
+  bad.devDependencies["react-native"] = bad.dependencies["react-native"];
+  assert.ok(validate(bad, lock).some(error => error.includes("react-native is duplicated")));
+});
+
+test("malformed dependency collections fail closed", () => {
+  for (const bad of [
+    {dependencies: [], devDependencies: {}},
+    {dependencies: {}, devDependencies: "wrong"},
+    {dependencies: null, devDependencies: ["react"]},
+  ]) {
+    assert.ok(validate(bad, lock).length > 0);
+  }
+});
