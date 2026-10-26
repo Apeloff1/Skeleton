@@ -395,7 +395,7 @@ def test_first_install_bootstraps_stable_forge_and_signing_secrets(tmp_path):
 def test_invalid_existing_gameforge_jwt_is_preserved_without_rotation(tmp_path):
     (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
     (tmp_path / ".env").write_text(
-        ENV_TEMPLATE + "GAMEFORGE_JWT_SECRET=operator-key-too-short\\n",
+        ENV_TEMPLATE + "GAMEFORGE_JWT_SECRET=operator-key-too-short\n",
         encoding="utf-8",
     )
     receipt = ensure_runtime_environment(tmp_path, rotate_secrets=True)
