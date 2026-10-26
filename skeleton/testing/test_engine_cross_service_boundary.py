@@ -73,11 +73,40 @@ class _Provider:
 
 
 class _Registry:
+    active_id = "fake"
+    available = True
+
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
 
     def require_active(self):
         return self.provider
+
+    def require_for_context(self, _context_policy):
+        return self.require_active()
+
+    def statuses(self):
+        # The backend model catalog requires a typed, ready hosted route.
+        # Keep the fixture on the production provider inventory boundary.
+        return [{
+            "id": "fake",
+            "provider_id": "fake",
+            "model": self.provider.model,
+            "available": True,
+            "active": True,
+            "fallback": False,
+            "architecture_acknowledged": True,
+            "configured": True,
+            "execution_mode": "hosted",
+            "credential_free": False,
+            "context_window": 16384,
+            "max_output_tokens": 8192,
+            "default_output_tokens": 512,
+            "limits_source": "engine_chat_policy",
+            "tokenizer": "approximate_text",
+            "capabilities": ["text-generation"],
+            "supports_temperature": True,
+        }]
 
 
 def _service(tmp_path, *, tenant_ids=frozenset({"tenant-a"}), scopes=None):
