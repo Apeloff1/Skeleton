@@ -43,10 +43,21 @@ _HOST_EXPORTS = {
 }
 
 
+def _load_reviewed_export_owner(module_name: str):
+    """Keep import side effects limited to explicitly reviewed modules."""
+    if module_name == ".creator_runbook_runtime":
+        return _import_module(".creator_runbook_runtime", __name__)
+    if module_name == ".creator_runbook_store":
+        return _import_module(".creator_runbook_store", __name__)
+    if module_name == ".orchestration_store":
+        return _import_module(".orchestration_store", __name__)
+    raise ImportError("unregistered lazy export owner")
+
+
 def __getattr__(name: str):
     module = _HOST_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"{__name__!r} has no attribute {name!r}")
-    value = getattr(_import_module(module, __name__), name)
+    value = getattr(_load_reviewed_export_owner(module), name)
     globals()[name] = value
     return value

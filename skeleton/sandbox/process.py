@@ -15,6 +15,7 @@ Returns a :class:`ProcessResult`; never raises for a non-zero exit.
 """
 from __future__ import annotations
 
+import math
 import os
 import selectors
 import shutil
@@ -58,9 +59,21 @@ class ProcessLimits:
     network: str = "inherit"  # "inherit" | "deny"
 
     def __post_init__(self) -> None:
-        if self.wall_seconds <= 0 or self.cpu_seconds <= 0:
-            raise ProcessPolicyError("time limits must be positive")
-        if self.network not in {"inherit", "deny"}:
+        if (type(self.wall_seconds) not in (int, float)
+                or self.wall_seconds <= 0
+                or (type(self.wall_seconds) is float and not math.isfinite(self.wall_seconds))):
+            raise ProcessPolicyError("wall time must be finite and positive")
+        for name in ("cpu_seconds", "memory_bytes", "open_files"):
+            value = getattr(self, name)
+            if type(value) is not int or value <= 0:
+                raise ProcessPolicyError(f"{name} must be a positive integer")
+        for name in ("file_bytes", "output_bytes"):
+            value = getattr(self, name)
+            if type(value) is not int or value < 0:
+                raise ProcessPolicyError(f"{name} must be a nonnegative integer")
+        if self.processes is not None and (type(self.processes) is not int or self.processes < 0):
+            raise ProcessPolicyError("processes must be a nonnegative integer or None")
+        if type(self.network) is not str or self.network not in {"inherit", "deny"}:
             raise ProcessPolicyError("network must be 'inherit' or 'deny'")
 
 
@@ -198,6 +211,12 @@ def run_isolated(
     if os.name != "posix":
         raise ProcessPolicyError("process isolation requires POSIX")
     lim = limits or ProcessLimits()
+    # Refuse unsafe or incomplete stdin before creating a jail or child.
+    if stdin is not None:
+        if not isinstance(stdin, bytes):
+            raise ProcessPolicyError("stdin must be bytes")
+        if len(stdin) > lim.output_bytes:
+            raise ProcessPolicyError("stdin exceeds bounded process input limit", context={"limit": lim.output_bytes})
     args = _resolve_argv0(check_argv(argv))
     owned = jail is None
     box = jail or FsJail.temporary(prefix="sbx-proc-")
@@ -234,7 +253,7 @@ def _run(args: tuple[str, ...], box: FsJail, cwd: str | None, stdin: bytes | Non
         raise ProcessPolicyError("executable not found", context={"argv0": args[0]}) from exc
     if stdin is not None and proc.stdin is not None:
         try:
-            proc.stdin.write(stdin[: lim.output_bytes])
+            proc.stdin.write(stdin)
         except BrokenPipeError:
             pass
         proc.stdin.close()

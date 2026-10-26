@@ -7121,6 +7121,11 @@
       "reason": "UI and presentation adapters remain frontend-owned pending wired, tested interfaces to the AI runtime"
     },
     {
+      "path": "skeleton/frontier_nav",
+      "owner": "Game Frontier virtual positioning and route-grounding domain",
+      "reason": "Canonical gameplay-facing virtual GPS, surveyed map fixes and NPC route grounding remain under skeleton/frontier_nav until an explicit tested AI-tree ownership cutover; virtual coordinates are not real-device location authority or completed native-engine evidence."
+    },
+    {
       "path": "skeleton/galaxy",
       "owner": "distributed compatibility boundary",
       "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
@@ -7264,6 +7269,11 @@
       "path": "skeleton/motive/facet10240",
       "owner": "AIFT-MOTIVE generated capability organ pack",
       "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/netcode",
+      "owner": "game-network transport and authoritative multiplayer runtime",
+      "reason": "Game-facing B061-B064 framing, transport, replication, lobbies and dedicated server remain under skeleton/netcode; skeleton/ai/netcode is a staged mirrored adapter, not a second authority. No AI ownership cutover or release signoff is implied."
     },
     {
       "path": "skeleton/network",

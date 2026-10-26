@@ -26,7 +26,7 @@ include = ["skeleton*"]
 "skeleton.app" = ["manifest.json"]
 
 [build-system]
-requires = ["setuptools==84.1.0", "wheel==0.48.0"]
+requires = ["setuptools==84.2.1", "wheel==0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -36,19 +36,19 @@ description = "Local-first game studio with Jeeves AI chat, Dragon source review
 requires-python = ">=3.11"
 dependencies = [
   "bcrypt>=4,<5",
-  "cryptography>=50.0.1",
+  "cryptography>=50.0.2",
   "fastapi>=0.142.2",
   "httpx>=0.28.1,<1",
   "motor==3.7.1",
   "pymongo==4.19.0",
-  "pydantic[email]>=2.14.0",
+  "pydantic[email]>=2.14.1",
   "pydantic-settings>=2.15.0",
   "uvicorn[standard]>=0.54.0",
 ]
 
 [project.optional-dependencies]
-dev = ["PyYAML>=6,<7", "pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.28.1,<1", "black>=26.5.1", "mypy>=2.4.0", "ruff>=0.17.1,<0.18"]
-local-inference = ["numpy==2.4.6", "Pillow>=12.3.0,<13"]
+dev = ["PyYAML>=6,<7", "pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.28.1,<1", "black>=26.5.1", "mypy>=2.4.0", "ruff>=0.17.2,<0.18"]
+local-inference = ["numpy==2.4.6", "Pillow>=13.0.0,<14"]
 jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 

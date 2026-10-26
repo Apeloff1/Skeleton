@@ -4,9 +4,10 @@ routes/gameforge_build.py — REAL build tool integration (/api/gameforge/build)
 Produces genuine, downloadable artifacts from a game's accepted gamefiles:
   • web  — a playable HTML5 bundle (index.html + payload) zipped on disk
   • source — a source zip of all gamefiles + manifest.json
-Both write real files to /app/backend/artifacts/builds and register them in Mongo
-(gameforge_builds) with real size + sha256. Native-engine exports (Godot/Unity/
-PyInstaller) are reported honestly as unavailable unless the toolchain is installed.
+Web/source archives are published through the governed artifact store
+with real size and sha256. Native Godot and PyInstaller builds use private
+temporary workspaces, clean up on failure, and publish archives through the
+same governed store. Toolchain availability is reported separately.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import hashlib
 import json
 import os
 import shutil
+import tempfile
 import time
 import zipfile
 from typing import Any, Optional
@@ -22,7 +24,6 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
-from core.exec_guard import code_execution_enabled, execution_disabled_response
 from core.gameforge_artifact_builder import (
     DEFAULT_ARTIFACTS_ROOT,
     artifact_build as _artifact_build,
@@ -34,21 +35,20 @@ from core.gameforge_artifact_builder import (
     resolve_under_dir as _resolve_under_dir,
     safe_segment as _safe_segment,
 )
+from core.exec_guard import code_execution_enabled, execution_disabled_response
+from routes.gameforge_auth import require_role
 
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
-try:
-    from routes.gameforge_auth import require_role
-    _viewer = require_role("viewer")
-    _editor = require_role("editor")
-except Exception:  # noqa: BLE001
-    def _viewer():  # type: ignore
-        return {"email": "anonymous", "role": "admin", "dev_mode": True}
-
-    _editor = _viewer
+# A missing auth module must fail router admission, never silently turn
+# protected routes into anonymous admin endpoints.
+_viewer = require_role("viewer")
+_editor = require_role("editor")
 
 _ARTIFACTS = str(DEFAULT_ARTIFACTS_ROOT)
-os.makedirs(_ARTIFACTS, exist_ok=True)
+# Import must never create directories: production /app may be read-only.
+# _artifact_build() performs guarded, explicit allocation only for a requested
+# native export; governed web/source delivery writes via the canonical store.
 
 
 def _artifact_retention_seconds() -> int:
@@ -168,50 +168,53 @@ async def build_desktop(b: DesktopBody, user=Depends(_editor)):
     import sys
     if not _has_pyinstaller():
         return {"ok": False, "error": "pyinstaller toolchain not installed"}
-    files = _gamefiles(b.game_name)
-    safe_name, build_id, workdir = _artifact_build(b.game_name, "desktop")
-    os.makedirs(workdir, exist_ok=True)
-    entry = _resolve_under_dir(workdir, "entry.py")
-    game_json = json.dumps({"game": safe_name, "files": [f.get("filename") for f in files]})
-    with open(entry, "w") as f:
-        f.write(
-            "import json\n"
-            f"GAME = json.loads({game_json!r})\n"
-            "def main():\n"
-            "    print('=== ' + GAME['game'] + ' — GameForge native build ===')\n"
-            "    print('gamefiles:', ', '.join(GAME['files']) or '(none)')\n"
-            "    print('Runtime OK.')\n"
-            "if __name__ == '__main__':\n    main()\n")
-    try:
-        proc = subprocess.run(
-            [sys.executable, "-m", "PyInstaller", "--onefile", "--name", build_id,
-             "--distpath", os.path.join(workdir, "dist"),
-             "--workpath", os.path.join(workdir, "build"),
-             "--specpath", workdir, entry],
-            capture_output=True, text=True, timeout=110)
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "error": "pyinstaller build timed out"}
-    binary = _resolve_under_dir(workdir, "dist", build_id)
-    if proc.returncode != 0 or not os.path.exists(binary):
-        return {"ok": False, "error": "pyinstaller build failed"}
-    zip_path = _resolve_under_dir(workdir, f"{build_id}.zip")
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.write(binary, os.path.basename(binary))
-    tenant = _tenant_id(user)
-    binary_bytes = os.path.getsize(binary)
-    rec = _governed_register(
-        build_id=build_id,
-        game_name=safe_name,
-        kind="desktop",
-        payload=zip_path.read_bytes(),
-        tenant_id=tenant,
-    )
-    shutil.rmtree(workdir, ignore_errors=True)
-    rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
-    rec["binary_bytes"] = binary_bytes
-    rec["platform"] = "linux-x86_64"
-    rec["ok"] = True
-    return rec
+    # Private scratch space is required when the application image is read-only.
+    # TemporaryDirectory cleans partial builds on failure and timeout.
+    with tempfile.TemporaryDirectory(prefix="gameforge-desktop-") as scratch_dir:
+        files = _gamefiles(b.game_name)
+        safe_name, build_id, workdir = _artifact_build(b.game_name, "desktop", artifacts_root=scratch_dir)
+        os.makedirs(workdir, exist_ok=True)
+        entry = _resolve_under_dir(workdir, "entry.py")
+        game_json = json.dumps({"game": safe_name, "files": [f.get("filename") for f in files]})
+        with open(entry, "w") as f:
+            f.write(
+                "import json\n"
+                f"GAME = json.loads({game_json!r})\n"
+                "def main():\n"
+                "    print('=== ' + GAME['game'] + ' — GameForge native build ===')\n"
+                "    print('gamefiles:', ', '.join(GAME['files']) or '(none)')\n"
+                "    print('Runtime OK.')\n"
+                "if __name__ == '__main__':\n    main()\n")
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "PyInstaller", "--onefile", "--name", build_id,
+                 "--distpath", os.path.join(workdir, "dist"),
+                 "--workpath", os.path.join(workdir, "build"),
+                 "--specpath", workdir, entry],
+                capture_output=True, text=True, timeout=110)
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": "pyinstaller build timed out"}
+        binary = _resolve_under_dir(workdir, "dist", build_id)
+        if proc.returncode != 0 or not os.path.exists(binary):
+            return {"ok": False, "error": "pyinstaller build failed"}
+        zip_path = _resolve_under_dir(workdir, f"{build_id}.zip")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+            z.write(binary, os.path.basename(binary))
+        tenant = _tenant_id(user)
+        binary_bytes = os.path.getsize(binary)
+        rec = _governed_register(
+            build_id=build_id,
+            game_name=safe_name,
+            kind="desktop",
+            payload=zip_path.read_bytes(),
+            tenant_id=tenant,
+        )
+        shutil.rmtree(workdir, ignore_errors=True)
+        rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
+        rec["binary_bytes"] = binary_bytes
+        rec["platform"] = "linux-x86_64"
+        rec["ok"] = True
+        return rec
 
 
 @router.post("/godot")
@@ -223,72 +226,74 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
         return execution_disabled_response("Godot native build")
 
     import subprocess
-    files = _gamefiles(b.game_name)
-    safe_name, build_id, workdir = _artifact_build(b.game_name, "godot")
-    os.makedirs(workdir, exist_ok=True)
-    zip_path = _resolve_under_dir(_ARTIFACTS, f"{build_id}.zip")
-    godot_name = json.dumps(str(b.game_name), ensure_ascii=False)
-    godot_files = json.dumps([str(f.get("filename") or "") for f in files], ensure_ascii=False)
-    project_godot = (
-        '; Godot 4 project — generated by GameForge\n'
-        'config_version=5\n\n[application]\n\n'
-        f'config/name={godot_name}\nrun/main_scene="res://main.tscn"\n\n'
-        '[rendering]\n\nrenderer/rendering_method="gl_compatibility"\n')
-    main_gd = (
-        'extends Node2D\n\n'
-        f'var game_name := {godot_name}\n'
-        f'var gamefiles := {godot_files}\n\n'
-        'func _ready():\n'
-        '\tprint("%s — GameForge Godot build" % game_name)\n'
-        '\tprint("gamefiles: ", gamefiles)\n'
-        '\t# Headless validation run: boot the engine, then quit cleanly.\n'
-        '\tget_tree().quit()\n')
-    main_tscn = (
-        '[gd_scene load_steps=2 format=3]\n\n'
-        '[ext_resource type="Script" path="res://main.gd" id="1"]\n\n'
-        '[node name="Main" type="Node2D"]\nscript = ExtResource("1")\n')
-    for name, content in (("project.godot", project_godot), ("main.gd", main_gd), ("main.tscn", main_tscn)):
-        with open(_resolve_under_dir(workdir, name), "w") as f:
-            f.write(content)
-    with open(_resolve_under_dir(workdir, "gamefiles.json"), "w") as f:
-        json.dump({"game": b.game_name, "files": files}, f, indent=2)
+    # Stage native resources in a private writable workspace, never /app.
+    with tempfile.TemporaryDirectory(prefix="gameforge-godot-") as scratch_dir:
+        files = _gamefiles(b.game_name)
+        safe_name, build_id, workdir = _artifact_build(b.game_name, "godot", artifacts_root=scratch_dir)
+        os.makedirs(workdir, exist_ok=True)
+        zip_path = _resolve_under_dir(workdir, f"{build_id}.zip")
+        godot_name = json.dumps(str(b.game_name), ensure_ascii=False)
+        godot_files = json.dumps([str(f.get("filename") or "") for f in files], ensure_ascii=False)
+        project_godot = (
+            '; Godot 4 project — generated by GameForge\n'
+            'config_version=5\n\n[application]\n\n'
+            f'config/name={godot_name}\nrun/main_scene="res://main.tscn"\n\n'
+            '[rendering]\n\nrenderer/rendering_method="gl_compatibility"\n')
+        main_gd = (
+            'extends Node2D\n\n'
+            f'var game_name := {godot_name}\n'
+            f'var gamefiles := {godot_files}\n\n'
+            'func _ready():\n'
+            '\tprint("%s — GameForge Godot build" % game_name)\n'
+            '\tprint("gamefiles: ", gamefiles)\n'
+            '\t# Headless validation run: boot the engine, then quit cleanly.\n'
+            '\tget_tree().quit()\n')
+        main_tscn = (
+            '[gd_scene load_steps=2 format=3]\n\n'
+            '[ext_resource type="Script" path="res://main.gd" id="1"]\n\n'
+            '[node name="Main" type="Node2D"]\nscript = ExtResource("1")\n')
+        for name, content in (("project.godot", project_godot), ("main.gd", main_gd), ("main.tscn", main_tscn)):
+            with open(_resolve_under_dir(workdir, name), "w") as f:
+                f.write(content)
+        with open(_resolve_under_dir(workdir, "gamefiles.json"), "w") as f:
+            json.dump({"game": b.game_name, "files": files}, f, indent=2)
 
-    engine = _godot_bin()
-    engine_validated = False
-    engine_version = None
-    engine_log = "not_run"
-    if engine:
-        try:
-            ver = subprocess.run([engine, "--headless", "--version"], capture_output=True, text=True, timeout=30)
-            engine_version = (ver.stdout or ver.stderr).strip().splitlines()[-1] if (ver.stdout or ver.stderr) else None
-            # Run the project headless — imports resources and executes main scene.
-            run = subprocess.run([engine, "--headless", "--path", workdir, "--quit"],
-                                 capture_output=True, text=True, timeout=90)
-            engine_validated = "GameForge Godot build" in (run.stdout or "") or run.returncode == 0
-            engine_log = "engine_validated" if engine_validated else "engine_validation_failed"
-        except Exception:  # noqa: BLE001
-            engine_log = "engine_run_failed"
+        engine = _godot_bin()
+        engine_validated = False
+        engine_version = None
+        engine_log = "not_run"
+        if engine:
+            try:
+                ver = subprocess.run([engine, "--headless", "--version"], capture_output=True, text=True, timeout=30)
+                engine_version = (ver.stdout or ver.stderr).strip().splitlines()[-1] if (ver.stdout or ver.stderr) else None
+                # Run the project headless — imports resources and executes main scene.
+                run = subprocess.run([engine, "--headless", "--path", workdir, "--quit"],
+                                     capture_output=True, text=True, timeout=90)
+                engine_validated = run.returncode == 0 and "GameForge Godot build" in (run.stdout or "")
+                engine_log = "engine_validated" if engine_validated else "engine_validation_failed"
+            except Exception:  # noqa: BLE001
+                engine_log = "engine_run_failed"
 
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-        for name in ("project.godot", "main.gd", "main.tscn", "gamefiles.json"):
-            z.write(_resolve_under_dir(workdir, name), name)
-    tenant = _tenant_id(user)
-    rec = _governed_register(
-        build_id=build_id,
-        game_name=safe_name,
-        kind="godot",
-        payload=zip_path.read_bytes(),
-        tenant_id=tenant,
-    )
-    shutil.rmtree(workdir, ignore_errors=True)
-    rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
-    rec["importable_godot_project"] = True
-    rec["engine_validated"] = engine_validated
-    rec["engine_version"] = engine_version
-    rec["engine_log"] = engine_log
-    rec["headless_exported"] = engine_validated
-    rec["ok"] = True
-    return rec
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+            for name in ("project.godot", "main.gd", "main.tscn", "gamefiles.json"):
+                z.write(_resolve_under_dir(workdir, name), name)
+        tenant = _tenant_id(user)
+        rec = _governed_register(
+            build_id=build_id,
+            game_name=safe_name,
+            kind="godot",
+            payload=zip_path.read_bytes(),
+            tenant_id=tenant,
+        )
+        shutil.rmtree(workdir, ignore_errors=True)
+        rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
+        rec["importable_godot_project"] = True
+        rec["engine_validated"] = engine_validated
+        rec["engine_version"] = engine_version
+        rec["engine_log"] = engine_log
+        rec["headless_exported"] = False  # native project import is not an export-template build
+        rec["ok"] = True
+        return rec
 
 
 class BuildBody(BaseModel):
@@ -298,25 +303,31 @@ class BuildBody(BaseModel):
 async def _build_web_for_user(b: BuildBody, user: Any):
     tenant = _tenant_id(user)
     timestamp = time.time()
-    return build_web_artifact(
-        b.game_name,
-        built_at=timestamp,
-        governed_store=_governed_store(),
-        tenant_id=tenant,
-        retention_until=timestamp + _artifact_retention_seconds(),
-    )
+    # ZIP assembly needs temporary files even when final storage is governed.
+    # Never allocate those intermediates under a read-only deployment image.
+    with tempfile.TemporaryDirectory(prefix="gameforge-web-") as scratch_dir:
+        return build_web_artifact(
+            b.game_name,
+            artifacts_root=scratch_dir,
+            built_at=timestamp,
+            governed_store=_governed_store(),
+            tenant_id=tenant,
+            retention_until=timestamp + _artifact_retention_seconds(),
+        )
 
 
 async def _build_source_for_user(b: BuildBody, user: Any):
     tenant = _tenant_id(user)
     timestamp = time.time()
-    return build_source_artifact(
-        b.game_name,
-        built_at=timestamp,
-        governed_store=_governed_store(),
-        tenant_id=tenant,
-        retention_until=timestamp + _artifact_retention_seconds(),
-    )
+    with tempfile.TemporaryDirectory(prefix="gameforge-source-") as scratch_dir:
+        return build_source_artifact(
+            b.game_name,
+            artifacts_root=scratch_dir,
+            built_at=timestamp,
+            governed_store=_governed_store(),
+            tenant_id=tenant,
+            retention_until=timestamp + _artifact_retention_seconds(),
+        )
 
 
 @router.post("/web")

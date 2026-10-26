@@ -39,9 +39,10 @@ on:
 permissions:
   contents: read
 
+# Preserve each main commit's E2E evidence; supersede only a PR's old head.
 concurrency:
-  group: app-foundation-e2e-${{ github.ref }}
-  cancel-in-progress: true
+  group: app-foundation-e2e-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   stack-e2e:

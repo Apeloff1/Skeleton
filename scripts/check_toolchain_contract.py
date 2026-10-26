@@ -136,12 +136,18 @@ def ref_scoped_cancellation(workflow: str) -> bool:
     )
 
 
-def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
-    """Return true when PRs cancel superseded runs but branch pushes queue."""
+def pr_only_ref_or_sha_scoped_cancellation(workflow: str) -> bool:
+    """Require PR-only preemption and a group bounded to PR or immutable main SHA."""
     group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
     return bool(
         group
-        and "${{ github.event.pull_request.number || github.ref }}" in group.group(1)
+        and any(
+            fallback in group.group(1)
+            for fallback in (
+                "${{ github.event.pull_request.number || github.ref }}",
+                "${{ github.event.pull_request.number || github.sha }}",
+            )
+        )
         and re.search(
             r"^\s*cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*(?:#.*)?$",
             workflow,
@@ -149,6 +155,58 @@ def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
         )
         is not None
     )
+
+
+def ci_preserves_main_run_evidence(workflow: str) -> bool:
+    """Validate top-level reusable-CI concurrency, never nested job settings.
+
+    Main commits must not cancel one another. PR heads may supersede their
+    own checks; other events must retain an immutable SHA group or never
+    cancel. Reject ambiguous or duplicated top-level concurrency entries.
+    """
+    lines = workflow.splitlines()
+    # The YAML top-level key must be exactly unindented; scanning arbitrary
+    # group/cancel lines could accept an unsafe top-level setting if a nested
+    # job declared an unrelated safe-looking concurrency rule.
+    indices = [i for i, line in enumerate(lines) if line == "concurrency:"]
+    if len(indices) != 1:
+        return False
+
+    settings: dict[str, str] = {}
+    for line in lines[indices[0] + 1:]:
+        if line and not line[0].isspace() and not line.startswith("#"):
+            break
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = re.fullmatch(r"  (group|cancel-in-progress):\s*(.+)", line)
+        if match is None:
+            return False
+        key, value = match.groups()
+        if key in settings:
+            return False
+        settings[key] = value.strip()
+    if set(settings) != {"group", "cancel-in-progress"}:
+        return False
+
+    group = settings["group"]
+    cancellation = settings["cancel-in-progress"]
+    # A trailing YAML comment is not part of the actual GitHub group value.
+    # Never accept a safety-critical SHA token that appears only in a comment.
+    if "#" in group or "#" in cancellation:
+        return False
+    if cancellation == "false":
+        return True
+    if cancellation == "true":
+        return "${{ github.sha }}" in group
+    if cancellation == "${{ github.event_name == 'pull_request' }}":
+        return any(
+            term in group
+            for term in (
+                "${{ github.event.pull_request.number || github.sha }}",
+                "${{ github.event.pull_request.number || github.ref }}",
+            )
+        )
+    return False
 
 
 def pinned_action_count(workflow: str, action: str, generation: str) -> int:
@@ -416,16 +474,13 @@ def main() -> int:
         failures,
     )
     require(
-        cancel_false(ci)
-        or sha_scoped_cancellation(ci)
-        or ref_scoped_cancellation(ci)
-        or pr_only_ref_scoped_cancellation(ci),
+        ci_preserves_main_run_evidence(ci),
         "CI concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
     require(
         pinned_action_count(ci, "actions/checkout", "v7.0.1") > 0
-        and pinned_action_count(ci, "actions/setup-python", "v7.0.0") > 0
+        and pinned_action_count(ci, "actions/setup-python", "v7.1.0") == 8
         and pinned_action_count(ci, "actions/setup-node", "v7.1.0") > 0,
         "CI must use immutable proven core action generations",
         failures,
@@ -434,13 +489,16 @@ def main() -> int:
     # not merely an arbitrary 40-hex ref followed by a version comment.
     require(
         ci.count("actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0") == 1
-        and ci.count("astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0") == 3,
+        and ci.count("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0") == 8
+        and ci.count("actions/setup-python@") == 8
+        and ci.count("astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2") == 3
+        and ci.count("astral-sh/setup-uv@") == 3,
         "CI Node/uv action SHA identities must match verified upstream release pins",
         failures,
     )
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.0") == 3,
-        "CI must use exactly three immutable setup-uv v10.3.0 sites backed by the repository uv pin",
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.2") == 3,
+        "CI must use exactly three immutable setup-uv v10.3.2 sites backed by the repository uv pin",
         failures,
     )
     ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'

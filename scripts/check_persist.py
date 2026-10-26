@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from skeleton.persist.verify import run_all  # noqa: E402
+from skeleton.persistence.core.verify import run_all  # noqa: E402  (#4122: canonical path)
 
 
 def main() -> int:
