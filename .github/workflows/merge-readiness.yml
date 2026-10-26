@@ -45,6 +45,10 @@ jobs:
         run: python scripts/check_merge_readiness_contract.py
       - name: Validate required-check policy
         run: python scripts/check_required_checks_policy.py
+      - name: Preserve immutable main commit CI concurrency custody
+        run: python scripts/check_ci_concurrency_custody.py
+      - name: Regress immutable main CI concurrency policy
+        run: python -m unittest discover -s tests -p test_ci_concurrency_custody.py -v
       - name: Validate Expo SDK and native runtime pairing
         run: python scripts/check_expo_runtime_pairing.py
       - name: Validate Expo SDK 54 bundled native dependency lockfile
