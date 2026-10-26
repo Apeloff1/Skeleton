@@ -515,3 +515,10 @@ def test_guard_fails_closed_for_oversized_plain_text():
     assert cleaned["note"] == REDACTED_MARK
     with pytest.raises(RealtimeSecretError):
         PayloadSecretGuard(mode="reject").scrub(payload)
+
+
+@pytest.mark.parametrize("invalid", [(1, 2), {"nested": ("a", "b")}, {"nested": {1, 2}}])
+def test_guard_rejects_non_json_collection_types(invalid):
+    for mode in ("redact", "reject"):
+        with pytest.raises(RealtimeSecretError, match="not JSON-native"):
+            PayloadSecretGuard(mode=mode).scrub({"value": invalid})
