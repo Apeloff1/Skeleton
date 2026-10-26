@@ -77,6 +77,20 @@ describe("expo-location adapter", () => {
     await expect(a.requestForegroundPermission()).resolves.toBe(false);
     expect(a.lastPermission()).toBe("denied");
   });
+  it("rejects contradictory granted permission fields", async () => {
+    const a = createExpoLocationAdapter(mockLoc);
+    mockLoc.getForegroundPermissionsAsync.mockResolvedValueOnce({
+      status: "granted", granted: false, canAskAgain: false,
+    });
+    await expect(a.requestForegroundPermission()).resolves.toBe(false);
+    expect(a.lastPermission()).toBe("blocked");
+    expect(mockLoc.watchPositionAsync).not.toHaveBeenCalled();
+    mockLoc.getForegroundPermissionsAsync.mockResolvedValueOnce({
+      status: "denied", granted: true, canAskAgain: false,
+    });
+    await expect(a.requestForegroundPermission()).resolves.toBe(false);
+    expect(a.lastPermission()).toBe("blocked");
+  });
   it("fails closed when location services are off", async () => {
     mockLoc.hasServicesEnabledAsync.mockResolvedValueOnce(false);
     const a = createExpoLocationAdapter(mockLoc);
@@ -127,6 +141,7 @@ describe("FrontierLocationProvider", () => {
     expect(api.fix).toMatchObject({ latitude_deg: 59.91, sequence: 1 });
     act(() => api.stop());
     expect(api.status).toBe("idle");
+    expect(api.fix).toBeNull(); // coordinates must not persist after Stop
     expect(mockLoc.remove).toHaveBeenCalledTimes(1);
   });
   it("keeps watching but surfaces an error for an inaccurate fix", async () => {
@@ -148,6 +163,24 @@ describe("FrontierLocationProvider", () => {
     expect(api.status).toBe("blocked");
     expect(mockLoc.watchPositionAsync).not.toHaveBeenCalled();
   });
+  it("does not open overlapping native location subscriptions", async () => {
+    let release!: (watch: { remove: () => void }) => void;
+    mockLoc.watchPositionAsync.mockImplementationOnce(
+      () => new Promise(resolve => { release = resolve; }),
+    );
+    mount();
+    const first = api.start();
+    const duplicate = api.start();
+    await act(async () => { await duplicate; });
+    expect(mockLoc.watchPositionAsync).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      release({ remove: mockLoc.remove });
+      await first;
+    });
+    expect(api.status).toBe("watching");
+    act(() => api.stop());
+    expect(mockLoc.remove).toHaveBeenCalledTimes(1);
+  });
   it("shows an error when services are disabled", async () => {
     mockLoc.hasServicesEnabledAsync.mockResolvedValueOnce(false);
     mount();
@@ -157,15 +190,21 @@ describe("FrontierLocationProvider", () => {
   it("ends the watch on a native watch failure", async () => {
     mount();
     await act(async () => { await api.start(); });
+    act(() => mockLoc.cb!(loc()));
+    expect(api.fix).not.toBeNull();
     act(() => mockLoc.err!("revoked"));
     expect(api.status).toBe("error");
+    expect(api.fix).toBeNull();
     expect(mockLoc.remove).toHaveBeenCalled();
   });
   it("stops when the app leaves the foreground", async () => {
     mount();
     await act(async () => { await api.start(); });
+    act(() => mockLoc.cb!(loc()));
+    expect(api.fix).not.toBeNull();
     act(() => mockAppStateListeners.forEach(l => l("background")));
     expect(api.status).toBe("idle");
+    expect(api.fix).toBeNull();
     expect(mockLoc.remove).toHaveBeenCalledTimes(1);
   });
   it("reports unavailable when no native adapter exists", async () => {
