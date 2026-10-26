@@ -11,11 +11,10 @@ from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
 from skeleton.api.engine_routes import _engine_coordinator
 from skeleton.api.engine_runtime import (
     EngineExecutionCoordinator,
-    EngineExecutionCoordinatorError,
 )
 from skeleton.persistence.execution_repository import ExecutionRepositoryConflict
 from skeleton.intelligence.execution_runtime import CognitiveExecutionRuntime
-from skeleton.provider_runtime import ProviderPolicyError, ProviderRegistry, ProviderUnavailableError, provider_execution_identity
+from skeleton.provider_runtime import ProviderPolicyError, ProviderRegistry, provider_execution_identity
 from skeleton.testing.test_engine_execution_coordinator import (
     FakeProvider,
     FakeRegistry,
@@ -25,6 +24,12 @@ from skeleton.testing.test_governed_model_engine_acceptance import (
     _engine_stack,
     _offline,
 )
+
+
+def _digest(value):
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+    ).hexdigest()
 
 
 @pytest.fixture
@@ -162,10 +167,10 @@ async def test_pin_commits_before_dispatch_and_recovers_exact_initial_artifact(
     command = _command("reference")
     with monkeypatch.context() as crash:
 
-        async def interrupted_resume(_runtime, *_args, **_kwargs):
+        async def interrupted_provider_turn(_runtime, *_args, **_kwargs):
             raise asyncio.CancelledError("process interruption before dispatch")
 
-        crash.setattr(CognitiveExecutionRuntime, "resume", interrupted_resume)
+        crash.setattr(CognitiveExecutionRuntime, "_run_provider_turn", interrupted_provider_turn)
         async with _engine_stack(tmp_path, "reference") as (_client, service, registry, app):
             service.submit(command, verified_service_principal="codedock-backend")
             coordinator = app.dependency_overrides[_engine_coordinator]()
@@ -199,9 +204,12 @@ async def test_corrupt_or_missing_local_pin_blocks_resumed_dispatch(
         elif damage == "digest":
             payload["provider_execution_binding"]["binding_digest"] = "0" * 64
         else:
-            identity = payload["provider_execution_binding"]["identity"]
-            identity["artifact"]["model_digest"] = "0" * 64
-            payload["provider_execution_binding"]["binding_digest"] = execution_payload_digest(identity)
+            binding = payload["provider_execution_binding"]
+            generator = binding["generator"]
+            generator["routes"][0]["local_activation"]["artifact"]["model_digest"] = "0" * 64
+            unsigned_generator = {k: v for k, v in generator.items() if k != "identity_digest"}
+            generator["identity_digest"] = _digest(unsigned_generator)
+            binding["binding_digest"] = _digest({k: v for k, v in binding.items() if k != "binding_digest"})
         current = service.repository.get(command.execution_request.execution_id)
         service.repository.checkpoint(
             current.execution_id,
@@ -227,20 +235,21 @@ async def test_corrupt_or_missing_local_pin_blocks_resumed_dispatch(
 
 def test_execution_descriptor_is_detached_content_only(local_artifact):
     adapter = ProviderRegistry.from_env().require_active()
-    identity = adapter.execution_identity()
-    assert set(identity) == {"schema_version", "provider_id", "model_id", "artifact", "inference"}
-    assert identity["inference"] == {"default_seed": 0}
-    assert set(identity["artifact"]) == {
-        "schema",
-        "model_id",
-        "model_digest",
-        "artifact_sha256",
-        "artifact_bytes",
-        "reference",
-    }
+    identity = provider_execution_identity(adapter)
+    assert identity["schema_version"] == "skeleton.provider.route_binding.v1"
+    assert identity["identity_digest"] == _digest({k: v for k, v in identity.items() if k != "identity_digest"})
+    assert identity["mode"] == "single"
+    assert len(identity["routes"]) == 1
+    route = identity["routes"][0]
+    assert route["provider_id"] == "local"
+    assert route["model_id"] == local_artifact[1].model_id
+    assert route["local_activation"]["default_seed"] == 0
+    artifact = route["local_activation"]["artifact"]
+    assert artifact["model_digest"] == local_artifact[1].model_digest
+    assert len(artifact["artifact_sha256"]) == 64
     assert str(local_artifact[0]) not in json.dumps(identity)
-    identity["artifact"]["model_digest"] = "0" * 64
-    assert adapter.execution_identity()["artifact"]["model_digest"] == local_artifact[1].model_digest
+    artifact["model_digest"] = "0" * 64
+    assert provider_execution_identity(adapter)["routes"][0]["local_activation"]["artifact"]["model_digest"] == local_artifact[1].model_digest
 
 
 @pytest.mark.asyncio
@@ -300,9 +309,9 @@ async def test_pristine_created_legacy_checkpoint_can_acquire_the_exact_pin(tmp_
         assert result.status == "completed"
         assert (
             service.repository.latest_checkpoint(current.execution_id).payload["provider_execution_binding"][
-                "identity"
+                "generator"
             ]
-            == registry.require_active().execution_identity()
+            == provider_execution_identity(registry.require_active())
         )
 
 
@@ -317,9 +326,9 @@ async def test_pristine_created_legacy_checkpoint_can_acquire_the_exact_pin(tmp_
 )
 def test_descriptor_rejects_invalid_loaded_artifact_receipt(local_artifact, field, value):
     adapter = ProviderRegistry.from_env().require_active()
-    adapter._artifact[field] = value
-    with pytest.raises(ProviderUnavailableError, match="execution identity|identity drift"):
-        adapter.execution_identity()
+    adapter._artifact_status[field] = value
+    with pytest.raises(ProviderPolicyError, match="execution identity artifact receipt drift"):
+        provider_execution_identity(adapter)
 
 
 @pytest.mark.asyncio
@@ -329,21 +338,40 @@ async def test_stale_absent_checkpoint_observation_cannot_replace_a_competing_pi
     async with _engine_stack(tmp_path, "reference") as (_client, service, first_registry, app):
         service.submit(command, verified_service_principal="codedock-backend")
         first = app.dependency_overrides[_engine_coordinator]()
-        runtime = CognitiveExecutionRuntime(
+        old_runtime = CognitiveExecutionRuntime(
             service.repository, first_registry.require_active(), first.tool_runtime
         )
+        handoff = command.compiled_context
+        old_payload = old_runtime._initial_payload(
+            command.execution_request, instructions=handoff.instructions,
+            prompt=handoff.prompt, context_digest=handoff.context_digest,
+        )
         assert service.repository.latest_checkpoint(command.execution_request.execution_id) is None
+        # Two activations observe the same checkpoint-less execution. The newer
+        # activation wins the compare-and-swap; the stale one cannot overwrite it.
         write_local_model_artifact(
             ReferenceNGramModel.train(("new competing content",), model_id=original.model_id), path
         )
         second_registry = ProviderRegistry.from_env()
-        second = EngineExecutionCoordinator(service, provider_registry=second_registry)
-        committed = second._pin_local_provider(command, runtime, second_registry.require_active(), None, ())
-        with pytest.raises(EngineExecutionCoordinatorError, match="provider_activation_binding_mismatch"):
-            first._pin_local_provider(command, runtime, first_registry.require_active(), None, ())
-        assert service.repository.latest_checkpoint(command.execution_request.execution_id) == committed
-        assert (
-            committed.payload["provider_execution_binding"]["identity"]
-            == second_registry.require_active().execution_identity()
+        new_runtime = CognitiveExecutionRuntime(
+            service.repository, second_registry.require_active(), first.tool_runtime
         )
-        await second.shutdown()
+        new_payload = new_runtime._initial_payload(
+            command.execution_request, instructions=handoff.instructions,
+            prompt=handoff.prompt, context_digest=handoff.context_digest,
+        )
+        current = service.repository.get(command.execution_request.execution_id)
+        committed = service.repository.checkpoint(
+            current.execution_id, new_payload,
+            expected_execution_version=current.version, expected_checkpoint_version=0,
+        )
+        assert old_payload["provider_execution_binding"] != new_payload["provider_execution_binding"]
+        with pytest.raises(ExecutionRepositoryConflict):
+            service.repository.checkpoint(
+                current.execution_id, old_payload,
+                expected_execution_version=current.version, expected_checkpoint_version=0,
+            )
+        assert service.repository.latest_checkpoint(current.execution_id) == committed
+        assert committed.payload["provider_execution_binding"]["generator"] == provider_execution_identity(
+            second_registry.require_active()
+        )
