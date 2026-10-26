@@ -296,6 +296,8 @@ class PayloadSecretGuard:
                 f"payload value of type {type(item).__name__} is not JSON-native; convert it before publishing"
             )
 
+        if not isinstance(payload, Mapping):
+            raise RealtimeSecretError("realtime payload must be a mapping")
         clean = visit(dict(payload), 0)
         if hits and self.mode == "reject":
             raise RealtimeSecretError(
