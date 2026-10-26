@@ -199,6 +199,35 @@ def test_oversize_argv_is_rejected_before_iterating_untrusted_arguments(tmp_path
     launched.assert_not_called()
 
 
+def test_untrusted_source_stringification_cannot_break_deny_audit(tmp_path: Path) -> None:
+    class HostileSource:
+        def __str__(self) -> str:
+            raise AssertionError("untrusted source must never be coerced to text")
+
+        def __repr__(self) -> str:
+            raise AssertionError("untrusted source must never be represented")
+
+    ex = _executor(tmp_path)
+    with patch("skeleton.sandbox.executor.run_isolated") as launched:
+        out = ex.execute(ToolRequest("unknown-tool", source=HostileSource()))
+    assert out.status == "denied"
+    assert out.returncode is None and not out.stdout
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.verify()
+    assert ex.audit.entries()[-1]["event"]["source"] == "<invalid>"
+    launched.assert_not_called()
+
+
+def test_untrusted_nonstring_source_is_receipted_without_leaking(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    payload = {"credentials": ["not-for-audit"]}
+    out = ex.execute(ToolRequest("unknown-tool", source=payload))
+    assert out.status == "denied"
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.entries()[-1]["event"]["source"] == "<invalid>"
+    assert ex.audit.verify()
+
+
 def test_execution_budget(tmp_path: Path) -> None:
     ex = _executor(tmp_path, policy=ExecutorPolicy(require_network_isolation=False, max_executions=1))
     assert ex.execute(ToolRequest("echo", ("one",))).ok
