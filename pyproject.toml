@@ -47,7 +47,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["PyYAML>=6,<7", "pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.28.1,<1", "black>=26.5.1", "mypy>=2.4.0", "ruff>=0.17.2,<0.18"]
+dev = ["PyYAML>=6,<7", "pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.28.1,<1", "black>=26.5.1", "mypy>=2.4.0", "ruff>=0.17.1,<0.18"]
 local-inference = ["numpy==2.4.6", "Pillow>=13.0.0,<14"]
 jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
