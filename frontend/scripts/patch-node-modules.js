@@ -378,7 +378,9 @@ function patchReactNativeRnGetPolyfillsExport() {
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '0.81.5') {
+  // Both supported package layouts must satisfy the same exact export-shape
+  // checks below; unknown versions remain fail-closed pending review.
+  if (version !== '0.81.5' && version !== '0.88.0') {
     throw new Error(
       `[patch-node-modules] react-native ${version} requires rn-get-polyfills export review`,
     );
