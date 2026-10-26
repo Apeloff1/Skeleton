@@ -413,3 +413,58 @@ def test_guard_preserves_oversized_plain_prose_without_encoded_content():
     assert len(value) > _MAX_DECODE_CHARS
     clean, hits = PayloadSecretGuard().scrub({"note": value})
     assert hits == 0 and clean["note"] == value
+
+
+@pytest.mark.parametrize(
+    "encode",
+    [
+        lambda text: "".join(f"&#{ord(ch)};" for ch in text),
+        lambda text: "".join(f"&#x{ord(ch):x};" for ch in text),
+        lambda text: __import__("html").escape(
+            "".join(f"&#{ord(ch)};" for ch in text)
+        ),
+        lambda text: __import__("urllib.parse", fromlist=["quote"]).quote(
+            "".join(f"&#{ord(ch)};" for ch in text), safe=""
+        ),
+        lambda text: base64.b64encode(
+            "".join(f"&#{ord(ch)};" for ch in text).encode()
+        ).decode(),
+    ],
+)
+def test_guard_catches_html_encoded_and_cross_encoded_credentials(encode):
+    encoded = encode(_FAKE_GH)
+    cleaned, hits = PayloadSecretGuard().scrub({"note": encoded})
+    assert hits >= 1 and cleaned["note"] != encoded
+    assert _FAKE_GH not in json.dumps(cleaned)
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": encoded})
+
+
+def test_guard_rejects_entity_encoding_past_decode_round_budget():
+    from html import escape
+
+    encoded = "".join(f"&#{ord(ch)};" for ch in _FAKE_GH)
+    for _ in range(5):
+        encoded = escape(encoded)
+    cleaned, hits = PayloadSecretGuard().scrub({"note": encoded})
+    assert hits and REDACTED_MARK in cleaned["note"]
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": encoded})
+
+
+def test_guard_rejects_entity_encoded_suffix_past_size_budget():
+    encoded = "".join(f"&#{ord(ch)};" for ch in _FAKE_GH)
+    payload = "ordinary status prose " * 850 + encoded
+    cleaned, hits = PayloadSecretGuard().scrub({"note": payload})
+    assert hits and REDACTED_MARK in cleaned["note"]
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": payload})
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["Rock &amp; Roll", "A &lt; B", "workshop &amp;amp; crafts"],
+)
+def test_guard_preserves_benign_html_entities(value):
+    cleaned, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits == 0 and cleaned["note"] == value
