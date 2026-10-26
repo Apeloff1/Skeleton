@@ -32,6 +32,7 @@ import base64
 import binascii
 import json
 import re
+from html import unescape as html_unescape
 from collections.abc import Mapping
 from typing import Any, Optional, Tuple
 from urllib.parse import unquote
@@ -78,6 +79,8 @@ _CAMEL_2 = re.compile(r"([a-z0-9])([A-Z])")
 _SEP = re.compile(r"[^a-z0-9]+")
 _B64_RE = re.compile(r"^[A-Za-z0-9+/_-]{16,}={0,2}$")
 _PCT_RE = re.compile(r"%[0-9A-Fa-f]{2}")
+# Character references can encode a credential a byte at a time.
+_ENTITY_RE = re.compile(r"&(?:\#(?:[xX][0-9A-Fa-f]+|[0-9]+)|[A-Za-z][A-Za-z0-9]+);?")
 #: Max percent-decode rounds (``%253D`` -> ``%3D`` -> ``=``); decode stops
 #: early at a fixpoint (Jenkins #4253 review, blocker 1).
 _MAX_DECODE_ROUNDS = 3
@@ -158,6 +161,10 @@ def _decode_step(value: str) -> Optional[str]:
         decoded = unquote(value)
         if decoded != value:
             return decoded
+    if _ENTITY_RE.search(value):
+        decoded = html_unescape(value)
+        if decoded != value:
+            return decoded
     return _b64_step(value)
 
 
@@ -173,7 +180,11 @@ def _decode_chain(value: str) -> Tuple[list, bool]:
         # Do not inspect only the prefix: a percent-encoded credential can sit
         # beyond the decode budget. Fail closed on any encoded oversized value,
         # using linear bounded-pattern checks instead of decoding huge input.
-        return out, bool(_PCT_RE.search(value) or _B64_RE.fullmatch(value.strip()))
+        return out, bool(
+            _PCT_RE.search(value)
+            or _ENTITY_RE.search(value)
+            or _B64_RE.fullmatch(value.strip())
+        )
     current = value
     for _ in range(_MAX_DECODE_ROUNDS):
         nxt = _decode_step(current)
