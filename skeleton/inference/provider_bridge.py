@@ -12,7 +12,7 @@ from skeleton.providers.contract import ProviderDelta, ProviderDeltaKind
 from .session import InferenceContractError, InferenceSession, InferenceUsage, ModelRequest, ModelResult, ModelStreamEvent
 
 def _plain(v:Any):
-    if isinstance(v,Enum): return v.value
+    if isinstance(v,Enum): return _plain(v.value)
     if isinstance(v,datetime):
         if v.tzinfo is None or v.utcoffset() is None:
             raise InferenceContractError("provider timestamp must be timezone-aware")
