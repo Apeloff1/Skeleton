@@ -129,6 +129,10 @@ class FakeRegistry:
         # The coordinator selects via the canonical context-aware registry API.
         return self.require_active()
 
+    def runtime_serving_engines(self):
+        # Hosted and fake providers have no activated local serving owner to drain.
+        return ()
+
 
 def _bundle(*, execution_id: str = "exec-golden"):
     runtime_deadline = datetime.now(timezone.utc) + timedelta(minutes=10)
