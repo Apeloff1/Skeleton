@@ -703,6 +703,7 @@ def test_full_profile_uses_custom_chroma_published_port(tmp_path):
 def test_full_profile_probes_custom_chroma_health(monkeypatch):
     from skeleton.app.health import ProbeResult, probe_application
 
+    assert load_manifest().service("chroma").health_path == "/api/v2/heartbeat"
     seen = []
 
     def probe(service, *, timeout):
@@ -718,6 +719,32 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
         full=True, public_url_overrides={"chroma": "http://localhost:8222"},
     )
     assert ("chroma", "http://localhost:8222") in seen
+
+def test_full_profile_missing_http_health_path_fails_closed(monkeypatch):
+    from dataclasses import replace
+    from skeleton.app.health import ProbeResult, probe_application
+
+    manifest = load_manifest()
+    broken = replace(
+        manifest,
+        services=tuple(
+            replace(service, health_path="") if service.name == "chroma" else service
+            for service in manifest.services
+        ),
+    )
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_url",
+        lambda service, *, timeout: ProbeResult(service.name, service.public_url, True, 200, "healthy"),
+    )
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_http",
+        lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
+    )
+    results = probe_application(manifest=broken, full=True)
+    chroma = next(result for result in results if result.service == "chroma")
+    assert chroma.ok is False
+    assert chroma.detail == "no public HTTP health probe declared"
+
 
 def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
     from skeleton.app.assembly import preflight
