@@ -495,7 +495,7 @@ def test_guard_never_emits_nonfinite_json_numbers(value):
 @pytest.mark.parametrize("invalid", [None, [], "not-a-map", 42, True])
 def test_guard_rejects_non_mapping_top_level_payload(invalid):
     for mode in ("redact", "reject"):
-        with pytest.raises(RealtimeSecretError, match="payload must be a mapping"):
+        with pytest.raises(RealtimeSecretError, match="payload must be a JSON-native dictionary"):
             PayloadSecretGuard(mode=mode).scrub(invalid)
 
 
@@ -531,3 +531,11 @@ def test_guard_rejects_custom_nested_mapping():
     for mode in ("redact", "reject"):
         with pytest.raises(RealtimeSecretError, match="JSON-native dictionaries"):
             PayloadSecretGuard(mode=mode).scrub(payload)
+
+
+def test_guard_rejects_custom_top_level_mapping():
+    from collections import UserDict
+
+    for mode in ("redact", "reject"):
+        with pytest.raises(RealtimeSecretError, match="JSON-native dictionary"):
+            PayloadSecretGuard(mode=mode).scrub(UserDict({"note": "ordinary"}))
