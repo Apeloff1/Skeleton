@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
