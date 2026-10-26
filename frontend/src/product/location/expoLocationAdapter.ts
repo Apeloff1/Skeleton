@@ -98,8 +98,11 @@ export function createExpoLocationAdapter(
     throw new FrontierLocationError("UNAVAILABLE", "Invalid foreground location sampling policy");
   }
   let last: PermissionOutcome = "unknown";
+  // Fail closed if the OS returns contradictory permission fields.
   const classify = (r: ExpoPermissionResponse): PermissionOutcome =>
-    r.granted || r.status === "granted" ? "granted" : r.canAskAgain ? "denied" : "blocked";
+    r.granted === true && r.status === "granted"
+      ? "granted"
+      : r.canAskAgain === false ? "blocked" : "denied";
 
   return {
     lastPermission: () => last,
