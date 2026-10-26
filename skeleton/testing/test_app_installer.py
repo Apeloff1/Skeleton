@@ -287,7 +287,7 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
     assert receipt.ok
     assert len(commands) == 1
     command, env = commands[0]
-    assert command[-1] == "config"
+    assert command[-2:] == ("config", "--quiet")  # never echo rendered secrets
     assert env["BUILD_TARGET"] == "production"
     assert env["FRONTEND_BUILD_TARGET"] == "production"
     assert env["FRONTEND_CONTAINER_PORT"] == "8080"
@@ -431,6 +431,7 @@ def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
 
 def test_first_install_build_output_streams_to_file_instead_of_memory(tmp_path, monkeypatch):
     from skeleton.app.installer import install_application
+    from skeleton.app.setup_runtime import SetupResult
 
     report = PreloadReport(
         root=tmp_path, platform="Windows", python="bundled",
