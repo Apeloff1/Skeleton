@@ -42,7 +42,10 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
-    return datetime(2026, 9, 23, 20, 30, tzinfo=timezone.utc)
+    # The engine's durable max_elapsed_seconds is anchored to created_at.
+    # Historical fixture dates silently expire once the wall clock advances.
+    # Truncation keeps repeated setup timestamps stable within each second.
+    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def test_engine_tool_runtime_factory_preserves_canonical_dependencies(tmp_path) -> None:
