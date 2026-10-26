@@ -1145,3 +1145,139 @@ class ContentSignalIndex:
                 raise
             recovered.corpus = corpus
             return recovered
+
+class ContentScrutinyError(MultimodalFoundationError):
+    """Issued corpus content cannot be inspected within its declared bounds."""
+
+
+@dataclass(frozen=True, slots=True)
+class ScrutinyEvidence:
+    """Measured source, decoder, rights-reference and speech-chain identities."""
+
+    layers: tuple[str, ...]
+    digests: tuple[str, ...]
+    bounds_ok: bool
+    recursion_depth: int
+    timestamp: float
+
+    def __post_init__(self) -> None:
+        if self.layers != ("bounds", "digest", "authority", "temporal") or len(self.digests) != 4:
+            raise ContentScrutinyError("scrutiny requires four measured layer digests")
+        for digest in self.digests:
+            _sha("scrutiny digest", digest)
+        if self.bounds_ok is not True:
+            raise ContentScrutinyError("failed bounds cannot issue successful scrutiny evidence")
+        if (
+            isinstance(self.recursion_depth, bool)
+            or not isinstance(self.recursion_depth, int)
+            or not 0 <= self.recursion_depth <= 8
+        ):
+            raise ContentScrutinyError("scrutiny depth exceeds bounds")
+        if (
+            isinstance(self.timestamp, bool)
+            or not isinstance(self.timestamp, (int, float))
+            or not math.isfinite(self.timestamp)
+            or self.timestamp <= 0
+        ):
+            raise ContentScrutinyError("scrutiny timestamp must be an observed positive time")
+
+
+class ContentScrutinyEngine:
+    """Read-only bounded checks through the existing corpus verification owner.
+
+    Decoder evidence establishes measured bytes. Source/rights references are
+    recorded without granting training, execution or promotion permission.
+    """
+
+    def __init__(self, max_depth: int = 8) -> None:
+        if isinstance(max_depth, bool) or not isinstance(max_depth, int) or not 0 <= max_depth <= 8:
+            raise ContentScrutinyError("max_depth must be an integer in [0, 8]")
+        self.max_depth = max_depth
+        self._evidence: list[ScrutinyEvidence] = []
+        self._total_evidence = 0
+
+    def scrutinize(self, corpus: MultimodalCorpus, *, depth: int = 0) -> ScrutinyEvidence:
+        if isinstance(depth, bool) or not isinstance(depth, int) or not 0 <= depth <= self.max_depth:
+            raise ContentScrutinyError("max scrutiny depth")
+        if not isinstance(corpus, MultimodalCorpus):
+            raise ContentScrutinyError("typed corpus is required")
+        try:
+            with corpus._lock:
+                ids = tuple(sorted(corpus._records))
+                if len(ids) > _CEILINGS["max_records"]:
+                    raise ContentScrutinyError("corpus record budget exceeded")
+                sizes = []
+                for record_id in ids:
+                    record = corpus._records[record_id]
+                    payload = corpus.store._objects.get(record.asset_digest)
+                    if not isinstance(payload, bytes) or len(payload) > _CEILINGS["max_source_bytes"]:
+                        raise ContentScrutinyError("corpus source byte budget exceeded")
+                    sizes.append(len(payload))
+                if sum(sizes) > _CEILINGS["max_total_source_bytes"]:
+                    raise ContentScrutinyError("total corpus source byte budget exceeded")
+                sources, authorities, temporal = [], [], []
+                for record_id in ids:
+                    record = corpus.get(record_id)
+                    asset = corpus.intake._assets[record_id]
+                    if asset.instruction_trusted or record.embedded_instruction_detected:
+                        raise ContentScrutinyError("instruction-bearing content cannot pass clean scrutiny")
+                    decoder = asset.validation if isinstance(asset, VerifiedMultimodalAsset) else None
+                    if (
+                        record.modality
+                        in {LearningModality.IMAGE, LearningModality.AUDIO, LearningModality.LIVE_SPEECH}
+                        and decoder is None
+                    ):
+                        raise ContentScrutinyError("media scrutiny requires an issued actual decoder receipt")
+                    sources.append(
+                        {
+                            "record": record.digest,
+                            "source": record.asset_digest,
+                            "decoder": decoder.digest if decoder else None,
+                        }
+                    )
+                    authorities.append(
+                        {
+                            "record_id": record_id,
+                            "source_refs": record.source_refs,
+                            "rights_refs": record.rights_refs,
+                            "lineage_refs": record.lineage_refs,
+                            "instruction_trusted": False,
+                            "training_authorized": False,
+                        }
+                    )
+                    speech_key = corpus._speech_record_keys.get(record_id)
+                    temporal.append(
+                        {
+                            "record_id": record_id,
+                            "duration_seconds": decoder.duration_seconds if decoder else None,
+                            "speech_chain": (
+                                corpus._speech_chunks[speech_key].chain_digest if speech_key else None
+                            ),
+                        }
+                    )
+                digests = (
+                    _digest({"records": len(ids), "bytes": sum(sizes), "limits": _CEILINGS}),
+                    _digest(sources),
+                    _digest(authorities),
+                    _digest(temporal),
+                )
+        except ContentScrutinyError:
+            raise
+        except (MultimodalFoundationError, KeyError, AttributeError, TypeError, ValueError) as exc:
+            raise ContentScrutinyError("corpus source or issued evidence verification failed") from exc
+        evidence = ScrutinyEvidence(
+            ("bounds", "digest", "authority", "temporal"), digests, True, depth, datetime.now(UTC).timestamp()
+        )
+        self._evidence.append(evidence)
+        del self._evidence[:-128]
+        self._total_evidence += 1
+        return evidence
+
+    def summary(self) -> dict[str, object]:
+        return {
+            "n_evidence": len(self._evidence),
+            "total_evidence": self._total_evidence,
+            "retained_evidence_limit": 128,
+            "max_depth_seen": max((e.recursion_depth for e in self._evidence), default=0),
+            "all_bounds_ok": all(e.bounds_ok for e in self._evidence),
+        }
