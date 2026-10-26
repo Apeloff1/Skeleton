@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import gc
 from uuid import NAMESPACE_URL, uuid4, uuid5
+from time import monotonic
 
 import httpx
 import pytest
@@ -15,6 +16,7 @@ from core.engine_client import (
     EngineConflictError,
     EngineExecutionFailed,
     EngineProtocolError,
+    EngineTerminalResult,
     EngineUnavailableError,
     command_from_context,
 )
@@ -1086,6 +1088,60 @@ async def test_terminal_poll_has_one_absolute_deadline_and_cancels_blocked_probe
             execution_id="execution", actor_id="actor", tenant_id="tenant", timeout_s=0.02,
         ), timeout=2)
     assert probe_cancelled.is_set()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("override", [False, True], ids=["configured-window", "per-call-window"])
+async def test_poll_request_allowance_spans_the_actual_observation_window(monkeypatch, override):
+    # Production used a 660s deadline but burned 2,400 short polls in ~240s.
+    # Scale that mismatch down: completion happens after the old polling cap
+    # would have expired, and must be observed without more probes or submits.
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN,
+        execution_timeout_s=1.8 if override else 0.6, poll_interval_s=0.001, max_poll_attempts=3))
+    completed = asyncio.Event()
+    probes = []
+    expected = EngineTerminalResult.from_payload({
+        "operation_id": "op", "execution_id": "execution", "status": "completed",
+        "final_output": "The original admitted execution completed.", "usage": {"model_turns": 1},
+        "provider_receipts": ["provider:original"],
+    })
+    async def complete_later():
+        await asyncio.sleep(0.12)
+        completed.set()
+    async def observe(**kwargs):
+        probes.append(dict(kwargs))
+        return expected if completed.is_set() else None
+    async def forbidden_mutation(*args, **kwargs):
+        pytest.fail("observation may not resubmit or cancel canonical work")
+    monkeypatch.setattr(client, "terminal_result_if_available", observe)
+    monkeypatch.setattr(client, "submit", forbidden_mutation)
+    monkeypatch.setattr(client, "cancel", forbidden_mutation)
+    completion = asyncio.create_task(complete_later())
+    try:
+        result = await client.wait_for_terminal(execution_id="execution", actor_id="actor", tenant_id="tenant",
+                                                **({"timeout_s": 0.6} if override else {}))
+    finally:
+        completion.cancel()
+        await asyncio.gather(completion, return_exceptions=True)
+    assert result is expected and completed.is_set()
+    assert 1 < len(probes) <= 3
+    assert all(probe["execution_id"] == "execution" for probe in probes)
+
+
+@pytest.mark.asyncio
+async def test_paced_polling_retains_absolute_deadline_and_explicit_request_cap(monkeypatch):
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN,
+        execution_timeout_s=0.1, poll_interval_s=0.001, max_poll_attempts=2))
+    probes = []
+    async def observe(**kwargs):
+        probes.append(kwargs)
+        return None
+    monkeypatch.setattr(client, "terminal_result_if_available", observe)
+    started = monotonic()
+    with pytest.raises(EngineUnavailableError, match="in time"):
+        await client.wait_for_terminal(execution_id="execution", actor_id="actor", tenant_id="tenant")
+    assert monotonic() - started >= 0.08
+    assert len(probes) <= 2
 
 
 @pytest.mark.asyncio

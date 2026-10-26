@@ -20,9 +20,10 @@ import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from routes.playable import (
+    PlayableModelFailure,
     _db, _GAME_SYS, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
 )
@@ -115,6 +116,10 @@ async def _do_aesthetics(pid: str) -> dict:
     )
     try:
         routed = await asyncio.to_thread(_llm_in_thread, prompt, _AESTHETICS_SYS, _GAME_ENSEMBLE)
+    except (PlayableModelFailure, HTTPException):
+        # The shared runner owns uncertain execution and revoked authority.
+        # Neither may become a completed "not applied" mutation result.
+        raise
     except Exception:
         return {"playable_id": pid, "applied": False, "error": "aesthetics model unavailable"}
     new_html, removed = _sanitize(_extract_html(routed.get("content", "")))

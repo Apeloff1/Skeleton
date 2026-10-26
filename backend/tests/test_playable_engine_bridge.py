@@ -142,6 +142,16 @@ def test_actual_runtime_repair_route_uses_complete_html_budget_and_keeps_owner_s
     assert [command.execution_request.resource_budget["max_output_tokens"] for command in commands] == [2048, 256, 2048]
     assert commands[-1].compiled_context.data_class == "confidential"
     assert commands[-1].operation.actor_id == "alice@example.test"
+    repair_context = commands[-1].compiled_context
+    assert repair_context.instructions == playable._RUNTIME_REPAIR_POLICY.instructions
+    policy_segment = playable._RUNTIME_REPAIR_POLICY.to_segment(
+        tenant_id="*", purpose="model-inference", created_at=datetime.now(timezone.utc), mandatory=True,
+    )
+    assert (policy_segment.segment_id, policy_segment.content_digest) in repair_context.source_snapshot
+    assert playable._RUNTIME_REPAIR_POLICY.policy_id == "backend.playable.runtime-repair"
+    assert playable._RUNTIME_REPAIR_POLICY.version == "1"
+    assert "WORLD-CLASS" not in repair_context.instructions and "DEPTH & INTRICACY" not in repair_context.instructions
+    assert "Fix an undefined score label while preserving game controls" in commands[-1].compiled_context.prompt
     assert source_queries and all(query == {"playable_id": pid, "owner_id": "alice@example.test", "tenant_id": "tenant-a"}
                                   for query in source_queries)
     assert client.post(f"/api/playable/{pid}/repair", headers=headers["bob"], json={"error": "denied"}).status_code == 404

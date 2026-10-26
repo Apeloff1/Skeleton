@@ -176,6 +176,23 @@ _REPAIR_SYS = _GAME_SYS + (
     "corrected HTML document — never a diff, never prose, never markdown fences."
 )
 
+# Runtime errors require preserving and repairing the existing game, rather
+# than expanding the original design brief. Keep this policy small and stable
+# so source code and the actual browser report remain the dominant context.
+_RUNTIME_REPAIR_POLICY = InstructionPolicy(
+    policy_id="backend.playable.runtime-repair",
+    version="1",
+    instructions=(
+        "Repair the supplied existing offline HTML5 game. Return ONLY its entire corrected HTML document, "
+        "with every closing tag and all CSS/JavaScript inline. Preserve working mechanics and assets. "
+        "Fix the reported runtime errors and broken controls first. Use mutable bindings for values that "
+        "are reassigned; bind visible Play/restart controls to real handlers after their DOM exists. "
+        "Keep animation running, keyboard/pointer controls responsive, and the canvas within the viewport. "
+        "Do not add features, levels, art systems, external dependencies, prose, TODOs or omitted code. "
+        "Keep the complete document compact."
+    ),
+)
+
 # Judge-driven quality elevation: keep the game runnable while raising depth,
 # polish and game-feel per the critique.
 _QUALITY_SYS = _GAME_SYS + (
@@ -240,7 +257,8 @@ class GenerateBody(BaseModel):
     derive_mode: str = ""
 
 
-async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None) -> dict:
+async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None,
+                     instruction_policy: InstructionPolicy | None = None) -> dict:
     """Execute canonical scoped model work from a worker's event loop.
 
     Historical ensemble names remain advisory. Canonical engine routing owns
@@ -258,16 +276,17 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
         chat = None
         dispatch_started = False
         try:
+            policy = instruction_policy or InstructionPolicy(
+                policy_id="backend.playable.generation", version="1", instructions=system.strip(),
+            )
+            if policy.instructions != system.strip():
+                raise ValueError("playable instruction policy content mismatch")
             chat = EngineChat(
                 session_id=sid,
                 tenant_id=identity["tenant_id"],
                 actor_id=identity["owner_id"],
                 data_class="confidential",
-                instruction_policy=InstructionPolicy(
-                    policy_id="backend.playable.generation",
-                    version="1",
-                    instructions=system.strip(),
-                ),
+                instruction_policy=policy,
             ).with_model(provider, model)
             # Every HTML mutation helper shares this finite feature default;
             # judges explicitly request their smaller 256-token envelope.
@@ -308,7 +327,8 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
 _LLM_SEM = threading.Semaphore(int(os.environ.get("LLM_MAX_CONCURRENCY", "3")))
 
 
-def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None) -> dict:
+def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None,
+                   instruction_policy: InstructionPolicy | None = None) -> dict:
     """Blocking entrypoint executed in a worker thread (own event loop) so the
     underlying LLM call never freezes the server's main event loop.
 
@@ -316,7 +336,8 @@ def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_token
     wire/polish jobs can't stampede the model providers or starve the thread pool.
     Threads simply wait their turn here — the event loop stays free."""
     with _LLM_SEM:
-        return asyncio.run(_llm_async(prompt, system, ensemble, max_output_tokens=max_output_tokens))
+        return asyncio.run(_llm_async(prompt, system, ensemble, max_output_tokens=max_output_tokens,
+                                      instruction_policy=instruction_policy))
 
 
 async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str = "studio",

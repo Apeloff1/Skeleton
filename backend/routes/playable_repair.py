@@ -17,13 +17,14 @@ import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from routes.playable_htmlutils import passes_playability_gate
 
 from routes.playable import (
-    _db, _REPAIR_SYS, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
+    PlayableModelFailure,
+    _db, _RUNTIME_REPAIR_POLICY, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job, _judge_eval,
 )
 
@@ -66,7 +67,14 @@ async def _do_repair(pid: str, error: str) -> dict:
         f"Return the FULL corrected single-file HTML document:\n{doc['html'][:12000]}"
     )
     try:
-        routed = await asyncio.to_thread(_llm_in_thread, repair_prompt, _REPAIR_SYS, _GAME_ENSEMBLE)
+        routed = await asyncio.to_thread(
+            _llm_in_thread, repair_prompt, _RUNTIME_REPAIR_POLICY.instructions, _GAME_ENSEMBLE,
+            instruction_policy=_RUNTIME_REPAIR_POLICY,
+        )
+    except (PlayableModelFailure, HTTPException):
+        # The shared runner owns uncertain execution and revoked authority.
+        # Neither may become a completed "not applied" mutation result.
+        raise
     except Exception:
         return {"playable_id": pid, "repaired": False, "error": "repair model unavailable"}
     new_html, _removed = _sanitize(_extract_html(routed.get("content", "")))

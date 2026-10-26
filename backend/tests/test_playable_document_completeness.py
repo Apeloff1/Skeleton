@@ -154,3 +154,97 @@ async def test_derived_partial_is_preserved_as_failed_even_with_a_lowered_score_
     inserted = next(row[1] for row in store.writes if row[0] == 'insert')
     assert inserted['status'] == 'failed' and inserted['html'] == TRUNCATED
     assert store.row == old
+
+
+_MUTATORS = [
+    ('edit', '_do_edit', ('finetune', 'Change the color')),
+    ('repair', '_do_repair', ('SyntaxError: unexpected end',)),
+    ('artwire', '_do_artwire', ()),
+    ('kbwire', '_do_kbwire', ()),
+    ('aesthetics', '_do_aesthetics', ()),
+    ('factions_wire', '_do_factions', ()),
+    ('physics', '_do_physics', ()),
+    ('sentience', '_do_sentience', ()),
+]
+
+
+def _failing_mutator(monkeypatch, name, method, extra, failure):
+    module = importlib.import_module('routes.playable_' + name)
+    old = {'playable_id': 'existing', 'html': COMPLETE, 'playability_score': 90,
+           'brief': 'Original fixture', 'version': 3}
+    store = _Collection(old)
+    monkeypatch.setattr(module, '_db', SimpleNamespace(
+        playables=store,
+        game_kb=_Collection({'artifacts': {'core_specs': {'title': 'Original'}}}),
+    ))
+    calls = []
+    def model(*args, **kwargs):
+        calls.append(1)
+        raise failure
+    monkeypatch.setattr(module, '_llm_in_thread', model)
+    if name == 'artwire':
+        async def assets(*args, **kwargs):
+            return {'hero': 'data:image/png;base64,AA=='}, [{'key': 'hero', 'kind': 'sprite', 'description': 'original'}]
+        monkeypatch.setattr(module, '_collect_assets', assets)
+    return lambda: getattr(module, method)('existing', *extra), store, old, calls
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('name,method,extra', _MUTATORS)
+@pytest.mark.parametrize('failure_kind', ['unconfirmed', 'confirmed', 'http403', 'http404'])
+async def test_mutator_preserves_typed_model_or_authority_failure_identity(monkeypatch, name, method, extra, failure_kind):
+    from fastapi import HTTPException
+    from routes.playable import PlayableModelFailure
+    if failure_kind.startswith('http'):
+        failure = HTTPException(int(failure_kind[4:]), 'PRIVATE-AUTHORITY-DETAIL')
+    else:
+        failure = PlayableModelFailure('project_model_execution_unconfirmed' if failure_kind == 'unconfirmed'
+                                       else 'project_model_transfer_denied',
+                                       unconfirmed=failure_kind == 'unconfirmed', request_key='engine-chat:original')
+    work, store, old, calls = _failing_mutator(monkeypatch, name, method, extra, failure)
+    with pytest.raises(type(failure)) as raised:
+        await work()
+    assert raised.value is failure
+    assert calls == [1]
+    assert store.writes == [] and store.row == old
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('name,method,extra', _MUTATORS)
+async def test_uncertain_mutator_job_retains_original_nonterminal_custody(monkeypatch, name, method, extra):
+    from routes import playable
+    failure = playable.PlayableModelFailure('project_model_execution_unconfirmed', unconfirmed=True,
+                                           request_key='engine-chat:original')
+    work, store, old, calls = _failing_mutator(monkeypatch, name, method, extra, failure)
+    jobs = _Collection({'job_id': 'original-job', 'job_status': 'running'})
+    monkeypatch.setattr(playable, '_db', SimpleNamespace(playable_jobs=jobs))
+    async def authorize(**kwargs):
+        return {'owner_id': 'owner', 'tenant_id': 'tenant'}
+    monkeypatch.setattr(playable, 'reauthorize_project_context', authorize)
+    await playable._run_job('original-job', work())
+    assert calls == [1] and store.writes == [] and store.row == old
+    assert len(jobs.writes) == 1
+    result = jobs.writes[0][1][1]['$set']
+    assert result['job_status'] == 'unconfirmed'
+    assert result['engine_request_key'] == 'engine-chat:original'
+    assert result['retry_same_request'] is True
+    assert not any(key in result for key in ('repaired', 'applied', 'edited', 'playable_id'))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('name,method,extra', _MUTATORS)
+@pytest.mark.parametrize('status', [403, 404])
+async def test_revoked_mutator_cannot_publish_job_completion_or_late_artifact(monkeypatch, name, method, extra, status):
+    from fastapi import HTTPException
+    from routes import playable
+    failure = HTTPException(status, 'PRIVATE-REVOKED-SOURCE')
+    work, store, old, calls = _failing_mutator(monkeypatch, name, method, extra, failure)
+    jobs = _Collection({'job_id': 'original-job', 'job_status': 'running'})
+    monkeypatch.setattr(playable, '_db', SimpleNamespace(playable_jobs=jobs))
+    async def authorize(**kwargs):
+        return {'owner_id': 'owner', 'tenant_id': 'tenant'}
+    monkeypatch.setattr(playable, 'reauthorize_project_context', authorize)
+    with pytest.raises(HTTPException) as raised:
+        await playable._run_job('original-job', work())
+    assert raised.value is failure
+    assert calls == [1] and jobs.writes == [] and store.writes == [] and store.row == old
