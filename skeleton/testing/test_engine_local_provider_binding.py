@@ -9,12 +9,13 @@ import pytest
 from skeleton.ai.runtime.inference import ReferenceNGramModel
 from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
 from skeleton.api.engine_routes import _engine_coordinator
-from skeleton.api.engine_runtime import (
-    EngineExecutionCoordinator,
-)
 from skeleton.persistence.execution_repository import ExecutionRepositoryConflict
 from skeleton.intelligence.execution_runtime import CognitiveExecutionRuntime
-from skeleton.provider_runtime import ProviderPolicyError, ProviderRegistry, provider_execution_identity
+from skeleton.provider_runtime import (
+    ProviderPolicyError,
+    ProviderRegistry,
+    provider_execution_identity,
+)
 from skeleton.testing.test_engine_execution_coordinator import (
     FakeProvider,
     FakeRegistry,
