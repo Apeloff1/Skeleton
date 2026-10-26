@@ -54,18 +54,22 @@ class BuildOrder:
   for n in self.nodes:visit(n)
  def _completed(self,completed):
   if not isinstance(completed,(tuple,list,set,frozenset)):raise BuildOrderError("completed must be a bounded collection")
-  if len(completed)>len(self.nodes):raise BuildOrderError("completed exceeds construction graph bound")
   done=set(_id(x,"completed_node_id") for x in completed)
+  if len(done)!=len(completed):raise BuildOrderError("duplicate completed node")
+  if len(completed)>len(self.nodes):raise BuildOrderError("completed exceeds construction graph bound")
   if not done.issubset(set(self.nodes)):raise BuildOrderError("completed contains unknown node")
   return done
  def blocked_reasons(self,node_id,completed):
-  _id(node_id,"node_id");done=set(completed);out=[]
+  _id(node_id,"node_id")
+  if node_id not in self.nodes:raise BuildOrderError("unknown node")
+  done=self._completed(completed);out=[]
   for d in self.dependencies:
    if d.downstream_id==node_id and d.kind is DependencyKind.HARD and d.upstream_id not in done:out.append("dependency:"+d.upstream_id)
   out.extend("stop:"+s.condition_id+":"+s.reason for s in self.stops if s.node_id==node_id and s.active)
   return tuple(sorted(out))
  def ready(self,completed):
-  done=set(completed);return tuple(n for n in self.nodes if n not in done and not self.blocked_reasons(n,done))
+  done=self._completed(completed)
+  return tuple(n for n in self.nodes if n not in done and not self.blocked_reasons(n,done))
  def maturity_allowed(self,node_id,completed):
   done=self._completed(completed)
   if node_id in done:raise BuildOrderError("completed node cannot request new maturity promotion")
