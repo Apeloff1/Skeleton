@@ -45,6 +45,10 @@ jobs:
         run: python scripts/check_merge_readiness_contract.py
       - name: Validate required-check policy
         run: python scripts/check_required_checks_policy.py
+      - name: Validate CI package floor parity
+        run: python scripts/check_ci_runtime_dependency_parity.py
+      - name: Regress CI package floor detection
+        run: python -m unittest discover -s tests -p test_ci_runtime_dependency_parity.py -v
       - name: Validate root production dependency metadata parity
         run: python scripts/check_root_package_metadata_parity.py
       - name: Regress root production package metadata floor drift
