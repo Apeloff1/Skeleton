@@ -8,7 +8,7 @@ and produces compact evidence describing the committed terminal transaction.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -64,7 +64,7 @@ class FunctionalAIRequest:
     max_model_turns: int = 8
     max_tool_calls: int = 16
     max_repeat_tool_batches: int = 1
-    created_at: datetime = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
         for name in ("request_id", "objective", "prompt", "instructions", "tenant_id"):
