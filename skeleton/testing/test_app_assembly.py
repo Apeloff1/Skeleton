@@ -275,7 +275,7 @@ def test_wait_for_application_rejects_invalid_budget():
 
 def test_all_launcher_paths_converge_on_product_shell():
     root = find_repo_root(Path(__file__))
-    launch = (root / "frontend/components/LaunchCascade.tsx").read_text(encoding="utf-8")
+    launch = (root / "frontend/src/components/LaunchCascade.tsx").read_text(encoding="utf-8")
     welcome = (root / "frontend/app/welcome.tsx").read_text(encoding="utf-8")
     safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
 
@@ -303,12 +303,16 @@ def test_production_web_ingress_routes_both_application_apis():
     assert "proxy_pass http://backend:8001;" in nginx
 
 
-def test_frontend_security_probe_supplies_compose_upstream_names():
+def test_frontend_live_probe_uses_compose_network_and_fails_on_bad_readiness():
     root = find_repo_root(Path(__file__))
-    workflow = (root / ".github/workflows/dependency-security.yml").read_text(encoding="utf-8")
+    workflow = (root / ".github/workflows/app-foundation-e2e.yml").read_text(encoding="utf-8")
 
-    assert "--add-host skeleton:127.0.0.1" in workflow
-    assert "--add-host backend:127.0.0.1" in workflow
+    # Compose provides service-name DNS. Manual loopback overrides would
+    # conceal invalid upstream service discovery in production-like E2E.
+    assert "docker compose -f docker-compose.yml up -d mongo skeleton backend frontend" in workflow
+    assert 'wait_for "${SKELETON_E2E_WEB_URL}/healthz" frontend' in workflow
+    assert "--add-host skeleton:127.0.0.1" not in workflow
+    assert "--add-host backend:127.0.0.1" not in workflow
 
 
 def test_backend_does_not_claim_skeleton_api_v1_prefix():
@@ -460,7 +464,7 @@ def test_public_product_readiness_route_is_registered():
 
 def test_product_routes_are_registered_in_canonical_route_registry():
     root = find_repo_root(Path(__file__))
-    registry = (root / "frontend/utils/routeRegistry.ts").read_text(encoding="utf-8")
+    registry = (root / "frontend/src/utils/routeRegistry.ts").read_text(encoding="utf-8")
 
     for route in (
         "/product",
