@@ -6,7 +6,9 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import stat
 import struct
 import tarfile
 from types import SimpleNamespace
@@ -209,6 +211,28 @@ def test_runtime_reuse_rejects_modified_source_before_acquisition(tmp_path, arti
     with pytest.raises(ValueError, match="bytes or SHA256"):
         provisioner.provision(request)
     assert not request.output.exists()
+
+
+def test_runtime_reuse_under_private_umask_remains_nonroot_traversable(tmp_path, artifacts):
+    private_parent = tmp_path / "private-operator-directory"
+    private_parent.mkdir(mode=0o700)
+    source = private_parent / "existing-chat"
+    old_umask = os.umask(0o077)
+    try:
+        provisioner.provision(args(source, artifacts))
+        request = args(private_parent / "optional-coding", artifacts, "coding")
+        request.runtime_archive = None
+        request.runtime_from = source
+        result = provisioner.provision(request)
+    finally:
+        os.umask(old_umask)
+    assert result["status"] == "provisioned"
+    assert stat.S_IMODE(private_parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(request.output.stat().st_mode) == 0o755
+    assert stat.S_IMODE((request.output / "runtime").stat().st_mode) == 0o755
+    assert stat.S_IMODE((request.output / "runtime/llama-completion").stat().st_mode) == 0o555
+    assert stat.S_IMODE((request.output / "runtime/LICENSE").stat().st_mode) == 0o444
+    assert stat.S_IMODE((request.output / provisioner.CODING_MODEL["filename"]).stat().st_mode) == 0o444
 
 
 def test_runtime_source_and_archive_are_explicitly_exclusive(tmp_path, artifacts):

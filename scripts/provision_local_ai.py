@@ -416,6 +416,9 @@ def _runtime_source(source: Path) -> tuple[Path, dict]:
 
 def _reuse_runtime(source: Path, receipt: dict, target: Path) -> list[dict]:
     target.mkdir(mode=0o755)
+    # Provisioning commonly runs under a private umask. Only this newly claimed
+    # artifact subdirectory must remain traversable by the nonroot engine UID.
+    target.chmod(0o755)
     records, total = [], 0
     for record in receipt["files"]:
         path = PurePosixPath(record["path"])
