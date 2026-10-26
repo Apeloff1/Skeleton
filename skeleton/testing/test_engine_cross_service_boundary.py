@@ -85,6 +85,10 @@ class _Registry:
     def require_for_context(self, _context_policy):
         return self.require_active()
 
+    def runtime_serving_engines(self):
+        # Hosted and fake providers have no activated local serving owner to drain.
+        return ()
+
     def statuses(self):
         # The backend model catalog requires a typed, ready hosted route.
         # Keep the fixture on the production provider inventory boundary.
