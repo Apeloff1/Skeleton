@@ -24,7 +24,9 @@ from skeleton.app.assembly import (
 from skeleton.app.preloader import inspect_host
 
 
-def _bounded_json(url: str, *, timeout: float) -> dict[str, object] | None:
+def _bounded_json(
+    url: str, *, timeout: float, max_response_bytes: int = 65536,
+) -> dict[str, object] | None:
     from skeleton.app.studio_readiness import _bounded_server
 
     parts = urlsplit(url)
@@ -37,7 +39,7 @@ def _bounded_json(url: str, *, timeout: float) -> dict[str, object] | None:
         timeout,
         endpoint=parts.path or "/",
         schema=None,
-        max_response_bytes=65536,
+        max_response_bytes=max_response_bytes,
     )
     value = result.get("report") if result.get("observed") is True else None
     return value if isinstance(value, dict) else None
@@ -55,7 +57,12 @@ def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) ->
         "missing": [],
         "scope": "Critical first-party route registration must be observed from the live backend.",
     }
-    status = _bounded_json(backend_base.rstrip("/") + "/api/health/registry", timeout=timeout)
+    # The full mounted-route inventory can exceed 64 KiB on a complete installation.
+    # Keep a larger finite allowance for this one read-only route registry.
+    status = _bounded_json(
+        backend_base.rstrip("/") + "/api/health/registry",
+        timeout=timeout, max_response_bytes=512 * 1024,
+    )
     critical = status.get("critical_routes") if isinstance(status, dict) else None
     if (
         isinstance(critical, dict)
