@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 import pytest
 
@@ -54,3 +55,15 @@ def test_dataclass_instance_supported_but_class_object_is_not():
 def test_nested_unsupported_object_is_denied_not_stringified():
     with pytest.raises(InferenceContractError, match="not canonically serializable"):
         provider_payload_digest({"untrusted": [object()]})
+
+
+def test_enums_follow_the_same_no_nan_contract_as_direct_values():
+    class EmitValue(Enum):
+        SAFE = "safe"
+        NONFINITE = float("inf")
+
+    assert provider_payload_digest({"value": EmitValue.SAFE}) == provider_payload_digest(
+        {"value": "safe"}
+    )
+    with pytest.raises(InferenceContractError, match="nonfinite number"):
+        provider_payload_digest({"value": EmitValue.NONFINITE})
