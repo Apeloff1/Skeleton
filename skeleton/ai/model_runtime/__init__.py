@@ -192,11 +192,81 @@ _LAZY_EXPORTS = {
 }
 
 
+def _load_trusted_lazy_module(module_name: str):
+    """Import from the repository-owned export map using only literal targets."""
+    if module_name == ".admission_checkpoint":
+        return import_module(".admission_checkpoint", __name__)
+    if module_name == ".admission_redundancy":
+        return import_module(".admission_redundancy", __name__)
+    if module_name == ".admission_scheduler":
+        return import_module(".admission_scheduler", __name__)
+    if module_name == ".chat_engine":
+        return import_module(".chat_engine", __name__)
+    if module_name == ".chat_protocol":
+        return import_module(".chat_protocol", __name__)
+    if module_name == ".chat_workspace":
+        return import_module(".chat_workspace", __name__)
+    if module_name == ".closed_loop_serving":
+        return import_module(".closed_loop_serving", __name__)
+    if module_name == ".conversation_persistence":
+        return import_module(".conversation_persistence", __name__)
+    if module_name == ".conversation_service":
+        return import_module(".conversation_service", __name__)
+    if module_name == ".conversation_store":
+        return import_module(".conversation_store", __name__)
+    if module_name == ".execution_telemetry":
+        return import_module(".execution_telemetry", __name__)
+    if module_name == ".flgb_model_runtime":
+        return import_module(".flgb_model_runtime", __name__)
+    if module_name == ".iteration_scheduler":
+        return import_module(".iteration_scheduler", __name__)
+    if module_name == ".native_llm_runtime":
+        return import_module(".native_llm_runtime", __name__)
+    if module_name == ".runtime_checkpoint":
+        return import_module(".runtime_checkpoint", __name__)
+    if module_name == ".runtime_contracts":
+        return import_module(".runtime_contracts", __name__)
+    if module_name == ".runtime_epochs":
+        return import_module(".runtime_epochs", __name__)
+    if module_name == ".runtime_feedback":
+        return import_module(".runtime_feedback", __name__)
+    if module_name == ".runtime_policy":
+        return import_module(".runtime_policy", __name__)
+    if module_name == ".runtime_service":
+        return import_module(".runtime_service", __name__)
+    if module_name == ".runtime_signals":
+        return import_module(".runtime_signals", __name__)
+    if module_name == ".serving_policy":
+        return import_module(".serving_policy", __name__)
+    if module_name == ".serving_telemetry":
+        return import_module(".serving_telemetry", __name__)
+    if module_name == ".slo_planner":
+        return import_module(".slo_planner", __name__)
+    if module_name == ".temporal_policy":
+        return import_module(".temporal_policy", __name__)
+    if module_name == ".text_normalization":
+        return import_module(".text_normalization", __name__)
+    if module_name == ".text_pipeline":
+        return import_module(".text_pipeline", __name__)
+    if module_name == ".tokenization":
+        return import_module(".tokenization", __name__)
+    if module_name == ".training_admission":
+        return import_module(".training_admission", __name__)
+    if module_name == ".weight_activation":
+        return import_module(".weight_activation", __name__)
+    if module_name == ".weight_gateway":
+        return import_module(".weight_gateway", __name__)
+    if module_name == ".weight_shard_store":
+        return import_module(".weight_shard_store", __name__)
+    raise ImportError("unregistered lazy export module")
+
+
+
 def __getattr__(name: str):
     module_name = _LAZY_EXPORTS.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = getattr(import_module(module_name, __name__), name)
+    value = getattr(_load_trusted_lazy_module(module_name), name)
     globals()[name] = value
     return value
 
