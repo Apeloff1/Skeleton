@@ -45,6 +45,8 @@ jobs:
         run: python scripts/check_merge_readiness_contract.py
       - name: Validate required-check policy
         run: python scripts/check_required_checks_policy.py
+      - name: Validate Expo SDK and native runtime pairing
+        run: python scripts/check_expo_runtime_pairing.py
       - name: Validate composed contract system
         run: python scripts/check_contract_system.py
       - name: Validate flaky-test quarantine registry
