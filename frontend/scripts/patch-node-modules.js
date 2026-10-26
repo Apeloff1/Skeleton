@@ -414,7 +414,11 @@ function patchExpoStaticIndexPath() {
   const pkgPath = path.join(ROOT, 'node_modules/@expo/cli/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const version = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
-  if (version !== '54.0.27') throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  // SDK 54 shipped both CLI versions with the same guarded static-index path.
+  // Future releases still require an explicit exact-version and source review.
+  if (!new Set(['54.0.27', '54.0.28']).has(version)) {
+    throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  }
   const target = path.join(ROOT, 'node_modules/@expo/cli/build/src/export/exportStaticAsync.js');
   const source = fs.readFileSync(target, 'utf8');
   // The upstream optional-slash regex strips "index" from "story-index",
@@ -422,8 +426,14 @@ function patchExpoStaticIndexPath() {
   const before = "pathname: filePathLocation.replace(/(\\/?index)?$/, '')";
   const after = "pathname: filePathLocation === 'index' ? '' : filePathLocation.replace(/\\/index$/, '')";
   if (source.includes(after)) { skipped++; return; }
-  if (!source.includes(before)) throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
-  fs.writeFileSync(target, source.replace(before, after), 'utf8');
+  if (source.split(before).length !== 2) {
+    throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
+  }
+  const hardened = source.replace(before, after);
+  if (!hardened.includes(after) || hardened.includes(before)) {
+    throw new Error('[patch-node-modules] Expo static path patch postcondition failed');
+  }
+  fs.writeFileSync(target, hardened, 'utf8');
   patched++;
   console.log('[patch-node-modules] ✓ Expo static index path segment');
 }
