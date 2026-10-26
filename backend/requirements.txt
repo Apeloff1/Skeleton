@@ -4,7 +4,7 @@
 # ============================================================================
 
 # --- Web framework ---
-fastapi==0.143.2
+fastapi==0.161.1
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 # Keep the backend websocket runtime on the maintained 16.x line.
@@ -21,7 +21,7 @@ aiosqlite==0.22.1
 
 # --- Validation / config ---
 pydantic==2.14.1
-pydantic-settings==2.16.0
+pydantic-settings==2.16.1
 email-validator==2.3.0
 python-dotenv==1.2.4
 
@@ -40,7 +40,7 @@ cryptography==50.0.2
 # openai 3.13.0 currently makes the pinned backend graph unresolvable in CI;
 # keep the compatible 2.x line until the provider stack is migrated together.
 openai==2.54.0
-litellm==1.105.1
+litellm==1.106.2
 # google-genai was removed after the #116 runtime audit found no active Python
 # model-execution call sites. Direct Google provider imports are CI-gated until
 # a canonical ProviderAdapter and shared contract tests are added deliberately.
@@ -64,7 +64,7 @@ stripe==15.6.1
 imageio==2.38.1
 imageio-ffmpeg==0.6.0
 scipy==1.17.1
-reportlab==5.0.1
+reportlab==5.1.0
 pillow==13.0.0
 numpy==2.4.6
 matplotlib==3.11.2
