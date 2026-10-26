@@ -448,6 +448,16 @@ def test_first_install_build_output_is_discarded_without_receipt_leak(tmp_path, 
         "skeleton.app.installer.compose_command",
         lambda action, **kwargs: ("docker", "compose", action),
     )
+    # Health and critical API route probes have separate required evidence.
+    # This test stubs both, leaving the production post-install gate intact.
+    monkeypatch.setattr(
+        "skeleton.app.installer.public_service_urls",
+        lambda root, **kwargs: {"backend": "http://127.0.0.1:8000"},
+    )
+    monkeypatch.setattr(
+        "skeleton.app.first_install.critical_backend_route_report",
+        lambda url, **kwargs: {"ready": url == "http://127.0.0.1:8000"},
+    )
     class Result:
         service = "backend"
         ok = True
