@@ -272,6 +272,10 @@ class PayloadSecretGuard:
                     return REDACTED
                 return item
             if isinstance(item, Mapping):
+                if not isinstance(item, dict):
+                    raise RealtimeSecretError(
+                        "payload mappings must be JSON-native dictionaries"
+                    )
                 out = {}
                 for key, child in item.items():
                     if not isinstance(key, str):
