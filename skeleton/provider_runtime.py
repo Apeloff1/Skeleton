@@ -3829,7 +3829,18 @@ def provider_execution_identity(adapter: ProviderAdapter) -> dict[str, object]:
                     or any(ch not in "0123456789abcdef" for ch in artifact_hash)
                     or type(artifact_bytes) is not int
                     or artifact_bytes < 1
-                    or artifact.get("reference") != "local-model-artifact:" + artifact_hash
+                    or artifact.get("reference") not in {
+                        "local-model-artifact:" + artifact_hash,
+                        "local-model-deployment:" + str(artifact.get("manifest_digest")),
+                    }
+                    or (
+                        artifact.get("reference", "").startswith("local-model-deployment:")
+                        and (
+                            not isinstance(artifact.get("manifest_digest"), str)
+                            or len(artifact["manifest_digest"]) != 64
+                            or any(ch not in "0123456789abcdef" for ch in artifact["manifest_digest"])
+                        )
+                    )
                 ):
                     raise ProviderPolicyError("local execution identity artifact receipt drift")
             from skeleton.ai.runtime.inference.local import ReferenceNGramModel
