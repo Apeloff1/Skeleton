@@ -138,3 +138,16 @@ def test_empty_library_results_keep_grounding_absent():
         assert offline_cli.main(["--model", "checkpoint.json", "--prompt", "hello",
                                  "--library", "notes.sqlite3", "--use-library", "--json"]) == 0
     assert session.value is None
+
+
+def test_app_cli_routes_offline_library_workspace_and_backup_to_original_owner():
+    from skeleton.app.cli import run_app_cli
+    from skeleton.app import offline_cli
+
+    flags = ("--library", "--use-library", "--workspace", "--backup-in", "--backup-out")
+    for flag in flags:
+        with patch.object(offline_cli, "main", return_value=0) as delegated:
+            rc = run_app_cli(["local-ai", "--model", "local.json", "--prompt", "hello", flag, "path"])
+            assert rc == 0
+            delegated.assert_called_once()
+            assert delegated.call_args.args[0][0:2] == ["--model", "local.json"]
