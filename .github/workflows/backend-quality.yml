@@ -47,9 +47,10 @@ on:
 permissions:
   contents: read
 
+# A PR's newer head supersedes only that PR; main SHA evidence is immutable.
 concurrency:
-  group: backend-quality-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: backend-quality-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ruff:
