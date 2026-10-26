@@ -215,6 +215,9 @@ class PayloadSecretGuard:
         def scan_text(item: str, depth: int) -> str:
             nonlocal hits
             stripped = item.strip()
+            if stripped[:1] in ("{", "[") and depth + 1 >= _MAX_DEPTH:
+                hits += 1
+                return REDACTED
             if stripped[:1] in ("{", "[") and depth + 1 < _MAX_DEPTH:
                 try:
                     embedded = json.loads(stripped)
