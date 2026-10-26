@@ -25,7 +25,7 @@
     "write_rule": "authoritative writes require durable commit acknowledgement; projections are source-first; scratch/recovery writes never become authority",
     "staleness_thresholds": "No numeric staleness threshold is invented. max_staleness_ms remains null until a domain-specific NFR supplies one."
   },
-  "profile_count": 21,
+  "profile_count": 27,
   "profiles": [
     {
       "schema_version": 1,
@@ -550,6 +550,149 @@
         "skeleton/cortex/deck_interactions.py",
         "skeleton/testing/test_reference_provenance.py",
         "docs/architecture/REFERENCE_PROVENANCE.md"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "domain_id": "jeeves-game-learning-workspace",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "read_guarantee": "authoritative_committed",
+      "write_guarantee": "durable_commit_ack",
+      "stale_policy": "reject",
+      "unknown_policy": "reject",
+      "source_refs": [],
+      "max_staleness_ms": null,
+      "consistency_statement": "Exact tenant/owner/project identity; source withdrawal and editor input epochs fence active publication; only complete episode snapshots advance learned policy cursor; receipts bind current admitted source and exact code/environment identities Studio campaigns commit complete independently reviewed round/lesson evidence before their cursor advances; exact source/policy/code and current consent bind every resumable slice.",
+      "evidence": [
+        "machine/ai_game_learning.json",
+        "machine/ai_game_learning_workspace.json",
+        "backend/core/game_learning.py",
+        "backend/routes/game_learning.py",
+        "machine/ai_game_policy_learning.json",
+        "machine/ai_game_play.json",
+        "machine/ai_game_demonstrations.json",
+        "machine/ai_game_content_uploads.json",
+        "machine/ai_game_console_build.json",
+        "machine/ai_game_console_editor.json",
+        "machine/ai_game_console_workspace.json",
+        "machine/ai_game_successor.json",
+        "machine/ai_game_style_analysis.json",
+        "machine/ai_game_successor_runtime.json",
+        "machine/ai_game_desktop_export.json",
+        "machine/ai_game_studio_learning.json"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "domain_id": "dragon-crawler-application",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "read_guarantee": "authoritative_committed",
+      "write_guarantee": "durable_commit_ack",
+      "stale_policy": "reject",
+      "unknown_policy": "reject",
+      "source_refs": [],
+      "max_staleness_ms": null,
+      "consistency_statement": "Tenant/owner isolation, exact request digest and bounded source/frontier/provenance state; no synthetic fetched/learned counters and no raw crawl automatically promoted to reviewed knowledge.",
+      "evidence": [
+        "machine/ai_dragon_crawler_app.json",
+        "machine/ai_dragon_crawler_operations.json",
+        "backend/core/dragon_crawler.py",
+        "backend/routes/dragon_academy.py"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "domain_id": "backend-curiosity-file-state",
+      "owner_plane": "feedback-learning",
+      "physical_store": "backend-data-volume",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "read_guarantee": "authoritative_committed",
+      "write_guarantee": "durable_commit_ack",
+      "stale_policy": "reject",
+      "unknown_policy": "reject",
+      "source_refs": [],
+      "max_staleness_ms": null,
+      "consistency_statement": "Existing canonical Curiosity and truth owners retain their file protocols; read-only application image never acts as writable state.",
+      "evidence": [
+        "backend/core/curiosity_service.py",
+        "backend/core/verified_curiosity.py",
+        "docker-compose.yml",
+        "machine/ai_first_install.json"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "domain_id": "dragon-reviewed-design-knowledge",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "read_guarantee": "authoritative_committed",
+      "write_guarantee": "durable_commit_ack",
+      "stale_policy": "reject",
+      "unknown_policy": "reject",
+      "source_refs": [],
+      "max_staleness_ms": null,
+      "consistency_statement": "Authoritative user annotations and review receipts, not authoritative external truth. Reserved crawler-review revisions require exact current owner/source/consent/expiry verification at search, brief, builder evidence and practice admission.",
+      "evidence": [
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/game_builder/reviewed_knowledge.py",
+        "skeleton/ai/game_builder/dragon_source_review.py",
+        "backend/core/dragon_runtime.py"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "domain_id": "dragon-conversation-micro-projection",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "authority": "derived",
+      "source_of_truth": false,
+      "read_guarantee": "eventual_projection",
+      "write_guarantee": "source_first_then_project",
+      "stale_policy": "explicit_only",
+      "unknown_policy": "reject",
+      "source_refs": [
+        "conversation-thread-state",
+        "conversation-message-state"
+      ],
+      "max_staleness_ms": null,
+      "consistency_statement": "derived ten-step interest checkpoints of committed canonical conversation windows; raw transcript text is not copied; retrieval rechecks current retention consent and never treats a stored training flag as permission",
+      "evidence": [
+        "skeleton/ai/webcrawler/dragon_conversation_micro_logs.py",
+        "backend/core/dragon_conversation_binding.py",
+        "backend/core/dragon_runtime_bridge.py",
+        "backend/tests/test_dragon_conversation_binding.py",
+        "tests/test_ai_dragon_resource_cognition.py",
+        "docs/ai/dragon-runtime-conversation-2026-10-10.md"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "domain_id": "dragon-practice-state",
+      "owner_plane": "feedback-learning",
+      "physical_store": "backend-data-volume",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "read_guarantee": "authoritative_committed",
+      "write_guarantee": "durable_commit_ack",
+      "stale_policy": "reject",
+      "unknown_policy": "reject",
+      "source_refs": [],
+      "max_staleness_ms": null,
+      "consistency_statement": "Only actual completed observations advance measured practice history. Fixed reference play cannot manufacture calibrated lessons, policy training, XP or source rights. Existing approved Lab promotion gates remain unchanged.",
+      "evidence": [
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/webcrawler/dragon_practice_lab.py",
+        "backend/core/dragon_reference_practice.py",
+        "backend/core/dragon_runtime.py"
       ]
     }
   ]
