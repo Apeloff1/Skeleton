@@ -980,7 +980,7 @@ function PlayableContent() {
               <View style={styles.busyRow}><ActivityIndicator color="#fff" /><Text style={styles.ctaTxt}>  {busyLabel}</Text></View>
             ) : <Text style={styles.ctaTxt}>{restoringJob ? 'Checking saved observation…' : !observationReady ? 'Sign in to verify saved jobs' : savedJob ? 'Resume or dismiss the saved job above' : '🎮 Generate & Play →'}</Text>}
           </TouchableOpacity>
-          {working ? <Text style={styles.hint}>{depth === 'fast' ? 'Fast mode: one focused, runnable game, gate-checked (~1 min).' : 'Studio mode: a richly intricate game, auto-repaired, judge-scored, then quality-refined (~3-5 min).'}</Text> : null}
+          {working ? <Text style={styles.hint}>{depth === 'fast' ? 'Fast mode: a focused game to preview and refine. Build time depends on your model.' : 'Studio mode: a richer game with repair, review and refinement. Build time depends on your model.'}</Text> : null}
           {error ? <Text testID="pl-error" style={styles.err}>{error}</Text> : null}
 
           {working && !savedJob && !game ? <GeneratingPreview label={busyLabel} /> : null}
