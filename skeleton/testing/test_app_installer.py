@@ -429,7 +429,7 @@ def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
     assert after["SKL_ENGINE_SERVICE_TOKEN"] != before["SKL_ENGINE_SERVICE_TOKEN"]
 
 
-def test_first_install_build_output_streams_to_file_instead_of_memory(tmp_path, monkeypatch):
+def test_first_install_build_output_is_discarded_without_receipt_leak(tmp_path, monkeypatch):
     from skeleton.app.installer import install_application
     from skeleton.app.setup_runtime import SetupResult
 
@@ -461,9 +461,10 @@ def test_first_install_build_output_streams_to_file_instead_of_memory(tmp_path, 
         calls.append((tuple(command), dict(kwargs)))
         if command[-1] == "up":
             assert "capture_output" not in kwargs
-            assert kwargs["stderr"] is subprocess.STDOUT
-            assert kwargs["stdout"].fileno() >= 0
-            kwargs["stdout"].write("pretend-secret-which-must-not-be-reported\n")
+            # Compose may log credentials: neither stream may enter memory,
+            # a receipt, or a world-readable temporary file.
+            assert kwargs["stdout"] is subprocess.DEVNULL
+            assert kwargs["stderr"] is subprocess.DEVNULL
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     receipt = install_application(tmp_path, start=True, install_python=False, runner=runner)
