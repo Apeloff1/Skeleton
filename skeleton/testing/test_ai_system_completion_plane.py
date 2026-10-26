@@ -95,6 +95,7 @@ def _local_model() -> LocalModelAdapter:
                 model_id="system-completion-local",
                 model_digest=model_digest,
                 runner=runner,
+                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
