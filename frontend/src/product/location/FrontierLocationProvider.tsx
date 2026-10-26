@@ -47,6 +47,7 @@ export function FrontierLocationProvider(props: FrontierLocationProviderProps): 
   const [state, setState] = useState<FrontierLocationState>(INITIAL);
   const session = useRef<FrontierGPSSession | null>(null);
   const generation = useRef(0);
+  const pendingStart = useRef<number | null>(null);
   const native = useMemo(
     () => (adapter !== undefined ? adapter : defaultAdapter(adapterOptions)),
     [adapter, adapterOptions],
@@ -61,8 +62,9 @@ export function FrontierLocationProvider(props: FrontierLocationProviderProps): 
   }, []);
 
   const start = useCallback(async () => {
-    if (session.current?.active()) return;
+    if (session.current?.active() || pendingStart.current === generation.current) return;
     const gen = ++generation.current;
+    pendingStart.current = gen;
     if (Platform.OS !== "web" && !native) {
       setState({ status: "unavailable", fix: null, error: { code: "UNAVAILABLE", message: "expo-location is not installed in this build" } });
       return;
@@ -85,7 +87,7 @@ export function FrontierLocationProvider(props: FrontierLocationProviderProps): 
           if (code === "WATCH_FAILED") {
             session.current?.stop();
             session.current = null;
-            setState(st => ({ ...st, status: "error", error: { code, message: err.message } }));
+            setState({ status: "error", fix: null, error: { code, message: err.message } });
           } else {
             setState(st => ({ ...st, error: { code, message: err.message } }));
           }
@@ -109,6 +111,8 @@ export function FrontierLocationProvider(props: FrontierLocationProviderProps): 
         const code = err instanceof FrontierLocationError ? err.code : "UNAVAILABLE";
         setState({ status: "error", fix: null, error: { code, message } });
       }
+    } finally {
+      if (pendingStart.current === gen) pendingStart.current = null;
     }
   }, [native, maxAccuracyM, maxAgeMs]);
 
