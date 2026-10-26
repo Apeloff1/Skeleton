@@ -285,7 +285,7 @@ class PayloadSecretGuard:
                     else:
                         out[key] = visit(child, depth + 1)
                 return out
-            if isinstance(item, (list, tuple)):
+            if isinstance(item, list):
                 return [visit(child, depth + 1) for child in item]
             raise RealtimeSecretError(
                 f"payload value of type {type(item).__name__} is not JSON-native; convert it before publishing"
