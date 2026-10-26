@@ -110,12 +110,13 @@ async def pipeline(pid: str):
         ("KB-synced · " if g.get("kb_applied") else "") + f"v{g.get('version', 1)} · {round((g.get('bytes') or 0) / 1024, 1)}KB",
         "/playable"))
     # 8) Playtest & QA → qa_report.json (forgeable)
-    qa_done = (ev_ok and score >= PLAYABILITY_THRESHOLD) or has_qa
     qa = _stage("qa", "Playtest & QA", "🧪",
-                "done" if qa_done else ("partial" if (ev_ok or has_qa) else "todo"),
-                (f"QA {(arts.get('qa_report') or {}).get('score', '?')}" if has_qa
-                 else (f"score {score} · {ev.get('verdict', '–')}" if ev_ok else "not evaluated")),
+                "partial" if (ev_ok or has_qa) else "todo",
+                ("Source QA report present; browser play remains unqualified" if has_qa
+                 else (f"Model review {ev.get('overall', score)} · {ev.get('verdict', '–')}; browser play remains unqualified"
+                       if ev_ok else "Browser play has not been qualified")),
                 "/playable")
+    qa.update(scope="model_review_or_source_report", runtime_checked=False, shippable=False)
     qa["forge"] = "qa"
     stages.append(qa)
     # 9) Build & Export → build_manifest.json (forgeable, deterministic)

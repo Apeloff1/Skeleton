@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import json
+import hashlib
 from html.parser import HTMLParser
 
 _MIN_DOC = (
@@ -250,6 +251,36 @@ def passes_playability_gate(validation: dict, threshold: int) -> bool:
         return False
     score = validation.get("score")
     return type(score) is int and 0 <= score <= 100 and score >= threshold
+
+
+def playable_html_digest(html: str) -> str:
+    """Bind an advisory review to the exact generated source bytes."""
+    return hashlib.sha256(html.encode("utf-8")).hexdigest()
+
+
+def model_review_projection(review, *, current_source_digest: str | None = None) -> dict:
+    """A model's opinion is not evidence that the game ran or may ship.
+
+    No trusted browser/runtime qualification owner is wired to this legacy
+    HTML surface. Neither model output nor stored/client-supplied booleans can
+    manufacture that authority. Historical scores remain visible as advice.
+    """
+    projected = dict(review) if isinstance(review, dict) else {"available": False}
+    verdict = projected.get("verdict")
+    if verdict in {"ship", "polish", "reject"}:
+        projected["advisory_recommendation"] = verdict
+    digest = projected.get("source_digest")
+    bound = (isinstance(digest, str) and len(digest) == 64
+             and all(character in "0123456789abcdef" for character in digest)
+             and digest == current_source_digest)
+    projected.update(scope="model_review", advisory=True, shippable=False,
+                     runtime_checked=False, release_qualified=False,
+                     source_bound=bound, stale=not bound)
+    if not bound:
+        projected["available"] = False
+        projected["source_binding_reason"] = "source_changed_review_required" if current_source_digest else "source_binding_unavailable"
+        projected.setdefault("reason", projected["source_binding_reason"])
+    return projected
 
 
 def _extract_json(text: str) -> dict:

@@ -15,9 +15,9 @@ import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from routes.playable import _db, _run_job
+from routes.playable import _db, _run_job, PlayableModelFailure
 from routes.playable_sentience import _do_sentience
 from routes.playable_physics import _do_physics
 from routes.playable_aesthetics import _do_aesthetics
@@ -43,6 +43,10 @@ async def _do_polish(pid: str, job_id: str) -> dict:
         }})
         try:
             res = await fn(pid)
+        except (PlayableModelFailure, HTTPException):
+            # The shared runner retains uncertain model custody and authority
+            # denials. Neither permits starting another model-backed step.
+            raise
         except Exception:  # a single step failing must not abort the chain
             res = {"applied": False, "error": "polish_step_failed"}
         ok = bool(res.get("applied"))

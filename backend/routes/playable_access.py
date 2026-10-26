@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.routing import APIRoute
 
 from routes import gameforge_auth as auth
+from routes.playable_htmlutils import model_review_projection, playable_html_digest
 
 
 @dataclass(frozen=True)
@@ -323,6 +324,48 @@ async def _authorize_operation(name, values, *, mutate=False, insert=False):
     return identity
 
 
+def _review_record(row, name):
+    if name not in {"playables", "playable_jobs"} or not isinstance(row, dict):
+        return row
+    projected = dict(row)
+    digest = playable_html_digest(row["html"]) if isinstance(row.get("html"), str) else row.get("html_digest")
+    if "evaluation" in row:
+        projected["evaluation"] = model_review_projection(row["evaluation"], current_source_digest=digest)
+    return projected
+
+
+def _review_document(document, name):
+    if name not in {"playables", "playable_jobs"} or not isinstance(document, dict):
+        return document
+    projected = dict(document)
+    if isinstance(projected.get("html"), str):
+        projected["html_digest"] = playable_html_digest(projected["html"])
+    return _review_record(projected, name)
+
+
+def _review_update(update, name):
+    if name not in {"playables", "playable_jobs"} or not isinstance(update, dict):
+        return update
+    projected = {operation: dict(changes) if isinstance(changes, dict) else changes
+                 for operation, changes in update.items()}
+    for operation in ("$set", "$setOnInsert"):
+        changes = projected.get(operation)
+        if not isinstance(changes, dict):
+            continue
+        if isinstance(changes.get("html"), str):
+            # One atomic source digest invalidates the prior review on all
+            # reads. Keep its historical scores; an unchanged source retains
+            # its review, and a fresh same-write review must match these bytes.
+            changes["html_digest"] = playable_html_digest(changes["html"])
+        if "evaluation" in changes:
+            review = changes["evaluation"]
+            digest = changes.get("html_digest")
+            if digest is None and isinstance(review, dict):
+                digest = review.get("source_digest")  # Rechecked against source on every read.
+            changes["evaluation"] = model_review_projection(review, current_source_digest=digest)
+    return projected
+
+
 class _ProjectCursor:
     def __init__(self, cursor, name, query, *, aggregate=False):
         self._cursor, self._name, self._query = cursor, name, query
@@ -348,7 +391,7 @@ class _ProjectCursor:
         rows = await self._cursor.to_list(*args, **kwargs)
         # Aggregations are scoped before any grouping/projection; ordinary
         # records additionally require intact authority in every result.
-        return rows if self._aggregate else [row for row in rows if _available(row, identity)]
+        return [_review_record(row, self._name) for row in rows if self._aggregate or _available(row, identity)]
 
     def __aiter__(self):
         async def iterate():
@@ -357,7 +400,7 @@ class _ProjectCursor:
                 raise HTTPException(403, "Project cursor authority changed")
             async for row in self._cursor:
                 if self._aggregate or _available(row, identity):
-                    yield row
+                    yield _review_record(row, self._name)
         return iterate()
 
 
@@ -371,39 +414,39 @@ class _ProjectCollection:
     async def find_one(self, query=None, projection=None, *args, **kwargs):
         identity = await _authorize_operation(self._name, query or {})
         row = await self._collection.find_one(_query(query), _projection(projection), *args, **kwargs)
-        return row if _available(row, identity) else None
+        return _review_record(row, self._name) if _available(row, identity) else None
 
     async def insert_one(self, document, *args, **kwargs):
         await _authorize_operation(self._name, document, mutate=True, insert=True)
-        return await self._collection.insert_one(_document(document), *args, **kwargs)
+        return await self._collection.insert_one(_document(_review_document(document, self._name)), *args, **kwargs)
 
     async def insert_many(self, documents, *args, **kwargs):
         documents = list(documents)
         for document in documents:
             await _authorize_operation(self._name, document, mutate=True, insert=True)
-        return await self._collection.insert_many([_document(document) for document in documents], *args, **kwargs)
+        return await self._collection.insert_many([_document(_review_document(document, self._name)) for document in documents], *args, **kwargs)
 
     async def update_one(self, query, update, *args, **kwargs):
         await _authorize_operation(self._name, {**query, **update.get("$set", {})}, mutate=True)
-        result = await self._collection.update_one(_query(query), _update(update), *args, **kwargs)
+        result = await self._collection.update_one(_query(query), _update(_review_update(update, self._name)), *args, **kwargs)
         if not kwargs.get("upsert") and getattr(result, "matched_count", None) == 0:
             raise HTTPException(404, "Project record not found")
         return result
 
     async def update_many(self, query, update, *args, **kwargs):
         await _authorize_operation(self._name, {**query, **update.get("$set", {})}, mutate=True)
-        return await self._collection.update_many(_query(query), _update(update), *args, **kwargs)
+        return await self._collection.update_many(_query(query), _update(_review_update(update, self._name)), *args, **kwargs)
 
     async def find_one_and_update(self, query, update, *args, **kwargs):
         identity = await _authorize_operation(self._name, {**query, **update.get("$set", {})}, mutate=True)
         if "projection" in kwargs:
             kwargs["projection"] = _projection(kwargs["projection"])
-        row = await self._collection.find_one_and_update(_query(query), _update(update), *args, **kwargs)
-        return row if _available(row, identity) else None
+        row = await self._collection.find_one_and_update(_query(query), _update(_review_update(update, self._name)), *args, **kwargs)
+        return _review_record(row, self._name) if _available(row, identity) else None
 
     async def replace_one(self, query, document, *args, **kwargs):
         await _authorize_operation(self._name, document, mutate=True)
-        return await self._collection.replace_one(_query(query), _document(document), *args, **kwargs)
+        return await self._collection.replace_one(_query(query), _document(_review_document(document, self._name)), *args, **kwargs)
 
     async def delete_one(self, query, *args, **kwargs):
         await _authorize_operation(self._name, query, mutate=True)

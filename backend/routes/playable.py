@@ -99,7 +99,7 @@ MAX_REPAIR = int(os.environ.get("PLAYABLE_MAX_REPAIR", "2"))
 # Quality-driven refinement: total refine budget (structural + judge-driven quality passes).
 # Each pass is an extra LLM round, so keep this modest (1 = one quality elevation pass).
 MAX_REFINE = int(os.environ.get("PLAYABLE_MAX_REFINE", "1"))
-# VII.1 — judge gate: minimum overall eval score to mark the build "shippable".
+# VII.1 — model-review recommendation floor, never a runtime/release grant.
 EVAL_SHIP_MIN = int(os.environ.get("PLAYABLE_EVAL_SHIP_MIN", "60"))
 # Rigorous quality target: keep re-refining (within budget) until the judge's
 # overall meets this bar. Higher ⇒ more intricate, more polished output.
@@ -164,6 +164,7 @@ features. Output ONLY the HTML document."""
 
 from routes.playable_htmlutils import (  # HTML codegen utils (split out)
     _extract_html, _sanitize, _validate, _extract_json, passes_playability_gate,
+    model_review_projection, playable_html_digest,
 )
 
 
@@ -435,14 +436,15 @@ async def _judge_eval(html: str, brief: str) -> dict:
     playability / coherence / fun / polish and returns a ship/polish/reject
     verdict. Offloaded to a worker thread; never raises."""
     if not html:
-        return {"available": False, "reason": "no html to evaluate"}
+        return model_review_projection({"available": False, "reason": "no html to evaluate"})
     prompt = (f"BRIEF:\n{brief or '(none)'}\n\nGAME HTML (may be truncated):\n{html[:14000]}\n\nScore this game.")
     routed = await asyncio.to_thread(_llm_in_thread, prompt, _JUDGE_SYS, _JUDGE_ENSEMBLE,
                                      max_output_tokens=JUDGE_OUTPUT_TOKENS)
     data = _extract_json(routed.get("content", ""))
     if not data:
-        return {"available": False, "reason": routed.get("error") or "judge returned no JSON",
-                "judge_model": routed.get("model")}
+        return model_review_projection({"available": False, "reason": routed.get("error") or "judge returned no JSON",
+                "judge_model": routed.get("model"), "source_digest": playable_html_digest(html)},
+                current_source_digest=playable_html_digest(html))
 
     def _clamp(v):
         try:
@@ -460,14 +462,14 @@ async def _judge_eval(html: str, brief: str) -> dict:
     length = str(data.get("length", "")).lower()
     if length not in ("short", "medium", "long"):
         length = "medium"
-    return {
+    return model_review_projection({
         "available": True, **axes, "overall": overall, "verdict": verdict,
         "difficulty": difficulty, "length": length,
         "critique": str(data.get("critique", ""))[:400],
         "top_fix": str(data.get("top_fix", ""))[:300],
         "judge_model": routed.get("model"),
-        "shippable": overall >= EVAL_SHIP_MIN,
-    }
+        "source_digest": playable_html_digest(html),
+    }, current_source_digest=playable_html_digest(html))
 
 
 async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str,
@@ -483,7 +485,11 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
     llm_error = routed.get("error")
     structurally_ok = bool(html) and passes_playability_gate(val, PLAYABILITY_THRESHOLD)
 
-    evaluation = gen.get("evaluation") or {"available": False, "reason": "skipped — failed structural gate"}
+    html_digest = playable_html_digest(html)
+    evaluation = model_review_projection(
+        gen.get("evaluation") or {"available": False, "reason": "skipped — failed structural gate"},
+        current_source_digest=html_digest,
+    )
     status = "ready" if structurally_ok else "failed"
 
     pid = uuid.uuid4().hex
@@ -496,6 +502,7 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
         "spec_id": spec_id or None,
         "parent_id": parent_id or None,
         "html": html,
+        "html_digest": html_digest,
         "bytes": len(html),
         "status": status,
         "playability_score": val["score"],
