@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from routes.playable_htmlutils import passes_playability_gate
+
 from routes.playable import (
     _db, _GAME_SYS, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
@@ -76,7 +78,7 @@ async def _do_edit(pid: str, mode: str, instruction: str) -> dict:
     val = _validate(new_html)
     # guard: must stay runnable AND not regress more than 10 pts below the prior score
     floor = max(PLAYABILITY_THRESHOLD, prev_score - 10)
-    if not new_html or val["score"] < floor:
+    if not new_html or not passes_playability_gate(val, floor):
         return {"playable_id": pid, "edited": False, "kind": mode, "score": val["score"],
                 "missing": val.get("missing", []), "prev_score": prev_score}
     trail = doc.get("edit_trail") or []

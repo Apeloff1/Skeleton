@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from routes.playable_htmlutils import passes_playability_gate
+
 from routes.playable import (
     _db, _GAME_SYS, PLAYABILITY_THRESHOLD, _codegen_quality_loop, _run_job,
     EXPANSION_SIZE_MULT, EXPANSION_MAX_REPAIR, EXPANSION_MAX_REFINE,
@@ -263,7 +265,7 @@ async def _do_derive(base: dict, mode: str, instruction: str, depth: str = "stud
 
     gen = await _codegen_quality_loop(prompt, sys_prompt, base_brief, depth, profile)
     routed, html, removed, val = gen["routed"], gen["html"], gen["removed"], gen["val"]
-    structurally_ok = bool(html) and val["score"] >= PLAYABILITY_THRESHOLD
+    structurally_ok = bool(html) and passes_playability_gate(val, PLAYABILITY_THRESHOLD)
     evaluation = gen.get("evaluation") or {"available": False, "reason": "skipped — failed structural gate"}
     pid = uuid.uuid4().hex
     doc = {

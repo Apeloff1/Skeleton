@@ -1,8 +1,10 @@
 """Real route privacy, JWT, EngineChat and EngineText composition regressions."""
 import asyncio
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -61,6 +63,16 @@ def bridge(project_boundary, monkeypatch):
     app = FastAPI()
     app.add_middleware(RoutePrivacyMiddleware)
     app.include_router(playable.router)
+    from routes import playable_repair
+    monkeypatch.setattr(playable_repair, "_db", playable._db)
+    app.include_router(playable_repair.router)
+    default_probe = playable_access.project_router(prefix="/api/playable")
+    @default_probe.post("/default-output-probe")
+    async def html_output_probe():
+        generated = await asyncio.to_thread(playable._llm_in_thread, "Original tiny game", playable._GAME_SYS_FAST, ["hint"])
+        judged = await playable._judge_eval(generated["content"], "Original tiny game")
+        return {"generated": bool(generated["content"]), "judged": judged["available"]}
+    app.include_router(default_probe)
     for prefix in ["/api/unknown-legacy-surface", "/api/health"]:
         router = playable_access.project_router(prefix=prefix)
         @router.post("/model-probe")
@@ -88,7 +100,7 @@ def test_real_middleware_and_engine_text_bridge_generates_with_confidential_scop
         assert result.json()["engine_execution_id"]
         assert result.json()["engine_provider_receipts"] == ["provider:one"]
     assert len(commands) == 4
-    assert [command.execution_request.resource_budget["max_output_tokens"] for command in commands] == [1024, 256, 1024, 256]
+    assert [command.execution_request.resource_budget["max_output_tokens"] for command in commands] == [2048, 256, 2048, 256]
     assert all(context.domain == "studio" and context.max_data_class.label == "confidential" for context in contexts)
     for command in commands:
         assert command.operation.actor_id == "alice@example.test"
@@ -98,6 +110,42 @@ def test_real_middleware_and_engine_text_bridge_generates_with_confidential_scop
     assert client.get(f"/api/playable/{pid}/raw", headers=headers["bob"]).status_code == 404
     assert client.get(f"/api/playable/{pid}/raw").status_code == 401
     assert len(commands) == 4
+
+
+def test_omitted_html_output_limit_uses_feature_budget_while_judge_stays_smaller(bridge):
+    client, headers, _, _, commands, contexts = bridge
+    result = client.post("/api/playable/default-output-probe", headers=headers["alice"])
+    assert result.status_code == 200, result.text
+    assert result.json() == {"generated": True, "judged": True}
+    assert [command.execution_request.resource_budget["max_output_tokens"] for command in commands] == [2048, 256]
+    assert all(context.domain == "studio" for context in contexts)
+
+
+def test_actual_runtime_repair_route_uses_complete_html_budget_and_keeps_owner_scope(bridge, monkeypatch):
+    client, headers, db, _, commands, _ = bridge
+    source_queries = []
+    class SyncPlayables:
+        def find_one(self, query):
+            source_queries.append(dict(query))
+            return next((deepcopy(row) for row in db.playables.rows
+                         if all(row.get(key) == value for key, value in query.items())), None)
+    from core import databases
+    monkeypatch.setattr(databases, "get_sync_db", lambda name: SimpleNamespace(playables=SyncPlayables()))
+    created = client.post("/api/playable/generate", headers=headers["alice"],
+                          json={"brief": "Original square reaches the portal", "depth": "fast"})
+    assert created.status_code == 200 and created.json()["status"] == "ready"
+    pid = created.json()["playable_id"]
+    repaired = client.post(f"/api/playable/{pid}/repair", headers=headers["alice"],
+                           json={"error": "Fix an undefined score label while preserving game controls"})
+    assert repaired.status_code == 200, repaired.text
+    assert repaired.json()["repaired"] is True, repaired.text
+    assert [command.execution_request.resource_budget["max_output_tokens"] for command in commands] == [2048, 256, 2048]
+    assert commands[-1].compiled_context.data_class == "confidential"
+    assert commands[-1].operation.actor_id == "alice@example.test"
+    assert source_queries and all(query == {"playable_id": pid, "owner_id": "alice@example.test", "tenant_id": "tenant-a"}
+                                  for query in source_queries)
+    assert client.post(f"/api/playable/{pid}/repair", headers=headers["bob"], json={"error": "denied"}).status_code == 404
+    assert len(commands) == 3
 
 
 @pytest.mark.parametrize("path", ["/api/unknown-legacy-surface/model-probe", "/api/health/model-probe"])

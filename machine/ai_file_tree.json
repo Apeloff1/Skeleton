@@ -130,7 +130,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "d446e2aad835489c52076723da74cbee2aea0b27",
+      "source_git_object_sha": "7ff5d0fac73529a18e1e9ffb06cd62036ab61d80",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",

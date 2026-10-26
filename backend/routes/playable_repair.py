@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from routes.playable_htmlutils import passes_playability_gate
+
 from routes.playable import (
     _db, _REPAIR_SYS, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job, _judge_eval,
@@ -69,10 +71,10 @@ async def _do_repair(pid: str, error: str) -> dict:
         return {"playable_id": pid, "repaired": False, "error": "repair model unavailable"}
     new_html, _removed = _sanitize(_extract_html(routed.get("content", "")))
     val = _validate(new_html)
-    if not new_html or val["score"] < PLAYABILITY_THRESHOLD:
+    if not new_html or not passes_playability_gate(val, PLAYABILITY_THRESHOLD):
         return {"playable_id": pid, "repaired": False,
                 "score": val["score"], "missing": val.get("missing", [])}
-    # The structural _validate gate already guarantees the fix is playable; skip the
+    # Structural completeness is required; browser behavior remains a separate check. Skip the
     # (slow, multi-model) judge eval here so self-heal stays fast & ingress-safe.
     trail = doc.get("repair_trail") or []
     trail.append({"attempt": len(trail) + 1, "kind": "runtime_repair",

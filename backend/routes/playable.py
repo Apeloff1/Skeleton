@@ -109,7 +109,7 @@ QUALITY_TARGET = int(os.environ.get("PLAYABLE_QUALITY_TARGET", "85"))
 QUALITY_TIME_BUDGET = int(os.environ.get("PLAYABLE_QUALITY_TIME_BUDGET", "210"))
 # Complete HTML needs a different finite output envelope from ordinary chat.
 # Catalog, context, operation and physical runtime limits still validate it.
-CODEGEN_OUTPUT_TOKENS = 1024
+CODEGEN_OUTPUT_TOKENS = 2048
 JUDGE_OUTPUT_TOKENS = 256
 
 # ── EXPANSION "DELUXE" CEILING-LIFT ──────────────────────────────────────────
@@ -163,7 +163,7 @@ features. Output ONLY the HTML document."""
 
 
 from routes.playable_htmlutils import (  # HTML codegen utils (split out)
-    _extract_html, _sanitize, _validate, _extract_json,
+    _extract_html, _sanitize, _validate, _extract_json, passes_playability_gate,
 )
 
 
@@ -269,8 +269,9 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
                     instructions=system.strip(),
                 ),
             ).with_model(provider, model)
-            if max_output_tokens is not None:
-                chat.with_max_tokens(max_output_tokens)
+            # Every HTML mutation helper shares this finite feature default;
+            # judges explicitly request their smaller 256-token envelope.
+            chat.with_max_tokens(CODEGEN_OUTPUT_TOKENS if max_output_tokens is None else max_output_tokens)
             dispatch_started = True
             resp = await chat.send_message(UserMessage(text=prompt))
             reauthorize_project_principal(mutate=True, sources=True)
@@ -351,7 +352,7 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
     best = {"routed": routed, "html": html, "removed": removed, "val": val, "evaluation": None}
 
     # ── phase 1: structural repairs (bounded by max_repair) ──
-    while best["val"]["score"] < PLAYABILITY_THRESHOLD and repairs_left > 0:
+    while not passes_playability_gate(best["val"], PLAYABILITY_THRESHOLD) and repairs_left > 0:
         repairs_left -= 1
         repair_prompt = (
             f"ORIGINAL BRIEF/PROMPT:\n{prompt}\n\n"
@@ -366,10 +367,11 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
         v2 = _validate(h2)
         trail.append({"attempt": len(trail) + 1, "kind": "structural_repair", "score": v2["score"],
                       "intricacy": v2.get("intricacy"), "missing": v2["missing"], "model": r2.get("model")})
-        if v2["score"] > best["val"]["score"]:
+        if (passes_playability_gate(v2, PLAYABILITY_THRESHOLD)
+            and not passes_playability_gate(best["val"], PLAYABILITY_THRESHOLD)) or v2["score"] > best["val"]["score"]:
             best = {"routed": r2, "html": h2, "removed": rem2, "val": v2, "evaluation": None}
 
-    structurally_ok = bool(best["html"]) and best["val"]["score"] >= PLAYABILITY_THRESHOLD
+    structurally_ok = bool(best["html"]) and passes_playability_gate(best["val"], PLAYABILITY_THRESHOLD)
 
     # ── phase 2: judge-driven quality refinement (bounded by max_refine) ──
     if structurally_ok:
@@ -393,7 +395,7 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
             _require_model_content(r3)
             h3, rem3 = _sanitize(_extract_html(r3.get("content", "")))
             v3 = _validate(h3)
-            cand_ok = bool(h3) and v3["score"] >= PLAYABILITY_THRESHOLD
+            cand_ok = bool(h3) and passes_playability_gate(v3, PLAYABILITY_THRESHOLD)
             ev3 = await _judge_eval(h3, brief) if cand_ok else {"available": False}
             trail.append({"attempt": len(trail) + 1, "kind": "quality_repair", "score": v3["score"],
                           "intricacy": v3.get("intricacy"), "eval_overall": ev3.get("overall"),
@@ -458,7 +460,7 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
     await reauthorize_project_context(mutate=True)
     routed, html, removed, val = gen["routed"], gen["html"], gen["removed"], gen["val"]
     llm_error = routed.get("error")
-    structurally_ok = bool(html) and val["score"] >= PLAYABILITY_THRESHOLD
+    structurally_ok = bool(html) and passes_playability_gate(val, PLAYABILITY_THRESHOLD)
 
     evaluation = gen.get("evaluation") or {"available": False, "reason": "skipped — failed structural gate"}
     status = "ready" if structurally_ok else "failed"
@@ -889,7 +891,7 @@ async def validate_playable(pid: str):
         "playable_id": pid, "title": doc.get("title"), "status": doc.get("status"),
         "stored_playability_score": doc.get("playability_score"),
         "recomputed_score": val["score"],
-        "passes_gate": val["score"] >= PLAYABILITY_THRESHOLD,
+        "passes_gate": passes_playability_gate(val, PLAYABILITY_THRESHOLD),
         "threshold": PLAYABILITY_THRESHOLD,
         "checks": val["checks"], "missing": val["missing"], "intricacy": val["intricacy"],
         "signals": val.get("signals", {}), "depth_hits": val.get("depth_hits", 0),

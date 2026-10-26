@@ -79,7 +79,7 @@ def project_boundary(memory_boundary, monkeypatch):
         return {
             "routed": {"model": "hermetic", "provider": "test"},
             "html": "<!DOCTYPE html><html>PRIVATE-NEW-PLAYABLE-CANARY</html>",
-            "removed": [], "val": {"score": 100, "missing": []},
+            "removed": [], "val": {"score": 100, "missing": [], "structurally_complete": True},
             "trail": [], "evaluation": {"available": False},
         }
     monkeypatch.setattr(playable, "_codegen_quality_loop", codegen)
@@ -206,6 +206,8 @@ def test_worker_rechecks_captured_source_with_sync_authority_before_engine_call(
         def __init__(self, **kwargs):
             engine_calls.append(kwargs)
         def with_model(self, *args):
+            return self
+        def with_max_tokens(self, value):
             return self
         async def send_message(self, message):
             return "owned model result"

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import json
+from html.parser import HTMLParser
 
 _MIN_DOC = (
     "<!DOCTYPE html><html><head><meta charset='utf-8'>"
@@ -24,12 +25,64 @@ _MIN_DOC = (
 )
 
 
+class _MarkupInspection(HTMLParser):
+    """Inspect raw-text boundaries without evaluating generated game code."""
+
+    def __init__(self, source: str):
+        super().__init__(convert_charrefs=False)
+        self.html_closed = False
+        self.body_opened = self.body_closed = False
+        self.raw_tag: str | None = None
+        self.feed(source)
+        self.close()
+
+    def handle_starttag(self, tag, attrs):
+        if self.raw_tag is not None:
+            return
+        if tag == "body":
+            self.body_opened = True
+        if tag in {"script", "style"}:
+            self.raw_tag = tag
+
+    def handle_startendtag(self, tag, attrs):
+        if tag in {"script", "style", "body", "html"}:
+            # HTML5 ignores self-closing syntax on these non-void elements.
+            # Track an actual end tag instead of inventing an XML closure.
+            self.handle_starttag(tag, attrs)
+        else:
+            super().handle_startendtag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        if self.raw_tag is not None:
+            # For a self-closing-looking raw-text start, HTMLParser may emit
+            # other callbacks that a browser would keep inside script/style.
+            if tag == self.raw_tag:
+                self.raw_tag = None
+            return
+        if tag == "html":
+            self.html_closed = True
+        if tag == "body":
+            self.body_closed = True
+
+
+def _inspect_completeness(html: str) -> dict[str, bool]:
+    try:
+        inspected = _MarkupInspection(html)
+    except (ValueError, AssertionError):
+        return {"document_complete": False, "raw_text_complete": False}
+    return {
+        "document_complete": inspected.html_closed and (not inspected.body_opened or inspected.body_closed),
+        "raw_text_complete": inspected.raw_tag is None,
+    }
+
+
 def _extract_html(text: str) -> str:
     """Return the playable HTML document from raw model output.
 
     Strips markdown fences and surrounding prose. If the model returns a usable
-    fragment (canvas / script / svg) without a full document, it is wrapped in a
-    minimal mobile-ready shell rather than discarded — so good output is never lost.
+    complete fragment (canvas / script / svg) without a full document, it is
+    wrapped in a minimal mobile-ready shell. Incomplete code stays unwrapped
+    for diagnostics and repair; extraction never fabricates a completed game.
     """
     if not text:
         return ""
@@ -58,6 +111,9 @@ def _extract_html(text: str) -> str:
     if start >= 0:  # had <html but no closing tag → still return what we have
         return s.strip()
     if any(t in low for t in ("<canvas", "<script", "<svg", "<style")):
+        completeness = _inspect_completeness(s)
+        if not completeness["raw_text_complete"]:
+            return s.strip()
         return _MIN_DOC.format(body=s.strip())
     return s.strip()
 
@@ -144,6 +200,13 @@ def _validate(html: str) -> dict:
     }
     score = sum(w for name, w in _CHECK_WEIGHTS if passed.get(name))
     missing = [name for name, _w in _CHECK_WEIGHTS if not passed.get(name)]
+    completeness = _inspect_completeness(html or "")
+    passed.update(completeness)
+    missing.extend(name for name, complete in completeness.items() if not complete)
+    if not all(completeness.values()):
+        # Keywords cannot outweigh unfinished markup/code. Existing consumers
+        # gate at 70, so truncation must remain a hard structural rejection.
+        score = min(score, 69)
 
     # ── Additive depth signals (diagnostic only; never lowers `score`) ──
     signals = {
@@ -167,11 +230,26 @@ def _validate(html: str) -> dict:
         "score": score,
         "missing": missing,
         "checks": passed,
+        "structurally_complete": all(completeness.values()),
+        "javascript_syntax_checked": False,
+        "runtime_checked": False,
         "signals": signals,
         "depth_hits": depth_hits,
         "intricacy": intricacy,
         "bytes": len(html or ""),
     }
+
+
+def passes_playability_gate(validation: dict, threshold: int) -> bool:
+    """Require complete markup independently of a configurable quality floor.
+
+    This is a structural gate only. It never asserts that closed JavaScript
+    parses, that browser execution succeeded, or that a game is enjoyable.
+    """
+    if not isinstance(validation, dict) or validation.get("structurally_complete") is not True:
+        return False
+    score = validation.get("score")
+    return type(score) is int and 0 <= score <= 100 and score >= threshold
 
 
 def _extract_json(text: str) -> dict:

@@ -3,11 +3,18 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
 from uuid import uuid4
 
 import pytest
 
-from skeleton.contracts.ai_execution import AIExecutionRequest, ExecutionState
+from skeleton.contracts.ai_execution import (
+    AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES,
+    AIExecutionContractError,
+    AIExecutionRequest,
+    AIExecutionResult,
+    ExecutionState,
+)
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionError,
     CognitiveExecutionRuntime,
@@ -219,6 +226,62 @@ async def test_direct_provider_completion_is_verified_and_atomically_finalized()
     assert result.result.stream_terminal_event.startswith("stream-terminal:exec-1:")
     assert len(repo.pending_outbox(execution_id="exec-1")) == 1
     assert len(provider.requests) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", ["original game source " * 250, "遊戲世界" * 900], ids=["ascii-html", "unicode-html"])
+async def test_generated_html_larger_than_a_reference_finalizes_and_replays_after_restart(tmp_path, content):
+    # The installed game builder produced 4,487 bytes, which used to pass
+    # inference/verification and then fail the 2,048-character Ref validator.
+    html = "<!DOCTYPE html><html><body><!--" + content + "--><canvas></canvas></body></html>"
+    assert len(html) > 2048
+    path = tmp_path / "generated-result.sqlite3"
+    repo = SQLiteExecutionRepository(path)
+    provider = FakeProvider([_text_response(html, response_id="html-response")])
+    runtime = _runtime(repo, provider, AsyncToolRuntime())
+    request = _request()
+    result = await runtime.start(request, instructions="Return complete original HTML.",
+                                 prompt="Create an original tiny offline game.",
+                                 context_digest="a" * 64, now=_now())
+    assert result.state is ExecutionState.COMPLETED
+    assert result.result.final_output == html
+    wire = json.loads(json.dumps(result.result.as_dict(), ensure_ascii=False))
+    assert wire["final_output"] == html
+    assert len(wire["provider_receipts"]) == 1
+    assert wire["usage"]["model_turns"] == 1
+    version = repo.get(request.execution_id).version
+    repo.close()
+
+    reopened = SQLiteExecutionRepository(path)
+    no_more_provider = FakeProvider([])
+    replay = await _runtime(reopened, no_more_provider, AsyncToolRuntime()).resume(
+        request.execution_id, now=_now(),
+    )
+    assert replay.result.as_dict() == wire
+    assert reopened.get(request.execution_id).version == version
+    assert len(reopened.pending_outbox(execution_id=request.execution_id)) == 1
+    assert no_more_provider.requests == []
+    reopened.close()
+
+
+@pytest.mark.parametrize("output", [
+    "x" * (AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES + 1),
+    "界" * (AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES // 3 + 1),
+    "invalid Unicode: \ud800",
+    " output with unacknowledged surrounding whitespace ",
+], ids=["ascii-over-limit", "unicode-over-byte-limit", "invalid-unicode", "not-normalized"])
+def test_execution_result_rejects_oversized_or_malformed_generated_text(output):
+    with pytest.raises(AIExecutionContractError, match="final_output"):
+        AIExecutionResult(operation_id="op", execution_id="exec", status="completed",
+                          usage={}, completed_at=_now(), final_output=output)
+
+
+@pytest.mark.parametrize("field", ["verification", "stream_terminal_event"])
+def test_generated_text_allowance_does_not_expand_reference_fields(field):
+    with pytest.raises(AIExecutionContractError, match=field):
+        AIExecutionResult(operation_id="op", execution_id="exec", status="completed",
+                          usage={}, completed_at=_now(), final_output="valid answer",
+                          **{field: "x" * 2049})
 
 
 @pytest.mark.asyncio

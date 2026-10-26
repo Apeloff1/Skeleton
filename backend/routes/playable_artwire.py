@@ -32,7 +32,7 @@ from routes.playable import (
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
 )
 from routes.asset_genesis import recompute_asset_status
-from routes.playable_htmlutils import inject_into_head
+from routes.playable_htmlutils import inject_into_head, passes_playability_gate
 
 router = project_router(prefix="/api/playable", tags=["playable"])
 
@@ -134,7 +134,7 @@ async def _do_artwire(pid: str, selected: dict | None = None) -> dict:
     new_html, removed = _sanitize(_extract_html(routed.get("content", "")))
     val = _validate(new_html)
     floor = max(PLAYABILITY_THRESHOLD, prev_score - 15)
-    if not new_html or val["score"] < floor:
+    if not new_html or not passes_playability_gate(val, floor):
         return {"playable_id": pid, "applied": False, "score": val["score"],
                 "missing": val.get("missing", []), "prev_score": prev_score}
     # deterministically inject the real data-URI registry

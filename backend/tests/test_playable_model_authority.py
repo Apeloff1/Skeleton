@@ -30,6 +30,8 @@ async def test_unexpected_model_failure_keeps_scope_and_cannot_authorize_hint_fa
         def with_model(self, provider, model):
             self.model = model
             return self
+        def with_max_tokens(self, value):
+            return self
         async def send_message(self, message):
             if self.model == "first":
                 raise RuntimeError("provider unavailable")
@@ -61,6 +63,8 @@ async def test_revoked_model_attempt_is_not_converted_into_provider_fallback(mon
         def __init__(self, **kwargs):
             constructed.append(kwargs)
         def with_model(self, *args):
+            return self
+        def with_max_tokens(self, value):
             return self
         async def send_message(self, message):
             return "authorized model result"
