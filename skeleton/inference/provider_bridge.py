@@ -5,6 +5,7 @@ from enum import Enum
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import math
 from typing import Any, Iterable
 from skeleton.provider_runtime import ProviderResponse
 from skeleton.providers.contract import ProviderDelta, ProviderDeltaKind
@@ -16,9 +17,19 @@ def _plain(v:Any):
         if v.tzinfo is None or v.utcoffset() is None:
             raise InferenceContractError("provider timestamp must be timezone-aware")
         return v.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
-    if is_dataclass(v): return _plain(asdict(v))
-    if isinstance(v,dict): return {str(k):_plain(x) for k,x in sorted(v.items(),key=lambda p:str(p[0]))}
+    if is_dataclass(v):
+        if isinstance(v, type):
+            raise InferenceContractError("provider payload requires dataclass instances")
+        return _plain(asdict(v))
+    if isinstance(v, dict):
+        # JSON object keys are strings. Coercing 1 and "1" to the same key
+        # silently erases one claim and can make distinct receipts hash alike.
+        if any(not isinstance(key, str) for key in v):
+            raise InferenceContractError("provider payload mapping keys must be strings")
+        return {key: _plain(v[key]) for key in sorted(v)}
     if isinstance(v,(list,tuple)): return [_plain(x) for x in v]
+    if isinstance(v, float) and not math.isfinite(v):
+        raise InferenceContractError("provider payload contains a nonfinite number")
     if v is None or isinstance(v,(str,int,float,bool)): return v
     raise InferenceContractError("provider payload is not canonically serializable")
 def provider_payload_digest(v:Any)->str:
