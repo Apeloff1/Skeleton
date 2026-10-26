@@ -49,6 +49,14 @@ function validate(manifest, lockText) {
   for (const name of Object.keys(production)) {
     if (Object.prototype.hasOwnProperty.call(development, name)) {
       errors.push(name + " is duplicated across dependencies and devDependencies");
+      // Report the shadowed production value too. Merely validating the
+      // merged map could conceal a forbidden native upgrade behind a valid
+      // devDependency of the same name.
+      if (Object.prototype.hasOwnProperty.call(EXPECTED, name) &&
+          production[name] !== EXPECTED[name]) {
+        errors.push(name + " expected " + EXPECTED[name] +
+                    ", found production pin " + String(production[name]));
+      }
     }
   }
   const deps = {...production, ...development};
