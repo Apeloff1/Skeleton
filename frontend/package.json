@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.20.6",
-    "@expo/cli": "54.0.27",
+    "@expo/cli": "54.0.28",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/ngrok": "^4.1.3",
     "@expo/vector-icons": "^15.0.3",
