@@ -36,7 +36,7 @@ description = "Local-first game studio with Jeeves AI chat, Dragon source review
 requires-python = ">=3.11"
 dependencies = [
   "bcrypt>=4,<5",
-  "cryptography>=50.0.1",
+  "cryptography>=50.0.2",
   "fastapi>=0.142.2",
   "httpx>=0.28.1,<1",
   "motor==3.7.1",
