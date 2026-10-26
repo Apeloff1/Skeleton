@@ -1,5 +1,6 @@
 """Real route privacy, JWT, EngineChat and EngineText composition regressions."""
 import asyncio
+import json
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from dataclasses import replace
@@ -52,8 +53,13 @@ def bridge(project_boundary, monkeypatch):
             route_contexts.append(current_route_privacy())
             if self.failure:
                 raise self.failure
-            text = ('{"overall":100,"playability":100,"coherence":100,"fun":100,"polish":100}'
-                    if 'Score this game.' in command.compiled_context.prompt else HTML)
+            if command.execution_request.context_policy.get("structured_output_schema"):
+                text = json.dumps({"schema_version": 1, "edits": [
+                    {"find": "ctx.fillStyle='#123';", "replace": "ctx.fillStyle='#124';"},
+                ]})
+            else:
+                text = ('{"overall":100,"playability":100,"coherence":100,"fun":100,"polish":100}'
+                        if 'Score this game.' in command.compiled_context.prompt else HTML)
             return replace(_terminal(command.execution_request.execution_id),
                            operation_id=command.operation.operation_id, final_output=text)
     engine = Client()
@@ -139,7 +145,9 @@ def test_actual_runtime_repair_route_uses_complete_html_budget_and_keeps_owner_s
                            json={"error": "Fix an undefined score label while preserving game controls"})
     assert repaired.status_code == 200, repaired.text
     assert repaired.json()["repaired"] is True, repaired.text
-    assert [command.execution_request.resource_budget["max_output_tokens"] for command in commands] == [2048, 256, 2048]
+    assert [command.execution_request.resource_budget["max_output_tokens"] for command in commands] == [2048, 256, 1024]
+    assert commands[-1].execution_request.resource_budget["max_model_turns"] == 1
+    assert "edits" in commands[-1].execution_request.context_policy["structured_output_schema"]["properties"]
     assert commands[-1].compiled_context.data_class == "confidential"
     assert commands[-1].operation.actor_id == "alice@example.test"
     repair_context = commands[-1].compiled_context
@@ -149,9 +157,14 @@ def test_actual_runtime_repair_route_uses_complete_html_budget_and_keeps_owner_s
     )
     assert (policy_segment.segment_id, policy_segment.content_digest) in repair_context.source_snapshot
     assert playable._RUNTIME_REPAIR_POLICY.policy_id == "backend.playable.runtime-repair"
-    assert playable._RUNTIME_REPAIR_POLICY.version == "1"
+    assert playable._RUNTIME_REPAIR_POLICY.version == "2"
     assert "WORLD-CLASS" not in repair_context.instructions and "DEPTH & INTRICACY" not in repair_context.instructions
     assert "Fix an undefined score label while preserving game controls" in commands[-1].compiled_context.prompt
+    published = db.playables.rows[0]
+    assert published["html"] == HTML.replace("ctx.fillStyle='#123';", "ctx.fillStyle='#124';")
+    assert published["version"] == 2 and published["last_repair"]["edit_count"] == 1
+    assert published["last_repair"]["engine_execution_id"] == commands[-1].execution_request.execution_id
+    assert published["last_repair"]["engine_provider_receipts"] == ["provider:one"]
     assert source_queries and all(query == {"playable_id": pid, "owner_id": "alice@example.test", "tenant_id": "tenant-a"}
                                   for query in source_queries)
     assert client.post(f"/api/playable/{pid}/repair", headers=headers["bob"], json={"error": "denied"}).status_code == 404

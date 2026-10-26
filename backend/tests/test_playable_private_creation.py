@@ -15,6 +15,12 @@ def _matches(row, query):
         if isinstance(value, dict) and "$in" in value:
             if row.get(key) not in value["$in"]:
                 return False
+        elif isinstance(value, dict) and "$nin" in value:
+            if row.get(key) in value["$nin"]:
+                return False
+        elif isinstance(value, dict) and "$ne" in value:
+            if row.get(key) == value["$ne"]:
+                return False
         elif row.get(key) != value:
             return False
     return True
@@ -36,6 +42,7 @@ class _Cursor:
 class _Collection:
     def __init__(self):
         self.rows, self.calls = [], []
+        self.writes = []
     async def insert_one(self, row):
         self.calls.append(("insert", deepcopy(row)))
         self.rows.append(deepcopy(row))
@@ -48,6 +55,7 @@ class _Collection:
         return next((deepcopy(row) for row in self.rows if _matches(row, query)), None)
     async def update_one(self, query, update, *args, **kwargs):
         self.calls.append(("update", deepcopy(query)))
+        self.writes.append((deepcopy(query), deepcopy(update)))
         for row in self.rows:
             if _matches(row, query):
                 row.update(deepcopy(update.get("$set", {})))

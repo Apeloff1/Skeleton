@@ -182,15 +182,14 @@ _REPAIR_SYS = _GAME_SYS + (
 # so source code and the actual browser report remain the dominant context.
 _RUNTIME_REPAIR_POLICY = InstructionPolicy(
     policy_id="backend.playable.runtime-repair",
-    version="1",
+    version="2",
     instructions=(
-        "Repair the supplied existing offline HTML5 game. Return ONLY its entire corrected HTML document, "
-        "with every closing tag and all CSS/JavaScript inline. Preserve working mechanics and assets. "
-        "Fix the reported runtime errors and broken controls first. Use mutable bindings for values that "
-        "are reassigned; bind visible Play/restart controls to real handlers after their DOM exists. "
-        "Keep animation running, keyboard/pointer controls responsive, and the canvas within the viewport. "
-        "Do not add features, levels, art systems, external dependencies, prose, TODOs or omitted code. "
-        "Keep the complete document compact."
+        "Propose minimal literal edits to repair the reported runtime error in the supplied offline HTML5 game. "
+        "Return ONLY JSON matching the response schema: schema_version 1 and an edits array of find/replace strings. "
+        "Copy each nonempty find string exactly from CURRENT_HTML, including whitespace and quotes; it must occur "
+        "exactly once. Propose at most eight nonoverlapping edits. Fix the actual error and broken controls first, "
+        "preserving all other game code, mechanics and assets. Do not rewrite the document or return HTML, markdown, "
+        "prose, paths or commands. The server owns the target and source digest; no digest echo is required."
     ),
 )
 
@@ -259,7 +258,8 @@ class GenerateBody(BaseModel):
 
 
 async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None,
-                     instruction_policy: InstructionPolicy | None = None) -> dict:
+                     instruction_policy: InstructionPolicy | None = None,
+                     structured_output_schema: dict | None = None, max_model_turns: int | None = None) -> dict:
     """Execute canonical scoped model work from a worker's event loop.
 
     Historical ensemble names remain advisory. Canonical engine routing owns
@@ -292,6 +292,10 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
             # Every HTML mutation helper shares this finite feature default;
             # judges explicitly request their smaller 256-token envelope.
             chat.with_max_tokens(CODEGEN_OUTPUT_TOKENS if max_output_tokens is None else max_output_tokens)
+            if max_model_turns is not None:
+                chat.with_max_model_turns(max_model_turns)
+            if structured_output_schema is not None:
+                chat.with_json_schema(structured_output_schema)
             dispatch_started = True
             resp = await chat.send_message(UserMessage(text=prompt))
             reauthorize_project_principal(mutate=True, sources=True)
@@ -329,7 +333,8 @@ _LLM_SEM = threading.Semaphore(int(os.environ.get("LLM_MAX_CONCURRENCY", "3")))
 
 
 def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None,
-                   instruction_policy: InstructionPolicy | None = None) -> dict:
+                   instruction_policy: InstructionPolicy | None = None,
+                   structured_output_schema: dict | None = None, max_model_turns: int | None = None) -> dict:
     """Blocking entrypoint executed in a worker thread (own event loop) so the
     underlying LLM call never freezes the server's main event loop.
 
@@ -338,7 +343,8 @@ def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_token
     Threads simply wait their turn here — the event loop stays free."""
     with _LLM_SEM:
         return asyncio.run(_llm_async(prompt, system, ensemble, max_output_tokens=max_output_tokens,
-                                      instruction_policy=instruction_policy))
+                                      instruction_policy=instruction_policy,
+                                      structured_output_schema=structured_output_schema, max_model_turns=max_model_turns))
 
 
 async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str = "studio",

@@ -5,6 +5,7 @@ browser observation. No model, generated game, or untrusted script is executed.
 """
 from copy import deepcopy
 import importlib
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -123,7 +124,9 @@ async def test_each_mutation_keeps_the_previous_artifact_when_model_output_is_tr
     calls = []
     def model(*args, **kwargs):
         calls.append(1)
-        return {'content': TRUNCATED, 'model': 'fixture'}
+        content = (json.dumps({'schema_version': 1, 'edits': [{'find': '</html>', 'replace': TRUNCATED}]})
+                   if name == 'repair' else TRUNCATED)
+        return {'content': content, 'model': 'fixture'}
     monkeypatch.setattr(module, '_db', db)
     monkeypatch.setattr(module, '_llm_in_thread', model)
     monkeypatch.setattr(module, 'PLAYABILITY_THRESHOLD', 1)
