@@ -12,6 +12,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("merge-readiness.yml", "Install backend and integration runtime"): (
+        "pytest>=8,<9", "httpx>=0.28.1,<1",
+    ),
     ("merge-readiness.yml", "Install focused unit-test runtime"): (
         "httpx>=0.28.1,<1", "fastapi>=0.142.2,<1", "pydantic>=2.14.1,<3",
         "pydantic-settings>=2.15.0,<3", "cryptography>=50.0.2",
