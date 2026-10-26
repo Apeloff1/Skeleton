@@ -239,6 +239,9 @@ class PayloadSecretGuard:
                 return REDACTED
             for variant in variants:
                 if variant.strip()[:1] in ("{", "["):
+                    if depth + 1 >= _MAX_DEPTH:
+                        hits += 1
+                        return REDACTED
                     before = hits
                     scan_text(variant, depth + 1)
                     if hits != before:
