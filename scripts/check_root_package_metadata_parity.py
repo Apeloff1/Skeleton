@@ -38,6 +38,33 @@ def validate(pyproject_text: str, setup_text: str) -> list[str]:
         issues.append("setup.cfg missing exact pyproject requirement: " + requirement)
     for requirement in sorted(set(from_setup) - set(declared)):
         issues.append("setup.cfg introduces divergent requirement: " + requirement)
+
+    # The optional feature sets are another supported installation surface.
+    # Compare complete extras rather than one dependency (e.g. OpenAI only).
+    optional = project["project"].get("optional-dependencies", {})
+    if not isinstance(optional, dict):
+        raise ValueError("optional-dependencies must be a mapping")
+    setup_extras = {
+        name: _requirements(raw.splitlines() if raw.strip() else [])
+        for name, raw in cfg.items("options.extras_require")
+    }
+    for extra in sorted(set(optional) | set(setup_extras)):
+        if extra not in optional:
+            issues.append("setup.cfg introduces unreviewed extra: " + extra)
+            continue
+        if extra not in setup_extras:
+            issues.append("setup.cfg missing optional extra: " + extra)
+            continue
+        expected = _requirements(optional[extra])
+        actual = setup_extras[extra]
+        if len(expected) != len(set(expected)):
+            issues.append("pyproject extra has duplicate requirements: " + extra)
+        if len(actual) != len(set(actual)):
+            issues.append("setup.cfg extra has duplicate requirements: " + extra)
+        for requirement in sorted(set(expected) - set(actual)):
+            issues.append("setup.cfg extra " + extra + " missing: " + requirement)
+        for requirement in sorted(set(actual) - set(expected)):
+            issues.append("setup.cfg extra " + extra + " divergent: " + requirement)
     return issues
 
 

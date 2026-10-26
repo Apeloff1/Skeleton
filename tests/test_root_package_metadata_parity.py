@@ -42,6 +42,40 @@ class RootPackageRequirementsParity(unittest.TestCase):
         )
         self.assertTrue(any("duplicate" in x for x in validate(self.project, duplicated)))
 
+    def test_stale_development_extra_floor_is_detected(self) -> None:
+        old = self.setup.replace(
+            "\truff>=0.17.2,<0.18", "\truff>=0.17.1,<0.18", 1
+        )
+        self.assertNotEqual(old, self.setup)
+        issues = validate(self.project, old)
+        self.assertTrue(any("dev" in issue and "ruff>=0.17.2" in issue for issue in issues))
+
+    def test_hosted_httpx_extra_floor_is_detected(self) -> None:
+        old = self.setup.replace(
+            "\topenai>=2.54.0,<3\n\thttpx>=0.28.1,<1",
+            "\topenai>=2.54.0,<3\n\thttpx>=0.28,<1", 1,
+        )
+        self.assertNotEqual(old, self.setup)
+        issues = validate(self.project, old)
+        self.assertTrue(any("hosted-inference" in issue and "httpx>=0.28.1" in issue for issue in issues))
+
+    def test_missing_optional_extra_fails_closed(self) -> None:
+        changed = self.setup.replace(
+            "jeeves-production-training =\n\ttorch>=2.5,<3\n", "", 1,
+        )
+        self.assertNotEqual(changed, self.setup)
+        self.assertTrue(any("missing optional extra: jeeves-production-training" in issue
+                            for issue in validate(self.project, changed)))
+
+    def test_duplicate_optional_extra_requirement_fails_closed(self) -> None:
+        changed = self.setup.replace(
+            "\ttorch>=2.5,<3",
+            "\ttorch>=2.5,<3\n\ttorch>=2.5,<3", 1,
+        )
+        self.assertNotEqual(changed, self.setup)
+        self.assertTrue(any("extra has duplicate" in issue
+                            for issue in validate(self.project, changed)))
+
     def test_malformed_metadata_is_not_accepted(self) -> None:
         with self.assertRaises(ValueError):
             validate("[project]\ndependencies = 4\n", self.setup)
