@@ -289,7 +289,8 @@ class PayloadSecretGuard:
                             f"payload keys must be strings, got {type(key).__name__}"
                         )
                     if is_sensitive_key(key):
-                        if child not in (None, "", REDACTED):
+                        # Avoid invoking user-defined equality on untrusted values.
+                        if child is not None and not (isinstance(child, str) and child in ("", REDACTED)):
                             hits += 1
                         out[key] = REDACTED
                     else:
