@@ -103,6 +103,10 @@ class _UnavailableRegistry:
     def require_for_context(self, _context_policy):
         raise ProviderUnavailableError("deterministic outage")
 
+    def runtime_serving_engines(self):
+        # The outage fixture has no locally owned engines to shut down.
+        return ()
+
 
 class _Registry:
     def __init__(self, provider) -> None:
@@ -113,6 +117,11 @@ class _Registry:
         # contract. The previously used require_active() was retired and
         # caused the coordinator to fail before exercising any journey logic.
         return self.provider
+
+    def runtime_serving_engines(self):
+        # A test provider only simulates completion; it is not a runtime-owned
+        # serving engine. Keep shutdown's real registry contract explicit.
+        return ()
 
 
 def _service(tmp_path, *, prefix: str = "golden") -> EngineExecutionService:
