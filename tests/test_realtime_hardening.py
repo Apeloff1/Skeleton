@@ -391,3 +391,25 @@ def test_guard_still_catches_standalone_sk_key():
     value = "key sk-" + "c" * 24
     clean, hits = PayloadSecretGuard().scrub({"note": value})
     assert hits and "sk-" + "c" * 24 not in clean["note"]
+
+
+def test_guard_fails_closed_for_encoded_secret_past_oversized_decode_budget():
+    from skeleton.realtime.guard import _MAX_DECODE_CHARS
+
+    encoded_token = "".join(f"%{ord(ch):02X}" for ch in _FAKE_GH)
+    value = "ordinary status prose " * 850 + encoded_token
+    assert len(value) > _MAX_DECODE_CHARS
+    clean, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits >= 1 and REDACTED_MARK in clean["note"]
+    assert encoded_token not in clean["note"]
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": value})
+
+
+def test_guard_preserves_oversized_plain_prose_without_encoded_content():
+    from skeleton.realtime.guard import _MAX_DECODE_CHARS
+
+    value = "ordinary status prose " * 850
+    assert len(value) > _MAX_DECODE_CHARS
+    clean, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits == 0 and clean["note"] == value
