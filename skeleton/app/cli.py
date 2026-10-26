@@ -270,6 +270,23 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "serve-local-ai":
         from skeleton.app.offline_http import main as serve_main
         return serve_main(arguments[1:])
+    # The frozen offline console owns deterministic capability execution.
+    # Route these explicit local-only commands to that exact implementation;
+    # its own mutually-exclusive parser and bounded graph validator remain
+    # authoritative. Other local-ai training/inference options stay here.
+    if (
+        arguments and arguments[0] == "local-ai"
+        and any(
+            option in arguments[1:]
+            for option in (
+                "--capability-file",
+                "--capability-graph-file",
+                "--capability-list",
+            )
+        )
+    ):
+        from skeleton.app.offline_cli import main as offline_main
+        return offline_main(arguments[1:])
     args = _parser().parse_args(arguments)
     command = args.command or "status"
 
