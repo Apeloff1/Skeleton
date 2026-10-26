@@ -211,6 +211,12 @@ def run_isolated(
     if os.name != "posix":
         raise ProcessPolicyError("process isolation requires POSIX")
     lim = limits or ProcessLimits()
+    # Refuse unsafe or incomplete stdin before creating a jail or child.
+    if stdin is not None:
+        if not isinstance(stdin, bytes):
+            raise ProcessPolicyError("stdin must be bytes")
+        if len(stdin) > lim.output_bytes:
+            raise ProcessPolicyError("stdin exceeds bounded process input limit", context={"limit": lim.output_bytes})
     args = _resolve_argv0(check_argv(argv))
     owned = jail is None
     box = jail or FsJail.temporary(prefix="sbx-proc-")
@@ -247,7 +253,7 @@ def _run(args: tuple[str, ...], box: FsJail, cwd: str | None, stdin: bytes | Non
         raise ProcessPolicyError("executable not found", context={"argv0": args[0]}) from exc
     if stdin is not None and proc.stdin is not None:
         try:
-            proc.stdin.write(stdin[: lim.output_bytes])
+            proc.stdin.write(stdin)
         except BrokenPipeError:
             pass
         proc.stdin.close()
