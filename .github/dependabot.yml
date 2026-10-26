@@ -90,17 +90,33 @@ updates:
           - "expo-*"
           - "@expo/*"
         update-types: ["minor", "patch"]
-      frontend-react-native-platform:
+      # React, ReactDOM, RN and React type definitions must migrate together.
+      # Expo SDK 54 pins this runtime trio; an incompatible group remains held.
+      frontend-react-core:
         applies-to: version-updates
-        dependency-type: production
         patterns:
           - "react"
           - "react-dom"
           - "react-native"
+          - "@types/react"
+        update-types: ["minor", "patch"]
+      # SDK-bundled native modules have their own fixed-version compatibility
+      # table in frontend/scripts/check-expo-native-compat.cjs. Keep changes
+      # independent of React Navigation so a blocked native bump does not
+      # strand supported navigation updates.
+      frontend-native-modules:
+        applies-to: version-updates
+        dependency-type: production
+        patterns:
           - "react-native-*"
-          - "@react-navigation/*"
           - "@react-native-community/*"
           - "@react-native-async-storage/*"
+        update-types: ["minor", "patch"]
+      frontend-react-navigation:
+        applies-to: version-updates
+        dependency-type: production
+        patterns:
+          - "@react-navigation/*"
         update-types: ["minor", "patch"]
       frontend-runtime:
         applies-to: version-updates
