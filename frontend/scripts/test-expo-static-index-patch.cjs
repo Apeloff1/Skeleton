@@ -64,6 +64,20 @@ test("idempotent hardened upstream code is accepted", () => {
   assert.equal(r.patched, 0);
 });
 
+test("mixed vulnerable and hardened expressions fail closed", () => {
+  assert.throws(
+    () => run("54.0.28", "const first = { " + after + " }; const second = { " + before + " };"),
+    /ambiguous mixed patch states/,
+  );
+});
+
+test("duplicate hardened expressions fail closed", () => {
+  assert.throws(
+    () => run("54.0.28", "const first = { " + after + " }; const second = { " + after + " };"),
+    /ambiguous mixed patch states/,
+  );
+});
+
 test("unknown Expo CLI version is rejected", () => {
   assert.throws(() => run("54.0.29", before), /requires static path review/);
 });

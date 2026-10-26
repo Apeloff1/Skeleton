@@ -425,7 +425,15 @@ function patchExpoStaticIndexPath() {
   // rendering /story- into story-index.html and breaking root hydration.
   const before = "pathname: filePathLocation.replace(/(\\/?index)?$/, '')";
   const after = "pathname: filePathLocation === 'index' ? '' : filePathLocation.replace(/\\/index$/, '')";
-  if (source.includes(after)) { skipped++; return; }
+  if (source.includes(after)) {
+    // A mixed or duplicated result is not an idempotent hardened source.
+    // Refuse partial rewrites rather than leaving an unsafe route behind.
+    if (source.includes(before) || source.split(after).length !== 2) {
+      throw new Error('[patch-node-modules] Expo static path contains ambiguous mixed patch states');
+    }
+    skipped++;
+    return;
+  }
   if (source.split(before).length !== 2) {
     throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
   }
