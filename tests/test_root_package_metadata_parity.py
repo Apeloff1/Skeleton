@@ -76,6 +76,34 @@ class RootPackageRequirementsParity(unittest.TestCase):
         self.assertTrue(any("extra has duplicate" in issue
                             for issue in validate(self.project, changed)))
 
+    def test_different_constraints_same_core_distribution_are_rejected(self) -> None:
+        changed = self.setup.replace(
+            "\tpydantic[email]>=2.14.1",
+            "\tpydantic[email]>=2.14.1\n\tpydantic>=2.0.0", 1,
+        )
+        self.assertNotEqual(changed, self.setup)
+        issues = validate(self.project, changed)
+        self.assertTrue(any("setup.cfg core: duplicate distribution pydantic" in x
+                            for x in issues))
+
+    def test_normalized_aliases_cannot_dodge_duplicate_detection(self) -> None:
+        changed = self.setup.replace(
+            "\tpydantic-settings>=2.15.0",
+            "\tpydantic-settings>=2.15.0\n\tpydantic_settings>=2.0.0", 1,
+        )
+        self.assertNotEqual(changed, self.setup)
+        self.assertTrue(any("duplicate distribution pydantic-settings" in x
+                            for x in validate(self.project, changed)))
+
+    def test_optional_extra_different_constraints_same_name_are_rejected(self) -> None:
+        changed = self.setup.replace(
+            "\truff>=0.17.2,<0.18",
+            "\truff>=0.17.2,<0.18\n\truff>=0.16.0", 1,
+        )
+        self.assertNotEqual(changed, self.setup)
+        self.assertTrue(any("setup.cfg extra dev: duplicate distribution ruff" in x
+                            for x in validate(self.project, changed)))
+
     def test_malformed_metadata_is_not_accepted(self) -> None:
         with self.assertRaises(ValueError):
             validate("[project]\ndependencies = 4\n", self.setup)
