@@ -1,6 +1,7 @@
 """Unfinished engine work retains its exact local artifact across restart."""
 
 import asyncio
+import hashlib
 import json
 
 import pytest
@@ -12,9 +13,9 @@ from skeleton.api.engine_runtime import (
     EngineExecutionCoordinator,
     EngineExecutionCoordinatorError,
 )
-from skeleton.contracts.ai_execution import execution_payload_digest
+from skeleton.persistence.execution_repository import ExecutionRepositoryConflict
 from skeleton.intelligence.execution_runtime import CognitiveExecutionRuntime
-from skeleton.provider_runtime import ProviderRegistry, ProviderUnavailableError
+from skeleton.provider_runtime import ProviderPolicyError, ProviderRegistry, ProviderUnavailableError, provider_execution_identity
 from skeleton.testing.test_engine_execution_coordinator import (
     FakeProvider,
     FakeRegistry,
@@ -72,7 +73,7 @@ async def _pause_after_actual_inference(tmp_path, monkeypatch):
 
         def observed_infer(request, cancelled):
             checkpoint = service.repository.latest_checkpoint(command.execution_request.execution_id)
-            assert checkpoint.payload["local_provider_binding"]["identity"] == adapter.execution_identity()
+            assert checkpoint.payload["provider_execution_binding"]["generator"] == provider_execution_identity(adapter)
             return infer(request, cancelled)
 
         monkeypatch.setattr(adapter.engine.model, "infer", observed_infer)
@@ -106,7 +107,7 @@ async def test_changed_weights_same_model_name_fail_before_resumed_dispatch(
         await coordinator.ensure_started(command)
         result = await _result(service, command.execution_request.execution_id)
         assert result.status == "failed"
-        assert result.usage["error_code"] == "local_provider_binding_mismatch"
+        assert result.usage["error_code"] == "provider_activation_binding_mismatch"
         assert result.usage["model_turns"] == 1
         assert result.usage["provider_usage"] == checkpoint.payload["usage_events"]
         assert list(result.provider_receipts) == checkpoint.payload["provider_receipts"]
@@ -135,7 +136,7 @@ async def test_exact_artifact_restart_finishes_without_replaying_committed_infer
 @pytest.mark.asyncio
 async def test_changed_local_seed_fails_before_resumed_dispatch(tmp_path, monkeypatch, local_artifact):
     command, checkpoint = await _pause_after_actual_inference(tmp_path, monkeypatch)
-    old_seed = checkpoint.payload["local_provider_binding"]["identity"]["inference"]["default_seed"]
+    old_seed = checkpoint.payload["provider_execution_binding"]["generator"]["routes"][0]["local_activation"]["default_seed"]
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", str(old_seed + 1))
     calls = []
     async with _engine_stack(tmp_path, "reference") as (_client, service, registry, app):
@@ -148,7 +149,7 @@ async def test_changed_local_seed_fails_before_resumed_dispatch(tmp_path, monkey
         await app.dependency_overrides[_engine_coordinator]().ensure_started(command)
         result = await _result(service, command.execution_request.execution_id)
         assert result.status == "failed"
-        assert result.usage["error_code"] == "local_provider_binding_mismatch"
+        assert result.usage["error_code"] == "provider_activation_binding_mismatch"
         assert result.usage["provider_usage"] == checkpoint.payload["usage_events"]
         assert service.repository.latest_checkpoint(result.execution_id) == checkpoint
         assert calls == []
@@ -173,8 +174,8 @@ async def test_pin_commits_before_dispatch_and_recovers_exact_initial_artifact(
             await asyncio.gather(task, return_exceptions=True)
             checkpoint = service.repository.latest_checkpoint(command.execution_request.execution_id)
             assert (
-                checkpoint.payload["local_provider_binding"]["identity"]
-                == registry.require_active().execution_identity()
+                checkpoint.payload["provider_execution_binding"]["generator"]
+                == provider_execution_identity(registry.require_active())
             )
             assert checkpoint.payload["model_turns"] == 0
             assert service.repository.result(command.execution_request.execution_id) is None
@@ -194,13 +195,13 @@ async def test_corrupt_or_missing_local_pin_blocks_resumed_dispatch(
     async with _engine_stack(tmp_path, "reference") as (_client, service, registry, app):
         payload = json.loads(json.dumps(checkpoint.payload))
         if damage == "deleted_pin":
-            del payload["local_provider_binding"]
+            del payload["provider_execution_binding"]
         elif damage == "digest":
-            payload["local_provider_binding"]["binding_digest"] = "0" * 64
+            payload["provider_execution_binding"]["binding_digest"] = "0" * 64
         else:
-            identity = payload["local_provider_binding"]["identity"]
+            identity = payload["provider_execution_binding"]["identity"]
             identity["artifact"]["model_digest"] = "0" * 64
-            payload["local_provider_binding"]["binding_digest"] = execution_payload_digest(identity)
+            payload["provider_execution_binding"]["binding_digest"] = execution_payload_digest(identity)
         current = service.repository.get(command.execution_request.execution_id)
         service.repository.checkpoint(
             current.execution_id,
@@ -219,7 +220,7 @@ async def test_corrupt_or_missing_local_pin_blocks_resumed_dispatch(
         result = await _result(service, command.execution_request.execution_id)
         assert result.status == "failed"
         assert result.usage["error_code"] == (
-            "local_provider_binding_missing" if damage == "deleted_pin" else "local_provider_binding_mismatch"
+            "provider_activation_binding_missing" if damage == "deleted_pin" else "provider_activation_binding_mismatch"
         )
         assert calls == []
 
@@ -251,7 +252,7 @@ async def test_local_recovery_cannot_substitute_an_external_provider(tmp_path, m
         coordinator.provider_registry = FakeRegistry(provider)
         await coordinator.ensure_started(command)
         result = await _result(service, command.execution_request.execution_id)
-        assert result.usage["error_code"] == "local_provider_binding_mismatch"
+        assert result.usage["error_code"] == "provider_activation_binding_mismatch"
         assert provider.requests == []
 
 
@@ -298,7 +299,7 @@ async def test_pristine_created_legacy_checkpoint_can_acquire_the_exact_pin(tmp_
         result = await _result(service, current.execution_id)
         assert result.status == "completed"
         assert (
-            service.repository.latest_checkpoint(current.execution_id).payload["local_provider_binding"][
+            service.repository.latest_checkpoint(current.execution_id).payload["provider_execution_binding"][
                 "identity"
             ]
             == registry.require_active().execution_identity()
@@ -338,11 +339,11 @@ async def test_stale_absent_checkpoint_observation_cannot_replace_a_competing_pi
         second_registry = ProviderRegistry.from_env()
         second = EngineExecutionCoordinator(service, provider_registry=second_registry)
         committed = second._pin_local_provider(command, runtime, second_registry.require_active(), None, ())
-        with pytest.raises(EngineExecutionCoordinatorError, match="local_provider_binding_mismatch"):
+        with pytest.raises(EngineExecutionCoordinatorError, match="provider_activation_binding_mismatch"):
             first._pin_local_provider(command, runtime, first_registry.require_active(), None, ())
         assert service.repository.latest_checkpoint(command.execution_request.execution_id) == committed
         assert (
-            committed.payload["local_provider_binding"]["identity"]
+            committed.payload["provider_execution_binding"]["identity"]
             == second_registry.require_active().execution_identity()
         )
         await second.shutdown()
