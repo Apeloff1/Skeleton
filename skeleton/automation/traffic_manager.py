@@ -90,8 +90,11 @@ class TrafficPolicy:
             self.max_stale_queued_runs,
             self.provider_tombstone_seconds,
         )
-        if any(isinstance(value, bool) or value <= 0 for value in values):
-            raise TrafficManagerError("traffic policy values must be positive")
+        # Queue capacity, admission thresholds and cooldown periods are
+        # discrete bounded counts. NaN/fractional values can defeat the
+        # positive-only check and make later comparisons non-deterministic.
+        if any(type(value) is not int or value <= 0 for value in values):
+            raise TrafficManagerError("traffic policy values must be positive integers")
 
 
 @dataclass(frozen=True, slots=True)
