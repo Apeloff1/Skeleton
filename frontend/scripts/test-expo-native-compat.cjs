@@ -19,15 +19,19 @@ test("independent RN and React major upgrades fail closed", () => {
   }
 });
 test("a correct selector cannot hide a mismatched resolved native version", () => {
-  for (const [selector, current, forged] of [
-    ["react-native@0.81.5", "0.81.5", "0.87.1"],
-    ["react-native-reanimated@~4.1.1", "4.1.7", "4.7.1"],
-    ["expo@~54.0.35", "54.0.37", "55.0.0"],
+  for (const [selector, forged] of [
+    ["react-native@0.81.5", "0.87.1"],
+    ["react-native-reanimated@~4.1.1", "4.7.1"],
+    ["expo@~54.0.35", "55.0.0"],
   ]) {
-    const header = selector + ':\n  version "' + current + '"';
-    const substitute = selector + ':\n  version "' + forged + '"';
-    assert.ok(lock.includes(header), selector + " source lock header");
-    const poisoned = lock.replace(header, substitute);
+    // Read the *current* lockfile resolution, not an obsolete patch release:
+    // changing an SDK54-compatible patch should never break the test itself.
+    const lines = lock.split("\n");
+    const position = lines.findIndex(line => line === selector + ":");
+    assert.ok(position >= 0, selector + " source lock selector");
+    assert.match(lines[position + 1], /^  version "[^"]+"$/);
+    lines[position + 1] = '  version "' + forged + '"';
+    const poisoned = lines.join("\n");
     assert.ok(validate(manifest, poisoned).some(error =>
       error.includes("resolved version") && error.includes(selector)), selector);
   }
