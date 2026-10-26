@@ -56,7 +56,8 @@ export function FrontierLocationProvider(props: FrontierLocationProviderProps): 
     generation.current += 1;
     session.current?.stop();
     session.current = null;
-    setState(s => (s.status === "watching" || s.status === "requesting" ? { ...s, status: "idle" } : s));
+    // Backgrounding, revocation and explicit Stop must not retain an OS fix.
+    setState({ status: "idle", fix: null, error: null });
   }, []);
 
   const start = useCallback(async () => {
