@@ -539,3 +539,18 @@ def test_guard_rejects_custom_top_level_mapping():
     for mode in ("redact", "reject"):
         with pytest.raises(RealtimeSecretError, match="JSON-native dictionary"):
             PayloadSecretGuard(mode=mode).scrub(UserDict({"note": "ordinary"}))
+
+
+def test_guard_fails_closed_on_encoded_json_at_depth_limit():
+    from skeleton.realtime.guard import _MAX_DEPTH
+    from urllib.parse import quote
+
+    encoded = quote('{"nested":{"secret":"opaque"}}', safe="")
+    payload = {"leaf": encoded}
+    for _ in range(_MAX_DEPTH - 2):
+        payload = {"nested": payload}
+    cleaned, hits = PayloadSecretGuard().scrub(payload)
+    assert hits >= 1
+    assert REDACTED_MARK in json.dumps(cleaned)
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub(payload)
