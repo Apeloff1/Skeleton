@@ -26,7 +26,7 @@ include = ["skeleton*"]
 "skeleton.app" = ["manifest.json"]
 
 [build-system]
-requires = ["setuptools==84.1.0", "wheel==0.48.0"]
+requires = ["setuptools==84.2.1", "wheel==0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
