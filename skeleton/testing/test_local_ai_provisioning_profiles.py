@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import stat
 import struct
+import subprocess
+import sys
 import tarfile
 from types import SimpleNamespace
 
@@ -20,6 +22,16 @@ SPEC = importlib.util.spec_from_file_location("profile_provisioner", ROOT / "scr
 assert SPEC and SPEC.loader
 provisioner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(provisioner)
+
+
+def test_provisioning_help_runs_before_site_packages_or_application_dependencies_exist():
+    result = subprocess.run(
+        [sys.executable, "-S", str(ROOT / "scripts/provision_local_ai.py"), "--help"],
+        cwd=ROOT, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--profile" in result.stdout and "--download" in result.stdout
+    assert result.stderr == ""
 
 
 def test_coding_recipe_is_official_revision_pinned_and_declared_without_changing_chat_default():
@@ -43,6 +55,11 @@ def test_coding_recipe_is_official_revision_pinned_and_declared_without_changing
 
 def test_coding_template_does_not_inject_qwen3_thinking_tokens_and_preserves_runtime_flags():
     from skeleton.ai.runtime.inference.deployment import QWEN3_COMPLETION_CHAT_TEMPLATE
+    from skeleton.ai.runtime.inference.llama_cpp import (
+        CODING_COMPLETION_CHAT_TEMPLATE, COMPLETION_CHAT_FLAGS,
+    )
+    assert provisioner.CODING_COMPLETION_CHAT_TEMPLATE == CODING_COMPLETION_CHAT_TEMPLATE
+    assert tuple(provisioner.PROFILE_ARGS) == COMPLETION_CHAT_FLAGS
     chat, coding = provisioner._profile_args("chat"), provisioner._profile_args("coding")
     assert chat[:-1] == coding[:-1]
     assert chat[-1] == QWEN3_COMPLETION_CHAT_TEMPLATE
