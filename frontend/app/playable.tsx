@@ -1005,11 +1005,11 @@ function PlayableContent() {
           <View style={styles.depthRow}>
             <TouchableOpacity testID="pl-depth-fast" style={[styles.depthBtn, depth === 'fast' && styles.depthBtnActive]} disabled={busy} onPress={() => setDepth('fast')}>
               <Text style={[styles.depthTxt, depth === 'fast' && styles.depthTxtActive]}>⚡ Fast</Text>
-              <Text style={styles.depthSub}>~1 min · quick</Text>
+              <Text style={styles.depthSub}>Focused prototype</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="pl-depth-studio" style={[styles.depthBtn, depth === 'studio' && styles.depthBtnActive]} disabled={busy} onPress={() => setDepth('studio')}>
               <Text style={[styles.depthTxt, depth === 'studio' && styles.depthTxtActive]}>💎 Studio</Text>
-              <Text style={styles.depthSub}>~3-5 min · max intricacy</Text>
+              <Text style={styles.depthSub}>Review and refine</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.autoCoverRow}>

@@ -1,4 +1,4 @@
-"""Provision the pinned optional CPU chat model; never start inference or services.
+"""Provision a pinned optional CPU model; never start inference or services.
 
 Downloads require --download. Existing approved files can be supplied instead.
 Only the canonical local deployment loader admits the resulting configuration.
@@ -28,6 +28,23 @@ MODEL = {
     "bytes": 639_446_688,
     "license": "Apache-2.0",
 }
+CODING_MODEL = {
+    "filename": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/f86cb2c1fa58255f8052cc32aeede1b7482d4361/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+    "sha256": "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
+    "bytes": 1_117_320_768,
+    "license": "Apache-2.0",
+}
+DEFAULT_PROFILE = "chat"
+MODEL_PROFILES = ("chat", "coding")
+MODEL_IDS = {"chat": "Qwen3-0.6B-Q8_0", "coding": "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M"}
+CODING_COMPLETION_CHAT_TEMPLATE = (
+    "{% for message in messages %}"
+    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
+    "{% endfor %}{% if add_generation_prompt %}"
+    "{{ '<|im_start|>assistant\\n' }}"
+    "{% endif %}"
+)
 RUNTIME = {
     "filename": "llama-b11429-bin-ubuntu-x64.tar.gz",
     "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11429/llama-b11429-bin-ubuntu-x64.tar.gz",
@@ -72,18 +89,26 @@ PROFILE_ARGS = [
 ]
 
 
-def _profile_args():
+def _model_recipe(profile: str = DEFAULT_PROFILE) -> dict:
+    if not isinstance(profile, str) or profile not in MODEL_PROFILES:
+        raise ValueError("Choose the pinned chat or coding model profile.")
+    return MODEL if profile == "chat" else CODING_MODEL
+
+
+def _profile_args(profile: str = DEFAULT_PROFILE):
     from skeleton.ai.runtime.inference.deployment import QWEN3_COMPLETION_CHAT_TEMPLATE
 
-    return [*PROFILE_ARGS, "--chat-template", QWEN3_COMPLETION_CHAT_TEMPLATE]
+    _model_recipe(profile)
+    template = QWEN3_COMPLETION_CHAT_TEMPLATE if profile == "chat" else CODING_COMPLETION_CHAT_TEMPLATE
+    return [*PROFILE_ARGS, "--chat-template", template]
 
 
-def _sha(path: Path) -> str:
+def _sha(path: Path, *, max_bytes: int = MAX_EXTRACTED) -> str:
     value = hashlib.sha256()
     descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
     with os.fdopen(descriptor, "rb") as stream:
         before = os.fstat(stream.fileno())
-        if not stat.S_ISREG(before.st_mode) or before.st_size > MODEL["bytes"]:
+        if not stat.S_ISREG(before.st_mode) or before.st_size > max_bytes:
             raise ValueError("Artifact is not a bounded regular file.")
         count = 0
         while block := stream.read(1024 * 1024):
@@ -199,7 +224,7 @@ def _download_pinned(destination: Path, recipe: dict) -> None:
 def _verify(path: Path, recipe: dict) -> None:
     if path.is_symlink() or not path.is_file():
         raise ValueError("Artifact must be an existing regular file, without a symlink.")
-    if path.stat().st_size != recipe["bytes"] or _sha(path) != recipe["sha256"]:
+    if path.stat().st_size != recipe["bytes"] or _sha(path, max_bytes=recipe["bytes"]) != recipe["sha256"]:
         raise ValueError("Artifact bytes or SHA256 do not match the pinned recipe.")
 
 
@@ -212,13 +237,19 @@ def _write_json(path: Path, value: dict) -> None:
 
 
 def _acquire(destination: Path, recipe: dict, source: Path | None, *, download: bool) -> None:
+    # One staging inode; publishing never copies a downloaded weight again or
+    # replaces a file that appeared concurrently in the claimed directory.
+    staged = destination.with_name("." + destination.name + ".pending")
     if source is not None:
         source = source.expanduser().absolute()
-        _copy_pinned(source, destination, recipe)
+        _copy_pinned(source, staged, recipe)
     else:
         if not download:
             raise ValueError("Supply both existing artifacts, or explicitly request --download.")
-        _download_pinned(destination, recipe)
+        _download_pinned(staged, recipe)
+    _verify(staged, recipe)
+    os.link(staged, destination)
+    staged.unlink()
     _verify(destination, recipe)
 
 
@@ -287,22 +318,27 @@ def _runtime_files(archive: Path, target: Path) -> list[dict]:
     return records
 
 
-def _existing(target: Path, *, threads: int, context_size: int = 8192) -> dict:
+def _existing(
+    target: Path, *, threads: int, context_size: int = 8192, profile: str = DEFAULT_PROFILE,
+) -> dict:
     from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
 
+    recipe = _model_recipe(profile)
     if target.is_symlink() or (target / ".incomplete").exists():
         raise ValueError("Destination is incomplete or symlinked; choose a new directory.")
     receipt_path = target / "provisioning.json"
     if receipt_path.is_symlink() or not receipt_path.is_file() or receipt_path.stat().st_size > 128 * 1024:
         raise ValueError("Existing directory has no bounded provisioning receipt.")
     receipt = json.loads(receipt_path.read_text())
+    if not isinstance(receipt, dict):
+        raise ValueError("Existing provisioning receipt must be an object.")
     unsigned = {key: value for key, value in receipt.items() if key != "receipt_digest"}
     identity = hashlib.sha256(
         json.dumps(unsigned, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()
     if receipt.get("schema_version") != SCHEMA or receipt.get("receipt_digest") != identity:
         raise ValueError("Existing provisioning receipt identity differs.")
-    if receipt.get("model") != MODEL or receipt.get("runtime") != RUNTIME:
+    if receipt.get("model") != recipe or receipt.get("runtime") != RUNTIME:
         raise ValueError("Existing provisioning recipe differs.")
     if receipt.get("runtime_platform") != TARGET:
         raise ValueError("Existing target runtime differs.")
@@ -311,10 +347,10 @@ def _existing(target: Path, *, threads: int, context_size: int = 8192) -> dict:
         raise ValueError("Existing provisioning file list is invalid.")
     paths, total = set(), 0
     for record in records:
-        if type(record.get("bytes")) is not int or not 0 < record["bytes"] <= MODEL["bytes"]:
+        if not isinstance(record, dict) or type(record.get("bytes")) is not int or not 0 < record["bytes"] <= recipe["bytes"]:
             raise ValueError("Existing provisioning file bound is invalid.")
         total += record["bytes"]
-        if total > MODEL["bytes"] + MAX_EXTRACTED + 128 * 1024:
+        if total > recipe["bytes"] + MAX_EXTRACTED + 128 * 1024:
             raise ValueError("Existing provisioning total file bound is invalid.")
         relative = PurePosixPath(record["path"])
         if (
@@ -329,10 +365,10 @@ def _existing(target: Path, *, threads: int, context_size: int = 8192) -> dict:
         if path.resolve() != path.absolute():
             raise ValueError("Provisioning path contains a symlink.")
         _verify(path, record)
-    required = {MODEL["filename"], "runtime/llama-completion", "runtime/LICENSE", "deployment.json"}
+    required = {recipe["filename"], "runtime/llama-completion", "runtime/LICENSE", "deployment.json"}
     if not required.issubset(paths):
         raise ValueError("Provisioning receipt omits a required artifact.")
-    _verify(target / MODEL["filename"], MODEL)
+    _verify(target / recipe["filename"], recipe)
     if _sha(target / "runtime/llama-completion") != EXECUTABLE_SHA256:
         raise ValueError("Existing runtime executable identity differs.")
     deployment = LocalModelDeployment.load(target / "deployment.json")
@@ -341,17 +377,66 @@ def _existing(target: Path, *, threads: int, context_size: int = 8192) -> dict:
     if deployment.threads != threads:
         raise ValueError("Existing thread configuration conflicts; choose a new directory.")
     if (
-        deployment.model_id != "Qwen3-0.6B-Q8_0"
+        deployment.model_id != MODEL_IDS[profile]
         or deployment.context_size != context_size
         or deployment.batch_size != 512
         or deployment.gpu_layers != 0
         or deployment.timeout_seconds != 600
         or deployment.temperature != 0.0
-        or deployment.extra_args != tuple(_profile_args())
+        or deployment.extra_args != tuple(_profile_args(profile))
         or deployment.output_framing != "llama_completion_eog"
     ):
         raise ValueError("Existing deployment profile differs from the pinned installer recipe.")
     return receipt
+
+
+def _runtime_source(source: Path) -> tuple[Path, dict]:
+    """Verify an existing complete pinned installation without retargeting it."""
+    source = source.expanduser().absolute()
+    if source.resolve() != source or not source.is_dir() or source.is_symlink():
+        raise ValueError("Runtime reuse requires a nonsymlink complete provisioning directory.")
+    receipt_path, manifest_path = source / "provisioning.json", source / "deployment.json"
+    for path in (receipt_path, manifest_path):
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 128 * 1024:
+            raise ValueError("Runtime reuse requires bounded regular provisioning and deployment records.")
+    receipt = json.loads(receipt_path.read_text())
+    if not isinstance(receipt, dict):
+        raise ValueError("Runtime reuse provisioning receipt must be an object.")
+    profile = next((name for name in MODEL_PROFILES if receipt.get("model") == _model_recipe(name)), None)
+    if profile is None:
+        raise ValueError("Runtime reuse source does not have a pinned model recipe.")
+    manifest = json.loads(manifest_path.read_text())
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("config"), dict):
+        raise ValueError("Runtime reuse deployment configuration must be an object.")
+    config = manifest["config"]
+    receipt = _existing(source, threads=config.get("threads"),
+                        context_size=config.get("context_size"), profile=profile)
+    return source, receipt
+
+
+def _reuse_runtime(source: Path, receipt: dict, target: Path) -> list[dict]:
+    target.mkdir(mode=0o755)
+    records, total = [], 0
+    for record in receipt["files"]:
+        path = PurePosixPath(record["path"])
+        if not path.parts or path.parts[0] != "runtime":
+            continue
+        name = path.name
+        if (len(path.parts) != 2 or not 0 < record["bytes"] <= 32 * 1024 * 1024
+            or not (name in {"llama-completion", "LICENSE"} or (name.startswith("lib") and ".so" in name))):
+            raise ValueError("Runtime reuse source contains an unsupported member.")
+        total += record["bytes"]
+        if total > MAX_EXTRACTED:
+            raise ValueError("Reused runtime exceeds the fixed extracted byte bound.")
+        destination = target / name
+        _copy_pinned(source.joinpath(*path.parts), destination, record)
+        destination.chmod(0o444 if name == "LICENSE" else 0o555)
+        records.append(dict(record))
+    if not {"runtime/llama-completion", "runtime/LICENSE"}.issubset({record["path"] for record in records}):
+        raise ValueError("Runtime reuse source omits its executable or license.")
+    if _sha(target / "llama-completion") != EXECUTABLE_SHA256:
+        raise ValueError("Reused runtime executable identity differs.")
+    return records
 
 
 def _platform_diagnostic(args):
@@ -383,6 +468,11 @@ def provision(args) -> dict:
     context_size = getattr(args, "context_size", 8192)
     if type(context_size) is not int or context_size not in {4096, 8192, 12288, 16384}:
         raise ValueError("Context size must be 4096, 8192, 12288 or 16384 tokens.")
+    profile = getattr(args, "profile", DEFAULT_PROFILE)
+    recipe = _model_recipe(profile)
+    runtime_from = getattr(args, "runtime_from", None)
+    if runtime_from is not None and args.runtime_archive is not None:
+        raise ValueError("Choose an existing runtime archive or a complete runtime source, not both.")
     platform_diagnostic = _platform_diagnostic(args)
     target = args.output.expanduser().absolute()
     existing_empty = False
@@ -390,7 +480,7 @@ def provision(args) -> dict:
         if target.is_symlink() or not target.is_dir() or target.resolve() != target:
             raise ValueError("Destination must be a nonsymlink artifact directory.")
         if any(target.iterdir()):
-            receipt = _existing(target, threads=args.threads, context_size=context_size)
+            receipt = _existing(target, threads=args.threads, context_size=context_size, profile=profile)
             return {
                 "status": "verified_existing",
                 "receipt_digest": receipt["receipt_digest"],
@@ -398,6 +488,7 @@ def provision(args) -> dict:
                 "platform": platform_diagnostic,
                 "threads": args.threads,
                 "context_size": context_size,
+                "profile": profile,
                 "activation": {
                     "AI_PROVIDER": "local",
                     "AI_LOCAL_MODEL_PATH": "",
@@ -416,13 +507,15 @@ def provision(args) -> dict:
                 "An existing empty directory must be operator-owned and not writable by other users."
             )
         existing_empty = True
-    if not args.download and (args.model is None or args.runtime_archive is None):
+    if not args.download and (args.model is None or (args.runtime_archive is None and runtime_from is None)):
         raise ValueError("Supply both pinned local artifacts or explicitly request --download.")
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.parent.resolve() != target.parent:
         raise ValueError("Destination parent must not contain symlinks.")
-    if shutil.disk_usage(target.parent).free < 2 * 1024**3:
-        raise ValueError("Provisioning requires at least two GiB free disk space.")
+    required_space = 2 * 1024**3 + recipe["bytes"] + RUNTIME["bytes"] + MAX_EXTRACTED
+    if shutil.disk_usage(target.parent).free < required_space:
+        raise ValueError("Provisioning must retain two GiB free after the bounded model/runtime acquisition.")
+    runtime_source = _runtime_source(runtime_from) if runtime_from is not None else None
     if not existing_empty:
         target.mkdir(mode=0o755)
     marker = target / ".incomplete"
@@ -433,21 +526,24 @@ def provision(args) -> dict:
     if any(path.name != ".incomplete" for path in target.iterdir()):
         raise ValueError("Destination changed while claiming the empty artifact directory.")
     target.chmod(0o755)
-    model = target / MODEL["filename"]
+    model = target / recipe["filename"]
     archive = target / RUNTIME["filename"]
-    _acquire(model, MODEL, args.model, download=args.download)
-    _acquire(archive, RUNTIME, args.runtime_archive, download=args.download)
-    files = _runtime_files(archive, target / "runtime")
+    _acquire(model, recipe, args.model, download=args.download)
+    if runtime_source is None:
+        _acquire(archive, RUNTIME, args.runtime_archive, download=args.download)
+        files = _runtime_files(archive, target / "runtime")
+        archive.unlink()
+    else:
+        files = _reuse_runtime(*runtime_source, target / "runtime")
     model.chmod(0o444)
-    archive.unlink()
     manifest = {
         "schema_version": DEPLOYMENT_SCHEMA,
         "runtime_kind": "llama.cpp-cli",
-        "model_id": "Qwen3-0.6B-Q8_0",
+        "model_id": MODEL_IDS[profile],
         "executable_path": "runtime/llama-completion",
         "executable_sha256": EXECUTABLE_SHA256,
-        "model_path": MODEL["filename"],
-        "model_sha256": MODEL["sha256"],
+        "model_path": recipe["filename"],
+        "model_sha256": recipe["sha256"],
         "config": {
             "context_size": context_size,
             "threads": args.threads,
@@ -455,7 +551,7 @@ def provision(args) -> dict:
             "gpu_layers": 0,
             "timeout_seconds": 600,
             "temperature": 0.0,
-            "extra_args": _profile_args(),
+            "extra_args": _profile_args(profile),
             "output_framing": "llama_completion_eog",
             "runtime_scratch_bytes": 512 * 1024 * 1024,
             "kv_bytes_per_token": None,
@@ -464,12 +560,13 @@ def provision(args) -> dict:
     candidate = target / ".deployment-candidate.json"
     _write_json(candidate, manifest)
     admitted = LocalModelDeployment.load(candidate)
-    for name in (MODEL["filename"], "deployment.json"):
-        path = model if name == MODEL["filename"] else candidate
-        files.append({"path": name, "bytes": path.stat().st_size, "sha256": _sha(path)})
+    for name in (recipe["filename"], "deployment.json"):
+        path = model if name == recipe["filename"] else candidate
+        files.append({"path": name, "bytes": path.stat().st_size,
+                      "sha256": _sha(path, max_bytes=recipe["bytes"])})
     receipt = {
         "schema_version": SCHEMA,
-        "model": MODEL,
+        "model": recipe,
         "runtime": RUNTIME,
         "runtime_platform": TARGET,
         "preparation": platform_diagnostic,
@@ -478,6 +575,8 @@ def provision(args) -> dict:
         "inference_executed": False,
         "production_promotion_authorized": False,
     }
+    if runtime_source is not None:
+        receipt["runtime_source_receipt_digest"] = runtime_source[1]["receipt_digest"]
     receipt["receipt_digest"] = hashlib.sha256(
         json.dumps(receipt, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()
@@ -491,11 +590,12 @@ def provision(args) -> dict:
         "status": "provisioned",
         "receipt_digest": receipt["receipt_digest"],
         "destination": str(target),
-        "model_bytes": MODEL["bytes"],
+        "model_bytes": recipe["bytes"],
         "runtime_files": len(files) - 2,
         "platform": platform_diagnostic,
         "threads": args.threads,
         "context_size": context_size,
+        "profile": profile,
         "activation": {
             "AI_PROVIDER": "local",
             "AI_LOCAL_MODEL_PATH": "",
@@ -514,16 +614,24 @@ def main() -> int:
     )
     parser.add_argument("--target", required=True, choices=(TARGET,), help="explicit pinned runtime target")
     parser.add_argument(
+        "--profile", choices=MODEL_PROFILES, default=DEFAULT_PROFILE,
+        help="chat: existing small Qwen3 default; coding: opt-in Qwen2.5-Coder-1.5B Q4_K_M (~1.1 GB)",
+    )
+    parser.add_argument(
         "--prepare-for-container",
         action="store_true",
         help="prepare Linux x86_64 artifacts on another host; target container must support this runtime",
     )
     parser.add_argument(
-        "--download", action="store_true", help="explicitly download the fixed ~657 MB public artifacts"
+        "--download", action="store_true", help="explicitly download the selected pinned public model/runtime artifacts"
     )
     parser.add_argument("--model", type=Path, help="existing exact pinned Qwen GGUF instead of downloading")
     parser.add_argument(
         "--runtime-archive", type=Path, help="existing exact pinned Ubuntu x64 release archive"
+    )
+    parser.add_argument(
+        "--runtime-from", type=Path,
+        help="reuse the verified executable/libraries from a complete pinned provisioning directory without changing it",
     )
     parser.add_argument("--threads", type=int, default=2)
     parser.add_argument(

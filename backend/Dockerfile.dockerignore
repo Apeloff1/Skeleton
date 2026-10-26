@@ -14,6 +14,7 @@
 !machine/state_topology.json
 !machine/ai_capabilities.json
 !machine/ai_runtime_schemas.json
+!machine/ai_local_model_provisioning.json
 !machine/ai_implementation_handoff.json
 !machine/ai_closure_evidence.json
 !machine/enterprise_ai_superiority.json
