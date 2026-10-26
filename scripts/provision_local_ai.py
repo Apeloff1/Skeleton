@@ -20,6 +20,10 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from skeleton.ai.runtime.inference.llama_cpp import (  # noqa: E402
+    CODING_COMPLETION_CHAT_TEMPLATE,
+    COMPLETION_CHAT_FLAGS,
+)
 
 MODEL = {
     "filename": "Qwen3-0.6B-Q8_0.gguf",
@@ -38,13 +42,6 @@ CODING_MODEL = {
 DEFAULT_PROFILE = "chat"
 MODEL_PROFILES = ("chat", "coding")
 MODEL_IDS = {"chat": "Qwen3-0.6B-Q8_0", "coding": "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M"}
-CODING_COMPLETION_CHAT_TEMPLATE = (
-    "{% for message in messages %}"
-    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
-    "{% endfor %}{% if add_generation_prompt %}"
-    "{{ '<|im_start|>assistant\\n' }}"
-    "{% endif %}"
-)
 RUNTIME = {
     "filename": "llama-b11429-bin-ubuntu-x64.tar.gz",
     "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11429/llama-b11429-bin-ubuntu-x64.tar.gz",
@@ -75,18 +72,7 @@ with urllib.request.urlopen(request,timeout=60) as origin,open(destination,'xb')
     if received!=expected: raise ValueError('artifact is truncated')
     target.flush();os.fsync(target.fileno())
 """
-PROFILE_ARGS = [
-    "--conversation",
-    "--single-turn",
-    "--simple-io",
-    "--no-perf",
-    "--no-escape",
-    "--color",
-    "off",
-    "--jinja",
-    "--reasoning",
-    "off",
-]
+PROFILE_ARGS = list(COMPLETION_CHAT_FLAGS)
 
 
 def _model_recipe(profile: str = DEFAULT_PROFILE) -> dict:

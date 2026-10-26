@@ -38,6 +38,13 @@
   },
   "target": "Explicit --target linux-x86_64-glibc only. Other host platforms require --prepare-for-container acknowledgement; host/target compatibility reported separately. Artifact preparation does not establish native execution compatibility.",
   "prompt_profile": "Explicit profile-specific completion template follows fixed completion flags. Chat retains canonical Qwen3 closed-empty-think template; opt-in coding uses plain ChatML without thinking tokens. Exact args/template enter manifest/profile digest. Existing profile directories are never silently rewritten or retargeted.",
+  "native_prompt_roles": {
+    "owner": "skeleton/ai/runtime/inference/llama_cpp.py:LlamaCppModel",
+    "recognition": "Only the exact existing pinned completion flags plus the canonical Qwen3 or coding template select the versioned native ChatML renderer. Existing manifests and provisioning receipts remain immutable; unknown/custom/raw profiles retain legacy rendering and CLI flags.",
+    "rendering": "Instructions and local tool/structured-output protocol, including the bounded validated JSON schema, occupy the system frame. Authorized user/assistant history keeps each role and exact content; the current prompt is a separate user frame. The sole assistant generation prefix is plain for coding and includes the existing closed empty think block for Qwen3. Reserved ChatML/EOT delimiters in any content fail before process admission; no arbitrary Jinja evaluation.",
+    "native_transport": "Recognized profiles use the pinned CLI binary-file reader and no-conversation mode to preserve exact UTF-8 bytes and the final assistant newline without a second template wrapper. Private prompt files, no-escape, schema grammar, output framing and all context/token/time/custody limits remain authoritative.",
+    "identity": "Effective prompt-format version enters the existing execution-profile digest only for recognized profiles, invalidating incompatible generation caches. Historical terminal results and deployment receipts are never rewritten. Rollback reverts rendering and must not treat an old generation receipt as new-format qualification."
+  },
   "empty_directory_claim": {
     "accepted": "New destination, or an existing empty nonsymlink directory owned by the effective operator UID with no group/world write access. Parent symlinks and foreign ownership are rejected.",
     "claim": "Exclusive create-only .incomplete marker, fsynced before artifact writes; concurrent or incomplete claims are never overwritten. Check emptiness again after claim.",
