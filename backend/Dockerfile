@@ -7,7 +7,7 @@
 
 # Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
 # so compiled wheels and native extensions do not cross a glibc/musl boundary.
-FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS builder
+FROM python:3.15-alpine@sha256:d44b1254cb92329418d164b22b20d86bbd3869d48e80e09e476531a409a728bb AS builder
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN --mount=type=secret,id=proxy_ca \
 
 # Prepare the existing flat backend layout in a source-only stage. The
 # Dockerfile-specific context allowlist excludes secrets and runtime data.
-FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS runtime-source
+FROM python:3.15-alpine@sha256:d44b1254cb92329418d164b22b20d86bbd3869d48e80e09e476531a409a728bb AS runtime-source
 WORKDIR /source
 COPY . .
 RUN mv backend /runtime \
@@ -42,7 +42,7 @@ RUN mv backend /runtime \
     && cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py
 
 # Stage 2: Production
-FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS production
+FROM python:3.15-alpine@sha256:d44b1254cb92329418d164b22b20d86bbd3869d48e80e09e476531a409a728bb AS production
 
 # Apply the current Alpine security repository updates to the runtime layer.
 # The pinned base remains reproducible while util-linux and other OS packages
