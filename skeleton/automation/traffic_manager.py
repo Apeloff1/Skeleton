@@ -24,11 +24,12 @@ import json
 import os
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from .automation_safety import load_automation_safety
 from .build_authority import APPROVED_BUILD_LABELS
 from .free_model import redact_secrets
 
@@ -875,6 +876,9 @@ def main() -> int:
         "GITHUB_RUN_ID", ""
     ).strip()
     force = _bool_env("TRAFFIC_FORCE")
+    # The currently active traffic manager is a trusted automation entrypoint.
+    # A malformed operator hold is an error, never an implicit admission.
+    operator_safety = load_automation_safety()
 
     snapshot = observe(
         repository,
@@ -885,6 +889,19 @@ def main() -> int:
         snapshot,
         force=force,
     )
+    if operator_safety.blocked:
+        # Holds also fence manual `force`, and prohibit automatic queue relief.
+        # Keep the observed pressure and immutable custody fingerprint in the
+        # receipt instead of fabricating an empty or green repository state.
+        decision = replace(
+            decision,
+            admit=False,
+            relieve=False,
+            reason="operator-" + operator_safety.status,
+            lane="hold",
+            relief_reason="operator-hold",
+            forced=False,
+        )
 
     print(
         json.dumps(
