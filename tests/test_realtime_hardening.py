@@ -468,3 +468,25 @@ def test_guard_rejects_entity_encoded_suffix_past_size_budget():
 def test_guard_preserves_benign_html_entities(value):
     cleaned, hits = PayloadSecretGuard().scrub({"note": value})
     assert hits == 0 and cleaned["note"] == value
+
+
+def test_guard_rejects_unexamined_nested_payload_beyond_depth_budget():
+    from skeleton.realtime.guard import _MAX_DEPTH
+
+    payload = {"leaf": "ordinary message"}
+    for depth in range(_MAX_DEPTH + 2):
+        payload = {"nested": payload}
+    clean, hits = PayloadSecretGuard().scrub(payload)
+    assert hits > 0
+    assert REDACTED_MARK in json.dumps(clean)
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub(payload)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_guard_never_emits_nonfinite_json_numbers(value):
+    cleaned, hits = PayloadSecretGuard().scrub({"metric": value})
+    assert hits == 1 and cleaned["metric"] == REDACTED_MARK
+    json.dumps(cleaned, allow_nan=False)
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"metric": value})
