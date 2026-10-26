@@ -35,7 +35,9 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
-    return datetime(2026, 9, 23, 19, 30, tzinfo=timezone.utc)
+    # Deadlines derive from wall time: an old fixed fixture silently exhausts
+    # the provider budget and hides execution/cancellation invariants.
+    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def _request(
