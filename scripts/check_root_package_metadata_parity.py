@@ -7,6 +7,7 @@ pyproject.toml or setup.cfg. Both must advertise identical runtime floors.
 from __future__ import annotations
 
 import configparser
+import re
 import tomllib
 from pathlib import Path
 
@@ -21,6 +22,24 @@ def _requirements(values: object) -> list[str]:
     return [value.strip() for value in values]
 
 
+
+_REQ_NAME = re.compile(
+    r"^([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)(?=\[|[<>=!~;@]|\s|$)"
+)
+
+
+def _validate_unique_packages(values: list[str], origin: str, issues: list[str]) -> None:
+    """Disallow two constraints on the same canonical distribution name."""
+    observed: set[str] = set()
+    for value in values:
+        match = _REQ_NAME.match(value)
+        if match is None:
+            raise ValueError(f"{origin}: malformed package requirement")
+        canonical = re.sub(r"[-_.]+", "-", match.group(1)).lower()
+        if canonical in observed:
+            issues.append(f"{origin}: duplicate distribution {canonical}")
+        observed.add(canonical)
+
 def validate(pyproject_text: str, setup_text: str) -> list[str]:
     """Return core metadata mismatches, raising for malformed metadata."""
     project = tomllib.loads(pyproject_text)
@@ -30,6 +49,8 @@ def validate(pyproject_text: str, setup_text: str) -> list[str]:
     setup = cfg.get("options", "install_requires")
     from_setup = _requirements(setup.splitlines() if setup.strip() else [])
     issues: list[str] = []
+    _validate_unique_packages(declared, "pyproject core", issues)
+    _validate_unique_packages(from_setup, "setup.cfg core", issues)
     if len(set(declared)) != len(declared):
         issues.append("pyproject core dependencies contain duplicate requirement strings")
     if len(set(from_setup)) != len(from_setup):
@@ -57,6 +78,8 @@ def validate(pyproject_text: str, setup_text: str) -> list[str]:
             continue
         expected = _requirements(optional[extra])
         actual = setup_extras[extra]
+        _validate_unique_packages(expected, "pyproject extra " + extra, issues)
+        _validate_unique_packages(actual, "setup.cfg extra " + extra, issues)
         if len(expected) != len(set(expected)):
             issues.append("pyproject extra has duplicate requirements: " + extra)
         if len(actual) != len(set(actual)):
