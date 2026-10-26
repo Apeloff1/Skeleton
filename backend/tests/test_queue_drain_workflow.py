@@ -26,7 +26,7 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
 def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     workflow = _workflow_text()
 
-    assert "runs-on: ubuntu-24.04-arm" in workflow
+    assert "    runs-on: ubuntu-latest\n" in workflow
     assert "actions: write" in workflow
     assert "contents: read" in workflow
     assert "permissions: {}" in workflow
@@ -158,7 +158,7 @@ def test_queue_drain_has_one_recovery_worker_and_independent_housekeeping() -> N
 
     assert "  drain:\n" in workflow
     assert "  wake-housekeeping:\n" not in workflow
-    assert "runs-on: ubuntu-24.04-arm" in workflow
+    assert "    runs-on: ubuntu-latest\n" in workflow
     assert "gh workflow run actions-housekeeping-cli.yml" not in workflow
     assert "schedule:" in housekeeping
     assert "cron: '23 4,16 * * *'" in housekeeping
@@ -239,7 +239,7 @@ def test_periodic_controller_coalescing_keeps_newest_live_wake() -> None:
 def test_drain_recovery_arm_lane_keeps_control_plane_safeguards() -> None:
     workflow = _workflow_text()
     drain = workflow[workflow.index("  drain:\n"):]
-    assert "runs-on: ubuntu-24.04-arm" in drain
+    assert "    runs-on: ubuntu-latest\n" in drain
     assert "cancel-in-progress: false" in workflow
     assert "if stale_pr_run(run, open_pr_heads):" in drain
     assert "if security_lane:" in drain
