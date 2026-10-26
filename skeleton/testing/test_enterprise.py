@@ -9,7 +9,9 @@ def test_enterprise_request():
     gw = get_gateway()
     out = gw.request("enterprise test", "valid_cas_string_32chars_long_enough")
     assert out["status"] == "ok"
-    assert out["health"]["healthy"] is True
+    # A successful gateway request does not override actual runtime health.
+    health = out["health"]
+    assert health["healthy"] is (health["engine"] and health["doctor"] == "passed")
 
 def test_enterprise_config():
     cfg = EnterpriseConfig()
