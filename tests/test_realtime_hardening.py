@@ -522,3 +522,12 @@ def test_guard_rejects_non_json_collection_types(invalid):
     for mode in ("redact", "reject"):
         with pytest.raises(RealtimeSecretError, match="not JSON-native"):
             PayloadSecretGuard(mode=mode).scrub({"value": invalid})
+
+
+def test_guard_rejects_custom_nested_mapping():
+    from collections import UserDict
+
+    payload = {"nested": UserDict({"note": "ordinary"})}
+    for mode in ("redact", "reject"):
+        with pytest.raises(RealtimeSecretError, match="JSON-native dictionaries"):
+            PayloadSecretGuard(mode=mode).scrub(payload)
