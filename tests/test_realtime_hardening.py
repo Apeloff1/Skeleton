@@ -567,3 +567,14 @@ def test_guard_fails_closed_on_raw_json_at_depth_limit():
     assert REDACTED_MARK in json.dumps(cleaned)
     with pytest.raises(RealtimeSecretError):
         PayloadSecretGuard(mode="reject").scrub(payload)
+
+
+def test_guard_does_not_compare_secret_field_value_with_custom_equality():
+    class DangerousEquality:
+        def __eq__(self, other):
+            raise AssertionError("untrusted equality must never be invoked")
+
+    cleaned, hits = PayloadSecretGuard().scrub({"accessToken": DangerousEquality()})
+    assert hits == 1 and cleaned["accessToken"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"accessToken": DangerousEquality()})
