@@ -341,7 +341,20 @@ class FunctionalAIRuntime:
         )
         self._assert_local_identity()
         if result.state is not ExecutionState.COMPLETED or result.result is None:
-            raise RuntimeError(f"VS-001 did not complete: {result.state.value}")
+            # This is a local-only diagnostic, never a model/provider payload.
+            # Emit the bounded typed terminal error code so exact-head CI can
+            # distinguish denied tool authority from failed verification.
+            code = "unavailable"
+            if result.result is not None:
+                candidate = result.result.usage.get("error_code", "")
+                if isinstance(candidate, str) and 0 < len(candidate) <= 64 and all(
+                    char.isascii() and (char.isalnum() or char in "_-")
+                    for char in candidate
+                ):
+                    code = candidate
+            raise RuntimeError(
+                f"VS-001 did not complete: {result.state.value}; error_code={code}"
+            )
         terminal = result.result
         if terminal.status != "completed" or terminal.final_output is None:
             raise RuntimeError("VS-001 terminal result is not completed")
