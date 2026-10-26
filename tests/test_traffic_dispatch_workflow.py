@@ -108,6 +108,43 @@ class TrafficDispatchWorkflowTests(unittest.TestCase):
             calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
             return completed, calls
 
+    def test_unset_operator_flags_do_not_break_strict_shell(self) -> None:
+        # A missing GitHub Actions repository variable is an empty value, not
+        # an error under the traffic policy. Keep both cases deterministic.
+        result, calls = self._execute(
+            SKELETON_AUTOMATION_PAUSED="",
+            SKELETON_AUTOMATION_QUARANTINED="",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(calls), 2)
+
+    def test_operator_pause_denies_dispatch_without_api_calls(self) -> None:
+        result, calls = self._execute(
+            SKELETON_AUTOMATION_PAUSED="yes",
+            SKELETON_AUTOMATION_QUARANTINED="",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("operator hold active", result.stdout)
+        self.assertEqual(calls, [])
+
+    def test_operator_quarantine_denies_dispatch_without_api_calls(self) -> None:
+        result, calls = self._execute(
+            SKELETON_AUTOMATION_PAUSED="false",
+            SKELETON_AUTOMATION_QUARANTINED="1",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("operator hold active", result.stdout)
+        self.assertEqual(calls, [])
+
+    def test_malformed_operator_flag_fails_closed_without_api_calls(self) -> None:
+        result, calls = self._execute(
+            SKELETON_AUTOMATION_PAUSED="sometimes",
+            SKELETON_AUTOMATION_QUARANTINED="false",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Invalid operator automation control", result.stdout)
+        self.assertEqual(calls, [])
+
     def test_recorded_admission_fingerprint_matches_canonical_implementation(
         self,
     ) -> None:
