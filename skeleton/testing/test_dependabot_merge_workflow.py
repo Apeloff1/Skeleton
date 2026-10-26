@@ -6,11 +6,15 @@ import sys
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "dependabot-automerge.yml"
+# Dependabot's automatic merger is retired; validate the archived contract
+# without mistaking the archive for a deployed Actions workflow.
+WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "dependabot-automerge.yml"
+LIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "dependabot-automerge.yml"
 SCRIPT = REPO_ROOT / "skeleton" / "automation" / "dependabot_merge_policy.py"
 
 
 def test_dependabot_worker_bypasses_root_package_imports() -> None:
+    assert not LIVE_WORKFLOW.exists()
     text = WORKFLOW.read_text(encoding="utf-8")
 
     assert "run: |" in text
