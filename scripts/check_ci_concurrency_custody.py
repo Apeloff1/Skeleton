@@ -24,7 +24,7 @@ def validate_text(name: str, content: str) -> list[str]:
     prefix = WORKFLOWS.get(name)
     if prefix is None:
         return [f"{name}: unreviewed workflow"]
-    block = re.search(r"(?m)^concurrency:\s*\n((?:^[ \t]+[^\n]*\n?)*)", content)
+    block = re.search(r"(?m)^concurrency:[ \t]*\n((?:^[ \t]+[^\n]*\n?)*)", content)
     if block is None:
         return [f"{name}: missing global concurrency block"]
     data: dict[str, str] = {}
