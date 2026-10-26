@@ -81,3 +81,17 @@ test("missing optional Expo CLI target remains no-op", () => {
   assert.equal(r.result, "untouched");
   assert.equal(r.patched, 0);
 });
+
+
+test("frontend manifest, frozen lockfile, and static-index patch agree", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  const declared = manifest.dependencies?.["@expo/cli"];
+  assert.match(declared, /^\d+\.\d+\.\d+$/, "Expo CLI must be exactly pinned");
+  const locked = fs.readFileSync(path.join(root, "yarn.lock"), "utf8");
+  const matches = [...locked.matchAll(/^"@expo\/cli@([^"\n]+)":\r?\n  version "([^"\n]+)"/gm)];
+  assert.equal(matches.length, 1, "frozen lockfile must resolve one direct Expo CLI");
+  assert.equal(matches[0][1], declared, "lockfile selector must match package.json");
+  assert.equal(matches[0][2], declared, "locked Expo CLI version must match exact pin");
+  const result = run(declared, before);
+  assert.equal(result.patched, 1, "locked Expo CLI must be covered by static patch review");
+});
