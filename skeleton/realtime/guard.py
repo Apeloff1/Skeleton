@@ -170,7 +170,10 @@ def _decode_chain(value: str) -> Tuple[list, bool]:
     """
     out: list = []
     if len(value) > _MAX_DECODE_CHARS:
-        return out, _decode_step(value[:_MAX_DECODE_CHARS]) is not None
+        # Do not inspect only the prefix: a percent-encoded credential can sit
+        # beyond the decode budget. Fail closed on any encoded oversized value,
+        # using linear bounded-pattern checks instead of decoding huge input.
+        return out, bool(_PCT_RE.search(value) or _B64_RE.fullmatch(value.strip()))
     current = value
     for _ in range(_MAX_DECODE_ROUNDS):
         nxt = _decode_step(current)
