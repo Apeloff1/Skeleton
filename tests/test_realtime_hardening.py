@@ -490,3 +490,10 @@ def test_guard_never_emits_nonfinite_json_numbers(value):
     json.dumps(cleaned, allow_nan=False)
     with pytest.raises(RealtimeSecretError):
         PayloadSecretGuard(mode="reject").scrub({"metric": value})
+
+
+@pytest.mark.parametrize("invalid", [None, [], "not-a-map", 42, True])
+def test_guard_rejects_non_mapping_top_level_payload(invalid):
+    for mode in ("redact", "reject"):
+        with pytest.raises(RealtimeSecretError, match="payload must be a mapping"):
+            PayloadSecretGuard(mode=mode).scrub(invalid)
