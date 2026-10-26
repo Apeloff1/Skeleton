@@ -87,7 +87,7 @@ def test_scoped_trinity_wrong_user_yields_no_personal_history() -> None:
     assert result.persona_frame
 
 
-def test_trinity_fusion_tie_break_is_deterministic() -> None:
+def test_scoped_trinity_rehearsal_preserves_provenance_identity() -> None:
     trinity,user=_trinity()
 
     first=trinity.query_scoped(
@@ -103,7 +103,21 @@ def test_trinity_fusion_tie_break_is_deterministic() -> None:
         user_id=str(user),
     )
 
-    assert first.provenance_chain==second.provenance_chain
+    # MAG updates access count during retrieval and intentionally gives the
+    # next query a rehearsal bonus. Relative tier order and scores can change.
+    def identities(result):
+        return {entry.split("(score=", 1)[0] for entry in result.provenance_chain}
+
+    assert identities(first) == identities(second)
+    assert len(first.provenance_chain) == len(identities(first))
+    assert len(second.provenance_chain) == len(identities(second))
+    assert all("fact-other" not in entry for entry in second.provenance_chain)
+
+    def mag_score(result):
+        entry = next(item for item in result.provenance_chain if item.startswith("mag:"))
+        return float(entry.split("(score=", 1)[1].removesuffix(")"))
+
+    assert mag_score(second) > mag_score(first)
 
 
 def test_scoped_trinity_rejects_empty_authority_scope() -> None:
