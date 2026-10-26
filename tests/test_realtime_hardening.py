@@ -504,3 +504,14 @@ def test_guard_rejects_non_string_mapping_keys_without_coercion():
         PayloadSecretGuard().scrub({1: "value"})
     with pytest.raises(RealtimeSecretError, match="keys must be strings"):
         PayloadSecretGuard(mode="reject").scrub({"nested": {2: "value"}})
+
+
+def test_guard_fails_closed_for_oversized_plain_text():
+    from skeleton.realtime.guard import _MAX_DECODE_CHARS
+
+    payload = {"note": "a" * (_MAX_DECODE_CHARS + 1)}
+    cleaned, hits = PayloadSecretGuard().scrub(payload)
+    assert hits >= 1
+    assert cleaned["note"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub(payload)
