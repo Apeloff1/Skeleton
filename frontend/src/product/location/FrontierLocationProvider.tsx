@@ -66,6 +66,7 @@ export function FrontierLocationProvider(props: FrontierLocationProviderProps): 
     const gen = ++generation.current;
     pendingStart.current = gen;
     if (Platform.OS !== "web" && !native) {
+      pendingStart.current = null;
       setState({ status: "unavailable", fix: null, error: { code: "UNAVAILABLE", message: "expo-location is not installed in this build" } });
       return;
     }
