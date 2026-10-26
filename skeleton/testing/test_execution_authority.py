@@ -1111,6 +1111,7 @@ def test_checkpoint_restore_requires_parent_first_for_delegated_authority() -> N
     allowed = restored.authorize(
         authority=child,
         capability="repo.read",
+        delta=ResourceUsage(tool_calls=1),
         replay_key="child-read-after-restart",
         now=NOW + timedelta(seconds=4),
     )
@@ -1172,6 +1173,7 @@ def test_child_usage_is_charged_against_parent_aggregate_budget() -> None:
     parent = _authority(budget=_budget(tool_calls=2))
     _admit(guard, parent)
     child = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         parent,
         budget=_budget(tool_calls=2, parallelism=1),
     )
@@ -1219,11 +1221,13 @@ def test_sibling_delegations_cannot_multiply_parent_budget() -> None:
     parent = _authority(budget=_budget(tool_calls=2))
     _admit(guard, parent)
     child_a = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         parent,
         actor_id="agent.worker-a",
         budget=_budget(tool_calls=2, parallelism=1),
     )
     child_b = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         parent,
         actor_id="agent.worker-b",
         budget=_budget(tool_calls=2, parallelism=1),
@@ -1284,6 +1288,7 @@ def test_deep_delegation_charges_every_ancestor_once() -> None:
     root = _authority(budget=_budget(tool_calls=2))
     _admit(guard, root)
     child = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         root,
         actor_id="agent.secretary",
         budget=_budget(tool_calls=2, parallelism=1),
@@ -1296,6 +1301,7 @@ def test_deep_delegation_charges_every_ancestor_once() -> None:
         now=NOW + timedelta(seconds=1),
     )
     grandchild = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         child,
         actor_id="agent.worker",
         budget=_budget(tool_calls=2, parallelism=1),
@@ -1329,6 +1335,7 @@ def test_delegated_replay_does_not_double_charge_ancestor_budget() -> None:
     parent = _authority(budget=_budget(tool_calls=1))
     _admit(guard, parent)
     child = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         parent,
         budget=_budget(tool_calls=1, parallelism=1),
     )
@@ -1366,6 +1373,7 @@ def test_checkpoint_restore_reconstructs_ancestor_aggregate_usage() -> None:
     parent = _authority(budget=_budget(tool_calls=2))
     _admit(source, parent)
     child = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         parent,
         budget=_budget(tool_calls=2, parallelism=1),
     )
@@ -1422,6 +1430,7 @@ def test_sealed_parent_evidence_reports_descendant_and_aggregate_usage() -> None
     parent = _authority(budget=_budget(tool_calls=2))
     _admit(guard, parent)
     child = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         parent,
         budget=_budget(tool_calls=1, parallelism=1),
     )
@@ -1459,6 +1468,7 @@ def test_parent_direct_use_cannot_ignore_descendant_consumption() -> None:
     parent = _authority(budget=_budget(tool_calls=2))
     _admit(guard, parent)
     child = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         parent,
         budget=_budget(tool_calls=2, parallelism=1),
     )
@@ -1495,6 +1505,7 @@ def test_intermediate_authority_direct_use_honors_grandchild_consumption() -> No
     root = _authority(budget=_budget(tool_calls=3))
     _admit(guard, root)
     child = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         root,
         actor_id="agent.secretary",
         budget=_budget(tool_calls=2, parallelism=1),
@@ -1507,6 +1518,7 @@ def test_intermediate_authority_direct_use_honors_grandchild_consumption() -> No
         now=NOW + timedelta(seconds=1),
     )
     grandchild = _child_authority(
+        capabilities=("repo.read", "repo.write"),
         child,
         actor_id="agent.worker",
         budget=_budget(tool_calls=2, parallelism=1),
