@@ -1425,6 +1425,9 @@ def run_gameforge_adapter(request: Dict[str, Any], state: Any) -> Dict[str, Any]
     from skeleton.forge.repair import REPAIR_MODES
 
     _reject_remote_project_writes(request)
+    # Invalid projection flags must be rejected before running the ten-stage
+    # builder; checking after execution can waste work or cause side effects.
+    include_files = _bool_field(request, "include_files", False)
     result = build_playable_game(
         _text_field(request, "vision", ""),
         era=_text_field(request, "era", "") or None,
@@ -1437,7 +1440,7 @@ def run_gameforge_adapter(request: Dict[str, Any], state: Any) -> Dict[str, Any]
         target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
         answers=_mapping_field(request, "answers", None, optional=True) or None,
     )
-    return project_operator_http(result, include_files=_bool_field(request, "include_files", False))
+    return project_operator_http(result, include_files=include_files)
 
 
 def _scope_id(value: str, fallback: str) -> str:
