@@ -59,10 +59,19 @@ test('a retained record is a validated metadata snapshot, never prompts, tokens 
   for (const value of [null, {}, { jobId: 42 }, { jobId: '../job' }, { jobId: 'x'.repeat(129) },
     { jobId: 'job', prompt: 'private prompt' }, { jobId: 'job', token: 'secret' },
     { jobId: 'job', engineRequestKey: 'x'.repeat(257) }, { jobId: 'job', errorCode: 'new\nline' },
-    { jobId: 'job', kind: 'x'.repeat(65) }]) await assert.rejects(store.set(value));
+    { jobId: 'job', kind: 'x'.repeat(65) }, { jobId: 'job', playableId: '../other' },
+    { jobId: 'job', playableId: 'foreign/target' }, { jobId: 'job', playableId: 42 }]) await assert.rejects(store.set(value));
   assert.equal(f.calls.length, 0);
   const mutable = { ...retained }, saving = store.set(mutable); mutable.jobId = 'job-other'; mutable.errorCode = 'altered'; await saving;
   assert.deepEqual(await store.get(), retained); store.dispose();
+});
+
+test('a repair receipt preserves its exact parent identity across reload', async () => {
+  const f = fixture(), store = await f.openPlayableJobObservation();
+  const repair = { jobId: 'repair-job-1', kind: 'repair', playableId: 'original-game-1' };
+  await store.set(repair); store.dispose();
+  const restored = await f.reload().openPlayableJobObservation();
+  assert.deepEqual(await restored.get(), repair); restored.dispose();
 });
 
 test('receipt acknowledgement waits for the physical write and exact storage readback', async () => {
@@ -213,7 +222,7 @@ function observationClosureFixture() {
     api: { get: async (url, options) => { calls.push({ kind: 'get', url, options }); return { ok: true, data: { job_id: retained.jobId, job_status: 'error', error: 'confirmed failure' } }; },
       post: async () => { throw new Error('Observation cannot submit or replay work'); } },
     setSavedJob: value => { state.saved = value; }, setObservationMessage: value => { state.message = value; },
-    setObservingJob: value => { state.observing = value; }, setBusy: value => { state.busy = value; }, setBusyLabel() {},
+    setObservingJob: value => { state.observing = value; }, setBusy: value => { state.busy = value; }, setBusyLabel() {}, setRepairing() {},
   };
   return { newer, state, calls, observationRequest, bindings, stored: () => stored };
 }

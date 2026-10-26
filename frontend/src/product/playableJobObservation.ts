@@ -6,6 +6,7 @@ import { OrderedCommitQueue } from '../utils/OrderedCommitQueue';
 export type PlayableJobObservation = {
   jobId: string;
   kind?: string;
+  playableId?: string;
   engineRequestKey?: string;
   errorCode?: string;
 };
@@ -34,14 +35,16 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 function record(value: unknown): PlayableJobObservation {
   if (!object(value) || !jobId(value.jobId)
-    || Object.keys(value).some(key => !['jobId', 'kind', 'engineRequestKey', 'errorCode'].includes(key))
+    || Object.keys(value).some(key => !['jobId', 'kind', 'playableId', 'engineRequestKey', 'errorCode'].includes(key))
     || value.kind !== undefined && !kind(value.kind)
+    || value.playableId !== undefined && !jobId(value.playableId)
     || value.engineRequestKey !== undefined && !engineKey(value.engineRequestKey)
     || value.errorCode !== undefined && !errorCode(value.errorCode)) {
     throw new Error('The retained playable job reference is invalid.');
   }
   return { jobId: value.jobId,
     ...(value.kind === undefined ? {} : { kind: value.kind }),
+    ...(value.playableId === undefined ? {} : { playableId: value.playableId }),
     ...(value.engineRequestKey === undefined ? {} : { engineRequestKey: value.engineRequestKey }),
     ...(value.errorCode === undefined ? {} : { errorCode: value.errorCode }) };
 }

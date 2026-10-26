@@ -136,6 +136,7 @@ function PlayableContent() {
   const [observationMessage, setObservationMessage] = React.useState('');
   const observationStore = React.useRef<PlayableJobObservationStore | null>(null);
   const observationRequest = React.useRef<AbortController | null>(null);
+  const repairSubmission = React.useRef<AbortController | null>(null);
   const pageActive = React.useRef(true);
   const busy = working || !observationReady || !!savedJob;
   const [busyLabel, setBusyLabel] = React.useState('Building your game…');
@@ -158,12 +159,14 @@ function PlayableContent() {
       }
     })();
     return () => {
-      pageActive.current = false; request.abort(); observationRequest.current?.abort();
+      pageActive.current = false; request.abort(); observationRequest.current?.abort(); repairSubmission.current?.abort();
       observationStore.current?.dispose(); observationStore.current = null;
     };
   }, []);
   const [polish, setPolish] = React.useState<{ step: number; total: number } | null>(null);
   const [game, setGame] = React.useState<Playable | null>(null);
+  const currentGame = React.useRef<Playable | null>(game);
+  currentGame.current = game;
   const [error, setError] = React.useState<string | null>(null);
   const [recent, setRecent] = React.useState<ListItem[]>([]);
   const [webKey, setWebKey] = React.useState(0);
@@ -388,40 +391,6 @@ function PlayableContent() {
     awardXp('react');
   }, [game, haptics]);
 
-  // 🔧 Auto-repair (async): kick a background repair job and poll /job/{id} so a
-  // long (~100s) LLM repair never hits a public-ingress edge timeout.
-  const autoRepair = React.useCallback(async () => {
-    if (!game || repairing) return;
-    haptics.selection(); setRepairing(true); setRepairMsg('Analyzing the crash…');
-    const start = await api.post<{ job_id?: string }>(
-      `/api/playable/${game.playable_id}/repair/async`, { error: gameError || '' }, { timeoutMs: 15_000, retries: 0 });
-    if (!start.ok || !start.data?.job_id) {
-      setRepairing(false); setRepairMsg('Could not start repair — please try again.'); haptics.notify('error'); return;
-    }
-    const jobId = start.data.job_id;
-    let done = false;
-    for (let i = 0; i < 80 && !done; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const st = await api.get<{ job_status?: string; repaired?: boolean; score?: number }>(
-        `/api/playable/job/${jobId}`, { timeoutMs: 12_000, retries: 0 });
-      const js = st.ok ? st.data?.job_status : undefined;
-      if (js === 'done') {
-        done = true;
-        if (st.data?.repaired) {
-          setRepairMsg(`✓ Fixed — playability ${st.data.score}/100. Reloading…`);
-          haptics.notify('success'); setGameError(null); setWebKey((k) => k + 1);
-        } else {
-          setRepairMsg('Could not auto-fix this one — try ✨ New game or 🔱 Remix.'); haptics.notify('error');
-        }
-      } else if (js === 'error') {
-        done = true; setRepairMsg('Repair failed — please try again.'); haptics.notify('error');
-      } else {
-        setRepairMsg(`🔧 Repairing… (${(i + 1) * 3}s)`);
-      }
-    }
-    if (!done) setRepairMsg('Still working in the background — reopen the game shortly.');
-    setRepairing(false);
-  }, [game, repairing, gameError, haptics]);
   const [coverBust, setCoverBust] = React.useState(0);
   const [coverHidden, setCoverHidden] = React.useState(false);
   const [coverBusy, setCoverBusy] = React.useState(false);
@@ -477,7 +446,7 @@ function PlayableContent() {
 
   // Observation is a GET-only view of the existing job, not a build lease or
   // permission to repeat its generating POST. Keep its owner-scoped receipt.
-  const pollJob = React.useCallback(async (jobId: string, readOnly = false) => {
+  const pollJob = React.useCallback(async (jobId: string, readOnly = false, initial?: PlayableJobObservation) => {
     if (observationRequest.current) return;
     const store = observationStore.current;
     if (!store?.current() || !/^[A-Za-z0-9_-]{1,128}$/.test(jobId)) return;
@@ -485,7 +454,7 @@ function PlayableContent() {
     observationRequest.current = controller;
     const current = () => pageActive.current && epoch === getAuthEpoch() && store.current()
       && observationRequest.current === controller;
-    let retained: PlayableJobObservation = { jobId };
+    let retained: PlayableJobObservation = initial || { jobId };
     let terminal: any = null;
     let unconfirmed = false;
     setSavedJob(retained); setObservingJob(true); setBusy(true);
@@ -503,13 +472,28 @@ function PlayableContent() {
         if (!current()) throw new Error('Observation detached.');
         const d = response.data;
         if (response.ok && d && (d.job_id === undefined || d.job_id === jobId)) {
+          if (retained.kind === 'repair' && (!retained.playableId
+            || d.kind !== undefined && d.kind !== 'repair'
+            || d.playable_id !== undefined && d.playable_id !== retained.playableId
+            || d.parent_id !== undefined && d.parent_id !== retained.playableId)) {
+            throw new Error('The repair observation target was not verified.');
+          }
           const waiting = playableJobUnconfirmed(response);
           if (waiting) {
             retained = { ...retained, ...waiting };
             await store.set(retained);
             if (!current()) throw new Error('Observation detached.');
             setSavedJob(retained); unconfirmed = true; controller.abort();
-          } else if (classifyBuildJob(response) !== 'pending') terminal = d;
+          } else if (classifyBuildJob(response) !== 'pending') {
+            if (retained.kind === 'repair' && (!retained.playableId || d.kind !== 'repair'
+              || d.playable_id !== retained.playableId && d.parent_id !== retained.playableId
+              || d.playable_id !== undefined && d.playable_id !== retained.playableId
+              || d.parent_id !== undefined && d.parent_id !== retained.playableId
+              || d.job_status === 'done' && typeof d.repaired !== 'boolean')) {
+              throw new Error('The repair target was not verified.');
+            }
+            terminal = d;
+          }
           if (d.job_status === 'running' && d.kind === 'polish' && d.step) {
             setBusyLabel(`Polishing ${d.step}/${d.step_total || 3}${d.step_label ? ' · ' + d.step_label : ''}…`);
           }
@@ -528,6 +512,21 @@ function PlayableContent() {
           : 'Job status is not confirmed. The original reference is retained. Resume observation to check the same job again.');
         return;
       }
+      let repairedGame: Playable | null = null;
+      if (retained.kind === 'repair' && terminal.job_status === 'done' && terminal.repaired === true) {
+        if (currentGame.current && currentGame.current.playable_id !== retained.playableId && !readOnly) {
+          setObservationMessage('The repair finished for another game. Resume this saved observation to open its original target.');
+          return;
+        }
+        const result = await api.get<Playable>(`/api/playable/${retained.playableId}`, {
+          signal: controller.signal, timeoutMs: 15_000, retries: 0,
+        });
+        if (!current()) return;
+        if (!result.ok || !result.data || result.data.playable_id !== retained.playableId || result.data.status !== 'ready') {
+          throw new Error('The repaired game could not be verified.');
+        }
+        repairedGame = result.data;
+      }
       const cleared = await store.clear(jobId);
       if (!current()) return;
       if (!cleared) {
@@ -541,6 +540,17 @@ function PlayableContent() {
       }
       setSavedJob(null); setObservationMessage('');
       const d = terminal;
+      if (retained.kind === 'repair') {
+        if (d.job_status === 'done' && d.repaired === true && repairedGame) {
+          setGame(repairedGame); setWebKey(k => k + 1); setGameError(null); setError(null);
+          setRepairMsg('The repaired game was saved. Preview it to check the result.');
+          loadRecent(); haptics.notify('success');
+        } else {
+          setRepairMsg(d.error || 'The backend could not confirm a corrected game. The original preview is unchanged.');
+          haptics.notify('error');
+        }
+        return;
+      }
       if (d.job_status === 'done' && d.kind === 'series') {
         setSeries(d.series || []); loadRecent(); setBusy(false); haptics.notify('success');
         if (autoCoverRef.current && !readOnly) {
@@ -620,9 +630,49 @@ function PlayableContent() {
     } catch {
       if (current()) setObservationMessage('The job reference or its latest status could not be verified. Keep this page open; resume checks the original job without submitting another build.');
     } finally {
-      if (current()) { setBusy(false); setObservingJob(false); observationRequest.current = null; }
+      if (current()) { setBusy(false); setRepairing(false); setObservingJob(false); observationRequest.current = null; }
     }
   }, [loadRecent, haptics]);
+
+  // Repair submission and observation use the same owner-scoped receipt as
+  // generation. A delayed or uncertain result never authorizes another POST.
+  const autoRepair = React.useCallback(async () => {
+    const store = observationStore.current;
+    if (!game || busy || repairing || repairSubmission.current || observationRequest.current || !store?.current()) return;
+    const controller = new AbortController(), epoch = getAuthEpoch(), target = game.playable_id;
+    repairSubmission.current = controller;
+    const current = () => pageActive.current && epoch === getAuthEpoch() && store.current()
+      && repairSubmission.current === controller && !controller.signal.aborted;
+    let acknowledged = false, rejected = false;
+    haptics.selection(); setRepairing(true); setBusy(true); setRepairMsg('Submitting this repair…');
+    try {
+      const previous = await store.get();
+      if (!current()) return;
+      if (previous) {
+        setSavedJob(previous); setObservationMessage('A saved job is awaiting observation. Resume it before submitting another repair.');
+        rejected = true; return;
+      }
+      if (currentGame.current?.playable_id !== target) { rejected = true; return; }
+      const start = await api.post<{ job_id?: string }>(`/api/playable/${target}/repair/async`,
+        { error: gameError || '' }, { signal: controller.signal, timeoutMs: 15_000, retries: 0 });
+      if (!current()) return;
+      const jobId = start.data?.job_id;
+      if (!start.ok || !jobId || !/^[A-Za-z0-9_-]{1,128}$/.test(jobId)) {
+        rejected = start.status >= 400 && start.status < 500 && ![408, 429].includes(start.status);
+        setRepairMsg(rejected ? 'The backend rejected this repair request.'
+          : 'The repair submission is not confirmed. Do not submit it again; inspect the existing jobs before starting more work.');
+        return;
+      }
+      acknowledged = true;
+      await pollJob(jobId, false, { jobId, kind: 'repair', playableId: target });
+    } catch {
+      if (current()) setRepairMsg('The repair submission or observation could not be confirmed. Keep the original job reference and resume observation.');
+    } finally {
+      if (current() && (acknowledged || rejected)) {
+        repairSubmission.current = null; setRepairing(false); setBusy(false);
+      }
+    }
+  }, [game, busy, repairing, gameError, haptics, pollJob]);
 
   const dismissJobObservation = React.useCallback(async () => {
     const retained = savedJob, store = observationStore.current;
@@ -1215,7 +1265,7 @@ function PlayableContent() {
                   <Text style={styles.repairTitle}>⚠️ This game hit a runtime error</Text>
                   <Text style={styles.repairMsg} numberOfLines={2}>{gameError}</Text>
                   <View style={styles.repairRow}>
-                    <TouchableOpacity testID="pl-repair-btn" style={[styles.repairBtn, repairing && { opacity: 0.5 }]} disabled={repairing} onPress={autoRepair}>
+                    <TouchableOpacity testID="pl-repair-btn" style={[styles.repairBtn, repairing && { opacity: 0.5 }]} disabled={repairing || busy} onPress={autoRepair}>
                       <Text style={styles.repairBtnTxt}>{repairing ? '🔧 Repairing…' : '🔧 Auto-repair'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity testID="pl-repair-dismiss" style={styles.repairDismiss} onPress={() => setGameError(null)}>
