@@ -497,3 +497,10 @@ def test_guard_rejects_non_mapping_top_level_payload(invalid):
     for mode in ("redact", "reject"):
         with pytest.raises(RealtimeSecretError, match="payload must be a mapping"):
             PayloadSecretGuard(mode=mode).scrub(invalid)
+
+
+def test_guard_rejects_non_string_mapping_keys_without_coercion():
+    with pytest.raises(RealtimeSecretError, match="keys must be strings"):
+        PayloadSecretGuard().scrub({1: "value"})
+    with pytest.raises(RealtimeSecretError, match="keys must be strings"):
+        PayloadSecretGuard(mode="reject").scrub({"nested": {2: "value"}})
