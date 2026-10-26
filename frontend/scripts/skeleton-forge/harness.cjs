@@ -39,7 +39,7 @@ Module._resolveFilename = function resolve(request, parent, ...rest) {
   }
   if (svgRoot && request.startsWith('.') && parent?.filename?.startsWith(svgRoot + path.sep)) {
     const target = path.resolve(path.dirname(parent.filename), request);
-    const webTarget = target.replace(/\\.js$/, '') + '.web.js';
+    const webTarget = target.replace(/\.js$/, '') + '.web.js';
     if (fs.existsSync(webTarget)) return webTarget;
   }
   if (request === 'react-native') request = 'react-native-web';
