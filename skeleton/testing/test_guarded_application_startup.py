@@ -255,3 +255,60 @@ def test_canonical_snapshot_rejects_aggregate_history_byte_budget():
                 tenant_scope_id="tenant", context_id=_CONTEXT, request_digest=_DIGEST,
             )
     asyncio.run(scenario())
+
+
+def test_canonical_application_mongo_wiring_is_one_time_and_requires_fenced_real_owners():
+    from types import SimpleNamespace
+    from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
+    from skeleton.testing.test_mongo_source_epoch import Database
+
+    epoch = MongoCanonicalSourceEpoch(Database())
+    conversation = SimpleNamespace(canonical_source_epoch=epoch)
+    memory = SimpleNamespace(canonical_source_epoch=epoch)
+    digest = sha256(b"trusted instruction policy").hexdigest()
+    state = ServerState()
+    with pytest.raises(RuntimeError, match="installed writer epoch"):
+        state.configure_engine_canonical_mongo_owners(
+            conversation=SimpleNamespace(canonical_source_epoch=None),
+            shared_epoch=epoch, policy_sha256=digest,
+        )
+    state.configure_engine_canonical_mongo_owners(
+        conversation=conversation, memory=memory, memory_namespace="memory",
+        shared_epoch=epoch, policy_sha256=digest,
+    )
+    assert state._engine_canonical_mongo_owners[0] is conversation
+    with pytest.raises(RuntimeError, match="replaced"):
+        state.configure_engine_canonical_mongo_owners(
+            conversation=conversation, shared_epoch=epoch, policy_sha256=digest,
+        )
+    too_late = ServerState()
+    too_late.engine_execution_service = object()
+    with pytest.raises(RuntimeError, match="precede"):
+        too_late.configure_engine_canonical_mongo_owners(
+            conversation=conversation, shared_epoch=epoch, policy_sha256=digest,
+        )
+
+
+def test_canonical_application_source_factory_configuration_is_one_time():
+    from skeleton.ai.runtime.inference.canonical_execution_source_factory import (
+        CanonicalExecutionSourceFactory,
+    )
+    from skeleton.testing.test_canonical_execution_source_factory import (
+        Resolver, Conversation,
+    )
+
+    factory = CanonicalExecutionSourceFactory(
+        conversation=Conversation(), resolver=Resolver(),
+    )
+    state = ServerState()
+    with pytest.raises(TypeError):
+        state.configure_engine_canonical_sources(
+            factory=object(), policy_sha256="a" * 64,
+        )
+    state.configure_engine_canonical_sources(
+        factory=factory, policy_sha256="a" * 64,
+    )
+    with pytest.raises(RuntimeError, match="replaced"):
+        state.configure_engine_canonical_sources(
+            factory=factory, policy_sha256="a" * 64,
+        )
