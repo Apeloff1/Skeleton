@@ -13,6 +13,10 @@ import json
 import re
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
+from skeleton.context.delivery_schema import (
+    parse_and_validate_delivery_json,
+    validate_delivery_schema,
+)
 from skeleton.context.sealed_sandwich import (
     SealedContextBoundaryError,
     SealedContextError,
@@ -145,11 +149,8 @@ class DeliveryContract:
             not isinstance(self.pattern, str) or not 1 <= len(self.pattern) <= 2048
         ):
             raise SealedContextError("regex output requires bounded pattern")
-        if self.format == "json" and self.json_schema is not None:
-            if not isinstance(self.json_schema, Mapping):
-                raise SealedContextError("JSON schema must be a mapping")
-            if len(json.dumps(dict(self.json_schema)).encode("utf-8")) > 64 * 1024:
-                raise SealedContextLimitError("JSON schema exceeds budget")
+        if self.format == "json":
+            validate_delivery_schema(self.json_schema)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,22 +298,7 @@ class GuardedLocalInference:
         if not isinstance(text, str):
             raise SealedContextError("local model did not produce text")
         if contract.format == "json":
-            try:
-                parsed = json.loads(text)
-            except (ValueError, TypeError) as exc:
-                raise SealedContextError("local JSON output violates format contract") from exc
-            schema = contract.json_schema
-            if schema is not None:
-                # This is intentionally a small supported subset, not JSON Schema certification.
-                if schema.get("type") == "object" and not isinstance(parsed, dict):
-                    raise SealedContextError("local JSON output is not an object")
-                required = schema.get("required", ())
-                if not isinstance(required, (list, tuple)) or any(
-                    not isinstance(name, str) for name in required
-                ):
-                    raise SealedContextError("unsupported JSON subset in delivery contract")
-                if not isinstance(parsed, dict) or any(key not in parsed for key in required):
-                    raise SealedContextError("local JSON output misses required keys")
+            parse_and_validate_delivery_json(text, contract.json_schema)
         elif contract.format == "regex":
             try:
                 match = re.fullmatch(contract.pattern or "", text)
