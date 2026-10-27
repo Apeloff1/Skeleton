@@ -1425,19 +1425,27 @@ def run_gameforge_adapter(request: Dict[str, Any], state: Any) -> Dict[str, Any]
     from skeleton.forge.repair import REPAIR_MODES
 
     _reject_remote_project_writes(request)
+    # Validate the entire request before constructing a runner or executing
+    # the ten-stage builder. Python evaluates function arguments left-to-right.
+    include_files = _bool_field(request, "include_files", False)
+    vision = _text_field(request, "vision", "")
+    era = _text_field(request, "era", "") or None
+    archetype = _text_field(request, "archetype", "") or None
+    repair_mode = _text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES)
+    playtest_mode = _text_field(request, "playtest", "off", allowed=PLAYTEST_MODES)
+    target = _text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS)
+    answers = _mapping_field(request, "answers", None, optional=True) or None
     result = build_playable_game(
-        _text_field(request, "vision", ""),
-        era=_text_field(request, "era", "") or None,
-        # None keeps a cockpit BIND ARCHETYPE pin. The pipeline then falls
-        # back to the canonical extraction preset.
-        archetype=_text_field(request, "archetype", "") or None,
-        repair_mode=_text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES),
-        playtest_mode=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
+        vision,
+        era=era,
+        archetype=archetype,
+        repair_mode=repair_mode,
+        playtest_mode=playtest_mode,
         runner=_gameforge_runner(state),
-        target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
-        answers=_mapping_field(request, "answers", None, optional=True) or None,
+        target=target,
+        answers=answers,
     )
-    return project_operator_http(result, include_files=_bool_field(request, "include_files", False))
+    return project_operator_http(result, include_files=include_files)
 
 
 def _scope_id(value: str, fallback: str) -> str:
