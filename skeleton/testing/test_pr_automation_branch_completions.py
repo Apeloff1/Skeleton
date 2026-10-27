@@ -427,30 +427,23 @@ def test_parse_pr_hints_json_fails_closed_on_malformed_payloads() -> None:
         parse_pr_hints_json("[0]")
 
 
-def test_workflow_run_consumers_match_every_completing_branch() -> None:
+def test_retired_workflow_run_consumers_are_not_reintroduced() -> None:
+    """Retired event fanout must not regain privileged PR or workflow events."""
     root = Path(__file__).resolve().parents[2]
     workflows = root / ".github" / "workflows"
-    expected = 'branches:\n      - "*"\n      - "**"'
-    consumers = {
-        "repair-intake.yml": "types: [completed]",
-        "idle-studio.yml": "types: [completed]",
-        "pr-obsolete-run-drain.yml": "types: [requested]",
-    }
-    for name, event_type in consumers.items():
-        text = (workflows / name).read_text(encoding="utf-8")
-        assert "workflow_run:" in text
-        assert event_type in text
-        assert expected in text, f"{name} must match every completing head"
-        assert "pull_requests[0]" not in text, f"{name} must not treat pull_requests[0] as identity"
+    for retired in (
+        "repair-intake.yml",
+        "idle-studio.yml",
+        "pr-obsolete-run-drain.yml",
+    ):
+        assert not (workflows / retired).exists(), retired
 
-    pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
-    assert "workflow_run:" in pr_automation
-    assert "types: [completed]" in pr_automation
-    assert "branches-ignore:\n      - main" in pr_automation
-    assert expected not in pr_automation
-    assert "pull_requests[0]" not in pr_automation
-
-    idle = (workflows / "idle-studio.yml").read_text(encoding="utf-8")
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in idle
-    assert "exceeded bounded identity scan" in idle
-    assert r"^[0-9a-f]{40}$" in idle
+    automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
+    triggers = automation.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+    assert "workflow_dispatch:" in triggers
+    for forbidden in ("workflow_run:", "schedule:", "pull_request:", "pull_request_target:", "push:"):
+        assert forbidden not in triggers
+    assert "cancel-in-progress: false" in automation
+    assert "github.event.workflow_run.head_sha" in automation
+    assert "github.event.workflow_run.head_branch" in automation
+    assert "pull_requests[0]" not in automation

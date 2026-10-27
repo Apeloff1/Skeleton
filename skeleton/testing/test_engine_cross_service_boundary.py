@@ -83,6 +83,13 @@ class _Registry:
     def require_active(self):
         return self.provider
 
+    def require_for_context(self, context_policy):
+        """Honor the coordinator's scoped provider-selection interface."""
+        selection = context_policy.get("provider_selection") or {}
+        if selection and (selection.get("provider_id"), selection.get("model_id")) != (self.provider.provider_id, self.provider.model):
+            raise ValueError("test registry does not own the requested provider/model")
+        return self.require_active()
+
     def statuses(self) -> list[dict[str, object]]:
         return [{
             "id": self.provider.provider_id,

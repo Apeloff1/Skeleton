@@ -39,17 +39,11 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
     assert legacy is canonical
 
 
-def test_shift_supervisor_control_failover_uses_canonical_state_reader() -> None:
-    workflow = (
-        Path(__file__).resolve().parents[1]
-        / ".github"
-        / "workflows"
-        / "shift-supervisor-control.yml"
-    ).read_text(encoding="utf-8")
+def test_shift_supervisor_state_reader_is_canonical_without_retired_workflow(tmp_path: Path) -> None:
+    from skeleton.automation.shift_supervisor.__main__ import _read_state
 
-    assert (
-        "from skeleton.automation.shift_supervisor.__main__ import _read_state"
-        in workflow
-    )
-    assert "from core.shift_supervisor.__main__ import _read_state" not in workflow
-
+    old_workflow = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "shift-supervisor-control.yml"
+    assert not old_workflow.exists()
+    state = tmp_path / "state.json"
+    state.write_text('{"version":1,"plan_items":[],"workers":[],"revisions":[]}', encoding="utf-8")
+    assert _read_state(state) == {"version": 1, "plan_items": [], "workers": [], "revisions": []}

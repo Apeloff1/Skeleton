@@ -36,6 +36,11 @@ def test_ai_tree_forge_is_overlay_free_after_creator_cutover() -> None:
     forge = next(item for item in manifest["mappings"] if item["id"] == "AIFT-FORGE")
     creator = next(item for item in manifest["mappings"] if item["id"] == "AIFT-CREATOR")
 
-    assert not forge.get("overlay_children")
+    overlays = forge.get("overlay_children", [])
+    # Staged AI-native overlays are explicit; the canonical Creator child is not an overlay.
+    assert len(overlays) == len(set(overlays))
+    assert all(not path.startswith("creator/") for path in overlays)
+    assert forge["source"] == "skeleton/forge"
+    assert forge["destination"] == "skeleton/ai/forge"
     assert creator["source"] == "skeleton/forge/creator"
     assert creator["destination"] == "skeleton/ai/forge/creator"
