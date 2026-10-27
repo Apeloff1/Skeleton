@@ -41,17 +41,24 @@ class BuildOrder:
    if s.node_id not in known:raise BuildOrderError("dangling stop condition")
   self._assert_acyclic()
  def _assert_acyclic(self):
-  graph={n:[] for n in self.nodes}
-  for d in self.dependencies:
-   if d.kind is DependencyKind.HARD:graph[d.upstream_id].append(d.downstream_id)
-  state={}
-  def visit(n):
-   if state.get(n)==1:raise BuildOrderError("hard dependency cycle")
-   if state.get(n)==2:return
-   state[n]=1
-   for x in graph[n]:visit(x)
-   state[n]=2
-  for n in self.nodes:visit(n)
+  # Kahn's algorithm avoids Python recursion limits on deep production DAGs.
+  # Soft dependencies are advisory: they cannot cause a hard-order cycle.
+  from collections import deque
+  successors={n:[] for n in self.nodes}
+  incoming={n:0 for n in self.nodes}
+  for dependency in self.dependencies:
+   if dependency.kind is DependencyKind.HARD:
+    successors[dependency.upstream_id].append(dependency.downstream_id)
+    incoming[dependency.downstream_id]+=1
+  queue=deque(node for node in self.nodes if incoming[node]==0)
+  visited=0
+  while queue:
+   node=queue.popleft()
+   visited+=1
+   for downstream in successors[node]:
+    incoming[downstream]-=1
+    if incoming[downstream]==0:queue.append(downstream)
+  if visited!=len(self.nodes):raise BuildOrderError("hard dependency cycle")
  def _completed(self,completed):
   if not isinstance(completed,(tuple,list,set,frozenset)):raise BuildOrderError("completed must be a bounded collection")
   done=set(_id(x,"completed_node_id") for x in completed)
@@ -59,17 +66,25 @@ class BuildOrder:
   if len(completed)>len(self.nodes):raise BuildOrderError("completed exceeds construction graph bound")
   if not done.issubset(set(self.nodes)):raise BuildOrderError("completed contains unknown node")
   return done
+ def _blocked_lookup(self,done):
+  """Index all hard blockers and active stops in one deterministic graph pass."""
+  messages={node:[] for node in self.nodes}
+  for dependency in self.dependencies:
+   if dependency.kind is DependencyKind.HARD and dependency.upstream_id not in done:
+    messages[dependency.downstream_id].append("dependency:"+dependency.upstream_id)
+  for stop in self.stops:
+   if stop.active:
+    messages[stop.node_id].append("stop:"+stop.condition_id+":"+stop.reason)
+  return {node:tuple(sorted(reasons)) for node,reasons in messages.items()}
  def blocked_reasons(self,node_id,completed):
   _id(node_id,"node_id")
   if node_id not in self.nodes:raise BuildOrderError("unknown node")
-  done=self._completed(completed);out=[]
-  for d in self.dependencies:
-   if d.downstream_id==node_id and d.kind is DependencyKind.HARD and d.upstream_id not in done:out.append("dependency:"+d.upstream_id)
-  out.extend("stop:"+s.condition_id+":"+s.reason for s in self.stops if s.node_id==node_id and s.active)
-  return tuple(sorted(out))
+  done=self._completed(completed)
+  return self._blocked_lookup(done)[node_id]
  def ready(self,completed):
   done=self._completed(completed)
-  return tuple(n for n in self.nodes if n not in done and not self.blocked_reasons(n,done))
+  blockers=self._blocked_lookup(done)
+  return tuple(node for node in self.nodes if node not in done and not blockers[node])
  def maturity_allowed(self,node_id,completed):
   done=self._completed(completed)
   if node_id in done:raise BuildOrderError("completed node cannot request new maturity promotion")
@@ -77,4 +92,5 @@ class BuildOrder:
 
  def snapshot(self,completed):
   done=self._completed(completed)
-  return tuple((n,n in done,self.blocked_reasons(n,tuple(sorted(done)))) for n in self.nodes)
+  blockers=self._blocked_lookup(done)
+  return tuple((node,node in done,blockers[node]) for node in self.nodes)
