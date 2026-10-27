@@ -151,7 +151,7 @@ class WitnessedMongoMementoAuthority:
                 )
             try:
                 from skeleton.persistence.sealed_memento_recovery_journal import (
-                    RecoveryJournalRecord,
+                    RecoveryJournalRecord, canonical_recovery_receipt, receipt_commitment,
                 )
 
                 record = await self.recovery_journal.read(
@@ -167,7 +167,14 @@ class WitnessedMongoMementoAuthority:
                     or record.incident_id != position.recovery_incident_id
                     or record.witness_revision + 1 != position.recovery_revision
                     or record.candidate_serial != position.recovery_head.serial
-                    or record.candidate_commitment != position.recovery_head.commitment):
+                    or record.candidate_commitment != position.recovery_head.commitment
+                    or record.receipt_digest != receipt_commitment(canonical_recovery_receipt(
+                        incident_id=record.incident_id, binding_digest=scope,
+                        previous_revision=record.witness_revision,
+                        committed_revision=position.recovery_revision,
+                        committed_head=position.recovery_head,
+                        source_thread_version=record.source_thread_version,
+                    ))):
                 raise MementoWitnessIndeterminate(
                     "external recovery incident is unfinished or mismatched"
                 )
