@@ -153,3 +153,91 @@ def test_native_factory_does_not_start_without_trusted_component_factory():
         build_native_transformer_adapter(None, require_guarded_inference=True)
     with pytest.raises(ProviderPolicyError, match="enforced"):
         build_native_transformer_adapter(None, guarded_components_factory=lambda backend: None)
+
+
+def test_native_bound_preflight_rejects_lossy_real_tokenizer():
+    import asyncio
+    from skeleton.ai.runtime.inference.local import LocalInferenceRequest
+    from skeleton.context.pre_delivery_guard import (
+        GuardedLocalInference, TrustedContextSnapshot, merkle_root, request_parts,
+    )
+    from skeleton.context.sealed_sandwich import SealedContextIntegrityError
+    from hashlib import sha256
+
+    active, tokenizer = backend()
+    snapshot_reader, reviewer = authorities()
+    components = native_transformer_guard_components(
+        active, snapshots=snapshot_reader, reviewer=reviewer,
+    )
+
+    class Engine:
+        model = active
+        calls = 0
+
+        async def generate(self, request, **kwargs):
+            self.calls += 1
+            return SimpleNamespace(text="must not be released")
+
+    engine = Engine()
+    guard = GuardedLocalInference(
+        engine, reviewer=components.reviewer,
+        tokenize=components.tokenize, detokenize=components.detokenize,
+        tokenizer_identity_attestor=lambda: components.verify_native_tokenizer(
+            engine.model, components.tokenize, components.detokenize,
+        ),
+    )
+    request = LocalInferenceRequest(prompt="hello", instructions="policy")
+    snapshot = TrustedContextSnapshot(
+        merkle_root(request_parts(request)), sha256(b"policy").hexdigest(),
+        1, "tenant", "thread",
+    )
+    original = tokenizer.decode_ids
+    tokenizer.decode_ids = lambda tokens: "wrong"
+    # A bound method's behavior changed, even though its identity digest
+    # remains advertised. The guard refuses before running any model.
+    with pytest.raises(SealedContextIntegrityError):
+        asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))
+    assert engine.calls == 0
+    tokenizer.decode_ids = original
+
+
+def test_native_tokenizer_change_after_generation_withholds_response():
+    import asyncio
+    from skeleton.ai.runtime.inference.local import LocalInferenceRequest
+    from skeleton.context.pre_delivery_guard import (
+        GuardedLocalInference, TrustedContextSnapshot, merkle_root, request_parts,
+    )
+    from skeleton.context.sealed_sandwich import SealedContextIntegrityError
+    from hashlib import sha256
+
+    active, tokenizer = backend()
+    snapshot_reader, reviewer = authorities()
+    components = native_transformer_guard_components(
+        active, snapshots=snapshot_reader, reviewer=reviewer,
+    )
+
+    class Engine:
+        model = active
+        calls = 0
+
+        async def generate(self, request, **kwargs):
+            self.calls += 1
+            tokenizer.unavailable = True
+            return SimpleNamespace(text="must not be released")
+
+    engine = Engine()
+    guard = GuardedLocalInference(
+        engine, reviewer=components.reviewer,
+        tokenize=components.tokenize, detokenize=components.detokenize,
+        tokenizer_identity_attestor=lambda: components.verify_native_tokenizer(
+            engine.model, components.tokenize, components.detokenize,
+        ),
+    )
+    request = LocalInferenceRequest(prompt="hello", instructions="policy")
+    snapshot = TrustedContextSnapshot(
+        merkle_root(request_parts(request)), sha256(b"policy").hexdigest(),
+        1, "tenant", "thread",
+    )
+    with pytest.raises(SealedContextIntegrityError, match="tokenizer identity"):
+        asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))
+    assert engine.calls == 1
