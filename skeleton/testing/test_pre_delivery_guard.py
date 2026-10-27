@@ -460,3 +460,56 @@ def test_native_grammar_and_projection_positive_recheck_required_on_success():
     assert output.text == '{"ok":true}'
     assert receipt.context_root == snapshot(req).root
     assert calls == {"sampler": 2, "projection": 2}
+
+
+def test_native_token_mapping_drift_blocks_delivery_even_with_identical_text():
+    request = Request("policy", (), "same byte-for-byte prompt")
+    mode = {"xor": 0}
+
+    class MappingSwapEngine(Engine):
+        async def generate(self, request, **kwargs):
+            output = await super().generate(request, **kwargs)
+            mode["xor"] = 3
+            return output
+
+    def encode(text):
+        return tuple(byte ^ mode["xor"] for byte in text.encode("utf-8"))
+
+    def decode(ids):
+        return bytes(value ^ mode["xor"] for value in ids).decode("utf-8")
+
+    engine = MappingSwapEngine()
+    guard = GuardedLocalInference(
+        engine, reviewer=reviewer, tokenize=encode, detokenize=decode,
+    )
+    # Both tokenizations round-trip to the identical UTF-8 prompt. Only the
+    # token-ID commitment detects the native model input mapping substitution.
+    with pytest.raises(SealedContextIntegrityError, match="token ID sequence changed"):
+        asyncio.run(guard.generate(
+            request, snapshot=snapshot(request), tenant_scope_id="tenant",
+        ))
+    assert engine.calls == 1
+
+
+def test_token_id_receipt_is_domain_separated_and_present_on_verified_delivery():
+    request = Request("policy", (("user", "history"),), "prompt")
+    engine = Engine()
+    _, receipt = asyncio.run(runner(engine).generate(
+        request, snapshot=snapshot(request), tenant_scope_id="tenant",
+    ))
+    assert len(receipt.token_sequence_sha256) == 64
+    assert receipt.token_sequence_sha256 != receipt.token_echo_sha256
+
+
+def test_token_ids_exceeding_native_uint64_are_rejected_before_model_execution():
+    request = Request("policy", (), "prompt")
+    engine = Engine()
+    guard = GuardedLocalInference(
+        engine, reviewer=reviewer, tokenize=lambda text: (1 << 80,),
+        detokenize=lambda ids: request.rendered_input,
+    )
+    with pytest.raises(SealedContextError, match="bounded unsigned"):
+        asyncio.run(guard.generate(
+            request, snapshot=snapshot(request), tenant_scope_id="tenant",
+        ))
+    assert engine.calls == 0
