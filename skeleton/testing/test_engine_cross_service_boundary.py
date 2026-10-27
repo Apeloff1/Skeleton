@@ -21,7 +21,9 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_runtime import (
     FinishReason,
     ProviderResponse,
+    ProviderUnavailableError,
     ProviderUsage,
+    provider_context_selection,
 )
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -80,6 +82,16 @@ class _Registry:
         self.provider = provider
 
     def require_active(self):
+        return self.provider
+
+    def require_for_context(self, context_policy):
+        # Mirror the engine's sealed exact provider/model selection without
+        # silently accepting an unknown provider or cross-model override.
+        selection = provider_context_selection(context_policy)
+        if selection is not None and (
+            selection["provider_id"], selection["model_id"]
+        ) != (self.provider.provider_id, self.provider.model):
+            raise ProviderUnavailableError("fixture model selection is unavailable")
         return self.provider
 
     def statuses(self) -> list[dict[str, object]]:
@@ -263,7 +275,9 @@ async def test_cross_service_tenant_and_scope_denial_never_reach_provider(tmp_pa
     )
     tenant_client = _client(_app(tenant_service, tenant_coordinator))
 
-    with pytest.raises(EngineTextError, match="canonical engine text execution failed"):
+    # The tenant-scoped inventory blocks unauthorized model selection before
+    # execution admission; a missing submit scope is checked separately below.
+    with pytest.raises(EngineTextError, match="canonical model selection or context settings are unavailable"):
         await execute_engine_text(
             _request(tenant_id="tenant-b", key="tenant-denied"),
             client=tenant_client,
