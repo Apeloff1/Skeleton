@@ -174,7 +174,11 @@ class GuardedLocalInference:
             raise SealedContextIntegrityError("trusted core instruction bytes changed")
         if getattr(request, "context_digest", None) not in {None, snapshot.root}:
             raise SealedContextIntegrityError("request context digest mismatches authority")
-        rendered = request.rendered_input
+        # Mirror the actual backend prompt renderer when it supplies one.
+        # Checking only the generic user-facing representation can miss
+        # provider-specific formatting or special-token insertion.
+        native_renderer = getattr(self.engine.model, "_render_prompt", None)
+        rendered = native_renderer(request) if callable(native_renderer) else request.rendered_input
         if not isinstance(rendered, str):
             raise SealedContextError("local rendered prompt must be text")
         encoded = rendered.encode("utf-8", errors="strict")
@@ -214,9 +218,22 @@ class GuardedLocalInference:
         )
         if "tenant_scope_id" in engine_options or "prepared_input" in engine_options:
             raise SealedContextBoundaryError("caller cannot override verified local scopes")
+        # Reuse the engine's model-native prepared input when available.
+        # LocalInferenceEngine validates its request, model and scope binding
+        # before admitting inference; clients cannot supply prepared tensors.
+        prepare = getattr(self.engine, "prepare_input", None)
+        if callable(prepare):
+            prepared = prepare(
+                request, scope_id=engine_options.get("scope_id"),
+                tenant_scope_id=tenant_scope_id,
+            )
+            if prepared is not None:
+                engine_options["prepared_input"] = prepared
         result = await self.engine.generate(
             request, tenant_scope_id=tenant_scope_id, **engine_options,
         )
+        if merkle_root(request_parts(request)) != root:
+            raise SealedContextIntegrityError("local input mutated during generation")
         text = getattr(result, "text", None)
         if not isinstance(text, str):
             raise SealedContextError("local model did not produce text")
