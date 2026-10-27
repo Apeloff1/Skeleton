@@ -67,6 +67,10 @@ class FakeCollection:
     def __init__(self, db, name):
         self.db, self.name = db, name
 
+    def with_options(self, **options):
+        assert options["write_concern"].w == "majority"
+        return self
+
     def _rows(self, session):
         return (session.rows if session is not None else self.db.rows)[self.name]
 
