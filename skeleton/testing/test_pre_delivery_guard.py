@@ -145,3 +145,34 @@ def test_cross_tenant_and_spoofed_context_digest_denied():
         g.preflight(replace(req, context_digest="a"*64), snapshot=snapshot(req),
                     tenant_scope_id="tenant", contract=DeliveryContract())
     assert eng.calls == 0
+
+
+def test_native_prompt_renderer_and_prepared_input_attestation():
+    from types import SimpleNamespace
+
+    class NativeEngine(Engine):
+        def __init__(self):
+            super().__init__()
+            self.model = SimpleNamespace(
+                _render_prompt=lambda request: "NATIVE::" + request.rendered_input
+            )
+            self.prepared = None
+
+        def prepare_input(self, request, *, scope_id, tenant_scope_id):
+            assert tenant_scope_id == "tenant"
+            self.prepared = ("scoped", request.digest)
+            return self.prepared
+
+        async def generate(self, request, **kwargs):
+            assert kwargs["prepared_input"] == self.prepared
+            return await super().generate(request, **kwargs)
+
+    req = Request("policy", (), "test native")
+    engine = NativeEngine()
+    output, receipt = asyncio.run(runner(engine).generate(
+        req, snapshot=snapshot(req), tenant_scope_id="tenant"
+    ))
+    assert output.text and engine.calls == 1
+    assert receipt.token_echo_sha256 == hashlib.sha256(
+        ("NATIVE::" + req.rendered_input).encode()
+    ).hexdigest()
