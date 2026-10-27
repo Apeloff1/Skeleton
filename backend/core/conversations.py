@@ -558,7 +558,6 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("conversation governed deletion exceeds record bound")
         return tuple(sorted(selected))
 
-    @fence_conversation_write
     async def delete_thread_with_governance(
         self,
         thread_id: str,
