@@ -13,6 +13,7 @@ import json
 import re
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
+from skeleton.context.delivery_regex import match_delivery_regex, validate_delivery_regex
 from skeleton.context.delivery_schema import (
     parse_and_validate_delivery_json,
     validate_delivery_schema,
@@ -157,10 +158,8 @@ class DeliveryContract:
     def __post_init__(self) -> None:
         if self.format not in {"text", "json", "regex"}:
             raise SealedContextError("unsupported output format")
-        if self.format == "regex" and (
-            not isinstance(self.pattern, str) or not 1 <= len(self.pattern) <= 2048
-        ):
-            raise SealedContextError("regex output requires bounded pattern")
+        if self.format == "regex":
+            validate_delivery_regex(self.pattern)
         if self.format == "json":
             validate_delivery_schema(self.json_schema)
 
@@ -326,12 +325,7 @@ class GuardedLocalInference:
                 text, json.loads(pinned_schema) if pinned_schema is not None else None,
             )
         elif contract.format == "regex":
-            try:
-                match = re.fullmatch(contract.pattern or "", text)
-            except re.error as exc:
-                raise SealedContextError("invalid output regex") from exc
-            if match is None:
-                raise SealedContextError("local output failed grammar contract")
+            match_delivery_regex(text, contract.pattern)
         return result, PreDeliveryReceipt(
             root, token_echo, reviewer_id, request.digest, _hash(text.encode("utf-8"))
         )
