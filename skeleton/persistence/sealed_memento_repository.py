@@ -199,12 +199,18 @@ class SQLiteMementoAuthority:
     def read_window(
         self, *, archive: SealedMementoArchive, after_serial: int = 0,
         limit: int = ARCHIVE_WINDOW_MESSAGES,
+        expected_starting_head: MementoCatalogHead | None = None,
     ) -> MementoReadPage:
         """Reconstruct a contiguous, authenticated 2000-record archive page."""
         if type(after_serial) is not int or after_serial < 0:
             raise SealedContextLimitError("invalid read cursor")
         if type(limit) is not int or not 1 <= limit <= ARCHIVE_WINDOW_MESSAGES:
             raise SealedContextLimitError("archive read is capped at 2000 records")
+        if expected_starting_head is not None and (
+            not isinstance(expected_starting_head, MementoCatalogHead)
+            or expected_starting_head.serial != after_serial
+        ):
+            raise MementoAuthorityConflict("caller-pinned archive cursor is invalid")
         b = archive.binding
         con = self.conversation._connection
         with self.conversation._lock:
@@ -227,6 +233,8 @@ class SQLiteMementoAuthority:
                         raise MementoAuthorityConflict("resume checkpoint is inconsistent")
                 else:
                     start = MementoCatalogHead()
+                if expected_starting_head is not None and start != expected_starting_head:
+                    raise MementoAuthorityConflict("archive cursor disagrees with verified prior page")
                 rows = con.execute(
                     """SELECT global_serial, stream, ciphertext, head_blob
                        FROM conversation_memento_frame
