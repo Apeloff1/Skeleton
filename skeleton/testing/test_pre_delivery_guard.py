@@ -246,3 +246,44 @@ def test_renderer_mutation_during_inference_withholds_output():
             req, snapshot=snapshot(req), tenant_scope_id="tenant",
         ))
     assert engine.calls == 1
+
+
+def test_nested_schema_and_duplicate_json_rejected_on_delivery():
+    schema = {"type": "object", "properties": {
+        "items": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+    }, "required": ["items"], "additionalProperties": False}
+    req = Request("policy", (), "valid JSON", structured_output_schema=schema)
+    engine = Engine('{"items":[1,0]}')
+    guard = runner(engine)
+    for invalid in (
+        '{"items":[1,0]}',
+        '{"items":[1],"items":[2]}',
+        '{"items":[1],"unexpected":true}',
+        '{"items":[true]}',
+        '{"items":[1e999]}',
+    ):
+        engine.text = invalid
+        with pytest.raises(SealedContextError):
+            asyncio.run(guard.generate(
+                req, snapshot=snapshot(req), tenant_scope_id="tenant",
+                contract=DeliveryContract("json", json_schema=schema),
+            ))
+    assert engine.calls == 5
+    engine.text = '{"items":[1,2]}'
+    result, _ = asyncio.run(guard.generate(
+        req, snapshot=snapshot(req), tenant_scope_id="tenant",
+        contract=DeliveryContract("json", json_schema=schema),
+    ))
+    assert json.loads(result.text) == {"items": [1, 2]}
+
+
+def test_unsupported_json_schema_rejected_before_any_backend_call():
+    engine = Engine()
+    for invalid in (
+        {"$ref": "https://example.com/untrusted"},
+        {"type": "object", "properties": {"v": {"$ref": "local"}}},
+        {"type": "number", "minimum": float("nan")},
+    ):
+        with pytest.raises(SealedContextError):
+            DeliveryContract("json", json_schema=invalid)
+    assert engine.calls == 0
