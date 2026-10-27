@@ -249,3 +249,51 @@ def lexical_correlate(records: Iterable[MementoRecord], *, query: str,
             scored.append((-score, item.serial, item))
     scored.sort(key=lambda item: (item[0], item[1]))
     return tuple(item for _, _, item in scored[:limit])
+
+
+def encode_catalog_head(head: MementoCatalogHead) -> bytes:
+    """Canonical metadata for the authoritative store's CAS record.
+
+    Encoding is not a signature: only the trusted persistence owner may
+    promote or read this value as authoritative.
+    """
+    if not isinstance(head, MementoCatalogHead):
+        raise SealedContextError("memento catalog head required")
+    return _canonical({
+        "schema_version": 1, "global_serial": head.serial,
+        "global_commitment": head.commitment,
+        "stream_heads": {
+            stream: {"sequence": head.stream_head(stream).sequence,
+                     "commitment": head.stream_head(stream).commitment}
+            for stream in _STREAMS
+        },
+    })
+
+
+def decode_catalog_head(data: bytes) -> MementoCatalogHead:
+    """Refuse noncanonical/corrupt CAS metadata before using it for recovery."""
+    if not isinstance(data, bytes) or len(data) > 4096:
+        raise SealedContextLimitError("invalid catalog metadata size")
+    try:
+        value = json.loads(data)
+        if type(value) is not dict or set(value) != {
+            "schema_version", "global_serial", "global_commitment", "stream_heads"
+        } or type(value["schema_version"]) is not int or value["schema_version"] != 1:
+            raise ValueError("invalid catalog schema")
+        streams = value["stream_heads"]
+        if type(streams) is not dict or set(streams) != set(_STREAMS):
+            raise ValueError("invalid stream names")
+        heads = {}
+        for stream in _STREAMS:
+            item = streams[stream]
+            if type(item) is not dict or set(item) != {"sequence", "commitment"}:
+                raise ValueError("invalid stream head shape")
+            heads[stream] = ContextHead(item["sequence"], item["commitment"])
+        head = MementoCatalogHead(
+            value["global_serial"], value["global_commitment"], **heads
+        )
+        if encode_catalog_head(head) != data:
+            raise ValueError("noncanonical catalog metadata")
+        return head
+    except (ValueError, TypeError, KeyError, UnicodeError) as exc:
+        raise SealedContextError("invalid memento catalog metadata") from exc
