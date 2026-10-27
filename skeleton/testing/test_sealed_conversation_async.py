@@ -158,3 +158,46 @@ def test_valid_but_stale_archive_rejected(state):
                 reader, codec, _frames(sink.frames), receipt, binding=binding
             )
     asyncio.run(work())
+
+
+def test_empty_thread_produces_only_checkpoint(state):
+    binding, codec = state
+    reader, sink = _MongoReader(binding, count=0), _Sink()
+
+    async def work():
+        receipt = await stage_canonical_conversation_async(reader, codec, sink, binding=binding)
+        assert receipt.message_count == 0 and len(sink.frames) == 1
+        await verify_staged_conversation_async(
+            reader, codec, _frames(sink.frames), receipt, binding=binding
+        )
+    asyncio.run(work())
+
+
+def test_begin_failure_aborts_partial_staging(state):
+    binding, codec = state
+    reader = _MongoReader(binding, count=1)
+
+    class BrokenBegin(_Sink):
+        async def begin(self, *, binding, thread_version):
+            self.frames.append(b"partial-private-object")
+            raise OSError("failure mid-begin")
+
+    sink = BrokenBegin()
+    with pytest.raises(OSError):
+        asyncio.run(stage_canonical_conversation_async(reader, codec, sink, binding=binding))
+    assert sink.aborted and not sink.frames
+
+
+def test_completion_failure_aborts_staging(state):
+    binding, codec = state
+    reader = _MongoReader(binding, count=1)
+
+    class BrokenComplete(_Sink):
+        async def complete(self, receipt):
+            self.completed = receipt
+            raise OSError("cannot stage receipt")
+
+    sink = BrokenComplete()
+    with pytest.raises(OSError):
+        asyncio.run(stage_canonical_conversation_async(reader, codec, sink, binding=binding))
+    assert sink.aborted and sink.completed is None and not sink.frames
