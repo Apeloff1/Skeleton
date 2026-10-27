@@ -870,7 +870,7 @@ class MongoConversationAuthority:
                     memento_owner = await self.threads.find_one(
                         {"_id": affected_thread_id, "tenant_id": str(tenant_id)},
                         {"owner_id": 1, "_sealed_memento_head": 1,
-                         "_sealed_memento_binding": 1},
+                         "_sealed_memento_binding": 1, "_sealed_memento_custody": 1},
                     )
                 except PyMongoError as exc:
                     raise ConversationStorageUnavailable(
@@ -882,11 +882,16 @@ class MongoConversationAuthority:
                         raise ConversationStorageUnavailable(
                             "memento deletion owner identity unavailable"
                         )
-                    from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
+                    from skeleton.persistence.mongo_memento_repository import (
+                        MongoMementoAuthority, memento_retirement_requires_witness,
+                    )
 
+                    witnessed = memento_retirement_requires_witness(
+                        memento_owner, witness_present=self.memento_witness is not None,
+                    )
                     memento = MongoMementoAuthority(self)
-                    if self.memento_witness is None:
-                        # Legacy/unenrolled archive: retain the existing majority purge.
+                    if not witnessed:
+                        # Only explicitly enrolled legacy archives may use this purge.
                         await memento.retire_thread(
                             tenant_id=str(tenant_id), owner_id=owner_id,
                             thread_id=affected_thread_id,
