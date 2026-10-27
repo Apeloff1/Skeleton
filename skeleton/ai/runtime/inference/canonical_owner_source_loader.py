@@ -90,8 +90,10 @@ class CanonicalOwnerSourceCollectionLoader:
                 raise SealedContextBoundaryError(
                     "memory owner requires namespace and shared writer epoch"
                 )
-        elif memory_namespace is not None or shared_epoch is not None:
-            raise SealedContextBoundaryError("unused memory or cross-owner fence")
+        elif memory_namespace is not None:
+            raise SealedContextBoundaryError("memory namespace requires a canonical memory owner")
+        if shared_epoch is not None and not callable(getattr(shared_epoch, "read_epoch", None)):
+            raise SealedContextBoundaryError("canonical writer epoch reader required")
         self._conversation = conversation
         self._memory = memory
         self._memory_namespace = memory_namespace
