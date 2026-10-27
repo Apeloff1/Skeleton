@@ -244,6 +244,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          -vv -o faulthandler_timeout=120
           skeleton/testing/test_pr_automation.py
           skeleton/testing/test_pr_automation_ruleset.py
           skeleton/testing/test_pr_automation_sensitive_paths.py
