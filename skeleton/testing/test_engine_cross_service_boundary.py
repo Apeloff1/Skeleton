@@ -94,6 +94,11 @@ class _Registry:
             raise ProviderUnavailableError("fixture model selection is unavailable")
         return self.provider
 
+    def runtime_serving_engines(self) -> tuple[()]:
+        # This fixture represents a hosted adapter, with no local serving
+        # engine to close during coordinator shutdown.
+        return ()
+
     def statuses(self) -> list[dict[str, object]]:
         # Match the authenticated, model-specific engine inventory contract.
         # A require_active-only test double hides real cross-service custody.
