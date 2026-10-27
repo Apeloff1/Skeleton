@@ -427,3 +427,35 @@ qualification requires the canonical source reader to be populated from
 authorized durable execution state and a production-native tokenizer binding,
 as well as complete exact-head Merge Readiness, backend, installation and E2E.
 Skipped jobs must not be represented as success.
+
+
+## Phase 18: independently reloaded compiler source-custody inventory
+
+`CanonicalSegmentSourceAuthority` (in
+`skeleton/ai/runtime/inference/canonical_source_custody.py`) implements
+the live `CurrentSourceAuthority` interface consumed by
+`EngineSubmissionCompiledInputLoader`. The operator-owned
+`CanonicalSourceCollectionLoader.read_current` must retrieve the **entire
+current authorized compiler candidate set**, including candidates omitted
+from the final prompt by policy or budgeting. The verifier recomputes a
+deterministically sorted `(segment_id, content_digest)` inventory from
+the materialized `ContextSegment` contents and their exact bytes. It
+rejects foreign tenant scope, changed actor/context, deletion, revocation,
+missing content, tampering, duplicate IDs and invalid source versions.
+Admission caps are 2,000 candidates, 4 MiB per candidate and 16 MiB total.
+
+This adapter never treats the compiled handoff itself as a current source
+reader. An operator must connect its loader to each canonical source owner;
+until then the app cannot claim globally operational guarded local inference.
+The scoped durable bridge independently rechecks source custody and engine
+execution state. Those reads are **not** a single cross-database
+transaction; concurrent post-check revocation remains a deployment/locking
+and finalization-design concern.
+
+An additive GitHub Actions regression passed **310 tests** at the initial
+Phase 18 head, covering the focused local provider, context, sealed archive,
+Mongo and witnessed recovery suites. Additional durable-engine integration
+tests explicitly bind the reconstructed candidate list to existing execution
+ownership and reject mutation/revocation with unchanged prompt text.
+Full Merge Readiness, Backend Quality, E2E and skipped release gates remain
+mandatory before promoting the draft PR.
