@@ -52,7 +52,7 @@ class RootPackageRequirementsParity(unittest.TestCase):
 
     def test_hosted_httpx_extra_floor_is_detected(self) -> None:
         old = self.setup.replace(
-            "\topenai>=2.54.0,<3\n\thttpx>=0.28.1,<1",
+            "\topenai>=3.37.0,<4\n\thttpx>=0.28.1,<1",
             "\topenai>=2.54.0,<3\n\thttpx>=0.28,<1", 1,
         )
         self.assertNotEqual(old, self.setup)
