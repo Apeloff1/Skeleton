@@ -59,6 +59,7 @@ class Submissions:
         handoff = SimpleNamespace(
             execution_id=EXECUTION, operation_id="operation",
             tenant_id=TENANT, context_id=CONTEXT, handoff_digest="c" * 64,
+            context_digest="c" * 64, compiler_version="independent-compiler-v1",
             source_snapshot=SEGMENTS, instructions="owner policy",
             history=(("user", "initial"),), prompt="latest",
         )
@@ -478,17 +479,18 @@ def test_protected_provider_dynamically_binds_its_exact_native_execution():
         root = merkle_root((
             ("system", b"owner policy"), ("user", b"initial"), ("user", b"latest"),
         ))
+        assert root != "c" * 64  # compiler digest is not a native Merkle root
         request = ProviderRequest(
             instructions="owner policy", history=(AIMessage("user", "initial"),),
             prompt="latest", max_output_tokens=4, tenant_id=TENANT,
-            context_id=CONTEXT, context_digest=root, execution_id=EXECUTION,
+            context_id=CONTEXT, context_digest="c" * 64, execution_id=EXECUTION,
             context_source_snapshot=SEGMENTS,
             context_compiler_version="independent-compiler-v1",
         )
         first = await adapter.generate(request)
         second = await adapter.generate(request)
         assert first.provider == "local" and second.provider == "local"
-        assert source.calls == 8  # two snapshot reads, two source reads each
+        assert source.calls == 12  # per turn: bootstrap + pre/postflight owner/source reads
         assert adapter.require_guarded_inference
         with pytest.raises(SealedContextBoundaryError):
             await snapshots.resolve(
