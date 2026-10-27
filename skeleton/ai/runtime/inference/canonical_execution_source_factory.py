@@ -77,6 +77,17 @@ class CanonicalExecutionSourceFactory:
     ) -> None:
         if not callable(getattr(resolver, "resolve", None)):
             raise SealedContextBoundaryError("independent execution conversation resolver required")
+        # Mixed-owner sources are admissible only if BOTH canonical writer
+        # objects are actively configured with the SAME shared epoch. A
+        # detached read-only callback cannot certify all writer paths.
+        if memory is not None and (
+            shared_epoch is None
+            or getattr(conversation, "canonical_source_epoch", None) is not shared_epoch
+            or getattr(memory, "canonical_source_epoch", None) is not shared_epoch
+        ):
+            raise SealedContextBoundaryError(
+                "canonical conversation and memory writers must share the durable epoch"
+            )
         # Validate actual owner APIs and mixed-source epoch requirements at
         # composition rather than waiting for the first model request.
         CanonicalOwnerSourceCollectionLoader(
