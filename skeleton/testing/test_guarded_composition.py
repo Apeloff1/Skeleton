@@ -135,3 +135,11 @@ def test_gguf_factory_rejects_unprovisioned_protected_mode_before_filesystem_acc
         build_llama_cpp_adapter(None, require_guarded_inference=True)
     with pytest.raises(LlamaCppRuntimeError, match="enforced local mode"):
         build_llama_cpp_adapter(None, guarded_components=object())
+
+
+def test_native_transformer_factory_rejects_unprovisioned_guard():
+    from skeleton.ai.runtime.inference.native_transformer import build_native_transformer_adapter
+    with pytest.raises(ProviderPolicyError, match="trusted components"):
+        build_native_transformer_adapter(None, require_guarded_inference=True)
+    with pytest.raises(ProviderPolicyError, match="enforced transformer mode"):
+        build_native_transformer_adapter(None, guarded_components=object())
