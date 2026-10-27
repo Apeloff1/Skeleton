@@ -74,6 +74,7 @@ def _effect_model() -> LocalModelAdapter:
                 model_id="effectiveness-local-model",
                 model_digest=model_digest,
                 runner=runner,
+                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
