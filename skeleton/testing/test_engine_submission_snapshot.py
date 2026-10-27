@@ -207,7 +207,7 @@ def test_durable_owner_drift_withholds_guarded_generation():
 
         @property
         def rendered_input(self):
-            return "system: owner policy\\nuser: initial\\nuser: latest\\nassistant:"
+            return "system: owner policy\nuser: initial\nuser: latest\nassistant:"
 
     async def scenario():
         bound, service, source = loader()
@@ -254,7 +254,7 @@ def test_durable_owner_cancellation_during_guarded_generation_withholds_result()
 
         @property
         def rendered_input(self):
-            return "system: owner policy\\nuser: initial\\nuser: latest\\nassistant:"
+            return "system: owner policy\nuser: initial\nuser: latest\nassistant:"
 
     async def scenario():
         bound, service, source = loader()
