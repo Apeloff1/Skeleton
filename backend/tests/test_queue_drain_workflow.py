@@ -236,7 +236,7 @@ def test_periodic_controller_coalescing_keeps_newest_live_wake() -> None:
     assert "'pending', 'waiting'" in workflow
 
 
-def test_drain_recovery_runner_keeps_control_plane_safeguards() -> None:
+def test_drain_recovery_arm_lane_keeps_control_plane_safeguards() -> None:
     workflow = _workflow_text()
     drain = workflow[workflow.index("  drain:\n"):]
     assert "    runs-on: ubuntu-latest\n" in drain
