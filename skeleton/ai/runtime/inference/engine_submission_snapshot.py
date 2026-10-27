@@ -237,25 +237,43 @@ class ScopedEngineCompiledSnapshotReader:
     """
 
     def __init__(
-        self, *, service: Any, source_authority: CurrentSourceAuthority,
-        policy_sha256: str,
+        self, *, service: Any, source_authority: CurrentSourceAuthority | None = None,
+        source_authority_factory: Any | None = None, policy_sha256: str,
     ) -> None:
         if not callable(getattr(getattr(service, "submissions", None),
                                  "get_by_execution_id", None)):
             raise SealedContextBoundaryError("durable engine submissions unavailable")
         if not callable(getattr(getattr(service, "repository", None), "get", None)):
             raise SealedContextBoundaryError("durable engine repository unavailable")
-        if not callable(getattr(source_authority, "inspect", None)):
+        if (source_authority is None) == (source_authority_factory is None):
+            raise SealedContextBoundaryError("exactly one canonical source binding required")
+        if source_authority is not None and not callable(getattr(source_authority, "inspect", None)):
             raise SealedContextBoundaryError("current canonical source inspector required")
+        if source_authority_factory is not None and not callable(
+            getattr(source_authority_factory, "bind_execution", None)
+        ):
+            raise SealedContextBoundaryError("scoped canonical source factory required")
         if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
                 or any(ch not in "0123456789abcdef" for ch in policy_sha256)):
             raise SealedContextBoundaryError("trusted instruction policy digest required")
         self._service = service
         self._source_authority = source_authority
+        self._source_authority_factory = source_authority_factory
         self._policy_sha256 = policy_sha256
         self._scope: ContextVar[_ExecutingScope | None] = ContextVar(
             "skeleton.engine.compiled_snapshot_scope", default=None,
         )
+
+    def _execution_authority(self, execution_id: str) -> CurrentSourceAuthority:
+        if self._source_authority_factory is None:
+            return self._source_authority
+        try:
+            authority = self._source_authority_factory.bind_execution(execution_id)
+        except Exception as exc:
+            raise SealedContextBoundaryError("execution source binding unavailable") from exc
+        if not callable(getattr(authority, "inspect", None)):
+            raise SealedContextBoundaryError("canonical execution source authority unavailable")
+        return authority
 
     async def prepare_provider(self, provider_request: Any) -> str:
         """Resolve the native Merkle root without equating it to compiler digest.
@@ -317,7 +335,7 @@ class ScopedEngineCompiledSnapshotReader:
             source_loader = EngineSubmissionCompiledInputLoader(
                 service=self._service, execution_id=execution_id,
                 native_request_digest=staging_digest,
-                source_authority=self._source_authority,
+                source_authority=self._execution_authority(execution_id),
             )
             snapshot = await CanonicalCompiledSnapshotReader(
                 loader=source_loader, policy_sha256=self._policy_sha256,
@@ -369,7 +387,7 @@ class ScopedEngineCompiledSnapshotReader:
         loader = EngineSubmissionCompiledInputLoader(
             service=self._service, execution_id=bound.execution_id,
             native_request_digest=bound.request_digest,
-            source_authority=self._source_authority,
+            source_authority=self._execution_authority(bound.execution_id),
         )
         return await CanonicalCompiledSnapshotReader(
             loader=loader, policy_sha256=self._policy_sha256,
