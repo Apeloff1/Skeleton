@@ -217,3 +217,72 @@ class WitnessedMongoMementoAuthority:
             )
         except Exception as exc:
             raise MementoWitnessIndeterminate("retirement tombstoned; Mongo purge unfinished") from exc
+
+    async def retire_bound_thread(
+        self, *, tenant_id: str, owner_id: str, thread_id: str,
+        binding_digest: str,
+    ) -> int:
+        """Canonical governance deletion using a previously authorized stored binding.
+
+        The existing conversation authority supplies the binding digest from
+        its own thread document, not from a user request. No decrypting keys
+        are required to tombstone an archive during GDPR/retention deletion.
+        Retrying a physical purge after an acknowledged tombstone is safe.
+        """
+        if any(not isinstance(v, str) or not v or len(v) > 256 for v in (
+            tenant_id, owner_id, thread_id,
+        )):
+            raise SealedContextBoundaryError("invalid governed archive deletion scope")
+        if (not isinstance(binding_digest, str) or len(binding_digest) != 64
+                or any(c not in "0123456789abcdef" for c in binding_digest)):
+            raise SealedContextBoundaryError("invalid stored archive binding")
+        conversation = getattr(self.mongo, "conversation", None)
+        threads = getattr(conversation, "threads", None)
+        if not callable(getattr(threads, "find_one", None)):
+            raise MementoWitnessUnavailable("canonical governed deletion reader unavailable")
+        try:
+            doc = await threads.find_one({
+                "_id": thread_id, "tenant_id": tenant_id, "owner_id": owner_id,
+            })
+        except Exception as exc:
+            raise MementoWitnessUnavailable("governed deletion lookup unavailable") from exc
+        if (not isinstance(doc, dict) or doc.get("_sealed_memento_binding") != binding_digest
+                or "_sealed_memento_head" not in doc):
+            raise SealedContextBoundaryError("canonical archive binding is missing or inconsistent")
+        from skeleton.context.sealed_memento import decode_catalog_head
+
+        expected_head = decode_catalog_head(bytes(doc["_sealed_memento_head"]))
+        try:
+            position = await self.witness.read(binding_digest=binding_digest)
+        except Exception as exc:
+            raise MementoWitnessUnavailable("governed deletion witness unavailable") from exc
+        if not isinstance(position, WitnessPosition) or position.binding_digest != binding_digest:
+            raise MementoWitnessUnavailable("governed deletion witness not provisioned")
+        if expected_head != position.head:
+            raise MementoWitnessDivergence("stored archive is inconsistent with deletion witness")
+        if not position.retired:
+            successor = WitnessPosition(
+                binding_digest, position.revision + 1, position.head, retired=True,
+            )
+            try:
+                accepted = await self.witness.compare_and_set(
+                    binding_digest=binding_digest, previous=position, successor=successor,
+                )
+            except Exception as exc:
+                raise MementoWitnessUnavailable("governed deletion tombstone unavailable") from exc
+            if accepted is not True:
+                raise MementoWitnessUnavailable("governed deletion tombstone rejected")
+        else:
+            successor = position
+        try:
+            confirmed = await self.witness.read(binding_digest=binding_digest)
+        except Exception as exc:
+            raise MementoWitnessIndeterminate("deletion tombstone recheck unavailable") from exc
+        if confirmed != successor:
+            raise MementoWitnessIndeterminate("external deletion tombstone not confirmed")
+        try:
+            return await self.mongo.retire_thread(
+                tenant_id=tenant_id, owner_id=owner_id, thread_id=thread_id,
+            )
+        except Exception as exc:
+            raise MementoWitnessIndeterminate("deletion tombstoned, physical purge incomplete") from exc
