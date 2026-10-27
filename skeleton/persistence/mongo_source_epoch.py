@@ -21,7 +21,9 @@ from hashlib import sha256
 from uuid import uuid4
 from typing import Any
 
-from skeleton.context.sealed_sandwich import SealedContextBoundaryError
+class MongoSourceEpochError(RuntimeError):
+    """Canonical source epoch is unavailable or violates write fencing."""
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +41,7 @@ class MongoCanonicalSourceEpoch:
         # A memory-only dummy/independently created collection is NOT accepted
         # as the production epoch witness.
         if not callable(getattr(database, "get_collection", None)):
-            raise SealedContextBoundaryError("canonical Mongo database required")
+            raise MongoSourceEpochError("canonical Mongo database required")
         try:
             from pymongo.read_concern import ReadConcern
             from pymongo.write_concern import WriteConcern
@@ -49,10 +51,10 @@ class MongoCanonicalSourceEpoch:
                 write_concern=WriteConcern(w="majority", wtimeout=10000),
             )
         except Exception as exc:
-            raise SealedContextBoundaryError("majority-durable source epoch unavailable") from exc
+            raise MongoSourceEpochError("majority-durable source epoch unavailable") from exc
         for method in ("find_one", "find_one_and_update", "insert_one"):
             if not callable(getattr(collection, method, None)):
-                raise SealedContextBoundaryError("durable source epoch collection unavailable")
+                raise MongoSourceEpochError("durable source epoch collection unavailable")
         self._collection = collection
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
             "skeleton.canonical_source_writer", default=None,
@@ -62,7 +64,7 @@ class MongoCanonicalSourceEpoch:
     def _key(tenant_id: str, actor_id: str) -> str:
         if any(not isinstance(v, str) or not v or v != v.strip()
                or len(v.encode("utf-8", "strict")) > 512 for v in (tenant_id, actor_id)):
-            raise SealedContextBoundaryError("canonical source writer identity invalid")
+            raise MongoSourceEpochError("canonical source writer identity invalid")
         return sha256(
             ("skeleton.canonical-source-epoch.v1\0" + tenant_id + "\0" + actor_id)
             .encode("utf-8")
@@ -79,7 +81,7 @@ class MongoCanonicalSourceEpoch:
         if (not isinstance(doc, dict) or doc.get("phase") != "stable"
                 or type(doc.get("epoch")) is not int or doc["epoch"] < 2
                 or doc["epoch"] % 2):
-            raise SealedContextBoundaryError("canonical source epoch missing, writing or quarantined")
+            raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
         return doc["epoch"]
 
     async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
@@ -91,7 +93,7 @@ class MongoCanonicalSourceEpoch:
                 "phase": "stable", "epoch": 2, "writer_token": None,
             })
         except Exception as exc:
-            raise SealedContextBoundaryError(
+            raise MongoSourceEpochError(
                 "source epoch already initialized or migration unavailable"
             ) from exc
 
@@ -100,12 +102,12 @@ class MongoCanonicalSourceEpoch:
         key = self._key(tenant_id, actor_id)
         task = asyncio.current_task()
         if task is None:
-            raise SealedContextBoundaryError("canonical source writer task required")
+            raise MongoSourceEpochError("canonical source writer task required")
         active = self._active.get()
         if active is not None:
             if (active.task is not task or active.tenant_id != tenant_id
                     or active.actor_id != actor_id):
-                raise SealedContextBoundaryError("canonical writer scope cannot be inherited")
+                raise MongoSourceEpochError("canonical writer scope cannot be inherited")
             yield
             return
         token = str(uuid4())
@@ -119,12 +121,12 @@ class MongoCanonicalSourceEpoch:
                 return_document=ReturnDocument.AFTER,
             )
         except Exception as exc:
-            raise SealedContextBoundaryError("canonical writer admission unavailable") from exc
+            raise MongoSourceEpochError("canonical writer admission unavailable") from exc
         if (not isinstance(acquired, dict) or acquired.get("writer_token") != token
                 or acquired.get("phase") != "writing"
                 or type(acquired.get("epoch")) is not int
                 or acquired["epoch"] < 3 or acquired["epoch"] % 2 != 1):
-            raise SealedContextBoundaryError("canonical writer epoch not owned")
+            raise MongoSourceEpochError("canonical writer epoch not owned")
         scope = self._active.set(_BoundWriter(tenant_id, actor_id, task, token))
         try:
             yield
@@ -138,12 +140,12 @@ class MongoCanonicalSourceEpoch:
                     return_document=ReturnDocument.AFTER,
                 )
             except Exception as exc:
-                raise SealedContextBoundaryError(
+                raise MongoSourceEpochError(
                     "canonical writer completion unavailable; epoch remains quarantined"
                 ) from exc
             if (not isinstance(closed, dict) or closed.get("phase") != "stable"
                     or closed.get("epoch") != acquired["epoch"] + 1):
-                raise SealedContextBoundaryError("canonical writer CAS lost; epoch quarantined")
+                raise MongoSourceEpochError("canonical writer CAS lost; epoch quarantined")
         finally:
             # An exception in the protected mutation intentionally leaves the
             # epoch WRITING: data might be partially committed and cannot be
@@ -163,7 +165,7 @@ def fence_conversation_write(method):
             return await method(self, *args, **kwargs)
         tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
         if not isinstance(tenant_id, str) or not isinstance(actor_id, str):
-            raise SealedContextBoundaryError("canonical conversation write actor missing")
+            raise MongoSourceEpochError("canonical conversation write actor missing")
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             return await method(self, *args, **kwargs)
 
@@ -182,7 +184,7 @@ def fence_memory_commit(method):
         from skeleton.contracts.memory_record import MemoryWriteProposal
 
         if not isinstance(proposal, MemoryWriteProposal):
-            raise SealedContextBoundaryError("canonical memory write proposal required")
+            raise MongoSourceEpochError("canonical memory write proposal required")
         async with epoch.writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id):
             return await method(self, proposal, *args, **kwargs)
 
@@ -205,7 +207,7 @@ def fence_memory_tombstone(method):
             include_tombstoned=True,
         )
         if current.tenant_id != tenant_id or current.namespace != namespace:
-            raise SealedContextBoundaryError("canonical memory tombstone scope changed")
+            raise MongoSourceEpochError("canonical memory tombstone scope changed")
         async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
             return await method(self, memory_id, *args, **kwargs)
 
@@ -213,6 +215,6 @@ def fence_memory_tombstone(method):
 
 
 __all__ = [
-    "MongoCanonicalSourceEpoch", "fence_conversation_write",
+    "MongoSourceEpochError", "MongoCanonicalSourceEpoch", "fence_conversation_write",
     "fence_memory_commit", "fence_memory_tombstone",
 ]
