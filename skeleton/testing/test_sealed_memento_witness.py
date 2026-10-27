@@ -455,3 +455,64 @@ def test_canonical_bound_deletion_does_not_accept_untrusted_binding_or_tenant():
         assert not w.positions[_binding_digest(a)].retired
         assert len(m.rows) == 1
     asyncio.run(scenario())
+
+def test_retired_deletion_retries_after_inflight_mongo_head_change():
+    """Irreversible erasure beats a stale retired head, never before retirement."""
+    from skeleton.context.sealed_memento import encode_catalog_head
+
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+
+        async def canonical(query):
+            return {"_sealed_memento_binding": _binding_digest(a),
+                    "_sealed_memento_head": encode_catalog_head(m.head)}
+
+        m.conversation = SimpleNamespace(threads=SimpleNamespace(find_one=canonical))
+        args = dict(tenant_id="tenant", owner_id="owner", thread_id="thread",
+                    binding_digest=_binding_digest(a))
+        m.fail_purge = True
+        with pytest.raises(MementoWitnessIndeterminate):
+            await guard.retire_bound_thread(**args)
+        retired = w.positions[_binding_digest(a)]
+        assert retired.retired
+        # A prepared operation committed in the race before the Mongo fence.
+        ciphertext, successor = a.seal(
+            MementoRecord(2, "llm", b"late concurrent reply"), previous=m.head,
+        )
+        m.rows.append(("llm", ciphertext, MementoRecord(2, "llm", b"late concurrent reply")))
+        m.head = successor
+        m.fail_purge = False
+        assert await guard.retire_bound_thread(**args) == 2
+        assert not m.rows and m.retired
+        assert w.positions[_binding_digest(a)] == retired
+
+    asyncio.run(scenario())
+
+
+def test_unretired_mismatch_still_denies_physical_deletion():
+    from skeleton.context.sealed_memento import encode_catalog_head
+
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        ciphertext, successor = a.seal(
+            MementoRecord(2, "user", b"unwitnessed"), previous=m.head,
+        )
+        m.rows.append(("user", ciphertext, MementoRecord(2, "user", b"unwitnessed")))
+        m.head = successor
+
+        async def canonical(query):
+            return {"_sealed_memento_binding": _binding_digest(a),
+                    "_sealed_memento_head": encode_catalog_head(m.head)}
+
+        m.conversation = SimpleNamespace(threads=SimpleNamespace(find_one=canonical))
+        with pytest.raises(MementoWitnessDivergence):
+            await guard.retire_bound_thread(
+                tenant_id="tenant", owner_id="owner", thread_id="thread",
+                binding_digest=_binding_digest(a),
+            )
+        assert not w.positions[_binding_digest(a)].retired
+        assert len(m.rows) == 2
+
+    asyncio.run(scenario())
