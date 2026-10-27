@@ -1,0 +1,300 @@
+"""Driver-independent Mongo transaction conformance and failure-injection checks."""
+
+from __future__ import annotations
+
+import asyncio
+from copy import deepcopy
+from dataclasses import replace
+from hashlib import sha256
+import sys
+from types import ModuleType, SimpleNamespace
+
+import pytest
+
+from skeleton.context.sealed_memento import MementoCatalogHead, MementoRecord, SealedMementoArchive
+from skeleton.context.sealed_sandwich import (
+    ContextBinding, ContextSandwichCodec, SealedContextBoundaryError,
+    SealedContextIntegrityError,
+)
+from skeleton.persistence.mongo_memento_repository import (
+    MongoMementoAuthority, MongoMementoConflict, MongoMementoUnavailable,
+)
+
+
+class FakeSession:
+    def __init__(self, database):
+        self.db = database
+        self.rows = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return False
+
+    def start_transaction(self, **kw):
+        assert kw["write_concern"].w == "majority"
+        assert kw["read_concern"].level == "snapshot"
+        return self
+
+    async def __enter_transaction(self):
+        self.rows = deepcopy(self.db.rows)
+        return self
+
+    async def __exit_transaction(self, error_type, *_):
+        if error_type is None:
+            if self.db.fail_commit:
+                raise RuntimeError("no majority ack")
+            self.db.rows = self.rows
+        return False
+
+    # Nested async with calls this same context manager twice; distinguish
+    # session lifecycle from transaction enter/leave.
+    async def __aenter__(self):
+        if self.rows is None:
+            self.rows = deepcopy(self.db.rows)
+        return self
+
+    async def __aexit__(self, error_type, *_):
+        if error_type is None:
+            if self.db.fail_commit:
+                raise RuntimeError("commit failed")
+            self.db.rows = self.rows
+        return False
+
+
+class FakeCollection:
+    def __init__(self, db, name):
+        self.db, self.name = db, name
+
+    def _rows(self, session):
+        return (session.rows if session is not None else self.db.rows)[self.name]
+
+    async def create_index(self, *a, **kw):
+        return kw["name"]
+
+    async def find_one(self, query, *, session=None):
+        for row in self._rows(session).values():
+            if matches(row, query):
+                return deepcopy(row)
+        return None
+
+    async def insert_one(self, row, *, session):
+        rows = self._rows(session)
+        if row["_id"] in rows:
+            raise RuntimeError("duplicate unique key")
+        rows[row["_id"]] = deepcopy(row)
+
+    async def update_one(self, query, update, *, session=None):
+        for key, row in self._rows(session).items():
+            if matches(row, query):
+                row.update(deepcopy(update["$set"]))
+                return SimpleNamespace(modified_count=1, matched_count=1)
+        return SimpleNamespace(modified_count=0, matched_count=0)
+
+    async def delete_many(self, query):
+        matches_ = [key for key, row in self._rows(None).items() if matches(row, query)]
+        for key in matches_:
+            del self._rows(None)[key]
+        return SimpleNamespace(deleted_count=len(matches_))
+
+    def find(self, query, *, session):
+        return FakeCursor([deepcopy(row) for row in self._rows(session).values()
+                           if matches(row, query)])
+
+
+class FakeCursor:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def sort(self, field, direction):
+        assert direction == 1
+        self.rows.sort(key=lambda row: row[field])
+        return self
+
+    def limit(self, count):
+        self.rows = self.rows[:count]
+        return self
+
+    async def to_list(self, *, length):
+        return self.rows[:length]
+
+
+def matches(row, predicate):
+    for key, expected in predicate.items():
+        actual = row.get(key)
+        if isinstance(expected, dict):
+            if "$exists" in expected and (key in row) != expected["$exists"]:
+                return False
+            if "$ne" in expected and actual == expected["$ne"]:
+                return False
+            if "$gt" in expected and not actual > expected["$gt"]:
+                return False
+            if "$lte" in expected and not actual <= expected["$lte"]:
+                return False
+        elif actual != expected:
+            return False
+    return True
+
+
+class FakeDatabase:
+    def __init__(self):
+        self.rows = {"conversation_threads": {}, "conversation_memento_frames": {}}
+        self.client = self
+        self.fail_commit = False
+        self.supports_sessions = True
+
+    def __getitem__(self, key):
+        return FakeCollection(self, key)
+
+    async def start_session(self):
+        if not self.supports_sessions:
+            raise RuntimeError("standalone server")
+        return FakeSession(self)
+
+
+class Authority:
+    def __init__(self):
+        self.database = FakeDatabase()
+        self.threads = self.database["conversation_threads"]
+        self.storage_calls = 0
+
+    async def get_thread(self, *_a, **_k):
+        raise AssertionError("do not read canonical state outside transaction")
+
+    async def _admit_storage(self, **kwargs):
+        assert kwargs["resource_id"] == "conversation-memento"
+        self.storage_calls += 1
+
+
+@pytest.fixture(autouse=True)
+def fake_pymongo(monkeypatch):
+    pymongo = ModuleType("pymongo")
+    read = ModuleType("pymongo.read_concern")
+    write = ModuleType("pymongo.write_concern")
+    read.ReadConcern = lambda level: SimpleNamespace(level=level)
+    write.WriteConcern = lambda w: SimpleNamespace(w=w)
+    monkeypatch.setitem(sys.modules, "pymongo", pymongo)
+    monkeypatch.setitem(sys.modules, "pymongo.read_concern", read)
+    monkeypatch.setitem(sys.modules, "pymongo.write_concern", write)
+
+
+@pytest.fixture
+def suite():
+    owner = Authority()
+    owner.database.rows["conversation_threads"]["t1"] = {
+        "_id": "t1", "tenant_id": "tenant", "owner_id": "owner",
+        "version": 3, "state": "active",
+    }
+    binding = ContextBinding("tenant", "owner", "t1", "local", "policy")
+    evidence = {"artifact:1": sha256(b"real output").hexdigest()}
+    archive = SealedMementoArchive(
+        ContextSandwichCodec({"key": b"k" * 32}, active_key_id="key"), binding,
+        work_verifier=lambda ref, digest, data: evidence.get(ref) == digest
+        and sha256(data).hexdigest() == digest,
+    )
+    return owner, MongoMementoAuthority(owner), archive, evidence
+
+
+def publish(db, archive, record):
+    async def run():
+        previous = await db.trusted_head(archive=archive)
+        wire, expected = archive.seal(record, previous=previous)
+        head = await db.publish(
+            archive=archive, expected_head=previous, expected_thread_version=3,
+            stream=record.stream, ciphertext=wire,
+        )
+        assert head == expected
+        return wire, expected
+    return asyncio.run(run())
+
+
+def test_transaction_and_verified_three_stream_replay(suite):
+    owner, db, archive, _ = suite
+    asyncio.run(db.ensure_indexes())
+    publish(db, archive, MementoRecord(1, "user", b"build"))
+    publish(db, archive, MementoRecord(2, "llm", b"done", causal_serial=1))
+    publish(db, archive, MementoRecord(
+        3, "work", b"real output", causal_serial=1,
+        evidence_ref="artifact:1", evidence_digest=sha256(b"real output").hexdigest(),
+    ))
+    page = asyncio.run(db.read_window(archive=archive))
+    assert [r.stream for r in page.records] == ["user", "llm", "work"]
+    assert not page.has_more and page.authoritative_head == page.verified_head
+    assert owner.storage_calls == 3
+
+
+def test_stale_head_version_and_owner_fail_closed(suite):
+    owner, db, archive, _ = suite
+    publish(db, archive, MementoRecord(1, "user", b"ok"))
+    fake, _ = archive.seal(MementoRecord(1, "user", b"other"), previous=MementoCatalogHead())
+    with pytest.raises(MongoMementoConflict):
+        asyncio.run(db.publish(archive=archive, expected_head=MementoCatalogHead(),
+                               expected_thread_version=3, stream="user", ciphertext=fake))
+    head = asyncio.run(db.trusted_head(archive=archive))
+    wire, _ = archive.seal(MementoRecord(2, "llm", b"next"), previous=head)
+    with pytest.raises(MongoMementoConflict):
+        asyncio.run(db.publish(archive=archive, expected_head=head,
+                               expected_thread_version=2, stream="llm", ciphertext=wire))
+    intruder = SealedMementoArchive(archive.codec, replace(archive.binding, tenant_id="other"))
+    with pytest.raises(SealedContextBoundaryError):
+        asyncio.run(db.trusted_head(archive=intruder))
+    assert len(owner.database.rows["conversation_memento_frames"]) == 1
+
+
+def test_failed_majority_commit_and_missing_transactions_do_not_publish(suite):
+    owner, db, archive, _ = suite
+    owner.database.fail_commit = True
+    head = MementoCatalogHead()
+    wire, _ = archive.seal(MementoRecord(1, "user", b"never commit"), previous=head)
+    with pytest.raises(MongoMementoUnavailable):
+        asyncio.run(db.publish(archive=archive, expected_head=head,
+                               expected_thread_version=3, stream="user", ciphertext=wire))
+    assert not owner.database.rows["conversation_memento_frames"]
+    assert "_sealed_memento_head" not in owner.database.rows["conversation_threads"]["t1"]
+    owner.database.fail_commit = False
+    owner.database.supports_sessions = False
+    with pytest.raises(MongoMementoUnavailable):
+        asyncio.run(db.publish(archive=archive, expected_head=head,
+                               expected_thread_version=3, stream="user", ciphertext=wire))
+
+
+def test_tamper_truncated_and_revoked_evidence_rejected(suite):
+    owner, db, archive, evidence = suite
+    publish(db, archive, MementoRecord(1, "user", b"saved"))
+    publish(db, archive, MementoRecord(
+        2, "work", b"real output", evidence_ref="artifact:1",
+        evidence_digest=sha256(b"real output").hexdigest(),
+    ))
+    assert len(asyncio.run(db.read_window(archive=archive)).records) == 2
+    evidence.clear()
+    with pytest.raises(SealedContextBoundaryError):
+        asyncio.run(db.read_window(archive=archive))
+    evidence["artifact:1"] = sha256(b"real output").hexdigest()
+    first = owner.database.rows["conversation_memento_frames"]["t1:1"]
+    first["ciphertext"] = first["ciphertext"].replace(b"ciphertext", b"CIPHERtext")
+    with pytest.raises((SealedContextIntegrityError, ValueError)):
+        asyncio.run(db.read_window(archive=archive))
+
+
+def test_retired_archive_blocks_all_resumption(suite):
+    owner, db, archive, _ = suite
+    owner.database.rows["conversation_threads"]["t1"]["_sealed_memento_retired"] = True
+    with pytest.raises(SealedContextBoundaryError):
+        asyncio.run(db.read_window(archive=archive))
+
+
+def test_governed_retirement_fences_archive_and_erases_frames(suite):
+    owner, db, archive, _ = suite
+    publish(db, archive, MementoRecord(1, "user", b"private"))
+    removed = asyncio.run(db.retire_thread(
+        tenant_id="tenant", owner_id="owner", thread_id="t1"
+    ))
+    assert removed == 1
+    assert not owner.database.rows["conversation_memento_frames"]
+    with pytest.raises(SealedContextBoundaryError):
+        asyncio.run(db.trusted_head(archive=archive))
+    with pytest.raises(SealedContextBoundaryError):
+        asyncio.run(db.retire_thread(
+            tenant_id="tenant", owner_id="intruder", thread_id="t1"
+        ))
