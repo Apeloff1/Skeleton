@@ -210,6 +210,7 @@ class GuardedLocalInference:
         detokenize: Callable[[Sequence[int]], str] | None = None,
         sampler_support: Callable[[Any, DeliveryContract], bool] | None = None,
         projection_attestor: Callable[[Any, str, str], bool] | None = None,
+        tokenizer_identity_attestor: Callable[[], bool] | None = None,
         require_token_echo: bool = True,
     ) -> None:
         if not hasattr(engine, "generate") or not callable(reviewer):
@@ -220,7 +221,19 @@ class GuardedLocalInference:
         self.detokenize = detokenize
         self.sampler_support = sampler_support
         self.projection_attestor = projection_attestor
+        self.tokenizer_identity_attestor = tokenizer_identity_attestor
         self.require_token_echo = require_token_echo
+
+    def _attest_tokenizer_identity(self) -> None:
+        verifier = self.tokenizer_identity_attestor
+        if verifier is None:
+            return
+        try:
+            verified = verifier()
+        except Exception as exc:
+            raise SealedContextBoundaryError("native tokenizer identity verification unavailable") from exc
+        if verified is not True:
+            raise SealedContextIntegrityError("native tokenizer identity changed")
 
     def preflight(
         self, request: Any, *, snapshot: TrustedContextSnapshot,
@@ -228,6 +241,7 @@ class GuardedLocalInference:
     ) -> tuple[str, str | None, str]:
         if contract.format == "json":
             _schema_snapshot(contract.json_schema)
+        self._attest_tokenizer_identity()
         if snapshot.tenant_id != tenant_scope_id:
             raise SealedContextBoundaryError("context snapshot crossed tenant boundary")
         parts = request_parts(request)
@@ -332,6 +346,9 @@ class GuardedLocalInference:
             result = await self.engine.generate(
                 request, tenant_scope_id=tenant_scope_id, **engine_options,
             )
+        # A backend or tokenizer may change while the native worker is busy.
+        # A second identity proof must succeed before releasing any bytes.
+        self._attest_tokenizer_identity()
         after_parts = request_parts(request)
         if merkle_root(after_parts) != root:
             raise SealedContextIntegrityError("local input mutated during generation")
