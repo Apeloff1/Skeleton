@@ -139,10 +139,17 @@ class CanonicalOwnerSourceCollectionLoader:
             ))
         revisions: list[tuple[str, int]] = []
         if self._memory is not None:
-            records = await self._memory.list_subject(
-                tenant_id=self._tenant_id, namespace=self._memory_namespace,
-                subject_id=self._actor_id, include_tombstoned=False,
-            )
+            bounded_reader = getattr(self._memory, "list_subject_for_context", None)
+            if callable(bounded_reader):
+                records = await bounded_reader(
+                    tenant_id=self._tenant_id, namespace=self._memory_namespace,
+                    subject_id=self._actor_id, limit=_MAX_ITEMS - len(segments),
+                )
+            else:
+                records = await self._memory.list_subject(
+                    tenant_id=self._tenant_id, namespace=self._memory_namespace,
+                    subject_id=self._actor_id, include_tombstoned=False,
+                )
             if not isinstance(records, tuple) or len(records) + len(segments) > _MAX_ITEMS:
                 raise SealedContextLimitError("canonical memory inventory incomplete or unbounded")
             for record in records:
