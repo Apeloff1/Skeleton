@@ -92,6 +92,9 @@ class VerifiedMementoRetriever:
                 cursor and page.starting_head != preceding
             ):
                 raise SealedContextReplayError("archive page cursor/continuity mismatch")
+            if (page.verified_head.serial != cursor + len(page.records)
+                    or page.has_more != (page.verified_head.serial < head.serial)):
+                raise SealedContextReplayError("archive page count or tail flag is inconsistent")
             pages += 1
             for record in page.records:
                 visited += 1
@@ -127,6 +130,9 @@ class VerifiedMementoRetriever:
             # the repository from independently persisted canonical state.
             page = self._read(archive=archive, after_serial=index - 1, limit=1)
             if (page.authoritative_head != head or page.source_thread_version != version
+                or page.starting_head.serial != index - 1
+                or page.verified_head.serial != index
+                or page.has_more != (index < head.serial)
                 or len(page.records) != 1 or page.records[0].serial != index):
                 raise SealedContextReplayError("causal point read lost canonical consistency")
             return page.records[0]
@@ -151,10 +157,15 @@ class VerifiedMementoRetriever:
         # anchors even if the child has no lexical overlap with the query.
         # Descendant scan never trusts model-generated evidence on its own.
         cursor = 0
+        preceding = MementoCatalogHead()
         while cursor < head.serial and found:
             page = self._read(archive=archive, after_serial=cursor,
-                              limit=ARCHIVE_WINDOW_MESSAGES)
-            if page.authoritative_head != head or page.source_thread_version != version:
+                              limit=ARCHIVE_WINDOW_MESSAGES,
+                              expected_starting_head=preceding)
+            if (page.authoritative_head != head or page.source_thread_version != version
+                    or page.starting_head != preceding
+                    or page.verified_head.serial != cursor + len(page.records)
+                    or page.has_more != (page.verified_head.serial < head.serial)):
                 raise SealedContextReplayError("archive changed during causal expansion")
             for item in page.records:
                 if item.causal_serial in found and item.serial not in found:
@@ -162,6 +173,7 @@ class VerifiedMementoRetriever:
             if page.verified_head.serial <= cursor:
                 raise SealedContextReplayError("causal scan stalled")
             cursor = page.verified_head.serial
+            preceding = page.verified_head
         return CorrelatedRetrievalReceipt(
             tuple(found[key] for key in sorted(found)), head, version,
             pages, visited, sha256(query.encode("utf-8")).hexdigest(),
