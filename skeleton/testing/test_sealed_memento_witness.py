@@ -75,7 +75,7 @@ class TransactionalMongoDouble:
         assert archive is self.archive
         return self.head
 
-    async def publish(self, *, archive, expected_head, expected_thread_version, stream, ciphertext):
+    async def publish(self, *, archive, expected_head, expected_thread_version, stream, ciphertext,\n                      custody_mode="legacy"):\n        assert custody_mode == "witnessed"
         self.publish_calls += 1
         assert archive is self.archive
         if self.retired or expected_thread_version != self.version:
