@@ -69,4 +69,3 @@ jobs:
             skeleton/testing/test_pre_delivery_guard.py \
             skeleton/testing/test_delivery_schema.py \
             skeleton/testing/test_delivery_regex.py
-
