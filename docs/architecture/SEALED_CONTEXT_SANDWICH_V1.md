@@ -334,3 +334,39 @@ The guarded local inference path now validates nested JSON with the strict and b
 Regex delivery now uses delivery_regex with an explicitly declared timeout-capable regex dependency. Regex patterns are limited to 2048 bytes, result strings to 64 KiB, and individual matches to 50 ms. Missing matcher support, invalid patterns and timeouts reject delivery. These are post-generation checks, not proof of model understanding or provider enforcement.
 
 The isolated focused regression suite passed 150 tests. Full exact-head Merge Readiness, Backend Quality and E2E qualification is still pending; skipped jobs cannot certify release.
+
+
+## Phase 17 extensions: native tokenizer and streaming release safety (2026-10-27)
+
+The canonical `ServerState` engine startup now accepts one application-owned
+`ProtectedLocalComponents` binding before creating its provider registry.
+The `CanonicalCompiledSnapshotReader` derives a Merkle root from the
+currently authorized compiled request source, enforces an independently pinned
+instruction digest, caps history/prompt allocations and refuses revoked,
+version-changed or cross-tenant records. The source loader itself remains
+an **unimplemented production dependency**: it must authenticate the source
+against canonical execution and conversation records, and check revocation on
+each read. No raw user/context digest is accepted as an authority witness.
+
+`bind_native_transformer_guard` supplies encode/decode callbacks from the
+actual `NativeLLMRuntime.tokenizer` and binds tokenizer digest, runtime
+identity and callable ownership. The GGUF path remains fail-closed until an
+equivalent native tokenizer proof exists; no byte-codec substitution is
+considered native attestation. Prompt bytes that cannot round-trip through
+the active native tokenizer cannot be admitted without explicit, audited
+normalization and proof of equivalence.
+
+Protected composition invokes tokenizer identity attestation before and after
+model inference. A midflight swap or verifier outage rejects delivery.
+Provider streaming remains a *buffered projection of the fully verified
+result*, not a native token-by-token unreviewed stream. Regression tests
+verify that a changed canonical version or forged output receipt emits zero
+stream deltas. This does not establish native streaming safety; arbitrary
+raw native token callbacks must not be exposed as a public route.
+
+The protected guard is an in-process trusted-component boundary, not a secure
+sandbox against arbitrary attacker-controlled Python executing inside the
+same process. Final production qualification still requires a persistent
+canonical loader with an independently administered monotonic witness, KMS
+integration, an independently managed reviewer, security review and full
+exact-head required checks. Skipped jobs remain *uncertified*.
