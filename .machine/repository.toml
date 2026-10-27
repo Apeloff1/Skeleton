@@ -24,7 +24,7 @@ oversized_generic_lines = 2400
 
 [[zone]]
 name = "repository-machine"
-prefixes = [".machine/", "machine/", "skeleton/repo_machine/", "skeleton/main_guard/"]
+prefixes = [".machine/", "machine/", "skeleton/repo_machine/", "skeleton/main_guard/", "skeleton/domains/", "skeleton/house/", "skeleton/masterplan/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "Canonical repository taxonomy, machine-readable maps, topology, ownership and bounded stewardship."
@@ -69,7 +69,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/"]
+prefixes = ["skeleton/security/", "skeleton/vault/", "skeleton/gates/", "skeleton/supply_chain/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -114,7 +114,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", ".emergent/"]
+prefixes = ["skeleton/automation/", ".emergent/", "skeleton/backlog/", "skeleton/jobs/", "skeleton/merge/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
@@ -123,7 +123,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "jeeves"
-prefixes = ["skeleton/jeeves/", "jeeves/", "core/jeeves/"]
+prefixes = ["skeleton/jeeves/", "jeeves/", "core/jeeves/", "skeleton/tutolage/"]
 owner = "jeeves-runtime"
 criticality = "high"
 purpose = "Jeeves reasoning, assurance, evidence, memory and orchestration planes."
@@ -132,7 +132,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "ai"
-prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/"]
+prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/", "skeleton/audio/", "skeleton/completion/", "skeleton/document_vision/", "skeleton/inference/", "skeleton/local_ai/", "skeleton/lora/", "skeleton/modeling/", "skeleton/models/", "skeleton/multimodal/", "skeleton/speech/", "skeleton/training/", "skeleton/video/", "skeleton/vision/"]
 owner = "ai-runtime"
 criticality = "high"
 purpose = "Canonical AI runtime, cognition, context, learning, model/provider adaptation and research-facing execution."
@@ -240,7 +240,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "application"
-prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/"]
+prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/", "skeleton/app_services/", "skeleton/cli/", "skeleton/client/", "skeleton/deck/", "skeleton/frontend/", "skeleton/gameforge/", "skeleton/mobile/", "skeleton/plugins/", "skeleton/router/", "skeleton/visual/"]
 owner = "application-runtime"
 criticality = "high"
 purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."
@@ -330,7 +330,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "platform"
-prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
+prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/artifact/", "skeleton/artifacts/", "skeleton/compat/", "skeleton/layers/", "skeleton/runtime/", "skeleton/runtimes/", "skeleton/storage/"]
 owner = "platform-runtime"
 criticality = "high"
 purpose = "State, storage, networking, native execution, observability and resilience substrate."
@@ -357,7 +357,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py", "skeleton/fix/", "skeleton/install/", "skeleton/ops/", "skeleton/packaging/"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
@@ -366,7 +366,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "frontier-runtime"
-prefixes = ["skeleton/frontier/"]
+prefixes = ["skeleton/frontier/", "skeleton/frontier_nav/"]
 owner = "frontier-runtime"
 criticality = "high"
 purpose = "Frontier domain runtime fully decomposed into runtime/, progression/, ecology/, economy/, characters/, and game/ canonical subdomains; flat historical module paths remain compatibility-only."
@@ -429,7 +429,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "research"
-prefixes = ["skeleton/research/"]
+prefixes = ["skeleton/research/", "skeleton/cs300/", "skeleton/p3/", "skeleton/p4/", "skeleton/p5/"]
 owner = "research-evidence"
 criticality = "medium"
 purpose = "Untrusted evidence intake, provenance-preserving discovery, source coverage and research support surfaces."
@@ -483,7 +483,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "godot.pointer", "skeleton/emulation/", "skeleton/godot/", "skeleton/netcode/", "skeleton/realtime/"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and engine-adapter execution."
@@ -492,7 +492,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "quality"
-prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
+prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/", "skeleton/errors/", "skeleton/maximise/", "skeleton/sota/", "skeleton/verification/"]
 owner = "quality-plane"
 criticality = "high"
 purpose = "Evaluation, quality analysis, artifact assurance and reusable gate-plane implementation."
@@ -555,7 +555,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "integrations"
-prefixes = ["skeleton/skills/", "skeleton/provider_runtime.py"]
+prefixes = ["skeleton/skills/", "skeleton/provider_runtime.py", "skeleton/connectors/"]
 owner = "integration-runtime"
 criticality = "medium"
 purpose = "Provider, skill and service integration boundaries that remain outside the canonical tool-edge package."
@@ -582,7 +582,7 @@ lifecycle = "historical"
 
 [[zone]]
 name = "specialized-runtime"
-prefixes = ["skeleton/cue/", "skeleton/genos/", "skeleton/parse/", "skeleton/turn/"]
+prefixes = ["skeleton/cue/", "skeleton/genos/", "skeleton/parse/", "skeleton/turn/", "skeleton/dna/", "skeleton/organs/"]
 owner = "core-runtime"
 criticality = "medium"
 purpose = "Unresolved specialized runtime subsystems that remain explicit until a concrete canonical owner and cutover contract are approved."
@@ -609,7 +609,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "docs"
-prefixes = ["docs/", "README", "BACKLOG", "CHANGELOG", "AGENTS", "CLAUDE", "GEMINI", "SECURITY", "LICENSE", "design_guidelines.json"]
+prefixes = ["docs/", "README", "BACKLOG", "CHANGELOG", "AGENTS", "CLAUDE", "GEMINI", "SECURITY", "LICENSE", "design_guidelines.json", "skeleton/documentation/", "skeleton/volumes/"]
 owner = "documentation-plane"
 criticality = "medium"
 purpose = "Human-facing architecture, plans, runbooks, status, policy and project documentation."
