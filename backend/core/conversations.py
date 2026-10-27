@@ -40,6 +40,7 @@ from skeleton.contracts.conversation import (
     ConversationThread,
     ConversationThreadState,
 )
+from skeleton.persistence.mongo_source_epoch import fence_conversation_write
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
@@ -216,6 +217,7 @@ class MongoConversationAuthority:
         governance_engine_target_executor: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_retention_planner: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         memento_witness: Any | None = None,
+        canonical_source_epoch: Any | None = None,
     ) -> None:
         self.database = database
         if callable(getattr(database, "with_options", None)):
@@ -231,6 +233,7 @@ class MongoConversationAuthority:
         self.governance_retention_planner = governance_retention_planner
         # Optional separately administered rollback/tombstone witness for encrypted archives.
         self.memento_witness = memento_witness
+        self.canonical_source_epoch = canonical_source_epoch
         # Installed only through the trusted application lifespan.
         self.dragon_projection = None
         self.dragon_projection_outcomes = {"written": 0, "skipped": 0, "degraded": 0}
@@ -1135,6 +1138,7 @@ class MongoConversationAuthority:
             "owner_id": owner_id,
         }
 
+    @fence_conversation_write
     async def create_thread(
         self,
         *,
@@ -1435,6 +1439,7 @@ class MongoConversationAuthority:
             pass
         return _thread_from_doc(updated)
 
+    @fence_conversation_write
     async def append_message(
         self,
         message: ConversationMessage,
@@ -1796,6 +1801,7 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("chat admission state is unavailable") from exc
         return None if doc is None else doc.get("_chat_dispatch")
 
+    @fence_conversation_write
     async def append_user_message(
         self,
         thread_id: str,
@@ -1837,6 +1843,7 @@ class MongoConversationAuthority:
             expected_thread_version=expected_thread_version,
         )
 
+    @fence_conversation_write
     async def commit_assistant_message(
         self,
         thread_id: str,
@@ -1899,6 +1906,7 @@ class MongoConversationAuthority:
             expected_thread_version=expected_thread_version,
         )
 
+    @fence_conversation_write
     async def regenerate_assistant_message(
         self,
         thread_id: str,
@@ -2073,7 +2081,16 @@ class MongoConversationAuthority:
     async def active_transcript(
         self, thread_id: str, *, tenant_id: str, owner_id: str
     ) -> tuple[ConversationMessage, ...]:
-        thread = await self._recover_prepared(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        # Protected source reads must not perform opportunistic writes outside
+        # the writer epoch. Normal conversation owners retain WAL recovery.
+        if self.canonical_source_epoch is not None:
+            thread = await self.get_thread(
+                thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            )
+        else:
+            thread = await self._recover_prepared(
+                thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            )
         if thread.message_sequence == 0:
             return ()
         query = {"thread_id": thread_id, "sequence": {"$lte": thread.message_sequence}}
@@ -2136,6 +2153,7 @@ class MongoConversationAuthority:
         lineage.reverse()
         return tuple(lineage)
 
+    @fence_conversation_write
     async def edit_user_message(
         self,
         thread_id: str,
@@ -3118,6 +3136,7 @@ class MongoConversationAuthority:
             "attachments_embedded": False,
         }
 
+    @fence_conversation_write
     async def set_state(
         self,
         thread_id: str,
