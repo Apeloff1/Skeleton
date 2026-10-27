@@ -883,28 +883,28 @@ class ServerState:
                 self.governance_lifecycle_executor
             ),
         )
-        # The actual durable service only exists here: assemble a task-scoped
-        # canonical owner reader AFTER its construction and BEFORE model startup.
-        # A missing native guard remains unavailable, not an implicit downgrade.
-        canonical_sources = getattr(self, "_engine_canonical_sources", None)
-        if canonical_sources is not None:
-            if guarded_local_components is None:
-                raise RuntimeError("canonical owners require protected native components")
-            from dataclasses import replace
-            from skeleton.ai.runtime.inference.engine_submission_snapshot import (
-                ScopedEngineCompiledSnapshotReader,
-            )
-
-            source_factory, policy_sha256 = canonical_sources
-            guarded_local_components = replace(
-                guarded_local_components,
-                snapshots=ScopedEngineCompiledSnapshotReader(
-                    service=service,
-                    source_authority_factory=source_factory,
-                    policy_sha256=policy_sha256,
-                ),
-            )
         try:
+            # The actual durable service only exists here: assemble a task-scoped
+            # canonical owner reader AFTER its construction and BEFORE model startup.
+            # A missing native guard remains unavailable, not an implicit downgrade.
+            canonical_sources = getattr(self, "_engine_canonical_sources", None)
+            if canonical_sources is not None:
+                if guarded_local_components is None:
+                    raise RuntimeError("canonical owners require protected native components")
+                from dataclasses import replace
+                from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+                    ScopedEngineCompiledSnapshotReader,
+                )
+
+                source_factory, policy_sha256 = canonical_sources
+                guarded_local_components = replace(
+                    guarded_local_components,
+                    snapshots=ScopedEngineCompiledSnapshotReader(
+                        service=service,
+                        source_authority_factory=source_factory,
+                        policy_sha256=policy_sha256,
+                    ),
+                )
             coordinator = EngineExecutionCoordinator(
                 service,
                 # Acquire exclusive execution custody before activating model
