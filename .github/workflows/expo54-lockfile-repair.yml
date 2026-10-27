@@ -39,6 +39,8 @@ jobs:
       - name: Verify immutable install
         working-directory: frontend
         run: corepack yarn install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Confirm resolver did not rewrite dependency manifest
+        run: git diff --exit-code -- frontend/package.json
       - name: Upload lockfile for review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
