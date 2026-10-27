@@ -294,3 +294,51 @@ def test_guarded_provider_stream_rejects_forged_delivery_receipt_without_deltas(
         assert chunks == []
 
     asyncio.run(scenario())
+
+
+def test_protected_stream_does_not_emit_before_guard_postflight():
+    async def scenario():
+        _, authority, _, adapter, request = fixture()
+        authority.mutate = True
+        observed = []
+        with pytest.raises(SealedContextReplayError):
+            async for delta in adapter.stream(request):
+                observed.append(delta)
+        assert observed == []
+        assert authority.calls == 2
+    asyncio.run(scenario())
+
+
+def test_protected_stream_only_emits_verified_buffered_result():
+    async def scenario():
+        _, authority, _, adapter, request = fixture()
+        events = [event async for event in adapter.stream(request)]
+        assert authority.calls == 2
+        assert [item.sequence for item in events] == list(range(len(events)))
+        assert len(events) >= 3
+        assert events[0].text is not None
+        assert events[-1].finish_reason is not None
+    asyncio.run(scenario())
+
+
+def test_forged_guarded_receipt_blocks_stream_first_byte():
+    async def scenario():
+        from dataclasses import replace
+        _, authority, service, adapter, request = fixture()
+        original = service.generate
+
+        async def forged(*args, **kwargs):
+            result = await original(*args, **kwargs)
+            return replace(
+                result,
+                receipt=replace(result.receipt, response_sha256="e" * 64),
+            )
+
+        service.generate = forged
+        emitted = []
+        with pytest.raises(ProviderPolicyError, match="receipt"):
+            async for event in adapter.stream(request):
+                emitted.append(event)
+        assert emitted == []
+        assert authority.calls == 2
+    asyncio.run(scenario())
