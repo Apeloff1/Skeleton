@@ -239,3 +239,19 @@ def test_canonical_server_provider_factory_receives_exact_trusted_guard(monkeypa
         admission_runtime=admission_authority, guarded_local_components=None,
     ) is registry
     assert observed[-1] == (admission_authority, True, None)
+
+
+def test_canonical_snapshot_rejects_aggregate_history_byte_budget():
+    async def scenario():
+        loader = CanonicalLoader()
+        # Each individual span is under 4 MiB but the combined window is
+        # over 16 MiB; this must not materialize a huge Merkle workload.
+        loader.record = replace(
+            loader.record,
+            history=(("user", "x" * (4 * 1024 * 1024)),) * 5,
+        )
+        with pytest.raises(SealedContextBoundaryError, match="aggregate byte budget"):
+            await reader(loader).resolve(
+                tenant_scope_id="tenant", context_id=_CONTEXT, request_digest=_DIGEST,
+            )
+    asyncio.run(scenario())
