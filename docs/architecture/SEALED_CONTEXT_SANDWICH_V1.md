@@ -531,4 +531,3 @@ The protected engine now has a real, task-scoped application composition path:
   Malware Gate and Workflow Input Security succeed, alongside the
   unimplemented operator migration, crash recovery and model-specific
   attestation drills. Skipped jobs are not passes.
-
