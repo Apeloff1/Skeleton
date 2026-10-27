@@ -150,3 +150,70 @@ async def test_candidate_count_and_total_bytes_are_bounded():
 def test_source_authority_requires_real_operator_loader():
     with pytest.raises(SealedContextBoundaryError):
         CanonicalSegmentSourceAuthority(loader=object())
+
+
+@pytest.mark.asyncio
+async def test_live_candidate_inventory_binds_existing_durable_engine_execution():
+    from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+        EngineSubmissionCompiledInputLoader,
+    )
+    from skeleton.testing.test_engine_submission_snapshot import (
+        owner as durable_owner, EXECUTION, REQUEST,
+    )
+
+    durable = durable_owner()
+    source = Owner()
+    snapshot = tuple(sorted(
+        (candidate.segment_id, candidate.content_digest)
+        for candidate in source.current.segments
+    ))
+    durable.submissions.stored.command.compiled_context.source_snapshot = snapshot
+    authority = CanonicalSegmentSourceAuthority(loader=source)
+    loader = EngineSubmissionCompiledInputLoader(
+        service=durable, execution_id=EXECUTION,
+        native_request_digest=REQUEST, source_authority=authority,
+    )
+    valid = await loader.read(
+        tenant_id=TENANT, context_id=CONTEXT, request_digest=REQUEST,
+    )
+    assert valid.source_version > 0
+    assert valid.instructions == "owner policy"
+    assert source.reads == 2  # before and after durable owner recheck
+
+    # A candidate changed after the compiled handoff must be rejected,
+    # even if the immutable compiled prompt bytes are unchanged.
+    source.current = replace(
+        source.current, version=source.current.version + 1,
+        segments=(segment(1, "first changed"), source.current.segments[1]),
+    )
+    with pytest.raises(SealedContextIntegrityError, match="custody"):
+        await loader.read(
+            tenant_id=TENANT, context_id=CONTEXT, request_digest=REQUEST,
+        )
+
+
+@pytest.mark.asyncio
+async def test_live_candidate_revocation_blocks_engine_while_prompt_is_unchanged():
+    from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+        EngineSubmissionCompiledInputLoader,
+    )
+    from skeleton.testing.test_engine_submission_snapshot import (
+        owner as durable_owner, EXECUTION, REQUEST,
+    )
+
+    durable = durable_owner()
+    source = Owner()
+    durable.submissions.stored.command.compiled_context.source_snapshot = tuple(sorted(
+        (candidate.segment_id, candidate.content_digest)
+        for candidate in source.current.segments
+    ))
+    authority = CanonicalSegmentSourceAuthority(loader=source)
+    loader = EngineSubmissionCompiledInputLoader(
+        service=durable, execution_id=EXECUTION,
+        native_request_digest=REQUEST, source_authority=authority,
+    )
+    source.current = replace(source.current, revoked=True)
+    with pytest.raises(SealedContextBoundaryError):
+        await loader.read(
+            tenant_id=TENANT, context_id=CONTEXT, request_digest=REQUEST,
+        )
