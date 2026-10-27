@@ -145,10 +145,15 @@ class TrafficManagerObservationTests(unittest.TestCase):
         )
 
         def fake_gh(args: list[str]) -> list[dict[str, object]]:
-            if args[0] == "run":
-                return [completed]
+            # The production observer uses the paginated REST Actions API for
+            # both history and status-specific active inventory.
+            assert args[0] == "api"
             endpoint = args[1]
-            return [hidden_active] if "status=in_progress" in endpoint else []
+            if "status=in_progress" in endpoint:
+                return [hidden_active]
+            if "status=" in endpoint:
+                return []
+            return [completed]
 
         with patch(
             "skeleton.automation.traffic_manager._gh_json",
