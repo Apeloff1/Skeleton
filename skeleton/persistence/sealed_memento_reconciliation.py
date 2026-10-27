@@ -236,6 +236,7 @@ class SignedMementoReconciler:
         # replay an indeterminate incident or issue a second grant under its ID.
         successor = WitnessPosition(
             grant.binding_digest, pinned.revision + 1, grant.candidate_head,
+            recovery_incident_id=grant.incident_id,
         )
         try:
             accepted = await witness.compare_and_set(
