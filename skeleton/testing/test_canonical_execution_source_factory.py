@@ -107,3 +107,34 @@ def test_no_caller_defined_execution_authority():
     for invalid in ("", "  ", "bad ", None):
         with pytest.raises(SealedContextBoundaryError):
             factory.bind_execution(invalid)
+
+
+def test_multiowner_protected_activation_requires_exact_same_writer_object():
+    class Memory:
+        async def list_subject(self, **kwargs):
+            return ()
+
+    conversation = Conversation()
+    memory = Memory()
+
+    class Epoch:
+        async def read_epoch(self, **kwargs):
+            return 2
+
+    shared = Epoch()
+    with pytest.raises(SealedContextBoundaryError, match="same"):
+        CanonicalExecutionSourceFactory(
+            conversation=conversation, resolver=Resolver(),
+            memory=memory, memory_namespace="memory", shared_epoch=shared,
+        )
+    conversation.canonical_source_epoch = shared
+    with pytest.raises(SealedContextBoundaryError, match="same"):
+        CanonicalExecutionSourceFactory(
+            conversation=conversation, resolver=Resolver(),
+            memory=memory, memory_namespace="memory", shared_epoch=shared,
+        )
+    memory.canonical_source_epoch = shared
+    assert isinstance(CanonicalExecutionSourceFactory(
+        conversation=conversation, resolver=Resolver(),
+        memory=memory, memory_namespace="memory", shared_epoch=shared,
+    ), CanonicalExecutionSourceFactory)
