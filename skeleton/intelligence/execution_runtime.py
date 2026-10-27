@@ -1467,7 +1467,13 @@ class CognitiveExecutionRuntime:
             context_id=(
                 None if context_policy.get("context_id") is None else str(context_policy["context_id"])
             ),
-            context_digest=str(context_digest),
+            # A digest without a canonical compiled-context ID is execution-local
+            # evidence, not provider-facing compiled-context provenance.
+            context_digest=(
+                str(context_digest)
+                if context_policy.get("context_id") is not None
+                else None
+            ),
             context_source_snapshot=tuple(source_snapshot),
             context_compiler_version=(
                 None
