@@ -207,8 +207,21 @@ async def inspect_recovery_incident(
         state = "reserved_unwitnessed"
     elif (pinned.revision == record.witness_revision + 1
           and pinned.recovery_incident_id == incident_id
+          and pinned.recovery_revision == pinned.revision
+          and pinned.recovery_head == head
           and pinned.head == head):
-        state = "completed_verified" if record.state == "completed" else "receipt_missing"
+        if record.state == "completed":
+            expected = receipt_commitment(canonical_recovery_receipt(
+                incident_id=incident_id, binding_digest=scope,
+                previous_revision=record.witness_revision,
+                committed_revision=pinned.revision, committed_head=head,
+                source_thread_version=record.source_thread_version,
+            ))
+            if record.receipt_digest != expected:
+                raise RecoveryJournalError("completed incident receipt is not cryptographically bound")
+            state = "completed_verified"
+        else:
+            state = "receipt_missing"
     else:
         raise MementoWitnessDivergence("incident witness/journal positions do not reconcile")
     try:
