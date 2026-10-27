@@ -675,6 +675,29 @@ class ServerState:
             raise RuntimeError("engine local guard may not be rebound")
         self._engine_local_guard_components = components
 
+    def configure_engine_canonical_sources(self, *, factory: Any, policy_sha256: str) -> None:
+        """Bind trusted persisted execution->source owners before engine startup.
+
+        Components still require an attested native backend, independent reviewer
+        and sampler. No provider request is allowed to choose these owners.
+        """
+        from skeleton.ai.runtime.inference.canonical_execution_source_factory import (
+            CanonicalExecutionSourceFactory,
+        )
+
+        if not isinstance(factory, CanonicalExecutionSourceFactory):
+            raise TypeError("production canonical source owner factory required")
+        if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
+                or any(char not in "0123456789abcdef" for char in policy_sha256)):
+            raise ValueError("independently pinned canonical instruction digest required")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("canonical source owners must be configured before startup")
+        if getattr(self, "_engine_canonical_sources", None) is not None:
+            raise RuntimeError("canonical source owners cannot be replaced")
+        self._engine_canonical_sources = (factory, policy_sha256)
+
     @staticmethod
     def _activate_engine_provider_registry(
         *, admission_runtime: Any, guarded_local_components: Any | None,
@@ -860,6 +883,27 @@ class ServerState:
                 self.governance_lifecycle_executor
             ),
         )
+        # The actual durable service only exists here: assemble a task-scoped
+        # canonical owner reader AFTER its construction and BEFORE model startup.
+        # A missing native guard remains unavailable, not an implicit downgrade.
+        canonical_sources = getattr(self, "_engine_canonical_sources", None)
+        if canonical_sources is not None:
+            if guarded_local_components is None:
+                raise RuntimeError("canonical owners require protected native components")
+            from dataclasses import replace
+            from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+                ScopedEngineCompiledSnapshotReader,
+            )
+
+            source_factory, policy_sha256 = canonical_sources
+            guarded_local_components = replace(
+                guarded_local_components,
+                snapshots=ScopedEngineCompiledSnapshotReader(
+                    service=service,
+                    source_authority_factory=source_factory,
+                    policy_sha256=policy_sha256,
+                ),
+            )
         try:
             coordinator = EngineExecutionCoordinator(
                 service,
