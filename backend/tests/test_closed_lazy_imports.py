@@ -65,7 +65,7 @@ def test_lazy_exports_are_backed_only_by_literal_module_dispatch(path: str, tabl
         assert expected == {".native_transformer"}
         dispatcher = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "__getattr__")
     else:
-        dispatcher = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_load_trusted_lazy_module")
+        dispatcher = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_load_reviewed_export_owner")
     literal_calls: set[str] = set()
     for node in ast.walk(dispatcher):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
@@ -362,7 +362,7 @@ def test_optional_decoder_negative_case_never_monkeypatches_global_import() -> N
 def test_swarm_module_provider_uses_only_governed_literal_default() -> None:
     from skeleton.gate_plane.agent_edge.swarm_adapter import ModuleSwarmDirectory
 
-    with pytest.raises(ValueError, match="unknown swarm module"):
+    with pytest.raises(ValueError, match="unknown swarm provider; inject CallableSwarmDirectory"):
         ModuleSwarmDirectory(module="not.a.trusted.module").snapshot()
     for file in (
         ROOT / "skeleton/gate_plane/agent_edge/swarm_adapter.py",
