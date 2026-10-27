@@ -151,4 +151,68 @@ class MongoCanonicalSourceEpoch:
             self._active.reset(scope)
 
 
-__all__ = ["MongoCanonicalSourceEpoch"]
+
+def fence_conversation_write(method):
+    """Apply configured writer fencing to real conversation mutation entrypoints."""
+    from functools import wraps
+
+    @wraps(method)
+    async def guarded(self, *args, **kwargs):
+        epoch = getattr(self, "canonical_source_epoch", None)
+        if epoch is None:
+            return await method(self, *args, **kwargs)
+        tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
+        if not isinstance(tenant_id, str) or not isinstance(actor_id, str):
+            raise SealedContextBoundaryError("canonical conversation write actor missing")
+        async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
+            return await method(self, *args, **kwargs)
+
+    return guarded
+
+
+def fence_memory_commit(method):
+    """Admit governed memory mutation before reservation, CAS and publication."""
+    from functools import wraps
+
+    @wraps(method)
+    async def guarded(self, proposal, *args, **kwargs):
+        epoch = getattr(self, "canonical_source_epoch", None)
+        if epoch is None:
+            return await method(self, proposal, *args, **kwargs)
+        from skeleton.contracts.memory_record import MemoryWriteProposal
+
+        if not isinstance(proposal, MemoryWriteProposal):
+            raise SealedContextBoundaryError("canonical memory write proposal required")
+        async with epoch.writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id):
+            return await method(self, proposal, *args, **kwargs)
+
+    return guarded
+
+
+def fence_memory_tombstone(method):
+    """Pin current memory subject before tombstone; underlying CAS rechecks it."""
+    from functools import wraps
+
+    @wraps(method)
+    async def guarded(self, memory_id, *args, **kwargs):
+        epoch = getattr(self, "canonical_source_epoch", None)
+        if epoch is None:
+            return await method(self, memory_id, *args, **kwargs)
+        tenant_id = kwargs.get("tenant_id")
+        namespace = kwargs.get("namespace")
+        current = await self.get(
+            memory_id, tenant_id=tenant_id, namespace=namespace,
+            include_tombstoned=True,
+        )
+        if current.tenant_id != tenant_id or current.namespace != namespace:
+            raise SealedContextBoundaryError("canonical memory tombstone scope changed")
+        async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
+            return await method(self, memory_id, *args, **kwargs)
+
+    return guarded
+
+
+__all__ = [
+    "MongoCanonicalSourceEpoch", "fence_conversation_write",
+    "fence_memory_commit", "fence_memory_tombstone",
+]
