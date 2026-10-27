@@ -12,28 +12,69 @@ from .workgraph import build_work_graph
 Intent=Literal["overview","repair","architecture","testing","security","documentation","performance"]
 MAX_CONTEXT_BYTES=48_000
 def _fits(payload,limit): return len(json.dumps(payload,sort_keys=True,separators=(",",":")).encode())<=limit
-def _bounded(payload,limit):
-    compact=dict(payload); compact["truncated_for_context"]=False
-    if _fits(compact,limit): return compact
-    compact["truncated_for_context"]=True
-    while not _fits(compact,limit):
-        changed=False
-        for key in ("files","work","findings","subsystems","topology","coordination","intelligence"):
-            value=compact.get(key)
-            if isinstance(value,list) and value: compact[key]=value[:max(1,len(value)//2)]; changed=True
-            elif isinstance(value,dict) and value:
-                if key=="topology":
-                    e=value.get("edges",[]); compact[key]={"edges":e[:max(1,len(e)//2)],"cycles":value.get("cycles",[])[:4]}; changed=True
-                elif key=="intelligence":
-                    compact[key]={"graph_fingerprint":value.get("graph_fingerprint"),"strategic_value":value.get("strategic_value",0),"decision_surface":value.get("decision_surface",[])[:8],"counterfactual_surface":value.get("counterfactual_surface",[])[:8],"bridge_candidates":value.get("bridge_candidates",[])[:8],"safe_parallel_groups":value.get("safe_parallel_groups",[])[:4]}; changed=True
-                elif key=="coordination":
-                    d=value.get("decisions",[]); compact[key]={"decisions":d[:max(1,len(d)//2)],"bottleneck":value.get("bottleneck"),"frontier_size":value.get("frontier_size",0),"max_parallelism":value.get("max_parallelism",0),"coordination_pressure":value.get("coordination_pressure",0),"safe_parallel_groups":value.get("safe_parallel_groups",[])[:4]}; changed=True
-            if _fits(compact,limit): return compact
-        if not changed: break
-    if not _fits(compact,limit):
-        keep={"intent","fingerprint","health","metrics","coordination","execution","intelligence","truncated_for_context"}
-        compact={k:compact[k] for k in keep if k in compact}; compact["truncated_for_context"]=True
+def _bounded(payload, limit):
+    """Compact context with guaranteed progress and a hard serialized byte cap."""
+    compact = dict(payload)
+    compact["truncated_for_context"] = False
+    if _fits(compact, limit):
+        return compact
+    compact["truncated_for_context"] = True
+    while not _fits(compact, limit):
+        changed = False
+        for key in ("files", "work", "findings", "subsystems", "topology", "coordination", "intelligence"):
+            value = compact.get(key)
+            reduced = value
+            if isinstance(value, list) and value:
+                # A singleton must shrink to zero, or the loop never terminates.
+                reduced = value[:len(value) // 2]
+            elif isinstance(value, dict) and value:
+                if key == "topology":
+                    edges = value.get("edges", [])
+                    cycles = value.get("cycles", [])
+                    reduced = {
+                        "edges": edges[:len(edges) // 2],
+                        "cycles": cycles[:min(4, len(cycles) // 2)],
+                    }
+                elif key == "intelligence":
+                    reduced = {
+                        "graph_fingerprint": value.get("graph_fingerprint"),
+                        "strategic_value": value.get("strategic_value", 0),
+                        "decision_surface": value.get("decision_surface", [])[:8],
+                        "counterfactual_surface": value.get("counterfactual_surface", [])[:8],
+                        "bridge_candidates": value.get("bridge_candidates", [])[:8],
+                        "safe_parallel_groups": value.get("safe_parallel_groups", [])[:4],
+                    }
+                elif key == "coordination":
+                    decisions = value.get("decisions", [])
+                    reduced = {
+                        "decisions": decisions[:len(decisions) // 2],
+                        "bottleneck": value.get("bottleneck"),
+                        "frontier_size": value.get("frontier_size", 0),
+                        "max_parallelism": value.get("max_parallelism", 0),
+                        "coordination_pressure": value.get("coordination_pressure", 0),
+                        "safe_parallel_groups": value.get("safe_parallel_groups", [])[:4],
+                    }
+            if reduced != value:
+                compact[key] = reduced
+                changed = True
+                if _fits(compact, limit):
+                    return compact
+        if not changed:
+            break
+    if not _fits(compact, limit):
+        # Preserve the most useful summary fields; discard optional fields only
+        # when necessary. Never return a supposedly bounded oversized payload.
+        keep = ("intent", "fingerprint", "health", "metrics", "coordination",
+                "execution", "intelligence", "truncated_for_context")
+        compact = {key: compact[key] for key in keep if key in compact}
+        for key in ("coordination", "execution", "intelligence", "metrics", "health"):
+            if _fits(compact, limit):
+                break
+            compact.pop(key, None)
+        if not _fits(compact, limit):
+            raise ValueError("essential repository context exceeds byte limit")
     return compact
+
 def context_for_intent(model:RepositoryModel,intent:Intent="overview",*,byte_limit:int=MAX_CONTEXT_BYTES):
     if isinstance(byte_limit,bool) or not isinstance(byte_limit,int) or not 4096<=byte_limit<=256000: raise ValueError("byte_limit must be in [4096,256000]")
     query=RepositoryQuery(model); graph=build_work_graph(model,limit=32)
