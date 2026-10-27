@@ -3899,6 +3899,8 @@ class LocalModelAdapter(ProviderAdapter):
                     raise ProviderPolicyError("guarded local inference requires tenant authority")
                 if not isinstance(request.context_id, str) or not request.context_id:
                     raise ProviderPolicyError("guarded local inference requires canonical context")
+                if not isinstance(local_request.context_digest, str) or not local_request.context_digest:
+                    raise ProviderPolicyError("guarded local inference requires independently pinned context digest")
                 if local_request.tools:
                     raise ProviderPolicyError("guarded local tool calls require independently verified execution")
                 from skeleton.context.pre_delivery_guard import DeliveryContract
@@ -3917,7 +3919,35 @@ class LocalModelAdapter(ProviderAdapter):
                     ),
                     timeout=remaining,
                 )
+                from .guarded_service import GuardedGeneration
+                from skeleton.context.pre_delivery_guard import PreDeliveryReceipt
+                if (not isinstance(generation, GuardedGeneration)
+                        or not isinstance(generation.receipt, PreDeliveryReceipt)
+                        or not isinstance(generation.result, LocalInferenceResult)):
+                    raise ProviderPolicyError("guarded local response lacks verified delivery receipt")
                 result = generation.result
+                receipt = generation.receipt
+                if (receipt.request_digest != local_request.digest
+                        or receipt.context_root != local_request.context_digest
+                        or not receipt.token_echo_sha256
+                        or not receipt.reviewer_id
+                        or receipt.response_sha256 != hashlib.sha256(
+                            result.text.encode("utf-8")
+                        ).hexdigest()):
+                    raise ProviderPolicyError("guarded local receipt does not match delivered payload")
+                if result.tool_calls:
+                    raise ProviderPolicyError("unverified local tool calls cannot escape guarded route")
+                if result.structured_output is not None:
+                    if local_request.structured_output_schema is None:
+                        raise ProviderPolicyError("unsolicited structured output bypassed guarded contract")
+                    from skeleton.context.delivery_schema import parse_and_validate_delivery_json
+                    parsed = parse_and_validate_delivery_json(
+                        result.text, local_request.structured_output_schema,
+                    )
+                    if not isinstance(parsed, dict) or (
+                        _stable_json(dict(result.structured_output)) != _stable_json(parsed)
+                    ):
+                        raise ProviderPolicyError("structured output differs from verified delivery text")
             else:
                 result = await asyncio.wait_for(
                     self.engine.generate(
