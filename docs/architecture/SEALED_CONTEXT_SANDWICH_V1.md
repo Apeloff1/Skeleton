@@ -370,3 +370,38 @@ same process. Final production qualification still requires a persistent
 canonical loader with an independently administered monotonic witness, KMS
 integration, an independently managed reviewer, security review and full
 exact-head required checks. Skipped jobs remain *uncertified*.
+
+
+## Phase 18: Native transformer tokenizer custody
+
+`skeleton.ai.runtime.inference.build_guarded_native_transformer_adapter`
+constructs a real native transformer backend *before* creating its protected
+context guard. The bridge in `native_guard_binding.py` captures the exact
+`NativeTokenizer.encode_ids` and `NativeTokenizer.decode_ids` bound methods
+and pins the admitted model, runtime and tokenizer identity digests.
+`verify_native_tokenizer` rejects a different backend, replacement callbacks,
+backend identity drift and any tokenizer or native-runtime attestation failure.
+The local inference guard repeats that identity check both before inference
+and before returning output. These are backend-bound identity checks, not
+cryptographic proof that the model understood the prompt.
+
+**Strict fail-closed token fidelity:** The tokenizer must decode the *actual
+rendered prompt* to the identical UTF-8 byte sequence. Native tokenizers with
+unknown-token substitutions, normalization changes or otherwise lossy decoding
+cannot serve that prompt in this protected mode. Do not replace the real
+native tokenizer with a byte-level test tokenizer merely to make admission pass.
+
+Protected native startup additionally requires a separately operated,
+currently authorized compiled-context snapshot reader and independent
+reviewer, provided by the application composition root. The
+`CanonicalCompiledSnapshotReader` is a bounded verifier over a required
+canonical loader; that loader and its durable revocation/version custody
+are **not** supplied automatically by a native model artifact.
+Text-only native backends make no JSON grammar, tool-execution or alternate
+projection attestations.
+
+The additive `Sealed Context Guard` workflow exercises the native adapter
+factory, exact callback binding, tokenizer drift, negative startup cases and
+pre/postflight output suppression. This workflow does not substitute for
+full Merge Readiness, Backend Quality, App Foundation E2E, KMS and production
+restore testing. Do not promote this draft to an end-to-end zero-loss claim.
