@@ -59,9 +59,8 @@ class EngineSubmissionCompiledInputLoader:
                 or len(native_request_digest) != 64
                 or any(ch not in "0123456789abcdef" for ch in native_request_digest)):
             raise SealedContextBoundaryError("bound engine native request identity required")
-        if (not callable(getattr(service, "submissions", None))
-                and not callable(getattr(getattr(service, "submissions", None),
-                                         "get_by_execution_id", None))):
+        if not callable(getattr(getattr(service, "submissions", None),
+                                 "get_by_execution_id", None)):
             raise SealedContextBoundaryError("canonical engine submission owner required")
         if not callable(getattr(getattr(service, "repository", None), "get", None)):
             raise SealedContextBoundaryError("canonical engine execution repository required")
