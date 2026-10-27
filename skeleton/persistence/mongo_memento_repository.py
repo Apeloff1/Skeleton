@@ -172,6 +172,8 @@ class MongoMementoAuthority:
             raise SealedContextError("invalid CAS publication authority")
         if custody_mode not in ("legacy", "witnessed"):
             raise SealedContextBoundaryError("invalid archival custody mode")
+        if custody_mode == "legacy" and getattr(self.conversation, "memento_witness", None) is not None:
+            raise SealedContextBoundaryError("witness-enabled conversation cannot publish legacy custody")
         if not isinstance(ciphertext, bytes) or len(ciphertext) > 4 * 1024 * 1024:
             raise SealedContextLimitError("invalid encrypted memento envelope size")
         # Decode/authenticate before storage admission, and repeat against the
