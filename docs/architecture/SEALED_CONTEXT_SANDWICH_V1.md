@@ -522,6 +522,11 @@ The protected engine now has a real, task-scoped application composition path:
   the canonical direct `_chat_engine_command` path. Edited request
   `_chat_execution` and regeneration requests require separate
   fully owner-validated bindings before protected execution.
+- The existing tenant-wide governance deletion and due-retention operations
+  can touch multiple actors, so the protected conversation owner rejects
+  these operations before mutation until a cross-owner retirement protocol
+  fences every affected actor and proves storage deletion. These are
+  unresolved *product release blockers*, not successful deletion receipts.
 - The source epoch must be persisted with majority concern on the same
   trusted canonical Mongo cluster. Restore, failover and deletion need
   externally attested drills. It is not the separate monotonic KMS/head
