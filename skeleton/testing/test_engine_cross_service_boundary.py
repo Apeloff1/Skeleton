@@ -73,11 +73,36 @@ class _Provider:
 
 
 class _Registry:
+    """Expose the scoped inventory contract used by the real provider registry."""
+
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
+        self.active_id = provider.provider_id
+        self.available = provider.available
 
     def require_active(self):
         return self.provider
+
+    def statuses(self) -> list[dict[str, object]]:
+        return [{
+            "id": self.provider.provider_id,
+            "model": self.provider.model,
+            "available": self.provider.available,
+            "active": True,
+            "fallback": False,
+            "architecture_acknowledged": True,
+            "configured": True,
+            "readiness_code": "ready",
+            "execution_mode": "hosted",
+            "credential_free": False,
+            "capabilities": ["text-generation"],
+            "context_window": 128_000,
+            "max_output_tokens": 16_384,
+            "default_output_tokens": 4_096,
+            "limits_source": "engine_chat_policy",
+            "tokenizer": "approximate_text",
+            "supports_temperature": True,
+        }]
 
 
 def _service(tmp_path, *, tenant_ids=frozenset({"tenant-a"}), scopes=None):
