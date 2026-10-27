@@ -1736,7 +1736,7 @@ class LocalInferenceEngine:
         # The scope is task-local, exact-request bound, and always revoked in
         # a finally block. It is an in-process integration fence, not a sandbox
         # against arbitrary trusted Python code.
-        self._guard_scope: ContextVar[tuple[str, str] | None] = ContextVar(
+        self._guard_scope: ContextVar[tuple[str, str, asyncio.Task[Any]] | None] = ContextVar(
             "skeleton.local.verified_context", default=None,
         )
         self.cache_size = cache_size
@@ -2930,7 +2930,10 @@ class LocalInferenceEngine:
                 or not isinstance(token_echo, str) or len(token_echo) != 64
                 or not isinstance(reviewer_id, str) or not reviewer_id):
             raise ProviderPolicyError("local verified scope lacks bound preflight evidence")
-        token = self._guard_scope.set((request.digest, context_root))
+        task = asyncio.current_task()
+        if task is None:
+            raise ProviderPolicyError("guarded local permit requires active asyncio task")
+        token = self._guard_scope.set((request.digest, context_root, task))
         try:
             yield
         finally:
@@ -2939,7 +2942,8 @@ class LocalInferenceEngine:
     def _require_guard_scope(self, request: LocalInferenceRequest) -> None:
         if self.require_guarded_context and (
             not isinstance(request, LocalInferenceRequest)
-            or self._guard_scope.get() != (request.digest, request.context_digest)
+            or self._guard_scope.get()
+               != (request.digest, request.context_digest, asyncio.current_task())
         ):
             raise ProviderPolicyError("local inference requires verified context admission")
 
