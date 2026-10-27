@@ -48,6 +48,7 @@ class WitnessPosition:
     revision: int
     head: MementoCatalogHead
     retired: bool = False
+    recovery_incident_id: str | None = None
 
     def __post_init__(self) -> None:
         if (not isinstance(self.binding_digest, str)
@@ -58,6 +59,13 @@ class WitnessPosition:
             raise MementoWitnessUnavailable("invalid monotonic witness revision")
         if not isinstance(self.head, MementoCatalogHead) or type(self.retired) is not bool:
             raise MementoWitnessUnavailable("malformed witnessed archive state")
+        if self.recovery_incident_id is not None and (
+            not isinstance(self.recovery_incident_id, str)
+            or not 1 <= len(self.recovery_incident_id) <= 128
+            or self.recovery_incident_id != self.recovery_incident_id.strip()
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.recovery_incident_id)
+        ):
+            raise MementoWitnessUnavailable("invalid witnessed recovery incident identity")
 
 
 class IndependentMementoWitness(Protocol):
@@ -96,7 +104,10 @@ class WitnessedMongoMementoAuthority:
     The witness is NOT provisioned or controlled here.
     """
 
-    def __init__(self, mongo: Any, *, witness: IndependentMementoWitness) -> None:
+    def __init__(
+        self, mongo: Any, *, witness: IndependentMementoWitness,
+        recovery_journal: Any | None = None,
+    ) -> None:
         required = ("trusted_head", "publish", "read_window", "retire_thread")
         if not all(callable(getattr(mongo, name, None)) for name in required):
             raise TypeError("canonical transactional Mongo memento adapter required")
@@ -104,8 +115,11 @@ class WitnessedMongoMementoAuthority:
             "read", "compare_and_set"
         )):
             raise TypeError("independent monotonic witness provider required")
+        if recovery_journal is not None and not callable(getattr(recovery_journal, "read", None)):
+            raise TypeError("independent recovery journal reader required")
         self.mongo = mongo
         self.witness = witness
+        self.recovery_journal = recovery_journal
 
     async def _position(self, archive: SealedMementoArchive) -> WitnessPosition:
         scope = _binding_digest(archive)
@@ -117,6 +131,36 @@ class WitnessedMongoMementoAuthority:
             raise MementoWitnessUnavailable("authorized witness position not provisioned")
         if position.retired:
             raise SealedContextBoundaryError("encrypted conversation has a permanent retirement fence")
+        # A recovery CAS can precede its journal acknowledgement. Without
+        # this independent completion check, the witness and Mongo would agree
+        # while an unfinalized recovery incident could leak plaintext.
+        if position.recovery_incident_id is not None:
+            if self.recovery_journal is None:
+                raise MementoWitnessIndeterminate(
+                    "witnessed recovery requires an independently finalized incident"
+                )
+            try:
+                from skeleton.persistence.sealed_memento_recovery_journal import (
+                    RecoveryJournalRecord,
+                )
+
+                record = await self.recovery_journal.read(
+                    binding_digest=scope, incident_id=position.recovery_incident_id,
+                )
+            except Exception as exc:
+                raise MementoWitnessIndeterminate(
+                    "recovery journal completion could not be confirmed"
+                ) from exc
+            if (not isinstance(record, RecoveryJournalRecord)
+                    or record.state != "completed"
+                    or record.binding_digest != scope
+                    or record.incident_id != position.recovery_incident_id
+                    or record.witness_revision + 1 != position.revision
+                    or record.candidate_serial != position.head.serial
+                    or record.candidate_commitment != position.head.commitment):
+                raise MementoWitnessIndeterminate(
+                    "external recovery incident is unfinished or mismatched"
+                )
         return position
 
     async def _consistent(self, archive: SealedMementoArchive) -> WitnessPosition:
