@@ -5,9 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from skeleton.context.sealed_sandwich import SealedContextBoundaryError
 from skeleton.persistence.mongo_source_epoch import (
-    MongoCanonicalSourceEpoch, fence_conversation_write,
+    MongoCanonicalSourceEpoch, MongoSourceEpochError, fence_conversation_write,
 )
 
 
@@ -67,17 +66,17 @@ async def read(owner, tenant="tenant", actor="actor", context="context"):
 @pytest.mark.asyncio
 async def test_durable_writer_epoch_requires_operator_migration_and_is_monotonic():
     owner = epoch()
-    with pytest.raises(SealedContextBoundaryError):
+    with pytest.raises(MongoSourceEpochError):
         await read(owner)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     assert await read(owner) == 2
     async with owner.writer(tenant_id="tenant", actor_id="actor"):
-        with pytest.raises(SealedContextBoundaryError, match="writing"):
+        with pytest.raises(MongoSourceEpochError, match="writing"):
             await read(owner)
     assert await read(owner) == 4
     async with owner.writer(tenant_id="tenant", actor_id="actor"):
         async with owner.writer(tenant_id="tenant", actor_id="actor"):
-            with pytest.raises(SealedContextBoundaryError):
+            with pytest.raises(MongoSourceEpochError):
                 await read(owner)
     assert await read(owner) == 6
 
@@ -95,9 +94,9 @@ async def test_reader_and_other_writers_reject_inflight_epoch():
 
     task = asyncio.create_task(writer())
     await entered.wait()
-    with pytest.raises(SealedContextBoundaryError):
+    with pytest.raises(MongoSourceEpochError):
         await read(owner)
-    with pytest.raises(SealedContextBoundaryError):
+    with pytest.raises(MongoSourceEpochError):
         async with owner.writer(tenant_id="tenant", actor_id="actor"):
             pass
     release.set()
@@ -112,9 +111,9 @@ async def test_failed_mutation_quarantines_epoch_until_manual_reconciliation():
     with pytest.raises(ValueError):
         async with owner.writer(tenant_id="tenant", actor_id="actor"):
             raise ValueError("injected partial mutation")
-    with pytest.raises(SealedContextBoundaryError, match="writing"):
+    with pytest.raises(MongoSourceEpochError, match="writing"):
         await read(owner)
-    with pytest.raises(SealedContextBoundaryError):
+    with pytest.raises(MongoSourceEpochError):
         async with owner.writer(tenant_id="tenant", actor_id="actor"):
             pass
 
@@ -125,7 +124,7 @@ async def test_writer_scope_cannot_be_inherited_into_child_task():
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     async with owner.writer(tenant_id="tenant", actor_id="actor"):
         async def stolen():
-            with pytest.raises(SealedContextBoundaryError, match="inherited"):
+            with pytest.raises(MongoSourceEpochError, match="inherited"):
                 async with owner.writer(tenant_id="tenant", actor_id="actor"):
                     pass
         await asyncio.create_task(stolen())
@@ -141,11 +140,11 @@ async def test_actual_conversation_write_decorator_surrounds_awaitable_owner_mut
 
         @fence_conversation_write
         async def append_message(self, *, tenant_id, owner_id):
-            with pytest.raises(SealedContextBoundaryError, match="writing"):
+            with pytest.raises(MongoSourceEpochError, match="writing"):
                 await read(owner)
             return "persisted"
 
     assert await Repo().append_message(tenant_id="tenant", owner_id="actor") == "persisted"
     assert await read(owner) == 4
-    with pytest.raises(SealedContextBoundaryError):
+    with pytest.raises(MongoSourceEpochError):
         await Repo().append_message(tenant_id="foreign", owner_id="actor")
