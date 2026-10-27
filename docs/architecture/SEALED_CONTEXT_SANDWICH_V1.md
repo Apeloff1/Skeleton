@@ -238,3 +238,54 @@ Readiness, Backend Quality and App Foundation E2E were **skipped**.
 Do not merge on that basis. Promote only after runtime authority,
 schema/state topology updates, write/restore drills, operator controls,
 privacy deletion, and fail-closed CI evidence are complete.
+
+## Phase 5: authority-resolved guarded local inference facade (2026-10-27)
+
+`skeleton/ai/runtime/inference/guarded_service.py` now implements
+`CanonicalGuardedLocalService` above the existing
+`GuardedLocalInference` and canonical `LocalInferenceEngine`.
+It does not create a new inference provider or credential owner.
+
+Before executing, the service resolves `TrustedContextSnapshot` from an
+injected **trusted, tenant-authorized reader**, bound by context ID and
+deterministic request digest. It checks tenant/context equality and rejects
+caller attempts to override `snapshot`, `prepared_input`, delivery
+contract or tenant authority. The existing wrapper then checks the pinned
+Merkle root and instruction digest, native-renderer/tokenizer echo,
+independent adversarial verdict and sampler/output contract.
+
+After the model has generated but **before** returning any response, the
+service re-reads the same authoritative snapshot. A changed version,
+instruction policy, root, context or tenant binding raises
+`SealedContextReplayError`, withholding the entire result. A
+`GuardedGeneration` includes the pre-delivery receipt and the accepted
+canonical snapshot version only after both checks succeed.
+
+This is **not yet a mandatory global intercept**: the product's provider
+composition root must route protected local generations through the new
+service and block direct unguarded entrypoints, including native streaming
+paths, cache hits, batching and tool calls. The snapshot-reader implementation
+must come from existing canonical conversation authority, not the client.
+Production additionally requires a real separate review model, a verified
+tokenizer/sampler capability and explicit timeouts/quotas. Passing a test
+mock reviewer or a permissive `sampler_support` callback does not prove
+prompt-injection immunity or grammar-constrained decoding.
+
+The dedicated `skeleton/testing/test_guarded_local_service.py` module
+covers authorized stable generation, a concurrent canonical edit,
+cross-tenant failure, and attempted prepared-tensor bypass.
+
+### Current scope and acceptance
+
+The focused isolated-source checks report **51 passing** across all seven
+sealed context, archive, storage and guarded inference test files. The
+documented example still needs exact-head GitHub tests under the full
+repository environment, including all mandatory architecture validators.
+The SQLite CAS is a reference-only persistence boundary; Mongo outbox,
+majority durability, privacy erasure, key lifecycle, external monotonic
+witness and production local-inference routing are not yet activated.
+
+Cryptography cannot eliminate LLM attention fading, hallucinations, prompt
+injection by itself, or finite context windows. Model-side internal thoughts
+and proprietary provider KV tensors remain unavailable unless their runtimes
+expose independently consented, version-compatible state export.
