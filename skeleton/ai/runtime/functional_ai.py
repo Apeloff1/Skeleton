@@ -113,6 +113,20 @@ class FunctionalAIRequest:
                 "tenant_id": self.tenant_id.strip(),
                 "data_class": self.data_class,
                 "capability": "vs001.functional_ai",
+                # The local provider requires the submitted digest and a
+                # stable canonical UUID together. Never substitute the
+                # execution ID or change this binding on a retry.
+                "context_id": str(
+                    uuid5(
+                        NAMESPACE_URL,
+                        "skeleton-vs001-context:"
+                        + self.tenant_id.strip()
+                        + ":"
+                        + self.request_id
+                        + ":"
+                        + self.context_digest,
+                    )
+                ),
             },
             tool_policy={
                 "tenant_id": self.tenant_id.strip(),
