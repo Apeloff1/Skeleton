@@ -405,3 +405,25 @@ factory, exact callback binding, tokenizer drift, negative startup cases and
 pre/postflight output suppression. This workflow does not substitute for
 full Merge Readiness, Backend Quality, App Foundation E2E, KMS and production
 restore testing. Do not promote this draft to an end-to-end zero-loss claim.
+
+## Phase 18: postflight native-input and sampler revalidation
+
+The protected local path must reattest native prompt projection, sampler
+grammar support and tokenizer identity after execution and before any response
+byte is returned. The guard now records a domain-separated SHA-256
+commitment over the exact admitted sequence of bounded unsigned 64-bit token
+IDs, and computes that commitment again during postflight. A changed
+token-to-ID mapping is detected even if the revised tokenizer decodes back
+to identical UTF-8 prompt text. The protected provider refuses a receipt
+missing this token sequence commitment; the buffered stream does not emit
+deltas on missing evidence or canonical source/version drift.
+
+These safeguards do not prove model comprehension, eliminate native
+implementation defects, or replace independent authorization. The
+domain-separated token commitment is a deterministic integrity receipt,
+not a cryptographic signature from a separate protected hardware boundary.
+Native tokenizer verification remains runtime-specific. Full product
+qualification requires the canonical source reader to be populated from
+authorized durable execution state and a production-native tokenizer binding,
+as well as complete exact-head Merge Readiness, backend, installation and E2E.
+Skipped jobs must not be represented as success.
