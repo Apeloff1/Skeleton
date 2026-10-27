@@ -8,6 +8,7 @@ Callers must obtain the snapshot root from independently authorized state.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import nullcontext
 import hashlib
 import json
 import re
@@ -283,20 +284,33 @@ class GuardedLocalInference:
         )
         if "tenant_scope_id" in engine_options or "prepared_input" in engine_options:
             raise SealedContextBoundaryError("caller cannot override verified local scopes")
-        # Reuse the engine's model-native prepared input when available.
-        # LocalInferenceEngine validates its request, model and scope binding
-        # before admitting inference; clients cannot supply prepared tensors.
-        prepare = getattr(self.engine, "prepare_input", None)
-        if callable(prepare):
-            prepared = prepare(
-                request, scope_id=engine_options.get("scope_id"),
-                tenant_scope_id=tenant_scope_id,
+        # Protected LocalInferenceEngine refuses direct/cached/batched work
+        # without this task-local permit, minted only after the preflight.
+        # Other engines retain the portable adapter contract.
+        if getattr(self.engine, "require_guarded_context", False):
+            admit = getattr(self.engine, "_verified_guard_scope", None)
+            if not callable(admit):
+                raise SealedContextBoundaryError("protected engine lacks verified scope")
+            scope = admit(
+                request, context_root=root, token_echo=token_echo,
+                reviewer_id=reviewer_id,
             )
-            if prepared is not None:
-                engine_options["prepared_input"] = prepared
-        result = await self.engine.generate(
-            request, tenant_scope_id=tenant_scope_id, **engine_options,
-        )
+        else:
+            scope = nullcontext()
+        with scope:
+            # The actual prepared tokens and cache admission are both within
+            # the exact verified request scope; clients supply no tensors.
+            prepare = getattr(self.engine, "prepare_input", None)
+            if callable(prepare):
+                prepared = prepare(
+                    request, scope_id=engine_options.get("scope_id"),
+                    tenant_scope_id=tenant_scope_id,
+                )
+                if prepared is not None:
+                    engine_options["prepared_input"] = prepared
+            result = await self.engine.generate(
+                request, tenant_scope_id=tenant_scope_id, **engine_options,
+            )
         after_parts = request_parts(request)
         if merkle_root(after_parts) != root:
             raise SealedContextIntegrityError("local input mutated during generation")
