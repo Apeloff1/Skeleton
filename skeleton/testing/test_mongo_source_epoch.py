@@ -148,3 +148,18 @@ async def test_actual_conversation_write_decorator_surrounds_awaitable_owner_mut
     assert await read(owner) == 4
     with pytest.raises(MongoSourceEpochError):
         await Repo().append_message(tenant_id="foreign", owner_id="actor")
+
+
+@pytest.mark.asyncio
+async def test_governed_tenant_retirement_denied_until_multi_actor_custody_exists():
+    # A tenant-wide deletion can touch multiple actors and separate owners.
+    # Never allow one actor's epoch to claim it has fenced every target.
+    from core.conversations import MongoConversationAuthority, ConversationStorageUnavailable
+
+    conversation = object.__new__(MongoConversationAuthority)
+    conversation.canonical_source_epoch = epoch()
+    with pytest.raises(ConversationStorageUnavailable, match="cross-owner retirement"):
+        await conversation.execute_governed_deletion(tenant_id="tenant")
+    with pytest.raises(ConversationStorageUnavailable, match="cross-owner retirement"):
+        await conversation.execute_due_retention(tenant_id="tenant")
+
