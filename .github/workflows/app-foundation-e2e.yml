@@ -48,8 +48,8 @@ jobs:
   stack-e2e:
     name: App Foundation E2E (stack + Playwright)
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
-    # Playwright 1.56.1 Chromium is not supported on Ubuntu 26.04 yet.
-    # Pin the runner OS so browser installation and E2E cases actually execute.
+    # Playwright 1.56.1 does not install Chromium on ubuntu-26.04 (the
+    # ubuntu-latest runner image as of 2026-10-26); use its supported LTS.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
