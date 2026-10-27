@@ -342,3 +342,32 @@ def test_forged_guarded_receipt_blocks_stream_first_byte():
         assert emitted == []
         assert authority.calls == 2
     asyncio.run(scenario())
+
+
+def test_provider_requires_token_sequence_commitment_before_delivery():
+    async def scenario():
+        from dataclasses import replace
+
+        _, authority, service, adapter, request = fixture()
+        real_generate = service.generate
+
+        async def remove_token_proof(*args, **kwargs):
+            verified = await real_generate(*args, **kwargs)
+            return replace(
+                verified,
+                receipt=replace(verified.receipt, token_sequence_sha256=None),
+            )
+
+        service.generate = remove_token_proof
+        with pytest.raises(ProviderPolicyError, match="receipt"):
+            await adapter.generate(request)
+        assert authority.calls == 2
+
+        emitted = []
+        with pytest.raises(ProviderPolicyError, match="receipt"):
+            async for delta in adapter.stream(request):
+                emitted.append(delta)
+        assert emitted == []
+        assert authority.calls == 4
+
+    asyncio.run(scenario())
