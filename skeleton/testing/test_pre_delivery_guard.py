@@ -359,3 +359,104 @@ def test_inference_merkle_request_rejects_invalid_unicode():
     request = Request("policy", (("user", chr(0xD800)),), "finish")
     with pytest.raises(SealedContextError, match="malformed"):
         request_parts(request)
+
+
+def test_sampler_attestation_revoked_after_native_generation_withholds_text():
+    req = Request(
+        "policy", (), "must return structured JSON",
+        structured_output_schema={"type": "object"},
+    )
+    state = {"allowed": True, "checks": 0}
+
+    class RevokingEngine(Engine):
+        async def generate(self, request, **kwargs):
+            response = await super().generate(request, **kwargs)
+            state["allowed"] = False
+            return response
+
+    engine = RevokingEngine('{"ok":true}')
+
+    def supports(model, contract):
+        state["checks"] += 1
+        return state["allowed"]
+
+    guard = GuardedLocalInference(
+        engine, reviewer=reviewer, tokenize=lambda t: tuple(t.encode()),
+        detokenize=lambda ids: bytes(ids).decode(), sampler_support=supports,
+    )
+    with pytest.raises(SealedContextBoundaryError, match="no longer attested"):
+        asyncio.run(guard.generate(
+            req, snapshot=snapshot(req), tenant_scope_id="tenant",
+            contract=DeliveryContract("json", json_schema={"type": "object"}),
+        ))
+    assert engine.calls == 1 and state["checks"] == 2
+
+
+def test_native_projection_attestation_revoked_after_native_generation_withholds_text():
+    from types import SimpleNamespace
+
+    req = Request("system", (("user", "prior approved input"),), "current")
+    state = {"allowed": True, "checks": 0}
+
+    class RevokingEngine(Engine):
+        async def generate(self, request, **kwargs):
+            response = await super().generate(request, **kwargs)
+            state["allowed"] = False
+            return response
+
+    engine = RevokingEngine("not released")
+    engine.model = SimpleNamespace(
+        _render_prompt=lambda request: "NATIVE::" + request.rendered_input
+    )
+
+    def attest(request, rendered, root):
+        state["checks"] += 1
+        return state["allowed"] and rendered == "NATIVE::" + request.rendered_input
+
+    guard = GuardedLocalInference(
+        engine, reviewer=reviewer,
+        tokenize=lambda text: tuple(text.encode()),
+        detokenize=lambda ids: bytes(ids).decode(),
+        projection_attestor=attest,
+    )
+    with pytest.raises(SealedContextIntegrityError, match="attestation changed"):
+        asyncio.run(guard.generate(
+            req, snapshot=snapshot(req), tenant_scope_id="tenant",
+        ))
+    assert engine.calls == 1 and state["checks"] == 2
+
+
+def test_native_grammar_and_projection_positive_recheck_required_on_success():
+    from types import SimpleNamespace
+
+    req = Request(
+        "policy", (("user", "history"),), "json",
+        structured_output_schema={"type": "object"},
+    )
+    engine = Engine('{"ok":true}')
+    engine.model = SimpleNamespace(
+        _render_prompt=lambda request: "NATIVE::" + request.rendered_input
+    )
+    calls = {"sampler": 0, "projection": 0}
+
+    def supported(model, contract):
+        calls["sampler"] += 1
+        return True
+
+    def attested(request, rendered, root):
+        calls["projection"] += 1
+        return rendered == "NATIVE::" + request.rendered_input
+
+    guard = GuardedLocalInference(
+        engine, reviewer=reviewer,
+        tokenize=lambda text: tuple(text.encode()),
+        detokenize=lambda ids: bytes(ids).decode(),
+        sampler_support=supported, projection_attestor=attested,
+    )
+    output, receipt = asyncio.run(guard.generate(
+        req, snapshot=snapshot(req), tenant_scope_id="tenant",
+        contract=DeliveryContract("json", json_schema={"type": "object"}),
+    ))
+    assert output.text == '{"ok":true}'
+    assert receipt.context_root == snapshot(req).root
+    assert calls == {"sampler": 2, "projection": 2}
