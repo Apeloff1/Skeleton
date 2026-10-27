@@ -164,7 +164,8 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Full-repository SAST needs a bounded window without disabling checks.
+    timeout-minutes: 90
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
