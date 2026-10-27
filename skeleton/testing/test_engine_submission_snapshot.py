@@ -365,3 +365,135 @@ def test_unchanged_source_is_observed_on_both_sides_of_durable_owner_recheck():
         assert source.calls == 2
 
     asyncio.run(scenario())
+
+
+def test_scoped_reader_requires_exact_async_task_and_clears_on_exit():
+    from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+        ScopedEngineCompiledSnapshotReader,
+    )
+
+    async def scenario():
+        service, custody = owner(), Source()
+        scoped = ScopedEngineCompiledSnapshotReader(
+            service=service, source_authority=custody,
+            policy_sha256=sha256(b"owner policy").hexdigest(),
+        )
+        async def read():
+            return await scoped.resolve(
+                tenant_scope_id=TENANT, context_id=CONTEXT, request_digest=REQUEST,
+            )
+        with pytest.raises(SealedContextBoundaryError):
+            await read()
+        assert custody.calls == 0
+        with scoped.bind_execution(
+            execution_id=EXECUTION, tenant_id=TENANT,
+            context_id=CONTEXT, request_digest=REQUEST,
+        ):
+            result = await read()
+            assert result.root
+            assert custody.calls == 2
+            with pytest.raises(SealedContextBoundaryError, match="nested"):
+                with scoped.bind_execution(
+                    execution_id=EXECUTION, tenant_id=TENANT,
+                    context_id=CONTEXT, request_digest=REQUEST,
+                ):
+                    pass
+            with pytest.raises(SealedContextBoundaryError, match="executing request"):
+                await asyncio.create_task(read())
+            with pytest.raises(SealedContextBoundaryError):
+                await scoped.resolve(
+                    tenant_scope_id="other", context_id=CONTEXT,
+                    request_digest=REQUEST,
+                )
+        with pytest.raises(SealedContextBoundaryError):
+            await read()
+        assert custody.calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_scoped_reader_closes_on_generator_error_and_cannot_replay_old_digest():
+    from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+        ScopedEngineCompiledSnapshotReader,
+    )
+
+    async def scenario():
+        custody = Source()
+        scoped = ScopedEngineCompiledSnapshotReader(
+            service=owner(), source_authority=custody,
+            policy_sha256=sha256(b"owner policy").hexdigest(),
+        )
+        with pytest.raises(RuntimeError, match="forced"):
+            with scoped.bind_execution(
+                execution_id=EXECUTION, tenant_id=TENANT,
+                context_id=CONTEXT, request_digest=REQUEST,
+            ):
+                raise RuntimeError("forced")
+        with pytest.raises(SealedContextBoundaryError):
+            await scoped.resolve(
+                tenant_scope_id=TENANT, context_id=CONTEXT,
+                request_digest=REQUEST,
+            )
+        assert custody.calls == 0
+
+    asyncio.run(scenario())
+
+
+def test_protected_provider_dynamically_binds_its_exact_native_execution():
+    from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+        ScopedEngineCompiledSnapshotReader,
+    )
+    from skeleton.ai.runtime.inference.guarded_service import CanonicalGuardedLocalService
+    from skeleton.ai.runtime.inference.local import (
+        LocalInferenceEngine, LocalModelAdapter, ReferenceNGramModel,
+    )
+    from skeleton.context.pre_delivery_guard import (
+        GuardedLocalInference, ReviewVerdict, merkle_root,
+    )
+    from skeleton.provider_runtime import AIMessage, ProviderRequest
+
+    async def scenario():
+        source = Source()
+        snapshots = ScopedEngineCompiledSnapshotReader(
+            service=owner(), source_authority=source,
+            policy_sha256=sha256(b"owner policy").hexdigest(),
+        )
+        engine = LocalInferenceEngine(
+            ReferenceNGramModel.train(["initial latest trusted answer"] * 6, order=2),
+            require_guarded_context=True, cache_size=2,
+        )
+        guard = GuardedLocalInference(
+            engine,
+            reviewer=lambda text, digest: ReviewVerdict(
+                True, digest, "distinct-reviewer", "allow",
+            ),
+            tokenize=lambda text: tuple(text.encode("utf-8")),
+            detokenize=lambda tokens: bytes(tokens).decode("utf-8"),
+        )
+        adapter = LocalModelAdapter(
+            engine,
+            guarded_service=CanonicalGuardedLocalService(guard, snapshots=snapshots),
+            require_guarded_inference=True,
+        )
+        root = merkle_root((
+            ("system", b"owner policy"), ("user", b"initial"), ("user", b"latest"),
+        ))
+        request = ProviderRequest(
+            instructions="owner policy", history=(AIMessage("user", "initial"),),
+            prompt="latest", max_output_tokens=4, tenant_id=TENANT,
+            context_id=CONTEXT, context_digest=root, execution_id=EXECUTION,
+            context_source_snapshot=SEGMENTS,
+            context_compiler_version="independent-compiler-v1",
+        )
+        first = await adapter.generate(request)
+        second = await adapter.generate(request)
+        assert first.provider == "local" and second.provider == "local"
+        assert source.calls == 8  # two snapshot reads, two source reads each
+        assert adapter.require_guarded_inference
+        with pytest.raises(SealedContextBoundaryError):
+            await snapshots.resolve(
+                tenant_scope_id=TENANT, context_id=CONTEXT,
+                request_digest="a" * 64,
+            )
+
+    asyncio.run(scenario())
