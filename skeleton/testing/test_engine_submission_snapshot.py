@@ -284,3 +284,38 @@ def test_durable_owner_cancellation_during_guarded_generation_withholds_result()
         assert engine.calls == 1 and source.calls == 1
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("mutation", ("cancel", "checkpoint", "version", "handoff", "delete"))
+def test_owner_mutation_inside_source_inspection_is_denied(mutation):
+    """The second read must catch edits made while live source inspection awaits."""
+    async def scenario():
+        service = owner()
+
+        class ConcurrentSource(Source):
+            async def inspect(self, *, tenant_id, context_id):
+                current = await super().inspect(
+                    tenant_id=tenant_id, context_id=context_id,
+                )
+                if mutation == "cancel":
+                    service.repository.execution.cancellation_requested = True
+                elif mutation == "checkpoint":
+                    service.repository.execution.checkpoint_version = 8
+                elif mutation == "version":
+                    service.repository.execution.version += 1
+                elif mutation == "handoff":
+                    original = service.submissions.stored.command.compiled_context
+                    service.submissions.stored.command.compiled_context = SimpleNamespace(
+                        **{**vars(original), "handoff_digest": "f" * 64}
+                    )
+                elif mutation == "delete":
+                    service.submissions.stored = None
+                return current
+
+        source = ConcurrentSource()
+        bound, _, _ = loader(service=service, custody=source)
+        with pytest.raises(SealedContextBoundaryError):
+            await inspect(bound)
+        assert source.calls == 1
+
+    asyncio.run(scenario())
