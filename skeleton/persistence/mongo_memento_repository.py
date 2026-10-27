@@ -35,6 +35,7 @@ _MAX_READ_BYTES = 16 * 1024 * 1024
 _HEAD_FIELD = "_sealed_memento_head"
 _BINDING_FIELD = "_sealed_memento_binding"
 _RETIRED_FIELD = "_sealed_memento_retired"
+_CUSTODY_FIELD = "_sealed_memento_custody"
 
 
 class MongoMementoConflict(SealedContextReplayError):
@@ -82,6 +83,19 @@ def _current(doc: dict[str, Any], archive: SealedMementoArchive) -> MementoCatal
     if doc.get(_BINDING_FIELD) != _binding_digest(archive):
         raise SealedContextBoundaryError("memento owner/model/policy binding changed")
     return decode_catalog_head(bytes(doc[_HEAD_FIELD]))
+
+
+def memento_retirement_requires_witness(thread: dict[str, Any], *, witness_present: bool) -> bool:
+    """Do not downgrade an unknown or witnessed archive during deletion.
+
+    Earlier unmarked archives require explicit, authorized custody migration.
+    """
+    mode = thread.get(_CUSTODY_FIELD)
+    if mode not in ("legacy", "witnessed"):
+        raise MongoMementoUnavailable("sealed archive custody is missing or invalid")
+    if mode == "witnessed" and not witness_present:
+        raise MongoMementoUnavailable("witnessed archive requires independent retirement authority")
+    return mode == "witnessed"
 
 
 class MongoMementoAuthority:
@@ -149,12 +163,15 @@ class MongoMementoAuthority:
     async def publish(
         self, *, archive: SealedMementoArchive, expected_head: MementoCatalogHead,
         expected_thread_version: int, stream: str, ciphertext: bytes,
+        custody_mode: str = "legacy",
     ) -> MementoCatalogHead:
         """Atomic ciphertext and thread-CAS; no partial availability is success."""
         if not isinstance(archive, SealedMementoArchive) or not isinstance(
             expected_head, MementoCatalogHead
         ) or type(expected_thread_version) is not int or expected_thread_version < 1:
             raise SealedContextError("invalid CAS publication authority")
+        if custody_mode not in ("legacy", "witnessed"):
+            raise SealedContextBoundaryError("invalid archival custody mode")
         if not isinstance(ciphertext, bytes) or len(ciphertext) > 4 * 1024 * 1024:
             raise SealedContextLimitError("invalid encrypted memento envelope size")
         # Decode/authenticate before storage admission, and repeat against the
@@ -179,6 +196,13 @@ class MongoMementoAuthority:
                     previous = _current(doc, archive)
                     if previous != expected_head:
                         raise MongoMementoConflict("stale memento catalog head")
+                    current_custody = doc.get(_CUSTODY_FIELD)
+                    if current_custody not in (None, "legacy", "witnessed"):
+                        raise MongoMementoConflict("invalid canonical archive custody")
+                    if current_custody is not None and current_custody != custody_mode:
+                        raise MongoMementoConflict("archive custody cannot change during publication")
+                    if previous.serial and current_custody is None and custody_mode != "legacy":
+                        raise MongoMementoConflict("unmarked archive needs explicit custody migration")
                     if record.causal_serial is not None:
                         predecessor = await self.frames.find_one({
                             "thread_id": b.conversation_id,
@@ -206,13 +230,18 @@ class MongoMementoAuthority:
                     if previous.serial:
                         predicate[_HEAD_FIELD] = encode_catalog_head(previous)
                         predicate[_BINDING_FIELD] = _binding_digest(archive)
+                        predicate[_CUSTODY_FIELD] = (
+                            {"$exists": False} if current_custody is None else custody_mode
+                        )
                     else:
                         predicate[_HEAD_FIELD] = {"$exists": False}
                         predicate[_BINDING_FIELD] = {"$exists": False}
+                        predicate[_CUSTODY_FIELD] = {"$exists": False}
                     updated = await self.conversation.threads.update_one(
                         predicate,
                         {"$set": {_HEAD_FIELD: encode_catalog_head(next_head),
-                                  _BINDING_FIELD: _binding_digest(archive)}},
+                                  _BINDING_FIELD: _binding_digest(archive),
+                                  _CUSTODY_FIELD: custody_mode}},
                         session=session,
                     )
                     if updated.modified_count != 1:
