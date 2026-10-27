@@ -96,30 +96,22 @@ def test_gameforge_build_import_does_not_create_artifact_directory(monkeypatch) 
     paths = {route.path for route in reloaded.router.routes}
     assert {"/api/gameforge/build/web", "/api/gameforge/build/source",
             "/api/gameforge/build/godot"}.issubset(paths)
-    assert reloaded._ARTIFACTS.endswith("/artifacts/builds")
+    from core.gameforge_artifact_builder import DEFAULT_ARTIFACTS_ROOT
+    assert reloaded._ARTIFACTS == str(DEFAULT_ARTIFACTS_ROOT)
 
 
 def test_gameforge_auth_dependency_fails_closed() -> None:
-    # Ensure a missing security module can never reintroduce the previous
-    # anonymous dev-admin fallback through an import-time try/except.
-    root = Path(__file__).resolve().parents[1]
-    source = (root / "routes/gameforge_build.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    auth_imports = [
-        node for node in tree.body
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "routes.gameforge_auth"
-        and any(alias.name == "require_role" for alias in node.names)
-    ]
-    assert len(auth_imports) == 1
-    assert not any(
-        isinstance(node, ast.FunctionDef) and node.name in {"_viewer", "_editor"}
-        for node in ast.walk(tree)
-    )
-    module = importlib.import_module("routes.gameforge_build")
-    assert module._viewer is not module._editor
-    assert module._viewer.__module__ == "routes.gameforge_auth"
-    assert module._editor.__module__ == "routes.gameforge_auth"
+    from fastapi import HTTPException
+    from routes import gameforge_build as build, gameforge_auth as auth
+
+    source = (Path(__file__).resolve().parents[1] / "routes/gameforge_build.py").read_text(encoding="utf-8")
+    assert "Depends(auth.require_authenticated_identity)" in source
+    assert "role" in source and '"editor", "admin"' in source
+    assert build._viewer is not build._editor
+    for principal in (None, {"tenant_id": "test"}, {"email": "anonymous", "tenant_id": "test"}):
+        with pytest.raises(HTTPException) as raised:
+            auth.require_authenticated_identity(principal)
+        assert raised.value.status_code == 401
 
 
 @pytest.mark.parametrize("kind", ["web", "source"])
@@ -142,13 +134,14 @@ def test_governed_web_and_source_stage_privately_and_cleanup(monkeypatch, kind: 
     sentinel = object()
     with monkeypatch.context() as scoped:
         scoped.setattr(build, "_governed_store", lambda: sentinel)
+        scoped.setattr(build, "_owned_gamefiles", lambda _name, _user: [{"filename": "game.py", "content": "x=1"}])
         scoped.setattr(
             build, "build_web_artifact" if kind == "web" else "build_source_artifact",
             guarded_artifact_builder,
         )
         body = build.BuildBody(game_name="read-only-image")
         endpoint = build._build_web_for_user if kind == "web" else build._build_source_for_user
-        result = asyncio.run(endpoint(body, {"tenant_id": "tenant-isolated"}))
+        result = asyncio.run(endpoint(body, {"tenant_id": "tenant-isolated", "email": "tester@example.test", "role": "editor"}))
 
     assert result["ok"] is True
     assert len(staged) == 1
@@ -187,13 +180,15 @@ def test_actual_governed_archive_builds_from_private_scratch(monkeypatch) -> Non
 
     with monkeypatch.context() as scoped:
         scoped.setattr(routes, "_governed_store", Store)
+        scoped.setattr(routes, "_owned_gamefiles", lambda _name, _user: [{"filename": "game.py", "content": "print(\'safe\')", "metadata": {"kind": "source"}}])
         scoped.setattr(impl, "database", Database)
         scoped.setattr(impl, "gamefiles", lambda _name: [
             {"filename": "game.py", "content": "print('safe')", "metadata": {"kind": "source"}},
         ])
         body = routes.BuildBody(game_name="read-only-image")
-        web = asyncio.run(routes._build_web_for_user(body, {"tenant_id": "tenant-private"}))
-        src = asyncio.run(routes._build_source_for_user(body, {"tenant_id": "tenant-private"}))
+        owner = {"email": "tester@example.test", "tenant_id": "tenant-private", "role": "editor"}
+        web = asyncio.run(routes._build_web_for_user(body, owner))
+        src = asyncio.run(routes._build_source_for_user(body, owner))
 
     assert web["ok"] and src["ok"]
     assert len(saved) == 2 and len(registered) == 2
