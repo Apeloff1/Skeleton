@@ -1425,11 +1425,15 @@ def run_gameforge_adapter(request: Dict[str, Any], state: Any) -> Dict[str, Any]
     from skeleton.forge.repair import REPAIR_MODES
 
     _reject_remote_project_writes(request)
-    # Validate the entire request before constructing a runner or executing
-    # the ten-stage builder. Python evaluates function arguments left-to-right.
+    # Invalid projection flags must be rejected before running the ten-stage
+    # builder; checking after execution can waste work or cause side effects.
     include_files = _bool_field(request, "include_files", False)
+    # Validate every client-controlled field *before* constructing the runner.
+    # Python evaluates call arguments left-to-right: a bad target or answers
+    # mapping used to be rejected only after _gameforge_runner mutated state.
     vision = _text_field(request, "vision", "")
     era = _text_field(request, "era", "") or None
+    # None keeps a cockpit BIND ARCHETYPE pin; the builder retains fallback.
     archetype = _text_field(request, "archetype", "") or None
     repair_mode = _text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES)
     playtest_mode = _text_field(request, "playtest", "off", allowed=PLAYTEST_MODES)
