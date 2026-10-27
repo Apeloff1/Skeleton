@@ -27,10 +27,13 @@ class Window:
         self.archive = archive
         self.mutate = False
 
-    def read(self, *, archive, after_serial=0, limit=2000):
+    def read(self, *, archive, after_serial=0, limit=2000,
+             expected_starting_head=None):
         assert archive is self.archive
         selected = self.entries[after_serial:after_serial + limit]
         start = self.entries[after_serial - 1][3] if after_serial else MementoCatalogHead()
+        if expected_starting_head is not None and start != expected_starting_head:
+            raise SealedContextReplayError("pinned cursor changed")
         ending = selected[-1][3] if selected else start
         restored = archive.replay(((a,b) for a,b,_,_ in selected),
                                   starting_head=start, trusted_head=ending,
@@ -91,4 +94,20 @@ def test_retrieval_result_budget_is_hard_limit(history):
     with pytest.raises(SealedContextLimitError):
         VerifiedMementoRetriever(window.read).search(
             archive=archive, query="dragon", limit=2, anchors=1,
+        )
+
+def test_verified_retrieval_rejects_changed_page_checkpoint(history):
+    archive, window = history
+    original = window.read
+
+    def corrupted(*, archive, after_serial=0, limit=2000,
+                  expected_starting_head=None):
+        if after_serial == 2000:
+            expected_starting_head = replace(expected_starting_head, commitment="f" * 64)
+        return original(archive=archive, after_serial=after_serial, limit=limit,
+                        expected_starting_head=expected_starting_head)
+
+    with pytest.raises(SealedContextReplayError):
+        VerifiedMementoRetriever(corrupted).search(
+            archive=archive, query="dragon", limit=12,
         )
