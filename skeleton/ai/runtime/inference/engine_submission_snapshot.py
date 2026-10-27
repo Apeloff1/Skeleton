@@ -109,6 +109,18 @@ class EngineSubmissionCompiledInputLoader:
             # digest when reconstructed from durable serialized bytes.
             if type(execution.version) is not int or execution.version < 1:
                 raise SealedContextBoundaryError("durable execution version invalid")
+            # Snapshot detached scalar identities BEFORE crossing an await.
+            # Mutable ORM/fake objects can otherwise change underneath the
+            # original reference and hide a concurrent cancellation.
+            initial_owner = (
+                execution.version,
+                getattr(execution, "checkpoint_version", None),
+                execution.cancellation_requested,
+                execution.terminal,
+                execution.operation_id,
+                getattr(command, "submission_digest", None),
+                handoff.handoff_digest,
+            )
             custody = await self._source_authority.inspect(
                 tenant_id=tenant_id, context_id=context_id,
             )
@@ -119,6 +131,39 @@ class EngineSubmissionCompiledInputLoader:
                     or type(custody.version) is not int or custody.version < 1
                     or custody.source_snapshot != handoff.source_snapshot):
                 raise SealedContextIntegrityError("canonical conversation custody changed or was revoked")
+            # Source I/O is an async suspension point. Re-read the original
+            # durable owners before admitting any prompt bytes. A changed
+            # execution/checkpoint, cancellation, deletion, or replaced
+            # submission must not inherit the earlier source inspection.
+            try:
+                verified_stored, verified_execution = await asyncio.to_thread(
+                    self._read_owned, self._service, self._execution_id,
+                )
+                verified_command = verified_stored.command
+                verified_handoff = verified_command.compiled_context
+                confirmed_owner = (
+                    verified_execution.version,
+                    getattr(verified_execution, "checkpoint_version", None),
+                    verified_execution.cancellation_requested,
+                    verified_execution.terminal,
+                    verified_execution.operation_id,
+                    getattr(verified_command, "submission_digest", None),
+                    verified_handoff.handoff_digest,
+                )
+                if (confirmed_owner != initial_owner
+                        or verified_execution.cancellation_requested
+                        or verified_execution.terminal
+                        or verified_command.execution_request.identity_digest
+                           != execution.request.identity_digest
+                        or verified_command.operation.tenant_id != tenant_id
+                        or verified_handoff.context_id != context_id):
+                    raise SealedContextBoundaryError(
+                        "durable engine owner changed during source inspection"
+                    )
+            except SealedContextBoundaryError:
+                raise
+            except Exception as exc:
+                raise SealedContextBoundaryError("durable engine recheck unavailable") from exc
             # A single integer pins BOTH independent version domains for
             # TrustedContextSnapshot. This is an opaque equality token, not
             # a strictly increasing counter.
