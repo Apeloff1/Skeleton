@@ -72,6 +72,9 @@ def compose_protected_local_adapter(
         detokenize=components.detokenize,
         sampler_support=components.sampler_support,
         projection_attestor=components.projection_attestor,
+        tokenizer_identity_attestor=lambda: components.verify_native_tokenizer(
+            engine.model, components.tokenize, components.detokenize,
+        ),
         require_token_echo=True,
     )
     service = CanonicalGuardedLocalService(guard, snapshots=components.snapshots)
