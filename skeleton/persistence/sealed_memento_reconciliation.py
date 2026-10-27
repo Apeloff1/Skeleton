@@ -17,7 +17,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from skeleton.context.sealed_memento import MementoCatalogHead, SealedMementoArchive
-from skeleton.context.sealed_sandwich import SealedContextBoundaryError, SealedContextReplayError
+from skeleton.context.sealed_sandwich import SealedContextBoundaryError
 from skeleton.persistence.sealed_memento_recovery import inspect_memento_recovery
 from skeleton.persistence.sealed_memento_witness import (
     IndependentMementoWitness,
