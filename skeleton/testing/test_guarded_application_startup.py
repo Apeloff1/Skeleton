@@ -162,8 +162,8 @@ def test_canonical_source_edit_during_inference_suppresses_answer():
 
         @property
         def rendered_input(self):
-            return ("system: immutable policy\\nuser: initial question\\n"
-                    "assistant: earlier answer\\nuser: current question\\nassistant:")
+            return ("system: immutable policy\nuser: initial question\n"
+                    "assistant: earlier answer\nuser: current question\nassistant:")
 
     async def scenario():
         loader = CanonicalLoader()
@@ -201,7 +201,7 @@ def test_canonical_snapshot_history_and_unicode_budgets_fail_before_merkle_alloc
             await reader(loader).resolve(
                 tenant_scope_id="tenant", context_id=_CONTEXT, request_digest=_DIGEST,
             )
-        loader.record = replace(loader.record, history=(("user", "\\ud800"),))
+        loader.record = replace(loader.record, history=(("user", "\ud800"),))
         with pytest.raises(SealedContextBoundaryError, match="Unicode"):
             await reader(loader).resolve(
                 tenant_scope_id="tenant", context_id=_CONTEXT, request_digest=_DIGEST,
