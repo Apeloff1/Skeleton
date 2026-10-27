@@ -162,4 +162,3 @@ async def test_governed_tenant_retirement_denied_until_multi_actor_custody_exist
         await conversation.execute_governed_deletion(tenant_id="tenant")
     with pytest.raises(ConversationStorageUnavailable, match="cross-owner retirement"):
         await conversation.execute_due_retention(tenant_id="tenant")
-
