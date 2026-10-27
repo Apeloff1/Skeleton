@@ -109,6 +109,7 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing --tb=short
           --ignore=skeleton/testing/test_engine_handoff_recovery.py
+          --maxfail=1
 
   integration_smoke:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
@@ -164,7 +165,9 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Full-repository SAST inventories span tens of thousands of Python files.
+    # Keep every gate mandatory while the bounded parallel scanner cuts CPU time.
+    timeout-minutes: 90
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
@@ -242,8 +245,11 @@ jobs:
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        # Verbose node ids + a bounded traceback dump expose long-stalled
+        # tests without dropping any test or downgrading their status.
         run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          python -m pytest -vv --noconftest -p pytest_asyncio.plugin
+          -o faulthandler_timeout=180
           skeleton/testing/test_pr_automation.py
           skeleton/testing/test_pr_automation_ruleset.py
           skeleton/testing/test_pr_automation_sensitive_paths.py
