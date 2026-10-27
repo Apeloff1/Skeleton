@@ -69,3 +69,15 @@ jobs:
             skeleton/testing/test_pre_delivery_guard.py \
             skeleton/testing/test_delivery_schema.py \
             skeleton/testing/test_delivery_regex.py
+
+      - name: Legacy reference end-to-end compatibility
+        env:
+          PYTHONPATH: '.:backend'
+        run: |
+          # Explicitly acknowledged development-mode fixtures only.
+          python -m pytest -q \
+            skeleton/testing/test_engine_local_provider_binding.py \
+            -k 'test_execution_descriptor_is_detached_content_only'
+          python -m pytest -q \
+            skeleton/testing/test_governed_model_engine_acceptance.py \
+            -k 'reference and test_governed_training_artifact_served_by_authenticated_engine_and_reopened'
