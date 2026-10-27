@@ -1243,6 +1243,7 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         return tuple(_thread_from_doc(doc) for doc in docs)
 
+    @fence_conversation_write
     async def rename_thread(
         self,
         thread_id: str,
@@ -1601,6 +1602,7 @@ class MongoConversationAuthority:
             raise ConversationNotFound(message_id)
         return doc.get("_chat_execution")
 
+    @fence_conversation_write
     async def bind_chat_execution(
         self,
         thread_id: str,
@@ -1753,6 +1755,7 @@ class MongoConversationAuthority:
             for record in rows
         ]
 
+    @fence_conversation_write
     async def chat_dispatch(
         self, thread_id, message_id, *, tenant_id, owner_id, record_digest, action="read"
     ):
@@ -2434,6 +2437,7 @@ class MongoConversationAuthority:
             thread_data_class=thread.data_class,
         )
 
+    @fence_conversation_write
     async def bind_user_engine_command(
         self,
         thread_id: str,
@@ -2607,6 +2611,7 @@ class MongoConversationAuthority:
             )
         )
 
+    @fence_conversation_write
     async def bind_regeneration_request(
         self,
         thread_id: str,
@@ -2730,6 +2735,7 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("regeneration dispatch state is malformed")
         return dict(state)
 
+    @fence_conversation_write
     async def transition_regeneration_dispatch(
         self,
         record: Mapping[str, Any],
