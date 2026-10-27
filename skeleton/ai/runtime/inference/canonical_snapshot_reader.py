@@ -87,19 +87,36 @@ class CanonicalCompiledSnapshotReader:
             raise SealedContextBoundaryError("canonical compiled context missing or revoked")
         if (not isinstance(record.instructions, str)
                 or not isinstance(record.prompt, str)
-                or not isinstance(record.history, tuple)):
+                or not isinstance(record.history, tuple)
+                or len(record.history) > 2000):
             raise SealedContextBoundaryError("canonical compiled input has invalid structure")
-        digest = hashlib.sha256(record.instructions.encode("utf-8", "strict")).hexdigest()
+        # Bound allocations *before* materializing a page of Merkle leaves.
+        # Policy and prompt bytes are measured independently of Python's
+        # variable-width text representation.
+        try:
+            instructions = record.instructions.encode("utf-8", "strict")
+            prompt = record.prompt.encode("utf-8", "strict")
+        except UnicodeError as exc:
+            raise SealedContextBoundaryError("canonical compiled input has invalid Unicode") from exc
+        if len(instructions) > 4 * 1024 * 1024 or len(prompt) > 4 * 1024 * 1024:
+            raise SealedContextBoundaryError("canonical prompt exceeds bounded admission")
+        digest = hashlib.sha256(instructions).hexdigest()
         if digest != self._policy_sha256:
             raise SealedContextIntegrityError("canonical instruction policy changed")
-        parts: list[tuple[str, bytes]] = [("system", record.instructions.encode("utf-8", "strict"))]
+        parts: list[tuple[str, bytes]] = [("system", instructions)]
         for item in record.history:
             if (not isinstance(item, tuple) or len(item) != 2
                     or item[0] not in ("user", "assistant")
                     or not isinstance(item[1], str)):
                 raise SealedContextBoundaryError("canonical history role or span invalid")
-            parts.append((item[0], item[1].encode("utf-8", "strict")))
-        parts.append(("user", record.prompt.encode("utf-8", "strict")))
+            try:
+                span = item[1].encode("utf-8", "strict")
+            except UnicodeError as exc:
+                raise SealedContextBoundaryError("canonical history has invalid Unicode") from exc
+            if len(span) > 4 * 1024 * 1024:
+                raise SealedContextBoundaryError("canonical history span exceeds admission")
+            parts.append((item[0], span))
+        parts.append(("user", prompt))
         root = merkle_root(tuple(parts))
         return TrustedContextSnapshot(
             root=root, policy_sha256=self._policy_sha256,
