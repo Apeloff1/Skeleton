@@ -445,11 +445,18 @@ def test_recovery_witness_requires_completed_external_journal_before_plaintext()
                 await guard.trusted_head(archive=archive)
             with pytest.raises(MementoWitnessIndeterminate):
                 await guard.read_window(archive=archive)
-        from skeleton.persistence.sealed_memento_recovery_journal import completed_record
+        from skeleton.persistence.sealed_memento_recovery_journal import (
+            completed_record, canonical_recovery_receipt,
+        )
         journal.fail_finish = False
         claim = journal.entries[(scope, grant.incident_id)]
+        canonical = canonical_recovery_receipt(
+            incident_id=grant.incident_id, binding_digest=scope,
+            previous_revision=old.revision, committed_revision=old.revision + 1,
+            committed_head=proposed, source_thread_version=grant.source_thread_version,
+        )
         assert await journal.complete(
-            previous=claim, successor=completed_record(claim, b"operator-completion-receipt"),
+            previous=claim, successor=completed_record(claim, canonical),
         )
         assert await gated.trusted_head(archive=archive) == proposed
         assert len((await gated.read_window(archive=archive)).records) == 2
@@ -484,6 +491,7 @@ def test_completed_recovery_record_wrong_candidate_is_still_denied():
         witness.positions[grant.binding_digest] = WitnessPosition(
             grant.binding_digest, old.revision + 2, proposed,
             recovery_incident_id=grant.incident_id,
+            recovery_revision=old.revision + 2, recovery_head=proposed,
         )
         gated = WitnessedMongoMementoAuthority(
             mongo, witness=witness, recovery_journal=journal,
@@ -493,7 +501,76 @@ def test_completed_recovery_record_wrong_candidate_is_still_denied():
         witness.positions[grant.binding_digest] = WitnessPosition(
             grant.binding_digest, old.revision + 1, proposed,
             recovery_incident_id="ANOTHER-INCIDENT",
+            recovery_revision=old.revision + 1, recovery_head=proposed,
         )
         with pytest.raises(MementoWitnessIndeterminate):
             await gated.read_window(archive=archive)
     asyncio.run(scenario())
+
+
+def test_forged_completed_receipt_never_unlocks_witnessed_plaintext():
+    from skeleton.persistence.sealed_memento_witness import (
+        WitnessedMongoMementoAuthority, WitnessPosition,
+    )
+    from skeleton.persistence.sealed_memento_recovery_journal import (
+        claim_record, completed_record, canonical_recovery_receipt,
+    )
+
+    async def scenario():
+        archive, mongo, witness, old, proposed = await crash_candidate()
+        private, _ = keys()
+        grant = setup_grant(archive, old, proposed)
+        journal = ExternalRecoveryJournal()
+        claim = claim_record(grant, tuple(x.signer_id for x in approval(grant, private)))
+        assert await journal.reserve(record=claim)
+        scope = grant.binding_digest
+        witness.positions[scope] = WitnessPosition(
+            scope, old.revision + 1, proposed,
+            recovery_incident_id=grant.incident_id,
+            recovery_revision=old.revision + 1, recovery_head=proposed,
+        )
+        guarded = WitnessedMongoMementoAuthority(
+            mongo, witness=witness, recovery_journal=journal,
+        )
+        for forged in (
+            b"unrelated operator says success",
+            canonical_recovery_receipt(
+                incident_id=grant.incident_id, binding_digest=scope,
+                previous_revision=old.revision, committed_revision=old.revision + 1,
+                committed_head=proposed, source_thread_version=2,
+            ),
+        ):
+            journal.entries[(scope, grant.incident_id)] = completed_record(claim, forged)
+            with pytest.raises(MementoWitnessIndeterminate):
+                await guarded.trusted_head(archive=archive)
+            with pytest.raises(MementoWitnessIndeterminate):
+                await guarded.read_window(archive=archive)
+        receipt = canonical_recovery_receipt(
+            incident_id=grant.incident_id, binding_digest=scope,
+            previous_revision=old.revision, committed_revision=old.revision + 1,
+            committed_head=proposed, source_thread_version=1,
+        )
+        journal.entries[(scope, grant.incident_id)] = completed_record(claim, receipt)
+        assert await guarded.trusted_head(archive=archive) == proposed
+    asyncio.run(scenario())
+
+
+def test_receipt_encoding_requires_exact_bounded_authority():
+    from skeleton.persistence.sealed_memento_recovery_journal import (
+        RecoveryJournalError, canonical_recovery_receipt, receipt_commitment,
+    )
+    archive, _, _, _ = setup()
+    scope = _binding_digest(archive)
+    with pytest.raises(RecoveryJournalError):
+        canonical_recovery_receipt(
+            incident_id="incident", binding_digest=scope, previous_revision=1,
+            committed_revision=3, committed_head=MementoCatalogHead(),
+            source_thread_version=1,
+        )
+    with pytest.raises(RecoveryJournalError):
+        canonical_recovery_receipt(
+            incident_id="bad\nincident", binding_digest=scope, previous_revision=1,
+            committed_revision=2, committed_head=MementoCatalogHead(),
+            source_thread_version=1,
+        )
+    assert receipt_commitment(b"canonical") != receipt_commitment(b"modified")
