@@ -1110,6 +1110,18 @@ class MongoConversationAuthority:
         except PyMongoError as exc:
             raise ConversationStorageUnavailable("conversation indexes are unavailable") from exc
 
+        # Enrolled archives cannot publish safely until their unique serial
+        # index and tenant deletion index are durably provisioned at startup.
+        if self.memento_witness is not None:
+            from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
+
+            try:
+                await MongoMementoAuthority(self).ensure_indexes()
+            except Exception as exc:
+                raise ConversationStorageUnavailable(
+                    "witnessed memento indexes are unavailable"
+                ) from exc
+
     @staticmethod
     def _authorized_filter(
         thread_id: str,
