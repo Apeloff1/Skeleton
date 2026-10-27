@@ -392,6 +392,9 @@ def main() -> int:
     )
     frontend_deps = frontend.get("dependencies", {})
     expected_frontend_matrix = {
+        # Expo SDK 54 and React 19.1 must retain the matching React type API;
+        # RN 0.88 / React 19.3 requires a coordinated Expo SDK upgrade.
+        "@types/react": "~19.1.0",
         "expo": EXPO_SDK_VERSION,
         "react": REACT_VERSION,
         "react-dom": REACT_VERSION,

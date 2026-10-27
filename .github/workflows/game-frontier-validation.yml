@@ -60,6 +60,11 @@ on:
       - "skeleton/forge/game_frontier_studio_chronicle_*.py"
       - "skeleton/forge/game_frontier_studio_route_assurance.py"
       - "scripts/export_game_studio_chronicle_handbooks.py"
+      - "scripts/certify_game_frontier_godot_import.py"
+      - "scripts/run_game_frontier_gfd_native_checks.py"
+      - "tests/test_gf_d_godot_import_cert.py"
+      - "tests/test_game_frontier_gfd_native_checks.py"
+      - ".github/workflows/game-frontier-native-smoke.yml"
       - ".github/workflows/game-frontier-validation.yml"
   workflow_dispatch:
 
@@ -118,3 +123,9 @@ jobs:
             skeleton/testing/test_game_frontier_book_curriculum_operational.py \
             skeleton/testing/test_game_frontier_studio_epic_routes.py \
             skeleton/testing/test_game_frontier_studio_epic_lod.py
+
+  godot4-native-smoke:
+    # No new root Actions admission: retain the pinned real-Godot checks as a reusable job.
+    uses: ./.github/workflows/game-frontier-native-smoke.yml
+    permissions:
+      contents: read

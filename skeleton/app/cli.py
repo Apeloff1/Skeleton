@@ -270,6 +270,18 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "serve-local-ai":
         from skeleton.app.offline_http import main as serve_main
         return serve_main(arguments[1:])
+    if arguments and arguments[0] == "local-ai":
+        from skeleton.app.offline_cli import _parser as offline_parser, main as offline_main
+
+        # Keep simple model inference under the app CLI; standalone workspace,
+        # library, backup and qualification options retain their original owner.
+        shared = {"--model", "--prompt", "--max-output-tokens", "--json", "--help", "-h"}
+        shell_options = {
+            option for action in offline_parser()._actions
+            for option in action.option_strings
+        } - shared
+        if any(argument.partition("=")[0] in shell_options for argument in arguments[1:]):
+            return offline_main(arguments[1:])
     args = _parser().parse_args(arguments)
     command = args.command or "status"
 
