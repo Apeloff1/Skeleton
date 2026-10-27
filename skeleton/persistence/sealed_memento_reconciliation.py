@@ -21,6 +21,7 @@ from skeleton.context.sealed_sandwich import SealedContextBoundaryError
 from skeleton.persistence.sealed_memento_recovery import inspect_memento_recovery
 from skeleton.persistence.sealed_memento_recovery_journal import (
     IndependentRecoveryJournal, RecoveryJournalError, claim_record, completed_record,
+    canonical_recovery_receipt,
 )
 from skeleton.persistence.sealed_memento_witness import (
     IndependentMementoWitness,
@@ -258,15 +259,14 @@ class SignedMementoReconciler:
             grant.incident_id, grant.binding_digest, pinned.revision,
             successor.revision, successor.head, grant.source_thread_version,
         )
-        from skeleton.context.sealed_memento import encode_catalog_head
-
-        receipt_bytes = _DOMAIN + json.dumps({
-            "incident": receipt.incident_id, "binding": receipt.binding_digest,
-            "previous_revision": receipt.previous_revision,
-            "committed_revision": receipt.committed_revision,
-            "head": encode_catalog_head(receipt.committed_head).decode("ascii"),
-            "source_thread_version": receipt.source_thread_version,
-        }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        receipt_bytes = canonical_recovery_receipt(
+            incident_id=receipt.incident_id,
+            binding_digest=receipt.binding_digest,
+            previous_revision=receipt.previous_revision,
+            committed_revision=receipt.committed_revision,
+            committed_head=receipt.committed_head,
+            source_thread_version=receipt.source_thread_version,
+        )
         completed = completed_record(claim, receipt_bytes)
         try:
             finalized = await self._journal.complete(previous=claim, successor=completed)
