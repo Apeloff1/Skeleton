@@ -15,6 +15,8 @@ runtimes plug into CallableLocalModel without changing cognitive orchestration.
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
+from contextvars import ContextVar
 import hashlib
 import json
 import math
@@ -1708,7 +1710,10 @@ class LocalInferenceEngine:
         max_concurrency: int = 1,
         max_batch_size: int = 256,
         max_queue_size: int = 256,
+        require_guarded_context: bool = False,
     ) -> None:
+        if type(require_guarded_context) is not bool:
+            raise ProviderPolicyError("guarded engine mode must be explicit")
         if not hasattr(model, "infer") or not hasattr(model, "model_digest"):
             raise TypeError("model must implement LocalModelBackend")
         if isinstance(cache_size, bool) or not isinstance(cache_size, int) or cache_size < 0:
@@ -1726,6 +1731,13 @@ class LocalInferenceEngine:
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= upper:
                 raise ValueError(f"{name} must be between 1 and {upper}")
         self.model = model
+        self.require_guarded_context = require_guarded_context
+        # The scope is task-local, exact-request bound, and always revoked in
+        # a finally block. It is an in-process integration fence, not a sandbox
+        # against arbitrary trusted Python code.
+        self._guard_scope: ContextVar[tuple[str, str] | None] = ContextVar(
+            "skeleton.local.verified_context", default=None,
+        )
         self.cache_size = cache_size
         self.max_concurrency = max_concurrency
         self.max_batch_size = max_batch_size
@@ -2890,6 +2902,33 @@ class LocalInferenceEngine:
                 break
         return size
 
+    @contextmanager
+    def _verified_guard_scope(
+        self, request: LocalInferenceRequest, *, context_root: str,
+        token_echo: str | None, reviewer_id: str,
+    ):
+        """Scoped permit available only after the independent preflight gate."""
+        if not self.require_guarded_context:
+            raise ProviderPolicyError("verified scope is unavailable on legacy local engines")
+        if (not isinstance(request, LocalInferenceRequest)
+                or not isinstance(context_root, str)
+                or request.context_digest != context_root
+                or not isinstance(token_echo, str) or len(token_echo) != 64
+                or not isinstance(reviewer_id, str) or not reviewer_id):
+            raise ProviderPolicyError("local verified scope lacks bound preflight evidence")
+        token = self._guard_scope.set((request.digest, context_root))
+        try:
+            yield
+        finally:
+            self._guard_scope.reset(token)
+
+    def _require_guard_scope(self, request: LocalInferenceRequest) -> None:
+        if self.require_guarded_context and (
+            not isinstance(request, LocalInferenceRequest)
+            or self._guard_scope.get() != (request.digest, request.context_digest)
+        ):
+            raise ProviderPolicyError("local inference requires verified context admission")
+
     def prepare_input(
         self,
         request: LocalInferenceRequest,
@@ -2904,6 +2943,7 @@ class LocalInferenceEngine:
         """
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
+        self._require_guard_scope(request)
         for name, value in (("scope_id", scope_id), ("tenant_scope_id", tenant_scope_id)):
             if value is not None and (not isinstance(value, str) or not value or len(value) > 512):
                 raise ValueError(f"{name} must be a non-empty bounded string")
@@ -3082,6 +3122,7 @@ class LocalInferenceEngine:
         """
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
+        self._require_guard_scope(request)
         if work_class not in {"interactive", "background"}:
             raise ValueError("local work_class must be interactive or background")
         for name, value in (
@@ -3382,6 +3423,8 @@ class LocalInferenceEngine:
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
+        if self.require_guarded_context:
+            raise ProviderPolicyError("guarded local batches require per-request verification")
         if work_class not in {"interactive", "background"}:
             raise ValueError("local work_class must be interactive or background")
         for name, value in (
@@ -3678,6 +3721,8 @@ class LocalModelAdapter(ProviderAdapter):
             raise ProviderPolicyError("guarded service cannot be supplied without enforced routing")
         self.guarded_service = guarded_service
         self.require_guarded_inference = require_guarded_inference
+        if require_guarded_inference and not engine.require_guarded_context:
+            raise ProviderPolicyError("guarded adapter requires fail-closed engine-side admission")
         self.engine = engine
         self.model = engine.model.model_id
         self._activated_model_digest = engine.model.model_digest
