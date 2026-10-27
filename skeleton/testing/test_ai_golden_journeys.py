@@ -100,6 +100,9 @@ class _SequenceProvider:
 
 
 class _UnavailableRegistry:
+    def runtime_serving_engines(self):
+        return ()
+
     def require_active(self):
         raise ProviderUnavailableError("deterministic outage")
 
@@ -112,6 +115,9 @@ class _UnavailableRegistry:
 class _Registry:
     def __init__(self, provider) -> None:
         self.provider = provider
+
+    def runtime_serving_engines(self):
+        return (self.provider,)
 
     def require_active(self):
         return self.provider
