@@ -143,3 +143,53 @@ def test_native_transformer_factory_rejects_unprovisioned_guard():
         build_native_transformer_adapter(None, require_guarded_inference=True)
     with pytest.raises(ProviderPolicyError, match="enforced transformer mode"):
         build_native_transformer_adapter(None, guarded_components=object())
+
+
+def test_tokenizer_drift_midflight_denies_verified_output():
+    from skeleton.context.sealed_sandwich import SealedContextIntegrityError
+
+    async def scenario():
+        engine, reader, request = protected_fixture()
+        verification_count = 0
+
+        def verifier(model, encode, decode):
+            nonlocal verification_count
+            verification_count += 1
+            # The startup and initial preflight are valid. Simulate a
+            # tokenizer/model hot swap before the final response can escape.
+            return verification_count < 3
+
+        adapter = compose_protected_local_adapter(
+            engine, components=secure_components(reader, attestor=verifier),
+        )
+        with pytest.raises(SealedContextIntegrityError, match="tokenizer identity"):
+            await adapter.generate(request)
+        assert reader.reads == 1
+        assert verification_count == 3
+
+    asyncio.run(scenario())
+
+
+def test_attestor_crash_midflight_fails_closed_without_response():
+    from skeleton.context.sealed_sandwich import SealedContextBoundaryError
+
+    async def scenario():
+        engine, reader, request = protected_fixture()
+        verification_count = 0
+
+        def verifier(model, encode, decode):
+            nonlocal verification_count
+            verification_count += 1
+            if verification_count == 3:
+                raise RuntimeError("tokenizer owner unavailable")
+            return True
+
+        adapter = compose_protected_local_adapter(
+            engine, components=secure_components(reader, attestor=verifier),
+        )
+        with pytest.raises(SealedContextBoundaryError, match="identity verification unavailable"):
+            await adapter.generate(request)
+        assert reader.reads == 1
+        assert verification_count == 3
+
+    asyncio.run(scenario())
