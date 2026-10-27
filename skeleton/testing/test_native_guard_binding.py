@@ -29,6 +29,8 @@ class FakeNativeTokenizer:
 
     def decode_ids(self, tokens):
         self.assert_unchanged()
+        if getattr(self, "lossy", False):
+            return "wrong"
         return bytes(tokens).decode("utf-8")
 
 
@@ -191,14 +193,13 @@ def test_native_bound_preflight_rejects_lossy_real_tokenizer():
         merkle_root(request_parts(request)), sha256(b"policy").hexdigest(),
         1, "tenant", "thread",
     )
-    original = tokenizer.decode_ids
-    tokenizer.decode_ids = lambda tokens: "wrong"
-    # A bound method's behavior changed, even though its identity digest
-    # remains advertised. The guard refuses before running any model.
+    tokenizer.lossy = True
+    # The exact native callback now has non-invertible decoding, although
+    # its bound method and asserted artifact identity are unchanged.
+    # The byte-echo guard rejects the call before inference.
     with pytest.raises(SealedContextIntegrityError):
         asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))
     assert engine.calls == 0
-    tokenizer.decode_ids = original
 
 
 def test_native_tokenizer_change_after_generation_withholds_response():
