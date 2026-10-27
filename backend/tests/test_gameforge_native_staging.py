@@ -31,7 +31,7 @@ def _instrument(monkeypatch):
 
     monkeypatch.setattr(routes, "_artifact_build", allocate)
     monkeypatch.setattr(routes, "_governed_register", publish)
-    monkeypatch.setattr(routes, "_gamefiles", lambda _: [{"filename": "scene.gd"}])
+    monkeypatch.setattr(routes, "_owned_gamefiles", lambda _game, _user: [{"filename": "scene.gd"}])
     monkeypatch.setattr(routes, "code_execution_enabled", lambda: True)
     return roots, published
 
