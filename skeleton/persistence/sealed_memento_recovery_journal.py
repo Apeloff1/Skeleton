@@ -158,11 +158,13 @@ async def inspect_recovery_incident(
             or head.commitment != record.candidate_commitment):
         raise MementoWitnessDivergence("incident candidate is absent or changed in Mongo")
     if (pinned.revision == record.witness_revision
+            and pinned.recovery_incident_id is None
             and pinned.head.serial == record.candidate_serial - 1
             and pinned.head.commitment == record.previous_commitment
             and record.state == "reserved"):
         state = "reserved_unwitnessed"
     elif (pinned.revision == record.witness_revision + 1
+          and pinned.recovery_incident_id == incident_id
           and pinned.head == head):
         state = "completed_verified" if record.state == "completed" else "receipt_missing"
     else:
