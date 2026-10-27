@@ -309,7 +309,7 @@ def test_http_abandoned_stream_has_no_never_awaited_warning(live_server):
             events = client.events()
             pending = asyncio.ensure_future(asyncio.wait_for(events.__anext__(), 10))
             await _wait_for_sub(hub)
-            await asyncio.to_thread(hub.publish, "build", "build.started", {"step": 1})
+            await asyncio.to_thread(hub.publish, "build", "build.started", {"step": 1}, owner="ui-tester")
             got = await pending
             await events.aclose()
             return got
@@ -397,7 +397,7 @@ def test_reconnect_sends_cursor_param_and_last_event_id():
 def test_http_cursor_param_alone_resumes(live_server):
     base, hub = live_server
     for i in range(3):
-        hub.publish("build", "build.log", {"i": i})
+        hub.publish("build", "build.log", {"i": i}, owner="ui-tester")
 
     async def scenario():
         async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, read=5.0)) as http:
@@ -454,10 +454,10 @@ def _app(hub, *, gate=True):
 
 @pytest.fixture()
 def live_server(monkeypatch):
-    from skeleton.realtime import RealtimeHub
+    from skeleton.realtime import RealtimeHub, sealed_principal_authorizer
 
     monkeypatch.setenv("GF_SEAL_SECRET", _SECRET)
-    hub = RealtimeHub(id_seed=500, heartbeat_interval_s=0.1)
+    hub = RealtimeHub(id_seed=500, heartbeat_interval_s=0.1, authorizer=sealed_principal_authorizer)
     base, server, thread, sock = _serve(_app(hub))
     try:
         yield base, hub

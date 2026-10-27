@@ -55,6 +55,13 @@ def gauss_legendre_rule(order: int) -> GaussLegendreRule:
                 reason="quadrature_non_convergence",
                 field=f"root[{i}]",
             )
+        # The last Newton correction changed root: use the derivative at
+        # the converged abscissa, not the previous Newton iterate.
+        p0, p1 = 1.0, root
+        for degree in range(2, order + 1):
+            pn = ((2 * degree - 1) * root * p1 - (degree - 1) * p0) / degree
+            p0, p1 = p1, pn
+        derivative = order * (root * p1 - p0) / (root * root - 1.0)
         weight = 2.0 / ((1.0 - root * root) * derivative * derivative)
         left = i
         right = order - 1 - i
