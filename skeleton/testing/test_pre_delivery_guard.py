@@ -59,6 +59,9 @@ def runner(engine):
     return GuardedLocalInference(
         engine, reviewer=reviewer, tokenize=lambda s: tuple(s.encode()),
         detokenize=lambda t: bytes(t).decode(), sampler_support=lambda _, c: True,
+        projection_attestor=lambda req, rendered, root: (
+            rendered == "NATIVE::" + req.rendered_input
+        ),
     )
 
 
@@ -176,3 +179,15 @@ def test_native_prompt_renderer_and_prepared_input_attestation():
     assert receipt.token_echo_sha256 == hashlib.sha256(
         ("NATIVE::" + req.rendered_input).encode()
     ).hexdigest()
+
+
+def test_native_renderer_dropping_history_is_blocked():
+    from types import SimpleNamespace
+    req = Request("keep this instruction", (("user", "important prior turn"),), "proceed")
+    engine = Engine()
+    engine.model = SimpleNamespace(_render_prompt=lambda _: "user: proceed")
+    guarded = runner(engine)
+    with pytest.raises(SealedContextIntegrityError):
+        guarded.preflight(req, snapshot=snapshot(req), tenant_scope_id="tenant",
+                          contract=DeliveryContract())
+    assert engine.calls == 0
