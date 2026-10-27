@@ -49,6 +49,8 @@ class WitnessPosition:
     head: MementoCatalogHead
     retired: bool = False
     recovery_incident_id: str | None = None
+    recovery_revision: int | None = None
+    recovery_head: MementoCatalogHead | None = None
 
     def __post_init__(self) -> None:
         if (not isinstance(self.binding_digest, str)
@@ -66,6 +68,14 @@ class WitnessPosition:
             or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.recovery_incident_id)
         ):
             raise MementoWitnessUnavailable("invalid witnessed recovery incident identity")
+        if self.recovery_incident_id is None:
+            if self.recovery_revision is not None or self.recovery_head is not None:
+                raise MementoWitnessUnavailable("orphaned witnessed recovery anchor")
+        elif (type(self.recovery_revision) is not int
+              or not 1 <= self.recovery_revision <= self.revision
+              or not isinstance(self.recovery_head, MementoCatalogHead)
+              or self.recovery_head.serial > self.head.serial):
+            raise MementoWitnessUnavailable("invalid witnessed recovery anchor")
 
 
 class IndependentMementoWitness(Protocol):
@@ -155,9 +165,9 @@ class WitnessedMongoMementoAuthority:
                     or record.state != "completed"
                     or record.binding_digest != scope
                     or record.incident_id != position.recovery_incident_id
-                    or record.witness_revision + 1 != position.revision
-                    or record.candidate_serial != position.head.serial
-                    or record.candidate_commitment != position.head.commitment):
+                    or record.witness_revision + 1 != position.recovery_revision
+                    or record.candidate_serial != position.recovery_head.serial
+                    or record.candidate_commitment != position.recovery_head.commitment):
                 raise MementoWitnessIndeterminate(
                     "external recovery incident is unfinished or mismatched"
                 )
@@ -198,7 +208,12 @@ class WitnessedMongoMementoAuthority:
         )
         if not isinstance(result, MementoCatalogHead) or result.serial != position.head.serial + 1:
             raise MementoWitnessIndeterminate("published head has unexpected global serial")
-        successor = WitnessPosition(position.binding_digest, position.revision + 1, result)
+        successor = WitnessPosition(
+            position.binding_digest, position.revision + 1, result,
+            recovery_incident_id=position.recovery_incident_id,
+            recovery_revision=position.recovery_revision,
+            recovery_head=position.recovery_head,
+        )
         try:
             accepted = await self.witness.compare_and_set(
                 binding_digest=position.binding_digest, previous=position,
