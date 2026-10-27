@@ -1662,6 +1662,28 @@ class MongoMemoryRepository:
             docs = [doc async for doc in cursor]
         return tuple(self._record_from_doc(doc) for doc in docs)
 
+    async def list_subject_for_context(
+        self, *, tenant_id: str, namespace: str, subject_id: str, limit: int,
+    ) -> tuple[MemoryRecord, ...]:
+        """Bound memory retrieval BEFORE allocating canonical context candidates."""
+        if type(limit) is not int or not 1 <= limit <= 2000:
+            raise MemoryRepositoryError("protected context memory read requires bounded limit")
+        query = {
+            **self._scope(tenant_id=tenant_id, namespace=namespace),
+            "subject_id": str(subject_id),
+            "state": MemoryState.ACTIVE.value,
+        }
+        cursor = self.records.find(query).sort(
+            [("updated_at", 1), ("memory_id", 1)]
+        ).limit(limit + 1)
+        if hasattr(cursor, "to_list"):
+            docs = await cursor.to_list(length=limit + 1)
+        else:
+            docs = [doc async for doc in cursor]
+        if len(docs) > limit:
+            raise MemoryRepositoryError("protected memory candidate inventory exceeds bound")
+        return tuple(self._record_from_doc(doc) for doc in docs)
+
     async def history(
         self,
         memory_id: str,
