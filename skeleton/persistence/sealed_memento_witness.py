@@ -258,7 +258,11 @@ class WitnessedMongoMementoAuthority:
             raise MementoWitnessUnavailable("governed deletion witness unavailable") from exc
         if not isinstance(position, WitnessPosition) or position.binding_digest != binding_digest:
             raise MementoWitnessUnavailable("governed deletion witness not provisioned")
-        if expected_head != position.head:
+        # An already committed tombstone is irreversible. A publication
+        # racing with the original tombstone may have changed Mongo's head;
+        # rejecting its physical purge would retain erased-user ciphertext.
+        # On first retirement, however, a stale Mongo head is still denied.
+        if expected_head != position.head and not position.retired:
             raise MementoWitnessDivergence("stored archive is inconsistent with deletion witness")
         if not position.retired:
             successor = WitnessPosition(
