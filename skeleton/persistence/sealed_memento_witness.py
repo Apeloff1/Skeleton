@@ -211,7 +211,7 @@ class WitnessedMongoMementoAuthority:
         result = await self.mongo.publish(
             archive=archive, expected_head=expected_head,
             expected_thread_version=expected_thread_version,
-            stream=stream, ciphertext=ciphertext,
+            stream=stream, ciphertext=ciphertext, custody_mode="witnessed",
         )
         if not isinstance(result, MementoCatalogHead) or result.serial != position.head.serial + 1:
             raise MementoWitnessIndeterminate("published head has unexpected global serial")
