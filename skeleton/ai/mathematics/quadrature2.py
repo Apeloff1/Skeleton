@@ -55,10 +55,8 @@ def gauss_legendre_rule(order: int) -> GaussLegendreRule:
                 reason="quadrature_non_convergence",
                 field=f"root[{i}]",
             )
-        # Newton's final correction updated the root, but `derivative`
-        # was evaluated at the *previous* root. Recompute it at the
-        # converged abscissa: the stale derivative causes 1e-14 weight
-        # normalization drift even for the four-point rule.
+        # The last Newton correction changed root: use the derivative at
+        # the converged abscissa, not the previous Newton iterate.
         p0, p1 = 1.0, root
         for degree in range(2, order + 1):
             pn = ((2 * degree - 1) * root * p1 - (degree - 1) * p0) / degree
