@@ -170,6 +170,28 @@ class EngineSubmissionCompiledInputLoader:
                 raise
             except Exception as exc:
                 raise SealedContextBoundaryError("durable engine recheck unavailable") from exc
+            # The owner recheck above awaits worker-thread I/O. The source
+            # can independently change while that I/O runs, so a single
+            # earlier source inspection is not a coherent two-owner snapshot.
+            # Compare detached custody values after the owner recheck and
+            # deny on version, revocation, actor, or segment replacement.
+            try:
+                confirmed_custody = await self._source_authority.inspect(
+                    tenant_id=tenant_id, actor_id=operation.actor_id,
+                    context_id=context_id,
+                )
+            except Exception as exc:
+                raise SealedContextBoundaryError(
+                    "canonical source custody recheck unavailable"
+                ) from exc
+            if (
+                type(confirmed_custody) is not CurrentSourceCustody
+                or confirmed_custody != custody
+                or confirmed_custody.revoked is not False
+            ):
+                raise SealedContextIntegrityError(
+                    "canonical source custody changed during durable owner recheck"
+                )
             # A single integer pins BOTH independent version domains for
             # TrustedContextSnapshot. This is an opaque equality token, not
             # a strictly increasing counter.
