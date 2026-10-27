@@ -13,7 +13,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import hashlib
+import json
 from typing import Protocol
+
+from skeleton.context.sealed_memento import MementoCatalogHead, encode_catalog_head
 
 from skeleton.context.sealed_sandwich import SealedContextBoundaryError
 
@@ -104,12 +107,51 @@ def claim_record(grant: object, signer_ids: tuple[str, str]) -> RecoveryJournalR
     )
 
 
+
+def canonical_recovery_receipt(
+    *, incident_id: str, binding_digest: str, previous_revision: int,
+    committed_revision: int, committed_head: MementoCatalogHead,
+    source_thread_version: int,
+) -> bytes:
+    """One canonical receipt for issuer AND independent witness read gate.
+
+    A completed journal flag and a digest of arbitrary bytes are insufficient.
+    The gateway must reproduce the digest from the externally pinned position.
+    """
+    if (not isinstance(incident_id, str) or not 1 <= len(incident_id) <= 128
+            or incident_id != incident_id.strip()
+            or any(ord(c) < 32 or ord(c) == 127 for c in incident_id)
+            or not isinstance(binding_digest, str) or len(binding_digest) != 64
+            or any(c not in "0123456789abcdef" for c in binding_digest)
+            or type(previous_revision) is not int or previous_revision < 1
+            or type(committed_revision) is not int
+            or committed_revision != previous_revision + 1
+            or not isinstance(committed_head, MementoCatalogHead)
+            or type(source_thread_version) is not int or source_thread_version < 1):
+        raise RecoveryJournalError("invalid independently bound recovery receipt")
+    body = {
+        "incident": incident_id, "binding": binding_digest,
+        "previous_revision": previous_revision,
+        "committed_revision": committed_revision,
+        "head": encode_catalog_head(committed_head).decode("ascii"),
+        "source_thread_version": source_thread_version,
+    }
+    return (b"skeleton.memento.operator_recovery.v1\x00"
+            + json.dumps(body, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=True, allow_nan=False).encode("utf-8"))
+
+
+def receipt_commitment(receipt_bytes: bytes) -> str:
+    """Domain-separated digest of the independently reproducible receipt."""
+    if not isinstance(receipt_bytes, bytes) or not receipt_bytes:
+        raise RecoveryJournalError("missing canonical recovery receipt bytes")
+    return hashlib.sha256(b"skeleton.memento.operator_receipt.v1\x00"
+                          + receipt_bytes).hexdigest()
+
+
 def completed_record(previous: RecoveryJournalRecord, signed_receipt: bytes) -> RecoveryJournalRecord:
-    if not isinstance(signed_receipt, bytes) or not signed_receipt:
-        raise RecoveryJournalError("recovery completion must bind immutable receipt bytes")
-    digest = hashlib.sha256(b"skeleton.memento.operator_receipt.v1\x00"
-                            + signed_receipt).hexdigest()
-    return replace(previous, state="completed", receipt_digest=digest)
+    return replace(previous, state="completed",
+                   receipt_digest=receipt_commitment(signed_receipt))
 
 
 @dataclass(frozen=True, slots=True)
