@@ -257,6 +257,80 @@ class ScopedEngineCompiledSnapshotReader:
             "skeleton.engine.compiled_snapshot_scope", default=None,
         )
 
+    async def prepare_provider(self, provider_request: Any) -> str:
+        """Resolve the native Merkle root without equating it to compiler digest.
+
+        The public provider context_digest remains the compiler's independent
+        binding. The local model's context_digest must be derived only from
+        owner-backed canonical bytes after checking the complete handoff and
+        fresh source custody. The subsequent guarded read repeats that proof.
+        """
+        from skeleton.context.pre_delivery_guard import merkle_root, request_parts
+        from skeleton.provider_runtime import ProviderRequest
+
+        if not isinstance(provider_request, ProviderRequest):
+            raise SealedContextBoundaryError("protected provider envelope required")
+        tenant_id = provider_request.tenant_id
+        context_id = provider_request.context_id
+        execution_id = provider_request.execution_id
+        compiled = provider_request.context_digest
+        if any(not isinstance(v, str) or not v for v in (
+            tenant_id, context_id, execution_id,
+        )):
+            raise SealedContextBoundaryError("provider execution authority incomplete")
+        if (not isinstance(compiled, str) or len(compiled) != 64
+                or any(ch not in "0123456789abcdef" for ch in compiled)):
+            raise SealedContextBoundaryError("compiled handoff digest missing")
+        try:
+            stored, execution = await asyncio.to_thread(
+                EngineSubmissionCompiledInputLoader._read_owned,
+                self._service, execution_id,
+            )
+            if stored is None or execution is None:
+                raise SealedContextBoundaryError("durable handoff missing")
+            handoff = stored.command.compiled_context
+            operation = stored.command.operation
+            exact_history = tuple(
+                (message.role, message.content) for message in provider_request.history
+            )
+            if (handoff.context_digest != compiled
+                    or handoff.tenant_id != tenant_id
+                    or handoff.context_id != context_id
+                    or handoff.execution_id != execution_id
+                    or operation.tenant_id != tenant_id
+                    or (provider_request.operation_id is not None
+                        and provider_request.operation_id != operation.operation_id)
+                    or handoff.compiler_version != provider_request.context_compiler_version
+                    or handoff.source_snapshot != provider_request.context_source_snapshot
+                    or handoff.instructions != provider_request.instructions
+                    or handoff.prompt != provider_request.prompt
+                    or handoff.history != exact_history):
+                raise SealedContextIntegrityError(
+                    "provider prompt or compiler binding differs from durable handoff"
+                )
+            # This staging digest is not the native request digest: native
+            # serialization happens AFTER the authenticated Merkle projection.
+            staging_digest = sha256(
+                ("skeleton.engine.bootstrap.v1:" + execution_id + ":" + compiled)
+                .encode("utf-8")
+            ).hexdigest()
+            source_loader = EngineSubmissionCompiledInputLoader(
+                service=self._service, execution_id=execution_id,
+                native_request_digest=staging_digest,
+                source_authority=self._source_authority,
+            )
+            snapshot = await CanonicalCompiledSnapshotReader(
+                loader=source_loader, policy_sha256=self._policy_sha256,
+            ).resolve(
+                tenant_scope_id=tenant_id, context_id=context_id,
+                request_digest=staging_digest,
+            )
+            return snapshot.root
+        except (SealedContextBoundaryError, SealedContextIntegrityError):
+            raise
+        except Exception as exc:
+            raise SealedContextBoundaryError("durable provider preflight unavailable") from exc
+
     @contextmanager
     def bind_execution(
         self, *, execution_id: str, tenant_id: str,
