@@ -79,6 +79,9 @@ class ServerState:
         self.operation_runtime: Optional[Any] = None
         self.engine_execution_service: Optional[Any] = None
         self.engine_execution_coordinator: Optional[Any] = None
+        # Trusted application-owned local guard, never sourced from HTTP or
+        # environment payloads. Bound once before engine startup.
+        self._engine_local_guard_components: Optional[Any] = None
         self.engine_tool_receipt_store: Optional[Any] = None
         self.engine_admission_runtime: Optional[Any] = None
         self.engine_execution_admission_runtime: Optional[Any] = None
@@ -653,6 +656,25 @@ class ServerState:
         self.operation_runtime = None
         self.intelligence = self.intelligence_core
 
+    def configure_engine_local_guard(self, components: Any) -> None:
+        """Install exactly one trusted local inference guard before startup.
+
+        The independent reader/reviewer/tokenizer must be assembled by the
+        application owner. Neither model output nor an API request can select
+        these dependencies. Never replace a running guard after activation.
+        """
+        from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+
+        if not isinstance(components, ProtectedLocalComponents):
+            raise TypeError("engine local guard requires trusted application components")
+        if (self.engine_execution_coordinator is not None
+                or self.engine_execution_service is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("engine local guard must be configured before startup")
+        if self._engine_local_guard_components is not None:
+            raise RuntimeError("engine local guard may not be rebound")
+        self._engine_local_guard_components = components
+
     def bind_engine_execution_service(
         self,
         *,
@@ -813,6 +835,10 @@ class ServerState:
                 else None
             ),
         )
+        # Freeze the selected application-owned verifier composition before
+        # constructing the provider graph. A missing composition leaves
+        # production local inference unavailable, never silently legacy.
+        guarded_local_components = self._engine_local_guard_components
         service = EngineExecutionService(
             repository,
             submissions,
@@ -831,6 +857,7 @@ class ServerState:
                 provider_registry_factory=lambda: ProviderRegistry.from_env(
                     admission_runtime=provider_admission_runtime,
                     retain_unavailable=True,
+                    guarded_components=guarded_local_components,
                 ),
                 finalization_binding_hook=(
                     self.bind_verified_memory_finalization
