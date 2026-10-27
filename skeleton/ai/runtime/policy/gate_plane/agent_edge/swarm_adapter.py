@@ -65,11 +65,14 @@ class ModuleSwarmDirectory:
     function: str = DEFAULT_SWARM_FUNCTION
 
     def snapshot(self) -> Mapping[str, Any]:
-        mod = importlib.import_module(self.module)
-        fn = getattr(mod, self.function)
-        out = fn()
+        # Module names and callable selectors cannot confer code-execution
+        # authority. Custom providers must be explicitly injected as callables.
+        if self.module != DEFAULT_SWARM_MODULE or self.function != DEFAULT_SWARM_FUNCTION:
+            raise ValueError("unknown swarm provider; inject CallableSwarmDirectory")
+        mod = importlib.import_module("skeleton.swarm.capabilities")
+        out = mod.capabilities()
         if not isinstance(out, Mapping):
-            raise TypeError(f"{self.module}.{self.function}() did not return a mapping")
+            raise TypeError("built-in swarm capabilities() did not return a mapping")
         return out
 
 
