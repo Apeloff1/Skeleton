@@ -17,12 +17,14 @@ on:
       - 'skeleton/ai/runtime/inference/llama_cpp.py'
       - 'skeleton/ai/runtime/inference/catalog.py'
       - 'skeleton/ai/runtime/inference/native_transformer.py'
+      - 'skeleton/ai/runtime/inference/native_guard_binding.py'
       - 'skeleton/provider_runtime.py'
       - 'skeleton/context/**'
       - 'skeleton/persistence/sealed_memento_*.py'
       - 'skeleton/persistence/mongo_memento_repository.py'
       - 'skeleton/testing/test_guarded_local_provider.py'
       - 'skeleton/testing/test_guarded_composition.py'
+      - 'skeleton/testing/test_native_guard_binding.py'
       - 'skeleton/testing/test_guarded_application_startup.py'
       - 'skeleton/testing/test_native_tokenizer_guard.py'
       - 'skeleton/testing/test_guarded_registry_activation.py'
@@ -69,6 +71,7 @@ jobs:
             skeleton/testing/test_local_inference.py \
             skeleton/testing/test_guarded_local_provider.py \
             skeleton/testing/test_guarded_composition.py \
+            skeleton/testing/test_native_guard_binding.py \
             skeleton/testing/test_guarded_application_startup.py \
             skeleton/testing/test_native_tokenizer_guard.py \
             skeleton/testing/test_guarded_registry_activation.py \
