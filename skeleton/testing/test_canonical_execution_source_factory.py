@@ -122,13 +122,13 @@ def test_multiowner_protected_activation_requires_exact_same_writer_object():
             return 2
 
     shared = Epoch()
-    with pytest.raises(SealedContextBoundaryError, match="same"):
+    with pytest.raises(SealedContextBoundaryError, match="share"):
         CanonicalExecutionSourceFactory(
             conversation=conversation, resolver=Resolver(),
             memory=memory, memory_namespace="memory", shared_epoch=shared,
         )
     conversation.canonical_source_epoch = shared
-    with pytest.raises(SealedContextBoundaryError, match="same"):
+    with pytest.raises(SealedContextBoundaryError, match="share"):
         CanonicalExecutionSourceFactory(
             conversation=conversation, resolver=Resolver(),
             memory=memory, memory_namespace="memory", shared_epoch=shared,
