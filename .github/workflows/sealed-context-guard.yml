@@ -78,6 +78,19 @@ jobs:
       - name: Compile changed production boundaries
         run: |
           python -m compileall -q skeleton/context skeleton/persistence skeleton/ai/runtime/inference backend/core/conversations.py
+      - name: Verify canonical metadata and AI-tree parity
+        run: |
+          python scripts/check_root_package_metadata_parity.py
+          python -m unittest discover -s tests -p 'test_root_package_metadata_parity.py' -q
+          python scripts/check_ai_file_tree.py
+      - name: Verify canonical conversation and immutable workflow pin regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: |
+          python -m pytest -q \
+            backend/tests/test_conversation_storage_admission.py \
+            backend/tests/test_dragon_conversation_binding.py \
+            backend/tests/test_supervisor_workflow_contract.py
       - name: Local model and guarded provider regression
         env:
           PYTHONPATH: '.:backend'
