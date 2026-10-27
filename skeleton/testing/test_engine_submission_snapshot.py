@@ -189,3 +189,98 @@ def test_loader_requires_real_existing_owner_and_source_interfaces():
         loader(service=SimpleNamespace(submissions=None, repository=None))
     with pytest.raises(SealedContextBoundaryError):
         loader(custody=object())
+
+
+def test_durable_owner_drift_withholds_guarded_generation():
+    from skeleton.ai.runtime.inference.guarded_service import CanonicalGuardedLocalService
+    from skeleton.context.pre_delivery_guard import GuardedLocalInference, ReviewVerdict, merkle_root
+    from skeleton.context.sealed_sandwich import SealedContextReplayError
+
+    class Request:
+        instructions = "owner policy"
+        history = (("user", "initial"),)
+        prompt = "latest"
+        digest = REQUEST
+        context_digest = merkle_root((
+            ("system", b"owner policy"), ("user", b"initial"), ("user", b"latest"),
+        ))
+
+        @property
+        def rendered_input(self):
+            return "system: owner policy\\nuser: initial\\nuser: latest\\nassistant:"
+
+    async def scenario():
+        bound, service, source = loader()
+        canonical = CanonicalCompiledSnapshotReader(
+            loader=bound, policy_sha256=sha256(b"owner policy").hexdigest(),
+        )
+
+        class Engine:
+            model = object()
+            calls = 0
+
+            async def generate(self, request, **kwargs):
+                self.calls += 1
+                source.current = replace(source.current, version=source.current.version + 1)
+                return SimpleNamespace(text="MUST_NOT_DELIVER")
+
+        engine = Engine()
+        guard = GuardedLocalInference(
+            engine,
+            reviewer=lambda text, digest: ReviewVerdict(True, digest, "separate-reviewer", "pass"),
+            tokenize=lambda text: tuple(text.encode("utf-8")),
+            detokenize=lambda ids: bytes(ids).decode("utf-8"),
+        )
+        protected = CanonicalGuardedLocalService(guard, snapshots=canonical)
+        with pytest.raises(SealedContextReplayError, match="changed"):
+            await protected.generate(Request(), tenant_scope_id=TENANT, context_id=CONTEXT)
+        assert engine.calls == 1 and source.calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_durable_owner_cancellation_during_guarded_generation_withholds_result():
+    from skeleton.ai.runtime.inference.guarded_service import CanonicalGuardedLocalService
+    from skeleton.context.pre_delivery_guard import GuardedLocalInference, ReviewVerdict, merkle_root
+
+    class Request:
+        instructions = "owner policy"
+        history = (("user", "initial"),)
+        prompt = "latest"
+        digest = REQUEST
+        context_digest = merkle_root((
+            ("system", b"owner policy"), ("user", b"initial"), ("user", b"latest"),
+        ))
+
+        @property
+        def rendered_input(self):
+            return "system: owner policy\\nuser: initial\\nuser: latest\\nassistant:"
+
+    async def scenario():
+        bound, service, source = loader()
+        canonical = CanonicalCompiledSnapshotReader(
+            loader=bound, policy_sha256=sha256(b"owner policy").hexdigest(),
+        )
+
+        class Engine:
+            model = object()
+            calls = 0
+
+            async def generate(self, request, **kwargs):
+                self.calls += 1
+                service.repository.execution.cancellation_requested = True
+                return SimpleNamespace(text="MUST_NOT_DELIVER")
+
+        engine = Engine()
+        guard = GuardedLocalInference(
+            engine,
+            reviewer=lambda text, digest: ReviewVerdict(True, digest, "separate-reviewer", "pass"),
+            tokenize=lambda text: tuple(text.encode("utf-8")),
+            detokenize=lambda ids: bytes(ids).decode("utf-8"),
+        )
+        protected = CanonicalGuardedLocalService(guard, snapshots=canonical)
+        with pytest.raises(SealedContextBoundaryError):
+            await protected.generate(Request(), tenant_scope_id=TENANT, context_id=CONTEXT)
+        assert engine.calls == 1 and source.calls == 1
+
+    asyncio.run(scenario())
