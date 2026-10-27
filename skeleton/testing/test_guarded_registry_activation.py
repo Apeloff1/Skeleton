@@ -84,3 +84,38 @@ def test_invalid_guard_policy_is_fail_closed(local_configuration, monkeypatch):
     monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "maybe")
     with pytest.raises(ProviderUnavailableError, match="invalid AI_LOCAL_GUARD_REQUIRED"):
         ProviderRegistry.from_env()
+
+
+@pytest.mark.asyncio
+async def test_explicit_legacy_reference_artifact_runs_without_hosted_provider(
+    tmp_path, monkeypatch, local_configuration,
+):
+    from skeleton.ai.runtime.inference.local import ReferenceNGramModel
+    from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+    from skeleton.provider_runtime import ProviderRequest
+
+    path = tmp_path / "operator-reference-model.json"
+    trained = ReferenceNGramModel.train(
+        ("local engine answer complete",), order=2, model_id="development-reference",
+    )
+    write_local_model_artifact(trained, path)
+    monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(path))
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "0")
+    monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
+    monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
+    adapter = registry.require_active()
+    result = await adapter.generate(
+        ProviderRequest(
+            prompt="local engine", instructions="Respond locally.",
+            max_output_tokens=8,
+        )
+    )
+    assert result.provider == "local"
+    assert result.model == trained.model_id
+    assert result.text == "answer complete"
+    assert result.usage.billed_cost == "0"
+    assert adapter.require_guarded_inference is False
+    # Legacy operation is explicitly NOT an independently governed receipt.
+    assert result.governance_decision_id is None
+    assert result.admission_decision_id is None
