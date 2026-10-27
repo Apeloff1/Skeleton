@@ -13,6 +13,7 @@ from skeleton.context.pre_delivery_guard import (
 )
 from skeleton.context.sealed_sandwich import (
     SealedContextBoundaryError, SealedContextError, SealedContextIntegrityError,
+    SealedContextLimitError,
 )
 
 
@@ -330,3 +331,31 @@ def test_native_sampler_schema_drift_during_inference_blocks_delivery():
             req, snapshot=snapshot(req), tenant_scope_id="tenant", contract=contract,
         ))
     assert engine.calls == 1
+
+
+def test_inference_merkle_request_bounds_history_before_building_spans():
+    request = Request("policy", (("user", "x"),) * 2001, "finish")
+    with pytest.raises(SealedContextLimitError, match="2,000-record"):
+        request_parts(request)
+
+
+def test_inference_merkle_request_rejects_forged_history_role():
+    request = Request("policy", (("system", "imposter authority"),), "finish")
+    with pytest.raises(SealedContextError, match="unsupported role"):
+        request_parts(request)
+
+
+def test_inference_merkle_request_bounds_aggregate_input_bytes():
+    # Each span fits individually; together they exceed the bounded 16-MiB
+    # context envelope. The guard must reject before model admission.
+    request = Request(
+        "policy", (("user", "x" * (4 * 1024 * 1024)),) * 5, "finish",
+    )
+    with pytest.raises(SealedContextLimitError, match="byte admission"):
+        request_parts(request)
+
+
+def test_inference_merkle_request_rejects_invalid_unicode():
+    request = Request("policy", (("user", chr(0xD800)),), "finish")
+    with pytest.raises(SealedContextError, match="malformed"):
+        request_parts(request)
