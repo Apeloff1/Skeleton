@@ -240,3 +240,78 @@ async def test_real_owner_inventory_must_match_durable_engine_handoff():
         await bridge.read(
             tenant_id=TENANT, context_id=CONTEXT, request_digest=REQUEST,
         )
+
+
+def memory_record(content: str = "owned memory", version: int = 1):
+    from skeleton.contracts.memory_record import (
+        MemoryKind, MemoryRecord, memory_payload_digest,
+    )
+    return MemoryRecord(
+        memory_id=str(UUID(int=901)), tenant_id=TENANT,
+        namespace="memory", subject_id=ACTOR, kind=MemoryKind.SEMANTIC,
+        version=version, created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        idempotency_key="canonical-memory-test",
+        payload_digest=memory_payload_digest(
+            kind=MemoryKind.SEMANTIC, content=content,
+            content_ref=None, provenance_refs=(),
+        ), content=content,
+    )
+
+
+@pytest.mark.asyncio
+async def test_real_memory_records_add_live_owner_content_and_revisions():
+    memory = Memory()
+    memory.records = (memory_record(),)
+    epoch = Epoch()
+    bound = loader(
+        memory=memory, memory_namespace="memory", shared_epoch=epoch,
+    )
+    authority = CanonicalSegmentSourceAuthority(loader=bound)
+    first = await authority.inspect(
+        tenant_id=TENANT, actor_id=ACTOR, context_id=CONTEXT,
+    )
+    assert len(first.source_snapshot) == 2
+    assert sha256(b"owned memory").hexdigest() in dict(
+        (digest, identity) for identity, digest in first.source_snapshot
+    )
+    memory.records = (memory_record("updated memory", version=2),)
+    epoch.counter += 1
+    after = await authority.inspect(
+        tenant_id=TENANT, actor_id=ACTOR, context_id=CONTEXT,
+    )
+    assert first.source_snapshot != after.source_snapshot
+    assert first.version != after.version
+
+
+@pytest.mark.asyncio
+async def test_tombstoned_or_cross_subject_memory_never_becomes_source():
+    from skeleton.contracts.memory_record import MemoryState
+
+    memory = Memory()
+    epoch = Epoch()
+    bound = loader(memory=memory, memory_namespace="memory", shared_epoch=epoch)
+    for candidate in (
+        replace(memory_record(), state=MemoryState.TOMBSTONED),
+        replace(memory_record(), subject_id="different"),
+    ):
+        memory.records = (candidate,)
+        with pytest.raises(SealedContextBoundaryError):
+            await bound.read_current(
+                tenant_id=TENANT, actor_id=ACTOR, context_id=CONTEXT,
+            )
+
+
+@pytest.mark.asyncio
+async def test_invalid_or_ambiguous_epoch_cannot_admit_mixed_sources():
+    class InvalidEpoch:
+        async def read_epoch(self, **kwargs):
+            return True
+
+    bound = loader(
+        memory=Memory(), memory_namespace="memory", shared_epoch=InvalidEpoch(),
+    )
+    with pytest.raises(SealedContextBoundaryError, match="epoch"):
+        await bound.read_current(
+            tenant_id=TENANT, actor_id=ACTOR, context_id=CONTEXT,
+        )
