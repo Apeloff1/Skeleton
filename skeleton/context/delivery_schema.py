@@ -75,7 +75,7 @@ def _schema_node(schema: Any, *, depth: int, budget: list[int]) -> None:
     if type(schema) is not dict or not schema or any(k not in _KEYS for k in schema):
         _error("unsupported or empty schema")
     kind = schema.get("type")
-    if kind not in _TYPES:
+    if type(kind) is not str or kind not in _TYPES:
         _error("schema type is required and must be supported")
     permitted = {
         "object": {"type", "properties", "required", "additionalProperties", "enum", "const"},
