@@ -36,6 +36,31 @@ def _hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _token_id_digest(tokens: Sequence[int]) -> str:
+    """Commit to the exact native token sequence, not just its decoded text."""
+    if isinstance(tokens, (str, bytes)) or not hasattr(tokens, "__len__"):
+        raise SealedContextLimitError("tokenizer returned invalid or unbounded sequence")
+    try:
+        count = len(tokens)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SealedContextLimitError("tokenizer sequence length cannot be verified") from exc
+    if type(count) is not int or count > 8_000_000 or count < 0:
+        raise SealedContextLimitError("tokenizer returned invalid or unbounded sequence")
+    digest = hashlib.sha256(b"skeleton.context.native-token-ids.v1\x00")
+    digest.update(count.to_bytes(8, "big"))
+    observed = 0
+    for token in tokens:
+        if type(token) is not int or token < 0 or token >= 1 << 64:
+            raise SealedContextError("native token IDs are not bounded unsigned integers")
+        digest.update(token.to_bytes(8, "big"))
+        observed += 1
+        if observed > count:
+            raise SealedContextLimitError("tokenizer sequence length changed during verification")
+    if observed != count:
+        raise SealedContextLimitError("tokenizer sequence length changed during verification")
+    return digest.hexdigest()
+
+
 def _schema_snapshot(schema: Mapping[str, Any] | None) -> str | None:
     """Freeze mutable schema mappings at the admission boundary."""
     if schema is None:
@@ -193,6 +218,7 @@ class PreDeliveryReceipt:
     reviewer_id: str
     request_digest: str
     response_sha256: str
+    token_sequence_sha256: str | None = None
 
 
 class GuardedLocalInference:
@@ -238,7 +264,7 @@ class GuardedLocalInference:
     def preflight(
         self, request: Any, *, snapshot: TrustedContextSnapshot,
         tenant_scope_id: str, contract: DeliveryContract,
-    ) -> tuple[str, str | None, str]:
+    ) -> tuple[str, str | None, str, str | None]:
         if contract.format == "json":
             _schema_snapshot(contract.json_schema)
         self._attest_tokenizer_identity()
@@ -274,14 +300,12 @@ class GuardedLocalInference:
             raise SealedContextLimitError("local rendered prompt exceeds byte admission")
         verify_rendered_spans(parts, encoded)
         token_digest: str | None = None
+        token_sequence_digest: str | None = None
         if self.require_token_echo and (self.tokenize is None or self.detokenize is None):
             raise SealedContextBoundaryError("native tokenizer echo verification is not configured")
         if self.tokenize is not None and self.detokenize is not None:
             tokens = self.tokenize(rendered)
-            if isinstance(tokens, (str, bytes)) or len(tokens) > 8_000_000:
-                raise SealedContextLimitError("tokenizer returned invalid or unbounded sequence")
-            if any(type(token) is not int or token < 0 for token in tokens):
-                raise SealedContextError("token IDs must be non-negative integers")
+            token_sequence_digest = _token_id_digest(tokens)
             if self.detokenize(tokens).encode("utf-8", errors="strict") != encoded:
                 raise SealedContextIntegrityError("native tokenizer round trip changed input bytes")
             token_digest = _hash(encoded)
@@ -302,7 +326,7 @@ class GuardedLocalInference:
                     )
             if self.sampler_support is None or not self.sampler_support(self.engine.model, contract):
                 raise SealedContextBoundaryError("local sampler lacks required grammar constraint")
-        return actual_root, token_digest, verdict.reviewer_id
+        return actual_root, token_digest, verdict.reviewer_id, token_sequence_digest
 
     async def generate(
         self, request: Any, *, snapshot: TrustedContextSnapshot,
@@ -314,7 +338,7 @@ class GuardedLocalInference:
             _schema_snapshot(getattr(request, "structured_output_schema", None))
             if pinned_schema is not None and contract.require_sampler_enforcement else None
         )
-        root, token_echo, reviewer_id = self.preflight(
+        root, token_echo, reviewer_id, admitted_token_ids = self.preflight(
             request, snapshot=snapshot, tenant_scope_id=tenant_scope_id, contract=contract,
         )
         if "tenant_scope_id" in engine_options or "prepared_input" in engine_options:
@@ -362,6 +386,14 @@ class GuardedLocalInference:
         verify_rendered_spans(after_parts, after_bytes)
         if token_echo is not None and _hash(after_bytes) != token_echo:
             raise SealedContextIntegrityError("native model input changed during inference")
+        if admitted_token_ids is not None:
+            if self.tokenize is None or self.detokenize is None:
+                raise SealedContextBoundaryError("admitted tokenizer is no longer available")
+            after_tokens = self.tokenize(after_rendered)
+            if _token_id_digest(after_tokens) != admitted_token_ids:
+                raise SealedContextIntegrityError("native token ID sequence changed during inference")
+            if self.detokenize(after_tokens).encode("utf-8", errors="strict") != after_bytes:
+                raise SealedContextIntegrityError("native tokenizer echo changed during inference")
         # Preflight attestation cannot be assumed to remain valid after native
         # work. A backend can replace its projection or grammar configuration
         # while inference is running; no output is released on such drift.
@@ -396,5 +428,6 @@ class GuardedLocalInference:
         elif contract.format == "regex":
             match_delivery_regex(text, contract.pattern)
         return result, PreDeliveryReceipt(
-            root, token_echo, reviewer_id, request.digest, _hash(text.encode("utf-8"))
+            root, token_echo, reviewer_id, request.digest, _hash(text.encode("utf-8")),
+            admitted_token_ids,
         )
