@@ -360,7 +360,8 @@ def test_operator_approval_requires_distinct_separation_roles():
 
 def test_read_only_incident_triage_covers_all_recovery_crash_windows():
     from skeleton.persistence.sealed_memento_recovery_journal import (
-        claim_record, completed_record, inspect_recovery_incident,
+        claim_record, completed_record, canonical_recovery_receipt,
+        inspect_recovery_incident,
     )
     from skeleton.persistence.sealed_memento_witness import WitnessPosition
 
@@ -379,13 +380,22 @@ def test_read_only_incident_triage_covers_all_recovery_crash_windows():
         successor = WitnessPosition(
             grant.binding_digest, old.revision + 1, proposed,
             recovery_incident_id=grant.incident_id,
+            recovery_revision=old.revision + 1,
+            recovery_head=proposed,
         )
         assert await witness.compare_and_set(binding_digest=grant.binding_digest,
                                              previous=old, successor=successor)
         incomplete = await inspect_recovery_incident(**args)
         assert incomplete.classification == "receipt_missing"
         assert incomplete.manual_intervention_required
-        complete = completed_record(claim, grant.signed_bytes())
+        complete = completed_record(claim, canonical_recovery_receipt(
+            incident_id=grant.incident_id,
+            binding_digest=grant.binding_digest,
+            previous_revision=old.revision,
+            committed_revision=successor.revision,
+            committed_head=proposed,
+            source_thread_version=grant.source_thread_version,
+        ))
         assert await journal.complete(previous=claim, successor=complete)
         stable = await inspect_recovery_incident(**args)
         assert stable.classification == "completed_verified"
