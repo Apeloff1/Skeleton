@@ -11,14 +11,21 @@ def _workflow() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
 
-def test_privileged_workflow_uses_only_trusted_default_branch_triggers():
+def _triggers() -> str:
+    """Inspect actual event registration, not workflow_run references in comments."""
+    return _workflow().split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+
+
+def test_privileged_workflow_is_manual_only_on_trusted_default_branch():
     text = _workflow()
-    assert "workflow_run:" in text
-    assert "schedule:" in text
-    assert "workflow_dispatch:" in text
-    assert "pull_request_target:" not in text
-    assert "pull_request_review:" not in text
-    assert "pull_request_review_comment:" not in text
+    triggers = _triggers()
+    assert "workflow_dispatch:" in triggers
+    for forbidden in (
+        "workflow_run:", "schedule:", "pull_request:", "pull_request_target:",
+        "pull_request_review:", "pull_request_review_comment:", "push:",
+    ):
+        assert forbidden not in triggers
+    assert "options: [observe, apply]" in triggers
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head" not in text
@@ -35,22 +42,14 @@ def test_privileged_python_executes_only_staged_package_in_isolated_mode():
     assert "python -m skeleton.pr_automation.runner" not in text
 
 
-def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
+def test_manual_workflow_serializes_writers_and_keeps_cancelled_run_guard():
     text = _workflow()
-    assert "types: [completed]" in text
-    assert "types: [requested, in_progress, completed]" not in text
-    assert "types: [requested]" not in text
-    assert "types: [in_progress]" not in text
-    assert "workflows:\n      - Merge Readiness" in text
-    assert "      - CI/CD" not in text
-    assert "      - Backend Quality" not in text
-    assert "      - Dependency Review" not in text
-    assert "      - Dependency Security" not in text
-    assert "      - CodeQL" not in text
+    assert "workflow_dispatch:" in _triggers()
+    assert "workflow_run:" not in _triggers()
+    assert "schedule:" not in _triggers()
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
-    assert "branches-ignore:\n      - main" in text
-    assert 'branches:\n      - "*"\n      - "**"' not in text
+    # Keep the dormant completion handler fail-closed if it is re-enabled.
     assert "github.event.workflow_run.conclusion != 'cancelled'" in text
     assert "github.event_name != 'workflow_run'" in text
 
