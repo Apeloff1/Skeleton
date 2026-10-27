@@ -11,12 +11,16 @@ dispatch must bind the exact LocalInferenceRequest.digest before admission.
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from hashlib import sha256
 import json
 from typing import Any, Protocol
 
-from skeleton.ai.runtime.inference.canonical_snapshot_reader import CanonicalCompiledInput
+from skeleton.ai.runtime.inference.canonical_snapshot_reader import (
+    CanonicalCompiledInput, CanonicalCompiledSnapshotReader,
+)
 from skeleton.context.sealed_sandwich import (
     SealedContextBoundaryError,
     SealedContextIntegrityError,
@@ -214,7 +218,95 @@ class EngineSubmissionCompiledInputLoader:
             raise SealedContextBoundaryError("canonical engine binding verification failed") from exc
 
 
+@dataclass(frozen=True, slots=True)
+class _ExecutingScope:
+    execution_id: str
+    tenant_id: str
+    context_id: str
+    request_digest: str
+    owner_task: asyncio.Task[Any]
+
+
+class ScopedEngineCompiledSnapshotReader:
+    """One startup-owned reader with per-task durable execution custody.
+
+    A protected adapter opens the scope inside its own guarded-generation
+    task. A child task inheriting the ContextVar cannot use the same binding,
+    and the finally block revokes it after postflight, timeout or cancellation.
+    No cross-request global mapping or user-supplied receipt is retained.
+    """
+
+    def __init__(
+        self, *, service: Any, source_authority: CurrentSourceAuthority,
+        policy_sha256: str,
+    ) -> None:
+        if not callable(getattr(getattr(service, "submissions", None),
+                                 "get_by_execution_id", None)):
+            raise SealedContextBoundaryError("durable engine submissions unavailable")
+        if not callable(getattr(getattr(service, "repository", None), "get", None)):
+            raise SealedContextBoundaryError("durable engine repository unavailable")
+        if not callable(getattr(source_authority, "inspect", None)):
+            raise SealedContextBoundaryError("current canonical source inspector required")
+        if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in policy_sha256)):
+            raise SealedContextBoundaryError("trusted instruction policy digest required")
+        self._service = service
+        self._source_authority = source_authority
+        self._policy_sha256 = policy_sha256
+        self._scope: ContextVar[_ExecutingScope | None] = ContextVar(
+            "skeleton.engine.compiled_snapshot_scope", default=None,
+        )
+
+    @contextmanager
+    def bind_execution(
+        self, *, execution_id: str, tenant_id: str,
+        context_id: str, request_digest: str,
+    ):
+        """Bind an exact native request for one guarded provider invocation."""
+        if self._scope.get() is not None:
+            raise SealedContextBoundaryError("nested durable snapshot scope is forbidden")
+        task = asyncio.current_task()
+        if task is None:
+            raise SealedContextBoundaryError("durable snapshot scope requires asyncio task")
+        if any(not isinstance(value, str) or not value for value in (
+            execution_id, tenant_id, context_id,
+        )):
+            raise SealedContextBoundaryError("durable execution scope is incomplete")
+        if (not isinstance(request_digest, str) or len(request_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in request_digest)):
+            raise SealedContextBoundaryError("native request digest is invalid")
+        token = self._scope.set(_ExecutingScope(
+            execution_id, tenant_id, context_id, request_digest, task,
+        ))
+        try:
+            yield
+        finally:
+            self._scope.reset(token)
+
+    async def resolve(
+        self, *, tenant_scope_id: str, context_id: str, request_digest: str,
+    ):
+        bound = self._scope.get()
+        if (bound is None or asyncio.current_task() is not bound.owner_task
+                or bound.tenant_id != tenant_scope_id
+                or bound.context_id != context_id
+                or bound.request_digest != request_digest):
+            raise SealedContextBoundaryError("durable snapshot is not bound to executing request")
+        loader = EngineSubmissionCompiledInputLoader(
+            service=self._service, execution_id=bound.execution_id,
+            native_request_digest=bound.request_digest,
+            source_authority=self._source_authority,
+        )
+        return await CanonicalCompiledSnapshotReader(
+            loader=loader, policy_sha256=self._policy_sha256,
+        ).resolve(
+            tenant_scope_id=tenant_scope_id, context_id=context_id,
+            request_digest=request_digest,
+        )
+
+
 __all__ = [
     "CurrentSourceCustody", "CurrentSourceAuthority",
     "EngineSubmissionCompiledInputLoader",
+    "ScopedEngineCompiledSnapshotReader",
 ]
