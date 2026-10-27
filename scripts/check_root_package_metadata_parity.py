@@ -47,7 +47,7 @@ def validate(pyproject_text: str, setup_text: str) -> list[str]:
     cfg.read_string(setup_text)
     declared = _requirements(project["project"]["dependencies"])
     setup = cfg.get("options", "install_requires")
-    from_setup = _requirements(setup.splitlines() if setup.strip() else [])
+    from_setup = _requirements([line.strip() for line in setup.splitlines() if line.strip()])
     issues: list[str] = []
     _validate_unique_packages(declared, "pyproject core", issues)
     _validate_unique_packages(from_setup, "setup.cfg core", issues)
@@ -66,7 +66,7 @@ def validate(pyproject_text: str, setup_text: str) -> list[str]:
     if not isinstance(optional, dict):
         raise ValueError("optional-dependencies must be a mapping")
     setup_extras = {
-        name: _requirements(raw.splitlines() if raw.strip() else [])
+        name: _requirements([line.strip() for line in raw.splitlines() if line.strip()])
         for name, raw in cfg.items("options.extras_require")
     }
     for extra in sorted(set(optional) | set(setup_extras)):
