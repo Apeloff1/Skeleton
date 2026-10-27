@@ -675,6 +675,18 @@ class ServerState:
             raise RuntimeError("engine local guard may not be rebound")
         self._engine_local_guard_components = components
 
+    @staticmethod
+    def _activate_engine_provider_registry(
+        *, admission_runtime: Any, guarded_local_components: Any | None,
+    ) -> Any:
+        """One canonical registry path for trusted startup policy injection."""
+        from skeleton.provider_runtime import ProviderRegistry
+
+        return ProviderRegistry.from_env(
+            admission_runtime=admission_runtime, retain_unavailable=True,
+            guarded_components=guarded_local_components,
+        )
+
     def bind_engine_execution_service(
         self,
         *,
@@ -854,10 +866,9 @@ class ServerState:
                 service,
                 # Acquire exclusive execution custody before activating model
                 # graphs, so a duplicate worker cannot allocate another catalog.
-                provider_registry_factory=lambda: ProviderRegistry.from_env(
+                provider_registry_factory=lambda: self._activate_engine_provider_registry(
                     admission_runtime=provider_admission_runtime,
-                    retain_unavailable=True,
-                    guarded_components=guarded_local_components,
+                    guarded_local_components=guarded_local_components,
                 ),
                 finalization_binding_hook=(
                     self.bind_verified_memory_finalization
