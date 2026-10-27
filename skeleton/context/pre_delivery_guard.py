@@ -34,6 +34,18 @@ def _hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _schema_snapshot(schema: Mapping[str, Any] | None) -> str | None:
+    """Freeze mutable schema mappings at the admission boundary."""
+    if schema is None:
+        return None
+    validate_delivery_schema(schema)
+    try:
+        return json.dumps(dict(schema), sort_keys=True, separators=(",", ":"),
+                          ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError, UnicodeError, OverflowError) as exc:
+        raise SealedContextError("schema snapshot could not be serialized") from exc
+
+
 def _leaf(index: int, name: str, data: bytes) -> bytes:
     return hashlib.sha256(
         _DOMAIN + b"leaf\x00" + index.to_bytes(4, "big")
@@ -193,6 +205,8 @@ class GuardedLocalInference:
         self, request: Any, *, snapshot: TrustedContextSnapshot,
         tenant_scope_id: str, contract: DeliveryContract,
     ) -> tuple[str, str | None, str]:
+        if contract.format == "json":
+            _schema_snapshot(contract.json_schema)
         if snapshot.tenant_id != tenant_scope_id:
             raise SealedContextBoundaryError("context snapshot crossed tenant boundary")
         parts = request_parts(request)
@@ -246,10 +260,8 @@ class GuardedLocalInference:
         if contract.format != "text" and contract.require_sampler_enforcement:
             if contract.format == "json" and contract.json_schema is not None:
                 configured = getattr(request, "structured_output_schema", None)
-                if not isinstance(configured, Mapping) or (
-                    json.dumps(configured, sort_keys=True, separators=(",", ":")) !=
-                    json.dumps(contract.json_schema, sort_keys=True, separators=(",", ":"))
-                ):
+                if (not isinstance(configured, Mapping)
+                        or _schema_snapshot(configured) != _schema_snapshot(contract.json_schema)):
                     raise SealedContextBoundaryError(
                         "native JSON sampler request is not bound to delivery schema"
                     )
@@ -262,6 +274,11 @@ class GuardedLocalInference:
         tenant_scope_id: str, contract: DeliveryContract = DeliveryContract(),
         **engine_options: Any,
     ) -> tuple[Any, PreDeliveryReceipt]:
+        pinned_schema = _schema_snapshot(contract.json_schema) if contract.format == "json" else None
+        pinned_native_schema = (
+            _schema_snapshot(getattr(request, "structured_output_schema", None))
+            if pinned_schema is not None and contract.require_sampler_enforcement else None
+        )
         root, token_echo, reviewer_id = self.preflight(
             request, snapshot=snapshot, tenant_scope_id=tenant_scope_id, contract=contract,
         )
@@ -298,7 +315,16 @@ class GuardedLocalInference:
         if not isinstance(text, str):
             raise SealedContextError("local model did not produce text")
         if contract.format == "json":
-            parse_and_validate_delivery_json(text, contract.json_schema)
+            if _schema_snapshot(contract.json_schema) != pinned_schema:
+                raise SealedContextIntegrityError("delivery schema mutated during inference")
+            if pinned_native_schema is not None and (
+                _schema_snapshot(getattr(request, "structured_output_schema", None))
+                != pinned_native_schema
+            ):
+                raise SealedContextIntegrityError("native sampler schema mutated during inference")
+            parse_and_validate_delivery_json(
+                text, json.loads(pinned_schema) if pinned_schema is not None else None,
+            )
         elif contract.format == "regex":
             try:
                 match = re.fullmatch(contract.pattern or "", text)
