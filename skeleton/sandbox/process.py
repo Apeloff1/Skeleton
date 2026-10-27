@@ -251,38 +251,67 @@ def _run(args: tuple[str, ...], box: FsJail, cwd: str | None, stdin: bytes | Non
         )
     except FileNotFoundError as exc:
         raise ProcessPolicyError("executable not found", context={"argv0": args[0]}) from exc
-    if stdin is not None and proc.stdin is not None:
-        try:
-            proc.stdin.write(stdin)
-        except BrokenPipeError:
-            pass
-        proc.stdin.close()
-
+    # A synchronous BufferedWriter.write() here can block forever if the child
+    # does not read stdin, or if the child fills stdout before reading stdin.
+    # Multiplex bounded stdin with output pipes under the *same* wall deadline.
+    input_view = memoryview(stdin) if stdin is not None else memoryview(b"")
+    input_offset = 0
     out, err = bytearray(), bytearray()
     truncated = timed_out = False
     sel = selectors.DefaultSelector()
     assert proc.stdout is not None and proc.stderr is not None
     sel.register(proc.stdout, selectors.EVENT_READ, out)
     sel.register(proc.stderr, selectors.EVENT_READ, err)
+    if proc.stdin is not None:
+        if input_view:
+            os.set_blocking(proc.stdin.fileno(), False)
+            sel.register(proc.stdin, selectors.EVENT_WRITE, "stdin")
+        else:
+            proc.stdin.close()
     deadline = started + lim.wall_seconds
-    while sel.get_map():
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            timed_out = True
-            _kill_group(proc)
-            break
-        for key, _ in sel.select(timeout=min(remaining, 0.1)):
-            chunk = os.read(key.fd, 65536)
-            if not chunk:
-                sel.unregister(key.fileobj)
-                continue
-            buf: bytearray = key.data
-            room = lim.output_bytes - len(buf)
-            if room > 0:
-                buf.extend(chunk[:room])
-            if len(chunk) > room:
-                truncated = True
-    sel.close()
+    try:
+        while sel.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = True
+                _kill_group(proc)
+                break
+            for key, _ in sel.select(timeout=min(remaining, 0.1)):
+                if key.data == "stdin":
+                    try:
+                        written = os.write(
+                            key.fd, input_view[input_offset : input_offset + 65536]
+                        )
+                    except (BlockingIOError, InterruptedError):
+                        continue
+                    except BrokenPipeError:
+                        # A child may legitimately close its stdin immediately.
+                        input_offset = len(input_view)
+                    else:
+                        # Zero progress on a writable descriptor must not spin.
+                        if written == 0:
+                            # Zero progress is not EOF: retain all pending bytes.
+                            # The shared wall deadline bounds repeated retries.
+                            continue
+                        input_offset += written
+                    if input_offset >= len(input_view):
+                        sel.unregister(key.fileobj)
+                        key.fileobj.close()
+                    continue
+                chunk = os.read(key.fd, 65536)
+                if not chunk:
+                    sel.unregister(key.fileobj)
+                    continue
+                buf: bytearray = key.data
+                room = lim.output_bytes - len(buf)
+                if room > 0:
+                    buf.extend(chunk[:room])
+                if len(chunk) > room:
+                    truncated = True
+    finally:
+        sel.close()
+        if proc.stdin is not None and not proc.stdin.closed:
+            proc.stdin.close()
     try:
         rc = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
     except subprocess.TimeoutExpired:
