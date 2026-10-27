@@ -349,17 +349,26 @@ def build_native_transformer_adapter(
     max_concurrency: int = 1,
     max_queue_size: int = 256,
     max_batch_size: int = 256,
+    require_guarded_inference: bool = False,
+    guarded_components: Any | None = None,
 ) -> LocalModelAdapter:
-    """Build the canonical provider-neutral adapter for the owned transformer."""
+    """Build canonical transformer; protected mode requires trusted composition."""
+    from skeleton.provider_runtime import ProviderPolicyError
+    if type(require_guarded_inference) is not bool:
+        raise ProviderPolicyError("protected transformer mode must be explicit")
+    if require_guarded_inference:
+        from .guarded_composition import ProtectedLocalComponents
+        if not isinstance(guarded_components, ProtectedLocalComponents):
+            raise ProviderPolicyError("protected transformer lacks trusted components")
+    elif guarded_components is not None:
+        raise ProviderPolicyError("protected components require enforced transformer mode")
     backend = NativeTransformerModel(runtime, model_id=model_id)
     engine = LocalInferenceEngine(
         backend, cache_size=cache_size, max_concurrency=max_concurrency,
         max_queue_size=max_queue_size, max_batch_size=max_batch_size,
+        require_guarded_context=require_guarded_inference,
     )
-    return LocalModelAdapter(
-        engine,
-        default_seed=default_seed,
-        artifact_status={
+    artifact_status = {
             "kind": "native_transformer",
             "model_digest": backend.model_digest,
             "runtime_digest": backend.runtime_digest,
@@ -367,7 +376,15 @@ def build_native_transformer_adapter(
             "architecture_digest": runtime.architecture.digest,
             "device": runtime.device.to_dict(),
             "generation_limits": backend.generation_limits(),
-        },
+    }
+    if require_guarded_inference:
+        from .guarded_composition import compose_protected_local_adapter
+        return compose_protected_local_adapter(
+            engine, components=guarded_components, default_seed=default_seed,
+            artifact_status=artifact_status,
+        )
+    return LocalModelAdapter(
+        engine, default_seed=default_seed, artifact_status=artifact_status,
     )
 
 
