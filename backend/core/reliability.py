@@ -364,7 +364,20 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
                     # Once first-tick admission is visible, its start time
                     # bounds the first sweep. Later use completed ticks only,
                     # so a stalled watchdog still forces a 503.
-                    if _bwd._tick_count > 0:
+                    task = getattr(_bwd, "_watchdog_task", None)
+                    # After at least one task existed, a stopped/crashed worker
+                    # is not a healthy first-tick grace period. Only a live
+                    # newly scheduled task may start with zero heartbeat ticks.
+                    if task is not None and (task.done() or getattr(_bwd, "_stopped", False)):
+                        shed = True
+                    elif task is not None and _bwd._tick_count == 0:
+                        # Scheduling is not progress. Bound first-tick grace
+                        # if its event loop never executes the new task.
+                        scheduled = getattr(_bwd, "_watchdog_scheduled_at", 0.0)
+                        age = time.time() - scheduled if scheduled else float("inf")
+                        if age > self.wd_stale_sec or age < -self.wd_stale_sec:
+                            shed = True
+                    elif _bwd._tick_count > 0:
                         heartbeat = (
                             getattr(_bwd, "_last_tick_at", 0.0)
                             or getattr(_bwd, "_first_tick_started_at", 0.0)
@@ -376,7 +389,19 @@ class LoadSheddingMiddleware(BaseHTTPMiddleware):
         except Exception:
             shed = False
         if shed:
-            return JSONResponse({"error": "service_unavailable", "reason": "load_shedding"}, status_code=503)
+            # This rejection happens ahead of the access logger and router.
+            # Make its origin distinguishable from proxy/auth/DB 503s, and
+            # give well-behaved clients bounded retry guidance during a drain.
+            # Never cache availability responses or echo any credentials.
+            return JSONResponse(
+                {"error": "service_unavailable", "reason": "load_shedding"},
+                status_code=503,
+                headers={
+                    "Retry-After": "5",
+                    "Cache-Control": "no-store",
+                    "X-Skeleton-Rejection-Source": "load-shedding",
+                },
+            )
         return await call_next(request)
 
 

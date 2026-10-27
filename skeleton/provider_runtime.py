@@ -353,6 +353,14 @@ def provider_response_deltas(
 
     if not isinstance(response, ProviderResponse):
         raise TypeError("response must be ProviderResponse")
+    # A naive datetime silently adopts the runner's local timezone when
+    # astimezone() is called. Never invent UTC evidence from that ambiguity.
+    if emitted_at is not None and (
+        not isinstance(emitted_at, datetime)
+        or emitted_at.tzinfo is None
+        or emitted_at.utcoffset() is None
+    ):
+        raise ProviderProtocolViolationError("emitted_at must be timezone-aware")
     instant = datetime.now(UTC) if emitted_at is None else emitted_at.astimezone(UTC)
     sequence = 0
     deltas: list[ProviderDelta] = []

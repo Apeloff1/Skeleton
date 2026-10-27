@@ -19,15 +19,19 @@ test("independent RN and React major upgrades fail closed", () => {
   }
 });
 test("a correct selector cannot hide a mismatched resolved native version", () => {
-  for (const [selector, current, forged] of [
-    ["react-native@0.81.5", "0.81.5", "0.87.1"],
-    ["react-native-reanimated@~4.1.1", "4.1.7", "4.7.1"],
-    ["expo@~54.0.35", "54.0.37", "55.0.0"],
+  for (const [selector, forged] of [
+    ["react-native@0.81.5", "0.87.1"],
+    ["react-native-reanimated@~4.1.1", "4.7.1"],
+    ["expo@~54.0.35", "55.0.0"],
   ]) {
-    const header = selector + ':\n  version "' + current + '"';
-    const substitute = selector + ':\n  version "' + forged + '"';
-    assert.ok(lock.includes(header), selector + " source lock header");
-    const poisoned = lock.replace(header, substitute);
+    // Read the *current* lockfile resolution, not an obsolete patch release:
+    // changing an SDK54-compatible patch should never break the test itself.
+    const lines = lock.split("\n");
+    const position = lines.findIndex(line => line === selector + ":");
+    assert.ok(position >= 0, selector + " source lock selector");
+    assert.match(lines[position + 1], /^  version "[^"]+"$/);
+    lines[position + 1] = '  version "' + forged + '"';
+    const poisoned = lines.join("\n");
     assert.ok(validate(manifest, poisoned).some(error =>
       error.includes("resolved version") && error.includes(selector)), selector);
   }
@@ -38,5 +42,31 @@ test("missing pinned lockfile selectors cannot claim compatibility", () => {
     const selector = key + "@" + EXPECTED[key];
     const stripped = lock.split("\n").filter(line => !line.includes(selector)).join("\n");
     assert.ok(validate(manifest, stripped).some(error => error.includes(selector)));
+  }
+});
+
+
+test("a development pin cannot mask an upgraded production native runtime", () => {
+  const bad = JSON.parse(JSON.stringify(manifest));
+  bad.dependencies["react-native-reanimated"] = "~4.7.1";
+  bad.devDependencies["react-native-reanimated"] = "~4.1.1";
+  const errors = validate(bad, lock);
+  assert.ok(errors.some(error => error.includes("react-native-reanimated is duplicated")));
+  assert.ok(errors.some(error => error.includes("react-native-reanimated expected ~4.1.1")));
+});
+
+test("duplicate dependency keys fail even when both pins match", () => {
+  const bad = JSON.parse(JSON.stringify(manifest));
+  bad.devDependencies["react-native"] = bad.dependencies["react-native"];
+  assert.ok(validate(bad, lock).some(error => error.includes("react-native is duplicated")));
+});
+
+test("malformed dependency collections fail closed", () => {
+  for (const bad of [
+    {dependencies: [], devDependencies: {}},
+    {dependencies: {}, devDependencies: "wrong"},
+    {dependencies: null, devDependencies: ["react"]},
+  ]) {
+    assert.ok(validate(bad, lock).length > 0);
   }
 });

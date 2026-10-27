@@ -14,8 +14,16 @@ module only bridges that async client into the synchronous SDK style:
 * seal: the realtime routes are the ``realtime`` gate domain, verified by the
   same ``RequestSealMiddleware`` / ``verify_seal`` as every other written route,
   so the gateway's ``x-gf-seal`` (plus one ``x-request-id``) is minted per
-  (re)connect. A 401 re-mints once and resumes from the last delivered id; a
-  second 401, or any 403, raises :class:`~skeleton.client.realtime.RealtimeAuthError`.
+  (re)connect. A 401 ``invalid_seal`` re-mints once and resumes from the last
+  delivered id; a second 401, any other 401 code, or any 403 raises
+  :class:`~skeleton.client.realtime.RealtimeAuthError`. A 503
+  ``seal_unavailable`` (:class:`~skeleton.client.realtime.RealtimeSealUnavailable`,
+  #4140) raises :class:`~skeleton.client.errors.SkeletonSealConfigError`, the
+  same contract as the gateway, and is never retried. Resume uses #4140's typed
+  ``RealtimeClient(cursor=)`` path (Last-Event-ID plus ``?cursor=``).
+
+  #4122: the #4136 workaround (re-mint on any bare 401 status, before #4140
+  typed the errors) is dropped in favour of ``error_code`` dispatch.
 
 Server-side filtering: ``?job_id=`` requests engine-authorized execution
 access with ``actor_id`` and ``tenant_id`` scope (and the caller’s service
@@ -34,7 +42,14 @@ from typing import Any
 
 from skeleton.client.cancel import CancelToken
 from skeleton.client.gateway import GatewayClient
-from skeleton.client.realtime import RealtimeAuthError, RealtimeClient, SSETransport
+from skeleton.client.errors import SkeletonSealConfigError
+from skeleton.client.realtime import (
+    SEAL_UNAVAILABLE,
+    RealtimeAuthError,
+    RealtimeClient,
+    RealtimeSealUnavailable,
+    SSETransport,
+)
 from skeleton.client.streaming import StreamEvent
 
 EVENTS_PATH = "/api/v1/events"
@@ -53,6 +68,21 @@ BUILD_CHANNELS: tuple[str, ...] = ("build", "agent")
 
 _POLL_SECONDS = 0.1
 _FRAME, _ERROR, _END = "frame", "error", "end"
+
+#: #4140 machine code for a bad/expired seal; the only 401 worth one re-mint.
+INVALID_SEAL = "invalid_seal"
+
+
+def _should_remint(exc: BaseException) -> bool:
+    """#4140 typed path: re-mint only on 401 ``invalid_seal``.
+
+    A missing ``error_code`` (legacy/unparseable body) keeps the old behaviour
+    so older servers still get one re-mint.
+    """
+    if not isinstance(exc, RealtimeAuthError) or getattr(exc, "status_code", None) != 401:
+        return False
+    code = getattr(exc, "error_code", None)
+    return code is None or code == INVALID_SEAL
 
 
 def frame_to_event(frame: Any) -> StreamEvent:
@@ -80,6 +110,10 @@ class _Pump:
         self.queue: queue.Queue = queue.Queue()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._task: asyncio.Task | None = None
+        # Backpressure: the pump reads at most one frame ahead of the consumer,
+        # so a consumer that stops after N events does not let RealtimeClient
+        # reconnect in the background (the #4136 runaway reconnect loop).
+        self._demand: asyncio.Event | None = None
         self._ready = threading.Event()
         self._thread = threading.Thread(target=self._run, name="skeleton-realtime", daemon=True)
         self._thread.start()
@@ -89,6 +123,7 @@ class _Pump:
         loop = asyncio.new_event_loop()
         self._loop = loop
         try:
+            self._demand = asyncio.Event()
             self._task = loop.create_task(self._pump())
             self._ready.set()
             loop.run_until_complete(self._task)
@@ -101,18 +136,35 @@ class _Pump:
                     loop.run_until_complete(self.transport.aclose())
                 except Exception:  # noqa: BLE001 - best-effort cleanup
                     pass
+            try:  # finalize the cancelled frames()/aiter_bytes() generators
+                loop.run_until_complete(loop.shutdown_asyncgens())
+            except Exception:  # noqa: BLE001 - best-effort cleanup
+                pass
             loop.close()
 
     async def _pump(self) -> None:
         try:
             async for frame in self.client.frames():
                 self.queue.put((_FRAME, frame))
+                demand = self._demand
+                if demand is not None:
+                    await demand.wait()
+                    demand.clear()
         except asyncio.CancelledError:
             raise
         except BaseException as exc:  # noqa: BLE001 - handed to the consumer thread
             self.queue.put((_ERROR, exc))
             return
         self.queue.put((_END, None))
+
+    def ack(self) -> None:
+        """Consumer took the last frame and wants the next one."""
+        loop, demand = self._loop, self._demand
+        if loop is not None and demand is not None and not loop.is_closed():
+            try:
+                loop.call_soon_threadsafe(demand.set)
+            except RuntimeError:
+                pass
 
     def stop(self) -> None:
         self.client.close()
@@ -180,10 +232,14 @@ def stream_realtime(
 
     pump = _start(resume)
     resealed = False
+    owe_ack = False
     try:
         while True:
             if cancel is not None:
                 cancel.raise_if_cancelled()
+            if owe_ack:
+                owe_ack = False
+                pump.ack()
             try:
                 kind, item = pump.queue.get(timeout=_POLL_SECONDS)
             except queue.Empty:
@@ -192,15 +248,17 @@ def stream_realtime(
                 if cancel is not None:
                     cancel.raise_if_cancelled()
                 yield frame_to_event(item)
+                owe_ack = True
             elif kind == _END:
                 return
             else:
-                if (
-                    isinstance(item, RealtimeAuthError)
-                    and getattr(item, "status_code", None) == 401
-                    and sealer is not None
-                    and not resealed
+                if isinstance(item, RealtimeSealUnavailable) or (
+                    getattr(item, "error_code", None) == SEAL_UNAVAILABLE
                 ):
+                    raise SkeletonSealConfigError(
+                        "server has no seal secret configured (503 seal_unavailable)"
+                    ) from item
+                if _should_remint(item) and sealer is not None and not resealed:
                     resealed = True
                     point = pump.client.last_event_id
                     pump.stop()

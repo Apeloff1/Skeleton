@@ -480,7 +480,7 @@ def main() -> int:
     )
     require(
         pinned_action_count(ci, "actions/checkout", "v7.0.1") > 0
-        and pinned_action_count(ci, "actions/setup-python", "v7.0.0") > 0
+        and pinned_action_count(ci, "actions/setup-python", "v7.1.0") == 8
         and pinned_action_count(ci, "actions/setup-node", "v7.1.0") > 0,
         "CI must use immutable proven core action generations",
         failures,
@@ -489,13 +489,16 @@ def main() -> int:
     # not merely an arbitrary 40-hex ref followed by a version comment.
     require(
         ci.count("actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0") == 1
-        and ci.count("astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0") == 3,
+        and ci.count("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0") == 8
+        and ci.count("actions/setup-python@") == 8
+        and ci.count("astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2") == 3
+        and ci.count("astral-sh/setup-uv@") == 3,
         "CI Node/uv action SHA identities must match verified upstream release pins",
         failures,
     )
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.0") == 3,
-        "CI must use exactly three immutable setup-uv v10.3.0 sites backed by the repository uv pin",
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.2") == 3,
+        "CI must use exactly three immutable setup-uv v10.3.2 sites backed by the repository uv pin",
         failures,
     )
     ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'

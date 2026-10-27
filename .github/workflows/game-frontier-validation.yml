@@ -78,8 +78,6 @@ concurrency:
 jobs:
   frontier-reference:
     runs-on: ubuntu-latest
-    # The full focused suite needs its documented upper bound; job
-    # concurrency and exact-head policies are unchanged.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
