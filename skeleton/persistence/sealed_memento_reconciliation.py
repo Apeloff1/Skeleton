@@ -122,6 +122,7 @@ class SignedMementoReconciler:
 
     def __init__(
         self, *, public_keys: Mapping[str, bytes], journal: IndependentRecoveryJournal,
+        operator_principals: Mapping[str, str], operator_roles: Mapping[str, str],
         clock: Callable[[], float] = time.time,
     ) -> None:
         if not isinstance(public_keys, Mapping) or len(public_keys) < 2:
@@ -135,6 +136,26 @@ class SignedMementoReconciler:
                 raise MementoRecoveryDenied("operator keys must be uniquely provisioned")
             seen.add(raw)
             self._keys[identity] = Ed25519PublicKey.from_public_bytes(raw)
+        # Two keys are not proof of two people. Identities and roles come
+        # from the *trusted* operator policy, never the signed grant.
+        if (not isinstance(operator_principals, Mapping)
+                or not isinstance(operator_roles, Mapping)
+                or set(operator_principals) != set(self._keys)
+                or set(operator_roles) != set(self._keys)):
+            raise MementoRecoveryDenied("independently provisioned operator principals and roles required")
+        self._principals = {}
+        self._roles = {}
+        for key_id in self._keys:
+            principal = operator_principals[key_id]
+            role = operator_roles[key_id]
+            if (not isinstance(principal, str) or not 1 <= len(principal) <= 128
+                    or principal != principal.strip()
+                    or role not in {"security", "operations"}):
+                raise MementoRecoveryDenied("recovery operator principal or separation role invalid")
+            self._principals[key_id] = principal
+            self._roles[key_id] = role
+        if len(set(self._roles.values())) != 2:
+            raise MementoRecoveryDenied("both independent recovery duty roles must be provisioned")
         if not all(callable(getattr(journal, name, None)) for name in (
             "reserve", "read", "complete"
         )):
@@ -151,6 +172,10 @@ class SignedMementoReconciler:
         if (not isinstance(signatures, tuple) or len(signatures) != 2
                 or len({item.signer_id for item in signatures}) != 2):
             raise MementoRecoveryDenied("two distinct operator signatures are mandatory")
+        if (len({self._principals.get(item.signer_id) for item in signatures}) != 2
+                or {self._roles.get(item.signer_id) for item in signatures}
+                != {"security", "operations"}):
+            raise MementoRecoveryDenied("two independent people and separated duties required")
         message = grant.signed_bytes()
         for item in signatures:
             key = self._keys.get(item.signer_id)
