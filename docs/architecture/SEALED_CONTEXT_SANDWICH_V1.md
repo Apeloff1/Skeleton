@@ -326,3 +326,11 @@ native tokenizer/sampler attestation, and exact-head CI qualification.
 A passing local focused test suite or a skipped CI job is not merge
 readiness. Mongo transaction durability requires replica-set or sharded
 transaction support; do not silently downgrade to standalone writes.
+
+## Phase 13-14 delivery validation (2026-10-27)
+
+The guarded local inference path now validates nested JSON with the strict and bounded delivery_schema module at admission and before release. Both the contract schema and native sampler schema are pinned across a generation call, and unexpected mutation rejects the result. Unsupported schema keywords, duplicate keys, nonfinite values, invalid Unicode, and excessive structure are rejected. This is not native sampler certification.
+
+Regex delivery now uses delivery_regex with an explicitly declared timeout-capable regex dependency. Regex patterns are limited to 2048 bytes, result strings to 64 KiB, and individual matches to 50 ms. Missing matcher support, invalid patterns and timeouts reject delivery. These are post-generation checks, not proof of model understanding or provider enforcement.
+
+The isolated focused regression suite passed 150 tests. Full exact-head Merge Readiness, Backend Quality and E2E qualification is still pending; skipped jobs cannot certify release.
