@@ -16,8 +16,8 @@ UV_REQUIRED_VERSION = "==0.12.15"
 JAVA_BOOTSTRAP_MAJOR = 21
 GIT_BOOTSTRAP_MINIMUM = "2.40"
 BOOTSTRAP_COMMAND = "mise run bootstrap"
-RUFF_CI_VERSION = "0.17.1"
-RUFF_DEV_REQUIREMENT = "ruff>=0.17.1,<0.18"
+RUFF_CI_VERSION = "0.17.2"
+RUFF_DEV_REQUIREMENT = "ruff>=0.17.2,<0.18"
 EXPO_SDK_VERSION = "~54.0.35"
 REACT_VERSION = "19.1.0"
 REACT_NATIVE_VERSION = "0.81.5"
@@ -596,7 +596,8 @@ def main() -> int:
     require(
         cancel_false(backend_quality)
         or sha_scoped_cancellation(backend_quality)
-        or ref_scoped_cancellation(backend_quality),
+        or ref_scoped_cancellation(backend_quality)
+        or ci_preserves_main_run_evidence(backend_quality),
         "Backend Quality concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
