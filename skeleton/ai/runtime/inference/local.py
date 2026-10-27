@@ -3991,6 +3991,21 @@ class LocalModelAdapter(ProviderAdapter):
             tool_choice=choice,
             specific_tool_id=(str(request.specific_tool_id).strip() if choice == "specific" else None),
         )
+        if self.require_guarded_inference:
+            # Compiler context_digest and native Merkle root are distinct
+            # namespaces. A durable, independently authorized snapshot reader
+            # may derive the latter after verifying the *exact* provider
+            # envelope against its stored compiled handoff.
+            projector = getattr(self.guarded_service.snapshots, "prepare_provider", None)
+            if projector is not None:
+                if not callable(projector):
+                    raise ProviderPolicyError("canonical guarded context projector is unavailable")
+                admitted_root = await projector(request)
+                if (not isinstance(admitted_root, str)
+                        or len(admitted_root) != 64
+                        or any(ch not in "0123456789abcdef" for ch in admitted_root)):
+                    raise ProviderPolicyError("durable native context root is invalid")
+                local_request = replace(local_request, context_digest=admitted_root)
         remaining = float(budget.max_wall_seconds) - (time.monotonic() - started)
         if request.deadline is not None:
             if (
