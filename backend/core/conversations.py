@@ -570,7 +570,7 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Delete one conversation plus its explicitly linked governed records."""
 
-        if self.canonical_source_epoch is not None:
+        if getattr(self, "canonical_source_epoch", None) is not None:
             # This operation may cascade to OTHER actors and storage owners.
             # An actor-scoped epoch does not prove their deletion custody.
             raise ConversationStorageUnavailable(
@@ -687,7 +687,7 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Execute one tenant retention plan across engine and conversation owners."""
 
-        if self.canonical_source_epoch is not None:
+        if getattr(self, "canonical_source_epoch", None) is not None:
             raise ConversationStorageUnavailable(
                 "protected tenant retention requires a cross-owner retirement fence"
             )
@@ -802,7 +802,7 @@ class MongoConversationAuthority:
         record_ids: tuple[str, ...] | None = None,
         reason: str = "tenant-request",
     ) -> Mapping[str, Any]:
-        if self.canonical_source_epoch is not None:
+        if getattr(self, "canonical_source_epoch", None) is not None:
             raise ConversationStorageUnavailable(
                 "protected governed deletion requires a cross-owner retirement fence"
             )
@@ -887,8 +887,6 @@ class MongoConversationAuthority:
                 try:
                     memento_owner = await self.threads.find_one(
                         {"_id": affected_thread_id, "tenant_id": str(tenant_id)},
-                        {"owner_id": 1, "_sealed_memento_head": 1,
-                         "_sealed_memento_binding": 1, "_sealed_memento_custody": 1},
                     )
                 except PyMongoError as exc:
                     raise ConversationStorageUnavailable(
@@ -2062,7 +2060,7 @@ class MongoConversationAuthority:
         after_sequence: int = 0,
         limit: int = 100,
     ) -> tuple[ConversationMessage, ...]:
-        if self.canonical_source_epoch is not None:
+        if getattr(self, "canonical_source_epoch", None) is not None:
             thread = await self.get_thread(
                 thread_id, tenant_id=tenant_id, owner_id=owner_id,
             )
@@ -2104,7 +2102,7 @@ class MongoConversationAuthority:
     ) -> tuple[ConversationMessage, ...]:
         # Protected source reads must not perform opportunistic writes outside
         # the writer epoch. Normal conversation owners retain WAL recovery.
-        if self.canonical_source_epoch is not None:
+        if getattr(self, "canonical_source_epoch", None) is not None:
             thread = await self.get_thread(
                 thread_id, tenant_id=tenant_id, owner_id=owner_id,
             )
@@ -2897,7 +2895,7 @@ class MongoConversationAuthority:
         ):
             raise ValueError("expected_thread_version must be a positive integer")
         for _attempt in range(3):
-            if self.canonical_source_epoch is not None:
+            if getattr(self, "canonical_source_epoch", None) is not None:
                 thread = await self.get_thread(
                     thread_id, tenant_id=tenant_id, owner_id=owner_id,
                 )
