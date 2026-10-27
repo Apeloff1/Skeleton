@@ -362,6 +362,23 @@ class GuardedLocalInference:
         verify_rendered_spans(after_parts, after_bytes)
         if token_echo is not None and _hash(after_bytes) != token_echo:
             raise SealedContextIntegrityError("native model input changed during inference")
+        # Preflight attestation cannot be assumed to remain valid after native
+        # work. A backend can replace its projection or grammar configuration
+        # while inference is running; no output is released on such drift.
+        if callable(native_renderer) and after_rendered != request.rendered_input:
+            if self.projection_attestor is None or self.projection_attestor(
+                request, after_rendered, root
+            ) is not True:
+                raise SealedContextIntegrityError(
+                    "native prompt projection attestation changed during inference"
+                )
+        if contract.format != "text" and contract.require_sampler_enforcement:
+            if self.sampler_support is None or self.sampler_support(
+                self.engine.model, contract
+            ) is not True:
+                raise SealedContextBoundaryError(
+                    "native sampler grammar is no longer attested at delivery"
+                )
         text = getattr(result, "text", None)
         if not isinstance(text, str):
             raise SealedContextError("local model did not produce text")
