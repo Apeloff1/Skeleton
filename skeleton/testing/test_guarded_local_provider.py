@@ -246,3 +246,51 @@ def test_guards_from_different_composition_roots_cannot_rebind_engine():
     )
     with pytest.raises(ProviderPolicyError, match="cannot be replaced"):
         engine._bind_verified_guard(other)
+
+
+def test_guarded_provider_stream_buffers_until_postflight_authority_recheck():
+    async def scenario():
+        _, authority, _, adapter, request = fixture()
+        authority.mutate = True
+        emitted = []
+        with pytest.raises(SealedContextReplayError):
+            async for delta in adapter.stream(request):
+                emitted.append(delta)
+        # Streaming must never send the first byte of an unverified answer.
+        assert emitted == []
+        assert authority.calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_guarded_provider_stream_yields_only_after_verified_generation():
+    async def scenario():
+        _, authority, _, adapter, request = fixture()
+        chunks = [delta async for delta in adapter.stream(request)]
+        assert chunks
+        assert authority.calls == 2
+        assert all(chunk is not None for chunk in chunks)
+
+    asyncio.run(scenario())
+
+
+def test_guarded_provider_stream_rejects_forged_delivery_receipt_without_deltas():
+    async def scenario():
+        from dataclasses import replace
+        _, _, service, adapter, request = fixture()
+        original = service.generate
+
+        async def forge(*args, **kwargs):
+            generation = await original(*args, **kwargs)
+            return replace(generation, receipt=replace(
+                generation.receipt, response_sha256="0" * 64,
+            ))
+
+        service.generate = forge
+        chunks = []
+        with pytest.raises(ProviderPolicyError, match="receipt"):
+            async for delta in adapter.stream(request):
+                chunks.append(delta)
+        assert chunks == []
+
+    asyncio.run(scenario())
