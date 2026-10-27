@@ -13,9 +13,9 @@ def _workflow() -> str:
 
 def test_privileged_workflow_uses_only_trusted_manual_default_branch_trigger():
     text = _workflow()
-    assert "\\n  workflow_run:" not in text
-    assert "\\n  schedule:" not in text
-    assert "workflow_dispatch:" in text
+    assert "\n  workflow_run:" not in text
+    assert "\n  schedule:" not in text
+    assert "on:\n  workflow_dispatch:" in text
     assert "pull_request_target:" not in text
     assert "pull_request_review:" not in text
     assert "pull_request_review_comment:" not in text
