@@ -11,10 +11,10 @@ def _workflow() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
 
-def test_privileged_workflow_uses_only_trusted_default_branch_triggers():
+def test_privileged_workflow_uses_only_trusted_manual_default_branch_trigger():
     text = _workflow()
-    assert "workflow_run:" in text
-    assert "schedule:" in text
+    assert "\\n  workflow_run:" not in text
+    assert "\\n  schedule:" not in text
     assert "workflow_dispatch:" in text
     assert "pull_request_target:" not in text
     assert "pull_request_review:" not in text
@@ -35,13 +35,13 @@ def test_privileged_python_executes_only_staged_package_in_isolated_mode():
     assert "python -m skeleton.pr_automation.runner" not in text
 
 
-def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
+def test_manual_workflow_serializes_writers_without_ci_fanout():
     text = _workflow()
-    assert "types: [completed]" in text
+    assert "types: [completed]" not in text
     assert "types: [requested, in_progress, completed]" not in text
     assert "types: [requested]" not in text
     assert "types: [in_progress]" not in text
-    assert "workflows:\n      - Merge Readiness" in text
+    assert "workflows:\n      - Merge Readiness" not in text
     assert "      - CI/CD" not in text
     assert "      - Backend Quality" not in text
     assert "      - Dependency Review" not in text
@@ -49,7 +49,7 @@ def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
     assert "      - CodeQL" not in text
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
-    assert "branches-ignore:\n      - main" in text
+    assert "branches-ignore:\n      - main" not in text
     assert 'branches:\n      - "*"\n      - "**"' not in text
     assert "github.event.workflow_run.conclusion != 'cancelled'" in text
     assert "github.event_name != 'workflow_run'" in text
