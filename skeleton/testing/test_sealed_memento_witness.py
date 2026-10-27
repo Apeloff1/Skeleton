@@ -68,6 +68,7 @@ class TransactionalMongoDouble:
         self.version = 1
         self.fail_purge = False
         self.publish_calls = 0
+        self.custody_modes = []
 
     async def trusted_head(self, *, archive):
         if self.retired:
@@ -77,7 +78,8 @@ class TransactionalMongoDouble:
 
     async def publish(self, *, archive, expected_head, expected_thread_version, stream, ciphertext,
                       custody_mode="legacy"):
-        assert custody_mode == "witnessed"
+        assert custody_mode in ("legacy", "witnessed")
+        self.custody_modes.append(custody_mode)
         self.publish_calls += 1
         assert archive is self.archive
         if self.retired or expected_thread_version != self.version:
@@ -148,6 +150,7 @@ async def add(archive, guarded, serial=1):
         stream="user", ciphertext=wire,
     )
     assert observed == expected
+    assert guarded.mongo.custody_modes[-1] == "witnessed"
     return expected
 
 
