@@ -558,6 +558,7 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("conversation governed deletion exceeds record bound")
         return tuple(sorted(selected))
 
+    @fence_conversation_write
     async def delete_thread_with_governance(
         self,
         thread_id: str,
@@ -791,6 +792,8 @@ class MongoConversationAuthority:
         record_ids: tuple[str, ...] | None = None,
         reason: str = "tenant-request",
     ) -> Mapping[str, Any]:
+        if self.canonical_source_epoch is not None:
+            self.canonical_source_epoch.require_tenant_writer(tenant_id=tenant_id)
         planner = self.governance_deletion_planner
         acker = self.governance_deletion_acker
         if planner is None or acker is None:
