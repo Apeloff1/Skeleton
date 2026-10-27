@@ -42,3 +42,102 @@ These routines are **read-only export and verification**. They do not create a n
 ## Conformance
 
 `python -m pytest skeleton/testing/test_sealed_sandwich.py -q` covers byte fidelity, randomization, tag tamper, metadata/key isolation, nonce/canonical encoding, gaps, duplicate/reordered frames, stale committed heads, trusted checkpoints, event duplication, model budget refusal, key rotation, paged canonical export, missing canonical messages and stale verification. Run the full required repository architecture gates from `AGENTS.md` after repository-level changes.
+
+
+## Phase 2: incremental Mongo-shaped streaming and binary attachments (2026-10-27)
+
+The async bridge in `skeleton/context/sealed_conversation_async.py` accepts
+the existing `MongoConversationAuthority.get_thread/list_messages` interface
+without introducing a new owner. `iter_canonical_events_async`:
+
+1. Reads the authorized thread ID, version and message-sequence high-water mark.
+2. Emits an encrypted candidate thread checkpoint.
+3. Pages **all** immutable messages in blocks of at most 500, including
+   superseded and inactive-branch records, not only the visible transcript.
+4. Enforces strictly contiguous sequence numbering and the original thread ID;
+   missing rows and crossing a tenant/owner scope fail closed.
+5. Re-reads the canonical thread after the final message. A moved version or
+   changed snapshot rejects staging, even if earlier frames were sealed.
+
+`stage_canonical_conversation_async` writes encrypted candidate frames to an
+`AsyncFrameStagingSink` using begin/append/complete/abort. The sink must be
+private, idempotently abortable, quota-limited and inaccessible to readers until
+a **separate authoritative commit** succeeds. On an export exception, the sink
+is aborted. The returned `StagedContextReceipt` is NOT proof of a committed
+archive; it reports candidate head, canonical thread version, message count,
+and emitted ciphertext-byte count. Under no circumstances should a client
+return its own receipt and thereby establish a current trusted head.
+
+`verify_staged_conversation_async` independently refetches canonical Mongo
+messages and decrypts supplied frames one at a time. It checks the complete
+canonical byte representation, authenticated sequence chain, tenant/model/policy,
+end-of-stream, source version, message count, candidate head and ciphertext
+count. Its expected version comes from an independently authorized Mongo read;
+a matching old client-held archive is rejected if canonical state changed.
+Because the source is read twice, object references and mutable external
+artifacts still need **their own** versioned custody and retrieval controls.
+
+### Chunked binary object format
+
+`skeleton/context/sealed_blobs.py` can stage content bytes behind attachment,
+tool-result or artifact references. It never writes plaintext into a public
+header. `seal_blob_frames` incrementally reads up to 256 KiB per chunk;
+each chunk uses `ContextEvent` with exact opaque bytes, canonical object ID,
+exact-next frame sequence, encrypted origin binding and AES-GCM. A final
+encrypted `receipt` event includes the object ID, total bytes, number of
+chunks, protocol version, and SHA-256 of the complete plaintext object.
+
+`restore_blob_to_staging` verifies all chunk indices, object identity,
+authenticated frame links, terminal receipt and **externally trusted** final
+head while streaming to a disposable output writer. The caller MUST discard
+this writer on ANY exception. The output MUST NOT be published to a user or
+tool before the function returns successfully. The wrapper
+`restore_blob_bytes` is intentionally capped at 256 KiB for in-memory use.
+Sources exceeding the explicit 8 GiB maximum fail, not silently truncate.
+Storage quotas and object lifecycle/retention obligations remain with their
+canonical owners.
+
+These object frames are only **encrypted candidate payloads**. No attachment
+is silently considered backed up merely because `content_ref` appears in a
+conversation message. A production adapter must resolve references through
+authorization, verify classification/consent, stage actual bytes, and commit an
+immutable object-version identity and archive head together with a durable
+publication receipt. A reference that cannot be resolved is an **incomplete
+archive**, not evidence of zero loss.
+
+### Required integration transaction (still pending)
+
+The authoritative conversation owner must expose a transaction/CAS operation
+scoped by tenant, owner, thread, source version and archive generation:
+
+- Validate the source message/snapshot version and authorization.
+- Verify frame count, object manifests, ciphertext existence, storage quota,
+  referenced object versions, retention rules and key availability.
+- Atomically fence the expected previous trusted head and record the next
+  commitment / durable outbox publication under the *existing* Mongo owner.
+- Mark a generation readable only when its entire encrypted payload is durable
+  and verified; otherwise keep it uncommitted and retry or discard staging.
+- On restart, reconcile unresolved outbox intents idempotently and fail closed
+  on missing frames, missing keys, mismatched heads or revoked permissions.
+- Support key rotation, legal deletion/crypto-erasure and owner-scoped export
+  without creating a second conversation authority.
+
+Do not claim operational zero-loss, authoritative replay resistance or
+production recovery until that transaction and its crash/rollback/replication
+tests land, are verified against live Mongo and pass exact-head CI.
+
+### Targeted conformance additions
+
+```bash
+python -m pytest -q \
+  skeleton/testing/test_sealed_sandwich.py \
+  skeleton/testing/test_sealed_conversation_async.py \
+  skeleton/testing/test_sealed_blobs.py
+```
+
+The added async suite checks multi-page (1,105-message) Unicode export,
+independent matching recovery, drift, storage-failure abort, stale archive,
+missing/extra frames and tenant mismatch. Binary tests check byte-exact
+streaming for NUL/non-UTF8/Unicode payloads, empty objects, digest-bearing
+terminal frames, wrong object IDs, duplication/reordering, truncation,
+stale trusted head, write failures and size-budget refusal.
