@@ -2044,11 +2044,14 @@ class MongoConversationAuthority:
         after_sequence: int = 0,
         limit: int = 100,
     ) -> tuple[ConversationMessage, ...]:
-        thread = await self._recover_prepared(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
+        if self.canonical_source_epoch is not None:
+            thread = await self.get_thread(
+                thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            )
+        else:
+            thread = await self._recover_prepared(
+                thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            )
         if isinstance(after_sequence, bool) or not isinstance(after_sequence, int) or after_sequence < 0:
             raise ValueError("after_sequence must be a non-negative integer")
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
@@ -2267,6 +2270,7 @@ class MongoConversationAuthority:
             raise ConversationNotFound(user_message_id)
         return self._bound_user_request_refs(_message_from_doc(doc), doc)
 
+    @fence_conversation_write
     async def bind_user_request_refs(
         self,
         thread_id: str,
@@ -2872,7 +2876,14 @@ class MongoConversationAuthority:
         ):
             raise ValueError("expected_thread_version must be a positive integer")
         for _attempt in range(3):
-            thread = await self._recover_prepared(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+            if self.canonical_source_epoch is not None:
+                thread = await self.get_thread(
+                    thread_id, tenant_id=tenant_id, owner_id=owner_id,
+                )
+            else:
+                thread = await self._recover_prepared(
+                    thread_id, tenant_id=tenant_id, owner_id=owner_id,
+                )
             if expected_thread_version is not None and thread.version != expected_thread_version:
                 raise ConversationConflict("thread version conflict; reconstruct the current conversation")
             messages, cursor, tip = await self._active_lineage_page(
