@@ -41,7 +41,7 @@ class Authority:
 
 def fixture():
     model = ReferenceNGramModel.train(["hello trusted answer"] * 6, order=2)
-    engine = LocalInferenceEngine(model, cache_size=2)
+    engine = LocalInferenceEngine(model, cache_size=2, require_guarded_context=True)
     local = LocalInferenceRequest(prompt="hello", instructions="policy", max_output_tokens=4)
     root = merkle_root(request_parts(local))
     authority = Authority(root=root, instruction_digest=sha256(b"policy").hexdigest())
@@ -174,4 +174,32 @@ def test_provider_rejects_unsolicited_structured_output():
         service.generate = tamper
         with pytest.raises(ProviderPolicyError, match="unsolicited structured"):
             await adapter.generate(request)
+    asyncio.run(scenario())
+
+
+def test_direct_engine_cache_and_preparation_cannot_bypass_protected_mode():
+    async def scenario():
+        engine, authority, _, adapter, request = fixture()
+        from skeleton.ai.runtime.inference.local import LocalInferenceRequest
+        native = LocalInferenceRequest(
+            prompt=request.prompt, instructions=request.instructions,
+            max_output_tokens=4, context_digest=request.context_digest,
+        )
+        from skeleton.provider_runtime import ProviderPolicyError
+        for call in (
+            lambda: engine.prepare_input(native, tenant_scope_id="tenant"),
+        ):
+            with pytest.raises(ProviderPolicyError):
+                call()
+        with pytest.raises(ProviderPolicyError):
+            await engine.generate(native, tenant_scope_id="tenant")
+        with pytest.raises(ProviderPolicyError):
+            await engine.generate_many((native,), tenant_scope_id="tenant")
+        # Provider entrypoint may still run, including a subsequent cached run,
+        # but only while the guarded preflight and postflight are both valid.
+        await adapter.generate(request)
+        await adapter.generate(request)
+        assert authority.calls == 4
+        with pytest.raises(ProviderPolicyError):
+            await engine.generate(native, tenant_scope_id="tenant")
     asyncio.run(scenario())
