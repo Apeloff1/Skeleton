@@ -853,6 +853,38 @@ class MongoConversationAuthority:
                         thread_id=affected_thread_id,
                     )
 
+        # A derived encrypted archive can retain deleted message bytes. Fence
+        # memento publication and purge ciphertext before the first canonical
+        # physical deletion, including message-only and retention operations.
+        # Threads without a sealed head follow the existing deletion path.
+        if actions:
+            affected_thread_ids = {
+                str(query["_id"] if kind == "thread" else query["thread_id"])
+                for _order, kind, query, _raw in actions
+            }
+            for affected_thread_id in sorted(affected_thread_ids):
+                try:
+                    memento_owner = await self.threads.find_one(
+                        {"_id": affected_thread_id, "tenant_id": str(tenant_id)},
+                        {"owner_id": 1, "_sealed_memento_head": 1},
+                    )
+                except PyMongoError as exc:
+                    raise ConversationStorageUnavailable(
+                        "memento deletion authority lookup failed"
+                    ) from exc
+                if memento_owner is not None and "_sealed_memento_head" in memento_owner:
+                    owner_id = str(memento_owner.get("owner_id") or "")
+                    if not owner_id:
+                        raise ConversationStorageUnavailable(
+                            "memento deletion owner identity unavailable"
+                        )
+                    from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
+
+                    await MongoMementoAuthority(self).retire_thread(
+                        tenant_id=str(tenant_id), owner_id=owner_id,
+                        thread_id=affected_thread_id,
+                    )
+
         actions.sort(key=lambda item: (item[0], item[3]["record_id"]))
         deleted: list[str] = []
         acknowledgements: list[dict[str, Any]] = []
