@@ -289,3 +289,40 @@ Cryptography cannot eliminate LLM attention fading, hallucinations, prompt
 injection by itself, or finite context windows. Model-side internal thoughts
 and proprietary provider KV tensors remain unavailable unless their runtimes
 expose independently consented, version-compatible state export.
+
+
+## Full-chain audit and verified retrieval integrity (2026-10-27)
+
+`skeleton/context/sealed_memento_audit.py` exposes
+`audit_memento_chain` for the SQLite conformance owner and
+`audit_memento_chain_async` for the production-shaped Mongo reader.
+Both obtain a catalog head **independently** before and after the scan,
+read a maximum of 2,000 events per page, pin each page's starting head,
+check every exact-next global sequence, reject thread version drift,
+cross-check counts of user/LLM/delivered-work events, and produce a
+domain-separated deterministic transcript digest without returning any
+recovered plaintext in the audit receipt.
+
+This is a bounded **verification operation**, not a lossless expansion
+of the model context window or a claim that a syntactically well-formed
+conversation was fully attended to by a model. Audit capacity is capped
+at 512 pages (up to 1,024,000 events), must be operator-budgeted, and
+fails closed when the scan cannot complete. Each page's owner-backed
+reader remains responsible for AES-GCM replay and independently
+persisted checkpoint verification. The digest must remain in authorized
+operational evidence; it is not an external rollback-resistant signature.
+
+`skeleton/context/sealed_memento_retrieval.py` additionally pins
+all causal expansion windows to the previously authenticated head and
+checks point-read checkpoint serials, page counts and terminal flags.
+Fault-injection tests cover cross-page gaps, deleted/inconsistent
+prefixes, replaced resume heads, lost point reads, versions changing
+during retrieval, and truncation at the scan budget.
+
+**Deployment gaps:** no independent monotonic off-database head witness
+or KMS-backed disaster-recovery evidence yet; the optional guarded
+local-inference facade still requires production composition routing,
+native tokenizer/sampler attestation, and exact-head CI qualification.
+A passing local focused test suite or a skipped CI job is not merge
+readiness. Mongo transaction durability requires replica-set or sharded
+transaction support; do not silently downgrade to standalone writes.
