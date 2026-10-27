@@ -132,6 +132,7 @@
       "path": "docker-compose.yml",
       "kind": "database",
       "public_url": "http://localhost:8000",
+      "health_path": "/api/v2/heartbeat",
       "container_port": 8000,
       "depends_on": [],
       "canonical": false,

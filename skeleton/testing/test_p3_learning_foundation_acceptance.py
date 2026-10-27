@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
+
+from skeleton.testing.local_inference_fixtures import local_serving_resources  # noqa: F401
+from skeleton.ai.runtime.training.evaluation import EvaluationCase, EvaluationSuite
 
 from skeleton.ai.runtime.learning_foundation.data import DatasetRegistry
 from skeleton.ai.runtime.learning_foundation.learning import (
@@ -118,17 +122,34 @@ def test_p3_t2_provider_independent_learning_to_multimodal_acceptance() -> None:
         episode_ids=(episode.episode_id,),
     )
     assert stage.passed is True
-    verifier = learning.evaluate_verifier_candidate(
-        VerifierCandidate(
+    candidate = VerifierCandidate(
             candidate_id="p3-t2-verifier-candidate",
             model_digest=run.artifact.model_digest,
             training_receipt_digest=run.receipt.digest,
-            benchmark_refs=("benchmark:p3-t2-heldout",),
+            benchmark_refs=("benchmark:p3-t2-heldout-a", "benchmark:p3-t2-heldout-b"),
             intended_claims=("claim:bounded-local-learning",),
-        ),
+        )
+    model = run.artifact.load_reference_model()
+    evaluations = []
+    for index, (prompt, expected) in enumerate((
+        ("local models preserve evidence", "identity"),
+        ("training recovery preserves", "checkpoints"),
+    )):
+        suite = EvaluationSuite(
+            f"p3-t2-heldout-{index}", "1",
+            (EvaluationCase(f"case-{index}", prompt, expected, 1),),
+            "heldout", _sha(f"p3-t2-fixture-population-{index}"),
+        )
+        evaluations.append(asyncio.run(learning.evaluate_benchmark(
+            candidate, model=model, training_receipt=run.receipt,
+            benchmark_ref=candidate.benchmark_refs[index], suite=suite,
+            verifier_id="p3-t2-independent-model-verifier", seed=42,
+        )))
+    verifier = learning.evaluate_verifier_candidate(
+        candidate,
         verifier_id="p3-t2-independent-model-verifier",
         trainer_id=run.receipt.trainer_id,
-        evaluation_refs=("eval:training-gate", "eval:curriculum-gate"),
+        evaluation_refs=tuple(receipt.digest for receipt in evaluations),
         curriculum_decision_refs=(stage.decision_digest,),
     )
     assert verifier.passed is True

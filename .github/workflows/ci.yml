@@ -337,6 +337,13 @@ jobs:
       - run: yarn typecheck
       - run: yarn test:operation-stream
       - run: yarn test:conversation
+      - run: yarn test:auth-transport
+      - run: yarn test:playable-preview
+      - run: yarn test:private-media
+      - run: yarn test:creator-identity
+      - name: Private job recovery, inactive crawler projection, and cache mitigation regressions
+        run: node --test scripts/test-playable-job-retention.cjs scripts/test-playable-job-observation.cjs scripts/test-crawler-inactive-session.cjs scripts/test-http-cache-max-stale-patch.cjs
+      - run: yarn test:metro-env-cache
       - run: yarn test:product-journeys
       - name: App-foundation contract regressions (consolidated from Merge Readiness)
         shell: bash
@@ -382,7 +389,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$EVENT_NAME" = "pull_request" ] && git rev-parse --verify -q HEAD^2 >/dev/null \
-            && ! git diff --name-only HEAD^1 HEAD | grep -Eq '(^|/)Dockerfile|^\.dockerignore|compose[^/]*\.ya?ml$|^\.github/workflows/ci\.yml$'; then
+            && ! git diff --name-only HEAD^1 HEAD | grep -Eq '(^|/)Dockerfile|^\.dockerignore|compose[^/]*\.ya?ml$|^frontend/(nginx\.conf|scripts/test-nginx-runtime-dns\.mjs)$|^\.github/workflows/ci\.yml$'; then
             echo "build=false" >> "$GITHUB_OUTPUT"
           else
             echo "build=true" >> "$GITHUB_OUTPUT"
@@ -413,6 +420,13 @@ jobs:
           context: ./frontend
           target: production
           push: false
+          load: true
+          tags: skeleton-frontend:ci
           platforms: linux/amd64
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+      - name: Frontend ingress DNS outage and replacement regression
+        if: steps.scope.outputs.build == 'true'
+        env:
+          NGINX_TEST_IMAGE: skeleton-frontend:ci
+        run: node --test frontend/scripts/test-nginx-runtime-dns.mjs

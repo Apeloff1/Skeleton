@@ -5,6 +5,8 @@ redirected into the app. Crawlable at /api/share/... (served by the backend).
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database
+
 import os
 import html
 import json
@@ -14,8 +16,9 @@ from fastapi.responses import HTMLResponse
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 
-router = APIRouter(prefix="/api/share", tags=["share"])
+router = project_router(prefix="/api/share", tags=["share"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 
 def _page(title: str, desc: str, image: str, deep_link: str) -> str:

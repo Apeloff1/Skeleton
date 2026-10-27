@@ -154,6 +154,66 @@ def _registry_server(payload):
             try:
                 self.wfile.write(raw)
             except (BrokenPipeError, ConnectionResetError):
+                pass  # A bounded reader can close before an oversized body ends.
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_large_mounted_route_registry_is_observable_over_real_http():
+    install = importlib.import_module("skeleton.app.first_install")
+    payload = {
+        "critical_routes": {"ok": True, "report_available": True, "missing": []},
+        "mounted_routes": ["/api/studio/" + str(i) for i in range(7000)],
+    }
+    assert 65536 < len(json.dumps(payload).encode()) < 512 * 1024
+    with _registry_server(payload) as base:
+        report = install.critical_backend_route_report(base, timeout=5)
+    assert report["observed"] is True
+    assert report["ready"] is True
+
+
+def test_registry_allowance_remains_bounded_over_real_http():
+    install = importlib.import_module("skeleton.app.first_install")
+    payload = {
+        "critical_routes": {"ok": True, "report_available": True, "missing": []},
+        "padding": "x" * (512 * 1024),
+    }
+    with _registry_server(payload) as base:
+        report = install.critical_backend_route_report(base, timeout=5)
+    assert report["observed"] is False
+    assert report["ready"] is False
+
+
+def test_ordinary_readiness_keeps_small_response_bound_over_real_http():
+    install = importlib.import_module("skeleton.app.first_install")
+    with _registry_server({"padding": "x" * 70000}) as base:
+        assert install._bounded_json(base + "/api/ai/providers", timeout=5) is None
+
+
+@contextmanager
+def _registry_server(payload):
+    raw = json.dumps(payload).encode()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            try:
+                self.wfile.write(raw)
+            except (BrokenPipeError, ConnectionResetError):
                 pass  # A bounded reader may close before an oversized response ends.
 
         def log_message(self, *args):

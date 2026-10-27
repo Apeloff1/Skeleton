@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from dataclasses import replace
 import hashlib
 import json
 import socket
 import threading
 
 import pytest
+
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
 
 from skeleton.ai.runtime.functional_ai import FunctionalAIRequest, FunctionalAIRuntime
 from skeleton.ai.runtime.inference import (
@@ -23,7 +26,23 @@ from skeleton.skills.tool_contract import ToolManifest, ToolEffect
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
-NOW = datetime(2026, 10, 2, 3, 30, tzinfo=timezone.utc)
+def test_vs001_compiles_materialized_inputs_without_trusting_source_digest() -> None:
+    request = FunctionalAIRequest(
+        request_id="context-binding",
+        objective="Answer one question.",
+        prompt="What is alpha?",
+        instructions="Use authorized evidence.",
+        context_digest="a" * 64,
+    )
+    changed = replace(request, prompt="What is beta?")
+    first = request.to_execution_request().context_policy
+    second = changed.to_execution_request().context_policy
+    assert first["context_digest"] != request.context_digest
+    assert first["context_digest"] != second["context_digest"]
+    assert first["source_snapshot"] != second["source_snapshot"]
+    assert first["compiler_version"] == request.compiled_context.compiler_version
+    assert first["context_id"] == request.compiled_context.context_id
+    assert len(first["source_snapshot"]) == 3
 
 
 def _local_tool_model() -> LocalModelAdapter:
@@ -67,6 +86,7 @@ def _local_tool_model() -> LocalModelAdapter:
                 model_id="vs001-local-tool-model",
                 model_digest=model_digest,
                 runner=runner,
+                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
@@ -141,7 +161,7 @@ async def test_vs001_local_model_tool_persist_reconnect_end_to_end(
         instructions="Use only the explicitly provided local tool and local model.",
         context_digest=hashlib.sha256(b"vs001-context").hexdigest(),
         allowed_tool_ids=("repo.read",),
-        created_at=NOW,
+        created_at=datetime.now(timezone.utc),
     )
     runtime = FunctionalAIRuntime(
         repo,
@@ -228,6 +248,7 @@ async def test_vs001_rejects_local_model_identity_swap_between_turns(tmp_path) -
         model_id="identity-model-v1",
         model_digest=original_digest,
         runner=runner,
+        protocol_capabilities=("text-generation", "tool-calls"),
     )
     holder["backend"]=backend
     adapter=LocalModelAdapter(LocalInferenceEngine(backend))
@@ -263,7 +284,7 @@ async def test_vs001_rejects_local_model_identity_swap_between_turns(tmp_path) -
         instructions="Stay on one bound local model.",
         context_digest=hashlib.sha256(b"identity-context").hexdigest(),
         allowed_tool_ids=("repo.read",),
-        created_at=NOW,
+        created_at=datetime.now(timezone.utc),
     )
     runtime=FunctionalAIRuntime(
         repo,
@@ -276,7 +297,7 @@ async def test_vs001_rejects_local_model_identity_swap_between_turns(tmp_path) -
                 "policy_satisfied":True,
                 "verifier_id":"identity-test",
                 "candidate_digest":hashlib.sha256(b"completed after swap").hexdigest(),
-                "context_digest":request.context_digest,
+                "context_digest":request.compiled_context.context_digest,
             },
             evidence_refs=("evidence:identity-test",),
         ),
@@ -304,7 +325,7 @@ async def test_vs001_rejects_identity_drift_before_new_execution(tmp_path) -> No
         prompt="Answer locally.",
         instructions="No identity drift.",
         context_digest=hashlib.sha256(b"pre-run-context").hexdigest(),
-        created_at=NOW,
+        created_at=datetime.now(timezone.utc),
     )
     with pytest.raises(RuntimeError,match="identity changed after binding"):
         await runtime.execute(request)

@@ -10,6 +10,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 from skeleton.app.local_ai import OfflineAISession
 from skeleton.app.local_ai_transcript import (
     LocalTranscriptError,

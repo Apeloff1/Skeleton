@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from skeleton.repo_machine.builder import RepositoryModelBuilder
 from skeleton.repo_machine.context import context_for_intent
@@ -111,10 +113,50 @@ class ContextWorkGraphTests(unittest.TestCase):
                 conflicts.update(node.conflict_keys)
 
     def test_truncated_context_compacts_lists(self) -> None:
+        from skeleton.repo_machine import context as context_module
+
         with tempfile.TemporaryDirectory() as temp:
             model = fixture(Path(temp))
-            context = context_for_intent(model, "overview", byte_limit=4096)
-            self.assertIn("fingerprint", context)
+            full = context_for_intent(model, "overview")
+            original_fits = context_module._fits
+            checks = 0
+
+            def finite_fits(payload, limit):
+                nonlocal checks
+                checks += 1
+                self.assertLess(checks, 256, "context compaction made no finite progress")
+                return original_fits(payload, limit)
+
+            with patch.object(context_module, "_fits", side_effect=finite_fits):
+                context = context_for_intent(model, "overview", byte_limit=4096)
+            self.assertLessEqual(
+                len(json.dumps(context, sort_keys=True, separators=(",", ":")).encode()),
+                4096,
+            )
+            self.assertTrue(context["truncated_for_context"])
+            self.assertEqual(context["fingerprint"], model.fingerprint)
+            self.assertEqual(context["intent"], "overview")
+            for key in ("health", "metrics", "coordination", "execution", "intelligence"):
+                self.assertIn(key, context)
+            for key in (
+                "repository_fingerprint", "plan_fingerprint", "definition_fingerprint",
+                "graph_fingerprint", "state", "ready_work", "blocked_work",
+            ):
+                self.assertEqual(context["execution"][key], full["execution"][key])
+            for key in ("repository_fingerprint", "graph_fingerprint", "max_parallelism"):
+                self.assertEqual(context["coordination"][key], full["coordination"][key])
+            self.assertEqual(context, context_for_intent(model, "overview", byte_limit=4096))
+
+    def test_oversized_required_execution_constraints_fail_closed(self) -> None:
+        from skeleton.repo_machine.context import _bounded
+
+        payload = {
+            "intent": "overview", "fingerprint": "f" * 64,
+            "execution": {"state": {"failed_work": ["constraint" * 1000]}},
+        }
+        with self.assertRaisesRegex(ValueError, "required repository context"):
+            _bounded(payload, 4096)
+        self.assertEqual(payload["execution"]["state"]["failed_work"], ["constraint" * 1000])
 
 
 class GrowthTests(unittest.TestCase):

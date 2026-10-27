@@ -68,7 +68,7 @@ async function loadStored(): Promise<string> {
 }
 
 /** Share cold storage initialization without confusing it with an account change. */
-async function initializeStoredToken(): Promise<void> {
+export async function initializeStoredToken(): Promise<void> {
   if (_tokenLoaded) return;
   if (!_tokenInitialization) {
     const epoch = _tokenEpoch;
@@ -281,6 +281,8 @@ export async function googleLogin(): Promise<{ ok: boolean; role?: string; error
 }
 
 export async function logout(): Promise<void> {
-  try { await api.post('/api/auth/logout', {}, { headers: authHeaders(), timeoutMs: 8000 }); } catch {}
+  const headers = authHeaders();
+  // Revoke local observations immediately, including a stalled server request.
   await persist('');
+  try { await api.post('/api/auth/logout', {}, { headers, timeoutMs: 8000 }); } catch {}
 }
