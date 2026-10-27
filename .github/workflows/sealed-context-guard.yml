@@ -32,6 +32,7 @@ on:
       - 'skeleton/testing/test_guarded_application_startup.py'
       - 'skeleton/testing/test_engine_submission_snapshot.py'
       - 'skeleton/testing/test_canonical_source_custody.py'
+      - 'skeleton/testing/test_canonical_owner_source_loader.py'
       - 'skeleton/testing/test_native_tokenizer_guard.py'
       - 'skeleton/testing/test_guarded_registry_activation.py'
       - 'skeleton/testing/test_guarded_local_service.py'
@@ -81,6 +82,7 @@ jobs:
             skeleton/testing/test_guarded_application_startup.py \
             skeleton/testing/test_engine_submission_snapshot.py \
             skeleton/testing/test_canonical_source_custody.py \
+            skeleton/testing/test_canonical_owner_source_loader.py \
             skeleton/testing/test_native_tokenizer_guard.py \
             skeleton/testing/test_guarded_registry_activation.py \
             skeleton/testing/test_guarded_local_service.py \
