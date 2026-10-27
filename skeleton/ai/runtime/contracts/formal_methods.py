@@ -350,9 +350,9 @@ class ImplementationBinding:
         )
 
     def resolve(self) -> object:
-        # A verification binding is a reference, not an import capability.
-        # Explicitly loaded modules can be resolved without executing code
-        # selected by a deserialized or untrusted module_path.
+        # A serialized binding is a reference to already-admitted code, not an
+        # executable module-import capability. Loading a new module here would
+        # permit verification itself to run arbitrary package import hooks.
         module = sys.modules.get(self.module_path)
         if module is None:
             raise FormalMethodError(
