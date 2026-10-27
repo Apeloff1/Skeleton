@@ -145,10 +145,17 @@ class TrafficManagerObservationTests(unittest.TestCase):
         )
 
         def fake_gh(args: list[str]) -> list[dict[str, object]]:
-            if args[0] == "run":
-                return [completed]
+            # The observer uses REST for both history and active-status scans.
+            # Keep the completed run in the unscoped history response so the
+            # fixture detects accidental loss of either inventory source.
+            if args[0] != "api":
+                raise AssertionError(f"unexpected GitHub command: {args!r}")
             endpoint = args[1]
-            return [hidden_active] if "status=in_progress" in endpoint else []
+            if "status=in_progress" in endpoint:
+                return [hidden_active]
+            if "status=" not in endpoint:
+                return [completed]
+            return []
 
         with patch(
             "skeleton.automation.traffic_manager._gh_json",
