@@ -213,3 +213,29 @@ def test_canonical_snapshot_history_and_unicode_budgets_fail_before_merkle_alloc
             )
 
     asyncio.run(scenario())
+
+
+def test_canonical_server_provider_factory_receives_exact_trusted_guard(monkeypatch):
+    from skeleton.provider_runtime import ProviderRegistry
+
+    components = trusted_components(reader(CanonicalLoader()))
+    admission_authority = object()
+    observed = []
+    registry = object()
+
+    def record(cls, *, admission_runtime, retain_unavailable, guarded_components):
+        observed.append((admission_runtime, retain_unavailable, guarded_components))
+        return registry
+
+    monkeypatch.setattr(ProviderRegistry, "from_env", classmethod(record))
+    result = ServerState._activate_engine_provider_registry(
+        admission_runtime=admission_authority, guarded_local_components=components,
+    )
+    assert result is registry
+    assert observed == [(admission_authority, True, components)]
+    # No magic environment-generated verifier is substituted when the app
+    # has not installed one. The registry retains fail-closed admission.
+    assert ServerState._activate_engine_provider_registry(
+        admission_runtime=admission_authority, guarded_local_components=None,
+    ) is registry
+    assert observed[-1] == (admission_authority, True, None)
