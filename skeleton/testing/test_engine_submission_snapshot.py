@@ -499,3 +499,39 @@ def test_protected_provider_dynamically_binds_its_exact_native_execution():
             )
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("damage", [
+    {"context_digest": "e" * 64},
+    {"context_compiler_version": "foreign-compiler"},
+    {"context_source_snapshot": (("other", "b" * 64),)},
+    {"instructions": "substituted instructions"},
+    {"prompt": "substituted user input"},
+    {"history": ()},
+])
+def test_compiler_digest_and_prompt_forgery_fails_before_guarded_native_projection(damage):
+    from dataclasses import replace
+    from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+        ScopedEngineCompiledSnapshotReader,
+    )
+    from skeleton.provider_runtime import AIMessage, ProviderRequest
+
+    async def scenario():
+        source = Source()
+        scoped = ScopedEngineCompiledSnapshotReader(
+            service=owner(), source_authority=source,
+            policy_sha256=sha256(b"owner policy").hexdigest(),
+        )
+        genuine = ProviderRequest(
+            instructions="owner policy", history=(AIMessage("user", "initial"),),
+            prompt="latest", max_output_tokens=4, tenant_id=TENANT,
+            context_id=CONTEXT, context_digest="c" * 64, execution_id=EXECUTION,
+            context_source_snapshot=SEGMENTS,
+            context_compiler_version="independent-compiler-v1",
+        )
+        forged = replace(genuine, **damage)
+        with pytest.raises(SealedContextIntegrityError, match="binding"):
+            await scoped.prepare_provider(forged)
+        assert source.calls == 0
+
+    asyncio.run(scenario())
