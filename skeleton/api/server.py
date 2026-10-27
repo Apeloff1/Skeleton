@@ -698,6 +698,43 @@ class ServerState:
             raise RuntimeError("canonical source owners cannot be replaced")
         self._engine_canonical_sources = (factory, policy_sha256)
 
+    def configure_engine_canonical_mongo_owners(
+        self, *, conversation: Any, shared_epoch: Any, policy_sha256: str,
+        memory: Any | None = None, memory_namespace: str | None = None,
+    ) -> None:
+        """Select real canonical Mongo owners for per-execution guarded admission.
+
+        The trusted application owner supplies the SAME source epoch installed
+        on its conversation and memory writers. At service startup we build the
+        resolver from the actual durable engine and existing canonical chat
+        command, not from HTTP or an archived handoff.
+        """
+        from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
+
+        if not isinstance(shared_epoch, MongoCanonicalSourceEpoch):
+            raise TypeError("majority-backed canonical writer epoch required")
+        if getattr(conversation, "canonical_source_epoch", None) is not shared_epoch:
+            raise RuntimeError("canonical conversation owner must enforce installed writer epoch")
+        if (memory is not None
+                and getattr(memory, "canonical_source_epoch", None) is not shared_epoch):
+            raise RuntimeError("canonical memory owner must enforce same writer epoch")
+        if (memory is None and memory_namespace is not None
+                or memory is not None and not memory_namespace):
+            raise ValueError("memory owner and namespace must be supplied together")
+        if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
+                or any(char not in "0123456789abcdef" for char in policy_sha256)):
+            raise ValueError("trusted canonical policy digest required")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("canonical source owner wiring must precede engine startup")
+        if (getattr(self, "_engine_canonical_sources", None) is not None
+                or getattr(self, "_engine_canonical_mongo_owners", None) is not None):
+            raise RuntimeError("canonical source owner wiring cannot be replaced")
+        self._engine_canonical_mongo_owners = (
+            conversation, memory, memory_namespace, shared_epoch, policy_sha256,
+        )
+
     @staticmethod
     def _activate_engine_provider_registry(
         *, admission_runtime: Any, guarded_local_components: Any | None,
@@ -888,6 +925,26 @@ class ServerState:
             # canonical owner reader AFTER its construction and BEFORE model startup.
             # A missing native guard remains unavailable, not an implicit downgrade.
             canonical_sources = getattr(self, "_engine_canonical_sources", None)
+            mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+            if mongo_owners is not None:
+                from skeleton.ai.runtime.inference.canonical_execution_source_factory import (
+                    CanonicalExecutionSourceFactory,
+                )
+                from skeleton.persistence.mongo_execution_source_binding import (
+                    MongoExecutionConversationResolver,
+                )
+                conversation, memory, memory_namespace, shared_epoch, policy_sha256 = mongo_owners
+                canonical_sources = (
+                    CanonicalExecutionSourceFactory(
+                        conversation=conversation,
+                        resolver=MongoExecutionConversationResolver(
+                            conversation=conversation, engine_service=service,
+                        ),
+                        memory=memory, memory_namespace=memory_namespace,
+                        shared_epoch=shared_epoch,
+                    ),
+                    policy_sha256,
+                )
             if canonical_sources is not None:
                 if guarded_local_components is None:
                     raise RuntimeError("canonical owners require protected native components")
