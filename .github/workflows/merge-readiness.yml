@@ -75,6 +75,8 @@ jobs:
     name: Unit
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      PYTEST_ADDOPTS: "--maxfail=25"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -166,6 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      PYTEST_ADDOPTS: "--maxfail=25"
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: Check out full history
@@ -207,6 +210,8 @@ jobs:
     name: PR Automation Tests
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      PYTEST_ADDOPTS: "--maxfail=25"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

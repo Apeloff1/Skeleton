@@ -596,7 +596,8 @@ def main() -> int:
     require(
         cancel_false(backend_quality)
         or sha_scoped_cancellation(backend_quality)
-        or ref_scoped_cancellation(backend_quality),
+        or ref_scoped_cancellation(backend_quality)
+        or pr_only_ref_or_sha_scoped_cancellation(backend_quality),
         "Backend Quality concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
