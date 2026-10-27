@@ -18,6 +18,7 @@ on:
       - 'skeleton/persistence/memory_repository.py'
       - 'skeleton/testing/test_canonical_execution_source_factory.py'
       - 'skeleton/testing/test_mongo_source_epoch.py'
+      - 'skeleton/testing/test_mongo_execution_source_binding.py'
       - 'skeleton/ai/runtime/inference/canonical_source_custody.py'
       - 'skeleton/ai/runtime/inference/native_tokenizer_guard.py'
       - 'skeleton/api/server.py'
@@ -91,6 +92,7 @@ jobs:
             skeleton/testing/test_canonical_source_custody.py \
             skeleton/testing/test_canonical_execution_source_factory.py \
             skeleton/testing/test_mongo_source_epoch.py \
+            skeleton/testing/test_mongo_execution_source_binding.py \
             skeleton/testing/test_canonical_owner_source_loader.py \
             skeleton/testing/test_native_tokenizer_guard.py \
             skeleton/testing/test_guarded_registry_activation.py \
