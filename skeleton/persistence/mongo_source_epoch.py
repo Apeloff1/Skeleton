@@ -97,6 +97,20 @@ class MongoCanonicalSourceEpoch:
                 "source epoch already initialized or migration unavailable"
             ) from exc
 
+    def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
+        """Guard lower-level mutation paths that cannot acquire own epoch."""
+        active = self._active.get()
+        if (active is None or active.task is not asyncio.current_task()
+                or active.tenant_id != tenant_id or active.actor_id != actor_id):
+            raise MongoSourceEpochError("canonical write requires owner-scoped epoch")
+
+    def require_tenant_writer(self, *, tenant_id: str) -> None:
+        """Deletion-only boundary; tenant sweeps cannot invent actor custody."""
+        active = self._active.get()
+        if (active is None or active.task is not asyncio.current_task()
+                or active.tenant_id != tenant_id):
+            raise MongoSourceEpochError("tenant deletion requires canonical actor writer")
+
     @asynccontextmanager
     async def writer(self, *, tenant_id: str, actor_id: str):
         key = self._key(tenant_id, actor_id)
