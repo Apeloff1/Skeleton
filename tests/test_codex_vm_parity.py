@@ -192,7 +192,9 @@ def test_receipt_is_reproducible_and_json_must_not_contaminate_checkout(tmp_path
     assert a["evidence_sha256"] == b["evidence_sha256"]
     assert len(a["evidence_sha256"]) == 64
     result = subprocess.run(
-        [sys.executable, str(SCRIPT), "--repo", str(repo), "--fetch", "--json", str(repo / "audit.json")],
+        [sys.executable, str(SCRIPT), "--repo", str(repo), "--fetch",
+         "--expected-main-sha", git(repo, "rev-parse", "main"),
+         "--json", str(repo / "audit.json")],
         check=False, text=True, capture_output=True,
     )
     assert result.returncode != 0
