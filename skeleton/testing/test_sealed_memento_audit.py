@@ -127,3 +127,48 @@ def test_checkpoint_replacement_and_missing_independent_reader_are_denied():
     with pytest.raises(SealedContextBoundaryError):
         audit_memento_chain(archive=history.archive, read_window=None,
                             trusted_head=history.trusted_head)
+
+
+def test_async_production_style_audit_is_exactly_equivalent_to_reference():
+    import asyncio
+    from skeleton.context.sealed_memento_audit import audit_memento_chain_async
+    history = History(2001)
+
+    async def head(**kwargs):
+        return history.trusted_head(**kwargs)
+
+    async def read(**kwargs):
+        return history.read_window(**kwargs)
+
+    receipt = asyncio.run(audit_memento_chain_async(
+        archive=history.archive, read_window=read, trusted_head=head,
+    ))
+    assert receipt == audit_memento_chain(
+        archive=history.archive, read_window=history.read_window,
+        trusted_head=history.trusted_head,
+    )
+
+
+def test_async_audit_denies_midscan_authority_replacement_and_budget():
+    import asyncio
+    from skeleton.context.sealed_memento_audit import audit_memento_chain_async
+    history = History(2001)
+
+    async def changed(**kwargs):
+        page = history.read_window(**kwargs)
+        if kwargs["after_serial"] == 2000:
+            return replace(page, authoritative_head=MementoCatalogHead())
+        return page
+
+    async def head(**kwargs):
+        return history.trusted_head(**kwargs)
+
+    with pytest.raises(SealedContextReplayError):
+        asyncio.run(audit_memento_chain_async(
+            archive=history.archive, read_window=changed, trusted_head=head,
+        ))
+    with pytest.raises(SealedContextLimitError):
+        asyncio.run(audit_memento_chain_async(
+            archive=history.archive, read_window=changed, trusted_head=head,
+            max_pages=1,
+        ))
