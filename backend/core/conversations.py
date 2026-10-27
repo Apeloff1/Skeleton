@@ -570,6 +570,12 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Delete one conversation plus its explicitly linked governed records."""
 
+        if self.canonical_source_epoch is not None:
+            # This operation may cascade to OTHER actors and storage owners.
+            # An actor-scoped epoch does not prove their deletion custody.
+            raise ConversationStorageUnavailable(
+                "protected governed deletion requires a cross-owner retirement fence"
+            )
         initial = await self.get_thread(
             thread_id,
             tenant_id=tenant_id,
@@ -681,6 +687,10 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Execute one tenant retention plan across engine and conversation owners."""
 
+        if self.canonical_source_epoch is not None:
+            raise ConversationStorageUnavailable(
+                "protected tenant retention requires a cross-owner retirement fence"
+            )
         # Expire Dragon's tenant-scoped derived summaries even when the
         # canonical governance plan has no parent records due in this sweep.
         projection = getattr(self, "dragon_projection", None)
@@ -793,7 +803,9 @@ class MongoConversationAuthority:
         reason: str = "tenant-request",
     ) -> Mapping[str, Any]:
         if self.canonical_source_epoch is not None:
-            self.canonical_source_epoch.require_tenant_writer(tenant_id=tenant_id)
+            raise ConversationStorageUnavailable(
+                "protected governed deletion requires a cross-owner retirement fence"
+            )
         planner = self.governance_deletion_planner
         acker = self.governance_deletion_acker
         if planner is None or acker is None:
