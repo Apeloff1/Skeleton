@@ -384,7 +384,7 @@ def test_protected_stream_emits_only_after_complete_verified_generation():
         assert deltas
         assert deltas[0].kind == ProviderDeltaKind.TEXT
         assert deltas[0].text is not None
-        assert deltas[-1].kind == ProviderDeltaKind.FINISH
+        assert deltas[-1].kind == ProviderDeltaKind.FINAL
 
     asyncio.run(scenario())
 
