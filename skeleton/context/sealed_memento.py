@@ -196,6 +196,40 @@ class SealedMementoArchive:
         )
         return wire, _advance(previous, record.stream, stream_head, wire)
 
+    def verify_append(
+        self,
+        stream: str,
+        wire: bytes,
+        *,
+        previous: MementoCatalogHead,
+        known_causal_serials: frozenset[int] | None = None,
+    ) -> tuple[MementoRecord, MementoCatalogHead]:
+        """Verify an encrypted candidate against the independently trusted head.
+
+        A work item must also match a separately authorized execution receipt.
+        The caller can pass known historical causal serials for strict linking.
+        """
+        if not isinstance(previous, MementoCatalogHead):
+            raise SealedContextError("trusted predecessor head is required")
+        frame = self.codec.open(
+            wire, binding=stream_binding(self.binding, stream),
+            previous=previous.stream_head(stream),
+        )
+        record = _parse(frame.payload)
+        if record.stream != stream or record.serial != previous.serial + 1:
+            raise SealedContextReplayError("memento stream identity or global serial mismatch")
+        if record.causal_serial is not None and known_causal_serials is not None:
+            if record.causal_serial not in known_causal_serials:
+                raise SealedContextReplayError("memento causal event is absent")
+        if record.stream == "work":
+            if _hash(record.payload) != record.evidence_digest:
+                raise SealedContextBoundaryError("delivered work digest mismatches bytes")
+            if self.work_verifier is None or not self.work_verifier(
+                record.evidence_ref, record.evidence_digest, record.payload
+            ):
+                raise SealedContextBoundaryError("unverified delivered-work receipt")
+        return record, _advance(previous, stream, frame.head, wire)
+
     def replay(self, entries: Iterable[tuple[str, bytes]], *,
                trusted_head: MementoCatalogHead,
                starting_head: MementoCatalogHead = MementoCatalogHead(),
@@ -210,16 +244,7 @@ class SealedMementoArchive:
         for stream, wire in entries:
             if len(records) >= max_messages:
                 raise SealedContextLimitError("archive window exceeded; page with trusted checkpoint")
-            frame = self.codec.open(
-                wire, binding=stream_binding(self.binding, stream),
-                previous=current.stream_head(stream),
-            )
-            record = _parse(frame.payload)
-            if record.stream != stream or record.serial != current.serial + 1:
-                raise SealedContextReplayError("cross-stream ordering or identity mismatch")
-            if record.causal_serial is not None and record.causal_serial >= record.serial:
-                raise SealedContextReplayError("forward causal reference")
-            current = _advance(current, stream, frame.head, wire)
+            record, current = self.verify_append(stream, wire, previous=current)
             records.append(record)
         if current != trusted_head:
             raise SealedContextReplayError("memento archive tail or trusted commitment differs")
@@ -299,3 +324,55 @@ def decode_catalog_head(data: bytes) -> MementoCatalogHead:
         return head
     except (ValueError, TypeError, KeyError, UnicodeError) as exc:
         raise SealedContextError("invalid memento catalog metadata") from exc
+
+
+def correlate_causal_bundle(
+    records: Iterable[MementoRecord], *, query: str, serial: int | None = None,
+    limit: int = 24, anchor_limit: int = 6,
+) -> tuple[MementoRecord, ...]:
+    """Bounded lexical RAG with complete causal prompt/response/work closure.
+
+    The caller must first reconstruct these records from an authenticated
+    archive read. A model response is never promoted to verified work.
+    """
+    if type(limit) is not int or not 1 <= limit <= 100:
+        raise SealedContextLimitError("invalid causal bundle size")
+    if type(anchor_limit) is not int or not 1 <= anchor_limit <= limit:
+        raise SealedContextLimitError("invalid causal anchor count")
+    values = tuple(records)
+    if len(values) > ARCHIVE_WINDOW_MESSAGES:
+        raise SealedContextLimitError("causal bundle requires a verified 2000-record page")
+    by_serial = {item.serial: item for item in values}
+    if len(by_serial) != len(values):
+        raise SealedContextReplayError("duplicate serial in causal retrieval candidate")
+    seeds = lexical_correlate(values, query=query, serial=serial, limit=anchor_limit)
+    selected: dict[int, MementoRecord] = {}
+
+    def add_ancestors(item: MementoRecord) -> None:
+        seen: set[int] = set()
+        current: MementoRecord | None = item
+        while current is not None and current.serial not in seen:
+            seen.add(current.serial)
+            selected[current.serial] = current
+            current = by_serial.get(current.causal_serial) if current.causal_serial else None
+
+    for item in seeds:
+        add_ancestors(item)
+    if serial is not None and serial in by_serial:
+        add_ancestors(by_serial[serial])
+    children: dict[int, list[MementoRecord]] = {}
+    for item in values:
+        if item.causal_serial is not None:
+            children.setdefault(item.causal_serial, []).append(item)
+    pending = set(selected)
+    while pending:
+        parent = pending.pop()
+        for child in children.get(parent, ()):
+            if child.serial not in selected:
+                add_ancestors(child)
+                pending.add(child.serial)
+                if len(selected) > limit:
+                    raise SealedContextLimitError("causal reconstruction exceeds output budget")
+    if len(selected) > limit:
+        raise SealedContextLimitError("causal reconstruction exceeds output budget")
+    return tuple(selected[index] for index in sorted(selected))
