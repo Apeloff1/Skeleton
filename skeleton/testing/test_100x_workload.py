@@ -6,7 +6,7 @@ def test_100x_driving():
     # A stationary car cannot accelerate against 0.05 * 18 m/s² braking.
     s = sim.step(1.0, 0.25, 0.0)
     assert s.speed > 0
-    assert s.telemetry["steps"] == 1
+    assert s.steps == 1
     assert sim.export_telemetry()
 def test_100x_multi():
     auth = SessionAuthority("100x")
