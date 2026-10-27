@@ -145,7 +145,7 @@ jobs:
           SKIP_HEAVY_SEED: "true"
           PYTHONPATH: ".."
         run: >-
-          uv run python -c "import server; assert server.app is not None;
+          uv run --no-sync python -c "import server; assert server.app is not None;
           print('server import: OK')"
       - name: Run canonical cross-subsystem integration matrix
         working-directory: .
