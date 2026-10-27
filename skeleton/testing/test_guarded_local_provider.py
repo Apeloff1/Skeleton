@@ -203,3 +203,40 @@ def test_direct_engine_cache_and_preparation_cannot_bypass_protected_mode():
         with pytest.raises(ProviderPolicyError):
             await engine.generate(native, tenant_scope_id="tenant")
     asyncio.run(scenario())
+
+
+def test_guard_permit_rejects_inherited_child_task():
+    async def scenario():
+        engine, _, service, _, request = fixture()
+        from skeleton.ai.runtime.inference.local import LocalInferenceRequest
+        from skeleton.provider_runtime import ProviderPolicyError
+        from hashlib import sha256
+        native = LocalInferenceRequest(
+            prompt=request.prompt, instructions=request.instructions,
+            max_output_tokens=4, context_digest=request.context_digest,
+        )
+        # Even code carrying the right verifier object cannot hand a permit
+        # to a child task by relying on ContextVar inheritance.
+        with engine._verified_guard_scope(
+            native, context_root=request.context_digest,
+            token_echo=sha256(native.rendered_input.encode()).hexdigest(),
+            reviewer_id="independent-reviewer", guard_identity=service.guard,
+        ):
+            child = asyncio.create_task(engine.generate(native, tenant_scope_id="tenant"))
+            with pytest.raises(ProviderPolicyError, match="verified context"):
+                await child
+        with pytest.raises(ProviderPolicyError, match="verified context"):
+            await engine.generate(native, tenant_scope_id="tenant")
+    asyncio.run(scenario())
+
+
+def test_guards_from_different_composition_roots_cannot_rebind_engine():
+    engine, _, _, _, request = fixture()
+    from skeleton.context.pre_delivery_guard import GuardedLocalInference, ReviewVerdict
+    other = GuardedLocalInference(
+        engine, reviewer=lambda t, d: ReviewVerdict(True, d, "other", "ok"),
+        tokenize=lambda t: list(t.encode()),
+        detokenize=lambda v: bytes(v).decode(),
+    )
+    with pytest.raises(ProviderPolicyError, match="cannot be replaced"):
+        engine._bind_verified_guard(other)
