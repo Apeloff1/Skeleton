@@ -3244,9 +3244,12 @@ class ProviderRegistry:
                 code = "local_external_fallback_denied"
             elif os.getenv("AI_VERIFICATION_MODEL", "").strip():
                 code = "local_external_verifier_denied"
-            elif guarded_components is not None or require_guarded_local is True or (
-                os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower() in {"1", "true"}
-            ):
+            elif not (
+                require_guarded_local is False
+                and os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower() in {"0", "false"}
+                and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
+                and os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() == "development"
+            ) or guarded_components is not None:
                 code = "local_guard_not_admitted"
             elif not model_path and not deployment_path and not catalog_path:
                 code = "local_model_not_configured"
@@ -3272,11 +3275,25 @@ class ProviderRegistry:
             raise ProviderUnavailableError("invalid AI_LOCAL_GUARD_REQUIRED policy")
         if require_guarded_local is not None and type(require_guarded_local) is not bool:
             raise ProviderUnavailableError("local guard policy must be a boolean")
-        guarded = (
-            raw_guard in {"1", "true"}
-            or require_guarded_local is True
-            or guarded_components is not None
+        # The application must never silently run an unreviewed local model.
+        # Legacy reference-model work is allowed only via an explicitly
+        # acknowledged, independently selected DEVELOPMENT-only escape hatch.
+        # Setting AI_LOCAL_GUARD_REQUIRED=0 alone does not grant permission.
+        development_legacy = (
+            active == "local"
+            and raw_guard in {"0", "false"}
+            and require_guarded_local is False
+            and guarded_components is None
+            and os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() == "development"
+            and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
         )
+        if active == "local" and raw_guard in {"0", "false"} and not development_legacy:
+            raise ProviderUnavailableError("unguarded local model requires explicit development-only authorization")
+        if active == "local" and require_guarded_local is False and not development_legacy:
+            raise ProviderUnavailableError("production local model cannot opt out of guarded inference")
+        guarded = (
+            active == "local" and not development_legacy
+        ) or require_guarded_local is True or guarded_components is not None
         if guarded and active != "local":
             raise ProviderUnavailableError("guarded local dependencies require AI_PROVIDER=local")
         if guarded:
