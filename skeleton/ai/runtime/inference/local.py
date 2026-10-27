@@ -1732,6 +1732,7 @@ class LocalInferenceEngine:
                 raise ValueError(f"{name} must be between 1 and {upper}")
         self.model = model
         self.require_guarded_context = require_guarded_context
+        self._verified_guard_owner: Any | None = None
         # The scope is task-local, exact-request bound, and always revoked in
         # a finally block. It is an in-process integration fence, not a sandbox
         # against arbitrary trusted Python code.
@@ -2902,14 +2903,27 @@ class LocalInferenceEngine:
                 break
         return size
 
+    def _bind_verified_guard(self, guard: Any) -> None:
+        """Bind exactly one composition-owned verifier, before protected use."""
+        from skeleton.context.pre_delivery_guard import GuardedLocalInference
+        if (not self.require_guarded_context
+                or not isinstance(guard, GuardedLocalInference)
+                or guard.engine is not self):
+            raise ProviderPolicyError("local engine cannot bind a foreign guard")
+        if self._verified_guard_owner is not None and self._verified_guard_owner is not guard:
+            raise ProviderPolicyError("verified local guard identity cannot be replaced")
+        self._verified_guard_owner = guard
+
     @contextmanager
     def _verified_guard_scope(
         self, request: LocalInferenceRequest, *, context_root: str,
-        token_echo: str | None, reviewer_id: str,
+        token_echo: str | None, reviewer_id: str, guard_identity: Any,
     ):
         """Scoped permit available only after the independent preflight gate."""
         if not self.require_guarded_context:
             raise ProviderPolicyError("verified scope is unavailable on legacy local engines")
+        if guard_identity is not self._verified_guard_owner or self._verified_guard_owner is None:
+            raise ProviderPolicyError("local inference rejected unregistered guard identity")
         if (not isinstance(request, LocalInferenceRequest)
                 or not isinstance(context_root, str)
                 or request.context_digest != context_root
@@ -3723,6 +3737,8 @@ class LocalModelAdapter(ProviderAdapter):
         self.require_guarded_inference = require_guarded_inference
         if require_guarded_inference and not engine.require_guarded_context:
             raise ProviderPolicyError("guarded adapter requires fail-closed engine-side admission")
+        if require_guarded_inference:
+            engine._bind_verified_guard(guarded_service.guard)
         self.engine = engine
         self.model = engine.model.model_id
         self._activated_model_digest = engine.model.model_digest
