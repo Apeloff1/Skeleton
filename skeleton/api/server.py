@@ -694,7 +694,8 @@ class ServerState:
                 or self.engine_execution_coordinator is not None
                 or self._engine_shutdown_pending):
             raise RuntimeError("canonical source owners must be configured before startup")
-        if getattr(self, "_engine_canonical_sources", None) is not None:
+        if (getattr(self, "_engine_canonical_sources", None) is not None
+                or getattr(self, "_engine_canonical_mongo_owners", None) is not None):
             raise RuntimeError("canonical source owners cannot be replaced")
         self._engine_canonical_sources = (factory, policy_sha256)
 
