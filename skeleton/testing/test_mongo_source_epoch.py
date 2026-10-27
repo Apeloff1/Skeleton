@@ -162,3 +162,25 @@ async def test_governed_tenant_retirement_denied_until_multi_actor_custody_exist
         await conversation.execute_governed_deletion(tenant_id="tenant")
     with pytest.raises(ConversationStorageUnavailable, match="cross-owner retirement"):
         await conversation.execute_due_retention(tenant_id="tenant")
+
+@pytest.mark.asyncio
+async def test_rejected_protected_thread_deletion_does_not_quarantine_writer_epoch():
+    """Denied no-write operations must not poison the majority-durable fence."""
+    from core.conversations import MongoConversationAuthority, ConversationStorageUnavailable
+
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    conversation = object.__new__(MongoConversationAuthority)
+    conversation.canonical_source_epoch = owner
+
+    with pytest.raises(ConversationStorageUnavailable, match="cross-owner retirement"):
+        await conversation.delete_thread_with_governance(
+            "thread", tenant_id="tenant", owner_id="actor",
+            expected_thread_version=1,
+        )
+    assert await read(owner) == 2
+    # A subsequent legitimate writer still acquires and commits normally.
+    async with owner.writer(tenant_id="tenant", actor_id="actor"):
+        with pytest.raises(MongoSourceEpochError, match="writing"):
+            await read(owner)
+    assert await read(owner) == 4
