@@ -15,7 +15,7 @@ runtimes plug into CallableLocalModel without changing cognitive orchestration.
 from __future__ import annotations
 
 import asyncio
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from contextvars import ContextVar
 import hashlib
 import json
@@ -4072,15 +4072,37 @@ class LocalModelAdapter(ProviderAdapter):
                     if local_request.structured_output_schema is not None
                     else DeliveryContract()
                 )
+                async def invoke_verified() -> Any:
+                    # An engine-owned durable reader must be activated for
+                    # this *exact* native digest inside the wait_for task, not
+                    # in the parent task where ContextVar inheritance could
+                    # accidentally confer the wrong execution identity.
+                    reader = self.guarded_service.snapshots
+                    binder = getattr(reader, "bind_execution", None)
+                    if binder is None:
+                        scope = nullcontext()
+                    else:
+                        if not callable(binder):
+                            raise ProviderPolicyError("durable snapshot binding is not callable")
+                        if not isinstance(request.execution_id, str) or not request.execution_id:
+                            raise ProviderPolicyError("durable guarded route requires engine execution ID")
+                        scope = binder(
+                            execution_id=request.execution_id,
+                            tenant_id=effective_tenant,
+                            context_id=request.context_id,
+                            request_digest=local_request.digest,
+                        )
+                    with scope:
+                        return await self.guarded_service.generate(
+                            local_request,
+                            tenant_scope_id=effective_tenant,
+                            context_id=request.context_id,
+                            contract=contract,
+                            **execution_options,
+                        )
+
                 generation = await asyncio.wait_for(
-                    self.guarded_service.generate(
-                        local_request,
-                        tenant_scope_id=effective_tenant,
-                        context_id=request.context_id,
-                        contract=contract,
-                        **execution_options,
-                    ),
-                    timeout=remaining,
+                    invoke_verified(), timeout=remaining,
                 )
                 from .guarded_service import GuardedGeneration
                 from skeleton.context.pre_delivery_guard import PreDeliveryReceipt
