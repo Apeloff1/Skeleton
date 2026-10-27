@@ -14,7 +14,7 @@ from skeleton.context.sealed_sandwich import (
     SealedContextBoundaryError, SealedContextIntegrityError,
 )
 from skeleton.testing.test_canonical_owner_source_loader import (
-    Conversation, TENANT, ACTOR, CONTEXT, THREAD,
+    Conversation, TENANT, ACTOR, CONTEXT, THREAD, message,
 )
 from skeleton.testing.test_engine_submission_snapshot import (
     owner as durable_owner, EXECUTION, REQUEST,
@@ -58,10 +58,7 @@ async def test_live_execution_binding_reloads_owner_on_every_guarded_read():
         tenant_id=TENANT, context_id=CONTEXT, request_digest=REQUEST,
     )).source_version > 0
     assert resolver.calls == 3
-    conversation.messages = tuple(
-        replace(msg, content="changed", content_ref=None)
-        for msg in conversation.messages
-    )
+    conversation.messages = (message(body="changed"),)
     conversation.version += 1
     with pytest.raises(SealedContextIntegrityError, match="custody"):
         await reader.read(
