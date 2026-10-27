@@ -40,12 +40,12 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
 
 
 def test_shift_supervisor_control_failover_uses_canonical_state_reader() -> None:
-    workflow = (
-        Path(__file__).resolve().parents[1]
-        / ".github"
-        / "workflows"
-        / "shift-supervisor-control.yml"
-    ).read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[1]
+    active = root / ".github" / "workflows" / "shift-supervisor-control.yml"
+    archived = root / ".github" / "workflows-archive" / "shift-supervisor-control.yml"
+    # The retired scheduler must not be reactivated merely to satisfy a test.
+    assert not active.exists()
+    workflow = archived.read_text(encoding="utf-8")
 
     assert (
         "from skeleton.automation.shift_supervisor.__main__ import _read_state"
