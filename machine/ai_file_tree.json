@@ -2784,7 +2784,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "ffed5b8fcc93c2895f02e14f0a1904e44767bc83",
+      "source_git_object_sha": "a0792dea0d865be8acc506ee647f866f760e5968",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
