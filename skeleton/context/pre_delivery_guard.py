@@ -293,7 +293,7 @@ class GuardedLocalInference:
                 raise SealedContextBoundaryError("protected engine lacks verified scope")
             scope = admit(
                 request, context_root=root, token_echo=token_echo,
-                reviewer_id=reviewer_id,
+                reviewer_id=reviewer_id, guard_identity=self,
             )
         else:
             scope = nullcontext()
