@@ -102,16 +102,37 @@ def verify_rendered_spans(
 
 
 def request_parts(request: Any) -> tuple[tuple[str, bytes], ...]:
-    """Uses exact request data, not stripped/normalized rendered model text."""
+    """Exact role-bound spans with bounded allocation BEFORE Merkle hashing."""
+    from itertools import islice
+
     try:
-        history = tuple(request.history)
-        pieces = (("system", request.instructions.encode("utf-8")),) + tuple(
-            (role, text.encode("utf-8")) for role, text in history
-        ) + (("user", request.prompt.encode("utf-8")),)
+        history = tuple(islice(iter(request.history), 2001))
+        if len(history) > 2000:
+            raise SealedContextLimitError("local history exceeds the 2,000-record cap")
+        ordered = (("system", request.instructions), *history, ("user", request.prompt))
+        pieces: list[tuple[str, bytes]] = []
+        total_bytes = 0
+        for index, entry in enumerate(ordered):
+            if (not isinstance(entry, tuple) or len(entry) != 2
+                    or type(entry[0]) is not str or type(entry[1]) is not str):
+                raise SealedContextError("malformed local inference role/span")
+            role, text = entry
+            if ((index == 0 and role != "system")
+                    or (index == len(ordered) - 1 and role != "user")
+                    or (0 < index < len(ordered) - 1 and role not in {"user", "assistant"})):
+                raise SealedContextError("local inference history contains unsupported role")
+            encoded = text.encode("utf-8", errors="strict")
+            total_bytes += len(encoded)
+            if len(encoded) > _MAX_PART_BYTES or total_bytes > 16 * 1024 * 1024:
+                raise SealedContextLimitError("local inference context exceeds byte admission")
+            pieces.append((role, encoded))
+    except SealedContextError:
+        raise
     except (AttributeError, TypeError, UnicodeError, ValueError) as exc:
         raise SealedContextError("malformed local inference prompt") from exc
-    merkle_root(pieces)
-    return pieces
+    result = tuple(pieces)
+    merkle_root(result)
+    return result
 
 
 @dataclass(frozen=True, slots=True)
