@@ -229,7 +229,7 @@ def test_guard_permit_rejects_inherited_child_task():
             reviewer_id="independent-reviewer", guard_identity=service.guard,
         ):
             child = asyncio.create_task(engine.generate(native, tenant_scope_id="tenant"))
-            with pytest.raises(ProviderPolicyError, match="verified context"):
+            with pytest.raises(ProviderPolicyError, match="child task"):
                 await child
         with pytest.raises(ProviderPolicyError, match="verified context"):
             await engine.generate(native, tenant_scope_id="tenant")
