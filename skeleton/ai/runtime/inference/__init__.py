@@ -108,6 +108,8 @@ def __getattr__(name: str):
     module = _NATIVE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    # Both admitted exports share one known implementation owner. Never feed
+    # a dispatch-table value into an executable import operation.
     value = getattr(_inference_import_module(".native_transformer", __name__), name)
     globals()[name] = value
     return value
