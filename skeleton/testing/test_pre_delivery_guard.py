@@ -23,6 +23,7 @@ class Request:
     prompt: str
     context_digest: str | None = None
     digest: str = "request-digest"
+    structured_output_schema: object = None
 
     @property
     def rendered_input(self):
@@ -66,7 +67,8 @@ def runner(engine):
 
 
 def test_attested_merkle_token_and_output_path():
-    req = Request("Follow verified policy", (("user", "hello"),), "give JSON")
+    req = Request("Follow verified policy", (("user", "hello"),), "give JSON",
+                  structured_output_schema={"type": "object", "required": ["ok"]})
     engine = Engine()
     result, receipt = asyncio.run(runner(engine).generate(
         req, snapshot=snapshot(req), tenant_scope_id="tenant",
@@ -191,3 +193,56 @@ def test_native_renderer_dropping_history_is_blocked():
         guarded.preflight(req, snapshot=snapshot(req), tenant_scope_id="tenant",
                           contract=DeliveryContract())
     assert engine.calls == 0
+
+
+def test_renderer_omission_and_reordering_rejected_without_backend_call():
+    from types import SimpleNamespace
+
+    req = Request("immutable core", (("user", "first historic payload exact"),
+                                     ("assistant", "second response exact")),
+                  "last request exact")
+    engine = Engine()
+    for malformed in (
+        "system: immutable core\nuser: last request exact\nassistant:",
+        "system: immutable core\nassistant: second response exact\n"
+        "user: first historic payload exact\nuser: last request exact",
+        "system: immutable core\nuser: first historic payload exac\n"
+        "assistant: second response exact\nuser: last request exact",
+    ):
+        engine.model = SimpleNamespace(_render_prompt=lambda r, value=malformed: value)
+        with pytest.raises(SealedContextIntegrityError):
+            asyncio.run(runner(engine).generate(
+                req, snapshot=snapshot(req), tenant_scope_id="tenant",
+            ))
+    assert engine.calls == 0
+
+
+def test_native_json_schema_must_be_bound_to_request():
+    req = Request("system", (), "give json", structured_output_schema={"type": "object"})
+    engine = Engine()
+    with pytest.raises(SealedContextBoundaryError):
+        asyncio.run(runner(engine).generate(
+            req, snapshot=snapshot(req), tenant_scope_id="tenant",
+            contract=DeliveryContract("json", json_schema={"type": "array"}),
+        ))
+    assert engine.calls == 0
+
+
+def test_renderer_mutation_during_inference_withholds_output():
+    from types import SimpleNamespace
+
+    req = Request("system", (("user", "unchanged history"),), "current prompt")
+
+    class AlteringEngine(Engine):
+        async def generate(self, request, **kwargs):
+            result = await super().generate(request, **kwargs)
+            self.model._render_prompt = lambda r: "system: "+r.instructions+"\nuser: "+r.prompt
+            return result
+
+    engine = AlteringEngine()
+    engine.model = SimpleNamespace(_render_prompt=lambda r: "NATIVE::"+r.rendered_input)
+    with pytest.raises(SealedContextIntegrityError):
+        asyncio.run(runner(engine).generate(
+            req, snapshot=snapshot(req), tenant_scope_id="tenant",
+        ))
+    assert engine.calls == 1
