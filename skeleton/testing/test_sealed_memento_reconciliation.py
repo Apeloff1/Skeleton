@@ -12,10 +12,46 @@ from skeleton.persistence.sealed_memento_reconciliation import (
     MementoRecoveryDenied, RecoveryGrant, RecoverySignature,
     SignedMementoReconciler,
 )
+from skeleton.persistence.sealed_memento_recovery_journal import RecoveryJournalError
 from skeleton.persistence.sealed_memento_witness import (
     MementoWitnessDivergence, MementoWitnessIndeterminate, _binding_digest,
 )
 from skeleton.testing.test_sealed_memento_witness import add, setup
+
+
+class ExternalRecoveryJournal:
+    """Unit-test double of externally durable, linearizable incident storage."""
+
+    def __init__(self):
+        self.entries = {}
+        self.reject = False
+        self.fail_read = False
+        self.fail_finish = False
+        self.reserve_calls = 0
+
+    async def reserve(self, *, record):
+        self.reserve_calls += 1
+        if self.reject:
+            return False
+        key = (record.binding_digest, record.incident_id)
+        if key in self.entries:
+            return False
+        self.entries[key] = record
+        return True
+
+    async def read(self, *, binding_digest, incident_id):
+        if self.fail_read:
+            raise OSError("external journal unavailable")
+        return self.entries.get((binding_digest, incident_id))
+
+    async def complete(self, *, previous, successor):
+        if self.fail_finish:
+            raise OSError("journal completion interrupted")
+        key = (previous.binding_digest, previous.incident_id)
+        if self.entries.get(key) != previous:
+            return False
+        self.entries[key] = successor
+        return True
 
 
 def keys():
@@ -58,7 +94,7 @@ def test_two_operator_reconciles_once_then_normal_reads_resume():
         archive, mongo, witness, old, proposed = await crash_candidate()
         private, public = keys()
         grant = setup_grant(archive, old, proposed)
-        verifier = SignedMementoReconciler(public_keys=public, clock=lambda: 1900000000)
+        verifier = SignedMementoReconciler(public_keys=public, journal=ExternalRecoveryJournal(), clock=lambda: 1900000000)
         receipt = await verifier.reconcile_one(
             archive=archive, mongo=mongo, witness=witness, grant=grant,
             signatures=approval(grant, private),
@@ -79,7 +115,7 @@ def test_forged_signature_and_one_operator_rejected_before_mutation():
         archive, mongo, witness, old, proposed = await crash_candidate()
         private, public = keys()
         grant = setup_grant(archive, old, proposed)
-        verifier = SignedMementoReconciler(public_keys=public, clock=lambda: 1900000000)
+        verifier = SignedMementoReconciler(public_keys=public, journal=ExternalRecoveryJournal(), clock=lambda: 1900000000)
         signatures = approval(grant, private)
         bad = (signatures[0], RecoverySignature(signatures[1].signer_id, b"0" * 64))
         for attempted in (bad, (signatures[0], signatures[0]), (signatures[0],)):
@@ -97,7 +133,7 @@ def test_reject_tampered_claims_missing_keys_duplicate_keys_and_expiration():
         archive, mongo, witness, old, proposed = await crash_candidate()
         private, public = keys()
         grant = setup_grant(archive, old, proposed)
-        verifier = SignedMementoReconciler(public_keys=public, clock=lambda: 1900000000)
+        verifier = SignedMementoReconciler(public_keys=public, journal=ExternalRecoveryJournal(), clock=lambda: 1900000000)
         signatures = approval(grant, private)
         altered = (
             replace(grant, incident_id="different"),
@@ -109,13 +145,14 @@ def test_reject_tampered_claims_missing_keys_duplicate_keys_and_expiration():
             with pytest.raises((MementoRecoveryDenied, MementoWitnessDivergence)):
                 await verifier.reconcile_one(archive=archive, mongo=mongo, witness=witness,
                                              grant=forged, signatures=signatures)
-        expired = SignedMementoReconciler(public_keys=public, clock=lambda: 1900000300)
+        expired = SignedMementoReconciler(public_keys=public, journal=ExternalRecoveryJournal(), clock=lambda: 1900000300)
         with pytest.raises(MementoRecoveryDenied):
             await expired.reconcile_one(archive=archive, mongo=mongo, witness=witness,
                                         grant=grant, signatures=signatures)
         with pytest.raises(MementoRecoveryDenied):
             SignedMementoReconciler(public_keys={"a": public["operator-0"],
-                                                     "b": public["operator-0"]})
+                                                     "b": public["operator-0"]},
+                                    journal=ExternalRecoveryJournal())
         with pytest.raises(MementoRecoveryDenied):
             RecoveryGrant("X", grant.binding_digest, old.revision, old.head,
                           proposed, 1, 100, 1500)
@@ -127,7 +164,7 @@ def test_retired_or_rolled_back_database_never_reconciled():
         archive, mongo, witness, old, proposed = await crash_candidate()
         private, public = keys()
         grant = setup_grant(archive, old, proposed)
-        verifier = SignedMementoReconciler(public_keys=public, clock=lambda: 1900000000)
+        verifier = SignedMementoReconciler(public_keys=public, journal=ExternalRecoveryJournal(), clock=lambda: 1900000000)
         signatures = approval(grant, private)
         scope = grant.binding_digest
         witness.positions[scope] = replace(old, retired=True)
@@ -148,7 +185,7 @@ def test_rejected_or_unacknowledged_witness_cas_is_indeterminate():
         archive, mongo, witness, old, proposed = await crash_candidate()
         private, public = keys()
         grant = setup_grant(archive, old, proposed)
-        verifier = SignedMementoReconciler(public_keys=public, clock=lambda: 1900000000)
+        verifier = SignedMementoReconciler(public_keys=public, journal=ExternalRecoveryJournal(), clock=lambda: 1900000000)
         witness.reject = True
         with pytest.raises(MementoWitnessIndeterminate):
             await verifier.reconcile_one(archive=archive, mongo=mongo, witness=witness,
@@ -162,7 +199,7 @@ def test_source_version_race_is_rejected_before_cas():
         archive, mongo, witness, old, proposed = await crash_candidate()
         private, public = keys()
         grant = setup_grant(archive, old, proposed)
-        verifier = SignedMementoReconciler(public_keys=public, clock=lambda: 1900000000)
+        verifier = SignedMementoReconciler(public_keys=public, journal=ExternalRecoveryJournal(), clock=lambda: 1900000000)
         base_read = mongo.read_window
         calls = 0
 
@@ -180,3 +217,94 @@ def test_source_version_race_is_rejected_before_cas():
                                          grant=grant, signatures=approval(grant, private))
         assert witness.positions[grant.binding_digest] == old
     asyncio.run(scenario())
+
+
+def test_unavailable_or_duplicate_incident_denied_before_witness_mutation():
+    async def scenario():
+        archive, mongo, witness, old, proposed = await crash_candidate()
+        raw, public = keys()
+        grant = setup_grant(archive, old, proposed)
+        journal = ExternalRecoveryJournal()
+        verifier = SignedMementoReconciler(
+            public_keys=public, journal=journal, clock=lambda: 1900000000,
+        )
+        journal.reject = True
+        with pytest.raises(RecoveryJournalError):
+            await verifier.reconcile_one(
+                archive=archive, mongo=mongo, witness=witness,
+                grant=grant, signatures=approval(grant, raw),
+            )
+        assert witness.positions[grant.binding_digest] == old
+        journal.reject = False
+        journal.fail_read = True
+        with pytest.raises(RecoveryJournalError):
+            await verifier.reconcile_one(
+                archive=archive, mongo=mongo, witness=witness,
+                grant=grant, signatures=approval(grant, raw),
+            )
+        assert witness.positions[grant.binding_digest] == old
+        # The reserve succeeded but read confirmation was lost. The incident
+        # must remain spent: manual investigation is required.
+        journal.fail_read = False
+        with pytest.raises(RecoveryJournalError):
+            await verifier.reconcile_one(
+                archive=archive, mongo=mongo, witness=witness,
+                grant=grant, signatures=approval(grant, raw),
+            )
+        assert journal.reserve_calls == 3
+        assert witness.positions[grant.binding_digest] == old
+    asyncio.run(scenario())
+
+
+def test_completed_recovery_has_single_use_durable_receipt():
+    async def scenario():
+        archive, mongo, witness, old, proposed = await crash_candidate()
+        raw, public = keys()
+        journal = ExternalRecoveryJournal()
+        grant = setup_grant(archive, old, proposed)
+        verifier = SignedMementoReconciler(
+            public_keys=public, journal=journal, clock=lambda: 1900000000,
+        )
+        receipt = await verifier.reconcile_one(
+            archive=archive, mongo=mongo, witness=witness,
+            grant=grant, signatures=approval(grant, raw),
+        )
+        entry = await journal.read(
+            binding_digest=grant.binding_digest, incident_id=grant.incident_id,
+        )
+        assert receipt.committed_head == proposed
+        assert entry.state == "completed" and len(entry.receipt_digest) == 64
+        assert entry.candidate_commitment == proposed.commitment
+        assert entry.approvers == ("operator-0", "operator-1")
+        assert journal.reserve_calls == 1
+        assert not await journal.reserve(record=entry)
+    asyncio.run(scenario())
+
+
+def test_post_commit_journal_failure_is_indeterminate_not_success():
+    async def scenario():
+        archive, mongo, witness, old, proposed = await crash_candidate()
+        raw, public = keys()
+        journal = ExternalRecoveryJournal()
+        journal.fail_finish = True
+        grant = setup_grant(archive, old, proposed)
+        verifier = SignedMementoReconciler(
+            public_keys=public, journal=journal, clock=lambda: 1900000000,
+        )
+        with pytest.raises(MementoWitnessIndeterminate):
+            await verifier.reconcile_one(
+                archive=archive, mongo=mongo, witness=witness,
+                grant=grant, signatures=approval(grant, raw),
+            )
+        assert witness.positions[grant.binding_digest].head == proposed
+        entry = await journal.read(
+            binding_digest=grant.binding_digest, incident_id=grant.incident_id,
+        )
+        assert entry.state == "reserved" and entry.receipt_digest is None
+    asyncio.run(scenario())
+
+
+def test_untrusted_recovery_journal_not_optional():
+    _, public = keys()
+    with pytest.raises(MementoRecoveryDenied):
+        SignedMementoReconciler(public_keys=public, journal=None)
