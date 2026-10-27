@@ -10,6 +10,7 @@ on:
       - 'skeleton/ai/runtime/inference/local.py'
       - 'skeleton/ai/runtime/inference/guarded_service.py'
       - 'skeleton/ai/runtime/inference/canonical_snapshot_reader.py'
+      - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
       - 'skeleton/ai/runtime/inference/native_tokenizer_guard.py'
       - 'skeleton/api/server.py'
       - 'skeleton/ai/runtime/inference/guarded_composition.py'
@@ -28,6 +29,7 @@ on:
       - 'skeleton/testing/test_guarded_composition.py'
       - 'skeleton/testing/test_native_guard_binding.py'
       - 'skeleton/testing/test_guarded_application_startup.py'
+      - 'skeleton/testing/test_engine_submission_snapshot.py'
       - 'skeleton/testing/test_native_tokenizer_guard.py'
       - 'skeleton/testing/test_guarded_registry_activation.py'
       - 'skeleton/testing/test_guarded_local_service.py'
@@ -75,6 +77,7 @@ jobs:
             skeleton/testing/test_guarded_composition.py \
             skeleton/testing/test_native_guard_binding.py \
             skeleton/testing/test_guarded_application_startup.py \
+            skeleton/testing/test_engine_submission_snapshot.py \
             skeleton/testing/test_native_tokenizer_guard.py \
             skeleton/testing/test_guarded_registry_activation.py \
             skeleton/testing/test_guarded_local_service.py \
