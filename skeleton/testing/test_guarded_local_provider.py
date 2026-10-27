@@ -371,3 +371,57 @@ def test_provider_requires_token_sequence_commitment_before_delivery():
         assert authority.calls == 4
 
     asyncio.run(scenario())
+
+
+def test_protected_stream_emits_only_after_complete_verified_generation():
+    """Provider-neutral streaming cannot expose unreviewed partial tokens."""
+    from skeleton.provider_runtime import ProviderDeltaKind
+
+    async def scenario():
+        _, authority, _, adapter, request = fixture()
+        deltas = [delta async for delta in adapter.stream(request)]
+        assert authority.calls == 2
+        assert deltas
+        assert deltas[0].kind == ProviderDeltaKind.TEXT
+        assert deltas[0].text is not None
+        assert deltas[-1].kind == ProviderDeltaKind.FINISH
+
+    asyncio.run(scenario())
+
+
+def test_protected_stream_revocation_yields_no_deltas():
+    async def scenario():
+        _, authority, _, adapter, request = fixture()
+        authority.mutate = True
+        observed = []
+        with pytest.raises(SealedContextReplayError):
+            async for delta in adapter.stream(request):
+                observed.append(delta)
+        assert observed == []
+        assert authority.calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_protected_stream_forged_receipt_never_yields_a_partial_delta():
+    from dataclasses import replace
+
+    async def scenario():
+        _, authority, service, adapter, request = fixture()
+        genuine = service.generate
+
+        async def forge(*args, **kwargs):
+            generation = await genuine(*args, **kwargs)
+            return replace(generation, receipt=replace(
+                generation.receipt, response_sha256="0" * 64,
+            ))
+
+        service.generate = forge
+        observed = []
+        with pytest.raises(ProviderPolicyError, match="receipt"):
+            async for delta in adapter.stream(request):
+                observed.append(delta)
+        assert observed == []
+        assert authority.calls == 2
+
+    asyncio.run(scenario())
