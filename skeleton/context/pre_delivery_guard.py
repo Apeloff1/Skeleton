@@ -57,6 +57,32 @@ def merkle_root(parts: Sequence[tuple[str, bytes]]) -> str:
     return leaves[0].hex()
 
 
+def verify_rendered_spans(
+    parts: Sequence[tuple[str, bytes]], rendered: bytes,
+) -> tuple[tuple[int, int], ...]:
+    """Require all original context segments verbatim and in chronological order.
+
+    Native templates may add delimiters but must not erase, trim or rearrange
+    source bytes. Source inclusion is not a proof of attention or role semantics.
+    """
+    if not isinstance(rendered, bytes) or len(rendered) > _MAX_PART_BYTES:
+        raise SealedContextLimitError("rendered prompt exceeds byte admission")
+    offsets: list[tuple[int, int]] = []
+    cursor = 0
+    for role, payload in parts:
+        if role not in {"system", "user", "assistant"} or not isinstance(payload, bytes):
+            raise SealedContextError("invalid source span")
+        if not payload:
+            offsets.append((cursor, cursor))
+            continue
+        index = rendered.find(payload, cursor)
+        if index < 0:
+            raise SealedContextIntegrityError("native renderer omitted or changed context bytes")
+        cursor = index + len(payload)
+        offsets.append((index, cursor))
+    return tuple(offsets)
+
+
 def request_parts(request: Any) -> tuple[tuple[str, bytes], ...]:
     """Uses exact request data, not stripped/normalized rendered model text."""
     try:
@@ -196,6 +222,7 @@ class GuardedLocalInference:
         encoded = rendered.encode("utf-8", errors="strict")
         if len(encoded) > _MAX_PART_BYTES:
             raise SealedContextLimitError("local rendered prompt exceeds byte admission")
+        verify_rendered_spans(parts, encoded)
         token_digest: str | None = None
         if self.require_token_echo and (self.tokenize is None or self.detokenize is None):
             raise SealedContextBoundaryError("native tokenizer echo verification is not configured")
@@ -216,6 +243,15 @@ class GuardedLocalInference:
                 or not verdict.reason_code):
             raise SealedContextBoundaryError("adversarial review declined or was unbound")
         if contract.format != "text" and contract.require_sampler_enforcement:
+            if contract.format == "json" and contract.json_schema is not None:
+                configured = getattr(request, "structured_output_schema", None)
+                if not isinstance(configured, Mapping) or (
+                    json.dumps(configured, sort_keys=True, separators=(",", ":")) !=
+                    json.dumps(contract.json_schema, sort_keys=True, separators=(",", ":"))
+                ):
+                    raise SealedContextBoundaryError(
+                        "native JSON sampler request is not bound to delivery schema"
+                    )
             if self.sampler_support is None or not self.sampler_support(self.engine.model, contract):
                 raise SealedContextBoundaryError("local sampler lacks required grammar constraint")
         return actual_root, token_digest, verdict.reviewer_id
@@ -244,8 +280,19 @@ class GuardedLocalInference:
         result = await self.engine.generate(
             request, tenant_scope_id=tenant_scope_id, **engine_options,
         )
-        if merkle_root(request_parts(request)) != root:
+        after_parts = request_parts(request)
+        if merkle_root(after_parts) != root:
             raise SealedContextIntegrityError("local input mutated during generation")
+        native_renderer = getattr(self.engine.model, "_render_prompt", None)
+        after_rendered = (
+            native_renderer(request) if callable(native_renderer) else request.rendered_input
+        )
+        if not isinstance(after_rendered, str):
+            raise SealedContextIntegrityError("local renderer changed during inference")
+        after_bytes = after_rendered.encode("utf-8", errors="strict")
+        verify_rendered_spans(after_parts, after_bytes)
+        if token_echo is not None and _hash(after_bytes) != token_echo:
+            raise SealedContextIntegrityError("native model input changed during inference")
         text = getattr(result, "text", None)
         if not isinstance(text, str):
             raise SealedContextError("local model did not produce text")
