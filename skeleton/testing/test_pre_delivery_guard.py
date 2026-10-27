@@ -287,3 +287,46 @@ def test_unsupported_json_schema_rejected_before_any_backend_call():
         with pytest.raises(SealedContextError):
             DeliveryContract("json", json_schema=invalid)
     assert engine.calls == 0
+
+
+def test_schema_drift_during_inference_blocks_delivery():
+    schema = {"type": "object", "properties": {
+        "ok": {"type": "boolean"},
+    }, "required": ["ok"], "additionalProperties": False}
+    req = Request("strict policy", (), "return JSON", structured_output_schema=schema)
+    contract = DeliveryContract("json", json_schema=schema)
+
+    class Mutator(Engine):
+        async def generate(self, request, **kwargs):
+            output = await super().generate(request, **kwargs)
+            schema["properties"]["ok"]["type"] = "integer"
+            return output
+
+    engine = Mutator('{"ok":true}')
+    with pytest.raises(SealedContextIntegrityError):
+        asyncio.run(runner(engine).generate(
+            req, snapshot=snapshot(req), tenant_scope_id="tenant", contract=contract,
+        ))
+    assert engine.calls == 1
+
+
+def test_native_sampler_schema_drift_during_inference_blocks_delivery():
+    expected = {"type": "object", "properties": {
+        "ok": {"type": "boolean"},
+    }, "required": ["ok"]}
+    configured = json.loads(json.dumps(expected))
+    req = Request("strict policy", (), "return JSON", structured_output_schema=configured)
+    contract = DeliveryContract("json", json_schema=expected)
+
+    class Mutator(Engine):
+        async def generate(self, request, **kwargs):
+            output = await super().generate(request, **kwargs)
+            configured["properties"]["ok"]["type"] = "integer"
+            return output
+
+    engine = Mutator('{"ok":true}')
+    with pytest.raises(SealedContextIntegrityError):
+        asyncio.run(runner(engine).generate(
+            req, snapshot=snapshot(req), tenant_scope_id="tenant", contract=contract,
+        ))
+    assert engine.calls == 1
