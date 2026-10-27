@@ -29,7 +29,7 @@ from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
-NOW = datetime(2026, 10, 2, 19, 45, tzinfo=timezone.utc)
+# Use a fresh wall-clock timestamp; the execution runtime enforces a strict\n# 120-second default deadline relative to request.created_at.
 
 
 def _effect_model() -> LocalModelAdapter:
@@ -87,7 +87,7 @@ def _request(request_id: str) -> FunctionalAIRequest:
         instructions="Use only the supplied local model and governed tool.",
         context_digest=hashlib.sha256(b"effectiveness-context").hexdigest(),
         allowed_tool_ids=("state.set",),
-        created_at=NOW,
+        created_at=datetime.now(timezone.utc),
     )
 
 
