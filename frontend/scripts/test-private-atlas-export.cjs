@@ -158,7 +158,7 @@ test('real Chromium downloads exact atlas bytes without rendering HTML or readin
   const address = 'http://127.0.0.1:' + server.address().port;
   await page.route('**/*', route => new URL(route.request().url()).origin === address ? route.continue() : route.abort());
   await page.goto(address, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(({ code, original }) => {
+  await page.evaluate(({ original }) => {
     window.__atlasExecuted = false; window.__tokenReads = 0;
     localStorage.setItem('atlasParentToken', 'local-canary-secret');
     const getItem = Storage.prototype.getItem;
@@ -172,10 +172,25 @@ test('real Chromium downloads exact atlas bytes without rendering HTML or readin
       '../utils/apiClient': { __esModule: true, default: { get: async (url, options) => { observations.requests.push({ url, responseType: options.responseType, retries: options.retries }); return { ok: true, data: original }; } } },
       '../auth/gameforgeAuth': { getAuthEpoch: () => 0, subscribeAuthChanges: () => () => {} },
     };
-    const module = { exports: {} };
-    new Function('require', 'module', 'exports', code)(id => { if (!(id in imports)) throw new Error('Unexpected canary import'); return imports[id]; }, module, module.exports);
-    document.querySelector('#export').onclick = () => { window.__atlasPromise = module.exports.downloadPrivateAtlas('browser_game'); };
-  }, { code: compiled(), original: ORIGINAL });
+    // Install only the closed, test-owned CommonJS import map. No Function/eval
+    // constructor: execute the checked-in TypeScript transpilation as a script.
+    window.__atlasModule = { exports: {} };
+    window.module = window.__atlasModule;
+    window.exports = window.__atlasModule.exports;
+    window.require = id => {
+      if (!Object.hasOwn(imports, id)) throw new Error('Unexpected canary import');
+      return imports[id];
+    };
+  }, { original: ORIGINAL });
+  await page.addScriptTag({ content: compiled() });
+  await page.evaluate(() => {
+    if (typeof window.__atlasModule.exports.downloadPrivateAtlas !== 'function') {
+      throw new Error('Atlas test module did not export downloadPrivateAtlas');
+    }
+    document.querySelector('#export').onclick = () => {
+      window.__atlasPromise = window.__atlasModule.exports.downloadPrivateAtlas('browser_game');
+    };
+  });
   const downloaded = page.waitForEvent('download'); await page.click('#export'); const download = await downloaded;
   assert.equal(download.suggestedFilename(), 'browser_game-world-atlas.html');
   assert.equal(fs.readFileSync(await download.path(), 'utf8'), ORIGINAL);
