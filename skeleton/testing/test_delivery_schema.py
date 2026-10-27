@@ -84,3 +84,9 @@ def test_required_and_enum_enforced():
         parse_and_validate_delivery_json('{"status":"unknown"}', {"type":"object", "properties": {
             "status": {"type":"string", "enum":["passed", "failed"]},
         }, "required":["status"]})
+
+
+def test_unhashable_schema_type_fails_with_boundaried_error():
+    for kind in (["object", "null"], {"type": "object"}):
+        with pytest.raises(SealedContextError):
+            validate_delivery_schema({"type": kind})
