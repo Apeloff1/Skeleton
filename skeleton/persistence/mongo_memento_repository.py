@@ -226,12 +226,18 @@ class MongoMementoAuthority:
     async def read_window(
         self, *, archive: SealedMementoArchive, after_serial: int = 0,
         limit: int = ARCHIVE_WINDOW_MESSAGES,
+        expected_starting_head: MementoCatalogHead | None = None,
     ) -> MongoMementoPage:
         """Snapshot-isolated authenticated page, including pinned final head."""
         if type(after_serial) is not int or after_serial < 0 or (
             type(limit) is not int or not 1 <= limit <= ARCHIVE_WINDOW_MESSAGES
         ):
             raise SealedContextLimitError("invalid bounded archive cursor")
+        if expected_starting_head is not None and (
+            not isinstance(expected_starting_head, MementoCatalogHead)
+            or expected_starting_head.serial != after_serial
+        ):
+            raise MongoMementoConflict("caller-pinned archive cursor is invalid")
         session, options = await self._start()
         b = archive.binding
         try:
@@ -253,6 +259,8 @@ class MongoMementoAuthority:
                             raise MongoMementoConflict("invalid cursor checkpoint")
                     else:
                         starting = MementoCatalogHead()
+                    if expected_starting_head is not None and starting != expected_starting_head:
+                        raise MongoMementoConflict("archive cursor disagrees with verified prior page")
                     rows = await (self.frames.find({
                         "thread_id": b.conversation_id, "tenant_id": b.tenant_id,
                         "owner_id": b.owner_id,
