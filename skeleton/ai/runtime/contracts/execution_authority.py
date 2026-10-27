@@ -589,7 +589,7 @@ class AuthorityEvidenceBundle:
 
     @property
     def aggregate_usage(self) -> ResourceUsage:
-        """Sum direct and descendant charges in the sealed evidence bundle."""
+        """Return sealed direct and descendant resource consumption together."""
         return self.final_usage.add(self.descendant_usage)
 
     def canonical_payload(self) -> dict[str, Any]:
