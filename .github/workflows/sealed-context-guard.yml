@@ -11,6 +11,13 @@ on:
       - 'skeleton/ai/runtime/inference/guarded_service.py'
       - 'skeleton/ai/runtime/inference/canonical_snapshot_reader.py'
       - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
+      - 'skeleton/ai/runtime/inference/canonical_execution_source_factory.py'
+      - 'skeleton/ai/runtime/inference/canonical_owner_source_loader.py'
+      - 'skeleton/persistence/mongo_execution_source_binding.py'
+      - 'skeleton/persistence/mongo_source_epoch.py'
+      - 'skeleton/persistence/memory_repository.py'
+      - 'skeleton/testing/test_canonical_execution_source_factory.py'
+      - 'skeleton/testing/test_mongo_source_epoch.py'
       - 'skeleton/ai/runtime/inference/canonical_source_custody.py'
       - 'skeleton/ai/runtime/inference/native_tokenizer_guard.py'
       - 'skeleton/api/server.py'
@@ -82,6 +89,8 @@ jobs:
             skeleton/testing/test_guarded_application_startup.py \
             skeleton/testing/test_engine_submission_snapshot.py \
             skeleton/testing/test_canonical_source_custody.py \
+            skeleton/testing/test_canonical_execution_source_factory.py \
+            skeleton/testing/test_mongo_source_epoch.py \
             skeleton/testing/test_canonical_owner_source_loader.py \
             skeleton/testing/test_native_tokenizer_guard.py \
             skeleton/testing/test_guarded_registry_activation.py \
