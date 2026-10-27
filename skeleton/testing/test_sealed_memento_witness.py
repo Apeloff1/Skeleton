@@ -383,3 +383,75 @@ def test_recovery_inspection_denies_missing_witness_and_forged_suffix():
         with pytest.raises(MementoWitnessDivergence):
             await inspect_memento_recovery(archive=a, mongo=m, witness=w)
     asyncio.run(scenario())
+
+
+def test_canonical_governed_deletion_needs_no_decryption_key():
+    from skeleton.context.sealed_memento import encode_catalog_head
+
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+
+        async def authoritative_thread(query):
+            assert query == {"_id": "thread", "tenant_id": "tenant", "owner_id": "owner"}
+            return {"_sealed_memento_binding": _binding_digest(a),
+                    "_sealed_memento_head": encode_catalog_head(m.head)}
+
+        m.conversation = SimpleNamespace(threads=SimpleNamespace(find_one=authoritative_thread))
+        removed = await guard.retire_bound_thread(
+            tenant_id="tenant", owner_id="owner", thread_id="thread",
+            binding_digest=_binding_digest(a),
+        )
+        assert removed == 1 and m.retired and not m.rows
+        assert w.positions[_binding_digest(a)].retired
+    asyncio.run(scenario())
+
+
+def test_governed_deletion_retry_after_tombstone_purges_remaining_frames():
+    from skeleton.context.sealed_memento import encode_catalog_head
+
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+
+        async def authoritative_thread(query):
+            return {"_sealed_memento_binding": _binding_digest(a),
+                    "_sealed_memento_head": encode_catalog_head(m.head)}
+
+        m.conversation = SimpleNamespace(threads=SimpleNamespace(find_one=authoritative_thread))
+        m.fail_purge = True
+        args = dict(tenant_id="tenant", owner_id="owner", thread_id="thread",
+                    binding_digest=_binding_digest(a))
+        with pytest.raises(MementoWitnessIndeterminate):
+            await guard.retire_bound_thread(**args)
+        first_position = w.positions[_binding_digest(a)]
+        assert first_position.retired and len(m.rows) == 1
+        m.fail_purge = False
+        assert await guard.retire_bound_thread(**args) == 1
+        assert w.positions[_binding_digest(a)] == first_position
+        assert m.retired and not m.rows
+    asyncio.run(scenario())
+
+
+def test_canonical_bound_deletion_does_not_accept_untrusted_binding_or_tenant():
+    from skeleton.context.sealed_memento import encode_catalog_head
+
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+
+        async def authoritative_thread(query):
+            if query["tenant_id"] != "tenant":
+                return None
+            return {"_sealed_memento_binding": _binding_digest(a),
+                    "_sealed_memento_head": encode_catalog_head(m.head)}
+
+        m.conversation = SimpleNamespace(threads=SimpleNamespace(find_one=authoritative_thread))
+        for extra in ({"tenant_id": "other"}, {"binding_digest": "b" * 64}):
+            args = {"tenant_id": "tenant", "owner_id": "owner", "thread_id": "thread",
+                    "binding_digest": _binding_digest(a), **extra}
+            with pytest.raises(SealedContextBoundaryError):
+                await guard.retire_bound_thread(**args)
+        assert not w.positions[_binding_digest(a)].retired
+        assert len(m.rows) == 1
+    asyncio.run(scenario())
