@@ -30,12 +30,12 @@ SEGMENTS = (("00000000-0000-4000-8000-000000000003", "b" * 64),)
 class Source:
     def __init__(self):
         self.calls = 0
-        self.current = CurrentSourceCustody(TENANT, CONTEXT, SEGMENTS, 7)
+        self.current = CurrentSourceCustody(TENANT, "actor", CONTEXT, SEGMENTS, 7)
         self.outage = False
 
-    async def inspect(self, *, tenant_id, context_id):
+    async def inspect(self, *, tenant_id, actor_id, context_id):
         self.calls += 1
-        assert (tenant_id, context_id) == (TENANT, CONTEXT)
+        assert (tenant_id, actor_id, context_id) == (TENANT, "actor", CONTEXT)
         if self.outage:
             raise ConnectionError("source unavailable")
         return self.current
@@ -62,7 +62,7 @@ class Submissions:
             source_snapshot=SEGMENTS, instructions="owner policy",
             history=(("user", "initial"),), prompt="latest",
         )
-        operation = SimpleNamespace(operation_id="operation", tenant_id=TENANT)
+        operation = SimpleNamespace(operation_id="operation", tenant_id=TENANT, actor_id="actor")
         command = SimpleNamespace(
             compiled_context=handoff, operation=operation,
             execution_request=SimpleNamespace(identity_digest="digest"),
@@ -119,7 +119,8 @@ def test_valid_source_custody_and_durable_version_produce_authoritative_merkle_s
 
 
 @pytest.mark.parametrize("damage", [
-    {"revoked": True}, {"tenant_id": "foreign"}, {"context_id": "foreign"},
+    {"revoked": True}, {"tenant_id": "foreign"}, {"actor_id": "foreign"},
+    {"context_id": "foreign"},
     {"source_snapshot": ()}, {"version": 0}, {"version": True},
 ])
 def test_mismatched_or_revoked_source_custody_refuses_release(damage):
@@ -293,9 +294,9 @@ def test_owner_mutation_inside_source_inspection_is_denied(mutation):
         service = owner()
 
         class ConcurrentSource(Source):
-            async def inspect(self, *, tenant_id, context_id):
+            async def inspect(self, *, tenant_id, actor_id, context_id):
                 current = await super().inspect(
-                    tenant_id=tenant_id, context_id=context_id,
+                    tenant_id=tenant_id, actor_id=actor_id, context_id=context_id,
                 )
                 if mutation == "cancel":
                     service.repository.execution.cancellation_requested = True
