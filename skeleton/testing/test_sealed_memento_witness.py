@@ -281,3 +281,105 @@ def test_external_post_commit_confirmation_failure_is_indeterminate():
             )
         assert m.publish_calls == 1
     asyncio.run(scenario())
+
+
+def test_recovery_inspection_consistent_and_single_unwitnessed_commit():
+    from skeleton.persistence.sealed_memento_recovery import inspect_memento_recovery
+
+    async def scenario():
+        a, m, w, guard = setup()
+        matching = await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+        assert matching.classification == "consistent" and not matching.manual_intervention_required
+        await add(a, guard)
+        w.reject = True
+        wire, _ = a.seal(MementoRecord(2, "user", b"after crash"), previous=m.head)
+        with pytest.raises(MementoWitnessIndeterminate):
+            await guard.publish(
+                archive=a, expected_head=m.head, expected_thread_version=1,
+                stream="user", ciphertext=wire,
+            )
+        inspected = await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+        assert inspected.classification == "single_verified_unwitnessed_commit"
+        assert inspected.witness_serial == 1 and inspected.mongo_serial == 2
+        assert inspected.candidate_serial == 2 and inspected.manual_intervention_required
+        assert w.positions[_binding_digest(a)].head.serial == 1
+    asyncio.run(scenario())
+
+
+def test_recovery_inspection_reports_rollback_fork_and_multiple_commits():
+    from skeleton.persistence.sealed_memento_recovery import inspect_memento_recovery
+
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        committed = m.head
+        m.head = MementoCatalogHead()
+        rollback = await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+        assert rollback.classification == "database_rollback_or_loss"
+        m.head = replace(committed, commitment="e" * 64)
+        fork = await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+        assert fork.classification == "same_serial_fork_or_corruption"
+        m.head = committed
+        w.positions[_binding_digest(a)] = WitnessPosition(_binding_digest(a), 1, MementoCatalogHead())
+        await m.publish(
+            archive=a, expected_head=m.head, expected_thread_version=1,
+            stream="user", ciphertext=a.seal(
+                MementoRecord(2, "user", b"next"), previous=m.head,
+            )[0],
+        )
+        multi = await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+        assert multi.classification == "unwitnessed_multiple_commits"
+    asyncio.run(scenario())
+
+
+def test_recovery_inspection_retired_tombstone_and_stability_race():
+    from skeleton.persistence.sealed_memento_recovery import inspect_memento_recovery
+    from skeleton.context.sealed_sandwich import SealedContextReplayError
+
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        await guard.retire_thread(archive=a)
+        retired = await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+        assert retired.classification == "retired" and retired.mongo_serial is None
+        assert retired.manual_intervention_required
+        b, mongo, store, guarded = setup()
+        original = store.read
+        calls = 0
+
+        async def changing(*, binding_digest):
+            nonlocal calls
+            calls += 1
+            item = await original(binding_digest=binding_digest)
+            return replace(item, revision=item.revision + 1) if calls == 2 else item
+
+        store.read = changing
+        with pytest.raises(SealedContextReplayError):
+            await inspect_memento_recovery(archive=b, mongo=mongo, witness=store)
+    asyncio.run(scenario())
+
+
+def test_recovery_inspection_denies_missing_witness_and_forged_suffix():
+    from skeleton.persistence.sealed_memento_recovery import inspect_memento_recovery
+
+    async def scenario():
+        a, m, w, guard = setup()
+        w.positions.clear()
+        with pytest.raises(MementoWitnessUnavailable):
+            await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+        w.positions[_binding_digest(a)] = WitnessPosition(_binding_digest(a), 1, MementoCatalogHead())
+        wire, _ = a.seal(MementoRecord(1, "user", b"unwitnessed"), previous=m.head)
+        await m.publish(
+            archive=a, expected_head=m.head, expected_thread_version=1,
+            stream="user", ciphertext=wire,
+        )
+        raw_read = m.read_window
+
+        async def altered(**kwargs):
+            page = await raw_read(**kwargs)
+            return SimpleNamespace(**{**vars(page), "authoritative_head": MementoCatalogHead()})
+
+        m.read_window = altered
+        with pytest.raises(MementoWitnessDivergence):
+            await inspect_memento_recovery(archive=a, mongo=m, witness=w)
+    asyncio.run(scenario())
