@@ -18,6 +18,7 @@ from skeleton.context.sealed_sandwich import (
 )
 from skeleton.persistence.mongo_memento_repository import (
     MongoMementoAuthority, MongoMementoConflict, MongoMementoUnavailable,
+    memento_retirement_requires_witness,
 )
 
 
@@ -321,3 +322,64 @@ def test_pinned_mongo_cursor_rejects_tampered_saved_checkpoint(suite):
         asyncio.run(db.read_window(
             archive=archive, after_serial=1, expected_starting_head=page.verified_head,
         ))
+
+
+def test_witnessed_custody_is_durable_and_cannot_be_silently_downgraded(suite):
+    owner, db, archive, _ = suite
+
+    async def scenario():
+        genesis = MementoCatalogHead()
+        wire, head = archive.seal(MementoRecord(1, "user", b"protected"), previous=genesis)
+        assert await db.publish(
+            archive=archive, expected_head=genesis, expected_thread_version=3,
+            stream="user", ciphertext=wire, custody_mode="witnessed",
+        ) == head
+        thread = owner.database.rows["conversation_threads"]["t1"]
+        assert thread["_sealed_memento_custody"] == "witnessed"
+        assert memento_retirement_requires_witness(thread, witness_present=True)
+        wire2, _ = archive.seal(MementoRecord(2, "user", b"protected-2"), previous=head)
+        with pytest.raises(MongoMementoConflict, match="custody"):
+            await db.publish(
+                archive=archive, expected_head=head, expected_thread_version=3,
+                stream="user", ciphertext=wire2,
+            )
+        assert len(owner.database.rows["conversation_memento_frames"]) == 1
+        assert owner.database.rows["conversation_threads"]["t1"]["_sealed_memento_head"]
+
+    asyncio.run(scenario())
+
+
+def test_retirement_refuses_missing_invalid_or_unavailable_witness():
+    with pytest.raises(MongoMementoUnavailable, match="custody"):
+        memento_retirement_requires_witness({}, witness_present=False)
+    with pytest.raises(MongoMementoUnavailable, match="custody"):
+        memento_retirement_requires_witness(
+            {"_sealed_memento_custody": "unknown"}, witness_present=True,
+        )
+    with pytest.raises(MongoMementoUnavailable, match="independent"):
+        memento_retirement_requires_witness(
+            {"_sealed_memento_custody": "witnessed"}, witness_present=False,
+        )
+    assert not memento_retirement_requires_witness(
+        {"_sealed_memento_custody": "legacy"}, witness_present=False,
+    )
+    assert memento_retirement_requires_witness(
+        {"_sealed_memento_custody": "witnessed"}, witness_present=True,
+    )
+
+
+def test_custody_cannot_be_reclassified_between_publications(suite):
+    owner, db, archive, _ = suite
+    publish(db, archive, MementoRecord(1, "user", b"legacy"))
+    assert owner.database.rows["conversation_threads"]["t1"]["_sealed_memento_custody"] == "legacy"
+
+    async def scenario():
+        head = await db.trusted_head(archive=archive)
+        wire, _ = archive.seal(MementoRecord(2, "user", b"upgrade"), previous=head)
+        with pytest.raises(MongoMementoConflict, match="custody"):
+            await db.publish(
+                archive=archive, expected_head=head, expected_thread_version=3,
+                stream="user", ciphertext=wire, custody_mode="witnessed",
+            )
+    asyncio.run(scenario())
+    assert len(owner.database.rows["conversation_memento_frames"]) == 1
