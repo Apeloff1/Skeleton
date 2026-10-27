@@ -19,6 +19,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from skeleton.context.sealed_memento import MementoCatalogHead, SealedMementoArchive
 from skeleton.context.sealed_sandwich import SealedContextBoundaryError
 from skeleton.persistence.sealed_memento_recovery import inspect_memento_recovery
+from skeleton.persistence.sealed_memento_recovery_journal import (
+    IndependentRecoveryJournal, RecoveryJournalError, claim_record, completed_record,
+)
 from skeleton.persistence.sealed_memento_witness import (
     IndependentMementoWitness,
     MementoWitnessDivergence,
@@ -118,7 +121,7 @@ class SignedMementoReconciler:
     """
 
     def __init__(
-        self, *, public_keys: Mapping[str, bytes],
+        self, *, public_keys: Mapping[str, bytes], journal: IndependentRecoveryJournal,
         clock: Callable[[], float] = time.time,
     ) -> None:
         if not isinstance(public_keys, Mapping) or len(public_keys) < 2:
@@ -132,6 +135,11 @@ class SignedMementoReconciler:
                 raise MementoRecoveryDenied("operator keys must be uniquely provisioned")
             seen.add(raw)
             self._keys[identity] = Ed25519PublicKey.from_public_bytes(raw)
+        if not all(callable(getattr(journal, name, None)) for name in (
+            "reserve", "read", "complete"
+        )):
+            raise MementoRecoveryDenied("external recovery incident journal required")
+        self._journal = journal
         if not callable(clock):
             raise MementoRecoveryDenied("trusted recovery clock required")
         self._clock = clock
@@ -189,6 +197,18 @@ class SignedMementoReconciler:
             raise MementoWitnessDivergence("recovery source changed before authorization commit")
         # Repeat the human signature and clock checks before external mutation.
         self._approve(grant, signatures)
+        claim = claim_record(grant, tuple(item.signer_id for item in signatures))
+        try:
+            reserved = await self._journal.reserve(record=claim)
+            confirmed_claim = await self._journal.read(
+                binding_digest=claim.binding_digest, incident_id=claim.incident_id,
+            )
+        except Exception as exc:
+            raise RecoveryJournalError("durable recovery incident reservation unavailable") from exc
+        if reserved is not True or confirmed_claim != claim:
+            raise RecoveryJournalError("incident already consumed or reservation unconfirmed")
+        # Reservation is permanent, even if a subsequent step fails. Never
+        # replay an indeterminate incident or issue a second grant under its ID.
         successor = WitnessPosition(
             grant.binding_digest, pinned.revision + 1, grant.candidate_head,
         )
@@ -208,7 +228,27 @@ class SignedMementoReconciler:
             raise MementoWitnessIndeterminate("recovery post-commit confirmation unavailable") from exc
         if observed != successor or db_head != grant.candidate_head:
             raise MementoWitnessIndeterminate("reconciled authority changed after witness CAS")
-        return ReconciledWitnessReceipt(
+        receipt = ReconciledWitnessReceipt(
             grant.incident_id, grant.binding_digest, pinned.revision,
             successor.revision, successor.head, grant.source_thread_version,
         )
+        from skeleton.context.sealed_memento import encode_catalog_head
+
+        receipt_bytes = _DOMAIN + json.dumps({
+            "incident": receipt.incident_id, "binding": receipt.binding_digest,
+            "previous_revision": receipt.previous_revision,
+            "committed_revision": receipt.committed_revision,
+            "head": encode_catalog_head(receipt.committed_head).decode("ascii"),
+            "source_thread_version": receipt.source_thread_version,
+        }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        completed = completed_record(claim, receipt_bytes)
+        try:
+            finalized = await self._journal.complete(previous=claim, successor=completed)
+            confirmation = await self._journal.read(
+                binding_digest=claim.binding_digest, incident_id=claim.incident_id,
+            )
+        except Exception as exc:
+            raise MementoWitnessIndeterminate("recovery committed but journal completion unavailable") from exc
+        if finalized is not True or confirmation != completed:
+            raise MementoWitnessIndeterminate("recovery committed without durable final journal receipt")
+        return receipt
