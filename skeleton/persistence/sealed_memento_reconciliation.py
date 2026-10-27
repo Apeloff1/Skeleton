@@ -238,6 +238,8 @@ class SignedMementoReconciler:
         successor = WitnessPosition(
             grant.binding_digest, pinned.revision + 1, grant.candidate_head,
             recovery_incident_id=grant.incident_id,
+            recovery_revision=pinned.revision + 1,
+            recovery_head=grant.candidate_head,
         )
         try:
             accepted = await witness.compare_and_set(
