@@ -92,7 +92,7 @@ class FunctionalAIRequest:
             raise ValueError("allowed_tool_ids must be non-empty")
         object.__setattr__(self, "allowed_tool_ids", tools)
         instant = self.created_at
-        if instant.tzinfo is None or instant.utcoffset() is None:
+        if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
             raise ValueError("created_at must be timezone-aware")
         object.__setattr__(self, "created_at", instant.astimezone(timezone.utc))
 
@@ -341,20 +341,7 @@ class FunctionalAIRuntime:
         )
         self._assert_local_identity()
         if result.state is not ExecutionState.COMPLETED or result.result is None:
-            # This is a local-only diagnostic, never a model/provider payload.
-            # Emit the bounded typed terminal error code so exact-head CI can
-            # distinguish denied tool authority from failed verification.
-            code = "unavailable"
-            if result.result is not None:
-                candidate = result.result.usage.get("error_code", "")
-                if isinstance(candidate, str) and 0 < len(candidate) <= 64 and all(
-                    char.isascii() and (char.isalnum() or char in "_-")
-                    for char in candidate
-                ):
-                    code = candidate
-            raise RuntimeError(
-                f"VS-001 did not complete: {result.state.value}; error_code={code}"
-            )
+            raise RuntimeError(f"VS-001 did not complete: {result.state.value}")
         terminal = result.result
         if terminal.status != "completed" or terminal.final_output is None:
             raise RuntimeError("VS-001 terminal result is not completed")
