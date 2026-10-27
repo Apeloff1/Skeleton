@@ -81,6 +81,7 @@ class VerifiedMementoRetriever:
                 raise SealedContextLimitError("verified archive scan budget exceeded")
             page = self._read(
                 archive=archive, after_serial=cursor, limit=ARCHIVE_WINDOW_MESSAGES,
+                expected_starting_head=(preceding if cursor else MementoCatalogHead()),
             )
             if head is None:
                 head = page.authoritative_head
