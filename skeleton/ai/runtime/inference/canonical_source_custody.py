@@ -89,6 +89,11 @@ class CanonicalSegmentSourceAuthority:
             if segment.content is None:
                 # Hash-only placeholders cannot prove live content or deletion.
                 raise SealedContextBoundaryError("canonical candidate content was not independently materialized")
+            # Unicode code points never take fewer than one UTF-8 byte;
+            # reject grossly oversized strings before allocating their
+            # potentially much larger encoded representation.
+            if len(segment.content) > _MAX_CONTENT_BYTES:
+                raise SealedContextLimitError("canonical candidate exceeds byte admission")
             try:
                 body = segment.content.encode("utf-8", "strict")
             except UnicodeError as exc:
