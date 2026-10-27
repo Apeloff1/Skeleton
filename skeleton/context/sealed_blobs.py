@@ -35,7 +35,10 @@ def _object_id(value: str) -> str:
     if (
         not isinstance(value, str)
         or not 1 <= len(value) <= 128
-        or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in value)
+        or any(
+            char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+            for char in value
+        )
     ):
         raise SealedContextError("invalid object identity")
     return value
