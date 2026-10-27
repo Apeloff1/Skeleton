@@ -141,3 +141,100 @@ missing/extra frames and tenant mismatch. Binary tests check byte-exact
 streaming for NUL/non-UTF8/Unicode payloads, empty objects, digest-bearing
 terminal frames, wrong object IDs, duplication/reordering, truncation,
 stale trusted head, write failures and size-budget refusal.
+
+## Phase 4: canonical SQLite CAS conformance and correlated replay (2026-10-27)
+
+The isolated `skeleton/persistence/sealed_memento_repository.py` module
+adds SQLite **conformance** behavior, not another conversation authority.
+It receives the already-open `SQLiteConversationRepository`, reuses its
+connection and reentrant lock, and stores encrypted candidate frames
+in two tables with foreign keys cascading from `conversation_thread`:
+
+- `conversation_memento_head`: one authorized, policy/model-bound,
+  independently fetched catalog head per conversation, including current
+  source thread version. No plaintext history or encryption keys stored.
+- `conversation_memento_frame`: monotonic global serial, cryptographic
+  stream name, ciphertext frame and end-of-frame catalog checkpoint.
+
+`publish` starts `BEGIN IMMEDIATE`, validates tenant/owner authorization,
+writable conversation state, expected canonical thread version, exact
+previous head, authenticated encryption, exact-next global/per-stream
+sequence, trusted work receipt, and SQL existence of any causal predecessor.
+It inserts the encrypted frame and advances the catalog head *in the same
+SQLite transaction*. A stale head, source version change, missing causal
+record, failed proof, authorization error or write failure rolls back both.
+This blocks acceptance of an old client-held state even when its own
+cryptographic authentication is valid.
+
+`read_window` reads a single database snapshot. It independently obtains
+the trusted head, checks an authenticated resume checkpoint, enforces a
+2,000-event record limit **and 16 MiB ciphertext limit**, checks complete
+global sequence continuity, re-verifies each frame's AEAD/stream chain and
+all delivered-work proofs, and compares the final head to the trusted
+catalog. It returns an explicit `has_more` cursor. It never returns a
+truncated page as a complete archive. A revoked/expired work receipt now
+fails read/replay rather than being presented as a completed execution.
+
+`SealedMementoArchive.verify_append` verifies an incoming encrypted
+candidate with the prior authorized catalog head; the archive's replay path
+also rechecks execution receipts rather than trusting the fact that a work
+event was sealed earlier.
+
+`correlate_causal_bundle` expands authenticated lexical matches to
+verified causal ancestors and descendants through serial IDs across all
+three streams. It preserves original role labels and does not equate
+LLM assertions with executed work. If a complete causal closure exceeds
+the configured output budget, it refuses rather than silently hiding
+related events.
+
+### Known hard boundaries
+
+1. **Production Mongo has not been wired.** Live Jeeves chat persists in
+   `backend/core/conversations.py`; the SQLite adapter is the existing
+   portable conformance harness. No production service is started here.
+2. **External rollback witness is still required** for adversarial
+   restoration of a database snapshot and all its trusted heads. AES-GCM
+   proves ciphertext integrity, not freshness relative to a head copied
+   from the same untrusted backup. Production should anchor/attest the
+   head or use a separately governed monotonic authority.
+3. **No claim of atomic remote object-store durability.** Metadata and
+   ciphertext must be staged, replicated, verified and durably committed
+   before a production Mongo majority-acknowledged publication advances
+   the readable catalog. Crash, retry, failover and key-unavailable behavior
+   must have a recovery outbox.
+4. **No effective doubling of physical model tokens.** Three archives
+   preserve separate provenance; retrieval is a bounded projection
+   into a model's unchanged finite tokenizer/context-window limits.
+5. **Retention and erasure must cascade.** SQLite foreign-key deletion
+   removes associated candidate frames. Live production additionally
+   needs legal retention hooks, KMS crypto-erasure, artifact reference
+   deletion, audit receipts and backup expiry.
+
+### Acceptance commands
+
+```bash
+python -m pytest -q \
+  skeleton/testing/test_sealed_sandwich.py \
+  skeleton/testing/test_sealed_conversation_async.py \
+  skeleton/testing/test_sealed_blobs.py \
+  skeleton/testing/test_sealed_memento.py \
+  skeleton/testing/test_pre_delivery_guard.py \
+  skeleton/testing/test_sealed_memento_repository.py
+
+python scripts/check_architecture_map.py
+python scripts/check_ai_app_construction.py
+python scripts/check_capability_interfaces.py
+python scripts/check_provider_bootstrap.py
+python scripts/check_state_topology.py
+python scripts/check_enterprise_ai_superiority.py --json
+python scripts/check_enterprise_ai_implementation_notes.py --json
+```
+
+Local isolated-source overlay: **47 focused tests passed** before the
+canonical repository test module was committed. Those tests are not a
+substitute for GitHub exact-head checks. On this draft PR, Repository
+Hygiene and Secret Scanning passed for the phase-four commit; Merge
+Readiness, Backend Quality and App Foundation E2E were **skipped**.
+Do not merge on that basis. Promote only after runtime authority,
+schema/state topology updates, write/restore drills, operator controls,
+privacy deletion, and fail-closed CI evidence are complete.
