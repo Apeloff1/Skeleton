@@ -26,6 +26,7 @@ from skeleton.context.sealed_sandwich import (
 @dataclass(frozen=True, slots=True)
 class CurrentSourceCustody:
     tenant_id: str
+    actor_id: str
     context_id: str
     source_snapshot: tuple[tuple[str, str], ...]
     version: int
@@ -34,7 +35,7 @@ class CurrentSourceCustody:
 
 class CurrentSourceAuthority(Protocol):
     async def inspect(
-        self, *, tenant_id: str, context_id: str
+        self, *, tenant_id: str, actor_id: str, context_id: str
     ) -> CurrentSourceCustody: ...
 
 
@@ -101,6 +102,8 @@ class EngineSubmissionCompiledInputLoader:
                     or handoff.operation_id != operation.operation_id
                     or handoff.tenant_id != tenant_id
                     or operation.tenant_id != tenant_id
+                    or not isinstance(operation.actor_id, str)
+                    or not operation.actor_id
                     or handoff.context_id != context_id
                     or execution.cancellation_requested
                     or execution.terminal):
@@ -122,11 +125,13 @@ class EngineSubmissionCompiledInputLoader:
                 handoff.handoff_digest,
             )
             custody = await self._source_authority.inspect(
-                tenant_id=tenant_id, context_id=context_id,
+                tenant_id=tenant_id, actor_id=operation.actor_id,
+                context_id=context_id,
             )
             if (not isinstance(custody, CurrentSourceCustody)
                     or custody.revoked is not False
                     or custody.tenant_id != tenant_id
+                    or custody.actor_id != operation.actor_id
                     or custody.context_id != context_id
                     or type(custody.version) is not int or custody.version < 1
                     or custody.source_snapshot != handoff.source_snapshot):
@@ -156,6 +161,7 @@ class EngineSubmissionCompiledInputLoader:
                         or verified_command.execution_request.identity_digest
                            != execution.request.identity_digest
                         or verified_command.operation.tenant_id != tenant_id
+                        or verified_command.operation.actor_id != operation.actor_id
                         or verified_handoff.context_id != context_id):
                     raise SealedContextBoundaryError(
                         "durable engine owner changed during source inspection"
