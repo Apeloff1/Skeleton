@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "c51f3a33539ca2680e8381312e10b1052c79ea3f",
+      "source_git_object_sha": "cffb99b2670e95264734fe25f92f969388291a1b",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "7e773e063d900533d7a293bbf51b8a49b1ebce5e",
+      "source_git_object_sha": "9fd95c84358a80659fa5f8214b66790a843b2c65",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -889,7 +889,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "5e86300d17acb3d437c43fc3edc251217094ba6b",
+      "source_git_object_sha": "f181efb63d9c47b4fdb01555274312ee6f5c7127",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -1180,7 +1180,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "60c3648ca97e2c4f4e7bd344ca4b65c156faff66",
+      "source_git_object_sha": "6079b088065094c99cb552a5bd93e2ce152e5bce",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -1269,7 +1269,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "97e5331920e7fad1ee5ea5a889f8cc3ec9b6d5e2",
+      "source_git_object_sha": "ec8649680450e7f4951805d7436abaeba7df6c3a",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1462,7 +1462,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "4d18dfdfa934a4f1516bf2547fb71d0326ba0419",
+      "source_git_object_sha": "a356c796dc01bf226bb40e2f8cf5d166cc91afb5",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1620,7 +1620,7 @@
       "source": "skeleton/organism",
       "destination": "skeleton/ai/runtime/organism",
       "kind": "tree",
-      "source_git_object_sha": "9c342b0f336573446909398d8043a231576bc6bb",
+      "source_git_object_sha": "ff262c351c35196112b7f1c9ec9ea8e1d106b0c7",
       "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
       "work_package_refs": [
         "WP-W02",
@@ -2784,7 +2784,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "ffed5b8fcc93c2895f02e14f0a1904e44767bc83",
+      "source_git_object_sha": "a0792dea0d865be8acc506ee647f866f760e5968",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -2912,7 +2912,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "20439c3039609c5cc220aa1b0a8db0f4a9f10d97",
+      "source_git_object_sha": "0089891575b363bb0e4f80cccc16dab7ed40702b",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
