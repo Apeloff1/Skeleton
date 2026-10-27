@@ -111,3 +111,49 @@ def test_verified_retrieval_rejects_changed_page_checkpoint(history):
         VerifiedMementoRetriever(corrupted).search(
             archive=archive, query="dragon", limit=12,
         )
+
+
+def test_retrieval_rejects_forged_verified_range_length(history):
+    archive, window = history
+    native = window.read
+
+    def forged(**kwargs):
+        page = native(**kwargs)
+        if kwargs["after_serial"] == 0 and kwargs["limit"] == 2000:
+            return replace(page, records=page.records[:-1])
+        return page
+
+    with pytest.raises(SealedContextReplayError):
+        VerifiedMementoRetriever(forged).search(archive=archive, query="dragon")
+
+
+def test_retrieval_rejects_wrong_point_read_checkpoint(history):
+    archive, window = history
+    native = window.read
+
+    def forged(**kwargs):
+        page = native(**kwargs)
+        if kwargs["after_serial"] == 11 and kwargs["limit"] == 1:
+            return replace(page, starting_head=MementoCatalogHead())
+        return page
+
+    with pytest.raises(SealedContextReplayError):
+        VerifiedMementoRetriever(forged).search(archive=archive, query="dragon")
+
+
+def test_retrieval_rejects_causal_expansion_cursor_substitution(history):
+    archive, window = history
+    native = window.read
+    later = 0
+
+    def forged(**kwargs):
+        nonlocal later
+        page = native(**kwargs)
+        if kwargs["after_serial"] == 2000 and kwargs["limit"] == 2000:
+            later += 1
+            if later == 2:
+                return replace(page, starting_head=MementoCatalogHead())
+        return page
+
+    with pytest.raises(SealedContextReplayError):
+        VerifiedMementoRetriever(forged).search(archive=archive, query="dragon")
