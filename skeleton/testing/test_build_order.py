@@ -33,3 +33,42 @@ def test_snapshot_recomputes_blocked_state_deterministically():
 def test_completed_node_cannot_be_promoted_again():
  o=BuildOrder(("AIQ.1",))
  with pytest.raises(BuildOrderError,match="completed node"):o.maturity_allowed("AIQ.1",("AIQ.1",))
+
+
+@pytest.mark.parametrize(
+    "completed",
+    [
+        ("AIQ.9",),
+        ("AIQ.1", "AIQ.1"),
+        ("AIQ.1", 123),
+        ["AIQ.1", "AIQ.1"],
+    ],
+)
+def test_all_build_order_queries_reject_invalid_completed_state(completed):
+    order = BuildOrder(("AIQ.1", "AIQ.2"))
+    for query in (
+        lambda: order.ready(completed),
+        lambda: order.blocked_reasons("AIQ.2", completed),
+        lambda: order.maturity_allowed("AIQ.2", completed),
+        lambda: order.snapshot(completed),
+    ):
+        with pytest.raises(BuildOrderError):
+            query()
+
+
+def test_unknown_node_is_not_implicitly_unblocked():
+    order = BuildOrder(("AIQ.1", "AIQ.2"))
+    for query in (
+        lambda: order.blocked_reasons("AIQ.9", ()),
+        lambda: order.maturity_allowed("AIQ.9", ()),
+    ):
+        with pytest.raises(BuildOrderError, match="unknown node"):
+            query()
+
+
+def test_both_build_order_implementations_are_identical():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    assert (root / "skeleton/automation/build_order.py").read_bytes() == (
+        root / "skeleton/ai/build/automation/build_order.py"
+    ).read_bytes()

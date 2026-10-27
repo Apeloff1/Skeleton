@@ -176,8 +176,12 @@ def polynomial_roots(
     leading = coeffs[-1]
     monic = tuple(value / leading for value in coeffs)
     radius = 1.0 + max(abs(value) for value in monic[:-1])
+    # Conjugate-symmetric equal-radius seeds can lock Durand-Kerner into
+    # oscillation even for polynomials with simple real roots. Break both
+    # angular and radial symmetry deterministically (never with randomness).
     roots = [
-        radius * cmath.exp(2j * math.pi * (index + 0.5) / degree)
+        radius * (1.0 + 0.1 * index / degree)
+        * cmath.exp(2j * math.pi * (index + 0.3) / degree)
         for index in range(degree)
     ]
     maximum_update = math.inf
