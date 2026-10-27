@@ -444,9 +444,15 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
         assert "pull_requests[0]" not in text, f"{name} must not treat pull_requests[0] as identity"
 
     pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
-    assert "workflow_run:" in pr_automation
-    assert "types: [completed]" in pr_automation
-    assert "branches-ignore:\n      - main" in pr_automation
+    # Unlike the bounded, unprivileged completion consumers above, the
+    # privileged PR automation workflow was deliberately made manual-only.
+    # Never reinstate automatic workflow_run or schedule triggers to satisfy
+    # an obsolete test expectation.
+    assert "\non:\n  workflow_dispatch:\n" in pr_automation
+    assert "\n  workflow_run:\n" not in pr_automation
+    assert "\n  schedule:\n" not in pr_automation
+    assert "pull_request_target:" not in pr_automation
+    assert "branches-ignore:\n      - main" not in pr_automation
     assert expected not in pr_automation
     assert "pull_requests[0]" not in pr_automation
 
