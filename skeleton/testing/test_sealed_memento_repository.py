@@ -152,3 +152,23 @@ def test_owner_deletion_cascades_encrypted_history(live):
     assert repository._connection.execute(
         "SELECT count(*) FROM conversation_memento_head"
     ).fetchone()[0] == 0
+
+def test_pinned_sqlite_cursor_rejects_tampered_saved_checkpoint(live):
+    from skeleton.context.sealed_memento import encode_catalog_head
+    repository, db, archive, _ = live
+    for number in range(1, 4):
+        publish(db, archive, MementoRecord(number, "user", str(number).encode()))
+    first = db.read_window(archive=archive, limit=1)
+    valid = db.read_window(
+        archive=archive, after_serial=1, expected_starting_head=first.verified_head,
+    )
+    assert [r.serial for r in valid.records] == [2, 3]
+    replaced = replace(first.verified_head, commitment="a" * 64)
+    repository._connection.execute(
+        "UPDATE conversation_memento_frame SET head_blob=? WHERE global_serial=1",
+        (encode_catalog_head(replaced),),
+    )
+    with pytest.raises(MementoAuthorityConflict):
+        db.read_window(
+            archive=archive, after_serial=1, expected_starting_head=first.verified_head,
+        )
