@@ -242,3 +242,10 @@ def test_native_tokenizer_change_after_generation_withholds_response():
     with pytest.raises(SealedContextIntegrityError, match="tokenizer identity"):
         asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))
     assert engine.calls == 1
+
+
+def test_public_native_guard_factory_uses_lazy_exports():
+    import skeleton.ai.runtime.inference as local_runtime
+    assert local_runtime.build_guarded_native_transformer_adapter is build_guarded_native_transformer_adapter
+    assert local_runtime.native_transformer_guard_components is native_transformer_guard_components
+    assert "build_guarded_native_transformer_adapter" in local_runtime.__all__
