@@ -64,7 +64,7 @@ def _execution() -> ExecutionIdentity:
 def test_scheduled_admission_reaches_exact_head_supervisor() -> None:
     traffic = _source(TRAFFIC)
     supervisor_source = _source(SUPERVISOR)
-    assert 'cron: "*/10 * * * *"' in traffic
+    assert "cron: '17 */6 * * *'" in traffic
     assert '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]' in traffic
     assert '-f "expected_base_sha=$TRAFFIC_ADMITTED_BASE_SHA"' in traffic
     assert "SUPERVISOR_CALLER_BASE_SHA: ${{ inputs.expected_base_sha }}" in supervisor_source
