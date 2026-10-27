@@ -4093,6 +4093,10 @@ class LocalModelAdapter(ProviderAdapter):
                 if (receipt.request_digest != local_request.digest
                         or receipt.context_root != local_request.context_digest
                         or not receipt.token_echo_sha256
+                        or not isinstance(receipt.token_sequence_sha256, str)
+                        or len(receipt.token_sequence_sha256) != 64
+                        or any(ch not in "0123456789abcdef"
+                               for ch in receipt.token_sequence_sha256)
                         or not receipt.reviewer_id
                         or receipt.response_sha256 != hashlib.sha256(
                             result.text.encode("utf-8")
