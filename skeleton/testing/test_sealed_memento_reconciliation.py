@@ -372,7 +372,10 @@ def test_read_only_incident_triage_covers_all_recovery_crash_windows():
         reserved = await inspect_recovery_incident(**args)
         assert reserved.classification == "reserved_unwitnessed"
         assert reserved.manual_intervention_required
-        successor = WitnessPosition(grant.binding_digest, old.revision + 1, proposed)
+        successor = WitnessPosition(
+            grant.binding_digest, old.revision + 1, proposed,
+            recovery_incident_id=grant.incident_id,
+        )
         assert await witness.compare_and_set(binding_digest=grant.binding_digest,
                                              previous=old, successor=successor)
         incomplete = await inspect_recovery_incident(**args)
@@ -410,4 +413,87 @@ def test_read_only_incident_triage_detects_evidence_loss_and_mutation():
         witness.positions[scope] = replace(old, retired=True)
         with pytest.raises(Exception):
             await inspect_recovery_incident(**args)
+    asyncio.run(scenario())
+
+
+def test_recovery_witness_requires_completed_external_journal_before_plaintext():
+    from skeleton.persistence.sealed_memento_witness import WitnessedMongoMementoAuthority
+
+    async def scenario():
+        archive, mongo, witness, old, proposed = await crash_candidate()
+        private, public = keys()
+        grant = setup_grant(archive, old, proposed)
+        journal = ExternalRecoveryJournal()
+        journal.fail_finish = True
+        reconciler = SignedMementoReconciler(
+            **trusted_auth(public), journal=journal, clock=lambda: 1900000000,
+        )
+        with pytest.raises(MementoWitnessIndeterminate):
+            await reconciler.reconcile_one(
+                archive=archive, mongo=mongo, witness=witness, grant=grant,
+                signatures=approval(grant, private),
+            )
+        scope = grant.binding_digest
+        assert witness.positions[scope].head == proposed
+        assert witness.positions[scope].recovery_incident_id == grant.incident_id
+        raw_guard = WitnessedMongoMementoAuthority(mongo, witness=witness)
+        gated = WitnessedMongoMementoAuthority(
+            mongo, witness=witness, recovery_journal=journal,
+        )
+        for guard in (raw_guard, gated):
+            with pytest.raises(MementoWitnessIndeterminate):
+                await guard.trusted_head(archive=archive)
+            with pytest.raises(MementoWitnessIndeterminate):
+                await guard.read_window(archive=archive)
+        from skeleton.persistence.sealed_memento_recovery_journal import completed_record
+        journal.fail_finish = False
+        claim = journal.entries[(scope, grant.incident_id)]
+        assert await journal.complete(
+            previous=claim, successor=completed_record(claim, b"operator-completion-receipt"),
+        )
+        assert await gated.trusted_head(archive=archive) == proposed
+        assert len((await gated.read_window(archive=archive)).records) == 2
+        assert await gated.publish(
+            archive=archive, expected_head=proposed, expected_thread_version=1,
+            stream="user", ciphertext=archive.seal(
+                MementoRecord(3, "user", b"safe next event", causal_serial=2),
+                previous=proposed,
+            )[0],
+        )
+    asyncio.run(scenario())
+
+
+def test_completed_recovery_record_wrong_candidate_is_still_denied():
+    from skeleton.persistence.sealed_memento_witness import (
+        WitnessedMongoMementoAuthority, WitnessPosition,
+    )
+    from skeleton.persistence.sealed_memento_recovery_journal import (
+        claim_record, completed_record,
+    )
+
+    async def scenario():
+        archive, mongo, witness, old, proposed = await crash_candidate()
+        private, public = keys()
+        grant = setup_grant(archive, old, proposed)
+        journal = ExternalRecoveryJournal()
+        claim = claim_record(grant, tuple(x.signer_id for x in approval(grant, private)))
+        assert await journal.reserve(record=claim)
+        assert await journal.complete(
+            previous=claim, successor=completed_record(claim, b"completed"),
+        )
+        witness.positions[grant.binding_digest] = WitnessPosition(
+            grant.binding_digest, old.revision + 2, proposed,
+            recovery_incident_id=grant.incident_id,
+        )
+        gated = WitnessedMongoMementoAuthority(
+            mongo, witness=witness, recovery_journal=journal,
+        )
+        with pytest.raises(MementoWitnessIndeterminate):
+            await gated.trusted_head(archive=archive)
+        witness.positions[grant.binding_digest] = WitnessPosition(
+            grant.binding_digest, old.revision + 1, proposed,
+            recovery_incident_id="ANOTHER-INCIDENT",
+        )
+        with pytest.raises(MementoWitnessIndeterminate):
+            await gated.read_window(archive=archive)
     asyncio.run(scenario())
