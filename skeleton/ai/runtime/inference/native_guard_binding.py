@@ -74,4 +74,29 @@ def native_transformer_guard_components(
     )
 
 
-__all__ = ["native_transformer_guard_components"]
+def build_guarded_native_transformer_adapter(
+    runtime: Any, *,
+    snapshots: TrustedSnapshotReader,
+    reviewer: BoundedAdversarialReviewer,
+    **adapter_options: Any,
+):
+    """Construct backend, then bind its exact native tokenizer at startup.
+
+    No generic user-supplied true-returning attestor is required, and no
+    unguarded adapter is created on any failure.
+    """
+    if "guarded_components" in adapter_options or "guarded_components_factory" in adapter_options:
+        raise ProviderPolicyError("native guard composition cannot be replaced by caller options")
+    if "require_guarded_inference" in adapter_options:
+        raise ProviderPolicyError("native guard policy is mandatory in this factory")
+    from .native_transformer import build_native_transformer_adapter
+    return build_native_transformer_adapter(
+        runtime, require_guarded_inference=True,
+        guarded_components_factory=lambda backend: native_transformer_guard_components(
+            backend, snapshots=snapshots, reviewer=reviewer,
+        ),
+        **adapter_options,
+    )
+
+
+__all__ = ["native_transformer_guard_components", "build_guarded_native_transformer_adapter"]
