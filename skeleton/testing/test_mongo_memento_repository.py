@@ -302,3 +302,22 @@ def test_governed_retirement_fences_archive_and_erases_frames(suite):
         asyncio.run(db.retire_thread(
             tenant_id="tenant", owner_id="intruder", thread_id="t1"
         ))
+
+def test_pinned_mongo_cursor_rejects_tampered_saved_checkpoint(suite):
+    from skeleton.context.sealed_memento import encode_catalog_head
+    owner, db, archive, _ = suite
+    publish(db, archive, MementoRecord(1, "user", b"first"))
+    publish(db, archive, MementoRecord(2, "llm", b"second", causal_serial=1))
+    page = asyncio.run(db.read_window(archive=archive, limit=1))
+    valid = asyncio.run(db.read_window(
+        archive=archive, after_serial=1, expected_starting_head=page.verified_head,
+    ))
+    assert [r.serial for r in valid.records] == [2]
+    replaced = replace(page.verified_head, commitment="a" * 64)
+    owner.database.rows["conversation_memento_frames"]["t1:1"]["head_blob"] = (
+        encode_catalog_head(replaced)
+    )
+    with pytest.raises(MongoMementoConflict):
+        asyncio.run(db.read_window(
+            archive=archive, after_serial=1, expected_starting_head=page.verified_head,
+        ))
