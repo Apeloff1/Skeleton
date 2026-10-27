@@ -742,7 +742,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "a67b5e17338c0f287e0469658e0ef60a3d415a3a",
+      "source_git_object_sha": "2297501d215c83ee57750785932b301dadce3311",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -2091,7 +2091,7 @@
       "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "723a68a7e23728a8ceb3fb91494020ffaf9b50de",
+      "source_git_object_sha": "c7e8ec2ff0fc605e62e3bbc32bfeb8ce6a8c3549",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -5296,7 +5296,7 @@
       "source": "skeleton/provenance",
       "destination": "skeleton/ai/runtime/provenance",
       "kind": "tree",
-      "source_git_object_sha": "6aa44a8f55d593651995d2b65d9beabad238661a",
+      "source_git_object_sha": "881e96383c0294584b6740262390d2a8068603c3",
       "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
       "work_package_refs": [
         "WP-W03",
