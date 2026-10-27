@@ -107,7 +107,7 @@ def test_valid_source_custody_and_durable_version_produce_authoritative_merkle_s
         )
         assert snapshot.snapshot_version == record.source_version
         assert snapshot.tenant_id == TENANT
-        assert custody.calls == 2
+        assert custody.calls == 4
         custody.current = replace(custody.current, version=8)
         changed = await inspect(bound)
         assert changed.source_version != record.source_version
@@ -235,7 +235,7 @@ def test_durable_owner_drift_withholds_guarded_generation():
         protected = CanonicalGuardedLocalService(guard, snapshots=canonical)
         with pytest.raises(SealedContextReplayError, match="changed"):
             await protected.generate(Request(), tenant_scope_id=TENANT, context_id=CONTEXT)
-        assert engine.calls == 1 and source.calls == 2
+        assert engine.calls == 1 and source.calls == 4
 
     asyncio.run(scenario())
 
@@ -282,7 +282,7 @@ def test_durable_owner_cancellation_during_guarded_generation_withholds_result()
         protected = CanonicalGuardedLocalService(guard, snapshots=canonical)
         with pytest.raises(SealedContextBoundaryError):
             await protected.generate(Request(), tenant_scope_id=TENANT, context_id=CONTEXT)
-        assert engine.calls == 1 and source.calls == 1
+        assert engine.calls == 1 and source.calls == 2
 
     asyncio.run(scenario())
 
@@ -318,5 +318,50 @@ def test_owner_mutation_inside_source_inspection_is_denied(mutation):
         with pytest.raises(SealedContextBoundaryError):
             await inspect(bound)
         assert source.calls == 1
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("change", ["version", "revoked", "actor", "segments", "outage"])
+def test_source_change_during_durable_owner_recheck_fails_closed(change):
+    """A good first source read must not authorize a later, changed source."""
+    async def scenario():
+        service = owner()
+        source = Source()
+        original_get = service.repository.get
+        reads = 0
+
+        def racing_owner_read(execution_id):
+            nonlocal reads
+            reads += 1
+            result = original_get(execution_id)
+            if reads == 2:
+                if change == "version":
+                    source.current = replace(source.current, version=source.current.version + 1)
+                elif change == "revoked":
+                    source.current = replace(source.current, revoked=True)
+                elif change == "actor":
+                    source.current = replace(source.current, actor_id="different")
+                elif change == "segments":
+                    source.current = replace(source.current, source_snapshot=())
+                elif change == "outage":
+                    source.outage = True
+            return result
+
+        service.repository.get = racing_owner_read
+        bound, _, _ = loader(service=service, custody=source)
+        with pytest.raises((SealedContextBoundaryError, SealedContextIntegrityError)):
+            await inspect(bound)
+        assert source.calls == 2 and reads == 2
+
+    asyncio.run(scenario())
+
+
+def test_unchanged_source_is_observed_on_both_sides_of_durable_owner_recheck():
+    async def scenario():
+        bound, service, source = loader()
+        record = await inspect(bound)
+        assert record.source_version > 0
+        assert source.calls == 2
 
     asyncio.run(scenario())
