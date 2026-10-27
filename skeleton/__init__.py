@@ -37,8 +37,8 @@ _LAZY_EXPORTS = {
 __all__ = ["__version__", "__codename__", *_LAZY_EXPORTS]
 
 
-def _load_trusted_lazy_module(module_name: str):
-    """Import from the repository-owned export map using only literal targets."""
+def _load_reviewed_export_owner(module_name: str):
+    """Keep import side effects limited to explicitly reviewed modules."""
     if module_name == "skeleton.agents.coordination":
         return import_module("skeleton.agents.coordination")
     if module_name == "skeleton.config.snapshots":
@@ -61,8 +61,7 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module("skeleton.vault.access")
     if module_name == "skeleton.vault.kms":
         return import_module("skeleton.vault.kms")
-    raise ImportError("unregistered lazy export module")
-
+    raise ImportError("unregistered lazy export owner")
 
 
 def __getattr__(name: str) -> Any:
@@ -70,7 +69,7 @@ def __getattr__(name: str) -> Any:
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attribute = target
-    value = getattr(_load_trusted_lazy_module(module_name), attribute)
+    value = getattr(_load_reviewed_export_owner(module_name), attribute)
     globals()[name] = value
     return value
 
