@@ -1,0 +1,283 @@
+"""Independently witnessed memento anti-rollback and crash-window drills."""
+
+from __future__ import annotations
+
+import asyncio
+from dataclasses import replace
+from types import SimpleNamespace
+
+import pytest
+
+from skeleton.context.sealed_memento import (
+    MementoCatalogHead, MementoRecord, SealedMementoArchive, _advance, stream_binding,
+)
+from skeleton.context.sealed_memento_audit import audit_memento_chain_async
+from skeleton.context.sealed_sandwich import (
+    ContextBinding, ContextSandwichCodec, SealedContextBoundaryError,
+    SealedContextReplayError,
+)
+from skeleton.persistence.sealed_memento_witness import (
+    MementoWitnessDivergence, MementoWitnessIndeterminate,
+    MementoWitnessUnavailable, WitnessedMongoMementoAuthority, WitnessPosition,
+    _binding_digest,
+)
+
+
+class ExternalMemoryWitness:
+    """Test double only; never use this volatile witness in production."""
+
+    def __init__(self, position):
+        self.positions = {position.binding_digest: position}
+        self.reject = False
+        self.fail = False
+        self.flip_confirmation = False
+        self.calls = 0
+
+    async def read(self, *, binding_digest):
+        if self.fail:
+            raise OSError("simulated witness outage")
+        item = self.positions.get(binding_digest)
+        if self.flip_confirmation and self.calls:
+            return replace(item, revision=item.revision + 1)
+        return item
+
+    async def compare_and_set(self, *, binding_digest, previous, successor):
+        self.calls += 1
+        if self.fail:
+            raise OSError("witness refused commit")
+        if self.reject or self.positions.get(binding_digest) != previous:
+            return False
+        if successor.binding_digest != binding_digest or successor.revision != previous.revision + 1:
+            return False
+        if previous.retired or successor.head.serial < previous.head.serial:
+            return False
+        if not successor.retired and successor.head.serial != previous.head.serial + 1:
+            return False
+        self.positions[binding_digest] = successor
+        return True
+
+
+class TransactionalMongoDouble:
+    """Models the encrypted canonical-head commit point and retired fencing."""
+
+    def __init__(self, archive):
+        self.archive = archive
+        self.head = MementoCatalogHead()
+        self.rows = []
+        self.retired = False
+        self.version = 1
+        self.fail_purge = False
+        self.publish_calls = 0
+
+    async def trusted_head(self, *, archive):
+        if self.retired:
+            raise SealedContextBoundaryError("conversation retired")
+        assert archive is self.archive
+        return self.head
+
+    async def publish(self, *, archive, expected_head, expected_thread_version, stream, ciphertext):
+        self.publish_calls += 1
+        assert archive is self.archive
+        if self.retired or expected_thread_version != self.version:
+            raise SealedContextBoundaryError("conversation invalid")
+        if expected_head != self.head:
+            raise SealedContextReplayError("stale head")
+        record, head = archive.verify_append(stream, ciphertext, previous=self.head)
+        self.rows.append((stream, ciphertext, record))
+        self.head = head
+        return head
+
+    async def read_window(self, *, archive, after_serial=0, limit=2000,
+                          expected_starting_head=None):
+        assert archive is self.archive
+        starts = [MementoCatalogHead()]
+        for stream, ciphertext, _record in self.rows:
+            frame = archive.codec.open(
+                ciphertext, binding=stream_binding(archive.binding, stream),
+                previous=starts[-1].stream_head(stream),
+            )
+            starts.append(_advance(starts[-1], stream, frame.head, ciphertext))
+        beginning = starts[after_serial]
+        if expected_starting_head is not None and beginning != expected_starting_head:
+            raise SealedContextReplayError("bad pinned resume cursor")
+        selected = self.rows[after_serial:after_serial + limit]
+        ending = starts[after_serial + len(selected)]
+        records = archive.replay(
+            ((stream, wire) for stream, wire, _ in selected),
+            starting_head=beginning, trusted_head=ending,
+        ) if selected else ()
+        return SimpleNamespace(
+            records=records, starting_head=beginning, verified_head=ending,
+            authoritative_head=self.head, source_thread_version=self.version,
+            has_more=ending.serial < self.head.serial,
+        )
+
+    async def retire_thread(self, *, tenant_id, owner_id, thread_id):
+        assert (tenant_id, owner_id, thread_id) == (
+            self.archive.binding.tenant_id, self.archive.binding.owner_id,
+            self.archive.binding.conversation_id,
+        )
+        if self.fail_purge:
+            raise OSError("simulated failed purge")
+        count = len(self.rows)
+        self.rows.clear()
+        self.retired = True
+        return count
+
+
+def setup():
+    archive = SealedMementoArchive(
+        ContextSandwichCodec({"key": b"a" * 32}, active_key_id="key"),
+        ContextBinding("tenant", "owner", "thread", "model", "policy"),
+    )
+    position = WitnessPosition(_binding_digest(archive), 1, MementoCatalogHead())
+    witness = ExternalMemoryWitness(position)
+    mongo = TransactionalMongoDouble(archive)
+    return archive, mongo, witness, WitnessedMongoMementoAuthority(mongo, witness=witness)
+
+
+async def add(archive, guarded, serial=1):
+    previous = await guarded.trusted_head(archive=archive)
+    wire, expected = archive.seal(
+        MementoRecord(serial, "user", f"message:{serial}".encode()), previous=previous,
+    )
+    observed = await guarded.publish(
+        archive=archive, expected_head=previous, expected_thread_version=1,
+        stream="user", ciphertext=wire,
+    )
+    assert observed == expected
+    return expected
+
+
+def test_witnessed_publish_and_pinned_read_across_restart():
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        await add(a, guard, 2)
+        restarted = WitnessedMongoMementoAuthority(m, witness=w)
+        page = await restarted.read_window(archive=a)
+        assert len(page.records) == 2
+        assert page.authoritative_head == await restarted.trusted_head(archive=a)
+    asyncio.run(scenario())
+
+
+def test_missing_or_cross_scope_witness_never_auto_provisions():
+    async def scenario():
+        a, m, w, guard = setup()
+        w.positions.clear()
+        with pytest.raises(MementoWitnessUnavailable):
+            await guard.trusted_head(archive=a)
+        w.positions[_binding_digest(a)] = WitnessPosition("0" * 64, 1, MementoCatalogHead())
+        with pytest.raises(MementoWitnessUnavailable):
+            await guard.trusted_head(archive=a)
+        assert m.publish_calls == 0
+    asyncio.run(scenario())
+
+
+def test_rewound_database_with_valid_old_ciphertext_is_denied():
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        m.head = MementoCatalogHead()
+        m.rows = []
+        with pytest.raises(MementoWitnessDivergence):
+            await guard.trusted_head(archive=a)
+        with pytest.raises(MementoWitnessDivergence):
+            await guard.read_window(archive=a)
+    asyncio.run(scenario())
+
+
+def test_failed_external_cas_is_indeterminate_and_denies_recovery():
+    async def scenario():
+        a, m, w, guard = setup()
+        w.reject = True
+        before = await guard.trusted_head(archive=a)
+        wire, _ = a.seal(MementoRecord(1, "user", b"proof"), previous=before)
+        with pytest.raises(MementoWitnessIndeterminate):
+            await guard.publish(
+                archive=a, expected_head=before, expected_thread_version=1,
+                stream="user", ciphertext=wire,
+            )
+        assert m.head.serial == 1
+        with pytest.raises(MementoWitnessDivergence):
+            await guard.read_window(archive=a)
+    asyncio.run(scenario())
+
+
+def test_witness_outage_denies_before_mongo_write():
+    async def scenario():
+        a, m, w, guard = setup()
+        w.fail = True
+        with pytest.raises(MementoWitnessUnavailable):
+            await guard.trusted_head(archive=a)
+        assert m.publish_calls == 0
+    asyncio.run(scenario())
+
+
+def test_stale_expected_head_is_rejected_without_writing():
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        wire, _ = a.seal(MementoRecord(1, "user", b"stale"), previous=MementoCatalogHead())
+        with pytest.raises(MementoWitnessDivergence):
+            await guard.publish(
+                archive=a, expected_head=MementoCatalogHead(),
+                expected_thread_version=1, stream="user", ciphertext=wire,
+            )
+        assert m.publish_calls == 1
+    asyncio.run(scenario())
+
+
+def test_tombstone_precedes_deletion_and_blocks_reactivation():
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        deleted = await guard.retire_thread(archive=a)
+        assert deleted == 1 and m.retired
+        assert w.positions[_binding_digest(a)].retired
+        with pytest.raises(SealedContextBoundaryError):
+            await guard.trusted_head(archive=a)
+        with pytest.raises(SealedContextBoundaryError):
+            await guard.retire_thread(archive=a)
+    asyncio.run(scenario())
+
+
+def test_failed_mongo_deletion_stays_tombstoned():
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        m.fail_purge = True
+        with pytest.raises(MementoWitnessIndeterminate):
+            await guard.retire_thread(archive=a)
+        assert len(m.rows) == 1 and w.positions[_binding_digest(a)].retired
+        with pytest.raises(SealedContextBoundaryError):
+            await guard.read_window(archive=a)
+    asyncio.run(scenario())
+
+
+def test_independent_async_audit_uses_witnessed_authority():
+    async def scenario():
+        a, m, w, guard = setup()
+        await add(a, guard)
+        await add(a, guard, 2)
+        receipt = await audit_memento_chain_async(
+            archive=a, read_window=guard.read_window, trusted_head=guard.trusted_head,
+        )
+        assert receipt.verified_records == 2 and receipt.pages == 1
+        assert receipt.head == await guard.trusted_head(archive=a)
+    asyncio.run(scenario())
+
+
+def test_external_post_commit_confirmation_failure_is_indeterminate():
+    async def scenario():
+        a, m, w, guard = setup()
+        w.flip_confirmation = True
+        before = await guard.trusted_head(archive=a)
+        wire, _ = a.seal(MementoRecord(1, "user", b"payload"), previous=before)
+        with pytest.raises(MementoWitnessIndeterminate):
+            await guard.publish(
+                archive=a, expected_head=before, expected_thread_version=1,
+                stream="user", ciphertext=wire,
+            )
+        assert m.publish_calls == 1
+    asyncio.run(scenario())
