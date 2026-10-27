@@ -184,6 +184,8 @@ class SealedMementoArchive:
             if record.causal_serial not in known_causal_serials:
                 raise SealedContextReplayError("missing historical causal reference")
         if record.stream == "work":
+            if _hash(record.payload) != record.evidence_digest:
+                raise SealedContextBoundaryError("work bytes differ from referenced evidence digest")
             if self.work_verifier is None or not self.work_verifier(
                 record.evidence_ref, record.evidence_digest, record.payload
             ):
