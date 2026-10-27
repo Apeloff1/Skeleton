@@ -3661,7 +3661,23 @@ class LocalModelAdapter(ProviderAdapter):
         *,
         default_seed: int = 0,
         artifact_status: Mapping[str, object] | None = None,
+        guarded_service: Any | None = None,
+        require_guarded_inference: bool = False,
     ) -> None:
+        # Protected local operations may not fall through to the plain
+        # scheduler/cache path. A trusted composition root supplies the
+        # canonical snapshot reader and independent review policy.
+        if type(require_guarded_inference) is not bool:
+            raise ProviderPolicyError("guard-required mode must be explicit")
+        if require_guarded_inference:
+            from .guarded_service import CanonicalGuardedLocalService
+            if (not isinstance(guarded_service, CanonicalGuardedLocalService)
+                    or guarded_service.guard.engine is not engine):
+                raise ProviderPolicyError("guard-required local route lacks its own verified engine")
+        elif guarded_service is not None:
+            raise ProviderPolicyError("guarded service cannot be supplied without enforced routing")
+        self.guarded_service = guarded_service
+        self.require_guarded_inference = require_guarded_inference
         self.engine = engine
         self.model = engine.model.model_id
         self._activated_model_digest = engine.model.model_digest
@@ -3711,6 +3727,7 @@ class LocalModelAdapter(ProviderAdapter):
     def status(self) -> dict[str, Any]:
         status = super().status()
         status["execution_mode"] = "local"
+        status["guard_required"] = self.require_guarded_inference
         status["network_policy"] = "none"
         status["model_digest"] = self.engine.model.model_digest
         status["runtime_digest"] = self.runtime_digest
@@ -3864,20 +3881,51 @@ class LocalModelAdapter(ProviderAdapter):
         remaining = serving_deadline - time.monotonic()
         if remaining <= 0:
             raise LocalInferenceCancelled("local inference deadline exceeded during preparation")
+        execution_options = {
+            "work_class": work_class,
+            "scope_id": cache_scope,
+            "preemption_scope_id": preemption_scope,
+            "deadline": serving_deadline,
+            "resource_max_input_tokens": budget.max_input_tokens,
+            "resource_max_output_tokens": budget.max_output_tokens,
+        }
         try:
-            result = await asyncio.wait_for(
-                self.engine.generate(
-                    local_request,
-                    work_class=work_class,
-                    scope_id=cache_scope,
-                    preemption_scope_id=preemption_scope,
-                    tenant_scope_id=tenant_scope,
-                    deadline=serving_deadline,
-                    resource_max_input_tokens=budget.max_input_tokens,
-                    resource_max_output_tokens=budget.max_output_tokens,
-                ),
-                timeout=remaining,
-            )
+            if self.require_guarded_inference:
+                # This is the only provider route while protected mode is on.
+                # Its guard must resolve authoritative context, check native
+                # preparation, perform model inference (including cache hits),
+                # and recheck the snapshot before any answer is returned.
+                if not isinstance(effective_tenant, str) or not effective_tenant:
+                    raise ProviderPolicyError("guarded local inference requires tenant authority")
+                if not isinstance(request.context_id, str) or not request.context_id:
+                    raise ProviderPolicyError("guarded local inference requires canonical context")
+                if local_request.tools:
+                    raise ProviderPolicyError("guarded local tool calls require independently verified execution")
+                from skeleton.context.pre_delivery_guard import DeliveryContract
+                contract = (
+                    DeliveryContract("json", json_schema=local_request.structured_output_schema)
+                    if local_request.structured_output_schema is not None
+                    else DeliveryContract()
+                )
+                generation = await asyncio.wait_for(
+                    self.guarded_service.generate(
+                        local_request,
+                        tenant_scope_id=effective_tenant,
+                        context_id=request.context_id,
+                        contract=contract,
+                        **execution_options,
+                    ),
+                    timeout=remaining,
+                )
+                result = generation.result
+            else:
+                result = await asyncio.wait_for(
+                    self.engine.generate(
+                        local_request, tenant_scope_id=tenant_scope,
+                        **execution_options,
+                    ),
+                    timeout=remaining,
+                )
         except TimeoutError as exc:
             raise LocalInferenceCancelled("local inference deadline exceeded") from exc
         except LocalInputBudgetError as exc:
