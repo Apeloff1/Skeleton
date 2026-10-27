@@ -29,7 +29,8 @@ from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
-# Use a fresh wall-clock timestamp; the execution runtime enforces a strict\n# 120-second default deadline relative to request.created_at.
+# Use a fresh wall-clock timestamp; the execution runtime enforces a strict
+# 120-second default deadline relative to request.created_at.
 
 
 def _effect_model() -> LocalModelAdapter:
@@ -74,6 +75,7 @@ def _effect_model() -> LocalModelAdapter:
                 model_id="effectiveness-local-model",
                 model_digest=model_digest,
                 runner=runner,
+                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
