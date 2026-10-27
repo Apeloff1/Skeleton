@@ -459,3 +459,76 @@ tests explicitly bind the reconstructed candidate list to existing execution
 ownership and reject mutation/revocation with unchanged prompt text.
 Full Merge Readiness, Backend Quality, E2E and skipped release gates remain
 mandatory before promoting the draft PR.
+
+
+## Phase 19 — live canonical ownership and writer fencing (review-only)
+
+The protected engine now has a real, task-scoped application composition path:
+
+1. At trusted application initialization, provision and inject one
+   `MongoCanonicalSourceEpoch` into the existing
+   `MongoConversationAuthority` and `MongoMemoryRepository`. Their
+   canonical mutation entrypoints advance the same majority-durable
+   actor-scoped source epoch. The migration operator must initialize each
+   tenant/actor record under a quiescent write freeze using
+   `provision_migration_epoch`; reads and model requests never initialize
+   authority implicitly.
+2. Install attested `ProtectedLocalComponents` using
+   `ServerState.configure_engine_local_guard` before engine startup.
+   Separately call `ServerState.configure_engine_canonical_mongo_owners`
+   with the **same** source epoch, canonical source owners and an
+   independently pinned instruction-policy SHA-256.
+3. `ServerState.bind_engine_execution_service` creates the *actual*
+   `EngineExecutionService`, then builds
+   `MongoExecutionConversationResolver` and
+   `CanonicalExecutionSourceFactory` using that service. The native
+   provider receives `ScopedEngineCompiledSnapshotReader` under the
+   existing guarded local composition path.
+4. Every protected request resolves its conversation through the actual
+   Mongo conversation *user message* and digest-verified
+   `_chat_engine_command`, comparing that immutable command to the
+   separately persisted execution. The original thread authorization
+   verifies tenant, actor, active branch and lifecycle. The
+   `CanonicalOwnerSourceCollectionLoader` independently reconstructs
+   the entire current active conversation and optionally canonical memory
+   subject records. The existing engine bridge verifies both source
+   custody and execution identity before native execution and after it.
+5. A live conversation/memory mutation moves the actor's epoch to an odd
+   `writing` state **before** canonical state changes, and advances it
+   to the next even `stable` value only after the canonical mutation
+   returns. Concurrent or missing writer state denies context reads.
+   An exception, crash, incomplete majority write, uncertain write result
+   or lost CAS leaves the epoch **quarantined**, requiring an independently
+   audited repair procedure; never time-expire, steal or auto-reset it.
+
+### Guarantee boundaries
+
+- This is a writer-enforced seqlock and reread consistency boundary,
+  **not** a cross-database atomic transaction, external consensus quorum
+  or a proof that unrelated writers cannot change Mongo. Production
+  activation requires every relevant writer, deletion and restore path
+  to participate. An uninstrumented application route invalidates the
+  stronger cross-owner guarantee.
+- Source candidate families outside canonical conversation and governed
+  memory (retrieval, tools, artifacts, skills, policies, derived Dragon
+  context) are **not silently verified**. Their presence causes an
+  inventory mismatch and protected inference fails closed until their
+  canonical owners are integrated.
+- Unrelated direct calls to the raw engine are still denied by guarded
+  engine policy; the startup factory only activates protection when the
+  deployment supplies real independent model/tokenizer attestations,
+  sampler attestation and the reviewer.
+- The `MongoExecutionConversationResolver` intentionally supports only
+  the canonical direct `_chat_engine_command` path. Edited request
+  `_chat_execution` and regeneration requests require separate
+  fully owner-validated bindings before protected execution.
+- The source epoch must be persisted with majority concern on the same
+  trusted canonical Mongo cluster. Restore, failover and deletion need
+  externally attested drills. It is not the separate monotonic KMS/head
+  witness for the sealed memento archive.
+- This remains a **draft / release-blocked** feature until full exact-head
+  Merge Readiness, Backend Quality, App Foundation E2E, Artifact Policy,
+  Malware Gate and Workflow Input Security succeed, alongside the
+  unimplemented operator migration, crash recovery and model-specific
+  attestation drills. Skipped jobs are not passes.
+
