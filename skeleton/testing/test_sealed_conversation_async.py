@@ -149,7 +149,9 @@ def test_valid_but_stale_archive_rejected(state):
         receipt = await stage_canonical_conversation_async(reader, codec, sink, binding=binding)
         reader.thread = SimpleNamespace(
             thread_id=binding.conversation_id, version=2, message_sequence=2,
-            as_dict=lambda: {"thread_id": binding.conversation_id, "version": 2, "message_sequence": 2},
+            as_dict=lambda: {
+                "thread_id": binding.conversation_id, "version": 2, "message_sequence": 2
+            },
         )
         with pytest.raises(SealedContextReplayError):
             await verify_staged_conversation_async(
