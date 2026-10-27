@@ -149,6 +149,7 @@ class GuardedLocalInference:
         tokenize: Callable[[str], Sequence[int]] | None = None,
         detokenize: Callable[[Sequence[int]], str] | None = None,
         sampler_support: Callable[[Any, DeliveryContract], bool] | None = None,
+        projection_attestor: Callable[[Any, str, str], bool] | None = None,
         require_token_echo: bool = True,
     ) -> None:
         if not hasattr(engine, "generate") or not callable(reviewer):
@@ -158,6 +159,7 @@ class GuardedLocalInference:
         self.tokenize = tokenize
         self.detokenize = detokenize
         self.sampler_support = sampler_support
+        self.projection_attestor = projection_attestor
         self.require_token_echo = require_token_echo
 
     def preflight(
@@ -181,6 +183,16 @@ class GuardedLocalInference:
         rendered = native_renderer(request) if callable(native_renderer) else request.rendered_input
         if not isinstance(rendered, str):
             raise SealedContextError("local rendered prompt must be text")
+        # A lossless tokenizer echo is not evidence that a native renderer kept
+        # every instruction/history segment. Demand a separately trusted
+        # projection attestor whenever the backend changes prompt formatting.
+        if callable(native_renderer) and rendered != request.rendered_input:
+            if self.projection_attestor is None or not self.projection_attestor(
+                request, rendered, actual_root
+            ):
+                raise SealedContextIntegrityError(
+                    "native prompt projection did not attest exact context preservation"
+                )
         encoded = rendered.encode("utf-8", errors="strict")
         if len(encoded) > _MAX_PART_BYTES:
             raise SealedContextLimitError("local rendered prompt exceeds byte admission")
