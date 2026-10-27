@@ -127,3 +127,70 @@ def audit_memento_chain(
         before, version, pages, current.serial, totals["user"], totals["llm"],
         totals["work"], digest.hexdigest(),
     )
+
+
+async def audit_memento_chain_async(
+    *, archive: Any, read_window: Callable[..., Any],
+    trusted_head: Callable[..., Any], max_pages: int = _MAX_AUDIT_PAGES,
+) -> MementoAuditReceipt:
+    """Async Mongo audit: independently pin before and after a bounded scan.
+
+    Callbacks are awaited page-by-page; no unverified raw documents or
+    client-supplied cursor heads become authoritative during this audit.
+    """
+    if not callable(read_window) or not callable(trusted_head):
+        raise SealedContextBoundaryError("canonical asynchronous archive authority required")
+    if type(max_pages) is not int or not 1 <= max_pages <= _MAX_AUDIT_PAGES:
+        raise SealedContextLimitError("asynchronous audit page limit is invalid")
+    before = await trusted_head(archive=archive)
+    if not isinstance(before, MementoCatalogHead):
+        raise SealedContextBoundaryError("independent trusted audit head is missing")
+    current = MementoCatalogHead()
+    version: int | None = None
+    totals = {"user": 0, "llm": 0, "work": 0}
+    digest = hashlib.sha256(_DOMAIN)
+    pages = 0
+    while True:
+        if pages >= max_pages:
+            raise SealedContextLimitError("complete archive audit exceeded bounded page budget")
+        page = await read_window(
+            archive=archive, after_serial=current.serial, limit=ARCHIVE_WINDOW_MESSAGES,
+            expected_starting_head=current,
+        )
+        pages += 1
+        if (not isinstance(page.starting_head, MementoCatalogHead)
+                or not isinstance(page.verified_head, MementoCatalogHead)
+                or page.starting_head != current or page.authoritative_head != before):
+            raise SealedContextReplayError("async archive audit checkpoint or trusted head changed")
+        if type(page.source_thread_version) is not int or page.source_thread_version < 1:
+            raise SealedContextReplayError("async archive source version is invalid")
+        if version is None:
+            version = page.source_thread_version
+        elif version != page.source_thread_version:
+            raise SealedContextReplayError("canonical conversation changed during async audit")
+        records = page.records
+        if not isinstance(records, tuple) or len(records) > ARCHIVE_WINDOW_MESSAGES:
+            raise SealedContextLimitError("async archive page exceeds verified record limit")
+        for expected, record in enumerate(records, start=current.serial + 1):
+            if record.serial != expected:
+                raise SealedContextReplayError("async archive audit detected a sequence gap")
+            digest.update(_record_bytes(record))
+            totals[record.stream] += 1
+        if (page.verified_head.serial != current.serial + len(records)
+                or page.verified_head.serial > before.serial
+                or sum(totals.values()) != page.verified_head.serial):
+            raise SealedContextReplayError("async archive page count or head is inconsistent")
+        current = page.verified_head
+        if not page.has_more:
+            if current != before:
+                raise SealedContextReplayError("async archive audit cannot reach trusted tail")
+            break
+        if not records or current == before:
+            raise SealedContextReplayError("async archive audit reader made no progress")
+    after = await trusted_head(archive=archive)
+    if after != before:
+        raise SealedContextReplayError("archive head changed during async audit")
+    return MementoAuditReceipt(
+        before, version, pages, current.serial, totals["user"], totals["llm"],
+        totals["work"], digest.hexdigest(),
+    )
