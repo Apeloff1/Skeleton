@@ -350,9 +350,8 @@ class ImplementationBinding:
         )
 
     def resolve(self) -> object:
-        # A verification binding is a reference, not an import capability.
-        # Explicitly loaded modules can be resolved without executing code
-        # selected by a deserialized or untrusted module_path.
+        # Binding metadata is a reference, never a module-import capability.
+        # Trusted owners must load code explicitly before verification.
         module = sys.modules.get(self.module_path)
         if module is None:
             raise FormalMethodError(
