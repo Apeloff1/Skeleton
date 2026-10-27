@@ -3762,6 +3762,13 @@ class LocalModelAdapter(ProviderAdapter):
         self._activated_model_digest = engine.model.model_digest
         self.default_seed = default_seed
         self._artifact_status = None if artifact_status is None else dict(artifact_status)
+        # Capture an immutable *content* pin; the legacy metadata alias remains
+        # testable but mutations never become new trusted execution authority.
+        self._artifact = self._artifact_status
+        self._artifact_activation_digest = (
+            None if self._artifact_status is None
+            else _digest(self._artifact_status)
+        )
 
     @property
     def available(self) -> bool:
@@ -3802,6 +3809,83 @@ class LocalModelAdapter(ProviderAdapter):
     def execution_contract(self) -> dict[str, Any]:
         """Return the exact configured route's bounded input/execution contract."""
         return self.engine.execution_contract(model_id=self.model)
+
+    def execution_identity(self) -> dict[str, Any]:
+        """Detached artifact/seed pin for a durable owner to persist and compare.
+
+        This value is not itself a checkpoint: only the execution repository
+        can make an atomic, monotonic checkpoint CAS before dispatch.
+        """
+        from skeleton.provider_runtime import ProviderUnavailableError
+
+        artifact = self._artifact_status
+        if not isinstance(artifact, dict) or self._artifact_activation_digest is None:
+            raise ProviderUnavailableError("local execution identity lacks activated artifact evidence")
+        try:
+            if _digest(artifact) != self._artifact_activation_digest:
+                raise ValueError("activated artifact receipt changed after admission")
+            fields = ("schema", "model_id", "model_digest", "artifact_sha256",
+                      "artifact_bytes", "reference")
+            if any(field not in artifact for field in fields):
+                raise ValueError("local execution identity lacks required artifact fields")
+            for field in ("schema", "model_id", "reference"):
+                value = artifact[field]
+                if (type(value) is not str or not value or len(value) > 256
+                        or any(ord(character) < 32 for character in value)):
+                    raise ValueError("local execution identity includes invalid artifact identity")
+            for field in ("artifact_sha256", "model_digest"):
+                value = artifact[field]
+                if (type(value) is not str or len(value) != 64
+                        or any(ch not in "0123456789abcdef" for ch in value)):
+                    raise ValueError("local execution identity includes invalid digest")
+            if (type(artifact["artifact_bytes"]) is not int
+                    or not 1 <= artifact["artifact_bytes"] <= 1024**4):
+                raise ValueError("local execution identity has invalid artifact byte count")
+            if (artifact["model_id"] != self.model
+                    or artifact["model_digest"] != self._activated_model_digest
+                    or self.engine.model.model_digest != self._activated_model_digest):
+                raise ValueError("local execution identity drift from activated weights")
+            if not artifact["reference"].startswith(
+                ("local-model-artifact:", "local-model-deployment:")
+            ):
+                raise ValueError("local execution identity reference is not content addressed")
+            reference_digest = artifact["reference"].rsplit(":", 1)[-1]
+            expected_digest = (
+                artifact.get("manifest_digest")
+                if artifact["reference"].startswith("local-model-deployment:")
+                else artifact["artifact_sha256"]
+            )
+            if reference_digest != expected_digest:
+                raise ValueError("local execution identity reference digest mismatch")
+            if type(self.default_seed) is not int or not 0 <= self.default_seed < 2**64:
+                raise ValueError("local execution identity seed is invalid")
+            # Never return a live mapping or filesystem path. The only allowed
+            # keys are the artifact loader's stable content-addressed receipt
+            # and explicitly declared catalog/deployment provenance fields.
+            allowed = set(fields) | {
+                "source_model_id", "catalog_digest", "catalog_entry_digest",
+                "catalog_source_sha256", "manifest_digest", "runtime_digest",
+                "runtime_kind",
+            }
+            if set(artifact) - allowed:
+                raise ValueError("local execution identity has unknown artifact fields")
+            for field in set(artifact) - set(fields):
+                value = artifact[field]
+                if type(value) is not str or not value or len(value) > 256:
+                    raise ValueError("local execution identity has invalid extra field")
+                if field.endswith("digest") or field.endswith("sha256"):
+                    if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                        raise ValueError("local execution identity has invalid provenance digest")
+            receipt = json.loads(_stable_json(artifact))
+        except (TypeError, ValueError, OverflowError, UnicodeError) as exc:
+            raise ProviderUnavailableError("local execution identity failed artifact validation") from exc
+        return {
+            "schema_version": "skeleton.local_provider.execution_identity.v1",
+            "provider_id": self.provider_id,
+            "model_id": self.model,
+            "artifact": receipt,
+            "inference": {"default_seed": self.default_seed},
+        }
 
     def status(self) -> dict[str, Any]:
         status = super().status()
