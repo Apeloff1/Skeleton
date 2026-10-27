@@ -55,7 +55,13 @@ def fixture():
     adapter = LocalModelAdapter(engine, guarded_service=service, require_guarded_inference=True)
     request = ProviderRequest(
         instructions="policy", prompt="hello", max_output_tokens=4,
-        tenant_id="tenant", context_id="00000000-0000-4000-8000-000000000001", context_digest=root,
+        tenant_id="tenant", context_id="00000000-0000-4000-8000-000000000001",
+        context_digest=root,
+        context_source_snapshot=((
+            "00000000-0000-4000-8000-000000000002",
+            sha256(b"policy and hello authoritative segment").hexdigest(),
+        ),),
+        context_compiler_version="verified-test-compiler-v1",
     )
     return engine, authority, service, adapter, request
 
