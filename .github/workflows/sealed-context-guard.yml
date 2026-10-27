@@ -9,6 +9,8 @@ on:
     paths:
       - 'skeleton/ai/runtime/inference/local.py'
       - 'skeleton/ai/runtime/inference/guarded_service.py'
+      - 'skeleton/ai/runtime/inference/canonical_snapshot_reader.py'
+      - 'skeleton/api/server.py'
       - 'skeleton/ai/runtime/inference/guarded_composition.py'
       - 'skeleton/ai/runtime/inference/deployment.py'
       - 'skeleton/ai/runtime/inference/llama_cpp.py'
@@ -20,6 +22,7 @@ on:
       - 'skeleton/persistence/mongo_memento_repository.py'
       - 'skeleton/testing/test_guarded_local_provider.py'
       - 'skeleton/testing/test_guarded_composition.py'
+      - 'skeleton/testing/test_guarded_application_startup.py'
       - 'skeleton/testing/test_guarded_registry_activation.py'
       - 'skeleton/testing/test_guarded_local_service.py'
       - 'skeleton/testing/test_pre_delivery_guard.py'
@@ -64,6 +67,7 @@ jobs:
             skeleton/testing/test_local_inference.py \
             skeleton/testing/test_guarded_local_provider.py \
             skeleton/testing/test_guarded_composition.py \
+            skeleton/testing/test_guarded_application_startup.py \
             skeleton/testing/test_guarded_registry_activation.py \
             skeleton/testing/test_guarded_local_service.py \
             skeleton/testing/test_pre_delivery_guard.py \
