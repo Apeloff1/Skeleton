@@ -215,6 +215,7 @@ class MongoConversationAuthority:
         governance_inventory_reader: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_engine_target_executor: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_retention_planner: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
+        memento_witness: Any | None = None,
     ) -> None:
         self.database = database
         if callable(getattr(database, "with_options", None)):
@@ -228,6 +229,8 @@ class MongoConversationAuthority:
         self.governance_inventory_reader = governance_inventory_reader
         self.governance_engine_target_executor = governance_engine_target_executor
         self.governance_retention_planner = governance_retention_planner
+        # Optional separately administered rollback/tombstone witness for encrypted archives.
+        self.memento_witness = memento_witness
         # Installed only through the trusted application lifespan.
         self.dragon_projection = None
         self.dragon_projection_outcomes = {"written": 0, "skipped": 0, "degraded": 0}
@@ -866,7 +869,8 @@ class MongoConversationAuthority:
                 try:
                     memento_owner = await self.threads.find_one(
                         {"_id": affected_thread_id, "tenant_id": str(tenant_id)},
-                        {"owner_id": 1, "_sealed_memento_head": 1},
+                        {"owner_id": 1, "_sealed_memento_head": 1,
+                         "_sealed_memento_binding": 1},
                     )
                 except PyMongoError as exc:
                     raise ConversationStorageUnavailable(
@@ -880,10 +884,27 @@ class MongoConversationAuthority:
                         )
                     from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
 
-                    await MongoMementoAuthority(self).retire_thread(
-                        tenant_id=str(tenant_id), owner_id=owner_id,
-                        thread_id=affected_thread_id,
-                    )
+                    memento = MongoMementoAuthority(self)
+                    if self.memento_witness is None:
+                        # Legacy/unenrolled archive: retain the existing majority purge.
+                        await memento.retire_thread(
+                            tenant_id=str(tenant_id), owner_id=owner_id,
+                            thread_id=affected_thread_id,
+                        )
+                    else:
+                        # Tombstone the external witness before physical deletion;
+                        # this path does not need to decrypt private message data.
+                        from skeleton.persistence.sealed_memento_witness import (
+                            WitnessedMongoMementoAuthority,
+                        )
+
+                        await WitnessedMongoMementoAuthority(
+                            memento, witness=self.memento_witness,
+                        ).retire_bound_thread(
+                            tenant_id=str(tenant_id), owner_id=owner_id,
+                            thread_id=affected_thread_id,
+                            binding_digest=memento_owner.get("_sealed_memento_binding"),
+                        )
 
         actions.sort(key=lambda item: (item[0], item[3]["record_id"]))
         deleted: list[str] = []
