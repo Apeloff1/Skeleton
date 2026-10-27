@@ -8,6 +8,10 @@ tombstone semantics. Derived vector/graph indexes may rebuild from this state.
 
 from __future__ import annotations
 
+from skeleton.persistence.mongo_source_epoch import (
+    fence_memory_commit, fence_memory_tombstone,
+)
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -1068,11 +1072,13 @@ class MongoMemoryRepository:
         *,
         repository_namespace: str = "memory",
         collection_prefix: str = "canonical_memory",
+        canonical_source_epoch=None,
     ) -> None:
         namespace = str(repository_namespace).strip()
         prefix = str(collection_prefix).strip()
         if not namespace or not prefix:
             raise ValueError("repository_namespace and collection_prefix are required")
+        self.canonical_source_epoch = canonical_source_epoch
         self.repository_namespace = namespace
         self.records = database[f"{prefix}_records"]
         self.idempotency = database[f"{prefix}_idempotency"]
@@ -1493,6 +1499,7 @@ class MongoMemoryRepository:
         if int(getattr(result, "matched_count", 1)) != 1:
             raise MemoryRepositoryError("idempotency receipt finalization failed")
 
+    @fence_memory_commit
     async def commit(
         self,
         proposal: MemoryWriteProposal,
@@ -1736,6 +1743,7 @@ class MongoMemoryRepository:
             raise MemoryNotFound("projection event not found")
         return self._projection_from_doc(doc)
 
+    @fence_memory_tombstone
     async def tombstone(
         self,
         memory_id: str,
