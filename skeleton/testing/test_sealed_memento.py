@@ -106,3 +106,18 @@ def test_cross_tenant_cannot_decrypt_and_untrusted_reference_is_not_auth(fixture
         intruder.replay(entries, trusted_head=head)
     with pytest.raises(ValueError):
         lexical_correlate([], query="secret", limit=101)
+
+
+def test_catalog_head_canonical_roundtrip_and_corruption(fixture):
+    from skeleton.context.sealed_memento import encode_catalog_head, decode_catalog_head
+
+    _, archive = fixture
+    _, _, head = _trail(archive)
+    wire = encode_catalog_head(head)
+    assert decode_catalog_head(wire) == head
+    with pytest.raises(SealedContextError):
+        decode_catalog_head(wire + b" ")
+    with pytest.raises(SealedContextError):
+        decode_catalog_head(wire.replace(b'"global_serial":5', b'"global_serial":4'))
+    with pytest.raises(SealedContextError):
+        decode_catalog_head(b'{"schema_version":1}')
