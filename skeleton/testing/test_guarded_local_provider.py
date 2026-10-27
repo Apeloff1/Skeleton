@@ -22,14 +22,14 @@ from skeleton.provider_runtime import ProviderPolicyError, ProviderRequest
 
 class Authority:
     def __init__(self, *, root: str, instruction_digest: str):
-        self.snapshot = TrustedContextSnapshot(root, instruction_digest, 1, "tenant", "thread")
+        self.snapshot = TrustedContextSnapshot(root, instruction_digest, 1, "tenant", "00000000-0000-4000-8000-000000000001")
         self.calls = 0
         self.mutate = False
 
     async def resolve(self, *, tenant_scope_id, context_id, request_digest):
         self.calls += 1
         assert tenant_scope_id == "tenant"
-        assert context_id == "thread"
+        assert context_id == "00000000-0000-4000-8000-000000000001"
         assert len(request_digest) == 64
         if self.mutate and self.calls == 2:
             s = self.snapshot
@@ -55,7 +55,7 @@ def fixture():
     adapter = LocalModelAdapter(engine, guarded_service=service, require_guarded_inference=True)
     request = ProviderRequest(
         instructions="policy", prompt="hello", max_output_tokens=4,
-        tenant_id="tenant", context_id="thread", context_digest=root,
+        tenant_id="tenant", context_id="00000000-0000-4000-8000-000000000001", context_digest=root,
     )
     return engine, authority, service, adapter, request
 
