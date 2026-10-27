@@ -114,7 +114,11 @@ def test_two_operator_reconciles_once_then_normal_reads_resume():
         )
         assert receipt.committed_head == proposed
         assert receipt.committed_revision == old.revision + 1
-        assert witness.positions[grant.binding_digest].head == proposed
+        position = witness.positions[grant.binding_digest]
+        assert position.head == proposed
+        assert position.recovery_incident_id == grant.incident_id
+        assert position.recovery_revision == old.revision + 1
+        assert position.recovery_head == proposed
         with pytest.raises(MementoWitnessDivergence):
             await verifier.reconcile_one(
                 archive=archive, mongo=mongo, witness=witness, grant=grant,
