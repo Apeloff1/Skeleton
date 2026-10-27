@@ -116,3 +116,62 @@ def test_protected_provider_rejects_mismatched_merkle_without_model_response():
             await adapter.generate(bad)
         assert authority.calls == 1
     asyncio.run(scenario())
+
+
+def test_provider_rejects_rewritten_delivery_receipt():
+    async def scenario():
+        from dataclasses import replace
+        _, authority, service, adapter, request = fixture()
+        genuine = service.generate
+
+        async def tamper(*args, **kwargs):
+            result = await genuine(*args, **kwargs)
+            return replace(result, receipt=replace(
+                result.receipt, response_sha256="f" * 64,
+            ))
+
+        service.generate = tamper
+        with pytest.raises(ProviderPolicyError, match="receipt"):
+            await adapter.generate(request)
+        assert authority.calls == 2
+    asyncio.run(scenario())
+
+
+def test_provider_rejects_unsolicited_tool_calls():
+    async def scenario():
+        from dataclasses import replace
+        from skeleton.ai.runtime.inference.local import LocalToolCall
+        _, _, service, adapter, request = fixture()
+        genuine = service.generate
+
+        async def tamper(*args, **kwargs):
+            verified = await genuine(*args, **kwargs)
+            modified = replace(
+                verified.result, finish_reason="tool_calls",
+                tool_calls=(LocalToolCall("call-1", "dangerous-tool", {}),),
+            )
+            return replace(verified, result=modified)
+
+        service.generate = tamper
+        with pytest.raises(ProviderPolicyError, match="tool calls"):
+            await adapter.generate(request)
+    asyncio.run(scenario())
+
+
+def test_provider_rejects_unsolicited_structured_output():
+    async def scenario():
+        from dataclasses import replace
+        _, _, service, adapter, request = fixture()
+        genuine = service.generate
+
+        async def tamper(*args, **kwargs):
+            verified = await genuine(*args, **kwargs)
+            return replace(
+                verified,
+                result=replace(verified.result, structured_output={"unverified": True}),
+            )
+
+        service.generate = tamper
+        with pytest.raises(ProviderPolicyError, match="unsolicited structured"):
+            await adapter.generate(request)
+    asyncio.run(scenario())
