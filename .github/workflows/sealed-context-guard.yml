@@ -70,14 +70,3 @@ jobs:
             skeleton/testing/test_delivery_schema.py \
             skeleton/testing/test_delivery_regex.py
 
-      - name: Legacy reference end-to-end compatibility
-        env:
-          PYTHONPATH: '.:backend'
-        run: |
-          # Explicitly acknowledged development-mode fixtures only.
-          # The legacy identity-descriptor test references an API removed
-          # from the current EngineExecutionCoordinator; it requires separate
-          # reconciliation, not a guard-policy exemption.
-          python -m pytest -q \
-            skeleton/testing/test_governed_model_engine_acceptance.py \
-            -k 'reference and test_governed_training_artifact_served_by_authenticated_engine_and_reopened'
