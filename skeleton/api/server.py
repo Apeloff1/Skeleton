@@ -732,7 +732,6 @@ class ServerState:
         from skeleton.persistence.execution_repository import (
             SQLiteExecutionRepository,
         )
-        from skeleton.provider_runtime import ProviderRegistry
         from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 
         settings = get_settings().engine
