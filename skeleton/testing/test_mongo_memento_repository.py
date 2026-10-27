@@ -383,3 +383,21 @@ def test_custody_cannot_be_reclassified_between_publications(suite):
             )
     asyncio.run(scenario())
     assert len(owner.database.rows["conversation_memento_frames"]) == 1
+
+
+def test_witness_configured_canonical_owner_denies_legacy_publication(suite):
+    owner, db, archive, _ = suite
+    owner.memento_witness = object()
+
+    async def scenario():
+        before = MementoCatalogHead()
+        wire, _ = archive.seal(MementoRecord(1, "user", b"cannot downgrade"), previous=before)
+        with pytest.raises(SealedContextBoundaryError, match="legacy custody"):
+            await db.publish(
+                archive=archive, expected_head=before, expected_thread_version=3,
+                stream="user", ciphertext=wire,
+            )
+
+    asyncio.run(scenario())
+    assert not owner.database.rows["conversation_memento_frames"]
+    assert "_sealed_memento_head" not in owner.database.rows["conversation_threads"]["t1"]
