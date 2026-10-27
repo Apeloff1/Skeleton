@@ -24,11 +24,12 @@ import json
 import os
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from .automation_safety import AutomationSafety, load_automation_safety
 from .build_authority import APPROVED_BUILD_LABELS
 from .free_model import redact_secrets
 
@@ -89,8 +90,11 @@ class TrafficPolicy:
             self.max_stale_queued_runs,
             self.provider_tombstone_seconds,
         )
-        if any(isinstance(value, bool) or value <= 0 for value in values):
-            raise TrafficManagerError("traffic policy values must be positive")
+        # Queue capacity, admission thresholds and cooldown periods are
+        # discrete bounded counts. NaN/fractional values can defeat the
+        # positive-only check and make later comparisons non-deterministic.
+        if any(type(value) is not int or value <= 0 for value in values):
+            raise TrafficManagerError("traffic policy values must be positive integers")
 
 
 @dataclass(frozen=True, slots=True)
@@ -857,6 +861,29 @@ def write_step_summary(decision: TrafficDecision) -> None:
     )
 
 
+
+def enforce_operator_safety(
+    decision: TrafficDecision, safety: AutomationSafety
+) -> TrafficDecision:
+    """Operator holds fence both new admissions and bounded Actions relief.
+
+    Preserve measured repository pressure and the original immutable decision
+    fingerprint so the hold cannot fabricate a healthy queue snapshot.
+    """
+    if not isinstance(decision, TrafficDecision) or not isinstance(safety, AutomationSafety):
+        raise TrafficManagerError("operator safety requires typed admission records")
+    if not safety.blocked:
+        return decision
+    return replace(
+        decision,
+        admit=False,
+        relieve=False,
+        reason="operator-" + safety.status,
+        lane="hold",
+        relief_reason="operator-hold",
+        forced=False,
+    )
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -875,6 +902,9 @@ def main() -> int:
         "GITHUB_RUN_ID", ""
     ).strip()
     force = _bool_env("TRAFFIC_FORCE")
+    # Fail before queue observation if an operator safety control is malformed.
+    # A force flag can never override a pause or quarantine.
+    safety = load_automation_safety()
 
     snapshot = observe(
         repository,
@@ -885,6 +915,7 @@ def main() -> int:
         snapshot,
         force=force,
     )
+    decision = enforce_operator_safety(decision, safety)
 
     print(
         json.dumps(
