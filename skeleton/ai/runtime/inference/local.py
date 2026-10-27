@@ -2939,13 +2939,27 @@ class LocalInferenceEngine:
         finally:
             self._guard_scope.reset(token)
 
-    def _require_guard_scope(self, request: LocalInferenceRequest) -> None:
-        if self.require_guarded_context and (
-            not isinstance(request, LocalInferenceRequest)
-            or self._guard_scope.get()
-               != (request.digest, request.context_digest, asyncio.current_task())
-        ):
+    def _require_guard_scope(
+        self, request: LocalInferenceRequest, *, allow_worker_thread: bool = False,
+    ) -> None:
+        if not self.require_guarded_context:
+            return
+        permit = self._guard_scope.get()
+        if (not isinstance(request, LocalInferenceRequest)
+                or permit is None
+                or permit[:2] != (request.digest, request.context_digest)):
             raise ProviderPolicyError("local inference requires verified context admission")
+        try:
+            task = asyncio.current_task()
+        except RuntimeError:
+            # The canonical engine's admitted tokenizer/memory preflight runs
+            # in asyncio.to_thread, which carries ContextVars but has no loop.
+            # A worker may prepare data, not invoke async generation itself.
+            if allow_worker_thread:
+                return
+            raise ProviderPolicyError("guarded local generation requires owning asyncio task")
+        if task is not permit[2]:
+            raise ProviderPolicyError("guarded local permit cannot move into a child task")
 
     def prepare_input(
         self,
@@ -2961,7 +2975,7 @@ class LocalInferenceEngine:
         """
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
-        self._require_guard_scope(request)
+        self._require_guard_scope(request, allow_worker_thread=True)
         for name, value in (("scope_id", scope_id), ("tenant_scope_id", tenant_scope_id)):
             if value is not None and (not isinstance(value, str) or not value or len(value) > 512):
                 raise ValueError(f"{name} must be a non-empty bounded string")
