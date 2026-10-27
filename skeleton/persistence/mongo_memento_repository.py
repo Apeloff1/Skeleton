@@ -298,18 +298,22 @@ class MongoMementoAuthority:
             raise SealedContextBoundaryError("memento deletion scope missing")
         scoped = {"_id": thread_id, "tenant_id": tenant_id, "owner_id": owner_id}
         try:
-            doc = await self.conversation.threads.find_one(scoped)
+            from pymongo.write_concern import WriteConcern
+            majority = WriteConcern(w="majority")
+            threads = self.conversation.threads.with_options(write_concern=majority)
+            frames = self.frames.with_options(write_concern=majority)
+            doc = await threads.find_one(scoped)
             if doc is None:
                 raise SealedContextBoundaryError("conversation deletion scope unauthorized")
-            result = await self.conversation.threads.update_one(
+            result = await threads.update_one(
                 scoped, {"$set": {_RETIRED_FIELD: True}},
             )
             if result.matched_count != 1:
                 raise MongoMementoConflict("deletion fence was not applied")
-            removed = await self.frames.delete_many({
+            removed = await frames.delete_many({
                 "tenant_id": tenant_id, "owner_id": owner_id, "thread_id": thread_id,
             })
-            remaining = await self.frames.find_one({
+            remaining = await frames.find_one({
                 "tenant_id": tenant_id, "owner_id": owner_id, "thread_id": thread_id,
             })
             if remaining is not None:
