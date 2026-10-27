@@ -5449,7 +5449,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "012df9616bf368f5aabfc5b82a50f20596ea0538",
+      "source_git_object_sha": "c08dc5b7977ab7ce5ddaf5aa83f75efc194fbdc9",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"
