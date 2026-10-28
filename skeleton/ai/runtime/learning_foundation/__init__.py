@@ -125,31 +125,31 @@ _LAZY_EXPORTS = {
 }
 
 
-def _load_reviewed_export_module(module_name: str):
-    """Exact literal-only dispatch for reviewed lazy module owners."""
-    if module_name == ".learning":
-        return import_module(".learning", __name__)
-    if module_name == ".lifecycle":
-        return import_module(".lifecycle", __name__)
-    if module_name == ".lifecycle_repository":
-        return import_module(".lifecycle_repository", __name__)
-    if module_name == ".multimodal":
-        return import_module(".multimodal", __name__)
-    if module_name == ".content_retrieval":
+def _load_literal_export_module(owner: str):
+    """Resolve only source-declared lazy export owners; never load arbitrary names."""
+    from importlib import import_module
+
+    if owner == ".content_retrieval":
         return import_module(".content_retrieval", __name__)
-    if module_name == ".rollout":
+    elif owner == ".learning":
+        return import_module(".learning", __name__)
+    elif owner == ".lifecycle":
+        return import_module(".lifecycle", __name__)
+    elif owner == ".lifecycle_repository":
+        return import_module(".lifecycle_repository", __name__)
+    elif owner == ".multimodal":
+        return import_module(".multimodal", __name__)
+    elif owner == ".rollout":
         return import_module(".rollout", __name__)
-    if module_name == ".temporal":
+    elif owner == ".temporal":
         return import_module(".temporal", __name__)
-    raise ImportError("unregistered lazy export owner")
+    raise ImportError("unregistered lazy export owner: " + repr(owner))
 
 
 def __getattr__(name: str):
     for module_name, names in _LAZY_EXPORTS.items():
         if name in names:
-            from importlib import import_module
-
-            value = getattr(_load_reviewed_export_module(module_name), name)
+            value = getattr(_load_literal_export_module("." + module_name), name)
             globals()[name] = value
             return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

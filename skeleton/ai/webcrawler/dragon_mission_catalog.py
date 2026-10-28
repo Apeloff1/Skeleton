@@ -50,23 +50,20 @@ CAPABILITY_CATALOG = tuple(
 )
 
 
-def _load_catalog_module(module_name: str):
-    """Only reviewed native crawler mission owners are executable."""
-    if module_name == "dragon_mission_token_feed":
-        return import_module(".dragon_mission_token_feed", __package__)
-    if module_name == "dragon_mission_quality":
-        return import_module(".dragon_mission_quality", __package__)
-    if module_name == "dragon_mission_scheduler":
-        return import_module(".dragon_mission_scheduler", __package__)
-    raise ValueError("unregistered mission owner")
-
-
 def resolve_mission_capability(rank: int):
     """Resolve a known callable for authorized callers, no implicit execution."""
     if not isinstance(rank,int) or isinstance(rank,bool) or not 1<=rank<=len(CAPABILITY_CATALOG):
         raise ValueError("unknown mission capability rank")
     capability=CAPABILITY_CATALOG[rank-1]
-    result=getattr(_load_catalog_module(capability.module),capability.name)
+    if capability.module == "dragon_mission_quality":
+        owner = import_module(".dragon_mission_quality", __package__)
+    elif capability.module == "dragon_mission_scheduler":
+        owner = import_module(".dragon_mission_scheduler", __package__)
+    elif capability.module == "dragon_mission_token_feed":
+        owner = import_module(".dragon_mission_token_feed", __package__)
+    else:
+        raise RuntimeError("unregistered mission capability module")
+    result=getattr(owner, capability.name)
     if not callable(result):
         raise RuntimeError("capability registry points to non-callable implementation")
     return result

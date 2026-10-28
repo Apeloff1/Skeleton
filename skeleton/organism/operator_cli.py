@@ -38,45 +38,6 @@ _VIEWS = {
 }
 
 
-def _load_view_module(module_name: str):
-    """Resolve only audited CLI view owners via literal imports."""
-    if module_name == "skeleton.organism.caps":
-        return import_module("skeleton.organism.caps")
-    if module_name == "skeleton.galaxy.lattice":
-        return import_module("skeleton.galaxy.lattice")
-    if module_name == "skeleton.kernel.scoreboard":
-        return import_module("skeleton.kernel.scoreboard")
-    if module_name == "skeleton.kernel.hot":
-        return import_module("skeleton.kernel.hot")
-    if module_name == "skeleton.kernel.coverage":
-        return import_module("skeleton.kernel.coverage")
-    if module_name == "skeleton.kernel.witness":
-        return import_module("skeleton.kernel.witness")
-    if module_name == "skeleton.kernel.persist":
-        return import_module("skeleton.kernel.persist")
-    if module_name == "skeleton.galaxy.quarantine":
-        return import_module("skeleton.galaxy.quarantine")
-    if module_name == "skeleton.organism.rotctx":
-        return import_module("skeleton.organism.rotctx")
-    if module_name == "skeleton.social.coverage":
-        return import_module("skeleton.social.coverage")
-    if module_name == "skeleton.organism.calendar":
-        return import_module("skeleton.organism.calendar")
-    if module_name == "skeleton.organism.observe":
-        return import_module("skeleton.organism.observe")
-    if module_name == "skeleton.organism.stacks":
-        return import_module("skeleton.organism.stacks")
-    if module_name == "skeleton.organism.context_step":
-        return import_module("skeleton.organism.context_step")
-    if module_name == "skeleton.organism.satellites":
-        return import_module("skeleton.organism.satellites")
-    if module_name == "skeleton.organism.path10":
-        return import_module("skeleton.organism.path10")
-    if module_name == "skeleton.organism.runloop":
-        return import_module("skeleton.organism.runloop")
-    raise ValueError("unregistered CLI view module")
-
-
 def _parser(command: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=f"python -m skeleton {command}")
     parser.add_argument("--json", action="store_true")
@@ -120,7 +81,43 @@ def _execute(command: str, org: Any, args: Any) -> Any:
     cue = " ".join(args.cue) if command in _CUE else ""
     if command in _VIEWS:
         module, func, mode = _VIEWS[command]
-        method = getattr(_load_view_module(module), func)
+        if module == "skeleton.galaxy.lattice":
+            owner = import_module("skeleton.galaxy.lattice")
+        elif module == "skeleton.galaxy.quarantine":
+            owner = import_module("skeleton.galaxy.quarantine")
+        elif module == "skeleton.kernel.coverage":
+            owner = import_module("skeleton.kernel.coverage")
+        elif module == "skeleton.kernel.hot":
+            owner = import_module("skeleton.kernel.hot")
+        elif module == "skeleton.kernel.persist":
+            owner = import_module("skeleton.kernel.persist")
+        elif module == "skeleton.kernel.scoreboard":
+            owner = import_module("skeleton.kernel.scoreboard")
+        elif module == "skeleton.kernel.witness":
+            owner = import_module("skeleton.kernel.witness")
+        elif module == "skeleton.organism.calendar":
+            owner = import_module("skeleton.organism.calendar")
+        elif module == "skeleton.organism.caps":
+            owner = import_module("skeleton.organism.caps")
+        elif module == "skeleton.organism.context_step":
+            owner = import_module("skeleton.organism.context_step")
+        elif module == "skeleton.organism.observe":
+            owner = import_module("skeleton.organism.observe")
+        elif module == "skeleton.organism.path10":
+            owner = import_module("skeleton.organism.path10")
+        elif module == "skeleton.organism.rotctx":
+            owner = import_module("skeleton.organism.rotctx")
+        elif module == "skeleton.organism.runloop":
+            owner = import_module("skeleton.organism.runloop")
+        elif module == "skeleton.organism.satellites":
+            owner = import_module("skeleton.organism.satellites")
+        elif module == "skeleton.organism.stacks":
+            owner = import_module("skeleton.organism.stacks")
+        elif module == "skeleton.social.coverage":
+            owner = import_module("skeleton.social.coverage")
+        else:
+            raise RuntimeError("unregistered operator view module")
+        method = getattr(owner, func)
         return (method() if mode == "plain" else
                 method(root) if mode == "root" else
                 method(root=root) if mode == "root_kw" else

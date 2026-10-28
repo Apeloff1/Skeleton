@@ -398,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "41b65d6e8e6712727db3d55273e736be31bb207e",
+      "source_git_object_sha": "42bd498f2d860e86c182ead2fa2e62e7d0815d98",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "e9c48d13f1f3368c14b1efa3bc479b4f33f4f118",
+      "source_git_object_sha": "8d70c3320ca479f98acd46e0c9cd40bd010b0c73",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "6eae392257ad589ffe8e4e1d7c81cd3a3ef97c82",
+      "source_git_object_sha": "7eaedb3fc89660983a9c3fd1cac4d30af8a70fd0",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1269,7 +1269,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "1580ba0429e479530d22eb85c742780bec8a1fb9",
+      "source_git_object_sha": "5b1acdbeb0c14abd0b38fe6b185472602aa3144a",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1426,7 +1426,7 @@
       "source": "skeleton/repo_intelligence",
       "destination": "skeleton/ai/build/repo_intelligence",
       "kind": "tree",
-      "source_git_object_sha": "a20df64260ae4009d2cac511bd7cba5c8e45f2a6",
+      "source_git_object_sha": "fb0afa7ae646bd6171595de570270ec1b0434662",
       "role": "repository intelligence for build/control workflows",
       "work_package_refs": [
         "WP-W00",
@@ -1620,7 +1620,7 @@
       "source": "skeleton/organism",
       "destination": "skeleton/ai/runtime/organism",
       "kind": "tree",
-      "source_git_object_sha": "33500ba88a8a3cc11865c8902733811c1a8b1cf0",
+      "source_git_object_sha": "a0722da5ae7d6f5fee603e2664397b17b80f0938",
       "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
       "work_package_refs": [
         "WP-W02",
@@ -2912,7 +2912,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "42a17c773462f3e0625268431c954c15674f9eee",
+      "source_git_object_sha": "54b0e1fef93ad9d0c83a816c909c9e47a18f481a",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -6019,7 +6019,7 @@
       "source": "skeleton/audio",
       "destination": "skeleton/ai/runtime/extensions/audio",
       "kind": "tree",
-      "source_git_object_sha": "a226964e603335f8e3964930417a81620469f036",
+      "source_git_object_sha": "e0ae7d233f8a64eb9becf115c8c18aa77b84b029",
       "role": "Bounded audio asset, segmentation, timestamp, confidence, and model-provenance contracts.",
       "work_package_refs": [
         "WP-W28",

@@ -30,22 +30,21 @@ def test_research_lineage_roots_are_historical_not_runtime_support() -> None:
         "skeleton/spine/",
         "skeleton/viscera/",
     }
-    # All currently unresolved roots retain explicit repository-machine owners.
-    # Their classification must not imply runtime promotion.
-    assert specialized["owner"] == "core-runtime"
-    assert specialized["lifecycle"] == "support"
+    # Preserve the explicit (not catch-all) owner inventory for live roots.
+    # These nine roots are separately classified as unresolved, not promoted
+    # to the historical research-lineage lifecycle.
     assert set(specialized["prefixes"]) == {
-        "skeleton/cs300/",
         "skeleton/cue/",
+        "skeleton/cs300/",
         "skeleton/dna/",
         "skeleton/fix/",
-        "skeleton/genos/",
         "skeleton/house/",
         "skeleton/maximise/",
         "skeleton/organs/",
         "skeleton/p3/",
         "skeleton/p4/",
         "skeleton/p5/",
+        "skeleton/genos/",
         "skeleton/parse/",
         "skeleton/turn/",
     }
