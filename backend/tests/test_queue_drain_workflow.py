@@ -244,3 +244,17 @@ def test_drain_recovery_arm_lane_keeps_control_plane_safeguards() -> None:
     assert "if stale_pr_run(run, open_pr_heads):" in drain
     assert "if security_lane:" in drain
     assert "if status == 429:" in drain
+
+def test_queue_drain_never_retries_owner_historical_tombstones() -> None:
+    workflow = _workflow_text()
+    # The immutable manifest's 31 historical run IDs have a dedicated
+    # canary-gated owner deletion workflow. The generic queue drainer must
+    # not use an expired retry-after timestamp and hammer refused requests.
+    assert "owner_historical_run_ids = frozenset({" in workflow
+    assert "provider_conflict_retry_after" not in workflow
+    assert "if run_id in owner_historical_run_ids:" in workflow
+    assert "37539069375," in workflow
+    assert "37642388873," in workflow
+    assert "37642398158," in workflow
+    assert "provider_conflicts_backed_off" in workflow
+    assert "owner-only, canary-gated deletion path" in workflow
