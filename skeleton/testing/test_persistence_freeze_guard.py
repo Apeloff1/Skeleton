@@ -19,6 +19,17 @@ from pathlib import Path
 
 import pytest
 
+def _import_frozen_fixture(module_name: str):
+    """Fixed, policy-reviewed freeze fixtures; no runtime module selection."""
+    if module_name == "skeleton.persist":
+        return importlib.import_module("skeleton.persist")
+    if module_name == "skeleton.storage":
+        return importlib.import_module("skeleton.storage")
+    if module_name == "skeleton.state":
+        return importlib.import_module("skeleton.state")
+    raise ImportError("unknown frozen persistence package")
+
+
 ROOT = Path(__file__).resolve().parents[2]
 FROZEN = ("persist", "storage", "state")
 FROZEN_ROOTS = tuple(f"skeleton/{name}" for name in FROZEN) + (
@@ -90,7 +101,7 @@ def test_frozen_packages_import_without_warnings(name: str) -> None:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            module = importlib.import_module(module_name)
+            module = _import_frozen_fixture(module_name)
         assert NOTICE in (module.__doc__ or "")
     finally:
         sys.modules.update(saved)
