@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-const root = path.resolve(__dirname, '../features/Jeeves/companion');
+const root = path.resolve(__dirname, '../src/features/Jeeves/companion');
 const cache = {};
 function load(name) {
   if (cache[name]) return cache[name];
@@ -124,15 +124,15 @@ const continued = acceptDragonFeed(accepted, {
 });
 assert.equal(continued.lastSequence, 41);
 assert.equal(continued.state.phase, 'celebrating');
-const workspace = fs.readFileSync(path.resolve(__dirname, '../features/Jeeves/CrawlerWorkspace.tsx'), 'utf8');
+const workspace = fs.readFileSync(path.resolve(__dirname, '../src/features/Jeeves/CrawlerWorkspace.tsx'), 'utf8');
 assert.match(workspace, /topics\.split\(\/\[\\s,\]\+\/\)/);
 assert.match(workspace, /a-z0-9\]\+\(\?:-\[a-z0-9\]\+\)\*/);
-const academy = fs.readFileSync(path.resolve(__dirname, '../features/Jeeves/companion/useDragonAcademy.ts'), 'utf8');
+const academy = fs.readFileSync(path.resolve(__dirname, '../src/features/Jeeves/companion/useDragonAcademy.ts'), 'utf8');
 assert.match(academy, /acceptDragonFeed\(journal\.current,f\)/);
 assert.match(academy, /history_truncated\?:boolean/);
 assert.match(academy, /requestedFromStart=cursor\.lastSequence===0/);
 assert.match(academy, /if\(!requestedFromStart\)return/);
-const panel = fs.readFileSync(path.resolve(__dirname, '../features/Jeeves/companion/DragonCompanionPanel.tsx'), 'utf8');
+const panel = fs.readFileSync(path.resolve(__dirname, '../src/features/Jeeves/companion/DragonCompanionPanel.tsx'), 'utf8');
 assert.match(panel, /seeds=\$\{encodeURIComponent\(approval\.sourceHosts\.map/);
 assert.match(panel, /This does not start the crawl/);
 assert.match(workspace, /https:\\\/\\\/\[a-z0-9\]/);

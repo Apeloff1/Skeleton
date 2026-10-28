@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from .llama_cpp import (
+    COMPLETION_CHAT_FLAGS,
+    QWEN3_COMPLETION_CHAT_TEMPLATE,
     LlamaCppConfig,
     LlamaCppModel,
     LlamaCppRuntimeError,
@@ -28,13 +30,6 @@ from .local import (
 
 SCHEMA = "skeleton.local_model.deployment.v1"
 QUALIFICATION_SCHEMA = "skeleton.local_model.qualification.v1"
-QWEN3_COMPLETION_CHAT_TEMPLATE = (
-    "{% for message in messages %}"
-    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
-    "{% endfor %}{% if add_generation_prompt %}"
-    "{{ '<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n' }}"
-    "{% endif %}"
-)
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_MANIFEST_BYTES = 1024 * 1024
 
@@ -408,18 +403,7 @@ def create_local_model_deployment(
     extra_args: tuple[str, ...] = ()
     completion_profile = runtime_profile in {"llama-completion-chat", "qwen3-completion-chat"}
     if completion_profile:
-        extra_args = (
-            "--conversation",
-            "--single-turn",
-            "--simple-io",
-            "--no-perf",
-            "--no-escape",
-            "--color",
-            "off",
-            "--jinja",
-            "--reasoning",
-            "off",
-        )
+        extra_args = COMPLETION_CHAT_FLAGS
         output_framing = "llama_completion_eog"
         if runtime_profile == "qwen3-completion-chat":
             extra_args += ("--chat-template", QWEN3_COMPLETION_CHAT_TEMPLATE)

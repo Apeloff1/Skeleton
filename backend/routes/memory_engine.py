@@ -29,8 +29,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
+from routes.gameforge_auth import require_authenticated_identity
 
 from services import cag, mag
 
@@ -43,12 +44,14 @@ try:
 except Exception:
     pass
 
-router = APIRouter(prefix="/api/memory-engine", tags=["memory-engine"])
+router = APIRouter(prefix="/api/memory-engine", tags=["memory-engine"], dependencies=[Depends(require_authenticated_identity)])
 
 
 class ComposeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     query: str = Field(..., min_length=1)
-    user_id: str = "anonymous"
+    user_id: Optional[str] = None
     pipeline: Optional[str] = None
     use_rag: bool = True
     rag_limit: int = Field(3, ge=0, le=10)
@@ -77,8 +80,10 @@ async def warm_prefix() -> dict:
 
 
 @router.post("/compose")
-async def compose(body: ComposeRequest) -> dict:
+async def compose(body: ComposeRequest, scope: dict = Depends(require_authenticated_identity)) -> dict:
     """Compose a KV-cache-optimized prompt: CAG prefix + RAG snippets + query."""
+    if body.user_id is not None and body.user_id != scope["owner_id"]:
+        raise HTTPException(status_code=403, detail="Memory owner mismatch")
     prefix = cag.jeeves_system_prefix()
     retrieved: list[str] = []
     if body.use_rag and body.rag_limit > 0:
@@ -86,7 +91,8 @@ async def compose(body: ComposeRequest) -> dict:
             from services.rag_service import RAGService
             rag = RAGService()
             hits = rag.get_relevant_context(
-                body.user_id, body.query, pipeline=body.pipeline, limit=body.rag_limit
+                scope["owner_id"], body.query, pipeline=body.pipeline, limit=body.rag_limit,
+                tenant_id=scope["tenant_id"],
             )
             retrieved = [h["content"] for h in hits]
         except Exception:

@@ -197,7 +197,26 @@ def test_product_shell_uses_single_runtime_readiness_source():
     assert "getProductReadiness" not in product
     assert "health?.product?.available" in product
     assert "product: runtime.product" in health
-    # This synchronous control-plane probe now executes off the event loop.
-    assert "from core.product_control_runtime import public_readiness" in runtime
-    assert "asyncio.to_thread(public_readiness)" in runtime
+    import ast
+    tree = ast.parse(runtime)
+    observations = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Await)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Attribute)
+        and isinstance(node.value.func.value, ast.Name)
+        and node.value.func.value.id == "asyncio"
+        and node.value.func.attr == "to_thread"
+        and node.value.args
+        and isinstance(node.value.args[0], ast.Name)
+        and node.value.args[0].id == "public_readiness"
+    ]
+    assert len(observations) == 1
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "public_readiness"
+        for node in ast.walk(tree)
+    ), "readiness must not block the event loop with a direct call"
     assert '"product": product_readiness' in runtime

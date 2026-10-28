@@ -4,8 +4,8 @@
   "owner": "existing skeleton.app installer and canonical local deployment owner",
   "implementation": "scripts/provision_local_ai.py",
   "deployment_authority": "skeleton/ai/runtime/inference/deployment.py:LocalModelDeployment",
-  "entrypoint": "python scripts/provision_local_ai.py --target linux-x86_64-glibc --download --output ./data/local-ai",
-  "network": "Explicit operator-only acquisition from two fixed HTTPS public artifact URLs: revision-pinned Qwen3-0.6B-Q8_0 Apache-2.0 weights and release-pinned llama.cpp b11429 Ubuntu x64 MIT runtime. Existing proxy and CA environment remain in effect. No credentials, arbitrary URLs, model invocation, service startup or browser download authority.",
+  "entrypoint": "python scripts/provision_local_ai.py --target linux-x86_64-glibc --profile chat --download --output ./data/local-ai",
+  "network": "Explicit operator-only acquisition selects one revision-pinned public Apache-2.0 Qwen model from the declared chat/coding profiles and the same fixed HTTPS llama.cpp b11429 Ubuntu x64 MIT runtime. Existing proxy and CA environment remain in effect. No credentials, arbitrary URLs, inference, service startup or browser download authority.",
   "integrity": "Exact expected bytes and SHA256 precede use. Archive extraction materializes only bounded regular libraries, completion executable and license, resolving only archive-internal aliases without creating symlinks. A portable relative-path manifest is admitted by the existing canonical loader before create-only publication. Failed provisioning remains explicitly incomplete and is never activated.",
   "storage": "Operator-owned model artifact directory only, not application state or a new store. Existing complete directories are verified and reused, never overwritten. Receipt binds all runtime files, model, license/source identity and deployment manifest.",
   "activation": "Operator sets existing AI_PROVIDER=local, clears AI_LOCAL_MODEL_PATH and sets AI_LOCAL_DEPLOYMENT_PATH to the read-only mounted deployment.json, then restarts the existing engine. No inferred promotion or credentials.",
@@ -14,11 +14,14 @@
     "runtime_archive_bytes": 17693462,
     "extracted_bytes": 134217728,
     "archive_members": 512,
-    "download_timeout_seconds": 1800
+    "download_timeout_seconds": 1800,
+    "maximum_model_bytes": 1117320768,
+    "retained_free_disk_bytes": 2147483648,
+    "acquisition_disk_admission": "Free bytes must cover selected model + runtime archive + maximum extracted bytes + retained two-GiB reserve before any claim/download. Existing fully provisioned reuse verifies content without new acquisition."
   },
   "limitations": [
-    "Bundled acquisition recipe is Linux x86_64 CPU only; other architectures use their compatible operator-provisioned runtime.",
-    "Small CPU model provides a reproducible integration path, not guaranteed planning quality or trained studio mastery.",
+    "Pinned acquisition profiles are Linux x86_64 CPU only; other architectures use a compatible operator-provisioned runtime.",
+    "The chat profile provides a small reproducible integration path; the optional coding model is not guaranteed studio mastery or successful repair. Both need actual quality and capacity evaluation.",
     "Shared-library receipt pins acquisition content; canonical runtime currently independently pins the executable and model.",
     "Download cleanup failure never produces successful activation; abandoned or partial directories retain incomplete marker. Parent private directories are never made public."
   ],
@@ -29,10 +32,19 @@
     "owner": "same existing operator installer; no service/store/scheduler/provider",
     "network_worker": "fixed stdlib Python -I -S child, exact pinned URL and byte count, only inherited deployment proxy/CA variables; absolute supervisor deadline, terminate/kill/wait before acknowledgement",
     "local_copy": "No-follow nonblocking regular-file descriptor, exact expected byte ceiling and hash during copy, stable descriptor identity before/after; no unbounded copyfileobj",
-    "reuse": "Existing exact target runtime and configured manifest profile/thread count must match request; no overwrite or implicit reconfiguration"
+    "reuse": "Existing exact target runtime and configured manifest profile/thread count must match request; no overwrite or implicit reconfiguration",
+    "publication": "A single .pending inode is hash/length verified, then atomically linked create-only to its final artifact name and unlinked from staging; no second downloaded-weight copy or replacement of a concurrently created destination. The incomplete marker remains until canonical manifest admission/publication completes.",
+    "runtime_reuse": "Explicit --runtime-from points only to a complete pinned installation. Its recipe/receipt, existing deployment configuration and all files are verified; only bounded runtime executable/license/library members are copied with descriptor identity and digest checks. The source is never rewritten, reconfigured or activated; the new receipt binds its source receipt digest."
   },
   "target": "Explicit --target linux-x86_64-glibc only. Other host platforms require --prepare-for-container acknowledgement; host/target compatibility reported separately. Artifact preparation does not establish native execution compatibility.",
-  "prompt_profile": "Explicit Qwen3 nonthinking completion template from canonical QWEN3_COMPLETION_CHAT_TEMPLATE, passed as --chat-template after fixed completion flags. --reasoning off controls display only; template has closed empty think prefix. Exact args/template enter manifest/profile digest. Existing older profile directories are never rewritten and conflict with this recipe.",
+  "prompt_profile": "Explicit profile-specific completion template follows fixed completion flags. Chat retains canonical Qwen3 closed-empty-think template; opt-in coding uses plain ChatML without thinking tokens. Exact args/template enter manifest/profile digest. Existing profile directories are never silently rewritten or retargeted.",
+  "native_prompt_roles": {
+    "owner": "skeleton/ai/runtime/inference/llama_cpp.py:LlamaCppModel",
+    "recognition": "Only the exact existing pinned completion flags plus the canonical Qwen3 or coding template select the versioned native ChatML renderer. Existing manifests and provisioning receipts remain immutable; unknown/custom/raw profiles retain legacy rendering and CLI flags.",
+    "rendering": "Instructions and local tool/structured-output protocol, including the bounded validated JSON schema, occupy the system frame. Authorized user/assistant history keeps each role and exact content; the current prompt is a separate user frame. The sole assistant generation prefix is plain for coding and includes the existing closed empty think block for Qwen3. Reserved ChatML/EOT delimiters in any content fail before process admission; no arbitrary Jinja evaluation.",
+    "native_transport": "Recognized profiles use the pinned CLI binary-file reader and no-conversation mode to preserve exact UTF-8 bytes and the final assistant newline without a second template wrapper. Private prompt files, no-escape, schema grammar, output framing and all context/token/time/custody limits remain authoritative.",
+    "identity": "Effective prompt-format version enters the existing execution-profile digest only for recognized profiles, invalidating incompatible generation caches. Historical terminal results and deployment receipts are never rewritten. Rollback reverts rendering and must not treat an old generation receipt as new-format qualification."
+  },
   "empty_directory_claim": {
     "accepted": "New destination, or an existing empty nonsymlink directory owned by the effective operator UID with no group/world write access. Parent symlinks and foreign ownership are rejected.",
     "claim": "Exclusive create-only .incomplete marker, fsynced before artifact writes; concurrent or incomplete claims are never overwritten. Check emptiness again after claim.",
@@ -51,5 +63,30 @@
     "operator_selection": "Explicit --context-size; the canonical activation and capacity owners still decide whether work fits.",
     "existing_installation": "Requested context must match the issued deployment. Reconfiguration requires a fresh destination; existing files are never overwritten.",
     "original_studio_guidance": "12288 tokens were used for the bounded eight-call original creation workflow; this does not guarantee success or capacity on every host."
+  },
+  "model_profiles": {
+    "default": "chat",
+    "selection": "Explicit --profile chat|coding. No existing destination is retargeted; receipt, model, context, threads and exact prompt args must match.",
+    "chat": {
+      "model_id": "Qwen3-0.6B-Q8_0",
+      "repository": "Qwen/Qwen3-0.6B-GGUF",
+      "revision": "23749fefcc72300e3a2ad315e1317431b06b590a",
+      "filename": "Qwen3-0.6B-Q8_0.gguf",
+      "sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+      "bytes": 639446688,
+      "license": "Apache-2.0",
+      "prompt_template": "Existing canonical Qwen3 closed-empty-think completion template; unchanged default."
+    },
+    "coding": {
+      "model_id": "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M",
+      "repository": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+      "revision": "f86cb2c1fa58255f8052cc32aeede1b7482d4361",
+      "filename": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+      "sha256": "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
+      "bytes": 1117320768,
+      "license": "Apache-2.0",
+      "prompt_template": "Explicit ChatML text completion with assistant generation prefix and no Qwen3 think tokens; same digest-bound llama.cpp completion framing."
+    },
+    "qualification": "Artifact preparation and admission only. Coding ability, throughput, repair success and host memory capacity require actual bounded runtime and browser observation; profile selection is not a quality or independent-verifier claim."
   }
 }

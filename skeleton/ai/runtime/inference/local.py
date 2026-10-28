@@ -29,6 +29,7 @@ import threading
 import time
 from collections import Counter, OrderedDict
 from collections.abc import Callable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from skeleton.compat.datetime_utc import UTC
 from datetime import datetime
@@ -57,6 +58,10 @@ _RESOURCE_CPU_SAMPLES: dict[str, tuple[float, float, float | None, float | None]
 _RESOURCE_COLLECTION_LOCK = threading.Lock()
 _RESOURCE_COLLECTION: tuple[float, ServingResources] | None = None
 _ANONYMOUS_TENANT_SCOPE = hashlib.sha256(b"skeleton-local-anonymous-tenant-v1").hexdigest()
+_LOCAL_DISPATCH_OBSERVER: ContextVar[Callable[[], None] | None] = ContextVar(
+    "skeleton.local.physical_dispatch_observer",
+    default=None,
+)
 
 
 class LocalInferenceCancelled(RuntimeError):
@@ -69,6 +74,15 @@ class LocalInferenceOverloaded(ProviderUnavailableError):
 
 class LocalInputBudgetError(ValueError):
     """A declared local request exceeds its finite token/character allowance."""
+
+
+class _LocalUsageLimitViolation(ProviderProtocolViolationError):
+    """Bounded observed numeric usage survives rejection of an overrun payload."""
+
+    def __init__(self, message: str, *, input_tokens: int, output_tokens: int) -> None:
+        super().__init__(message)
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
 
 
 @dataclass(frozen=True, slots=True)
@@ -2531,11 +2545,33 @@ class LocalInferenceEngine:
         result = LocalInferenceResult(
             **{name: getattr(result, name) for name in LocalInferenceResult.__dataclass_fields__}
         )
+        if result.model_id != self.model.model_id or result.model_digest != self.model.model_digest:
+            raise ValueError("local inference result model identity drift")
+        if prepared_input is not None and result.input_tokens != prepared_input.input_tokens:
+            raise ProviderProtocolViolationError("local result differs from admitted native input accounting")
         limits = _local_generation_limits(self.model)
         budget = LocalInputBudget.from_limits(limits)
-        budget.validate_tokens(result.input_tokens, request.max_output_tokens)
         if result.input_tokens > admitted_input_tokens:
-            raise ProviderProtocolViolationError("local terminal input usage exceeds admitted accounting")
+            raise _LocalUsageLimitViolation(
+                "local terminal input usage exceeds admitted accounting",
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+            )
+        if result.output_tokens > request.max_output_tokens:
+            raise _LocalUsageLimitViolation(
+                "local backend exceeded admitted output-token limit",
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+            )
+        budget.validate_tokens(result.input_tokens, request.max_output_tokens)
+        protocols = _local_protocol_capabilities(self.model)
+        if (
+            result.structured_output is not None
+            and "structured-output" not in protocols
+            or result.tool_calls
+            and "tool-calls" not in protocols
+        ):
+            raise ProviderProtocolViolationError("local backend returned an undeclared response feature")
         maximum_bytes = limits.get("max_output_utf8_bytes", 4 * 1024 * 1024)
         payload_bytes = len((result.text or "").encode("utf-8"))
         if result.structured_output is not None:
@@ -2547,12 +2583,6 @@ class LocalInferenceEngine:
                 break
         if payload_bytes > maximum_bytes:
             raise ProviderProtocolViolationError("local result exceeds activated output-byte limit")
-        if result.model_id != self.model.model_id or result.model_digest != self.model.model_digest:
-            raise ValueError("local inference result model identity drift")
-        if prepared_input is not None and result.input_tokens != prepared_input.input_tokens:
-            raise ProviderProtocolViolationError("local result differs from admitted native input accounting")
-        if result.output_tokens > request.max_output_tokens:
-            raise ProviderProtocolViolationError("local backend exceeded admitted output-token limit")
 
         declared_tools = {
             str(item.get("tool_id", "")).strip(): item
@@ -2619,7 +2649,10 @@ class LocalInferenceEngine:
         try:
             if cancel.is_set():
                 raise LocalInferenceCancelled("local inference cancelled before execution")
+            observe_dispatch = _LOCAL_DISPATCH_OBSERVER.get()
             if prepared_input is None:
+                if observe_dispatch is not None:
+                    observe_dispatch()
                 result = self.model.infer(request, cancel)
             else:
                 # Keep native tokenization and accounting attached to the
@@ -2631,6 +2664,8 @@ class LocalInferenceEngine:
                     raise ProviderPolicyError("prepared local input authority changed before dispatch")
                 # The native owner validates its issuer, immutable sequence
                 # and current execution identity at this dispatch boundary.
+                if observe_dispatch is not None:
+                    observe_dispatch()
                 result = self.model.infer_prepared(request, cancel, prepared_input)
             if not isinstance(result, LocalInferenceResult):
                 raise TypeError("local backend must return LocalInferenceResult")

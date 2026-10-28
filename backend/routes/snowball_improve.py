@@ -17,16 +17,20 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Query
+from fastapi import HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from core.databases import client as _MONGO
 from core.stage_vault import vault_for_stage
 from routes.snowball_audit import snowball_audit, DELIVER_THRESHOLD
 from routes.snowball import _LADDER, _compile_gdd
+from routes.playable_access import (
+    assert_project_access, project_identity, project_router,
+    reauthorize_project_context, scoped_database,
+)
 
-router = APIRouter(prefix="/api/snowball", tags=["snowball"])
-_db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+router = project_router(prefix="/api/snowball", tags=["snowball"])
+_db = scoped_database(_MONGO[os.environ.get("DB_NAME", "test_database")])
 
 # 🔌 Vault "game-mount": every build step that should draw on the knowledge vault.
 _ALL_BUILD_STEPS = [
@@ -139,8 +143,12 @@ async def auto_improve(pid: str):
             'a JSON array of {"signal":str,"current":int,"upgrade":"concrete 1-2 sentence action",'
             '"impact":"why it lifts the score"}. Be concrete and buildable, no fluff.')
         prompt = f"GAME: {audit.get('title','')}\n\nFAILING SIGNALS:\n{blk}\n\nGAME SUMMARY:\n{gdd[:6000]}"
+        scope = await reauthorize_project_context(mutate=True)
         res = await route_complete("reasoning", prompt, system=system,
+                                   tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
+                                   data_class="confidential",
                                    session_id=f"improve-{pid}", timeout_s=60, use_cache=False)
+        await reauthorize_project_context(mutate=True)
         if not res.get("error"):
             from routes.canon_graph import _extract_json_array
             upgrades = _extract_json_array(res.get("content", ""))
@@ -321,6 +329,7 @@ async def upgrade_plan_md(pid: str):
 
 # ── 🔁 AUTO-LOOP: drive a game to the 95 gate, capped at N passes ──────────────
 _AUTO_LOOP: dict = {}
+_AUTO_LOOP_AUTHORITY: dict[str, dict] = {}
 
 
 async def _run_auto_loop(pid: str, loop_id: str, max_passes: int):
@@ -329,7 +338,10 @@ async def _run_auto_loop(pid: str, loop_id: str, max_passes: int):
     deliverable = False
     final_gate = 0
     for p in range(max_passes):
+        await reauthorize_project_context(mutate=True)
+        await assert_project_access(pid, mutate=True)
         audit = await snowball_audit(pid, deep=True)
+        await reauthorize_project_context(mutate=True)
         final_gate = audit.get("gate_floor", 0)
         passes.append({"pass": p + 1, "gate_floor": final_gate, "deliverable": audit.get("deliverable")})
         _AUTO_LOOP[loop_id] = {"status": "running", "pid": pid, "pass": p + 1,
@@ -346,7 +358,10 @@ async def _run_auto_loop(pid: str, loop_id: str, max_passes: int):
                 if j and j.get("job_status") == "done":
                     break
                 await asyncio.sleep(3)
+    await reauthorize_project_context(mutate=True)
+    await assert_project_access(pid, mutate=True)
     fa = await snowball_audit(pid, deep=True)
+    await reauthorize_project_context(mutate=True)
     final_gate = fa.get("gate_floor", final_gate)
     deliverable = fa.get("deliverable", deliverable)
     _AUTO_LOOP[loop_id] = {"status": "done", "pid": pid, "passes": passes,
@@ -364,13 +379,28 @@ async def start_auto_loop(pid: str, max_passes: int = Query(3, ge=1, le=6)):
     g = await _db.playables.find_one({"playable_id": pid}, {"_id": 0, "playable_id": 1})
     if not g:
         return {"error": "game not found"}
+    for old_id in list(_AUTO_LOOP):
+        if len(_AUTO_LOOP) < 40:
+            break
+        if _AUTO_LOOP[old_id].get("status") != "running":
+            _AUTO_LOOP.pop(old_id, None)
+            _AUTO_LOOP_AUTHORITY.pop(old_id, None)
+    if len(_AUTO_LOOP) >= 40:
+        raise HTTPException(429, "Automatic improvement capacity is full")
     loop_id = _uuid.uuid4().hex
     _AUTO_LOOP[loop_id] = {"status": "running", "pid": pid, "pass": 0,
                            "max_passes": max_passes, "passes": [], "gate_floor": 0}
+    _AUTO_LOOP_AUTHORITY[loop_id] = {"identity": project_identity(), "pid": pid}
     asyncio.create_task(_run_auto_loop(pid, loop_id, max_passes))
     return {"loop_id": loop_id, "status": "running", "max_passes": max_passes}
 
 
 @router.get("/auto-loop/{loop_id}")
 async def auto_loop_status(loop_id: str):
-    return _AUTO_LOOP.get(loop_id) or {"error": "loop not found"}
+    identity = await reauthorize_project_context()
+    authority = _AUTO_LOOP_AUTHORITY.get(loop_id)
+    row = _AUTO_LOOP.get(loop_id)
+    if not row or not authority or authority["identity"] != identity:
+        raise HTTPException(404, "Loop not found")
+    await assert_project_access(authority["pid"])
+    return row

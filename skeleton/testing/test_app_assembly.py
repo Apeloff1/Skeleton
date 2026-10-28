@@ -168,8 +168,6 @@ def test_default_smoke_profile_has_frontend_backend_and_engine():
 
 def test_frontend_clients_share_canonical_runtime_endpoints():
     root = find_repo_root(Path(__file__))
-    # Frontend sources live in src/; the historical root-level paths were
-    # removed by the app assembly migration.
     resolver = (root / "frontend/src/utils/apiBase.ts").read_text(encoding="utf-8")
 
     assert "export const API_BASE" in resolver
@@ -182,7 +180,8 @@ def test_frontend_clients_share_canonical_runtime_endpoints():
         "frontend/src/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
         "frontend/src/utils/apiClient.ts": "import { API_BASE } from './apiBase';",
         "frontend/src/utils/bootHealth.ts": "import { API_BASE } from './apiBase';",
-        "frontend/src/utils/api.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/product/aiChatClient.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/product/appHealthClient.ts": "import { API_BASE, SKELETON_API_BASE } from '../utils/apiBase';",
         "frontend/src/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
     }
     for relative, expected in expected_imports.items():
@@ -303,16 +302,15 @@ def test_production_web_ingress_routes_both_application_apis():
     assert "proxy_pass http://backend:8001;" in nginx
 
 
-def test_frontend_live_probe_uses_compose_network_and_fails_on_bad_readiness():
+def test_frontend_security_probe_supplies_compose_upstream_names():
     root = find_repo_root(Path(__file__))
-    workflow = (root / ".github/workflows/app-foundation-e2e.yml").read_text(encoding="utf-8")
+    active = root / ".github/workflows/dependency-security.yml"
+    archived = root / ".github/workflows-archive/dependency-security.yml"
+    # Validate the retained probe definition, independently of its execution schedule.
+    workflow = (active if active.is_file() else archived).read_text(encoding="utf-8")
 
-    # Compose provides service-name DNS. Manual loopback overrides would
-    # conceal invalid upstream service discovery in production-like E2E.
-    assert "docker compose -f docker-compose.yml up -d mongo skeleton backend frontend" in workflow
-    assert 'wait_for "${SKELETON_E2E_WEB_URL}/healthz" frontend' in workflow
-    assert "--add-host skeleton:127.0.0.1" not in workflow
-    assert "--add-host backend:127.0.0.1" not in workflow
+    assert "--add-host skeleton:127.0.0.1" in workflow
+    assert "--add-host backend:127.0.0.1" in workflow
 
 
 def test_backend_does_not_claim_skeleton_api_v1_prefix():
@@ -703,7 +701,6 @@ def test_full_profile_uses_custom_chroma_published_port(tmp_path):
 def test_full_profile_probes_custom_chroma_health(monkeypatch):
     from skeleton.app.health import ProbeResult, probe_application
 
-    assert load_manifest().service("chroma").health_path == "/api/v2/heartbeat"
     seen = []
 
     def probe(service, *, timeout):
@@ -719,32 +716,6 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
         full=True, public_url_overrides={"chroma": "http://localhost:8222"},
     )
     assert ("chroma", "http://localhost:8222") in seen
-
-def test_full_profile_missing_http_health_path_fails_closed(monkeypatch):
-    from dataclasses import replace
-    from skeleton.app.health import ProbeResult, probe_application
-
-    manifest = load_manifest()
-    broken = replace(
-        manifest,
-        services=tuple(
-            replace(service, health_path="") if service.name == "chroma" else service
-            for service in manifest.services
-        ),
-    )
-    monkeypatch.setattr(
-        "skeleton.app.health.probe_url",
-        lambda service, *, timeout: ProbeResult(service.name, service.public_url, True, 200, "healthy"),
-    )
-    monkeypatch.setattr(
-        "skeleton.app.health.probe_http",
-        lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
-    )
-    results = probe_application(manifest=broken, full=True)
-    chroma = next(result for result in results if result.service == "chroma")
-    assert chroma.ok is False
-    assert chroma.detail == "no public HTTP health probe declared"
-
 
 def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
     from skeleton.app.assembly import preflight

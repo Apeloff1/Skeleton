@@ -5,9 +5,10 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
  */
 import React from 'react';
 import {
-  View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, useWindowDimensions, ActivityIndicator, Linking,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, useWindowDimensions, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import PrivateImage, { savePrivateImage } from '../src/components/PrivateImage';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const MODES = ['cartographic', 'globe', 'nasa', 'bloom', 'thematic'];
@@ -26,7 +27,7 @@ function Pane({ label, testID, defaultMode, seed, master }: { label: string; tes
     <View testID={testID} style={[styles.pane, { width: size + 16 }]}>
       <Text style={styles.paneLabel}>Pane {label} {master ? '· 4K master' : '· preview'}</Text>
       <View style={{ width: size, height: size }}>
-        <Image source={{ uri: renderUrl(mode, seed, master) + `&n=${nonce}` }}
+        <PrivateImage uri={renderUrl(mode, seed, master) + `&q=${nonce}`}
           onLoadStart={() => setLoading(true)} onLoadEnd={() => setLoading(false)}
           style={{ width: size, height: size, borderRadius: 10, backgroundColor: '#0b1220' }} resizeMode="cover" />
         {loading && (
@@ -44,7 +45,11 @@ function Pane({ label, testID, defaultMode, seed, master }: { label: string; tes
           </TouchableOpacity>
         ))}
       </View>
-      <TouchableOpacity testID={`${testID}-download`} onPress={() => Linking.openURL(renderUrl(mode, seed, true))} style={styles.dlBtn}>
+      <TouchableOpacity testID={`${testID}-download`} onPress={() => {
+        void savePrivateImage(renderUrl(mode, seed, true), `world-${seed}-${mode}.png`).catch(() => {
+          Alert.alert('Render unavailable', 'Sign in and try saving the render again.');
+        });
+      }} style={styles.dlBtn}>
         <Text style={styles.dlTxt}>⬇️ Download 4K master</Text>
       </TouchableOpacity>
     </View>

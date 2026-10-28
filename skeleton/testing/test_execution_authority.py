@@ -1174,7 +1174,7 @@ def test_child_usage_is_charged_against_parent_aggregate_budget() -> None:
     _admit(guard, parent)
     child = _child_authority(
         parent,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         budget=_budget(tool_calls=2, parallelism=1),
     )
     guard.admit(
@@ -1222,13 +1222,13 @@ def test_sibling_delegations_cannot_multiply_parent_budget() -> None:
     _admit(guard, parent)
     child_a = _child_authority(
         parent,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         actor_id="agent.worker-a",
         budget=_budget(tool_calls=2, parallelism=1),
     )
     child_b = _child_authority(
         parent,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         actor_id="agent.worker-b",
         budget=_budget(tool_calls=2, parallelism=1),
     )
@@ -1289,7 +1289,7 @@ def test_deep_delegation_charges_every_ancestor_once() -> None:
     _admit(guard, root)
     child = _child_authority(
         root,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         actor_id="agent.secretary",
         budget=_budget(tool_calls=2, parallelism=1),
     )
@@ -1302,7 +1302,7 @@ def test_deep_delegation_charges_every_ancestor_once() -> None:
     )
     grandchild = _child_authority(
         child,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         actor_id="agent.worker",
         budget=_budget(tool_calls=2, parallelism=1),
     )
@@ -1336,7 +1336,7 @@ def test_delegated_replay_does_not_double_charge_ancestor_budget() -> None:
     _admit(guard, parent)
     child = _child_authority(
         parent,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         budget=_budget(tool_calls=1, parallelism=1),
     )
     guard.admit(
@@ -1374,7 +1374,7 @@ def test_checkpoint_restore_reconstructs_ancestor_aggregate_usage() -> None:
     _admit(source, parent)
     child = _child_authority(
         parent,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         budget=_budget(tool_calls=2, parallelism=1),
     )
     source.admit(
@@ -1431,7 +1431,7 @@ def test_sealed_parent_evidence_reports_descendant_and_aggregate_usage() -> None
     _admit(guard, parent)
     child = _child_authority(
         parent,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         budget=_budget(tool_calls=1, parallelism=1),
     )
     guard.admit(
@@ -1469,7 +1469,7 @@ def test_parent_direct_use_cannot_ignore_descendant_consumption() -> None:
     _admit(guard, parent)
     child = _child_authority(
         parent,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         budget=_budget(tool_calls=2, parallelism=1),
     )
     guard.admit(
@@ -1506,7 +1506,7 @@ def test_intermediate_authority_direct_use_honors_grandchild_consumption() -> No
     _admit(guard, root)
     child = _child_authority(
         root,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         actor_id="agent.secretary",
         budget=_budget(tool_calls=2, parallelism=1),
     )
@@ -1519,7 +1519,7 @@ def test_intermediate_authority_direct_use_honors_grandchild_consumption() -> No
     )
     grandchild = _child_authority(
         child,
-        capabilities=("repo.read", "repo.write"),
+        capabilities=("repo.write",),
         actor_id="agent.worker",
         budget=_budget(tool_calls=2, parallelism=1),
     )

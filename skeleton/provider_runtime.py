@@ -18,6 +18,7 @@ import math
 import os
 import platform
 import socket
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -3151,6 +3152,192 @@ class OpenAISyncProviderAdapter:
         raise ProviderInvocationError("model provider request failed") from last_error
 
 
+class _GovernedLocalAdapter(ProviderAdapter):
+    """Bind activated local execution to the canonical policy/accounting owner.
+
+    The underlying adapter retains its tokenizer, workers, cache and native
+    receipts. This facade grants no additional model or network authority.
+    """
+
+    provider_id = "local"
+
+    def __init__(
+        self, adapter: ProviderAdapter, *, admission_runtime: AdmissionRuntime, timeout_seconds: float
+    ) -> None:
+        self._adapter = adapter
+        self.model = adapter.model
+        self.admission_runtime = admission_runtime
+        self.timeout_seconds = timeout_seconds
+        self.max_retries = 0
+        self._activated_model_digest = adapter.engine.model.model_digest
+        self._source_model_id = adapter.engine.model.model_id
+        self._architecture_receipt = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._adapter, name)
+
+    def _ensure_architecture(self) -> None:
+        try:
+            receipt = load_provider_architecture(self.provider_id)
+        except ProviderArchitectureError as exc:
+            raise ProviderUnavailableError("local provider architecture acknowledgement failed") from exc
+        if not isinstance(receipt, ProviderArchitectureReceipt) or receipt.provider_id != self.provider_id:
+            raise ProviderUnavailableError("local provider architecture acknowledgement is invalid")
+        self._architecture_receipt = receipt
+
+    @property
+    def available(self) -> bool:
+        try:
+            self._ensure_architecture()
+            return self.model == self._adapter.model and self._adapter.available
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError):
+            return False
+
+    @property
+    def supports_cooperative_cancellation(self) -> bool:
+        return self._adapter.supports_cooperative_cancellation
+
+    def execution_identity(self) -> dict[str, object]:
+        self._ensure_architecture()
+        try:
+            backend = self.engine.model
+            if (
+                backend.model_digest != self._activated_model_digest
+                or backend.model_id != self._source_model_id
+            ):
+                raise ValueError("activated model identity differs")
+            check = getattr(backend, "assert_identity", None)
+            if callable(check):
+                check()
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError) as exc:
+            raise ProviderUnavailableError("local artifact identity drift") from exc
+        return provider_execution_identity(self)
+
+    def status(self) -> dict[str, Any]:
+        try:
+            result = self._adapter.status()
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError) as exc:
+            raise ProviderUnavailableError("local artifact identity drift") from exc
+        result["available"] = self.available
+        return result
+
+    async def close(self, *, cancel_running: bool = True) -> None:
+        await self._adapter.close(cancel_running=cancel_running)
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        from skeleton.ai.runtime.inference.local import (
+            LocalInferenceCancelled,
+            _LOCAL_DISPATCH_OBSERVER,
+            _LocalUsageLimitViolation,
+        )
+
+        started = time.perf_counter()
+        self._ensure_architecture()
+        _validate_request(request, default_model=self.model)
+        if not self.available:
+            raise ProviderUnavailableError("local artifact identity drift or activated model unavailable")
+        data_class, purpose, tenant_id = _effective_governance_fields(
+            data_class=request.data_class,
+            purpose=request.purpose,
+            tenant_id=request.tenant_id,
+            governance_context=request.governance_context,
+        )
+        try:
+            governance = require_provider_transfer(
+                ProviderTransferRequest(
+                    provider_id=self.provider_id,
+                    data_class=data_class,
+                    purpose=purpose,
+                    tenant_id=tenant_id,
+                    source="skeleton/provider_runtime.py",
+                )
+            )
+        except DataGovernanceDenied as exc:
+            raise ProviderPolicyError("local model transfer denied by governance policy") from exc
+        limits = self.generation_limits()
+        requested_output = (
+            request.max_output_tokens
+            if request.max_output_tokens is not None
+            else min(256, request.resource_budget.max_output_tokens, limits["max_output_tokens"])
+        )
+        if type(requested_output) is not int or requested_output < 1:
+            raise ProviderPolicyError("local model requires a positive admitted output allowance")
+        timeout = _remaining_provider_timeout(
+            request, min(self.timeout_seconds, request.resource_budget.max_wall_seconds)
+        )
+        execution_deadline = datetime.now(UTC) + timedelta(seconds=timeout)
+        if request.deadline is not None:
+            execution_deadline = min(execution_deadline, request.deadline.astimezone(UTC))
+        bounded_request = replace(request, deadline=execution_deadline)
+        # Local execution never reserves a caller-supplied hosted-model cost.
+        lease, estimate = _admit_provider_request(
+            self.admission_runtime,
+            replace(request, estimated_cost_usd=0.0),
+            tenant_id=tenant_id,
+            requested_output_tokens=requested_output,
+            timeout_seconds=timeout,
+            provider_attempts=1,
+        )
+        dispatched = threading.Event()
+        observer = _LOCAL_DISPATCH_OBSERVER.set(dispatched.set)
+
+        def complete_usage(input_tokens: int, output_tokens: int):
+            actual = UsageEstimate(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=0.0,
+                wall_seconds=max(0.0, time.perf_counter() - started),
+                provider_attempts=1,
+            )
+            try:
+                _meter_provider_actual_usage(self.admission_runtime, lease, actual)
+                return self.admission_runtime.complete(lease.operation_id, actual)
+            except AdmissionRuntimeError as exc:
+                _quarantine_provider_usage(
+                    self.admission_runtime, lease, reason="local-usage-reconciliation-failed"
+                )
+                raise ProviderPolicyError("local model usage reconciliation failed") from exc
+
+        try:
+            response = await self._adapter.generate(bounded_request)
+            if response.provider != self.provider_id or response.model != self.model:
+                raise ProviderProtocolViolationError("local response differs from its activated route")
+            _require_accountable_provider_usage(self.admission_runtime, lease, response.usage)
+        except _LocalUsageLimitViolation as exc:
+            complete_usage(exc.input_tokens, exc.output_tokens)
+            raise ProviderPolicyError("local model actual usage exceeded its admitted budget") from exc
+        except BaseException as exc:
+            if dispatched.is_set():
+                _quarantine_provider_usage(
+                    self.admission_runtime, lease, reason="local-dispatch-or-response-ambiguous"
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
+            if isinstance(exc, LocalInferenceCancelled):
+                raise ProviderInvocationError("local model deadline exceeded or execution cancelled") from exc
+            if isinstance(exc, ProviderPolicyError):
+                raise ProviderPolicyError("local model admission denied: " + str(exc)) from exc
+            raise
+        finally:
+            _LOCAL_DISPATCH_OBSERVER.reset(observer)
+        actual = _actual_provider_usage(
+            response,
+            estimate=estimate,
+            wall_seconds=time.perf_counter() - started,
+            attempts_used=1,
+            normalized_usage=response.usage,
+        )
+        completion = complete_usage(actual.input_tokens, actual.output_tokens)
+        if completion.operation_overrun:
+            raise ProviderPolicyError("local model actual usage exceeded its admitted budget")
+        return replace(
+            response,
+            governance_decision_id=governance.decision_id,
+            admission_decision_id=lease.decision.decision_id,
+            data_class=governance.data_class,
+        )
+
+
 class _UnavailableLocalAdapter(ProviderAdapter):
     """Startup diagnostics only; this descriptor cannot perform inference."""
 
@@ -3218,15 +3405,9 @@ class ProviderRegistry:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         retain_unavailable: bool = False,
-        guarded_components: Any | None = None,
-        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         try:
-            return cls._from_env(
-                admission_runtime=admission_runtime,
-                guarded_components=guarded_components,
-                require_guarded_local=require_guarded_local,
-            )
+            return cls._from_env(admission_runtime=admission_runtime)
         except ProviderUnavailableError:
             if not retain_unavailable or os.getenv("AI_PROVIDER", "openai").strip().lower() != "local":
                 raise
@@ -3244,13 +3425,6 @@ class ProviderRegistry:
                 code = "local_external_fallback_denied"
             elif os.getenv("AI_VERIFICATION_MODEL", "").strip():
                 code = "local_external_verifier_denied"
-            elif not (
-                require_guarded_local is False
-                and os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower() in {"0", "false"}
-                and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
-                and os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() == "development"
-            ) or guarded_components is not None:
-                code = "local_guard_not_admitted"
             elif not model_path and not deployment_path and not catalog_path:
                 code = "local_model_not_configured"
             elif sum(bool(value) for value in (model_path, deployment_path, catalog_path)) != 1:
@@ -3266,40 +3440,8 @@ class ProviderRegistry:
         cls,
         *,
         admission_runtime: AdmissionRuntime | None = None,
-        guarded_components: Any | None = None,
-        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
-        raw_guard = os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower()
-        if raw_guard not in {"", "0", "false", "1", "true"}:
-            raise ProviderUnavailableError("invalid AI_LOCAL_GUARD_REQUIRED policy")
-        if require_guarded_local is not None and type(require_guarded_local) is not bool:
-            raise ProviderUnavailableError("local guard policy must be a boolean")
-        # The application must never silently run an unreviewed local model.
-        # Legacy reference-model work is allowed only via an explicitly
-        # acknowledged, independently selected DEVELOPMENT-only escape hatch.
-        # Setting AI_LOCAL_GUARD_REQUIRED=0 alone does not grant permission.
-        development_legacy = (
-            active == "local"
-            and raw_guard in {"0", "false"}
-            and require_guarded_local is False
-            and guarded_components is None
-            and os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() == "development"
-            and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
-        )
-        if active == "local" and raw_guard in {"0", "false"} and not development_legacy:
-            raise ProviderUnavailableError("unguarded local model requires explicit development-only authorization")
-        if active == "local" and require_guarded_local is False and not development_legacy:
-            raise ProviderUnavailableError("production local model cannot opt out of guarded inference")
-        guarded = (
-            active == "local" and not development_legacy
-        ) or require_guarded_local is True or guarded_components is not None
-        if guarded and active != "local":
-            raise ProviderUnavailableError("guarded local dependencies require AI_PROVIDER=local")
-        if guarded:
-            from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
-            if not isinstance(guarded_components, ProtectedLocalComponents):
-                raise ProviderUnavailableError("guard-required local startup lacks trusted dependencies")
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         secondary_values = {
@@ -3329,24 +3471,37 @@ class ProviderRegistry:
                     "local provider requires exactly one artifact, deployment manifest or model catalog"
                 )
             capacity = _local_execution_capacity()
+            cache_size, default_seed = _local_model_configuration(
+                default_cache_size=0 if catalog_path or deployment_path else 128
+            )
+            local_admission = admission_runtime or AdmissionRuntime()
+
+            def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
+                return _GovernedLocalAdapter(
+                    adapter, admission_runtime=local_admission, timeout_seconds=timeout
+                )
+
             if catalog_path:
                 try:
                     from skeleton.ai.runtime.inference.catalog import LocalModelCatalogError, load_local_model_catalog
 
                     activation = load_local_model_catalog(
                         catalog_path,
-                        cache_size=_env_int("AI_LOCAL_MODEL_CACHE_SIZE", 0, minimum=0),
-                        default_seed=_env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0),
-                        require_guarded_inference=guarded,
-                        guarded_components=guarded_components,
+                        cache_size=cache_size,
+                        default_seed=default_seed,
                         **capacity,
                     )
                 except (LocalModelCatalogError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider catalog failed activation") from exc
+                configured = {id(adapter): guarded(adapter) for adapter in activation.adapters}
                 return cls(
-                    activation.adapters,
+                    tuple(configured.values()),
                     active="local",
-                    verification_adapter=activation.verification_adapter,
+                    verification_adapter=(
+                        None
+                        if activation.verification_adapter is None
+                        else configured[id(activation.verification_adapter)]
+                    ),
                 )
             if deployment_path:
                 try:
@@ -3357,16 +3512,14 @@ class ProviderRegistry:
 
                     adapter = load_local_model_adapter(
                         deployment_path,
-                        cache_size=_env_int("AI_LOCAL_MODEL_CACHE_SIZE", 0, minimum=0),
-                        default_seed=_env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0),
+                        cache_size=cache_size,
+                        default_seed=default_seed,
                         rehash_artifacts_each_run=True,
-                        require_guarded_inference=guarded,
-                        guarded_components=guarded_components,
                         **capacity,
                     )
                 except (LocalModelDeploymentError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
-                return cls([adapter], active="local")
+                return cls([guarded(adapter)], active="local")
             try:
                 from skeleton.ai.runtime.inference import (
                     LocalInferenceEngine,
@@ -3376,40 +3529,19 @@ class ProviderRegistry:
                 )
 
                 loaded = load_local_model_artifact(model_path)
-                cache_size = _env_int(
-                    "AI_LOCAL_MODEL_CACHE_SIZE",
-                    128,
-                    minimum=0,
+                local_adapter = LocalModelAdapter(
+                    LocalInferenceEngine(
+                        loaded.model,
+                        cache_size=cache_size,
+                        **capacity,
+                    ),
+                    default_seed=default_seed,
+                    artifact_status=loaded.receipt.as_dict(),
                 )
-                default_seed = _env_int(
-                    "AI_LOCAL_MODEL_SEED",
-                    0,
-                    minimum=0,
-                )
-                engine = LocalInferenceEngine(
-                    loaded.model,
-                    cache_size=cache_size,
-                    require_guarded_context=guarded,
-                    **capacity,
-                )
-                if guarded:
-                    from skeleton.ai.runtime.inference.guarded_composition import (
-                        compose_protected_local_adapter,
-                    )
-                    local_adapter = compose_protected_local_adapter(
-                        engine, components=guarded_components,
-                        default_seed=default_seed,
-                        artifact_status=loaded.receipt.as_dict(),
-                    )
-                else:
-                    local_adapter = LocalModelAdapter(
-                        engine, default_seed=default_seed,
-                        artifact_status=loaded.receipt.as_dict(),
-                    )
-            except (LocalModelArtifactError, ProviderPolicyError, TypeError, ValueError) as exc:
+            except (LocalModelArtifactError, TypeError, ValueError) as exc:
                 raise ProviderUnavailableError("local provider model artifact failed activation") from exc
             return cls(
-                [local_adapter],
+                [guarded(local_adapter)],
                 active="local",
             )
 
@@ -3881,36 +4013,6 @@ def provider_execution_identity(adapter: ProviderAdapter) -> dict[str, object]:
             status = route.status()
             artifact = status.get("artifact") or {}
             model_digest = status.get("model_digest")
-            # Artifact-backed local routes must expose a detached, exact
-            # activation receipt. A poisoned or rewritten receipt may not
-            # masquerade as the model actually loaded into this process.
-            if artifact:
-                artifact_hash = artifact.get("artifact_sha256")
-                artifact_bytes = artifact.get("artifact_bytes")
-                if (
-                    not isinstance(artifact.get("schema"), str)
-                    or not artifact["schema"]
-                    or artifact.get("model_id") != model
-                    or artifact.get("model_digest") != model_digest
-                    or not isinstance(artifact_hash, str)
-                    or len(artifact_hash) != 64
-                    or any(ch not in "0123456789abcdef" for ch in artifact_hash)
-                    or type(artifact_bytes) is not int
-                    or artifact_bytes < 1
-                    or artifact.get("reference") not in {
-                        "local-model-artifact:" + artifact_hash,
-                        "local-model-deployment:" + str(artifact.get("manifest_digest")),
-                    }
-                    or (
-                        artifact.get("reference", "").startswith("local-model-deployment:")
-                        and (
-                            not isinstance(artifact.get("manifest_digest"), str)
-                            or len(artifact["manifest_digest"]) != 64
-                            or any(ch not in "0123456789abcdef" for ch in artifact["manifest_digest"])
-                        )
-                    )
-                ):
-                    raise ProviderPolicyError("local execution identity artifact receipt drift")
             from skeleton.ai.runtime.inference.local import ReferenceNGramModel
             from skeleton.ai.runtime.inference.local import _digest as reference_digest
 
@@ -4018,9 +4120,12 @@ def _env_float(name: str, default: float, *, minimum: float) -> float:
     if raw is None:
         return default
     try:
-        return max(minimum, float(raw))
-    except ValueError:
-        return default
+        value = float(raw)
+    except ValueError as exc:
+        raise ProviderUnavailableError(name + " must be finite numeric within configured bounds") from exc
+    if not math.isfinite(value) or value < minimum:
+        raise ProviderUnavailableError(name + " is outside configured bounds")
+    return value
 
 
 def _env_int(name: str, default: int, *, minimum: int) -> int:
@@ -4028,9 +4133,20 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
     if raw is None:
         return default
     try:
-        return max(minimum, int(raw))
-    except ValueError:
-        return default
+        value = int(raw)
+    except ValueError as exc:
+        raise ProviderUnavailableError(name + " must be an integer within configured bounds") from exc
+    if value < minimum:
+        raise ProviderUnavailableError(name + " is outside configured bounds")
+    return value
+
+
+def _local_model_configuration(*, default_cache_size: int) -> tuple[int, int]:
+    cache = _env_int("AI_LOCAL_MODEL_CACHE_SIZE", default_cache_size, minimum=0)
+    seed = _env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0)
+    if cache > 4096 or seed > 2**64 - 1:
+        raise ProviderUnavailableError("local model cache or seed is outside configured bounds")
+    return cache, seed
 
 
 __all__ = [

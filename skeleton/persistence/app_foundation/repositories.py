@@ -136,13 +136,20 @@ class SqliteBuildRepository:
         return Build(r["build_id"], r["project_id"], r["status"], r["created_at"], r["updated_at"],
                      r["job_id"], r["target"], json.loads(r["result"]), r["error"])
 
-    def create_build(self, project_id: str, target: str = "") -> Build:
+    def create_build(self, project_id: str, target: str = "", *,
+                     job_id: Optional[str] = None, transaction: Any = None) -> Build:
+        """Create a build, optionally in the existing queue publication transaction."""
         now = time.time()
         bid = _new_id("bld")
+        def insert(c):
+            c.execute("INSERT INTO builds (build_id, project_id, status, target, job_id, created_at, updated_at)"
+                      " VALUES (?,?,?,?,?,?,?)",
+                      (bid, project_id, "queued" if job_id else "pending", target, job_id, now, now))
+            return self._b(c.execute("SELECT * FROM builds WHERE build_id=?", (bid,)).fetchone())
+        if transaction is not None:
+            return insert(transaction)
         with self.db.tx() as c:
-            c.execute("INSERT INTO builds (build_id, project_id, status, target, created_at, updated_at)"
-                      " VALUES (?,?,?,?,?,?)", (bid, project_id, "pending", target, now, now))
-        return self.get_build(bid)  # type: ignore[return-value]
+            return insert(c)
 
     def get_build(self, build_id: str) -> Optional[Build]:
         rows = self.db.query("SELECT * FROM builds WHERE build_id=?", (build_id,))

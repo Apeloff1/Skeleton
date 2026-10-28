@@ -1467,10 +1467,7 @@ class CognitiveExecutionRuntime:
             context_id=(
                 None if context_policy.get("context_id") is None else str(context_policy["context_id"])
             ),
-            # A functional/legacy request carries an internal context digest but
-            # has no compiled context identity or immutable source snapshot. Do
-            # not falsely assert an independently compiled provider context.
-            context_digest=(str(context_digest) if context_policy.get("context_id") is not None else None),
+            context_digest=str(context_digest),
             context_source_snapshot=tuple(source_snapshot),
             context_compiler_version=(
                 None

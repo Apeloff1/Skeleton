@@ -148,8 +148,9 @@ Older installations with a missing, placeholder or invalid-length
 preflight requires a normalized token of 32–4096 characters, matching the
 engine client contract. Both services receive the same generated value from
 Compose. After explicitly rotating secrets, restart backend and engine together
-so their authentication values agree. Secret rotation also changes local Mongo
-credentials; existing databases require coordinated credential migration.
+so their authentication values agree. Generic secret rotation preserves local
+Mongo credentials, GameForge account signing and persistent seal/signing keys.
+Changing database credentials requires a coordinated authenticated migration.
 Keep the previous private environment backup for rollback; never attach it to
 diagnostic reports. Setup alone does not install trained AI weights or prove
 model readiness.

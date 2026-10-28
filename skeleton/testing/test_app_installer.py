@@ -9,7 +9,7 @@ import pytest
 
 from skeleton.app.installer import InstallPhase, install_application
 from skeleton.app.preloader import PreloadCheck, PreloadReport
-from skeleton.app.setup_runtime import ensure_runtime_environment
+from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment
 
 
 ENV_TEMPLATE = """# test runtime
@@ -218,8 +218,8 @@ def test_installer_skip_python_runs_bounded_validation(tmp_path, monkeypatch):
         "runtime-preflight",
         "compose-config",
     ]
-    assert all(not phase.required for phase in receipt.phases if phase.name == "configuration-note")
     assert next(phase for phase in receipt.phases if phase.name == "python-install").required is False
+    assert all(not phase.required for phase in receipt.phases if phase.name == "configuration-note")
     assert commands == [("docker", "compose", "config")]
 
 
@@ -273,10 +273,7 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
     monkeypatch.setattr("skeleton.app.installer.checks_ok", lambda checks: True)
     monkeypatch.setattr(
         "skeleton.app.installer.ensure_runtime_environment",
-        lambda *args, **kwargs: type("Setup", (), {
-            "created": False, "changed": False,
-            "env_path": tmp_path / ".env", "configured_keys": (), "warnings": (),
-        })(),
+        lambda *args, **kwargs: SetupResult(tmp_path / ".env", False, False, (), (), ()),
     )
     commands = []
     def runner(command, **kwargs):
@@ -287,7 +284,7 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
     assert receipt.ok
     assert len(commands) == 1
     command, env = commands[0]
-    assert command[-2:] == ("config", "--quiet")  # never echo rendered secrets
+    assert command[-2:] == ("config", "--quiet")
     assert env["BUILD_TARGET"] == "production"
     assert env["FRONTEND_BUILD_TARGET"] == "production"
     assert env["FRONTEND_CONTAINER_PORT"] == "8080"
@@ -392,19 +389,6 @@ def test_first_install_bootstraps_stable_forge_and_signing_secrets(tmp_path):
         assert key in repeat.preserved_keys
 
 
-def test_invalid_existing_gameforge_jwt_is_preserved_without_rotation(tmp_path):
-    (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
-    (tmp_path / ".env").write_text(
-        ENV_TEMPLATE + "GAMEFORGE_JWT_SECRET=operator-key-too-short\n",
-        encoding="utf-8",
-    )
-    receipt = ensure_runtime_environment(tmp_path, rotate_secrets=True)
-    values = _read_values(tmp_path / ".env")
-    assert values["GAMEFORGE_JWT_SECRET"] == "operator-key-too-short"
-    assert "GAMEFORGE_JWT_SECRET" in receipt.preserved_keys
-    assert "GAMEFORGE_JWT_SECRET must contain 32 to 4096 characters" in receipt.warnings
-
-
 def test_invalid_existing_signing_seed_is_flagged_without_destruction(tmp_path):
     (tmp_path / ".env").write_text(
         ENV_TEMPLATE + "GF_KEYHOLDER_SEED=operator-invalid-seed\n",
@@ -429,9 +413,8 @@ def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
     assert after["SKL_ENGINE_SERVICE_TOKEN"] != before["SKL_ENGINE_SERVICE_TOKEN"]
 
 
-def test_first_install_build_output_is_discarded_without_receipt_leak(tmp_path, monkeypatch):
+def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(tmp_path, monkeypatch):
     from skeleton.app.installer import install_application
-    from skeleton.app.setup_runtime import SetupResult
 
     report = PreloadReport(
         root=tmp_path, platform="Windows", python="bundled",
@@ -448,16 +431,6 @@ def test_first_install_build_output_is_discarded_without_receipt_leak(tmp_path, 
         "skeleton.app.installer.compose_command",
         lambda action, **kwargs: ("docker", "compose", action),
     )
-    # Health and critical API route probes have separate required evidence.
-    # This test stubs both, leaving the production post-install gate intact.
-    monkeypatch.setattr(
-        "skeleton.app.installer.public_service_urls",
-        lambda root, **kwargs: {"backend": "http://127.0.0.1:8000"},
-    )
-    monkeypatch.setattr(
-        "skeleton.app.first_install.critical_backend_route_report",
-        lambda url, **kwargs: {"ready": url == "http://127.0.0.1:8000"},
-    )
     class Result:
         service = "backend"
         ok = True
@@ -469,12 +442,10 @@ def test_first_install_build_output_is_discarded_without_receipt_leak(tmp_path, 
     calls = []
     def runner(command, **kwargs):
         calls.append((tuple(command), dict(kwargs)))
-        if command[-1] == "up":
+        if "up" in command:
             assert "capture_output" not in kwargs
-            # Compose may log credentials: neither stream may enter memory,
-            # a receipt, or a world-readable temporary file.
-            assert kwargs["stdout"] is subprocess.DEVNULL
-            assert kwargs["stderr"] is subprocess.DEVNULL
+            assert kwargs["stderr"] == subprocess.DEVNULL
+            assert kwargs["stdout"] == subprocess.DEVNULL
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     receipt = install_application(tmp_path, start=True, install_python=False, runner=runner)

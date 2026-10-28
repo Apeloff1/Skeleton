@@ -232,6 +232,24 @@ def test_cli_overwrite_does_not_mutate_hardlinked_user_file(tmp_path):
     assert (destination / "Makefile").read_text() != "user content"
 
 
+def test_cli_failed_atomic_replacement_preserves_source_and_removes_temporary(tmp_path, monkeypatch):
+    from skeleton.ai.webcrawler import dragon_native_cli as cli
+
+    destination = tmp_path / "nes"
+    emit_demo("nes", destination)
+    source = destination / "Makefile"
+    source.write_text("preserve user source")
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("replacement unavailable")
+
+    monkeypatch.setattr(cli.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="replacement unavailable"):
+        emit_demo("nes", destination, overwrite=True)
+    assert source.read_text() == "preserve user source"
+    assert not list(destination.rglob(".dragon-source-*"))
+
+
 def test_nes_rejects_unsupported_mapper_trainer_and_header_fields():
     valid = bytearray(b"NES\x1a\x02\x01" + bytes(16 + 32768 + 8192 - 6))
     for offset, value in ((6, 0x10), (6, 4), (7, 8), (8, 1), (15, 1)):

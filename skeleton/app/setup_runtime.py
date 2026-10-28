@@ -309,6 +309,18 @@ def ensure_runtime_environment(
     else:
         preserved.append("JWT_SECRET")
 
+    # The existing GameForge auth owner uses a different configuration key.
+    # Keep its signing identity stable too, without sharing signing material
+    # between the two existing authentication surfaces.
+    gameforge_secret = values.get("GAMEFORGE_JWT_SECRET", "")
+    if _is_placeholder(gameforge_secret) or not 32 <= len(gameforge_secret) <= 4096:
+        gameforge_secret = secrets.token_hex(32)
+        text = _replace_env_value(text, "GAMEFORGE_JWT_SECRET", gameforge_secret)
+        values["GAMEFORGE_JWT_SECRET"] = gameforge_secret
+        configured.append("GAMEFORGE_JWT_SECRET")
+    else:
+        preserved.append("GAMEFORGE_JWT_SECRET")
+
     # The backend and engine must share this value before Compose can start.
     # Upgrade existing .env files as well as templates predating Stage-5.
     service_token = values.get("SKL_ENGINE_SERVICE_TOKEN", "")
@@ -348,11 +360,6 @@ def ensure_runtime_environment(
     signing_seed = values["GF_KEYHOLDER_SEED"]
     if len(signing_seed) != 64 or any(c not in "0123456789abcdefABCDEF" for c in signing_seed):
         warnings.append("GF_KEYHOLDER_SEED must be exactly 32 bytes of hexadecimal data")
-    # Existing operator signing identities must never be silently replaced.
-    # Invalid non-placeholder keys are retained and reported for preflight.
-    gameforge_secret = values["GAMEFORGE_JWT_SECRET"]
-    if not 32 <= len(gameforge_secret) <= 4096:
-        warnings.append("GAMEFORGE_JWT_SECRET must contain 32 to 4096 characters")
 
     user_uri = quote(username, safe="")
     password_uri = quote(password, safe="")

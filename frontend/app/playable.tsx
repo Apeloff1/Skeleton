@@ -11,14 +11,20 @@ import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
   StyleSheet, SafeAreaView, Platform, KeyboardAvoidingView, Dimensions,
-  Animated, Easing, Image, Switch, Modal, Alert,
+  Animated, Easing, Switch, Modal, Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
+import PrivateImage, { savePrivateImage } from '../src/components/PrivateImage';
+import GamePreview from '../src/features/Playable/GamePreview';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
-import { awardXp, getVisitorId } from '../src/utils/liveops';
+import { awardXp } from '../src/utils/liveops';
+import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
+import { creatorRequestCurrent, resolveCreatorPrincipal } from '../src/product/creatorIdentity';
+import { classifyBuildJob, watchBuildJob } from '../src/product/buildJobLifecycle';
+import { openPlayableJobObservation, playableJobUnconfirmed, type PlayableJobObservation, type PlayableJobObservationStore } from '../src/product/playableJobObservation';
 import theme from '../src/theme/tokens';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -68,66 +74,6 @@ const genStyles = StyleSheet.create({
   sub: { color: '#7c6fb0', fontSize: 12, marginTop: 6, fontWeight: '600' },
 });
 
-// Cross-platform game preview: an <iframe> on Expo Web, the native
-// react-native-webview elsewhere (lazy-required so web bundling never breaks).
-let _WebView: any = null;
-function _tryLoadWebView() {
-  if (_WebView) return _WebView;
-  try {
-     
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _WebView = require('react-native-webview').WebView;
-  } catch {
-    _WebView = null;
-  }
-  return _WebView;
-}
-const GamePreview: React.FC<{ uri: string; testID?: string; onGameError?: (msg: string) => void }> = ({ uri, testID, onGameError }) => {
-  // Listen for runtime errors posted by the injected reporter (web iframe path).
-  React.useEffect(() => {
-    if (Platform.OS !== 'web' || !onGameError || typeof window === 'undefined') return;
-    const handler = (e: any) => {
-      const d = e?.data;
-      if (d && d.__pl_error) onGameError(String(d.message || 'Runtime error'));
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [onGameError]);
-
-  if (Platform.OS === 'web') {
-    return React.createElement('iframe', {
-      src: uri, title: 'game-preview', 'data-testid': testID,
-      style: { border: 0, background: '#000', width: '100%', height: '100%' },
-    });
-  }
-  const W = _tryLoadWebView();
-  if (!W) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-        <Text style={{ color: '#94a3b8', fontSize: 12 }}>Preview unavailable on this device</Text>
-      </View>
-    );
-  }
-  return (
-    <W
-      testID={testID}
-      source={{ uri }}
-      style={{ flex: 1, backgroundColor: '#000' }}
-      originWhitelist={['*']}
-      javaScriptEnabled
-      domStorageEnabled
-      scalesPageToFit={false}
-      allowsInlineMediaPlayback
-      mediaPlaybackRequiresUserAction={false}
-      onMessage={(e: any) => {
-        try {
-          const d = JSON.parse(e?.nativeEvent?.data || '{}');
-          if (d && d.__pl_error && onGameError) onGameError(String(d.message || 'Runtime error'));
-        } catch { /* ignore non-JSON messages */ }
-      }}
-    />
-  );
-};
 
 interface Evaluation {
   available?: boolean; overall?: number; verdict?: string;
@@ -153,7 +99,7 @@ interface ListItem {
 function MiniCover({ id, hasCover, size = 38 }: { id: string; hasCover?: boolean; size?: number }) {
   const [err, setErr] = React.useState(false);
   if (hasCover && !err) {
-    return <Image source={{ uri: `${BACKEND}/api/playable/${id}/cover.png` }} style={{ width: size, height: size, borderRadius: 8, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
+    return <PrivateImage uri={`${BACKEND}/api/playable/${id}/cover.png`} style={{ width: size, height: size, borderRadius: 8, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
   }
   return <View style={{ width: size, height: size, borderRadius: 8, backgroundColor: '#16203a', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: size * 0.45 }}>🎮</Text></View>;
 }
@@ -170,16 +116,57 @@ const POLISH_STEPS: { n: number; icon: string; label: string }[] = [
 ];
 
 export default function PlayableScreen() {
+  const epoch = React.useSyncExternalStore(subscribeAuthChanges, getAuthEpoch, getAuthEpoch);
+  // Private metadata and drafts belong to one account, as do rendered bytes.
+  return <PlayableContent key={epoch} />;
+}
+
+function PlayableContent() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; remix?: string; brief?: string; autopolish?: string }>();
   const autopolishedRef = React.useRef(false);
   const haptics = useHaptics();
   const tweakRef = React.useRef<React.ElementRef<typeof TextInput>>(null);
   const [brief, setBrief] = React.useState('A one-thumb arcade game where you tap to make a glowing orb hop between rising platforms — go as high as you can without falling.');
-  const [busy, setBusy] = React.useState(false);
+  const [working, setBusy] = React.useState(false);
+  const [savedJob, setSavedJob] = React.useState<PlayableJobObservation | null>(null);
+  const [observingJob, setObservingJob] = React.useState(false);
+  const [restoringJob, setRestoringJob] = React.useState(true);
+  const [observationReady, setObservationReady] = React.useState(false);
+  const [observationMessage, setObservationMessage] = React.useState('');
+  const observationStore = React.useRef<PlayableJobObservationStore | null>(null);
+  const observationRequest = React.useRef<AbortController | null>(null);
+  const repairSubmission = React.useRef<AbortController | null>(null);
+  const pageActive = React.useRef(true);
+  const busy = working || !observationReady || !!savedJob;
   const [busyLabel, setBusyLabel] = React.useState('Building your game…');
+  React.useEffect(() => {
+    const request = new AbortController();
+    pageActive.current = true;
+    void (async () => {
+      try {
+        const store = await openPlayableJobObservation(request.signal);
+        if (request.signal.aborted || !pageActive.current) { store.dispose(); return; }
+        observationStore.current = store;
+        const retained = await store.get();
+        if (request.signal.aborted || !pageActive.current || !store.current()) return;
+        setSavedJob(retained); setObservationReady(true);
+        if (retained) setObservationMessage('A saved job is awaiting observation. Resume checks this original job without starting another build.');
+      } catch {
+        if (!request.signal.aborted && pageActive.current) setObservationMessage('Sign in and reopen this page to verify saved build observations before starting another job.');
+      } finally {
+        if (!request.signal.aborted && pageActive.current) setRestoringJob(false);
+      }
+    })();
+    return () => {
+      pageActive.current = false; request.abort(); observationRequest.current?.abort(); repairSubmission.current?.abort();
+      observationStore.current?.dispose(); observationStore.current = null;
+    };
+  }, []);
   const [polish, setPolish] = React.useState<{ step: number; total: number } | null>(null);
   const [game, setGame] = React.useState<Playable | null>(null);
+  const currentGame = React.useRef<Playable | null>(game);
+  currentGame.current = game;
   const [error, setError] = React.useState<string | null>(null);
   const [recent, setRecent] = React.useState<ListItem[]>([]);
   const [webKey, setWebKey] = React.useState(0);
@@ -303,16 +290,11 @@ export default function PlayableScreen() {
   const shareCard = React.useCallback(async () => {
     if (!game) return;
     haptics.selection();
-    const base = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : BACKEND;
-    const url = `${base}/api/playable/${game.playable_id}/card.png`;
+    const url = `${BACKEND}/api/playable/${game.playable_id}/card.png`;
     try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).clipboard) {
-        await (navigator as any).clipboard.writeText(url);
-      } else {
-        await Clipboard.setStringAsync(url);
-      }
-      setCopied(true); haptics.notify('success'); setTimeout(() => setCopied(false), 2000);
-    } catch { setError('Could not copy card link.'); }
+      await savePrivateImage(url, `${game.playable_id}-card.png`);
+      haptics.notify('success');
+    } catch { setError('Could not save the card image. Sign in and try again.'); }
   }, [game, haptics]);
 
   // ── 📚 Save to Collection (Creator Marketplace) ──
@@ -332,13 +314,19 @@ export default function PlayableScreen() {
   const [reportMsg, setReportMsg] = React.useState('');
   const submitReport = React.useCallback(async (reason: string) => {
     if (!game) return;
+    const epoch = getAuthEpoch();
     haptics.selection();
     setReportBusy(true);
-    const visitor = await getVisitorId();
-    const r = await api.post('/api/governance/report', { playable_id: game.playable_id, reason, reporter_id: visitor }, { timeoutMs: 12_000 });
-    setReportBusy(false);
-    if (r.ok) { setReportMsg('✓ Thanks — our moderators will review this game.'); setTimeout(() => setReportModal(false), 1400); }
-    else setReportMsg('Could not submit report. Please try again.');
+    try {
+      const principal = await resolveCreatorPrincipal(undefined, epoch);
+      if (!creatorRequestCurrent(epoch)) return;
+      const r = await api.post('/api/governance/report', { playable_id: game.playable_id, reason, reporter_id: principal }, { timeoutMs: 12_000 });
+      if (!creatorRequestCurrent(epoch)) return;
+      if (r.ok) { setReportMsg('✓ Thanks — our moderators will review this game.'); setTimeout(() => setReportModal(false), 1400); }
+      else setReportMsg('Could not submit report. Please try again.');
+    } catch {
+      if (creatorRequestCurrent(epoch)) setReportMsg('Sign in and try submitting the report again.');
+    } finally { if (creatorRequestCurrent(epoch)) setReportBusy(false); }
   }, [game, haptics]);
 
   // ── ⚖️ Creator appeal (shown only when this game is restricted by moderation) ──
@@ -357,14 +345,20 @@ export default function PlayableScreen() {
   }, [game?.playable_id]);
   const submitAppeal = React.useCallback(async () => {
     if (!game || appealReason.trim().length < 10) { setAppealMsg('Please write at least 10 characters.'); return; }
+    const epoch = getAuthEpoch();
     haptics.selection();
     setAppealBusy(true);
-    const visitor = await getVisitorId();
-    const r = await api.post<{ appeal_id?: string; error?: string }>('/api/governance/appeal',
-      { playable_id: game.playable_id, reason: appealReason.trim(), creator_id: visitor }, { timeoutMs: 12_000 });
-    setAppealBusy(false);
-    if (r.ok && r.data?.appeal_id) { setAppealMsg('✓ Appeal submitted — a moderator will re-review your game.'); setTimeout(() => setAppealModal(false), 1500); }
-    else setAppealMsg(r.data?.error || 'Could not submit appeal.');
+    try {
+      const principal = await resolveCreatorPrincipal(undefined, epoch);
+      if (!creatorRequestCurrent(epoch)) return;
+      const r = await api.post<{ appeal_id?: string; error?: string }>('/api/governance/appeal',
+        { playable_id: game.playable_id, reason: appealReason.trim(), creator_id: principal }, { timeoutMs: 12_000 });
+      if (!creatorRequestCurrent(epoch)) return;
+      if (r.ok && r.data?.appeal_id) { setAppealMsg('✓ Appeal submitted — a moderator will re-review your game.'); setTimeout(() => setAppealModal(false), 1500); }
+      else setAppealMsg(r.data?.error || 'Could not submit appeal.');
+    } catch {
+      if (creatorRequestCurrent(epoch)) setAppealMsg('Sign in and try submitting the appeal again.');
+    } finally { if (creatorRequestCurrent(epoch)) setAppealBusy(false); }
   }, [game, appealReason, haptics]);
   const addToColl = React.useCallback(async (cid: string, name: string) => {
     if (!game) return;
@@ -397,40 +391,6 @@ export default function PlayableScreen() {
     awardXp('react');
   }, [game, haptics]);
 
-  // 🔧 Auto-repair (async): kick a background repair job and poll /job/{id} so a
-  // long (~100s) LLM repair never hits a public-ingress edge timeout.
-  const autoRepair = React.useCallback(async () => {
-    if (!game || repairing) return;
-    haptics.selection(); setRepairing(true); setRepairMsg('Analyzing the crash…');
-    const start = await api.post<{ job_id?: string }>(
-      `/api/playable/${game.playable_id}/repair/async`, { error: gameError || '' }, { timeoutMs: 15_000, retries: 0 });
-    if (!start.ok || !start.data?.job_id) {
-      setRepairing(false); setRepairMsg('Could not start repair — please try again.'); haptics.notify('error'); return;
-    }
-    const jobId = start.data.job_id;
-    let done = false;
-    for (let i = 0; i < 80 && !done; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const st = await api.get<{ job_status?: string; repaired?: boolean; score?: number }>(
-        `/api/playable/job/${jobId}`, { timeoutMs: 12_000, retries: 0 });
-      const js = st.ok ? st.data?.job_status : undefined;
-      if (js === 'done') {
-        done = true;
-        if (st.data?.repaired) {
-          setRepairMsg(`✓ Fixed — playability ${st.data.score}/100. Reloading…`);
-          haptics.notify('success'); setGameError(null); setWebKey((k) => k + 1);
-        } else {
-          setRepairMsg('Could not auto-fix this one — try ✨ New game or 🔱 Remix.'); haptics.notify('error');
-        }
-      } else if (js === 'error') {
-        done = true; setRepairMsg('Repair failed — please try again.'); haptics.notify('error');
-      } else {
-        setRepairMsg(`🔧 Repairing… (${(i + 1) * 3}s)`);
-      }
-    }
-    if (!done) setRepairMsg('Still working in the background — reopen the game shortly.');
-    setRepairing(false);
-  }, [game, repairing, gameError, haptics]);
   const [coverBust, setCoverBust] = React.useState(0);
   const [coverHidden, setCoverHidden] = React.useState(false);
   const [coverBusy, setCoverBusy] = React.useState(false);
@@ -484,23 +444,116 @@ export default function PlayableScreen() {
     }
   }, [autoCoverPid, game?.playable_id, makeCover]);
 
-  // Shared job poller (used by generate / remix / sequel / competitor / prequel /
-  // expansion / variants). Rigorous quality refinement chains several LLM rounds,
-  // and Expansion (3× volume) can run 15+ min, so allow a very generous window.
-  const pollJob = React.useCallback(async (jobId: string) => {
-    const deadline = Date.now() + 2_400_000;
-    while (Date.now() < deadline) {
-      await new Promise((res) => setTimeout(res, 3000));
-      const j = await api.get<any>(`/api/playable/job/${jobId}`, { timeoutMs: 15_000 });
-      const d = j.data;
-      if (!j.ok || !d) continue;
-      if (d.job_status === 'running' && d.kind === 'polish' && d.step) {
-        const tot = d.step_total || 3;
-        setBusyLabel(`✨ Polishing ${d.step}/${tot}${d.step_label ? ' · ' + d.step_label : ''}…`);
+  // Observation is a GET-only view of the existing job, not a build lease or
+  // permission to repeat its generating POST. Keep its owner-scoped receipt.
+  const pollJob = React.useCallback(async (jobId: string, readOnly = false, initial?: PlayableJobObservation) => {
+    if (observationRequest.current) return;
+    const store = observationStore.current;
+    if (!store?.current() || !/^[A-Za-z0-9_-]{1,128}$/.test(jobId)) return;
+    const epoch = getAuthEpoch(), controller = new AbortController();
+    observationRequest.current = controller;
+    const current = () => pageActive.current && epoch === getAuthEpoch() && store.current()
+      && observationRequest.current === controller;
+    let retained: PlayableJobObservation = initial || { jobId };
+    let terminal: any = null;
+    let unconfirmed = false;
+    setSavedJob(retained); setObservingJob(true); setBusy(true);
+    setObservationMessage('Observing the saved job. Leaving this page does not cancel it.');
+    try {
+      const previous = await store.get();
+      if (!current()) return;
+      if (previous && previous.jobId !== jobId) throw new Error('A different job is already retained.');
+      retained = previous || retained;
+      await store.set(retained);
+      if (!current()) return;
+      setSavedJob(retained);
+      const outcome = await watchBuildJob(async signal => {
+        const response = await api.get<any>(`/api/playable/job/${jobId}`, { signal, timeoutMs: 15_000, retries: 0 });
+        if (!current()) throw new Error('Observation detached.');
+        const d = response.data;
+        if (response.ok && d && (d.job_id === undefined || d.job_id === jobId)) {
+          if (retained.kind === 'repair' && (!retained.playableId
+            || d.kind !== undefined && d.kind !== 'repair'
+            || d.playable_id !== undefined && d.playable_id !== retained.playableId
+            || d.parent_id !== undefined && d.parent_id !== retained.playableId)) {
+            throw new Error('The repair observation target was not verified.');
+          }
+          const waiting = playableJobUnconfirmed(response);
+          if (waiting) {
+            retained = { ...retained, ...waiting };
+            await store.set(retained);
+            if (!current()) throw new Error('Observation detached.');
+            setSavedJob(retained); unconfirmed = true; controller.abort();
+          } else if (classifyBuildJob(response) !== 'pending') {
+            if (retained.kind === 'repair' && (!retained.playableId || d.kind !== 'repair'
+              || d.playable_id !== retained.playableId && d.parent_id !== retained.playableId
+              || d.playable_id !== undefined && d.playable_id !== retained.playableId
+              || d.parent_id !== undefined && d.parent_id !== retained.playableId
+              || d.job_status === 'done' && typeof d.repaired !== 'boolean')) {
+              throw new Error('The repair target was not verified.');
+            }
+            terminal = d;
+          }
+          if (d.job_status === 'running' && d.kind === 'polish' && d.step) {
+            setBusyLabel(`Polishing ${d.step}/${d.step_total || 3}${d.step_label ? ' · ' + d.step_label : ''}…`);
+          }
+        } else if (response.ok) throw new Error('The job response identity was not verified.');
+        return response;
+      }, { signal: controller.signal, intervalMs: 3_000, maxIntervalMs: 15_000,
+        maxChecks: 60, requestTimeoutMs: 15_000, maxConsecutiveErrors: 3 });
+      if (!current()) return;
+      if (unconfirmed) {
+        setObservationMessage('The model execution is not confirmed. The original job is retained. Resume only checks this same job; it does not restart generation or guarantee recovery.');
+        return;
+      }
+      if (!terminal || ['timeout', 'disconnected', 'aborted'].includes(outcome.phase)) {
+        setObservationMessage(outcome.phase === 'timeout'
+          ? 'Observation timed out. The backend job may still be running; its original reference is retained. Resume observation instead of starting another build.'
+          : 'Job status is not confirmed. The original reference is retained. Resume observation to check the same job again.');
+        return;
+      }
+      let repairedGame: Playable | null = null;
+      if (retained.kind === 'repair' && terminal.job_status === 'done' && terminal.repaired === true) {
+        if (currentGame.current && currentGame.current.playable_id !== retained.playableId && !readOnly) {
+          setObservationMessage('The repair finished for another game. Resume this saved observation to open its original target.');
+          return;
+        }
+        const result = await api.get<Playable>(`/api/playable/${retained.playableId}`, {
+          signal: controller.signal, timeoutMs: 15_000, retries: 0,
+        });
+        if (!current()) return;
+        if (!result.ok || !result.data || result.data.playable_id !== retained.playableId || result.data.status !== 'ready') {
+          throw new Error('The repaired game could not be verified.');
+        }
+        repairedGame = result.data;
+      }
+      const cleared = await store.clear(jobId);
+      if (!current()) return;
+      if (!cleared) {
+        const latest = await store.get();
+        if (!current()) return;
+        setSavedJob(latest);
+        if (latest) {
+          setObservationMessage('A different job reference is now retained. Resume observes that saved job without starting another build.');
+          return;
+        }
+      }
+      setSavedJob(null); setObservationMessage('');
+      const d = terminal;
+      if (retained.kind === 'repair') {
+        if (d.job_status === 'done' && d.repaired === true && repairedGame) {
+          setGame(repairedGame); setWebKey(k => k + 1); setGameError(null); setError(null);
+          setRepairMsg('The repaired game was saved. Preview it to check the result.');
+          loadRecent(); haptics.notify('success');
+        } else {
+          setRepairMsg(d.error || 'The backend could not confirm a corrected game. The original preview is unchanged.');
+          haptics.notify('error');
+        }
+        return;
       }
       if (d.job_status === 'done' && d.kind === 'series') {
         setSeries(d.series || []); loadRecent(); setBusy(false); haptics.notify('success');
-        if (autoCoverRef.current) {
+        if (autoCoverRef.current && !readOnly) {
           const ids = (d.series || []).filter((s: any) => s.status === 'ready' && s.playable_id).map((s: any) => s.playable_id);
           (async () => {
             for (const id of ids) {
@@ -513,7 +566,7 @@ export default function PlayableScreen() {
       }
       if (d.job_status === 'done' && d.kind === 'variants') {
         setVariants(d.variants || []); loadRecent(); setBusy(false); haptics.notify('success');
-        if (autoCoverRef.current) {
+        if (autoCoverRef.current && !readOnly) {
           const ids = (d.variants || []).filter((v: any) => v.status === 'ready' && v.playable_id).map((v: any) => v.playable_id);
           (async () => {
             for (const id of ids) {
@@ -562,7 +615,7 @@ export default function PlayableScreen() {
       }
       if (d.job_status === 'done' && d.status === 'ready') {
         setGame(d as Playable); setWebKey((k) => k + 1); loadRecent(); setBusy(false); haptics.notify('success');
-        if (autoCoverRef.current) setAutoCoverPid((d as Playable).playable_id);
+        if (autoCoverRef.current && !readOnly) setAutoCoverPid((d as Playable).playable_id);
         return;
       }
       if (d.job_status === 'done' && d.status === 'failed') {
@@ -572,18 +625,84 @@ export default function PlayableScreen() {
       if (d.job_status === 'error') {
         setError(d.error || 'generation failed'); setBusy(false); haptics.notify('error'); return;
       }
+      if (['cancelled', 'canceled'].includes(d.job_status)) setError('The backend confirmed this job was cancelled.');
+      else setError('The backend finished this job without a runnable playable result.');
+    } catch {
+      if (current()) setObservationMessage('The job reference or its latest status could not be verified. Keep this page open; resume checks the original job without submitting another build.');
+    } finally {
+      if (current()) { setBusy(false); setRepairing(false); setObservingJob(false); observationRequest.current = null; }
     }
-    setError('Timed out building the game. Please try again.');
-    setBusy(false); haptics.notify('error');
   }, [loadRecent, haptics]);
+
+  // Repair submission and observation use the same owner-scoped receipt as
+  // generation. A delayed or uncertain result never authorizes another POST.
+  const autoRepair = React.useCallback(async () => {
+    const store = observationStore.current;
+    if (!game || busy || repairing || repairSubmission.current || observationRequest.current || !store?.current()) return;
+    const controller = new AbortController(), epoch = getAuthEpoch(), target = game.playable_id;
+    repairSubmission.current = controller;
+    const current = () => pageActive.current && epoch === getAuthEpoch() && store.current()
+      && repairSubmission.current === controller && !controller.signal.aborted;
+    let acknowledged = false, rejected = false;
+    haptics.selection(); setRepairing(true); setBusy(true); setRepairMsg('Submitting this repair…');
+    try {
+      const previous = await store.get();
+      if (!current()) return;
+      if (previous) {
+        setSavedJob(previous); setObservationMessage('A saved job is awaiting observation. Resume it before submitting another repair.');
+        rejected = true; return;
+      }
+      if (currentGame.current?.playable_id !== target) { rejected = true; return; }
+      const start = await api.post<{ job_id?: string }>(`/api/playable/${target}/repair/async`,
+        { error: gameError || '' }, { signal: controller.signal, timeoutMs: 15_000, retries: 0 });
+      if (!current()) return;
+      const jobId = start.data?.job_id;
+      if (!start.ok || !jobId || !/^[A-Za-z0-9_-]{1,128}$/.test(jobId)) {
+        rejected = start.status >= 400 && start.status < 500 && ![408, 429].includes(start.status);
+        setRepairMsg(rejected ? 'The backend rejected this repair request.'
+          : 'The repair submission is not confirmed. Do not submit it again; inspect the existing jobs before starting more work.');
+        return;
+      }
+      acknowledged = true;
+      await pollJob(jobId, false, { jobId, kind: 'repair', playableId: target });
+    } catch {
+      if (current()) setRepairMsg('The repair submission or observation could not be confirmed. Keep the original job reference and resume observation.');
+    } finally {
+      if (current() && (acknowledged || rejected)) {
+        repairSubmission.current = null; setRepairing(false); setBusy(false);
+      }
+    }
+  }, [game, busy, repairing, gameError, haptics, pollJob]);
+
+  const dismissJobObservation = React.useCallback(async () => {
+    const retained = savedJob, store = observationStore.current;
+    if (!retained || !store?.current()) return;
+    observationRequest.current?.abort(); observationRequest.current = null;
+    try {
+      const cleared = await store.clear(retained.jobId);
+      if (!pageActive.current || !store.current()) return;
+      if (!cleared) {
+        const latest = await store.get();
+        if (!pageActive.current || !store.current()) return;
+        setSavedJob(latest); setObservingJob(false); setBusy(false);
+        setObservationMessage(latest ? 'A different job reference is now retained. It has not been dismissed.' : '');
+        return;
+      }
+      setSavedJob(null); setObservationMessage(''); setObservingJob(false); setBusy(false);
+    } catch {
+      if (pageActive.current && store.current()) {
+        setObservingJob(false); setBusy(false);
+        setObservationMessage('The saved observation could not be dismissed. Its job reference is still retained.');
+      }
+    }
+  }, [savedJob]);
 
   const generate = React.useCallback(async () => {
     if (brief.trim().length < 8 || busy) return;
     haptics.selection();
     setBusy(true); setBusyLabel(depth === 'fast' ? 'Quick-building your game…' : 'Crafting a studio-grade game…'); setError(null); setGame(null);
-    const creatorId = await getVisitorId();
     const kick = await api.post<{ job_id?: string; error?: string }>(
-      '/api/playable/generate/async', { brief, depth, creator_id: creatorId }, { timeoutMs: 20_000, retries: 1 });
+      '/api/playable/generate/async', { brief, depth }, { timeoutMs: 20_000, retries: 0 });
     const jobId = kick.data?.job_id;
     if (!kick.ok || !jobId) {
       setError(kick.data?.error || kick.error || `HTTP ${kick.status}`); setBusy(false); return;
@@ -807,6 +926,20 @@ export default function PlayableScreen() {
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.subtitle}>🕹️ Brief → real, self-contained game you play right here.</Text>
 
+          {(savedJob || observationMessage || restoringJob) && <View testID="pl-job-observation" style={styles.panel}>
+            <Text style={styles.panelTitle}>Saved build observation</Text>
+            {savedJob && <Text testID="pl-job-id" selectable style={styles.panelEmpty}>Job: {savedJob.jobId}</Text>}
+            <Text testID="pl-job-status" accessibilityLiveRegion="polite" style={styles.panelEmpty}>{restoringJob ? 'Checking this account’s saved job reference…' : observationMessage}</Text>
+            {savedJob?.errorCode && <Text style={styles.panelEmpty}>Status: {savedJob.errorCode}</Text>}
+            {savedJob?.engineRequestKey && <Text selectable style={styles.panelEmpty}>Engine request: {savedJob.engineRequestKey}</Text>}
+            {observingJob && <ActivityIndicator color="#a78bfa" accessibilityLabel="Observing the saved job" />}
+            {savedJob && <View style={styles.toolbar}>
+              <TouchableOpacity testID="pl-job-resume" style={styles.toolBtn} disabled={observingJob || restoringJob} onPress={() => { void pollJob(savedJob.jobId, true); }}><Text style={styles.toolBtnTxt}>Resume observation</Text></TouchableOpacity>
+              <TouchableOpacity testID="pl-job-dismiss" style={styles.toolBtn} onPress={() => { void dismissJobObservation(); }}><Text style={styles.toolBtnTxt}>Dismiss saved observation</Text></TouchableOpacity>
+            </View>}
+            {savedJob && <Text style={styles.panelEmpty}>Dismissing forgets this saved reference. It does not cancel the backend job.</Text>}
+          </View>}
+
           <View style={styles.toolbar}>
             <TouchableOpacity testID="pl-import-toggle" style={styles.toolBtn} onPress={() => { haptics.selection(); loadImportBuilds(); setShowImport((s) => !s); }}>
               <Text style={styles.toolBtnTxt}>📦 Import from Vault</Text>
@@ -872,11 +1005,11 @@ export default function PlayableScreen() {
           <View style={styles.depthRow}>
             <TouchableOpacity testID="pl-depth-fast" style={[styles.depthBtn, depth === 'fast' && styles.depthBtnActive]} disabled={busy} onPress={() => setDepth('fast')}>
               <Text style={[styles.depthTxt, depth === 'fast' && styles.depthTxtActive]}>⚡ Fast</Text>
-              <Text style={styles.depthSub}>~1 min · quick</Text>
+              <Text style={styles.depthSub}>Focused prototype</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="pl-depth-studio" style={[styles.depthBtn, depth === 'studio' && styles.depthBtnActive]} disabled={busy} onPress={() => setDepth('studio')}>
               <Text style={[styles.depthTxt, depth === 'studio' && styles.depthTxtActive]}>💎 Studio</Text>
-              <Text style={styles.depthSub}>~3-5 min · max intricacy</Text>
+              <Text style={styles.depthSub}>Review and refine</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.autoCoverRow}>
@@ -893,22 +1026,22 @@ export default function PlayableScreen() {
             />
           </View>
           <TouchableOpacity testID="pl-generate" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={generate} disabled={busy}>
-            {busy ? (
+            {working ? (
               <View style={styles.busyRow}><ActivityIndicator color="#fff" /><Text style={styles.ctaTxt}>  {busyLabel}</Text></View>
-            ) : <Text style={styles.ctaTxt}>🎮 Generate & Play →</Text>}
+            ) : <Text style={styles.ctaTxt}>{restoringJob ? 'Checking saved observation…' : !observationReady ? 'Sign in to verify saved jobs' : savedJob ? 'Resume or dismiss the saved job above' : '🎮 Generate & Play →'}</Text>}
           </TouchableOpacity>
-          {busy ? <Text style={styles.hint}>{depth === 'fast' ? 'Fast mode: one focused, runnable game, gate-checked (~1 min).' : 'Studio mode: a richly intricate game, auto-repaired, judge-scored, then quality-refined (~3-5 min).'}</Text> : null}
+          {working ? <Text style={styles.hint}>{depth === 'fast' ? 'Fast mode: a focused game to preview and refine. Build time depends on your model.' : 'Studio mode: a richer game with repair, review and refinement. Build time depends on your model.'}</Text> : null}
           {error ? <Text testID="pl-error" style={styles.err}>{error}</Text> : null}
 
-          {busy && !game ? <GeneratingPreview label={busyLabel} /> : null}
+          {working && !savedJob && !game ? <GeneratingPreview label={busyLabel} /> : null}
 
           {game ? (
             <View testID="pl-result">
               {!coverHidden ? (
-                <Image
+                <PrivateImage
                   key={`cover-${coverBust}`}
                   testID="pl-cover"
-                  source={{ uri: `${BACKEND}/api/playable/${game.playable_id}/cover.png?v=${coverBust}` }}
+                  uri={`${BACKEND}/api/playable/${game.playable_id}/cover.png?v=${coverBust}`}
                   style={styles.coverBanner}
                   resizeMode="cover"
                   onError={() => setCoverHidden(true)}
@@ -930,8 +1063,8 @@ export default function PlayableScreen() {
                   <View style={styles.coverOptsRow}>
                     {coverOpts.map((idx) => (
                       <TouchableOpacity key={idx} testID={`pl-cover-opt-${idx}`} style={styles.coverOptWrap} onPress={() => selectCoverOption(idx)}>
-                        <Image
-                          source={{ uri: `${BACKEND}/api/playable/${game.playable_id}/cover/opt/${idx}.png` }}
+                        <PrivateImage
+                          uri={`${BACKEND}/api/playable/${game.playable_id}/cover/opt/${idx}.png`}
                           style={styles.coverOptImg}
                           resizeMode="cover"
                         />
@@ -1048,8 +1181,8 @@ export default function PlayableScreen() {
                   {(assetPack.assets || []).length > 0 ? (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
                       {(assetPack.assets || []).map((a: any) => (
-                        <Image key={a.asset_id} testID={`pl-ap-${a.asset_id}`}
-                          source={{ uri: `${BACKEND}/api/assets/genesis/${a.asset_id}.png` }}
+                        <PrivateImage key={a.asset_id} testID={`pl-ap-${a.asset_id}`}
+                          uri={`${BACKEND}/api/assets/genesis/${a.asset_id}.png`}
                           style={styles.apThumb} resizeMode="cover" />
                       ))}
                     </ScrollView>
@@ -1132,7 +1265,7 @@ export default function PlayableScreen() {
                   <Text style={styles.repairTitle}>⚠️ This game hit a runtime error</Text>
                   <Text style={styles.repairMsg} numberOfLines={2}>{gameError}</Text>
                   <View style={styles.repairRow}>
-                    <TouchableOpacity testID="pl-repair-btn" style={[styles.repairBtn, repairing && { opacity: 0.5 }]} disabled={repairing} onPress={autoRepair}>
+                    <TouchableOpacity testID="pl-repair-btn" style={[styles.repairBtn, repairing && { opacity: 0.5 }]} disabled={repairing || busy} onPress={autoRepair}>
                       <Text style={styles.repairBtnTxt}>{repairing ? '🔧 Repairing…' : '🔧 Auto-repair'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity testID="pl-repair-dismiss" style={styles.repairDismiss} onPress={() => setGameError(null)}>
@@ -1158,7 +1291,7 @@ export default function PlayableScreen() {
                   <Text style={styles.forgedTxt}>🌍 Forged from {(game as any).forged_from}</Text>
                 </View>
               ) : null}
-              {busy ? (
+              {working ? (
                 <View testID="pl-busy" style={styles.busyBanner}>
                   {polish ? (
                     <View style={styles.polishSteps}>

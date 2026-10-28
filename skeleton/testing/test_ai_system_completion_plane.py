@@ -10,6 +10,8 @@ import threading
 
 import pytest
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 from skeleton.contracts.ai_execution import (
     AIExecutionRequest,
     AIExecutionResult,
@@ -141,9 +143,6 @@ async def _functional_run(
     request_id: str = "ai-system-completion-e2e",
     created_at: datetime | None = None,
 ):
-    if created_at is None:
-        # A live model call must not inherit historical fixed-time fixtures.
-        created_at = datetime.now(timezone.utc)
     database = tmp_path / database_name
     repository = SQLiteExecutionRepository(database)
     tools = AsyncToolRuntime()
@@ -179,7 +178,7 @@ async def _functional_run(
         instructions="Use the local model and governed tool only.",
         context_digest=hashlib.sha256(b"system-completion-context").hexdigest(),
         allowed_tool_ids=("repo.read",),
-        created_at=created_at,
+        created_at=created_at or datetime.now(timezone.utc),
     )
     runtime = FunctionalAIRuntime(
         repository,
@@ -297,13 +296,13 @@ def _staged_finalization_recovery(
             execution_request.execution_id,
             state,
             expected_version=execution.version,
-            now=request.created_at,
+            now=NOW,
         )
 
     intent = repository.stage_finalization(
         terminal,
         expected_execution_version=execution.version,
-        now=request.created_at,
+        now=NOW,
     )
     intent_digest = intent.intent_digest
     repository.close()
@@ -316,7 +315,7 @@ def _staged_finalization_recovery(
     assert recovered_intent.intent_digest == intent_digest
     reopened.finalize_staged(
         execution_request.execution_id,
-        now=request.created_at,
+        now=NOW,
     )
     recovered_result = reopened.result(execution_request.execution_id)
     intent_cleared = (
@@ -618,7 +617,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     plane.prove_independent_verification(terminal)
     plane.prove_verification_binding(
         terminal,
-        context_digest=request.context_digest,
+        context_digest=request.compiled_context.context_digest,
     )
     plane.prove_context_integrity(
         context_subject_id=request.execution_id,
@@ -775,7 +774,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     )
 
     report = plane.report()
-    assert report.valid is True
+    assert report.valid is True, report.as_dict()
     assert report.missing == ()
     assert report.failed == ()
     assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 32
@@ -1259,7 +1258,7 @@ def test_request_result_binding_rejects_cross_operation_result() -> None:
         prompt="test",
         instructions="test",
         context_digest=hashlib.sha256(b"binding-context").hexdigest(),
-        created_at=NOW,
+        created_at=datetime.now(timezone.utc),
     ).to_execution_request()
     from skeleton.contracts.ai_execution import AIExecutionResult
 

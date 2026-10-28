@@ -1419,6 +1419,8 @@ def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
     # Restored: dropped by the stale-base merge of #4139.
     from skeleton.api.agent_edge_mount import install_registered_agent_edge
     install_registered_agent_edge(app)
+    from skeleton.api.agent_edge_mount import install_registered_agent_edge
+    install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(

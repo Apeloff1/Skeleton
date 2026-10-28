@@ -136,6 +136,17 @@ class ContextWorkGraphTests(unittest.TestCase):
         self.assertEqual(context, _bounded(oversized, 4096))
         self.assertIn("health", oversized)  # Input is never mutated.
 
+    def test_oversized_required_execution_constraints_fail_closed(self) -> None:
+        from skeleton.repo_machine.context import _bounded
+
+        payload = {
+            "intent": "overview", "fingerprint": "f" * 64,
+            "execution": {"state": {"failed_work": ["constraint" * 1000]}},
+        }
+        with self.assertRaisesRegex(ValueError, "required repository context"):
+            _bounded(payload, 4096)
+        self.assertEqual(payload["execution"]["state"]["failed_work"], ["constraint" * 1000])
+
 
 class GrowthTests(unittest.TestCase):
     def test_growth_recommendations_are_priority_sorted(self) -> None:
