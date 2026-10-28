@@ -29,7 +29,7 @@ from skeleton.learning.school.session_audit import (
 
 
 def _load_reviewed_school_owner(module_name: str):
-    """Resolve only fixed canonical or governed school modules."""
+    """Resolve only reviewed canonical or governed school modules."""
     if module_name == "skeleton.ai.learning.school.decision_ledger":
         return importlib.import_module("skeleton.ai.learning.school.decision_ledger")
     if module_name == "skeleton.ai.learning.school.runtime_replay":
