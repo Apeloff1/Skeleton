@@ -355,7 +355,7 @@ async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
     ciphertext, _ = archive.seal(MementoRecord(1, "user", b"message"), previous=genesis)
     assert getattr(MongoMementoAuthority.publish, "__canonical_source_writer_fence__") == "memento"
     assert getattr(MongoMementoAuthority.retire_thread, "__canonical_source_writer_fence__") == "memento"
-    with pytest.raises(MongoSourceEpochError, match="writer epoch not owned|admission unavailable"):
+    with pytest.raises(MongoSourceEpochError, match="witnessed handoff"):
         await mongo.publish(
             archive=archive, expected_head=genesis, expected_thread_version=1,
             stream="user", ciphertext=ciphertext, custody_mode="witnessed",
@@ -383,6 +383,12 @@ async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
             stream="user", ciphertext=ciphertext, custody_mode="witnessed",
         )
     mongo.conversation.memento_witness = saved
+    assert await read(owner) == 2
+    with pytest.raises(MongoSourceEpochError, match="witnessed handoff"):
+        await mongo.publish(
+            archive=archive, expected_head=genesis, expected_thread_version=1,
+            stream="user", ciphertext=ciphertext, custody_mode="witnessed",
+        )
     assert await read(owner) == 2
     # The test deliberately leaves the mutation method unimplemented: only the
     # ownership preflight is under test. Denied calls never begin Mongo writes.
