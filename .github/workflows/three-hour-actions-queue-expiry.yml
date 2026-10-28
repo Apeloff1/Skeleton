@@ -1,0 +1,61 @@
+name: Expire Actions queues older than three hours
+
+on:
+  schedule:
+    # Frequent bounded sweeps; offset from the top of the hour.
+    - cron: '13,28,43,58 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Inventory only; do not cancel queued runs"
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/three-hour-actions-queue-expiry.yml'
+      - 'scripts/cancel_stale_actions_queue.py'
+      - 'tests/test_cancel_stale_actions_queue.py'
+
+# The sweep never changes CI policies, PR states, or GitHub retention.
+permissions: {}
+
+concurrency:
+  group: three-hour-actions-queue-expiry-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  expire-queued:
+    name: Bounded cancellation of strictly queued runs older than 3h
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout exact-head cleanup policy only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/cancel_stale_actions_queue.py
+            tests/test_cancel_stale_actions_queue.py
+          sparse-checkout-cone-mode: false
+
+      - name: Test queued-only expiry and GitHub refusal handling
+        run: python3 -m unittest discover -s tests -p 'test_cancel_stale_actions_queue.py' -v
+
+      - name: Recheck and expire stale queued Actions runs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DRY_RUN" == "true" ]]; then
+            python3 scripts/cancel_stale_actions_queue.py --dry-run
+          else
+            python3 scripts/cancel_stale_actions_queue.py
+          fi
