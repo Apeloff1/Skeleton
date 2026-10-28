@@ -1303,6 +1303,16 @@ async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -
             "protected bootstrap requires native guard, canonical conversation "
             "and memory owners, and one shared durable writer epoch"
         )
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+
+    conversation, memory, _, shared_epoch, _ = mongo_owners
+    if (not isinstance(memory, MongoMemoryRepository)
+            or memory.canonical_source_epoch is not shared_epoch):
+        raise RuntimeError("protected bootstrap requires the real epoch-fenced Mongo memory authority")
+    if (not callable(getattr(conversation, "get_thread", None))
+            or not callable(getattr(conversation, "active_transcript", None))
+            or conversation.canonical_source_epoch is not shared_epoch):
+        raise RuntimeError("protected bootstrap requires a live epoch-fenced conversation authority")
 
 
 def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
