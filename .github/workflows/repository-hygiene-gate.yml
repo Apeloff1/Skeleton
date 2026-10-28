@@ -78,6 +78,10 @@ jobs:
           python -m unittest discover -s scripts -p 'test_filename_safety.py'
           python scripts/check_filename_safety.py --base "$DIFF_BASE" --head "$HEAD_SHA"
 
+      - name: Verify operator hold and private runtime artifact custody
+        shell: bash
+        run: python -m unittest discover -s tests -p 'test_security_boundary_custody.py' -v
+
       - name: Reject whitespace errors and conflict markers
         shell: bash
         run: |
