@@ -79,6 +79,7 @@ class MongoCanonicalSourceEpoch:
             "tenant_id": tenant_id, "actor_id": actor_id,
         })
         if (not isinstance(doc, dict) or doc.get("phase") != "stable"
+                or doc.get("writer_token") is not None
                 or type(doc.get("epoch")) is not int or doc["epoch"] < 2
                 or doc["epoch"] % 2):
             raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
