@@ -282,18 +282,30 @@ class ServerState:
             MongoMemoryLifecycleAdapter,
         )
 
-        if database is None:
-            from motor.motor_asyncio import AsyncIOMotorClient
+        # Protected local inference must use the exact canonical memory owner
+        # whose writes participate in the shared durable source epoch. Creating
+        # a second unfenced repository would invalidate admission/postflight.
+        mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+        if mongo_owners is not None:
+            if database is not None:
+                raise RuntimeError("protected canonical memory owner cannot be overridden")
+            _, repository, _, shared_epoch, _ = mongo_owners
+            if (not isinstance(repository, MongoMemoryRepository)
+                    or repository.canonical_source_epoch is not shared_epoch):
+                raise RuntimeError("protected canonical memory writer is not epoch-fenced")
+        else:
+            if database is None:
+                from motor.motor_asyncio import AsyncIOMotorClient
 
-            mongo = get_settings().mongo
-            client = AsyncIOMotorClient(
-                mongo.uri,
-                serverSelectionTimeoutMS=mongo.timeout_ms,
-            )
-            database = client[mongo.database]
-            self.canonical_memory_mongo_client = client
+                mongo = get_settings().mongo
+                client = AsyncIOMotorClient(
+                    mongo.uri,
+                    serverSelectionTimeoutMS=mongo.timeout_ms,
+                )
+                database = client[mongo.database]
+                self.canonical_memory_mongo_client = client
 
-        repository = MongoMemoryRepository(database)
+            repository = MongoMemoryRepository(database)
         await repository.ensure_indexes()
 
         governance = self.bind_governance_registry()
@@ -1261,7 +1273,39 @@ async def _close_realtime(app: Any) -> None:
         await hub.aclose()
 
 
-def create_app() -> Any:
+async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -> None:
+    """Allow deployer-owned native and canonical Mongo authorities before engine startup.
+
+    Never source a bootstrap from an HTTP request, environment variable or
+    persisted conversation. The trusted application composition must install
+    its attested native backend, reviewer, real canonical owners and the shared
+    majority-durable writer epoch. Missing authorities abort startup.
+    """
+    if bootstrap is None:
+        return
+    if not callable(bootstrap):
+        raise TypeError("trusted protected bootstrap must be callable")
+    if (state.engine_execution_service is not None
+            or state.engine_execution_coordinator is not None
+            or state._engine_shutdown_pending):
+        raise RuntimeError("protected bootstrap must precede engine startup")
+    from inspect import isawaitable
+
+    result = bootstrap(state)
+    if isawaitable(result):
+        await result
+    elif result is not None:
+        raise TypeError("protected bootstrap must not return an authority")
+    mongo_owners = getattr(state, "_engine_canonical_mongo_owners", None)
+    if (state._engine_local_guard_components is None
+            or mongo_owners is None or mongo_owners[1] is None):
+        raise RuntimeError(
+            "protected bootstrap requires native guard, canonical conversation "
+            "and memory owners, and one shared durable writer epoch"
+        )
+
+
+def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
     from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle, ServicePhase
 
     fastapi = _get_fastapi()
@@ -1365,10 +1409,14 @@ def create_app() -> Any:
         state.bind_governance_registry()
         state.bind_canonical_artifact_store()
         state.bind_canonical_retrieval_index()
+        # A deployment-provided bootstrap is the only path to protected native
+        # mode. It must bind trusted owners BEFORE service/provider activation.
+        await _run_trusted_protected_bootstrap(state, trusted_protected_bootstrap)
         state.bind_engine_execution_service(
             runtime_lifecycle=runtime_lifecycle,
         )
-        if _canonical_memory_mongo_configured():
+        if (_canonical_memory_mongo_configured()
+                or getattr(state, "_engine_canonical_mongo_owners", None) is not None):
             await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
         _bind_realtime(app, state)
