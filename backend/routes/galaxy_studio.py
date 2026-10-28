@@ -3943,11 +3943,22 @@ def _generate_expansion_files(
     existing_files.update((build.get("files") or {}).keys())
     generated_count = 0
 
+    def _reject_synthetic_artifact(path: str, content: str) -> None:
+        """Fail closed on known count-padding artifacts, not legitimate assets."""
+        if not isinstance(path, str) or not isinstance(content, str):
+            raise GalaxyBuildStopped("expansion_artifact_invalid")
+        normalized = path.replace("\\", "/").lower()
+        if normalized.startswith("expansions/") and "/generated_" in normalized:
+            raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
+        if "procedurally generated expansion file #" in content.lower():
+            raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
+
     def _add(path, content):
         nonlocal generated_count
         if generated_count >= target_expansion_files:
             raise _ExpansionTargetReached
         _check_build_continuation(build)
+        _reject_synthetic_artifact(path, content)
         emit_file(path, content)
         generated_count += 1
         existing_files.add(path)
