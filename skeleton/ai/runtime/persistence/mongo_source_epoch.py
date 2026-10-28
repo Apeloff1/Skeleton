@@ -265,6 +265,17 @@ def fence_memento_write(method):
             # Syntactically invalid no-write denials must not quarantine an
             # otherwise stable actor epoch merely by acquiring it.
             raise MongoSourceEpochError("canonical memento mutation thread missing")
+        if "archive" in kwargs and method.__name__ == "publish":
+            # A protected Mongo source must NEVER use the legacy independent-
+            # witness bypass. Reject policy mistakes before acquiring the
+            # majority epoch so a denied no-write call cannot quarantine it.
+            if kwargs.get("custody_mode", "legacy") != "witnessed":
+                raise MongoSourceEpochError("protected memento requires witnessed custody")
+            witness = getattr(conversation, "memento_witness", None)
+            if not all(callable(getattr(witness, name, None)) for name in (
+                "read", "compare_and_set",
+            )):
+                raise MongoSourceEpochError("protected memento requires independent witness")
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             return await method(self, *args, **kwargs)
 
