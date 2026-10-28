@@ -1,0 +1,116 @@
+name: Owner-scoped orphan CodeQL recovery
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/recover-orphan-codeql-40470377670.yml']
+permissions: {}
+concurrency:
+  group: owner-codeql-orphan-40470377670-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  exact-run-recovery:
+    if: github.actor == github.repository_owner && github.ref == 'refs/heads/main'
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-slim
+    timeout-minutes: 6
+    steps:
+      - name: Revalidate one historic CodeQL run before supported DELETE
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.OWNER_ACTIONS_CLEANUP_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import urllib.error
+
+          repo = 'Apeloff1/Skeleton'
+          if os.getenv('REPO') != repo:
+              raise SystemExit('Repository mismatch: no mutation')
+          token = os.environ.get('GH_TOKEN')
+          if not token:
+              raise SystemExit('Missing Actions write token')
+          root = 'https://api.github.com/repos/' + repo
+          path = '/actions/runs/40470377670'
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': 'Bearer ' + token,
+              'X-GitHub-Api-Version': '2026-03-10',
+              'User-Agent': 'skeleton-one-run-codeql-recovery',
+          }
+
+          def api(method, url):
+              req = urllib.request.Request(root + url, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as resp:
+                      data = resp.read()
+                      return resp.status, json.loads(data) if data else None
+              except urllib.error.HTTPError as error:
+                  return error.code, None
+
+          def get(url):
+              status, data = api('GET', url)
+              if status != 200:
+                  raise SystemExit('Preflight GET HTTP ' + str(status))
+              return data
+
+          frozen = {
+              'id': 40470377670,
+              'name': 'CodeQL',
+              'event': 'dynamic',
+              'path': 'dynamic/github-code-scanning/codeql',
+              'head_sha': '75b9f280e90e2eff07253b0bfc281f67252d526e',
+              'head_branch': 'refs/pull/4349/head',
+              'workflow_id': 339025396,
+              'check_suite_id': 109687393448,
+              'created_at': '2026-10-27T07:58:28Z',
+              'updated_at': '2026-10-27T07:58:28Z',
+              'status': 'queued',
+              'conclusion': None,
+              'run_attempt': 1,
+          }
+
+          def validate():
+              status, run = api('GET', path)
+              if status == 404:
+                  return False
+              if status != 200 or not isinstance(run, dict):
+                  raise SystemExit('Run GET failed: HTTP ' + str(status))
+              if any(run.get(k) != v for k, v in frozen.items()):
+                  raise SystemExit('Immutable run identity/state drift: preserved')
+              jobs = get(path + '/jobs?per_page=1')
+              artifacts = get(path + '/artifacts?per_page=1')
+              if jobs.get('total_count') != 0 or artifacts.get('total_count') != 0:
+                  raise SystemExit('Run has jobs or artifacts: preserved')
+              for endpoint in ('approvals', 'pending_deployments'):
+                  pending = get(path + '/' + endpoint)
+                  if not isinstance(pending, list) or pending:
+                      raise SystemExit('Run has approvals or deployments: preserved')
+              pr = get('/pulls/4349')
+              if pr.get('state') != 'closed' or not pr.get('merged_at'):
+                  raise SystemExit('PR #4349 not confirmed merged: preserved')
+              if (pr.get('head') or {}).get('sha') == frozen['head_sha']:
+                  raise SystemExit('Run is final PR head: preserved')
+              return True
+
+          if not validate():
+              print('Already absent before mutation, verified HTTP 404')
+              raise SystemExit(0)
+          if not validate():
+              raise SystemExit('Run disappeared during second preflight')
+          # Exactly one documented DELETE. Never escalate provider refusal.
+          status, _ = api('DELETE', path)
+          if status == 204 and api('GET', path)[0] == 404:
+              print('Run 40470377670 deleted and verified GET 404')
+              raise SystemExit(0)
+          if status == 404 and api('GET', path)[0] == 404:
+              print('Run already absent; no new deletion claimed')
+              raise SystemExit(0)
+          raise SystemExit('GitHub refused or did not verify deletion: HTTP ' + str(status))
+          PY
