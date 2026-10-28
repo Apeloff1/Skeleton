@@ -10297,6 +10297,7 @@
         "quality_progress_schema": "skeleton.game.studio_quality_progress.v1",
         "owner": "backend/core/game_studio_agent.py",
         "state_authority": "Existing CORE_DB game_learning_revisions scoped studio_agent_goal journal and existing workspace jobs; no new store, provider, runtime root or promotion authority",
+        "planner_schema_capacity": "Build the exact typed response schema before fitting new planner prompts. For the initial projection, existing scoped catalog selection, declared active/fallback llama.cpp routes, and exact scoped cooperation-role selections use the canonical native renderer's conservative maximum over its declared profiles and raw framing, including the visible schema, with the unchanged context safety margin. Project optional observations only; preserve every granted operation and persist exactly the schema measured. An irreducible oversized prompt/schema fails with the existing typed capacity error before a model call or pending publication. Existing pending requests and idempotency identities remain unchanged. Cooperative stage prompts can grow as artifacts are generated; initial preflight does not certify their capacity, and the canonical native runtime continues to enforce its limit at each dispatch. Hosted/reference-only routes retain their existing estimation behavior; unknown custom native profile capacity is not certified.",
         "bounds": {
           "steps": 16,
           "model_calls": 16,
