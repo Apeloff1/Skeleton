@@ -533,7 +533,7 @@ def test_witnessed_publication_and_retirement_hold_source_epoch_until_acknowledg
     async def scenario():
         archive, mongo, witness, guard = setup()
         epoch = MongoCanonicalSourceEpoch(Database())
-        mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch)
+        mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         original_cas = witness.compare_and_set
         acknowledged = []
@@ -572,7 +572,7 @@ def test_unacknowledged_witness_commit_quarantines_canonical_source_epoch():
     async def scenario():
         archive, mongo, witness, guard = setup()
         epoch = MongoCanonicalSourceEpoch(Database())
-        mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch)
+        mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         witness.reject = True
         head = MementoCatalogHead()
