@@ -775,6 +775,18 @@ class ServerState:
         if self.engine_execution_service is not None:
             return self.engine_execution_service
 
+        # This entrypoint is also used directly by product code. Enforce the
+        # same trusted writer inventory here, not only in create_app's
+        # optional bootstrap, BEFORE opening any local execution resources.
+        mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+        if mongo_owners is not None:
+            from skeleton.persistence.mongo_source_epoch import verify_canonical_source_writer_inventory
+
+            conversation, memory, _, shared_epoch, _ = mongo_owners
+            verify_canonical_source_writer_inventory(
+                conversation=conversation, memory=memory, epoch=shared_epoch,
+            )
+
         from pathlib import Path
 
         from skeleton.api.engine_authority import (
