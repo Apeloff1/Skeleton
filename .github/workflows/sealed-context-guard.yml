@@ -48,6 +48,10 @@ on:
       - 'skeleton/testing/test_guarded_registry_activation.py'
       - 'skeleton/testing/test_guarded_local_service.py'
       - 'skeleton/testing/test_pre_delivery_guard.py'
+      - 'backend/routes/share.py'
+      - 'backend/tests/test_share_page_security.py'
+      - 'scripts/chroma_backup.py'
+      - 'tests/test_chroma_backup.py'
       - 'skeleton/testing/test_delivery_*.py'
       - 'skeleton/testing/test_sealed_*.py'
       - 'pyproject.toml'
@@ -119,3 +123,11 @@ jobs:
             skeleton/testing/test_delivery_regex.py \
             skeleton/testing/test_mongo_memento_repository.py \
             skeleton/testing/test_sealed_*.py
+
+      - name: Consumer share and Chroma custody regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: |
+          python -m pytest -q \
+            backend/tests/test_share_page_security.py \
+            tests/test_chroma_backup.py
