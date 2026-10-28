@@ -43,6 +43,27 @@ from .local import (
 )
 
 _COMPLETION_EOG_TRAILERS = (" [end of text]\n\n\n", " [end of text]\n")
+# These are the two existing operator-provisioned profiles, not a general
+# Jinja interpreter. Keep their manifest spelling stable for installed receipts.
+COMPLETION_CHAT_FLAGS = (
+    "--conversation", "--single-turn", "--simple-io", "--no-perf",
+    "--no-escape", "--color", "off", "--jinja", "--reasoning", "off",
+)
+CODING_COMPLETION_CHAT_TEMPLATE = (
+    "{% for message in messages %}"
+    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
+    "{% endfor %}{% if add_generation_prompt %}"
+    "{{ '<|im_start|>assistant\\n' }}"
+    "{% endif %}"
+)
+QWEN3_COMPLETION_CHAT_TEMPLATE = (
+    "{% for message in messages %}"
+    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
+    "{% endfor %}{% if add_generation_prompt %}"
+    "{{ '<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n' }}"
+    "{% endif %}"
+)
+_CHATML_CONTENT_DELIMITERS = ("<|im_start|>", "<|im_end|>", "<|endoftext|>")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
@@ -77,6 +98,7 @@ _MANAGED_LONG_FLAGS = {
     "--model",
     "--prompt",
     "--file",
+    "--binary-file",
     "--n-predict",
     "--seed",
     "--temp",
@@ -97,6 +119,7 @@ _MANAGED_SHORT_FLAGS = (
     "-c",
     "-t",
     "-b",
+    "-bf",
     "-ngl",
     "-j",
     "-jf",
@@ -303,7 +326,9 @@ class LlamaCppConfig:
                     item == flag or item.startswith(flag + "=") for flag in _REMOTE_ACQUISITION_SHORT_FLAGS
                 )
             if remote:
-                raise ValueError(f"extra_args may not enable network access {item}")
+                raise ValueError(
+                    f"extra_args may not enable remote model acquisition or network access {item}"
+                )
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
 
@@ -825,34 +850,38 @@ class LlamaCppModel:
     @property
     def execution_profile_digest(self) -> str:
         """Bind decoding/resource policy without changing executable identity."""
-        return _digest(
-            {
-                "schema": "skeleton.llama-cpp.execution-profile.v1",
-                "runtime": self.runtime_digest,
-                "model": self.model_digest,
-                "model_id": self._admitted_model_id,
-                "context_size": self.config.context_size,
-                "threads": self.config.threads,
-                "batch_size": self.config.batch_size,
-                "gpu_layers": self.config.gpu_layers,
-                "temperature": float(self.config.temperature),
-                "extra_args": list(self.config.extra_args),
-                "output_framing": self.config.output_framing,
-                "output_framing_suffixes": (
-                    list(_COMPLETION_EOG_TRAILERS)
-                    if self.config.output_framing == "llama_completion_eog"
-                    else []
-                ),
-                "timeout_seconds": float(self.config.timeout_seconds),
-                "max_output_bytes": self.config.max_output_bytes,
-                "max_stderr_bytes": self.config.max_stderr_bytes,
-                "environment_digest": _digest(self._effective_environment()),
-                "serving_metadata": self._serving_metadata.as_dict(),
-                "runtime_scratch_bytes": self.config.runtime_scratch_bytes,
-                "kv_bytes_per_token": self.config.kv_bytes_per_token,
-                "seed_policy": "uint32_mod_4294967295_without_random_sentinel",
-            }
-        )
+        profile = {
+            "schema": "skeleton.llama-cpp.execution-profile.v1",
+            "runtime": self.runtime_digest,
+            "model": self.model_digest,
+            "model_id": self._admitted_model_id,
+            "context_size": self.config.context_size,
+            "threads": self.config.threads,
+            "batch_size": self.config.batch_size,
+            "gpu_layers": self.config.gpu_layers,
+            "temperature": float(self.config.temperature),
+            "extra_args": list(self.config.extra_args),
+            "output_framing": self.config.output_framing,
+            "output_framing_suffixes": (
+                list(_COMPLETION_EOG_TRAILERS)
+                if self.config.output_framing == "llama_completion_eog"
+                else []
+            ),
+            "timeout_seconds": float(self.config.timeout_seconds),
+            "max_output_bytes": self.config.max_output_bytes,
+            "max_stderr_bytes": self.config.max_stderr_bytes,
+            "environment_digest": _digest(self._effective_environment()),
+            "serving_metadata": self._serving_metadata.as_dict(),
+            "runtime_scratch_bytes": self.config.runtime_scratch_bytes,
+            "kv_bytes_per_token": self.config.kv_bytes_per_token,
+            "seed_policy": "uint32_mod_4294967295_without_random_sentinel",
+        }
+        native_chat_profile = self._native_chat_profile()
+        if native_chat_profile is not None:
+            # A corrected role renderer must not reuse a generation cached
+            # under the old single-user-blob conversation transport.
+            profile["prompt_format"] = native_chat_profile
+        return _digest(profile)
 
     def _effective_context(self) -> int:
         configured = self.config.context_size
@@ -945,17 +974,56 @@ class LlamaCppModel:
         """Admit cached answers against the same artifact policy as execution."""
         self._assert_artifacts_stable()
 
+    def _native_chat_profile(self) -> str | None:
+        if self.config.output_framing != "llama_completion_eog":
+            return None
+        for template, profile in (
+            (CODING_COMPLETION_CHAT_TEMPLATE, "skeleton.chatml.coding.v1"),
+            (QWEN3_COMPLETION_CHAT_TEMPLATE, "skeleton.chatml.qwen3-closed-think.v1"),
+        ):
+            if self.config.extra_args == (*COMPLETION_CHAT_FLAGS, "--chat-template", template):
+                return profile
+        return None
+
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
-        prompt = request.rendered_input
+        profile = self._native_chat_profile()
+        if profile is None:
+            # Generic local/reference/custom deployments retain their exact
+            # historical text protocol and operator-selected CLI behavior.
+            return request.rendered_input + self._prompt_protocol(request)
+
+        protocol = self._prompt_protocol(request, include_schema=True)
+        messages: list[tuple[str, str]] = []
+        if request.instructions.strip() or protocol:
+            messages.append(("system", request.instructions + protocol))
+        messages.extend(request.history)
+        messages.append(("user", request.prompt))
+        for _, content in messages:
+            if any(marker in content for marker in _CHATML_CONTENT_DELIMITERS):
+                raise LlamaCppRuntimeError("local message contains a reserved ChatML control delimiter")
+        rendered = "".join(
+            "<|im_start|>" + role + "\n" + content + "<|im_end|>\n"
+            for role, content in messages
+        )
+        rendered += "<|im_start|>assistant\n"
+        if profile == "skeleton.chatml.qwen3-closed-think.v1":
+            rendered += "<think>\n\n</think>\n\n"
+        return rendered
+
+    def _prompt_protocol(self, request: LocalInferenceRequest, *, include_schema: bool = False) -> str:
         if not request.tools:
             if request.structured_output_schema is None:
-                return prompt
-            return (
-                prompt
-                + "\n\n[Skeleton local structured-output protocol]\n"
+                return ""
+            contract = (
+                "\n\n[Skeleton local structured-output protocol]\n"
                 + "Output exactly one JSON object matching the supplied schema. "
                 + "Do not include markdown fences or prose outside the JSON object."
             )
+            if include_schema:
+                contract += "\nRequired JSON schema: " + _stable_json(
+                    self._normalized_structured_output_schema(request)
+                )
+            return contract
         allowed: list[dict[str, Any]] = []
         seen_tool_ids: set[str] = set()
         for item in request.tools:
@@ -991,7 +1059,11 @@ class LlamaCppModel:
             contract += "\nA tool call is required for this turn; do not return a prose-only answer."
         if request.tool_choice == "specific":
             contract += "\nRequired tool_id: " + str(request.specific_tool_id)
-        return prompt + contract
+        if include_schema and request.structured_output_schema is not None:
+            contract += "\nRequired final JSON schema: " + _stable_json(
+                self._normalized_structured_output_schema(request)
+            )
+        return contract
 
     def _normalized_structured_output_schema(
         self,
@@ -1078,7 +1150,7 @@ class LlamaCppModel:
             self._runtime.path,
             "-m",
             self._model.path,
-            "-f",
+            "--binary-file" if self._native_chat_profile() is not None else "-f",
             str(prompt_file),
             "-n",
             str(request.max_output_tokens),
@@ -1097,7 +1169,13 @@ class LlamaCppModel:
             command.extend(("-ngl", str(self.config.gpu_layers)))
         if schema_file is not None:
             command.extend(("--json-schema-file", str(schema_file)))
-        command.extend(self.config.extra_args)
+        if self._native_chat_profile() is None:
+            command.extend(self.config.extra_args)
+        else:
+            # -f strips one trailing newline in the pinned completion CLI;
+            # binary-file preserves the exact assistant generation prefix.
+            # Conversation mode would wrap the entire file as one user turn.
+            command.extend(("--no-conversation", "--simple-io", "--no-perf", "--no-escape", "--color", "off"))
         return command
 
     def _effective_environment(self) -> dict[str, str]:
@@ -1593,8 +1671,18 @@ def build_llama_cpp_adapter(
     max_concurrency: int = 1,
     max_queue_size: int = 256,
     max_batch_size: int = 256,
+    require_guarded_inference: bool = False,
+    guarded_components: Any | None = None,
 ) -> LocalModelAdapter:
-    """Build an offline adapter, optionally applying measured consumer limits."""
+    """Build offline adapter; protected mode has no unguarded fallback."""
+    if type(require_guarded_inference) is not bool:
+        raise LlamaCppRuntimeError("protected local mode must be explicit")
+    if require_guarded_inference:
+        from .guarded_composition import ProtectedLocalComponents
+        if not isinstance(guarded_components, ProtectedLocalComponents):
+            raise LlamaCppRuntimeError("protected local deployment lacks trusted components")
+    elif guarded_components is not None:
+        raise LlamaCppRuntimeError("protected components require enforced local mode")
     if consumer_budget is not None:
         try:
             model_bytes = Path(config.model_path).stat().st_size
@@ -1605,16 +1693,20 @@ def build_llama_cpp_adapter(
             consumer_budget,
             model_bytes=model_bytes,
         ).configuration
-    return LocalModelAdapter(
-        LocalInferenceEngine(
-            LlamaCppModel(config),
-            cache_size=cache_size,
-            max_concurrency=max_concurrency,
-            max_queue_size=max_queue_size,
-            max_batch_size=max_batch_size,
-        ),
-        default_seed=default_seed,
+    engine = LocalInferenceEngine(
+        LlamaCppModel(config),
+        cache_size=cache_size,
+        max_concurrency=max_concurrency,
+        max_queue_size=max_queue_size,
+        max_batch_size=max_batch_size,
+        require_guarded_context=require_guarded_inference,
     )
+    if require_guarded_inference:
+        from .guarded_composition import compose_protected_local_adapter
+        return compose_protected_local_adapter(
+            engine, components=guarded_components, default_seed=default_seed,
+        )
+    return LocalModelAdapter(engine, default_seed=default_seed)
 
 
 __all__ = [
