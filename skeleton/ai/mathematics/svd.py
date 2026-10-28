@@ -32,13 +32,27 @@ def singular_value_decomposition(
     columns = len(source[0])
     tolerance = positive_scalar("rank_tolerance", rank_tolerance)
     transposed = transpose(source)
-    gram = tuple(
-        tuple(
-            compensated_sum(transposed[i][k] * source[k][j] for k in range(rows))
-            for j in range(columns)
+    # Diagonalize the smaller Gram matrix. For a wide full-row-rank matrix,
+    # A.T @ A has unavoidable zero eigenvalues; roundoff can make them look
+    # positive and produce catastrophic 1/sigma amplification in A+.
+    # A @ A.T avoids those artificial null modes and yields a thin SVD.
+    wide = rows < columns
+    if wide:
+        gram = tuple(
+            tuple(
+                compensated_sum(source[i][k] * source[j][k] for k in range(columns))
+                for j in range(rows)
+            )
+            for i in range(rows)
         )
-        for i in range(columns)
-    )
+    else:
+        gram = tuple(
+            tuple(
+                compensated_sum(transposed[i][k] * source[k][j] for k in range(rows))
+                for j in range(columns)
+            )
+            for i in range(columns)
+        )
     eig = symmetric_eigensystem(gram, tolerance=max(tolerance * tolerance, 1e-15))
     raw_values = []
     for index, eigenvalue in enumerate(eig.eigenvalues):
@@ -56,19 +70,35 @@ def singular_value_decomposition(
     singular_values: list[float] = []
     left_vectors: list[Vector] = []
     right_vectors: list[Vector] = []
-    for singular, right in zip(raw_values, eig.eigenvectors):
+    for singular, vector in zip(raw_values, eig.eigenvectors):
         if singular <= cutoff:
             continue
-        image = matvec(source, right)
-        left = tuple(value / singular for value in image)
-        norm = math.sqrt(compensated_sum(value * value for value in left))
-        if norm == 0.0 or not math.isfinite(norm):
-            raise MathInvariantError(
-                "SVD produced an invalid left singular vector",
-                reason="numerical_invariant_failure",
-                field="left_vectors",
-            )
-        left = tuple(value / norm for value in left)
+        if wide:
+            # From A A.T, the eigenvectors are LEFT singular vectors.
+            # Derive each unit RIGHT vector using A.T u / sigma.
+            left = vector
+            image = matvec(transposed, left)
+            right = tuple(value / singular for value in image)
+            norm = math.sqrt(compensated_sum(value * value for value in right))
+            if norm == 0.0 or not math.isfinite(norm):
+                raise MathInvariantError(
+                    "SVD produced an invalid right singular vector",
+                    reason="numerical_invariant_failure",
+                    field="right_vectors",
+                )
+            right = tuple(value / norm for value in right)
+        else:
+            right = vector
+            image = matvec(source, right)
+            left = tuple(value / singular for value in image)
+            norm = math.sqrt(compensated_sum(value * value for value in left))
+            if norm == 0.0 or not math.isfinite(norm):
+                raise MathInvariantError(
+                    "SVD produced an invalid left singular vector",
+                    reason="numerical_invariant_failure",
+                    field="left_vectors",
+                )
+            left = tuple(value / norm for value in left)
         singular *= norm
         singular_values.append(singular)
         left_vectors.append(left)

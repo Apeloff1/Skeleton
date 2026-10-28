@@ -65,6 +65,13 @@ def validate(
         errors.append("priority queue source_catalog path drifted")
     if queue.get("source_matrix") != "machine/ai_full_edge_case_matrix.json":
         errors.append("priority queue source_matrix path drifted")
+    required_scope = {
+        "historical_catalog": "signed_implementation_at_pinned_commit",
+        "priority_queue": "post_historical_exact_head_verification_pending",
+        "historical_verification_commit": "6dcb6c4b1445ef653ec3afef1e1a986b41034a6a",
+    }
+    if queue.get("verification_scopes") != required_scope:
+        errors.append("priority queue historical/current-head scope pin drifted")
     if set(queue.get("status_values") or []) != ALLOWED_STATUSES:
         errors.append("priority queue status_values drifted")
 
@@ -203,6 +210,16 @@ def validate(
                 )
         if not isinstance(item.get("accountability_status"), str) or not item["accountability_status"].strip():
             errors.append(f"{item_id}: accountability_status must be non-empty")
+        # A historically signed ACCOUNTABILITY entry is not evidence that
+        # this edge-case regression passed. Never erase authenticated ledger
+        # receipts or conflate their checkboxes with case completion.
+        case_verified = item.get("case_completion_verified")
+        if type(case_verified) is not bool:
+            errors.append(f"{item_id}: case_completion_verified must be boolean")
+        if item.get("status") in {"planned", "in_progress", "evidence_pending"} and case_verified is True:
+            errors.append(f"{item_id}: unverified case cannot claim completed test")
+        if case_verified is True and (not evidence or not isinstance(disposition, str) or not disposition.strip()):
+            errors.append(f"{item_id}: verified case requires admitted evidence and disposition")
 
     return errors
 

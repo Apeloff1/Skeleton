@@ -144,23 +144,28 @@ class AutomationSafetyTests(unittest.TestCase):
         self.assertEqual(payload["reason"], "incident response")
 
     def test_trusted_workflows_expose_repository_operator_controls(self) -> None:
-        for path in (
-            Path(".github/workflows/autonomous-studio.yml"),
-            Path(".github/workflows/idle-studio.yml"),
+        # The retired autonomous/idle studio workflows are not deployed.
+        # Assert controls on the real queue-admission workflow instead.
+        path = Path(".github/workflows/automation-traffic-manager.yml")
+        text = path.read_text(encoding="utf-8")
+        for name in (
+            "SKELETON_AUTOMATION_PAUSED",
+            "SKELETON_AUTOMATION_QUARANTINED",
+            "SKELETON_AUTOMATION_HOLD_REASON",
         ):
-            text = path.read_text(encoding="utf-8")
-            self.assertIn(
-                "SKELETON_AUTOMATION_PAUSED: ${{ vars.SKELETON_AUTOMATION_PAUSED }}",
-                text,
-            )
-            self.assertIn(
-                "SKELETON_AUTOMATION_QUARANTINED: ${{ vars.SKELETON_AUTOMATION_QUARANTINED }}",
-                text,
-            )
-            self.assertIn(
-                "SKELETON_AUTOMATION_HOLD_REASON: ${{ vars.SKELETON_AUTOMATION_HOLD_REASON }}",
-                text,
-            )
+            self.assertIn(f"{name}: " + "${{ vars." + name + " }}", text)
+        # Both write-bearing jobs must recheck the operator hold independently
+        # of the earlier read-only admission step.
+        self.assertEqual(
+            text.count("for variable in SKELETON_AUTOMATION_PAUSED SKELETON_AUTOMATION_QUARANTINED"),
+            2,
+        )
+        self.assertIn("Automation operator hold active; no dispatch or relief.", text)
+        controller = Path("skeleton/automation/traffic_manager.py").read_text(encoding="utf-8")
+        self.assertIn("operator_safety = load_automation_safety()", controller)
+        self.assertIn("if operator_safety.blocked:", controller)
+        self.assertIn("admit=False", controller)
+        self.assertIn("relieve=False", controller)
 
 
 if __name__ == "__main__":

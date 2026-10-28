@@ -144,8 +144,10 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
     )
 
     assert recovered.state == "completed"
-    assert recovered.accepted is True
-    assert recovered.reasons == ()
+    # With no signed completion intent, accounting may be durably completed
+    # but qualification must not silently claim that it was authorized.
+    assert recovered.accepted is False
+    assert recovered.reasons == ("operation-budget-recovery-intent-missing",)
     assert recovered.completion_digest is not None
     assert recovered.accounting_decision_digest is not None
     assert recovered.promotion_authority is False
@@ -365,10 +367,11 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
         evidence_refs=_refs("completion-wins"),
     )
     assert completed.state == "completed"
-    assert completed.accepted is True
+    assert completed.accepted is False
+    assert completed.reasons == ("operation-budget-recovery-intent-missing",)
 
 
-def test_restart_journal_conflict_never_releases_preexisting_reservation(
+def test_restart_replay_does_not_rewrite_preexisting_journal_reservation(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -376,7 +379,7 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
     operation = "op-replay-journal-conflict"
     request = _request(operation)
     first = _governor(path)
-    first.reserve(request, now_wall=10.0)
+    original = first.reserve(request, now_wall=10.0)
 
     restarted = _governor(path)
     assert restarted._journal is not None
@@ -390,11 +393,9 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
         reject_replay,
     )
 
-    with pytest.raises(
-        CostGovernorConflict,
-        match="simulated journal replay conflict",
-    ):
-        restarted.reserve(request, now_wall=20.0)
+    # Exact replay reads the existing durable admission instead of recording
+    # it a second time; the patched write endpoint must remain untouched.
+    assert restarted.reserve(request, now_wall=20.0) == original
 
     # The reservation predated this restart attempt, so a metadata disagreement
     # must not refund/delete it.

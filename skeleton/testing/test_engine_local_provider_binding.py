@@ -33,6 +33,9 @@ def local_artifact(tmp_path, monkeypatch):
     write_local_model_artifact(model, path)
     _offline(monkeypatch)
     monkeypatch.setenv("AI_PROVIDER", "local")
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "0")
+    monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
+    monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
     monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(path))
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", "0")
     for name in (
@@ -225,7 +228,7 @@ async def test_corrupt_or_missing_local_pin_blocks_resumed_dispatch(
 
 
 def test_execution_descriptor_is_detached_content_only(local_artifact):
-    adapter = ProviderRegistry.from_env().require_active()
+    adapter = ProviderRegistry.from_env(require_guarded_local=False).require_active()
     identity = adapter.execution_identity()
     assert set(identity) == {"schema_version", "provider_id", "model_id", "artifact", "inference"}
     assert identity["inference"] == {"default_seed": 0}
@@ -315,7 +318,7 @@ async def test_pristine_created_legacy_checkpoint_can_acquire_the_exact_pin(tmp_
     ],
 )
 def test_descriptor_rejects_invalid_loaded_artifact_receipt(local_artifact, field, value):
-    adapter = ProviderRegistry.from_env().require_active()
+    adapter = ProviderRegistry.from_env(require_guarded_local=False).require_active()
     adapter._artifact[field] = value
     with pytest.raises(ProviderUnavailableError, match="execution identity|identity drift"):
         adapter.execution_identity()
@@ -335,7 +338,7 @@ async def test_stale_absent_checkpoint_observation_cannot_replace_a_competing_pi
         write_local_model_artifact(
             ReferenceNGramModel.train(("new competing content",), model_id=original.model_id), path
         )
-        second_registry = ProviderRegistry.from_env()
+        second_registry = ProviderRegistry.from_env(require_guarded_local=False)
         second = EngineExecutionCoordinator(service, provider_registry=second_registry)
         committed = second._pin_local_provider(command, runtime, second_registry.require_active(), None, ())
         with pytest.raises(EngineExecutionCoordinatorError, match="local_provider_binding_mismatch"):
