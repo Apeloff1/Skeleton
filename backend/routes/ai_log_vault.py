@@ -526,8 +526,7 @@ async def execute_startup_training(startup_id: str, config: LogscraperConfig, sc
     """Execute comprehensive startup training"""
     scope = _scope(scope)
     
-    # Run logscraper
-    scope = _scope(scope)
+    # Run logscraper using already validated canonical scope.
     await execute_logscraper(f"{startup_id}_scrape", config, scope)
     
     # Get the training data
@@ -608,6 +607,8 @@ async def export_training_data(format: str = "json", limit: int = 1000,
         raise HTTPException(status_code=422, detail="Invalid export limit")
     cursor = ai_queries_collection.find(scope).limit(limit)
     async for doc in cursor:
+        if not _owned(doc, scope):
+            continue
         doc["_id"] = str(doc["_id"])
         if "timestamp" in doc:
             doc["timestamp"] = doc["timestamp"].isoformat()
