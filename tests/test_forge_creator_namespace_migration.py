@@ -29,13 +29,16 @@ def test_legacy_creator_module_reexports_canonical_module() -> None:
     assert legacy.apply_edit is canonical.apply_edit
 
 
-def test_ai_tree_forge_is_overlay_free_after_creator_cutover() -> None:
+def test_ai_tree_creator_cutover_preserves_independent_forge_overlays() -> None:
     manifest = json.loads(
         (ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8")
     )
     forge = next(item for item in manifest["mappings"] if item["id"] == "AIFT-FORGE")
     creator = next(item for item in manifest["mappings"] if item["id"] == "AIFT-CREATOR")
 
-    assert not forge.get("overlay_children")
+    # Creator has its own governed child mapping; unrelated Forge overlays remain.
+    overlays = forge.get("overlay_children", [])
+    assert "creator" not in overlays
+    assert overlays == sorted(set(overlays))
     assert creator["source"] == "skeleton/forge/creator"
     assert creator["destination"] == "skeleton/ai/forge/creator"
