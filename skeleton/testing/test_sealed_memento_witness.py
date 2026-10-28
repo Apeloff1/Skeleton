@@ -521,3 +521,74 @@ def test_unretired_mismatch_still_denies_physical_deletion():
         assert len(m.rows) == 2
 
     asyncio.run(scenario())
+
+
+def test_witnessed_publication_and_retirement_hold_source_epoch_until_acknowledged():
+    """Canonical reads cannot see a stable epoch before external witness CAS."""
+    from skeleton.persistence.mongo_source_epoch import (
+        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+    )
+    from skeleton.testing.test_mongo_source_epoch import Database
+
+    async def scenario():
+        archive, mongo, witness, guard = setup()
+        epoch = MongoCanonicalSourceEpoch(Database())
+        mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch)
+        await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
+        original_cas = witness.compare_and_set
+        acknowledged = []
+
+        async def inspected_cas(**kwargs):
+            with pytest.raises(MongoSourceEpochError, match="writing"):
+                await epoch.read_epoch(
+                    tenant_id="tenant", actor_id="owner", context_id="thread",
+                )
+            acknowledged.append(kwargs["successor"].revision)
+            return await original_cas(**kwargs)
+
+        witness.compare_and_set = inspected_cas
+        await add(archive, guard)
+        assert acknowledged == [2]
+        assert await epoch.read_epoch(
+            tenant_id="tenant", actor_id="owner", context_id="thread",
+        ) == 4
+
+        assert await guard.retire_thread(archive=archive) == 1
+        assert acknowledged == [2, 3]
+        assert await epoch.read_epoch(
+            tenant_id="tenant", actor_id="owner", context_id="thread",
+        ) == 6
+
+    asyncio.run(scenario())
+
+
+def test_unacknowledged_witness_commit_quarantines_canonical_source_epoch():
+    """A durable Mongo frame with no witness CAS is not a stable source state."""
+    from skeleton.persistence.mongo_source_epoch import (
+        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+    )
+    from skeleton.testing.test_mongo_source_epoch import Database
+
+    async def scenario():
+        archive, mongo, witness, guard = setup()
+        epoch = MongoCanonicalSourceEpoch(Database())
+        mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch)
+        await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
+        witness.reject = True
+        head = MementoCatalogHead()
+        wire, _ = archive.seal(
+            MementoRecord(1, "user", b"unacknowledged"),
+            previous=head,
+        )
+        with pytest.raises(MementoWitnessIndeterminate):
+            await guard.publish(
+                archive=archive, expected_head=head, expected_thread_version=1,
+                stream="user", ciphertext=wire,
+            )
+        assert mongo.head.serial == 1
+        with pytest.raises(MongoSourceEpochError, match="quarantined"):
+            await epoch.read_epoch(
+                tenant_id="tenant", actor_id="owner", context_id="thread",
+            )
+
+    asyncio.run(scenario())
