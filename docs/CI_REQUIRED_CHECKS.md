@@ -88,3 +88,8 @@ scripts/configure_main_protection.sh --verify    # admin-only: verify
 Do not replace the deterministic summary with a changing list of individual job
 names. Renaming the workflow, job, or a lane is a policy change: update
 `.github/ci/required-checks.json` and the protection configuration together.
+
+
+## Operational enforcement gap — 2026-10-28
+
+At main `6cdd2bb5e7b5f186671790b1ea63cf1dded8c020`, live GitHub branch metadata reported `protected=false` and no enforced required checks. A successful workflow or committed required-check policy is **not** equivalent to branch protection. The owner-side `scripts/configure_main_protection.sh --apply` and `--verify` commands require an administrative GitHub CLI credential and must both complete before release certification. The automatic reconciliation lane rejects merge mutations if `main` is unprotected or protection cannot be read. Manual/direct pushes are not protected until GitHub branch protection is enabled. Review `docs/security/SECURITY_STATUS.md` for the current operational and production qualification blockers.

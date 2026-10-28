@@ -1,4 +1,8 @@
-# NEXT — factory queue (CoS, 2026-10-24)
+# NEXT — current release blockers and historical factory queue
+
+> **Live operational review — 2026-10-28, main `6cdd2bb5e7b5`.** The table below is a historical 2026-10-24 shift assignment, **not** a current PR queue or release approval. The live pull-request API returned 0 open PRs at this snapshot. Main had no GitHub branch protection or required status contexts; Merge Readiness and security/E2E checks for this head were queued, not green. 166 workflow runs were queued across branches. Restore GitHub enforcement with `scripts/configure_main_protection.sh --apply` using an authorized admin login, then `--verify` and `python scripts/merge_readiness_status.py --ref main --json`. The automated merge lane now denies mutation while `main` is unprotected; the historical cleanup retains 19 provider-refused HTTP 403 IDs (do not imply deletion). Context-archive KMS/witness, writer migration and restoration drills remain separate production-release evidence. See `docs/security/SECURITY_STATUS.md`.
+
+## Archived factory queue — 2026-10-24
 
 Factory-style work, **no Cursor cloud agents**. Source of truth for claims: `artifacts/COS/FANOUT.md` + `artifacts/COS/STATUS.md`.
 

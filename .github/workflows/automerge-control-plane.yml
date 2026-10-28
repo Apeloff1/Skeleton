@@ -143,6 +143,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A configured policy file is not GitHub enforcement. Refuse all
+          # automatic mutations while the target branch is unprotected or
+          # when its protection state cannot be read reliably.
+          protected="$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/branches/${AUTOMERGE_DEFAULT_BRANCH}" --jq '.protected')"
+          if [[ "$protected" != "true" ]]; then
+            echo "::error::Auto-merge refused: GitHub default branch protection is not enabled"
+            exit 1
+          fi
           python -m skeleton.pr_automation.automerge_cli             --repo "$GITHUB_REPOSITORY"             --base "$AUTOMERGE_DEFAULT_BRANCH"             --ledger "$AUTOMERGE_LEDGER_PATH"             --report-json "$AUTOMERGE_REPORT_PATH"
 
       - name: Upload reconciliation evidence

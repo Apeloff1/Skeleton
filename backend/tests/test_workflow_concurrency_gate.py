@@ -541,3 +541,24 @@ def test_reusable_ci_preserves_immutable_main_sha_evidence() -> None:
     unsafe = workflow.replace(cancel, "cancel-in-progress: true")
     assert unsafe != workflow
     assert not check_toolchain_contract.ci_preserves_main_run_evidence(unsafe)
+
+
+
+def test_owner_historical_cleanup_uses_dispatch_unique_outer_and_authorized_job_lock() -> None:
+    """Issue-comment wakeups must not occupy/cancel the owner cleanup job slot."""
+    root = Path(__file__).resolve().parents[2]
+    source = (root / ".github/workflows/owner-historical-actions-cleanup.yml").read_text(
+        encoding="utf-8"
+    )
+    record, findings = concurrency.violations_from_text(
+        "owner-historical-actions-cleanup.yml", source
+    )
+    assert findings == []
+    assert record is not None
+    assert "github.run_id" in record.template
+    assert "cancel-in-progress: false" in source
+    assert "github.actor == github.repository_owner" in source
+    assert "github.event.issue.number == 3902" in source
+    assert "github.event.comment.body == '/owner-historical-cleanup-30-arm-v5'" in source
+    # Unrelated comments do not share any workflow-level lock.
+    assert "group: owner-historical-actions-cleanup-v5-arm-${{ github.repository }}" in source

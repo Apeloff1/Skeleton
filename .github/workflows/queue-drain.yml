@@ -32,7 +32,9 @@ jobs:
     # Queue recovery must remain schedulable when the ARM runner pool is
     # saturated. This job uses only portable Python stdlib and Bash;
     # the exact-head and security-safe cancellation rules are unchanged.
-    runs-on: ubuntu-latest
+    # ARM recovered earlier stalled Actions cleanup; use its independent runner
+    # pool instead of waiting behind the already congested ubuntu-latest lane.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
