@@ -44,6 +44,44 @@ def independently_triggered(found: set[str]) -> bool:
     return bool(found - {"workflow_dispatch", "workflow_call"})
 
 
+
+# These two one-shot workflows only run when their own YAML is changed on
+# their exact, pinned branch. They cannot multiply routine main/PR CI work.
+# Match the *entire* trigger block, not just an event or filename: any wider
+# trigger immediately consumes the normal 20-workflow admission budget.
+SELF_ONLY_MAINTENANCE_TRIGGERS = {
+    "expo54-lockfile-repair.yml": """on:
+  workflow_dispatch:
+  push:
+    branches:
+      - repair/expo54-lockfile-20261027
+    paths:
+      - '.github/workflows/expo54-lockfile-repair.yml'""",
+    "historical-zero-job-canary.yml": """on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/historical-zero-job-canary.yml']""",
+}
+
+
+def self_only_maintenance_trigger(name: str, source: str) -> bool:
+    """Recognize two pinned, self-change-only maintenance admissions."""
+    expected = SELF_ONLY_MAINTENANCE_TRIGGERS.get(name)
+    if expected is None:
+        return False
+    lines = source.splitlines()
+    if lines.count("on:") != 1:
+        return False
+    start = lines.index("on:")
+    end = next(
+        (i for i in range(start + 1, len(lines))
+         if lines[i] and not lines[i][0].isspace()
+         and not lines[i].startswith("#")),
+        len(lines),
+    )
+    return "\n".join(lines[start:end]).strip() == expected
+
+
 def audit(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     try:
@@ -70,18 +108,22 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # Signed evidence workflows may sit beside the compact PR set when they
-    # cannot run automatically. Only non-manual triggers consume the cap.
+    # Preserve the 20 general automatic-admission ceiling. Two pinned,
+    # self-change-only maintenance workflows cannot fan out on normal pushes
+    # or pull requests; any trigger widening immediately counts against it.
     automatic = 0
     for path in active:
         try:
-            found = events(path.read_text(encoding="utf-8"))
+            source = path.read_text(encoding="utf-8")
+            found = events(source)
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
-        if independently_triggered(found):
+        if independently_triggered(found) and not self_only_maintenance_trigger(
+            path.name, source
+        ):
             automatic += 1
     if automatic > 20:
         failures.append(f"unexpected active workflow count: {automatic}")

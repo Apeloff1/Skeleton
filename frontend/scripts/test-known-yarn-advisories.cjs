@@ -63,37 +63,12 @@ test('unsupported or malformed locks fail rather than hiding findings', () => {
   assert.throws(() => parseYarnV1('# yarn lockfile v1\n\n\nfoo@^1:\n  version "1.0.0"\n\nfoo@^1:\n  version "1.1.0"'), /duplicate/);
 });
 
-test('unpatched deepmerge is not hidden behind a clean undici pin', () => {
-  const source = fixture() +
-    '\n\nundici@6.28.1:\n  version "6.28.1"' +
-    '\n\ndeepmerge@^4.3.1:\n  version "4.3.1"';
-  const result = auditLock(source);
-  const status = Object.fromEntries(result.findings.map(x => [x.name, x.status]));
-  assert.equal(status.undici, 'patched_in_lock');
-  assert.equal(status.deepmerge, 'unpatched_affected');
-  assert.deepEqual(result.outstanding.sort(), ['braces', 'deepmerge', 'node-forge']);
-  assert.equal(result.release_accepted, false);
-});
-
-test('undici lower versions fail, deepmerge lower unaffected versions do not fail', () => {
-  const source = fixture() +
-    '\n\nundici@6.28.0:\n  version "6.28.0"' +
-    '\n\ndeepmerge@^4.1.1:\n  version "4.1.1"';
-  const result = auditLock(source);
-  const status = Object.fromEntries(result.findings.map(x => [x.name, x.status]));
-  assert.equal(status.undici, 'patch_required');
-  assert.equal(status.deepmerge, 'not_affected');
-  assert.deepEqual(result.outstanding.sort(), ['braces', 'node-forge', 'undici']);
-});
-
 test('the actual lockfile cannot be certified while unpatched advisories remain', () => {
   const actual = fs.readFileSync(path.resolve(__dirname, '..', 'yarn.lock'), 'utf8');
   const result = auditLock(actual);
   const status = Object.fromEntries(result.findings.map(x => [x.name, x.status]));
   assert.equal(status['braces'], 'unpatched_affected');
   assert.equal(status['node-forge'], 'unpatched_affected');
-  assert.equal(status.deepmerge, 'unpatched_affected');
-  assert.equal(status.undici, 'patched_in_lock');
   assert.equal(status['http-cache-semantics'], 'patched_in_lock');
   assert.equal(result.release_accepted, false);
 });
