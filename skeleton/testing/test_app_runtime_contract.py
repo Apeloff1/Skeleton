@@ -103,6 +103,39 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
     assert "readiness unavailable" not in json.dumps(payload)
 
 
+
+def test_product_readiness_unavailable_never_reports_healthy(monkeypatch):
+    runtime = _runtime_module()
+
+    class HealthyDB:
+        async def command(self, name: str):
+            assert name == "ping"
+            return {"ok": 1}
+
+    async def healthy_engine(_timeout: float):
+        return {
+            "name": "skeleton",
+            "ok": True,
+            "status": 200,
+            "latency_ms": 1,
+            "detail": "healthy",
+        }
+
+    def unavailable_readiness():
+        raise RuntimeError("readiness provider unavailable")
+
+    monkeypatch.setattr(runtime, "core_db", HealthyDB())
+    monkeypatch.setattr(runtime, "_probe_engine", healthy_engine)
+    monkeypatch.setattr(runtime, "public_readiness", unavailable_readiness)
+
+    payload = asyncio.run(runtime._runtime_status(500))
+    assert all(service["ok"] for service in payload["services"])
+    assert payload["product"]["available"] is False
+    assert payload["product"]["detail"] == "RuntimeError"
+    assert payload["ok"] is False
+    assert "readiness provider unavailable" not in json.dumps(payload)
+
+
 def test_ready_endpoint_uses_http_status_for_whole_app_verdict(monkeypatch):
     runtime = _runtime_module()
 
