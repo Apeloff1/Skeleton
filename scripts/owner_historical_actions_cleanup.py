@@ -232,7 +232,10 @@ def main() -> int:
         return 0
     counters = {"confirmed_deleted": 0, "already_absent_or_moved": 0,
                 "provider_refusal": 0, "skipped_by_budget": 0}
-    # Oldest evidence first; stop immediately on a provider-side refusal.
+    refused_ids: list[int] = []
+    # Refusals apply to individual immutable runs, not the whole batch.
+    # Preserve the refused run and continue only independently proven IDs.
+    # Rate limiting or unexpected errors stop immediately.
     for index, row in enumerate(MANIFEST):
         if time.monotonic() - start > LIMIT_SECONDS or counters["confirmed_deleted"] >= MAX_DELETES:
             counters["skipped_by_budget"] += len(MANIFEST) - index
@@ -247,11 +250,25 @@ def main() -> int:
             continue
         # An accepted DELETE is not a confirmed deletion.
         status, detail = request("DELETE", f"/actions/runs/{run_id}")
-        if status != 204:
-            print(f"Provider rejected owner deletion: {run_id} HTTP {status}; "
-                  "stopping without touching further historical records")
+        if status in (403, 409, 422):
+            reason = str(detail).lower()
+            if "rate limit" in reason or "abuse" in reason or "too many requests" in reason:
+                raise RuntimeError(
+                    f"GitHub API rate limitation on historical run {run_id}: HTTP {status}"
+                )
+            # Provider rejection protects this specific run; don't retry it,
+            # bypass permissions, or infer deletion from a non-204 response.
             counters["provider_refusal"] += 1
-            break
+            refused_ids.append(run_id)
+            print(
+                f"Preserving provider-refused historical run {run_id}: "
+                f"HTTP {status}; moving to independently verified IDs"
+            )
+            continue
+        if status != 204:
+            raise RuntimeError(
+                f"Unexpected DELETE response for run {run_id}: HTTP {status}"
+            )
         verify_status, _ = request("GET", f"/actions/runs/{run_id}")
         if verify_status != 404:
             raise RuntimeError(
@@ -260,6 +277,7 @@ def main() -> int:
         counters["confirmed_deleted"] += 1
         print(f"Owner deletion verified by 404: run={run_id}")
     print("Owner historical cleanup:", json.dumps(counters, sort_keys=True))
+    print("Provider-refused historical IDs:", refused_ids)
     summary = os.getenv("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as output:
@@ -267,6 +285,7 @@ def main() -> int:
             output.write("Canary: original success or independently verified first DELETE; GET 404\n")
             for key, value in counters.items():
                 output.write(f"- {key}: {value}\n")
+            output.write(f"- Provider-refused IDs: {refused_ids}\n")
     return 1 if counters["provider_refusal"] else 0
 
 
