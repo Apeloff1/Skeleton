@@ -401,3 +401,57 @@ def test_witness_configured_canonical_owner_denies_legacy_publication(suite):
     asyncio.run(scenario())
     assert not owner.database.rows["conversation_memento_frames"]
     assert "_sealed_memento_head" not in owner.database.rows["conversation_threads"]["t1"]
+
+
+def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch(suite, monkeypatch):
+    """Real archive-frame transactions are fenced by the canonical writer."""
+    from skeleton.persistence.mongo_source_epoch import (
+        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+    )
+    from skeleton.testing.test_mongo_source_epoch import Database
+    import pymongo
+
+    monkeypatch.setattr(
+        pymongo, "ReturnDocument", SimpleNamespace(AFTER="after"),
+        raising=False,
+    )
+    conversation, mongo, archive, _ = suite
+    writer_epoch = MongoCanonicalSourceEpoch(Database())
+    conversation.canonical_source_epoch = writer_epoch
+
+    async def scenario():
+        with pytest.raises(MongoSourceEpochError, match="writer epoch not owned"):
+            previous = MementoCatalogHead()
+            wire, _ = archive.seal(
+                MementoRecord(1, "user", b"initial"),
+                previous=previous,
+            )
+            await mongo.publish(
+                archive=archive, expected_head=previous,
+                expected_thread_version=3, stream="user", ciphertext=wire,
+            )
+        assert conversation.storage_calls == 0
+        await writer_epoch.provision_migration_epoch(
+            tenant_id="tenant", actor_id="owner",
+        )
+        published = await mongo.publish(
+            archive=archive, expected_head=previous,
+            expected_thread_version=3, stream="user", ciphertext=wire,
+        )
+        assert published.serial == 1
+        assert await writer_epoch.read_epoch(
+            tenant_id="tenant", actor_id="owner", context_id="t1",
+        ) == 4
+        page = await mongo.read_window(archive=archive)
+        assert [record.content for record in page.records] == [b"initial"]
+        deleted = await mongo.retire_thread(
+            tenant_id="tenant", owner_id="owner", thread_id="t1",
+        )
+        assert deleted == 1
+        assert await writer_epoch.read_epoch(
+            tenant_id="tenant", actor_id="owner", context_id="t1",
+        ) == 6
+        with pytest.raises(SealedContextBoundaryError, match="retired"):
+            await mongo.trusted_head(archive=archive)
+
+    asyncio.run(scenario())
