@@ -3405,9 +3405,12 @@ class ProviderRegistry:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         retain_unavailable: bool = False,
+        guarded_components: Any | None = None,
     ) -> ProviderRegistry:
         try:
-            return cls._from_env(admission_runtime=admission_runtime)
+            return cls._from_env(
+                admission_runtime=admission_runtime, guarded_components=guarded_components,
+            )
         except ProviderUnavailableError:
             if not retain_unavailable or os.getenv("AI_PROVIDER", "openai").strip().lower() != "local":
                 raise
@@ -3440,8 +3443,14 @@ class ProviderRegistry:
         cls,
         *,
         admission_runtime: AdmissionRuntime | None = None,
+        guarded_components: Any | None = None,
     ) -> ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
+        if guarded_components is not None:
+            from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+
+            if active != "local" or not isinstance(guarded_components, ProtectedLocalComponents):
+                raise ProviderPolicyError("protected local components require a trusted local provider")
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         secondary_values = {
@@ -3475,6 +3484,7 @@ class ProviderRegistry:
                 default_cache_size=0 if catalog_path or deployment_path else 128
             )
             local_admission = admission_runtime or AdmissionRuntime()
+            require_guarded_inference = guarded_components is not None
 
             def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
                 return _GovernedLocalAdapter(
@@ -3489,6 +3499,8 @@ class ProviderRegistry:
                         catalog_path,
                         cache_size=cache_size,
                         default_seed=default_seed,
+                        require_guarded_inference=require_guarded_inference,
+                        guarded_components=guarded_components,
                         **capacity,
                     )
                 except (LocalModelCatalogError, OSError, TypeError, ValueError) as exc:
@@ -3515,6 +3527,8 @@ class ProviderRegistry:
                         cache_size=cache_size,
                         default_seed=default_seed,
                         rehash_artifacts_each_run=True,
+                        require_guarded_inference=require_guarded_inference,
+                        guarded_components=guarded_components,
                         **capacity,
                     )
                 except (LocalModelDeploymentError, OSError, TypeError, ValueError) as exc:
@@ -3529,15 +3543,27 @@ class ProviderRegistry:
                 )
 
                 loaded = load_local_model_artifact(model_path)
-                local_adapter = LocalModelAdapter(
-                    LocalInferenceEngine(
-                        loaded.model,
-                        cache_size=cache_size,
-                        **capacity,
-                    ),
-                    default_seed=default_seed,
-                    artifact_status=loaded.receipt.as_dict(),
+                engine = LocalInferenceEngine(
+                    loaded.model,
+                    cache_size=cache_size,
+                    require_guarded_context=require_guarded_inference,
+                    **capacity,
                 )
+                if require_guarded_inference:
+                    from skeleton.ai.runtime.inference.guarded_composition import compose_protected_local_adapter
+
+                    local_adapter = compose_protected_local_adapter(
+                        engine,
+                        components=guarded_components,
+                        default_seed=default_seed,
+                        artifact_status=loaded.receipt.as_dict(),
+                    )
+                else:
+                    local_adapter = LocalModelAdapter(
+                        engine,
+                        default_seed=default_seed,
+                        artifact_status=loaded.receipt.as_dict(),
+                    )
             except (LocalModelArtifactError, TypeError, ValueError) as exc:
                 raise ProviderUnavailableError("local provider model artifact failed activation") from exc
             return cls(
