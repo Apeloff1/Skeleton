@@ -952,15 +952,6 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         except Exception:
             pass
 
-    # Cache the full batch result — MASSIVE cap bump for AAA-scale volume.
-    # Floor: every batch guarantees ≥ 600 files even if phase generation was
-    # light; ceiling 10,000 per batch to allow AAA cranked-slider builds to
-    # reach 100k+ total files without memory explosion.
-    # BATCH_CAP/FLOOR tuned 16× bigger than original: BATCH_CAP lifted 2× on
-    # top of the 4× tier (3000→12000→24000) so heavy builds can fill cap;
-    # BATCH_FLOOR kept at 800 so 8-way parallel padding stays under ~3 GB
-    # peak. The big scale-up happens in the SERIAL floor pass below which
-    # reaches 96k+ files safely.
     # ═══ Apply per-category phase_weights from user settings (v7) ═══
     # User can dial any batch category from 0× (skip) to 3× (triple emphasis).
     # Maps directly to BATCH_NAMES keys (foundation, core_mechanics, etc.).
@@ -977,8 +968,6 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         weight = 1.0
     # Clamp for safety
     weight = max(0.0, min(3.0, weight))
-    BATCH_CAP = 24000
-    BATCH_FLOOR = 0 if _explicit_file_budget(build) is not None else int(800 * weight)      # 0 → skipped, 1.0 → 800, 2.0 → 1600
     if weight == 0.0:
         # Honor skip: emit a single marker file and return
         marker = {
@@ -992,17 +981,8 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         return accepted
     _check_build_continuation(build)
     if batch_files:
-        if len(batch_files) > BATCH_CAP:
-            batch_files = dict(list(batch_files.items())[:BATCH_CAP])
-        # Floor-padding — augment with synthetic-but-real expansion files
-        if len(batch_files) < BATCH_FLOOR:
-            deficit = BATCH_FLOOR - len(batch_files)
-            batch_name = BATCH_NAMES.get(batch_num, f"batch_{batch_num}")
-            pad = _generate_floor_padding(batch_num, t, g, batch_name, deficit)
-            batch_files.update(pad)
-            print(f"[GALAXY] Batch {batch_num} floor-padded with {len(pad)} extra files (deficit was {deficit})")
         build["_gen_cache"][cache_key] = batch_files
-        print(f"[GALAXY] Batch {batch_num} complete: {len(batch_files)} files (cap={BATCH_CAP}, floor={BATCH_FLOOR})")
+        print(f"[GALAXY] Batch {batch_num} complete: {len(batch_files)} real generated files")
         # Heartbeat — watchdog reads this to detect zombie runners
         try:
             from datetime import datetime as _dt
