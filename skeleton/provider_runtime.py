@@ -3463,7 +3463,12 @@ class ProviderRegistry:
         )
         if active == "local" and (raw_guard in {"0", "false"} or require_guarded_local is False) and not development_legacy:
             raise ProviderUnavailableError("unguarded local model requires explicit development-only authorization")
-        guarded_required = raw_guard in {"1", "true"} or require_guarded_local is True or guarded_components is not None
+        guarded_required = (
+            (active == "local" and not development_legacy)
+            or raw_guard in {"1", "true"}
+            or require_guarded_local is True
+            or guarded_components is not None
+        )
         if guarded_required and active != "local":
             raise ProviderUnavailableError("guarded local dependencies require AI_PROVIDER=local")
         if guarded_required:
