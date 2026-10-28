@@ -322,6 +322,15 @@ def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, 
             raise MongoSourceEpochError("missing fenced Mongo memory mutation helper: " + name)
     if not callable(getattr(MongoMemoryRepository, "_require_canonical_writer", None)):
         raise MongoSourceEpochError("missing internal Mongo memory writer guard")
+    from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
+
+    # The ciphertext sidecar edits the canonical conversation's head and
+    # physically erases its frames. Keep both operations in the known source
+    # inventory: an un-fenced derivative writer breaks source epoch guarantees.
+    for name in ("publish", "retire_thread"):
+        method = getattr(MongoMementoAuthority, name, None)
+        if getattr(method, "__canonical_source_writer_fence__", None) != "memento":
+            raise MongoSourceEpochError("unfenced canonical memento writer: " + name)
 
 
 __all__ = [
