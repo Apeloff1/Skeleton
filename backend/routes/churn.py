@@ -10,8 +10,8 @@ never blocked, even when LLM enrichment is requested.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from routes.galaxy_studio_access import private_build_access
+from pydantic import BaseModel
 
 from core import churn_2_service as churn
 

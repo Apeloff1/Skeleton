@@ -6,8 +6,8 @@ BuildPlan DAG, execute it (async), and re-plan from any node.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from routes.galaxy_studio_access import private_build_access
+from pydantic import BaseModel
 
 from core import autonomous_orchestrator as orch
 
