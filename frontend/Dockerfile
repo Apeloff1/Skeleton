@@ -12,10 +12,12 @@ WORKDIR /app
 COPY package.json yarn.lock* ./
 COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
+COPY scripts/verify-no-release-npm-security.js scripts/verify-deepmerge-security.cjs ./scripts/
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-concurrency 4 --network-timeout 120000 \
     && node ./scripts/patch-node-modules.js \
+    && node ./scripts/verify-no-release-npm-security.js \
     && yarn cache clean
 
 # Stage 2: Development
