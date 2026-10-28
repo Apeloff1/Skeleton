@@ -512,3 +512,26 @@ def test_run_server_forwards_exact_trusted_native_bootstrap(monkeypatch):
         ("create", deployment),
         ("serve", application, "127.0.0.1", 8844),
     ]
+
+
+def test_direct_engine_startup_rejects_fake_canonical_owner_before_allocating_resources():
+    """Direct state binding cannot bypass the trusted lifespan bootstrap."""
+    from types import SimpleNamespace
+    from skeleton.persistence.mongo_source_epoch import (
+        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+    )
+    from skeleton.testing.test_mongo_source_epoch import Database
+
+    epoch = MongoCanonicalSourceEpoch(Database())
+    state = ServerState()
+    state.configure_engine_local_guard(trusted_components(reader(CanonicalLoader())))
+    state.configure_engine_canonical_mongo_owners(
+        conversation=SimpleNamespace(canonical_source_epoch=epoch),
+        memory=SimpleNamespace(canonical_source_epoch=epoch),
+        memory_namespace="memory", shared_epoch=epoch,
+        policy_sha256="a" * 64,
+    )
+    with pytest.raises(MongoSourceEpochError, match="production Mongo authority"):
+        state.bind_engine_execution_service()
+    assert state.engine_execution_service is None
+    assert state.engine_execution_coordinator is None
