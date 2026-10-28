@@ -1,9 +1,10 @@
 """Cancel GitHub Actions runs that have remained queued for more than three hours.
 
-Only the exact "queued" state is eligible. Re-fetch each candidate immediately
-before requesting ordinary cancellation; never force-cancel active jobs, alter
-required-check rules, or count a requested cancellation as a terminal result.
-Runs stuck in GitHub's provider-side HTTP 409 state remain visible failures.
+Only provably superseded or closed-PR runs in exact "queued" state are eligible.
+Re-fetch both PR and run state immediately before ordinary cancellation; never
+force-cancel active jobs, cancel required checks for a current PR head, alter
+branch protection, or count a requested cancellation as terminal. Provider HTTP
+409 errors remain explicitly unresolved.
 """
 from __future__ import annotations
 
@@ -25,6 +26,20 @@ MAX_PAGES = 10
 MAX_CANCEL_REQUESTS = 80
 REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 API_VERSION = "2022-11-28"
+SHA_PATTERN = re.compile(r"[a-fA-F0-9]{40}\\Z")
+# These legacy IDs have repeatedly returned provider-side HTTP 409 even
+# after safe ordinary and force-cancel requests. Keep one rotating canary,
+# rather than hammering all of them every fifteen minutes.
+PROVIDER_409_RUNS = frozenset({
+    34952509012, 34952509059, 34952509095, 34952518480,
+    34952518481, 34952518541, 34952526563, 34952526568,
+    34952526576, 34952531648, 34952531743, 34952531771,
+    37539069375, 37539069791, 37642345734, 37642355681,
+    37642358530, 37642383890, 37642388873, 37642398158,
+    37642398159, 37642398161, 37655496094, 37655496139,
+    37655521563, 37655522865, 37655530898, 38320296726,
+    38320664775, 38320664778, 38320665862,
+})
 
 
 class CleanupError(RuntimeError):
@@ -110,6 +125,50 @@ class GitHubActions:
                 return list(found.values())
         raise CleanupError("queued run inventory exceeds bounded page limit")
 
+    def confirmed_obsolete(self, row: dict[str, Any]) -> bool:
+        # No age-only cancellation of main CI, security scans, scheduled
+        # supervisors, CodeQL dynamic runs, or unassociated commits.
+        if row.get("event") != "pull_request":
+            return False
+        sha = row.get("head_sha")
+        branch = row.get("head_branch")
+        if not isinstance(sha, str) or not SHA_PATTERN.fullmatch(sha):
+            return False
+        if not isinstance(branch, str) or not branch:
+            return False
+        # GitHub omits pull_requests[] for many historical queued runs.
+        # Use its commit-to-PR association, never guess based on branch names.
+        matches = self.checked_get(
+            f"/repos/{self.repository}/commits/{sha}/pulls?per_page=100"
+        )
+        if not isinstance(matches, list) or len(matches) >= 100:
+            raise CleanupError("unverifiable commit-to-PR association")
+        found_obsolete = False
+        for item in matches:
+            if not isinstance(item, dict):
+                raise CleanupError("invalid commit-to-PR evidence")
+            number = item.get("number")
+            if type(number) is not int or number <= 0:
+                raise CleanupError("invalid associated PR number")
+            detail = self.checked_get(f"/repos/{self.repository}/pulls/{number}")
+            if not isinstance(detail, dict) or detail.get("number") != number:
+                raise CleanupError("PR identity changed during preflight")
+            base_repo = (detail.get("base") or {}).get("repo") or {}
+            head = detail.get("head") or {}
+            if base_repo.get("full_name") != self.repository:
+                continue
+            if head.get("ref") != branch:
+                continue
+            if detail.get("state") == "open" and head.get("sha") == sha:
+                return False  # Current required check: never cancel.
+            if detail.get("state") == "closed" or (
+                detail.get("state") == "open"
+                and isinstance(head.get("sha"), str)
+                and head["sha"] != sha
+            ):
+                found_obsolete = True
+        return found_obsolete
+
     def unchanged_and_queued(self, row: dict[str, Any], *, now: int, current: int) -> bool:
         run_id = row["id"]
         detail = self.checked_get(f"/repos/{self.repository}/actions/runs/{run_id}")
@@ -117,7 +176,12 @@ class GitHubActions:
             raise CleanupError("run identity changed during preflight")
         if detail.get("created_at") != row.get("created_at"):
             raise CleanupError("run creation timestamp changed during preflight")
+        for field in ("head_sha", "head_branch", "event", "path", "workflow_id"):
+            if detail.get(field) != row.get(field):
+                raise CleanupError(f"run {field} changed during preflight")
         if not stale_queued(detail, now=now, current=current):
+            return False
+        if not self.confirmed_obsolete(detail):
             return False
         jobs = self.checked_get(
             f"/repos/{self.repository}/actions/runs/{run_id}/jobs?per_page=100"
@@ -147,13 +211,24 @@ def cleanup(client: GitHubActions, *, now: int, current: int,
     counters = {
         "queued_seen": len(rows), "older_than_three_hours": len(stale),
         "considered": 0, "cancel_requested": 0, "confirmed_cancelled": 0,
-        "already_moved": 0, "provider_conflict": 0, "failed": 0,
+        "already_moved_or_protected": 0, "provider_conflict": 0, "failed": 0,
+        "provider_backed_off": 0,
         "deferred": max(0, len(stale) - MAX_CANCEL_REQUESTS),
     }
+    # Historical provider-409 tombstones are retried one at a time per six
+    # hours; current-head runs and unrelated new cancellations keep priority.
+    known = sorted(int(r["id"]) for r in stale if r["id"] in PROVIDER_409_RUNS)
+    canary = (
+        known[(now // (6 * 3600)) % len(known)]
+        if known and (now // 900) % 24 == 0 else None
+    )
     for row in stale[:MAX_CANCEL_REQUESTS]:
         ident = row["id"]
+        if ident in PROVIDER_409_RUNS and ident != canary:
+            counters["provider_backed_off"] += 1
+            continue
         if not client.unchanged_and_queued(row, now=int(time.time()), current=current):
-            counters["already_moved"] += 1
+            counters["already_moved_or_protected"] += 1
             continue
         counters["considered"] += 1
         if dry_run:
@@ -173,7 +248,7 @@ def cleanup(client: GitHubActions, *, now: int, current: int,
             counters["provider_conflict"] += 1
             print(f"provider refused queued cancellation: run={ident} http={status}")
         elif status == 404:
-            counters["already_moved"] += 1
+            counters["already_moved_or_protected"] += 1
         else:
             counters["failed"] += 1
             print(f"cancellation not accepted: run={ident} http={status}")
