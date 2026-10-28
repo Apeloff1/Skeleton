@@ -64,7 +64,6 @@ class LiteralPatchResult:
     patch_fingerprint: str
     edit_count: int
     evidence: tuple[AppliedEdit, ...]
-    proposal_edit_count: int
 
 
 def _fail(code: str):
@@ -164,10 +163,8 @@ def apply_literal_patch(source: str, response: str | bytes, *, expected_source_s
     raw_edits = proposal["edits"]
     if not isinstance(raw_edits, list) or not 1 <= len(raw_edits) <= MAX_EDITS:
         _fail("literal_patch_invalid_edits")
-    # Validate and charge every raw object before collapsing repeats. A model
-    # cannot evade the aggregate budget by repeating an otherwise valid edit.
-    validated = []
-    total = 0
+    located = []
+    seen, total = set(), 0
     for item in raw_edits:
         if not isinstance(item, dict) or set(item) != {"find", "replace"}:
             _fail("literal_patch_invalid_schema")
@@ -178,16 +175,9 @@ def apply_literal_patch(source: str, response: str | bytes, *, expected_source_s
             _fail("literal_patch_limit_exceeded")
         if anchor == replacement:
             _fail("literal_patch_no_change")
-        validated.append((anchor, replacement))
-
-    located = []
-    seen: dict[str, str] = {}
-    for anchor, replacement in validated:
         if anchor in seen:
-            if seen[anchor] != replacement:
-                _fail("literal_patch_duplicate_edit")
-            continue
-        seen[anchor] = replacement
+            _fail("literal_patch_duplicate_edit")
+        seen.add(anchor)
         position = _one_anchor(source, anchor)
         located.append((position, position + len(anchor), TextEdit("replace", anchor, replacement)))
     located.sort(key=lambda value: value[0])
@@ -214,5 +204,4 @@ def apply_literal_patch(source: str, response: str | bytes, *, expected_source_s
     after_digest = hashlib.sha256(current.encode("utf-8")).hexdigest()
     if after_digest == before_digest:
         _fail("literal_patch_no_change")
-    return LiteralPatchResult(current, before_digest, after_digest, plan.fingerprint, len(located),
-                              tuple(evidence), proposal_edit_count=len(raw_edits))
+    return LiteralPatchResult(current, before_digest, after_digest, plan.fingerprint, len(located), tuple(evidence))
