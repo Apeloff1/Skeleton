@@ -106,6 +106,13 @@ jobs:
           "pytest>=8,<9" "fastapi==0.161.1"
           "pydantic-settings>=2.15.0,<3" "httpx==0.28.1" "pymongo>=4,<5" "motor>=3,<4"
           "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2"
+      - name: Retain local-AI boilerplate qualification in the mandatory backend gate
+        if: steps.scope.outputs.full == 'true'
+        working-directory: ${{ github.workspace }}
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest skeleton/testing/test_local_ai_boilerplate.py
       - name: Install plan-only quality runtime
         if: steps.scope.outputs.plan_only == 'true'
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2.14.1,<3"

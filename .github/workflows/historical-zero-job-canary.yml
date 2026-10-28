@@ -1,9 +1,7 @@
 name: Historical Actions zero-job canary recovery
 
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/historical-zero-job-canary.yml']
+  workflow_dispatch:
 
 permissions: {}
 
@@ -49,7 +47,7 @@ jobs:
           if not token or (
               os.environ.get('GH_REPOSITORY') != REPO
               or os.environ.get('GH_REF') != 'refs/heads/main'
-              or os.environ.get('GH_EVENT') != 'push'
+              or os.environ.get('GH_EVENT') != 'workflow_dispatch'
           ):
               raise SystemExit('Refusing unexpected execution context')
 
