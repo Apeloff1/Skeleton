@@ -639,9 +639,9 @@ export function createCapability(id: string): any | null {{
 '''
 
 
-def generate_all_capabilities(build: dict, title: str, genre: str) -> Dict[str, str]:
+def generate_all_capabilities(build: dict, title: str, genre: str, *, files_factory=None) -> Dict[str, str]:
     """Generate the entire 40-capability codebase + registry. Safe & additive."""
-    files: Dict[str, str] = {}
+    files: Dict[str, str] = files_factory() if files_factory is not None else {}
     for spec in CAPABILITY_SPECS:
         try:
             files.update(generate_capability_files(spec, title, genre))
