@@ -73,6 +73,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     ENVIRONMENT=production \
+    GALAXY_BUILDS_VAULT_DIR=/app/data/builds_vault \
     CORS_ORIGINS=https://cors.invalid
 
 # Release version (from the repo-root VERSION file, passed by the release
