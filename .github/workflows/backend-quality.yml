@@ -106,6 +106,15 @@ jobs:
           "pytest>=8,<9" "fastapi==0.161.1"
           "pydantic-settings>=2.15.0,<3" "httpx==0.28.1" "pymongo>=4,<5" "motor>=3,<4"
           "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2"
+      - name: Share-route origin and URL injection regressions
+        if: steps.scope.outputs.full == 'true'
+        working-directory: ${{ github.workspace }}
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "backend"
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_share_page_security.py
       - name: Install plan-only quality runtime
         if: steps.scope.outputs.plan_only == 'true'
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2.14.1,<3"
