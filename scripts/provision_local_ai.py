@@ -451,6 +451,10 @@ def _platform_diagnostic(args):
     system, machine, libc = platform.system(), platform.machine().lower(), platform.libc_ver()[0]
     compatible = system == "Linux" and machine in {"x86_64", "amd64"} and libc == "glibc"
     if not compatible and not args.prepare_for_container:
+        if system == "Windows":
+            raise ValueError(
+                "Use an x86-64 WSL2 Linux filesystem to prepare the Linux container runtime."
+            )
         raise ValueError(
             "This runtime requires Linux x86_64 glibc; use explicit container preparation on another host."
         )
@@ -503,6 +507,16 @@ def provision(args) -> dict:
                     "SKELETON_LOCAL_MODEL_DIR": target.as_posix(),
                 },
             }
+        existing_empty = True
+    if platform_diagnostic["host_system"] == "Windows":
+        # An NTFS readonly hardlink cannot safely use the same unlink sequence
+        # as POSIX, and st_uid does not establish the operator's Windows ACL.
+        # Refuse before claiming a directory or transferring pinned artifacts.
+        raise ValueError(
+            "Native Windows acquisition is not yet qualified; provision from an "
+            "x86-64 WSL2 Linux filesystem for the Linux container."
+        )
+    if existing_empty:
         ownership = target.stat()
         if (
             not hasattr(os, "geteuid")
@@ -512,7 +526,6 @@ def provision(args) -> dict:
             raise ValueError(
                 "An existing empty directory must be operator-owned and not writable by other users."
             )
-        existing_empty = True
     if not args.download and (args.model is None or (args.runtime_archive is None and runtime_from is None)):
         raise ValueError("Supply both pinned local artifacts or explicitly request --download.")
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -626,7 +639,7 @@ def main() -> int:
     parser.add_argument(
         "--prepare-for-container",
         action="store_true",
-        help="prepare Linux x86_64 artifacts on another host; target container must support this runtime",
+        help="prepare Linux x86_64 artifacts on a supported host; on Windows use a WSL2 Linux filesystem",
     )
     parser.add_argument(
         "--download", action="store_true", help="explicitly download the selected pinned public model/runtime artifacts"
