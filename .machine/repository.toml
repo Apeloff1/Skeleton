@@ -69,7 +69,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/"]
+prefixes = ["skeleton/supply_chain/", "skeleton/security/", "skeleton/vault/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -132,7 +132,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "ai"
-prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/"]
+prefixes = ["skeleton/completion/", "skeleton/dna/", "skeleton/document_vision/", "skeleton/inference/", "skeleton/local_ai/", "skeleton/lora/", "skeleton/maximise/", "skeleton/modeling/", "skeleton/models/", "skeleton/multimodal/", "skeleton/p3/", "skeleton/p4/", "skeleton/p5/", "skeleton/sota/", "skeleton/speech/", "skeleton/training/", "skeleton/tutolage/", "skeleton/video/", "skeleton/vision/", "skeleton/visual/", "skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/"]
 owner = "ai-runtime"
 criticality = "high"
 purpose = "Canonical AI runtime, cognition, context, learning, model/provider adaptation and research-facing execution."
@@ -240,7 +240,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "application"
-prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/"]
+prefixes = ["skeleton/app_services/", "skeleton/cli/", "skeleton/client/", "skeleton/deck/", "skeleton/mobile/", "skeleton/router/", "skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/"]
 owner = "application-runtime"
 criticality = "high"
 purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."
@@ -258,7 +258,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "frontend"
-prefixes = ["frontend/"]
+prefixes = ["skeleton/frontend/", "frontend/"]
 owner = "frontend-runtime"
 criticality = "medium"
 purpose = "Canonical browser/mobile product shell and human-facing application interface."
@@ -294,7 +294,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "foundation"
-prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
+prefixes = ["skeleton/compat/", "skeleton/cs300/", "skeleton/domains/", "skeleton/house/", "skeleton/layers/", "skeleton/organs/", "skeleton/runtime/", "skeleton/runtimes/", "skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
 owner = "core-runtime"
 criticality = "critical"
 purpose = "Foundational contracts, kernel primitives, configuration and package-level boot architecture."
@@ -357,7 +357,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/ops/cockpit/","skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
+prefixes = ["skeleton/fix/", "skeleton/gameforge/", "skeleton/install/", "skeleton/jobs/", "skeleton/merge/", "skeleton/ops/", "skeleton/packaging/", "skeleton/ops/cockpit/","skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
@@ -366,7 +366,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "frontier-runtime"
-prefixes = ["skeleton/frontier/"]
+prefixes = ["skeleton/frontier_nav/", "skeleton/frontier/"]
 owner = "frontier-runtime"
 criticality = "high"
 purpose = "Frontier domain runtime fully decomposed into runtime/, progression/, ecology/, economy/, characters/, and game/ canonical subdomains; flat historical module paths remain compatibility-only."
@@ -465,7 +465,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "distributed"
-prefixes = ["skeleton/distributed/"]
+prefixes = ["skeleton/netcode/", "skeleton/realtime/", "skeleton/distributed/"]
 owner = "distributed-runtime"
 criticality = "critical"
 purpose = "Canonical distributed runtime infrastructure for federation, transport, election, consensus, synchronization and fleet coordination."
@@ -483,7 +483,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "godot.pointer"]
+prefixes = ["skeleton/audio/", "skeleton/emulation/", "skeleton/godot/", "skeleton/simulation/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and engine-adapter execution."
@@ -492,7 +492,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "quality"
-prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
+prefixes = ["skeleton/artifact/", "skeleton/artifacts/", "skeleton/errors/", "skeleton/gates/", "skeleton/verification/", "skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
 owner = "quality-plane"
 criticality = "high"
 purpose = "Evaluation, quality analysis, artifact assurance and reusable gate-plane implementation."
@@ -546,7 +546,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "tools"
-prefixes = ["skeleton/tools/"]
+prefixes = ["skeleton/connectors/", "skeleton/plugins/", "skeleton/tools/"]
 owner = "tool-runtime"
 criticality = "high"
 purpose = "Canonical governed tool execution edges, connector adapters and authenticated webhook integrations."
@@ -609,7 +609,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "docs"
-prefixes = ["docs/", "README", "BACKLOG", "CHANGELOG", "AGENTS", "CLAUDE", "GEMINI", "SECURITY", "LICENSE", "design_guidelines.json"]
+prefixes = ["skeleton/backlog/", "skeleton/documentation/", "skeleton/masterplan/", "skeleton/volumes/", "docs/", "README", "BACKLOG", "CHANGELOG", "AGENTS", "CLAUDE", "GEMINI", "SECURITY", "LICENSE", "design_guidelines.json"]
 owner = "documentation-plane"
 criticality = "medium"
 purpose = "Human-facing architecture, plans, runbooks, status, policy and project documentation."
