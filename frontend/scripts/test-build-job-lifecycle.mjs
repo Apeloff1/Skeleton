@@ -14,6 +14,29 @@ test('terminal statuses distinguish completion, cancellation and errors', () => 
   assert.equal(classifyBuildJob({ data: { job_status: 'error' } }), 'failed');
   assert.equal(classifyBuildJob({ data: { status: 'cancelled' } }), 'cancelled');
 });
+const custody = (patch = {}) => ({ runner_live: false, physical_workers: 0, stop_requested: false,
+  drain_pending: false, partial_artifacts: true, storage_failed: false, unflushed_files: 0, ...patch });
+test('physical work retains custody despite a terminal label', () => {
+  for (const status of ['completed', 'failed', 'cancelled']) {
+    for (const execution of [custody({ runner_live: true }), custody({ physical_workers: 1 }), custody({ drain_pending: true })]) {
+      assert.equal(classifyBuildJob({ status, execution }), 'pending', `${status} must wait for physical drain`);
+    }
+  }
+});
+test('success requires stopped work and durable output; retained artifact presence is valid', () => {
+  assert.equal(classifyBuildJob({ status: 'completed', execution: custody() }), 'completed');
+  for (const patch of [{ stop_requested: true }, { storage_failed: true }, { unflushed_files: 3 }]) {
+    assert.equal(classifyBuildJob({ status: 'completed', execution: custody(patch) }), 'pending');
+  }
+  assert.equal(classifyBuildJob({ status: 'cancelled', execution: custody({ stop_requested: true, unflushed_files: 3 }) }), 'cancelled');
+  assert.equal(classifyBuildJob({ status: 'failed', execution: custody({ storage_failed: true, unflushed_files: 3 }) }), 'failed');
+});
+test('malformed physical custody cannot unlock success', () => {
+  for (const execution of [null, [], {}, custody({ runner_live: 'false' }), custody({ physical_workers: -1 }),
+    custody({ physical_workers: 1.5 }), custody({ unflushed_files: Infinity }), custody({ storage_failed: undefined })]) {
+    assert.equal(classifyBuildJob({ status: 'completed', execution }), 'pending');
+  }
+});
 test('waiter polls sequentially and stops only at a terminal outcome', async () => {
   let calls = 0;
   const result = await watchBuildJob(async () => {

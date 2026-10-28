@@ -168,7 +168,7 @@ def test_default_smoke_profile_has_frontend_backend_and_engine():
 
 def test_frontend_clients_share_canonical_runtime_endpoints():
     root = find_repo_root(Path(__file__))
-    resolver = (root / "frontend/utils/apiBase.ts").read_text(encoding="utf-8")
+    resolver = (root / "frontend/src/utils/apiBase.ts").read_text(encoding="utf-8")
 
     assert "export const API_BASE" in resolver
     assert "export const SKELETON_API_BASE" in resolver
@@ -176,12 +176,13 @@ def test_frontend_clients_share_canonical_runtime_endpoints():
     assert "EXPO_PUBLIC_SKELETON_URL" in resolver
 
     expected_imports = {
-        "frontend/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
-        "frontend/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
-        "frontend/src/utils/apiClient.ts": "import { API_BASE } from '../../utils/apiBase';",
-        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from '../../utils/apiBase';",
-        "frontend/utils/safeFetch.ts": "import { API_BASE } from './apiBase';",
-        "frontend/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/utils/apiClient.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/product/aiChatClient.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/product/appHealthClient.ts": "import { API_BASE, SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
     }
     for relative, expected in expected_imports.items():
         source = (root / relative).read_text(encoding="utf-8")
@@ -190,7 +191,7 @@ def test_frontend_clients_share_canonical_runtime_endpoints():
 
 def test_frontend_skeleton_health_matches_engine_liveness_contract():
     root = find_repo_root(Path(__file__))
-    client = (root / "frontend/services/skeleton.ts").read_text(encoding="utf-8")
+    client = (root / "frontend/src/services/skeleton.ts").read_text(encoding="utf-8")
     routes = (root / "skeleton/api/routes.py").read_text(encoding="utf-8")
 
     assert "'/api/v1/health/live'" in client
@@ -204,7 +205,7 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    assert 'router = APIRouter(prefix="/api/admin/ops"' in ops
+    assert 'router = project_router(prefix="/api/admin/ops"' in ops
     assert '("routes.ops",' in registry
 
     required_routes = (
@@ -273,7 +274,7 @@ def test_wait_for_application_rejects_invalid_budget():
 
 def test_all_launcher_paths_converge_on_product_shell():
     root = find_repo_root(Path(__file__))
-    launch = (root / "frontend/components/LaunchCascade.tsx").read_text(encoding="utf-8")
+    launch = (root / "frontend/src/components/LaunchCascade.tsx").read_text(encoding="utf-8")
     welcome = (root / "frontend/app/welcome.tsx").read_text(encoding="utf-8")
     safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
 
@@ -297,13 +298,18 @@ def test_production_web_ingress_routes_both_application_apis():
     engine_location = directives.index("location ^~ /api/v1/ {")
     backend_location = directives.index("location ^~ /api/ {")
     assert engine_location < backend_location
-    assert "proxy_pass http://skeleton:8001;" in nginx
-    assert "proxy_pass http://backend:8001;" in nginx
+    assert "server skeleton:8001 resolve;" in nginx
+    assert "server backend:8001 resolve;" in nginx
+    assert "proxy_pass http://application_engine;" in nginx
+    assert "proxy_pass http://application_backend;" in nginx
 
 
 def test_frontend_security_probe_supplies_compose_upstream_names():
     root = find_repo_root(Path(__file__))
-    workflow = (root / ".github/workflows/dependency-security.yml").read_text(encoding="utf-8")
+    active = root / ".github/workflows/dependency-security.yml"
+    archived = root / ".github/workflows-archive/dependency-security.yml"
+    # Validate the retained probe definition, independently of its execution schedule.
+    workflow = (active if active.is_file() else archived).read_text(encoding="utf-8")
 
     assert "--add-host skeleton:127.0.0.1" in workflow
     assert "--add-host backend:127.0.0.1" in workflow
@@ -458,7 +464,7 @@ def test_public_product_readiness_route_is_registered():
 
 def test_product_routes_are_registered_in_canonical_route_registry():
     root = find_repo_root(Path(__file__))
-    registry = (root / "frontend/utils/routeRegistry.ts").read_text(encoding="utf-8")
+    registry = (root / "frontend/src/utils/routeRegistry.ts").read_text(encoding="utf-8")
 
     for route in (
         "/product",
@@ -700,7 +706,7 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
     seen = []
 
     def probe(service, *, timeout):
-        seen.append((service.name, service.public_url))
+        seen.append((service.name, service.public_url, service.health_path))
         return ProbeResult(service.name, service.public_url, True, 200, "healthy")
 
     def http(name, url, *, timeout):
@@ -711,7 +717,23 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
     probe_application(
         full=True, public_url_overrides={"chroma": "http://localhost:8222"},
     )
-    assert ("chroma", "http://localhost:8222") in seen
+    assert ("chroma", "http://localhost:8222", "/api/v2/heartbeat") in seen
+
+
+def test_optional_chroma_unavailability_fails_full_readiness_only(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application, probes_ok
+
+    def probe(service, *, timeout):
+        ready = service.name != "chroma"
+        return ProbeResult(service.name, service.public_url, ready, 200 if ready else None, "observed")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", probe)
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_http",
+        lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
+    )
+    assert probes_ok(probe_application(full=False))
+    assert not probes_ok(probe_application(full=True))
 
 def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
     from skeleton.app.assembly import preflight

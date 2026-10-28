@@ -590,11 +590,11 @@ def get_capability_catalog() -> dict:
     }
 
 
-def generate_capability_files(spec: dict, title: str, genre: str) -> Dict[str, str]:
+def generate_capability_files(spec: dict, title: str, genre: str, *, files_factory=None) -> Dict[str, str]:
     """Generate the full file set for ONE capability (engine + mutations)."""
     cap = _camel(spec["id"])
     base = f"capabilities/{cap}"
-    files: Dict[str, str] = {}
+    files: Dict[str, str] = files_factory() if files_factory is not None else {}
     # 1) the big engine module
     files[f"{base}/{cap}Engine.ts"] = _gen_capability_engine(spec, title, genre)
     # 2) "mutate too": per-operator variants
@@ -639,13 +639,15 @@ export function createCapability(id: string): any | null {{
 '''
 
 
-def generate_all_capabilities(build: dict, title: str, genre: str) -> Dict[str, str]:
+def generate_all_capabilities(build: dict, title: str, genre: str, *, files_factory=None) -> Dict[str, str]:
     """Generate the entire 40-capability codebase + registry. Safe & additive."""
-    files: Dict[str, str] = {}
+    files: Dict[str, str] = files_factory() if files_factory is not None else {}
     for spec in CAPABILITY_SPECS:
         try:
-            files.update(generate_capability_files(spec, title, genre))
+            files.update(generate_capability_files(spec, title, genre, files_factory=files_factory))
         except Exception as e:  # one bad capability never sinks the rest
+            if isinstance(build, dict) and build.get("_bg_stop_requested"):
+                raise
             print(f"[GALAXY capabilities] {spec['id']} failed ({type(e).__name__})")
     files["capabilities/CapabilityRegistry.ts"] = _gen_capability_registry(title, genre)
     if isinstance(build, dict):

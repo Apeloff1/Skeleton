@@ -9,7 +9,7 @@ Why this matters:
   runtime. This script catches that mismatch at CI / pre-commit time.
 
 What it checks:
-  1. Every route declared in /app/frontend/utils/routeRegistry.ts has a
+  1. Every route declared in /app/frontend/src/utils/routeRegistry.ts has a
      corresponding /app/frontend/app/<route>.tsx file (or +not-found.tsx,
      index.tsx, etc. for special cases).
   2. Every /app/frontend/app/*.tsx file is referenced in the registry (so
@@ -48,7 +48,7 @@ except ImportError:
 # ── Resolve project paths ────────────────────────────────────────────
 REPO = Path(__file__).resolve().parent.parent
 APP_DIR  = REPO / "frontend" / "app"
-REG_FILE = REPO / "frontend" / "utils" / "routeRegistry.ts"
+REG_FILE = REPO / "frontend" / "src" / "utils" / "routeRegistry.ts"
 
 # Routes that map to special expo-router files (not 1:1 with a path).
 SPECIAL_MAP = {
@@ -100,12 +100,24 @@ def expected_filenames(route_path: str) -> list[str]:
 
 
 def scan_app_files() -> set[str]:
-    """Return set of relative paths (basenames + folder/index.tsx) inside /app."""
+    """Map Expo route groups to URL paths and reject ambiguous route files."""
     out: set[str] = set()
+    urls: dict[str, str] = {}
     for p in APP_DIR.rglob("*.tsx"):
         if not p.is_file(): continue
         rel = p.relative_to(APP_DIR).as_posix()
-        out.add(rel)
+        parts = [part for part in Path(rel).parts if not (part.startswith("(") and part.endswith(")"))]
+        normalized = "/".join(parts)
+        out.add(normalized)
+        if p.name in INFRA_FILES:
+            continue
+        route_parts = [*parts[:-1], parts[-1][:-4]]
+        if route_parts[-1] == "index":
+            route_parts.pop()
+        url = "/" + "/".join(route_parts)
+        if url in urls:
+            raise ValueError(f"duplicate Expo URL {url}: {urls[url]} and {rel}")
+        urls[url] = rel
     return out
 
 

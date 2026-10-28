@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import json
 import tempfile
 import unittest
 
 from skeleton.repo_machine.builder import RepositoryModelBuilder
-from skeleton.repo_machine.context import context_for_intent
+from skeleton.repo_machine.context import _bounded, context_for_intent
 from skeleton.repo_machine.growth import growth_recommendations
 from skeleton.repo_machine.metrics import structural_metrics
 from skeleton.repo_machine.ownership import analyze_ownership
@@ -115,6 +116,56 @@ class ContextWorkGraphTests(unittest.TestCase):
             model = fixture(Path(temp))
             context = context_for_intent(model, "overview", byte_limit=4096)
             self.assertIn("fingerprint", context)
+
+
+    def test_context_compaction_terminates_with_nonshrinking_metadata(self) -> None:
+        oversized = {
+            "intent": "overview",
+            "fingerprint": "a" * 64,
+            "health": {"large_evidence": "x" * 20000},
+            "coordination": {"decisions": [], "safe_parallel_groups": []},
+            "intelligence": {"decision_surface": [], "bridge_candidates": []},
+        }
+        context = _bounded(oversized, 4096)
+        self.assertEqual(context["fingerprint"], oversized["fingerprint"])
+        self.assertTrue(context["truncated_for_context"])
+        self.assertLessEqual(
+            len(json.dumps(context, sort_keys=True, separators=(",", ":")).encode()),
+            4096,
+        )
+        self.assertEqual(context, _bounded(oversized, 4096))
+        self.assertIn("health", oversized)  # Input is never mutated.
+
+    def test_oversized_required_execution_constraints_fail_closed(self) -> None:
+        from skeleton.repo_machine.context import _bounded
+
+        payload = {
+            "intent": "overview", "fingerprint": "f" * 64,
+            "execution": {"state": {"failed_work": ["constraint" * 1000]}},
+        }
+        with self.assertRaisesRegex(ValueError, "required repository context"):
+            _bounded(payload, 4096)
+        self.assertEqual(payload["execution"]["state"]["failed_work"], ["constraint" * 1000])
+
+    def test_compaction_retains_required_execution_state_and_constraints(self) -> None:
+        payload = {
+            "intent": "repair",
+            "fingerprint": "f" * 64,
+            "health": {"evidence": "x" * 8000},
+            "execution": {
+                "state": {"failed_work": ["task-42"]},
+                "constraints": {"source_digest": "a" * 64},
+                "steps": [{"details": "y" * 3000} for _ in range(4)],
+                "parallel_batches": [["b" * 2000] for _ in range(4)],
+            },
+        }
+        result = _bounded(payload, 4096)
+        self.assertLessEqual(len(json.dumps(result, sort_keys=True, separators=(",", ":")).encode()), 4096)
+        self.assertEqual(result["fingerprint"], payload["fingerprint"])
+        self.assertEqual(result["execution"]["state"], payload["execution"]["state"])
+        self.assertEqual(result["execution"]["constraints"], payload["execution"]["constraints"])
+        self.assertTrue(result["truncated_for_context"])
+        self.assertEqual(len(payload["execution"]["steps"]), 4)
 
 
 class GrowthTests(unittest.TestCase):

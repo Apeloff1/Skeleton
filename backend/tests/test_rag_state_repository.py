@@ -148,6 +148,7 @@ def test_cocoding_lookup_is_bound_to_user_ownership() -> None:
     repo.put_cocoding_context(
         session_id="code-1",
         user_id="owner-a",
+        tenant_id="tenant-a",
         pipeline="python",
         context="ctx",
         code_snippets=["print(1)"],
@@ -155,8 +156,10 @@ def test_cocoding_lookup_is_bound_to_user_ownership() -> None:
         timestamp="2026-09-21T18:00:00Z",
     )
 
-    assert repo.get_cocoding_context("code-1", user_id="owner-a") is not None
-    assert repo.get_cocoding_context("code-1", user_id="owner-b") is None
+    assert repo.get_cocoding_context("code-1", user_id="owner-a", tenant_id="tenant-a") is not None
+    assert repo.get_cocoding_context("code-1", user_id="owner-b", tenant_id="tenant-a") is None
+    assert repo.get_cocoding_context("code-1", user_id="owner-a", tenant_id="tenant-b") is None
+    assert repo.get_cocoding_context("code-1", user_id="owner-a") is None
 
 
 def test_feedback_identity_is_idempotent_and_stats_cover_authority() -> None:

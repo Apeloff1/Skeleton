@@ -1,6 +1,6 @@
 /** Account-scoped image bytes. Private API URLs never become image sources. */
 import { API_BASE } from '../utils/apiBase';
-import { prepareApiRequest } from '../auth/gameforgeAuth';
+import { prepareApiRequest } from '../utils/apiClient';
 
 export const MAX_PRIVATE_IMAGE_BYTES = 4 * 1024 * 1024;
 export const MAX_PRIVATE_IMAGE_PIXELS = 16 * 1024 * 1024;

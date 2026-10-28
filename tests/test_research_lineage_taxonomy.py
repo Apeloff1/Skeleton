@@ -32,7 +32,9 @@ def test_research_lineage_roots_are_historical_not_runtime_support() -> None:
     }
     assert set(specialized["prefixes"]) == {
         "skeleton/cue/",
+        "skeleton/dna/",
         "skeleton/genos/",
+        "skeleton/organs/",
         "skeleton/parse/",
         "skeleton/turn/",
     }

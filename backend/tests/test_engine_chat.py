@@ -10,6 +10,58 @@ from core.engine_text import EngineTextError, EngineTextResponse
 from skeleton.context.instruction_policy import InstructionPolicy
 
 
+def test_default_model_turn_allowance_preserves_existing_chat_identity():
+    chat = EngineChat(session_id="compatibility-session", system_message="Existing immutable rules.")
+    legacy = "engine-chat:3ba28e94978a78f22e91fdbf805f4d6ac4913a03a9db58ab205316b9833a184c"
+    assert chat._idempotency_key("Keep the original request.") == legacy
+    assert chat.with_max_model_turns(4)._idempotency_key("Keep the original request.") == legacy
+    assert chat.with_max_model_turns(1)._idempotency_key("Keep the original request.") != legacy
+    assert chat.with_max_model_turns(4)._idempotency_key("Keep the original request.") == legacy
+
+
+@pytest.mark.parametrize("value", [0, 5, -1, True, False, 1.0, "1", None])
+def test_chat_turn_allowance_only_accepts_strict_existing_range(value):
+    chat = EngineChat(session_id="unchanged-limit")
+    before = chat._idempotency_key("same request")
+    with pytest.raises(EngineTextError, match="max_model_turns"):
+        chat.with_max_model_turns(value)
+    assert chat._idempotency_key("same request") == before
+
+
+@pytest.mark.asyncio
+async def test_chat_single_turn_and_json_schema_delegate_to_existing_text_owner():
+    seen = []
+    async def execute(request):
+        seen.append(request)
+        return EngineTextResponse(text='{"edits":[]}', execution_id="single-turn", verification=None,
+                                  evidence_refs=(), usage={"model_turns": 1})
+    schema = {"type": "object", "properties": {"edits": {"type": "array", "items": {"type": "string"}}},
+              "required": ["edits"], "additionalProperties": False}
+    chat = EngineChat(session_id="bounded-patch", engine_executor=execute).with_max_model_turns(1).with_json_schema(schema)
+    await chat.send_message("Propose one bounded edit.")
+    assert len(seen) == 1
+    assert seen[0].max_model_turns == 1 and seen[0].structured_output_schema == schema
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("original_turns", [1, 4])
+async def test_explicit_turn_key_cannot_silently_reuse_a_different_turn_budget(original_turns):
+    seen = []
+    async def execute(request):
+        seen.append(request)
+        return EngineTextResponse(text="Original durable answer", execution_id="original-execution",
+                                  verification=None, evidence_refs=(), usage={"model_turns": 1})
+    chat = EngineChat(session_id="explicit-budget", turn_idempotency_key="same-explicit-turn", engine_executor=execute)
+    chat.with_max_model_turns(original_turns)
+    first = await chat.send_message("The exact same request")
+    key = chat._idempotency_key("The exact same request")
+    chat.with_max_model_turns(4 if original_turns == 1 else 1)
+    assert chat._idempotency_key("The exact same request") == key
+    with pytest.raises(EngineTextError, match="changed chat request"):
+        await chat.send_message("The exact same request")
+    assert len(seen) == 1 and str(first) == "Original durable answer"
+
+
 @pytest.mark.asyncio
 async def test_engine_chat_delegates_to_canonical_engine_text(monkeypatch):
     seen = []

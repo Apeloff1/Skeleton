@@ -6,6 +6,8 @@ import threading
 
 import pytest
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 from skeleton.ai.runtime.functional_ai import FunctionalAIRequest, FunctionalAIRuntime
 from skeleton.ai.runtime.inference import (
     CallableLocalModel,
@@ -27,9 +29,6 @@ from skeleton.skills.tool_contract import (
 )
 from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
-
-
-NOW = datetime(2026, 10, 2, 19, 45, tzinfo=timezone.utc)
 
 
 def _effect_model() -> LocalModelAdapter:
