@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from core import text_gamefile as tg
+from routes.galaxy_studio_access import require_owned_build
 
 router = APIRouter(prefix="/api/galaxy-studio/text-gamefile", tags=["text-gamefile"])
 
@@ -29,12 +30,14 @@ def generate(key: str, req: GenReq):
 
 
 class PruneReq(BaseModel):
-    build_id: str | None = None      # None → prune ALL forged gamefiles
+    build_id: str = Field(..., min_length=1)
 
 
 @router.post("/prune")
-def prune(req: PruneReq | None = None):
-    return tg.prune_gamefiles((req.build_id if req else None))
+def prune(req: PruneReq):
+    # Never fall back to an unscoped global deletion.
+    require_owned_build(req.build_id, mutation=True)
+    return tg.prune_gamefiles(req.build_id)
 
 
 @router.get("/{build_id}/list")

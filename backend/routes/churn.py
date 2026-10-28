@@ -67,6 +67,12 @@ def run_async(build_id: str, req: RunReq | None = None):
     return {"job_id": jid, "status": "running"}
 
 
+@router.post("/job/{job_id}/cancel")
+def cancel_job(job_id: str):
+    """Cancel only an authenticated, owned churn job."""
+    return churn.cancel_job(job_id)
+
+
 @router.get("/job/{job_id}")
 def job(job_id: str):
     return churn.get_job(job_id)
@@ -93,11 +99,12 @@ def apply(build_id: str, gid: str, req: ApplyReq):
 class DaemonReq(BaseModel):
     enabled: bool
     interval_s: int | None = None
+    build_ids: list[str] | None = None
 
 
 @router.post("/daemon/toggle")
 def daemon_toggle(req: DaemonReq):
-    return churn.toggle_daemon(req.enabled, req.interval_s)
+    return churn.toggle_daemon(req.enabled, req.interval_s, build_ids=req.build_ids)
 
 
 @router.get("/daemon/status")

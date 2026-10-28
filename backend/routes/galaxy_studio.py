@@ -176,7 +176,7 @@ PHASES_PER_BATCH = 10
 #   (4) at the start of every floor-pass chunk harvest loop.
 # Anything that touches "files" must honour this constant.
 # ═══════════════════════════════════════════════════════════════════════
-GLOBAL_FILE_BUDGET = int(os.environ.get("GALAXY_FILE_BUDGET", "25000"))
+GLOBAL_FILE_BUDGET = int(os.environ.get("GALAXY_FILE_BUDGET", "0"))  # 0 disables the optional file-count ceiling
 
 # Add computed pct to each phase entry
 for _i, _p in enumerate(BUILD_PHASES):
@@ -468,6 +468,24 @@ async def _load_build(build_id: str):
 _VAULT_FLUSH_THRESHOLD = int(os.environ.get("GALAXY_FLUSH_EVERY", "300"))
 
 
+def _reject_synthetic_artifact(path: str, content: str) -> None:
+    """Reject known padding signatures before they enter durable custody."""
+    if not isinstance(path, str) or not isinstance(content, str):
+        raise GalaxyBuildStopped("artifact_invalid")
+    normalized = path.replace("\\", "/").lower()
+    if normalized.startswith("expansions/") and "/generated_" in normalized:
+        raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
+    if "procedurally generated expansion file #" in content.lower():
+        raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
+    if normalized.startswith("skipped/") and normalized.endswith(".md"):
+        raise GalaxyBuildStopped("synthetic_skipped_phase_marker_rejected")
+    # Legacy floor-pass output is count padding, not authored game content.
+    if normalized.startswith("aaa_delivery_floor/"):
+        raise GalaxyBuildStopped("synthetic_floor_padding_rejected")
+    if normalized.startswith("padding/") or normalized.startswith("filler/"):
+        raise GalaxyBuildStopped("synthetic_padding_artifact_rejected")
+
+
 def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FLUSH_THRESHOLD) -> int:
     """Persist a bounded pending file set; a failed write stops more generation.
 
@@ -482,6 +500,9 @@ def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FL
         raise GalaxyBuildStopped("build_identity_missing")
     if build.get("_vault_write_failed"):
         raise GalaxyBuildStopped(str(build.get("_bg_stop_reason") or "vault_write_failed"))
+    # Fail closed before detaching or writing any pending artifact.
+    for path, content in files.items():
+        _reject_synthetic_artifact(path, content)
     snapshot = files
     build["files"] = {}
     try:
@@ -755,7 +776,7 @@ def _explicit_file_budget(build: dict) -> int | None:
     scale = build.get("scale_info")
     requested = scale.get("explicit_target_files") if isinstance(scale, dict) else None
     if isinstance(requested, int) and not isinstance(requested, bool) and requested > 0:
-        return min(requested, max(1, GLOBAL_FILE_BUDGET))
+        return min(requested, GLOBAL_FILE_BUDGET) if GLOBAL_FILE_BUDGET > 0 else requested
     return None
 
 
@@ -952,15 +973,6 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         except Exception:
             pass
 
-    # Cache the full batch result — MASSIVE cap bump for AAA-scale volume.
-    # Floor: every batch guarantees ≥ 600 files even if phase generation was
-    # light; ceiling 10,000 per batch to allow AAA cranked-slider builds to
-    # reach 100k+ total files without memory explosion.
-    # BATCH_CAP/FLOOR tuned 16× bigger than original: BATCH_CAP lifted 2× on
-    # top of the 4× tier (3000→12000→24000) so heavy builds can fill cap;
-    # BATCH_FLOOR kept at 800 so 8-way parallel padding stays under ~3 GB
-    # peak. The big scale-up happens in the SERIAL floor pass below which
-    # reaches 96k+ files safely.
     # ═══ Apply per-category phase_weights from user settings (v7) ═══
     # User can dial any batch category from 0× (skip) to 3× (triple emphasis).
     # Maps directly to BATCH_NAMES keys (foundation, core_mechanics, etc.).
@@ -977,32 +989,16 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         weight = 1.0
     # Clamp for safety
     weight = max(0.0, min(3.0, weight))
-    BATCH_CAP = 24000
-    BATCH_FLOOR = 0 if _explicit_file_budget(build) is not None else int(800 * weight)      # 0 → skipped, 1.0 → 800, 2.0 → 1600
     if weight == 0.0:
-        # Honor skip: emit a single marker file and return
-        marker = {
-            f"skipped/{BATCH_NAMES.get(batch_num, 'batch')}.md": (
-                f"# Batch {batch_num} ({BATCH_NAMES.get(batch_num,'?')}) skipped by user (weight=0)\n"
-            )
-        }
+        # A skipped phase produces no artifact. Never fabricate a marker file
+        # that would be counted as generated game content.
         accepted = _new_phase_files(build)
-        accepted.update(marker)
         build["_gen_cache"][cache_key] = accepted
         return accepted
     _check_build_continuation(build)
     if batch_files:
-        if len(batch_files) > BATCH_CAP:
-            batch_files = dict(list(batch_files.items())[:BATCH_CAP])
-        # Floor-padding — augment with synthetic-but-real expansion files
-        if len(batch_files) < BATCH_FLOOR:
-            deficit = BATCH_FLOOR - len(batch_files)
-            batch_name = BATCH_NAMES.get(batch_num, f"batch_{batch_num}")
-            pad = _generate_floor_padding(batch_num, t, g, batch_name, deficit)
-            batch_files.update(pad)
-            print(f"[GALAXY] Batch {batch_num} floor-padded with {len(pad)} extra files (deficit was {deficit})")
         build["_gen_cache"][cache_key] = batch_files
-        print(f"[GALAXY] Batch {batch_num} complete: {len(batch_files)} files (cap={BATCH_CAP}, floor={BATCH_FLOOR})")
+        print(f"[GALAXY] Batch {batch_num} complete: {len(batch_files)} real generated files")
         # Heartbeat — watchdog reads this to detect zombie runners
         try:
             from datetime import datetime as _dt
@@ -3148,34 +3144,13 @@ async def _run_background_build_inner(
             }
         )
         await _save_build_required(build)
-        if build["file_count"] >= GLOBAL_FILE_BUDGET and batch_num < TOTAL_BATCHES:
+        if GLOBAL_FILE_BUDGET > 0 and build["file_count"] >= GLOBAL_FILE_BUDGET and batch_num < TOTAL_BATCHES:
             raise GalaxyBuildStopped("artifact_file_budget_exhausted")
         await asyncio.to_thread(_worker_cooldown, context=f"after-batch-{batch_num}")
 
-    # Preserve the existing requested delivery floor while keeping physical
-    # custody and at most one small unharvested result. No RAM fallback on I/O
-    # failure and no further submissions until a durable append is confirmed.
-    complexity = int(build.get("complexity", 60) or 60)
-    floor_target = max(50000, 50000 + (complexity - 50) * 2500)
-    sliders = [
-        build.get(key, 0)
-        for key in (
-            "graphics_era",
-            "world_size",
-            "ai_complexity",
-            "physics_realism",
-            "narrative_branching",
-            "multiplayer_max",
-        )
-    ]
-    if any(int(value or 0) >= 8 for value in sliders):
-        floor_target += 75000
-    if all(int(value or 0) >= 9 for value in sliders):
-        floor_target += 125000
-    fusion = max(1.0, min(1.6, float(build.get("fusion_multiplier", 1.0) or 1.0)))
-    # Explicitly bounded builds receive real phase outputs only. Padding is
-    # not evidence of quality and must not inflate a caller's file ceiling.
-    floor_target = 0 if _explicit_file_budget(build) is not None else min(int(floor_target * fusion), GLOBAL_FILE_BUDGET)
+    # Do not impose an arbitrary minimum or synthesize filler files to meet
+    # a count. Actual durable generator output determines delivered size.
+    floor_target = 0
     from core import build_vault as _bv
 
     current_files = await asyncio.to_thread(_bv.get_file_count, build_id)
@@ -3985,7 +3960,7 @@ def _generate_expansion_files(
     vision = build.get("game_vision", "")
     from core import build_vault as _bv
 
-    existing_files = {item["path"] for item in _bv.list_file_paths(build["build_id"], limit=300000)}
+    existing_files = {item["path"] for item in _bv.list_file_paths(build["build_id"], limit=None)}
     existing_files.update((build.get("files") or {}).keys())
     generated_count = 0
 
@@ -3994,6 +3969,7 @@ def _generate_expansion_files(
         if generated_count >= target_expansion_files:
             raise _ExpansionTargetReached
         _check_build_continuation(build)
+        _reject_synthetic_artifact(path, content)
         emit_file(path, content)
         generated_count += 1
         existing_files.add(path)
@@ -4509,36 +4485,8 @@ def _generate_expansion_files(
                     ),
                 )
 
-    # ═══ SAFEGUARD: Guarantee 4X target is met ═══
-    # If we're still short, generate additional procedural filler files
-    current_count = generated_count
-    if current_count < target_expansion_files:
-        deficit = target_expansion_files - current_count
-        filler_categories = [
-            ("animations", "animation state machine with blend trees, transitions, IK targets, root motion"),
-            ("configs", "configuration preset with gameplay tuning parameters, balance values, difficulty curves"),
-            ("tests", "comprehensive test suite with unit tests, integration tests, edge cases, mocks"),
-            ("localization", "localization strings with translations, pluralization, RTL support, formatting"),
-            ("achievements", "achievement definition with conditions, rewards, progress tracking, display data"),
-            ("tutorials", "tutorial step with highlight targets, instruction text, validation, skip logic"),
-        ]
-        filler_idx = 0
-        while generated_count < target_expansion_files:
-            cat_name, cat_desc = filler_categories[filler_idx % len(filler_categories)]
-            path = f"expansions/{cat_name}/generated_{filler_idx:05d}.ts"
-            if path not in existing_files:
-                _add(
-                    path,
-                    _gen_data_file(
-                        f"gen_{cat_name}_{filler_idx}",
-                        f"{cat_desc} — procedurally generated expansion file #{filler_idx}",
-                        title,
-                        genre,
-                    ),
-                )
-            filler_idx += 1
-            if filler_idx > len(existing_files) + target_expansion_files * 2:
-                break  # Safety valve
+    # Keep only genuine expansion outputs. A requested target is a planning
+    # goal, not permission to pad the result with synthetic filler files.
 
     return None
 
@@ -4640,7 +4588,9 @@ async def _run_expansion_bg(build_id: str, exp_type: str, description: str, mult
     try:
         async with _artifact_operation(build, "expansion"):
             before = await _await_build_io(build, _vault_total_files, build)
-            target = max(1, min(GLOBAL_FILE_BUDGET, int(scale.get("target_files") or before * 4 or 800)))
+            target = max(1, int(scale.get("target_files") or before * 4 or 800))
+            if GLOBAL_FILE_BUDGET > 0:
+                target = min(target, GLOBAL_FILE_BUDGET)
             exp["files_before"] = before
             exp["target_files"] = target
             stats = await _await_build_io(

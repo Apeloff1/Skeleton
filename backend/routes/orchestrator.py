@@ -39,6 +39,12 @@ def execute_async(plan_id: str):
     return {"job_id": orch.start_execute_job(plan_id), "status": "running"}
 
 
+@router.post("/job/{job_id}/cancel")
+def cancel_job(job_id: str):
+    """Cancel only an authenticated, owned orchestration job."""
+    return orch.cancel_job(job_id)
+
+
 @router.get("/job/{job_id}")
 def job(job_id: str):
     return orch.get_job(job_id)

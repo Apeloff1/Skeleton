@@ -31,9 +31,28 @@ def _instrument(monkeypatch):
 
     monkeypatch.setattr(routes, "_artifact_build", allocate)
     monkeypatch.setattr(routes, "_governed_register", publish)
-    monkeypatch.setattr(routes, "_gamefiles", lambda _: [{"filename": "scene.gd"}])
+    # Exercise native staging with a synthetic, already-authorized source. The
+    # production _owned_gamefiles authority check is tested separately.
+    monkeypatch.setattr(routes, "_owned_gamefiles", lambda game, user: [{"filename": "scene.gd"}])
+    # This unit test models a connected governed owner; production must still
+    # refuse native export until that owner is actually available.
+    monkeypatch.setattr(routes, "_governed_store", lambda: object())
     monkeypatch.setattr(routes, "code_execution_enabled", lambda: True)
     return roots, published
+
+
+def test_native_export_fails_closed_without_governed_owner(monkeypatch):
+    """An authenticated source alone must never bypass unavailable custody."""
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(routes, "_owned_gamefiles", lambda game, user: [{"filename": "scene.gd"}])
+    with pytest.raises(HTTPException) as failure:
+        asyncio.run(routes.build_godot(
+            routes.BuildBody(game_name="QAStage"),
+            user={"tenant_id": "test-tenant", "email": "qa@example.test", "role": "editor"},
+        ))
+    assert failure.value.status_code == 503
+    assert failure.value.detail["code"] == "artifact_owner_unavailable"
 
 
 def test_native_godot_stages_privately_and_cleans_after_publish(monkeypatch):
@@ -42,7 +61,7 @@ def test_native_godot_stages_privately_and_cleans_after_publish(monkeypatch):
 
     result = asyncio.run(
         routes.build_godot(routes.BuildBody(game_name="QAStage"),
-                           user={"tenant_id": "test-tenant"})
+                           user={"tenant_id": "test-tenant", "email": "qa@example.test", "role": "editor"})
     )
 
     assert result["ok"] is True
@@ -71,7 +90,7 @@ def test_native_desktop_stages_privately_and_cleans_after_publish(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
     result = asyncio.run(
         routes.build_desktop(routes.DesktopBody(game_name="QAStage"),
-                             user={"tenant_id": "test-tenant"})
+                             user={"tenant_id": "test-tenant", "email": "qa@example.test", "role": "editor"})
     )
     assert result["ok"] is True
     assert result["binary_bytes"] > 0
@@ -95,7 +114,7 @@ def test_native_scratch_is_deleted_when_governed_publication_fails(monkeypatch):
     with pytest.raises(RuntimeError, match="storage policy unavailable"):
         asyncio.run(
             routes.build_godot(routes.BuildBody(game_name="QAStage"),
-                               user={"tenant_id": "test-tenant"})
+                               user={"tenant_id": "test-tenant", "email": "qa@example.test", "role": "editor"})
         )
     assert roots and not roots[0].exists()
 
@@ -123,7 +142,7 @@ def test_godot_engine_evidence_requires_exit_zero_and_scene_marker(
     monkeypatch.setattr(subprocess, "run", fake_run)
     result = asyncio.run(
         routes.build_godot(routes.BuildBody(game_name="QAStage"),
-                           user={"tenant_id": "test-tenant"})
+                           user={"tenant_id": "test-tenant", "email": "qa@example.test", "role": "editor"})
     )
     assert len(roots) == len(published) == 1
     assert not roots[0].exists()
@@ -144,7 +163,7 @@ def test_desktop_timeout_releases_private_workspace(monkeypatch):
     monkeypatch.setattr(subprocess, "run", timed_out)
     result = asyncio.run(
         routes.build_desktop(routes.DesktopBody(game_name="QAStage"),
-                             user={"tenant_id": "test-tenant"})
+                             user={"tenant_id": "test-tenant", "email": "qa@example.test", "role": "editor"})
     )
     assert result == {"ok": False, "error": "pyinstaller build timed out"}
     assert len(roots) == 1

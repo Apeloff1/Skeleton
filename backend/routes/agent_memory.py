@@ -143,12 +143,16 @@ async def reflect(body: ReflectBody, scope: dict[str, str] = Depends(require_aut
     if not agent_id:
         return {"error": "agent_id required"}
     window = max(3, min(int(body.window or 12), 50))
-    recent = await _db.agent_memories.find(
+    # Query-side scope filtering is mandatory, but a faulty backend may return
+    # extra rows. Bound the overfetch, then re-check ownership *before* taking
+    # the reflection window so foreign rows cannot crowd out owned episodes.
+    candidate_limit = min(200, max(50, window * 4))
+    candidates = await _db.agent_memories.find(
         {"agent_id": agent_id, **scope, "kind": {"$ne": "reflection"}}, PROJ
-    ).sort("created_at", -1).limit(window).to_list(window)
-    recent = [m for m in recent if m.get("agent_id") == agent_id
+    ).sort("created_at", -1).limit(candidate_limit).to_list(candidate_limit)
+    recent = [m for m in candidates if m.get("agent_id") == agent_id
               and m.get("kind") != "reflection"
-              and all(m.get(key) == value for key, value in scope.items())]
+              and all(m.get(key) == value for key, value in scope.items())][:window]
     if len(recent) < 3:
         return {"error": "not enough episodes to reflect on (need ≥3)", "have": len(recent)}
     episodes = "\n".join(f"- ({m.get('kind')}) {m.get('content')}" for m in reversed(recent))
