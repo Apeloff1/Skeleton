@@ -482,6 +482,8 @@ def _reject_synthetic_artifact(path: str, content: str) -> None:
     # Legacy floor-pass output is count padding, not authored game content.
     if normalized.startswith("aaa_delivery_floor/"):
         raise GalaxyBuildStopped("synthetic_floor_padding_rejected")
+    if normalized.startswith("padding/") or normalized.startswith("filler/"):
+        raise GalaxyBuildStopped("synthetic_padding_artifact_rejected")
 
 
 def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FLUSH_THRESHOLD) -> int:
