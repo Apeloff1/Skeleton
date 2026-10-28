@@ -1,0 +1,50 @@
+name: Owner-ordered historical Actions cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/owner-historical-actions-cleanup.yml'
+      - 'scripts/owner_historical_actions_cleanup.py'
+  workflow_run:
+    workflows: ['Historical Actions zero-job canary recovery']
+    types: [completed]
+  workflow_dispatch:
+
+# No broad cancellation, no security-gate bypass: only one immutable approved
+# list of 30 old runs, gated by the single canary being proven deleted.
+permissions: {}
+
+concurrency:
+  group: owner-historical-actions-cleanup-v1-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  owner-cleanup:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.id == 40625466138 &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 14
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Read only the approved owner cleanup implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/owner_historical_actions_cleanup.py
+          sparse-checkout-cone-mode: false
+      - name: Compile the bounded historical cleanup logic
+        shell: bash
+        run: python3 -m py_compile scripts/owner_historical_actions_cleanup.py
+      - name: Apply owner-approved immutable cleanup only after proven canary removal
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/owner_historical_actions_cleanup.py
