@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import builtins
+import sys
 import hashlib
 import io
 import random
@@ -293,14 +293,9 @@ def test_missing_or_permissive_optional_image_decoder_fails_closed(monkeypatch):
     with pytest.raises(MultimodalSanitizationError, match="truncated"):
         _admit(_image())
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", False)
-    original_import = builtins.__import__
-
-    def unavailable(name, *args, **kwargs):
-        if name == "PIL":
-            raise ImportError("optional decoder unavailable")
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", unavailable)
+    # Simulate an unavailable optional decoder through Python's import cache.
+    # Do not hook every import globally or add runtime-selected import targets.
+    monkeypatch.setitem(sys.modules, "PIL", None)
     with pytest.raises(MultimodalSanitizationError, match="Pillow"):
         _admit(_image())
 
