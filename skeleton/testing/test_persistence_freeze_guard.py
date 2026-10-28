@@ -90,7 +90,14 @@ def test_frozen_packages_import_without_warnings(name: str) -> None:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            module = importlib.import_module(module_name)
+            if module_name == "skeleton.persist":
+                module = importlib.import_module("skeleton.persist")
+            elif module_name == "skeleton.storage":
+                module = importlib.import_module("skeleton.storage")
+            elif module_name == "skeleton.state":
+                module = importlib.import_module("skeleton.state")
+            else:
+                raise AssertionError("unregistered frozen package")
         assert NOTICE in (module.__doc__ or "")
     finally:
         sys.modules.update(saved)

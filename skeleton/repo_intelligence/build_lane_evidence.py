@@ -155,7 +155,26 @@ def audit_batch(spec: BatchEvidence, *, root: Path = REPO_ROOT, title: str = "")
     for module, symbols in sorted(spec.modules.items()):
         res.checked += 1
         try:
-            mod = importlib.import_module(module)
+            if module == "skeleton.build.asset_pipeline":
+                mod = importlib.import_module("skeleton.build.asset_pipeline")
+            elif module == "skeleton.build.build_observability":
+                mod = importlib.import_module("skeleton.build.build_observability")
+            elif module == "skeleton.build.cache_contract":
+                mod = importlib.import_module("skeleton.build.cache_contract")
+            elif module == "skeleton.build.incremental_graph":
+                mod = importlib.import_module("skeleton.build.incremental_graph")
+            elif module == "skeleton.build.parallel_scheduler":
+                mod = importlib.import_module("skeleton.build.parallel_scheduler")
+            elif module == "skeleton.build.release_graph":
+                mod = importlib.import_module("skeleton.build.release_graph")
+            elif module == "skeleton.build.remote_build":
+                mod = importlib.import_module("skeleton.build.remote_build")
+            elif module == "skeleton.repo_intelligence.batch_plan":
+                mod = importlib.import_module("skeleton.repo_intelligence.batch_plan")
+            elif module == "skeleton.repo_intelligence.git_index":
+                mod = importlib.import_module("skeleton.repo_intelligence.git_index")
+            else:
+                raise ImportError("unregistered build lane module")
         except Exception as exc:  # fail closed: any import failure is a regression
             res.problems.append(f"import {module}: {type(exc).__name__}")
             continue

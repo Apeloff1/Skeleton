@@ -20,6 +20,18 @@ NAMESPACES = (
 )
 
 
+def _source_controlled_namespace(namespace: str):
+    if namespace == "skeleton":
+        return importlib.import_module("skeleton")
+    elif namespace == "skeleton.inference":
+        return importlib.import_module("skeleton.inference")
+    elif namespace == "skeleton.jeeves.ai":
+        return importlib.import_module("skeleton.jeeves.ai")
+    elif namespace == "skeleton.ai.agents.jeeves.ai":
+        return importlib.import_module("skeleton.ai.agents.jeeves.ai")
+    raise ValueError("unregistered lazy dispatch test namespace")
+
+
 @pytest.mark.parametrize("namespace,path,symbol,importer", NAMESPACES)
 def test_dispatch_imports_are_literal_and_match_source_controlled_map(
     namespace: str, path: str, symbol: str, importer: str,
@@ -42,7 +54,7 @@ def test_dispatch_imports_are_literal_and_match_source_controlled_map(
         for call in calls
     ), "an export dispatcher must never derive an executable import target"
     approved = {call.args[0].value for call in calls}
-    module = importlib.import_module(namespace)
+    module = _source_controlled_namespace(namespace)
     owners = module._HOST_EXPORTS.values() if hasattr(module, "_HOST_EXPORTS") else (
         item[0] for item in module._LAZY_EXPORTS.values()
     )
@@ -53,7 +65,7 @@ def test_dispatch_imports_are_literal_and_match_source_controlled_map(
 def test_approved_symbol_dispatches_one_literal_module(
     namespace: str, path: str, symbol: str, importer: str,
 ) -> None:
-    module = importlib.import_module(namespace)
+    module = _source_controlled_namespace(namespace)
     marker = object()
     original = module.__dict__.get(symbol)
     existed = symbol in module.__dict__
@@ -74,7 +86,7 @@ def test_approved_symbol_dispatches_one_literal_module(
 def test_unknown_export_never_executes_import(
     namespace: str, path: str, symbol: str, importer: str,
 ) -> None:
-    module = importlib.import_module(namespace)
+    module = _source_controlled_namespace(namespace)
     with patch.object(module, importer) as loader:
         with pytest.raises(AttributeError):
             module.__getattr__("unregistered_dynamic_export")
@@ -85,7 +97,7 @@ def test_unknown_export_never_executes_import(
 def test_corrupted_export_owner_fails_closed_before_import(
     namespace: str, path: str, symbol: str, importer: str,
 ) -> None:
-    module = importlib.import_module(namespace)
+    module = _source_controlled_namespace(namespace)
     exports = module._HOST_EXPORTS if hasattr(module, "_HOST_EXPORTS") else module._LAZY_EXPORTS
     saved = exports[symbol]
     try:

@@ -99,9 +99,35 @@ def main() -> int:
         if not isinstance(handler, str) or "." not in handler:
             _fail(errors, f"{volume_id}: handler must be importable dotted path")
             continue
+        # The repository-owned catalog, not JSON input, authorizes imports.
+        spec = catalog.get(volume_id) if isinstance(volume_id, str) else None
+        if spec is None or spec.handler != handler:
+            _fail(errors, f"{volume_id}: handler differs from canonical Python catalog")
+            continue
         module_name, attribute = handler.rsplit(".", 1)
         try:
-            module = importlib.import_module(module_name)
+            if module_name == "skeleton.ai.runtime.deferred.compute":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.compute")
+            elif module_name == "skeleton.ai.runtime.deferred.contract_fuzzing":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.contract_fuzzing")
+            elif module_name == "skeleton.ai.runtime.deferred.contracts":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.contracts")
+            elif module_name == "skeleton.ai.runtime.deferred.knowledge":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.knowledge")
+            elif module_name == "skeleton.ai.runtime.deferred.operations_experience":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.operations_experience")
+            elif module_name == "skeleton.ai.runtime.deferred.platform_control":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.platform_control")
+            elif module_name == "skeleton.ai.runtime.deferred.reliability_release":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.reliability_release")
+            elif module_name == "skeleton.ai.runtime.deferred.research_evaluation":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.research_evaluation")
+            elif module_name == "skeleton.ai.runtime.deferred.simulation_mode":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.simulation_mode")
+            elif module_name == "skeleton.ai.runtime.deferred.tooling_security":
+                module = importlib.import_module("skeleton.ai.runtime.deferred.tooling_security")
+            else:
+                raise ImportError("unregistered deferred handler module")
         except Exception as exc:
             _fail(errors, f"{volume_id}: handler module import failed: {exc}")
             continue
