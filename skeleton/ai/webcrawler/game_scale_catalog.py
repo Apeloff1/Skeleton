@@ -78,7 +78,29 @@ def game_milestone_by_number(number:int):
     if not isinstance(number,int) or isinstance(number,bool) or not 1<=number<=100:
         raise ValueError("invalid implemented milestone number")
     milestone=MILESTONES[number-1]
-    function=getattr(import_module(milestone.module,__package__),milestone.operation)
+    if milestone.module == ".game_scale_assets":
+        owner = import_module(".game_scale_assets", __package__)
+    elif milestone.module == ".game_scale_balancing":
+        owner = import_module(".game_scale_balancing", __package__)
+    elif milestone.module == ".game_scale_campaign":
+        owner = import_module(".game_scale_campaign", __package__)
+    elif milestone.module == ".game_scale_combat":
+        owner = import_module(".game_scale_combat", __package__)
+    elif milestone.module == ".game_scale_economy":
+        owner = import_module(".game_scale_economy", __package__)
+    elif milestone.module == ".game_scale_editor":
+        owner = import_module(".game_scale_editor", __package__)
+    elif milestone.module == ".game_scale_npc_ai":
+        owner = import_module(".game_scale_npc_ai", __package__)
+    elif milestone.module == ".game_scale_research":
+        owner = import_module(".game_scale_research", __package__)
+    elif milestone.module == ".game_scale_story":
+        owner = import_module(".game_scale_story", __package__)
+    elif milestone.module == ".game_scale_world":
+        owner = import_module(".game_scale_world", __package__)
+    else:
+        raise RuntimeError("unregistered game milestone module")
+    function=getattr(owner, milestone.operation)
     if not callable(function):
         raise RuntimeError("registered milestone is not executable")
     return function

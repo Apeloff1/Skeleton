@@ -149,8 +149,6 @@ def _load_literal_export_module(owner: str):
 def __getattr__(name: str):
     for module_name, names in _LAZY_EXPORTS.items():
         if name in names:
-            from importlib import import_module
-
             value = getattr(_load_literal_export_module("." + module_name), name)
             globals()[name] = value
             return value

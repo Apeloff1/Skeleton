@@ -55,7 +55,15 @@ def resolve_mission_capability(rank: int):
     if not isinstance(rank,int) or isinstance(rank,bool) or not 1<=rank<=len(CAPABILITY_CATALOG):
         raise ValueError("unknown mission capability rank")
     capability=CAPABILITY_CATALOG[rank-1]
-    result=getattr(import_module("." + capability.module, __package__),capability.name)
+    if capability.module == "dragon_mission_quality":
+        owner = import_module(".dragon_mission_quality", __package__)
+    elif capability.module == "dragon_mission_scheduler":
+        owner = import_module(".dragon_mission_scheduler", __package__)
+    elif capability.module == "dragon_mission_token_feed":
+        owner = import_module(".dragon_mission_token_feed", __package__)
+    else:
+        raise RuntimeError("unregistered mission capability module")
+    result=getattr(owner, capability.name)
     if not callable(result):
         raise RuntimeError("capability registry points to non-callable implementation")
     return result
