@@ -10,10 +10,11 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# v6 isolates improved main supersession recovery from the old queue lane.
-# One worker and one pending wake coalesce future triggers.
+# v7 enters a dedicated ARM recovery lane instead of waiting behind the
+# already-queued v6 x64 drainer. One worker and one pending wake coalesce
+# subsequent v7 triggers without cancelling active recovery or CI evidence.
 concurrency:
-  group: queue-drain-v6-${{ github.repository }}
+  group: queue-drain-v7-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -26,13 +27,12 @@ jobs:
     permissions:
       actions: write
       contents: read
-    # Place the Python-only cleanup worker on the ARM recovery pool instead
-    # of competing with broad x64 PR validation. Safety comes from the
-    # exact-head and stale-PR guards, not runner architecture.
-    # Queue recovery must remain schedulable when the ARM runner pool is
-    # saturated. This job uses only portable Python stdlib and Bash;
-    # the exact-head and security-safe cancellation rules are unchanged.
-    runs-on: ubuntu-latest
+    # Use the independently functioning ARM recovery pool: the older v6
+    # ubuntu-latest drainer is itself queued behind x64 PR validation.
+    # Housekeeping already executes successfully on ubuntu-24.04-arm.
+    # This job uses portable Python stdlib and Bash. Preserve all existing
+    # current-head, immutable-main, and security-custody cancellation fences.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
