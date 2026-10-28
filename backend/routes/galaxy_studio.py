@@ -468,6 +468,19 @@ async def _load_build(build_id: str):
 _VAULT_FLUSH_THRESHOLD = int(os.environ.get("GALAXY_FLUSH_EVERY", "300"))
 
 
+def _reject_synthetic_artifact(path: str, content: str) -> None:
+    """Reject known padding signatures before they enter durable custody."""
+    if not isinstance(path, str) or not isinstance(content, str):
+        raise GalaxyBuildStopped("artifact_invalid")
+    normalized = path.replace("\\", "/").lower()
+    if normalized.startswith("expansions/") and "/generated_" in normalized:
+        raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
+    if "procedurally generated expansion file #" in content.lower():
+        raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
+    if normalized.startswith("skipped/") and normalized.endswith(".md"):
+        raise GalaxyBuildStopped("synthetic_skipped_phase_marker_rejected")
+
+
 def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FLUSH_THRESHOLD) -> int:
     """Persist a bounded pending file set; a failed write stops more generation.
 
@@ -482,6 +495,9 @@ def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FL
         raise GalaxyBuildStopped("build_identity_missing")
     if build.get("_vault_write_failed"):
         raise GalaxyBuildStopped(str(build.get("_bg_stop_reason") or "vault_write_failed"))
+    # Fail closed before detaching or writing any pending artifact.
+    for path, content in files.items():
+        _reject_synthetic_artifact(path, content)
     snapshot = files
     build["files"] = {}
     try:
@@ -3942,16 +3958,6 @@ def _generate_expansion_files(
     existing_files = {item["path"] for item in _bv.list_file_paths(build["build_id"], limit=None)}
     existing_files.update((build.get("files") or {}).keys())
     generated_count = 0
-
-    def _reject_synthetic_artifact(path: str, content: str) -> None:
-        """Fail closed on known count-padding artifacts, not legitimate assets."""
-        if not isinstance(path, str) or not isinstance(content, str):
-            raise GalaxyBuildStopped("expansion_artifact_invalid")
-        normalized = path.replace("\\", "/").lower()
-        if normalized.startswith("expansions/") and "/generated_" in normalized:
-            raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
-        if "procedurally generated expansion file #" in content.lower():
-            raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
 
     def _add(path, content):
         nonlocal generated_count
