@@ -329,7 +329,7 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
-name = "governed-storage"
+name = "platform"
 prefixes = ["skeleton/storage/"]
 owner = "platform-runtime"
 criticality = "high"
@@ -338,7 +338,7 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
-name = "release-cockpit"
+name = "build-delivery"
 prefixes = ["skeleton/ops/cockpit/"]
 owner = "delivery-plane"
 criticality = "high"
