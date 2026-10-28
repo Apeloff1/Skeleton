@@ -259,6 +259,12 @@ def fence_memento_write(method):
         if (not isinstance(tenant_id, str) or not isinstance(actor_id, str)
                 or not tenant_id or not actor_id):
             raise MongoSourceEpochError("canonical memento mutation actor missing")
+        if ("archive" not in kwargs and
+                (not isinstance(kwargs.get("thread_id"), str)
+                 or not kwargs["thread_id"])):
+            # Syntactically invalid no-write denials must not quarantine an
+            # otherwise stable actor epoch merely by acquiring it.
+            raise MongoSourceEpochError("canonical memento mutation thread missing")
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             return await method(self, *args, **kwargs)
 
