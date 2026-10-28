@@ -19,14 +19,15 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
     assert 'workflows: ["Merge Readiness", "Prune redundant branches safely"]' not in workflow
     assert "branches: [main]" in workflow
     assert "\n  push:\n    branches: [main]\n    paths: ['.github/workflows/queue-drain.yml']" in workflow
-    assert "group: queue-drain-v6-${{ github.repository }}" in workflow
+    assert "group: queue-drain-admission-v9-${{ github.run_id }}" in workflow
+    assert "group: queue-drain-slim-v9-${{ github.repository }}" in workflow
     assert "cancel-in-progress: false" in workflow
 
 
 def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     workflow = _workflow_text()
 
-    assert "    runs-on: ubuntu-24.04-arm\n" in workflow
+    assert "    runs-on: ubuntu-slim\n" in workflow
     assert "actions: write" in workflow
     assert "contents: read" in workflow
     assert "permissions: {}" in workflow
@@ -158,7 +159,7 @@ def test_queue_drain_has_one_recovery_worker_and_independent_housekeeping() -> N
 
     assert "  drain:\n" in workflow
     assert "  wake-housekeeping:\n" not in workflow
-    assert "    runs-on: ubuntu-24.04-arm\n" in workflow
+    assert "    runs-on: ubuntu-slim\n" in workflow
     assert "gh workflow run actions-housekeeping-cli.yml" not in workflow
     assert "schedule:" in housekeeping
     assert "cron: '23 4,16 * * *'" in housekeeping
@@ -236,25 +237,60 @@ def test_periodic_controller_coalescing_keeps_newest_live_wake() -> None:
     assert "'pending', 'waiting'" in workflow
 
 
-def test_drain_recovery_arm_lane_keeps_control_plane_safeguards() -> None:
+def test_drain_recovery_slim_lane_keeps_control_plane_safeguards() -> None:
     workflow = _workflow_text()
     drain = workflow[workflow.index("  drain:\n"):]
-    assert "    runs-on: ubuntu-24.04-arm\n" in drain
+    assert "    runs-on: ubuntu-slim\n" in drain
+    assert "group: queue-drain-slim-v9-${{ github.repository }}" in drain
     assert "cancel-in-progress: false" in workflow
     assert "if stale_pr_run(run, open_pr_heads):" in drain
     assert "if security_lane:" in drain
     assert "if status == 429:" in drain
 
-def test_queue_drain_never_retries_owner_historical_tombstones() -> None:
+def test_drain_owner_unprotected_historical_ids_keep_immutable_preflight() -> None:
     workflow = _workflow_text()
-    # The immutable manifest's 31 historical run IDs have a dedicated
-    # canary-gated owner deletion workflow. The generic queue drainer must
-    # not use an expired retry-after timestamp and hammer refused requests.
-    assert "owner_historical_run_ids = frozenset({" in workflow
-    assert "provider_conflict_retry_after" not in workflow
+    # Owner removed the special quarantine on 19 immutable, zero-job queued
+    # tombstones. They are cancellation *candidates*, not exempt from the
+    # current-head/security policy, and a provider 409 is never a success.
+    excluded = workflow.split("owner_historical_run_ids = frozenset({", 1)[1].split("})", 1)[0]
+    allowed = workflow.split("unprotected_historical_heads = {", 1)[1].split("}", 1)[0]
+    expected_19 = (
+        37539069375, 37539069791, 37642345734, 37642355681,
+        37642358530, 37642383890, 37642388873, 37642398158,
+        37642398159, 37642398161, 37655496094, 37655496139,
+        37655521563, 37655522865, 37655530898, 38320296726,
+        38320664775, 38320664778, 38320665862,
+    )
+    assert len(expected_19) == 19
+    for run_id in expected_19:
+        assert f"{run_id}:" in allowed
+        assert f"{run_id}," not in excluded
+    assert "34952509012," in excluded
+    assert "34952531771," in excluded
     assert "if run_id in owner_historical_run_ids:" in workflow
-    assert "37539069375," in workflow
-    assert "37642388873," in workflow
-    assert "37642398158," in workflow
-    assert "provider_conflicts_backed_off" in workflow
-    assert "owner-only, canary-gated deletion path" in workflow
+    assert "if run_id in unprotected_historical_heads:" in workflow
+    assert "live_status, live_run = request(" in workflow
+    assert "jobs_status, jobs = request(" in workflow
+    assert "live_run.get('status') == 'queued'" in workflow
+    assert "live_run.get('conclusion') is None" in workflow
+    assert "jobs.get('total_count') == 0" in workflow
+    assert "live_run.get('head_sha') != main_sha()" in workflow
+    assert "live_run.get('head_sha') == unprotected_historical_heads[run_id]" in workflow
+    assert "status in {403, 409, 422}" in workflow
+    assert "GitHub refused owner-unprotected historical" in workflow
+    assert "if security_lane:" in workflow
+    assert "provider_conflict_retry_after" not in workflow
+
+
+def test_drain_admits_without_workflow_lock_but_serializes_worker() -> None:
+    workflow = _workflow_text()
+    top_level = workflow.split("concurrency:\n", 1)[1].split("\n\npermissions:", 1)[0]
+    worker = workflow.split("jobs:\n  drain:\n", 1)[1]
+    assert "queue-drain-admission-v9-${{ github.run_id }}" in top_level
+    assert "cancel-in-progress: false" in top_level
+    assert "queue-drain-slim-v9-${{ github.repository }}" in worker
+    assert "cancel-in-progress: false" in worker
+    assert "    runs-on: ubuntu-slim\n" in worker
+    assert "permissions: {}" in workflow
+    assert "actions: write" in worker
+    assert "contents: read" in worker
