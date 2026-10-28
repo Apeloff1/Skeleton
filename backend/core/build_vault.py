@@ -413,6 +413,12 @@ def get_file_count(build_id: str, *, pending_paths: Iterable[str] = ()) -> int:
         return len(index) + sum(path not in index for path in pending)
 
 
+def get_file_paths(build_id: str) -> tuple[str, ...]:
+    """Read unique live path names without decompressing stored contents."""
+    with _lock_for(build_id):
+        return tuple(_read_manifest(build_id)["path_index"])
+
+
 def get_stats(build_id: str) -> dict:
     m = _read_manifest(build_id)
     return {
