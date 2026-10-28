@@ -9,12 +9,13 @@ never blocked, even when LLM enrichment is requested.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from routes.galaxy_studio_access import private_build_access
 
 from core import churn_2_service as churn
 
-router = APIRouter(prefix="/api/churn", tags=["churn"])
+router = APIRouter(prefix="/api/churn", tags=["churn"], dependencies=[Depends(private_build_access)])
 
 
 # ── model catalog (full list — premium + free, all providers) ────────────────
