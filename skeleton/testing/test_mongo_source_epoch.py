@@ -197,7 +197,7 @@ async def test_protected_internal_conversation_recovery_rejects_unfenced_caller(
     conversation.canonical_source_epoch = owner
     conversation.get_thread = AsyncMock(return_value="verified-thread")
     conversation.messages = SimpleNamespace(find_one=AsyncMock(return_value=None))
-    with pytest.raises(MongoSourceEpochError, match="actor"):
+    with pytest.raises(MongoSourceEpochError, match="owner-scoped epoch"):
         await conversation._recover_prepared(
             "thread", tenant_id="tenant", owner_id="actor",
         )
@@ -233,13 +233,13 @@ async def test_internal_mongo_memory_mutations_require_same_actor_writer_epoch()
         lambda: memory._commit_reservation(proposal, "token", record),
     )
     for operation in operations:
-        with pytest.raises(MongoSourceEpochError, match="actor"):
+        with pytest.raises(MongoSourceEpochError, match="owner-scoped epoch"):
             await operation()
 
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     async with owner.writer(tenant_id="tenant", actor_id="actor"):
         # A no-write replay token is admitted only under the same real writer.
         await memory._release_failed_reservation(proposal, "replay")
-        with pytest.raises(MongoSourceEpochError, match="actor"):
+        with pytest.raises(MongoSourceEpochError, match="owner-scoped epoch"):
             memory._require_canonical_writer(tenant_id="tenant", actor_id="other")
     assert await read(owner) == 4
