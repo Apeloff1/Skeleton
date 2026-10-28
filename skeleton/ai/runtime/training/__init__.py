@@ -128,12 +128,37 @@ _LAZY_EXPORTS = {
 }
 
 
+def _load_literal_export_module(owner: str):
+    """Resolve only source-declared lazy export owners; never load arbitrary names."""
+    from importlib import import_module
+
+    if owner == ".checkpoint_archive":
+        return import_module(".checkpoint_archive", __name__)
+    elif owner == ".data":
+        return import_module(".data", __name__)
+    elif owner == ".distributed_trainer":
+        return import_module(".distributed_trainer", __name__)
+    elif owner == ".elastic_trainer":
+        return import_module(".elastic_trainer", __name__)
+    elif owner == ".learning_pipeline":
+        return import_module(".learning_pipeline", __name__)
+    elif owner == ".neural_trainer":
+        return import_module(".neural_trainer", __name__)
+    elif owner == ".observability":
+        return import_module(".observability", __name__)
+    elif owner == ".preference_trainer":
+        return import_module(".preference_trainer", __name__)
+    elif owner == ".verifier":
+        return import_module(".verifier", __name__)
+    raise ImportError("unregistered lazy export owner: " + repr(owner))
+
+
 def __getattr__(name: str):
     for module_name, names in _LAZY_EXPORTS.items():
         if name in names:
             from importlib import import_module
 
-            value = getattr(import_module("." + module_name, __name__), name)
+            value = getattr(_load_literal_export_module("." + module_name), name)
             globals()[name] = value
             return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

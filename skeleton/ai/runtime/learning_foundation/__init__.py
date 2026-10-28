@@ -125,12 +125,33 @@ _LAZY_EXPORTS = {
 }
 
 
+def _load_literal_export_module(owner: str):
+    """Resolve only source-declared lazy export owners; never load arbitrary names."""
+    from importlib import import_module
+
+    if owner == ".content_retrieval":
+        return import_module(".content_retrieval", __name__)
+    elif owner == ".learning":
+        return import_module(".learning", __name__)
+    elif owner == ".lifecycle":
+        return import_module(".lifecycle", __name__)
+    elif owner == ".lifecycle_repository":
+        return import_module(".lifecycle_repository", __name__)
+    elif owner == ".multimodal":
+        return import_module(".multimodal", __name__)
+    elif owner == ".rollout":
+        return import_module(".rollout", __name__)
+    elif owner == ".temporal":
+        return import_module(".temporal", __name__)
+    raise ImportError("unregistered lazy export owner: " + repr(owner))
+
+
 def __getattr__(name: str):
     for module_name, names in _LAZY_EXPORTS.items():
         if name in names:
             from importlib import import_module
 
-            value = getattr(import_module("." + module_name, __name__), name)
+            value = getattr(_load_literal_export_module("." + module_name), name)
             globals()[name] = value
             return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
