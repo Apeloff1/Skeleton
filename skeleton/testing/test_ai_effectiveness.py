@@ -87,7 +87,7 @@ def _request(request_id: str) -> FunctionalAIRequest:
         instructions="Use only the supplied local model and governed tool.",
         context_digest=hashlib.sha256(b"effectiveness-context").hexdigest(),
         allowed_tool_ids=("state.set",),
-        created_at=NOW,
+        created_at=datetime.now(timezone.utc),
     )
 
 

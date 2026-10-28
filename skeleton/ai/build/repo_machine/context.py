@@ -18,7 +18,7 @@ _CONTEXT_SURFACES = (
     "topology", "coordination", "intelligence",
 )
 _NESTED_SURFACES = (
-    "edges", "cycles", "decisions", "decision_surface",
+    "edges", "cycles", "decisions", "ranked_decisions", "decision_surface",
     "counterfactual_surface", "bridge_candidates", "safe_parallel_groups",
 )
 
@@ -66,14 +66,37 @@ def _bounded(payload: dict, limit: int) -> dict:
         if not changed:
             break
 
+    # Prefer trimming optional plan and metric detail before dropping useful
+    # summary sections. Keep plan identities, readiness and execution state.
+    while not _fits(compact, limit):
+        changed = False
+        for name, fields in (("execution", ("steps", "parallel_batches")),
+                             ("metrics", ("zones",))):
+            value = compact.get(name)
+            if not isinstance(value, dict):
+                continue
+            reduced = dict(value)
+            for field in fields:
+                items = reduced.get(field)
+                if isinstance(items, list) and items:
+                    reduced[field] = items[:len(items) // 2]
+                    changed = True
+            if reduced != value:
+                compact[name] = reduced
+        if not changed:
+            break
+
+    if _fits(compact, limit):
+        return compact
+
     # The fixed summaries alone can exceed a small context budget. Remove
     # nonidentity sections deterministically until the serialized result fits.
     for name in (
         "entrypoints", "files", "topology", "findings", "work",
-        "subsystems", "coordination", "intelligence", "metrics", "health",
+        "subsystems", "intelligence", "metrics", "health",
     ):
-        # Execution constraints and failed-work state are authoritative, not
-        # advisory evidence. Never silently discard them to fit a token budget.
+        # Coordination identity, execution constraints and failed-work state
+        # are authoritative; never discard them to fit a token budget.
         compact.pop(name, None)
         if _fits(compact, limit):
             return compact

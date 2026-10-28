@@ -75,6 +75,15 @@ Qwen3 thinking-prefix tokens; fixed completion framing and exact template enter
 the admitted deployment digest. The same configured operation deadlines, token,
 context, admission, physical-worker and storage limits remain in force.
 
+The two pinned chat profiles preserve system instructions, user/assistant history
+and the current user prompt as separate native roles. Validated tool and JSON
+schemas are visible to the model in the system frame. The runtime preserves the
+exact assistant prefix through binary-file input and disables a second native
+conversation wrapper. Reserved role-control tokens in message content are rejected
+before dispatch. Custom/raw deployment profiles retain their existing behavior.
+The corrected prompt format changes the execution-profile cache identity; existing
+deployment receipts and historical results stay intact.
+
 A coding model is not an independent reviewer by virtue of its name. Profile
 selection does not fine-tune weights, authorize background research or certify a
 game as playable. Generated game markup and actual browser behavior remain

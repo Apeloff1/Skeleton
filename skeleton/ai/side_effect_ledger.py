@@ -35,7 +35,7 @@ _ALLOWED = {
     EffectState.UNKNOWN: {EffectState.RECONCILIATION_REQUIRED},
     EffectState.COMPENSATING: {EffectState.COMPENSATED, EffectState.RECONCILIATION_REQUIRED},
     EffectState.RECONCILIATION_REQUIRED: {EffectState.FAILED, EffectState.SUCCEEDED, EffectState.COMPENSATED},
-    EffectState.SUCCEEDED: set(),
+    EffectState.SUCCEEDED: {EffectState.COMPENSATING},
     EffectState.COMPENSATED: set(),
 }
 

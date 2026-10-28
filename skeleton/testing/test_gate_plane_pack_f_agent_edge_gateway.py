@@ -306,3 +306,23 @@ def test_server_py_check_rejects_unlisted_changes(line):
 def test_server_py_check_accepts_exact_allowlisted_lines():
     diff = "\n".join("+    " + line for line in sorted(SERVER_PY_ALLOWED_LINES)) + "\n+\n+    # comment\n"
     assert disallowed_server_py_lines(diff) == []
+
+
+def test_server_composes_agent_edge_behind_shared_gate():
+    """The assembled server owns HTTP composition and gates the optional edge."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    tree = ast.parse((root / "skeleton/api/server.py").read_text())
+    factory = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "create_app")
+    calls = [
+        statement.value.func.id
+        for statement in factory.body
+        if isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Call)
+        and isinstance(statement.value.func, ast.Name)
+    ]
+    assert calls.count("install_registered_agent_edge") == 1
+    assert calls.index("install_gate") < calls.index("install_registered_agent_edge")
+    assert "create_agent_gateway_app" not in calls

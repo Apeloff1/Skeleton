@@ -135,6 +135,7 @@ python scripts/provision_local_ai.py --target linux-x86_64-glibc \
 ```dotenv
 AI_PROVIDER=local
 AI_LOCAL_MODEL_PATH=
+AI_LOCAL_MODEL_CATALOG_PATH=
 AI_LOCAL_DEPLOYMENT_PATH=/app/local-ai/deployment.json
 SKELETON_LOCAL_MODEL_DIR=./data/local-ai
 ```
@@ -152,6 +153,11 @@ runtime; preparing Linux files on another host does not prove native execution.
 Hosted providers and already installed GGUF models are alternatives. Follow the
 [complete AI and crawler setup](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md) for activation,
 platform details, offline inputs and private configuration.
+
+An optional [local coding profile](docs/ai/LOCAL_CODING_PROFILE.md) pins the
+official Qwen2.5-Coder-1.5B Q4 model and can reuse an existing verified runtime.
+Activation is explicit and preserves the original chat model directory. Model
+availability and valid output formatting do not establish generated-game quality.
 
 ## Use the studio
 
@@ -173,6 +179,9 @@ refinement workflow. The stages share the original request, source snapshot,
 deadline and resource allowance. Live progress and final details show actual
 provider receipts and model identities. Configure roles and recovery using the
 [cooperative AI guide](docs/ai/COOPERATIVE_AI_EXECUTION.md).
+
+AI reviews remain advisory. Source changes invalidate old reviews; a high model
+score cannot substitute for execution evidence or grant release approval.
 
 Expand the AI conversation status bar to open **Runtime optimization**. It shows
 observed local pressure, admission capacity, numeric outcome learning and idle
@@ -202,7 +211,8 @@ requests keep their identity and explicit Stop intent. Setup shows database heal
 before sign-in and clears account-specific observations when the account changes.
 See [failure recovery and artifact operations](docs/ai/AI_FOUNDATIONS_AND_RECOVERY.md)
 for partial expansion/package results, interrupted cleanup and uncertain remote
-submissions. These source changes remain unqualified for runtime reliability.
+submissions. The [installed verification report](docs/ai/CONSUMER_READINESS_2026-10-26.md)
+records finite recovery observations and remaining reliability limits.
 The advanced policy form uses the server's actual editable fields and installed
 capacity limits. Administrators can also preview and download bounded pages of
 retained numeric learning data, and reset an eligible maintenance circuit against
@@ -277,11 +287,14 @@ service readiness and recovery boundaries.
 
 ## Current capability boundaries
 
-- The studio has a working bounded creation/build/export workflow. Desktop packages
-  are browser-rendered launchers; cross-compilation does not prove execution on every OS.
+- The studio supports bounded original-world editing, human/AI reference play,
+  policy training and source export. AI-generated HTML needs actual browser
+  verification; model scores cannot certify playability. Desktop packages are
+  browser-rendered launchers; cross-compilation does not prove execution on every OS.
 - Native emulation and builds require approved cores, suitable content/firmware,
   compiler SDKs and the sandbox. The default Alpine backend does not make every
-  host native tool executable. The recorded inventory still has 70 unmapped targets.
+  host native tool executable. The verification VM has no approved native console
+  core; inventory entries do not establish emulation accuracy.
 - Learning updates game policies and records compatible lessons. It does not
   automatically change Jeeves's transformer weights or guarantee creative quality.
 - Compressed design corpora are optional reference text, not measured gameplay
@@ -291,7 +304,7 @@ service readiness and recovery boundaries.
   arbitrary-ROM semantic understanding, or superiority over commercial games.
 - Adaptive serving, operational learning and maintenance remain an implementation
   candidate. The current installation pass runs automated tests and real workflows;
-  [installation evidence and release blockers](docs/ai/CONSUMER_READINESS_2026-10-23.md)
+  [installation evidence and release blockers](docs/ai/CONSUMER_READINESS_2026-10-26.md)
   distinguish verified behavior from consumer and enterprise qualification.
 
 Exact historical observations are in the

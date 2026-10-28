@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "f105761a565f1895bf77132cb3a58dc1534d4ff6",
+      "source_git_object_sha": "0fb27d4656687597af77db3638defd2bb88c093d",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -2282,7 +2282,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "39c7fc4394096dfbdd19c9efededf58c1e30d2b8",
+      "source_git_object_sha": "af4b5c95d1213f2c7cfa0b001a5f5d7b6b7326f9",
       "role": "Repository model, impact, workgraph, governance, stewardship, ownership-aware maintenance, and bounded cleanup authority for autonomous repository engineering.",
       "work_package_refs": [
         "WP-W11",

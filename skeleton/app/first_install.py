@@ -57,8 +57,9 @@ def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) ->
         "missing": [],
         "scope": "Critical first-party route registration must be observed from the live backend.",
     }
-    # The full mounted-route inventory can exceed 64 KiB on a complete installation.
-    # Keep a larger finite allowance for this one read-only route registry.
+    # The registry includes the mounted route inventory, which exceeds 64 KiB
+    # on a complete installation. Keep the larger allowance local to this
+    # endpoint; ordinary readiness projections retain their smaller bound.
     status = _bounded_json(
         backend_base.rstrip("/") + "/api/health/registry",
         timeout=timeout, max_response_bytes=512 * 1024,
