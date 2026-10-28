@@ -216,8 +216,14 @@ class WitnessedMongoMementoAuthority:
                 raise MementoWitnessUnavailable(
                     "protected source requires the same configured independent witness"
                 )
+            from skeleton.persistence.mongo_source_epoch import _witnessed_memento_handoff
+
             async with epoch.writer(tenant_id=tenant_id, actor_id=owner_id):
-                yield
+                async with _witnessed_memento_handoff(
+                    mongo=self.mongo, witness=self.witness,
+                    tenant_id=tenant_id, actor_id=owner_id,
+                ):
+                    yield
 
     async def publish(
         self, *, archive: SealedMementoArchive, expected_head: MementoCatalogHead,
