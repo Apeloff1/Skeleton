@@ -5,17 +5,22 @@ builds, or log an explicit build event.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from core import build_ledger as bl
+from routes.galaxy_studio_access import visible_build_rows
 
 router = APIRouter(prefix="/api/galaxy-studio/builds", tags=["build-ledger"])
 
 
 @router.get("")
-def list_builds(limit: int = 200):
-    return bl.list_builds(limit=limit)
+async def list_builds(limit: int = 200):
+    result = bl.list_builds(limit=limit)
+    if not isinstance(result, dict) or not isinstance(result.get("builds"), list):
+        raise HTTPException(503, "Build inventory unavailable")
+    filtered = await visible_build_rows(result["builds"])
+    return {**result, "builds": filtered, "count": len(filtered)}
 
 
 @router.get("/{build_id}/ledger")
