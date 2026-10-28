@@ -64,8 +64,6 @@ def _execution() -> ExecutionIdentity:
 def test_scheduled_admission_reaches_exact_head_supervisor() -> None:
     traffic = _source(TRAFFIC)
     supervisor_source = _source(SUPERVISOR)
-    # The reviewed six-hour cadence preserves queue headroom; exact-head
-    # dispatch and supervisor custody are checked independently below.
     assert "cron: '17 */6 * * *'" in traffic
     assert '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]' in traffic
     assert '-f "expected_base_sha=$TRAFFIC_ADMITTED_BASE_SHA"' in traffic

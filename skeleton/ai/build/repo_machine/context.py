@@ -10,70 +10,76 @@ from .model import RepositoryModel
 from .query import RepositoryQuery
 from .workgraph import build_work_graph
 Intent=Literal["overview","repair","architecture","testing","security","documentation","performance"]
-MAX_CONTEXT_BYTES=48_000
-def _fits(payload,limit): return len(json.dumps(payload,sort_keys=True,separators=(",",":")).encode())<=limit
-def _bounded(payload, limit):
-    """Compact context with guaranteed progress and a hard serialized byte cap."""
+MAX_CONTEXT_BYTES = 48_000
+# Each pass halves every reducible sequence. A previously compact surface
+# cannot report fictitious progress and keep CI stuck in repeated JSON dumps.
+_CONTEXT_SURFACES = (
+    "files", "entrypoints", "work", "findings", "subsystems",
+    "topology", "coordination", "intelligence",
+)
+_NESTED_SURFACES = (
+    "edges", "cycles", "decisions", "decision_surface",
+    "counterfactual_surface", "bridge_candidates", "safe_parallel_groups",
+)
+
+
+def _fits(payload: dict, limit: int) -> bool:
+    return len(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()) <= limit
+
+
+def _shrink_surface(value: object) -> tuple[object, bool]:
+    """Halve retained evidence with strictly decreasing finite list lengths."""
+    if isinstance(value, list) and value:
+        return value[: len(value) // 2], True
+    if not isinstance(value, dict):
+        return value, False
+    reduced = dict(value)
+    changed = False
+    for name in _NESTED_SURFACES:
+        items = reduced.get(name)
+        if isinstance(items, list) and items:
+            reduced[name] = items[: len(items) // 2]
+            changed = True
+    return (reduced, True) if changed else (value, False)
+
+
+def _bounded(payload: dict, limit: int) -> dict:
     compact = dict(payload)
     compact["truncated_for_context"] = False
     if _fits(compact, limit):
         return compact
+
     compact["truncated_for_context"] = True
-    while not _fits(compact, limit):
+    while True:
+        # One serialization per pass, not once per key or an unbounded loop
+        # over unchanged coordination/intelligence metadata.
+        if _fits(compact, limit):
+            return compact
         changed = False
-        for key in ("files", "work", "findings", "subsystems", "topology", "coordination", "intelligence"):
-            value = compact.get(key)
-            reduced = value
-            if isinstance(value, list) and value:
-                # A singleton must shrink to zero, or the loop never terminates.
-                reduced = value[:len(value) // 2]
-            elif isinstance(value, dict) and value:
-                if key == "topology":
-                    edges = value.get("edges", [])
-                    cycles = value.get("cycles", [])
-                    reduced = {
-                        "edges": edges[:len(edges) // 2],
-                        "cycles": cycles[:min(4, len(cycles) // 2)],
-                    }
-                elif key == "intelligence":
-                    reduced = {
-                        "graph_fingerprint": value.get("graph_fingerprint"),
-                        "strategic_value": value.get("strategic_value", 0),
-                        "decision_surface": value.get("decision_surface", [])[:8],
-                        "counterfactual_surface": value.get("counterfactual_surface", [])[:8],
-                        "bridge_candidates": value.get("bridge_candidates", [])[:8],
-                        "safe_parallel_groups": value.get("safe_parallel_groups", [])[:4],
-                    }
-                elif key == "coordination":
-                    decisions = value.get("decisions", [])
-                    reduced = {
-                        "decisions": decisions[:len(decisions) // 2],
-                        "bottleneck": value.get("bottleneck"),
-                        "frontier_size": value.get("frontier_size", 0),
-                        "max_parallelism": value.get("max_parallelism", 0),
-                        "coordination_pressure": value.get("coordination_pressure", 0),
-                        "safe_parallel_groups": value.get("safe_parallel_groups", [])[:4],
-                    }
-            if reduced != value:
-                compact[key] = reduced
+        for name in _CONTEXT_SURFACES:
+            if name not in compact:
+                continue
+            updated, reduced = _shrink_surface(compact[name])
+            if reduced:
+                compact[name] = updated
                 changed = True
-                if _fits(compact, limit):
-                    return compact
         if not changed:
             break
+
+    # The fixed summaries alone can exceed a small context budget. Remove
+    # nonidentity sections deterministically until the serialized result fits.
+    for name in (
+        "entrypoints", "files", "topology", "findings", "work",
+        "subsystems", "coordination", "execution", "intelligence",
+        "metrics", "health",
+    ):
+        compact.pop(name, None)
+        if _fits(compact, limit):
+            return compact
     if not _fits(compact, limit):
-        # Preserve the most useful summary fields; discard optional fields only
-        # when necessary. Never return a supposedly bounded oversized payload.
-        keep = ("intent", "fingerprint", "health", "metrics", "coordination",
-                "execution", "intelligence", "truncated_for_context")
-        compact = {key: compact[key] for key in keep if key in compact}
-        for key in ("coordination", "execution", "intelligence", "metrics", "health"):
-            if _fits(compact, limit):
-                break
-            compact.pop(key, None)
-        if not _fits(compact, limit):
-            raise ValueError("essential repository context exceeds byte limit")
+        raise ValueError("context identity exceeds byte limit")
     return compact
+
 
 def context_for_intent(model:RepositoryModel,intent:Intent="overview",*,byte_limit:int=MAX_CONTEXT_BYTES):
     if isinstance(byte_limit,bool) or not isinstance(byte_limit,int) or not 4096<=byte_limit<=256000: raise ValueError("byte_limit must be in [4096,256000]")

@@ -392,8 +392,7 @@ def main() -> int:
     )
     frontend_deps = frontend.get("dependencies", {})
     expected_frontend_matrix = {
-        # Expo SDK 54 and React 19.1 must retain the matching React type API;
-        # RN 0.88 / React 19.3 requires a coordinated Expo SDK upgrade.
+        # Expo SDK 54/React 19.1 must retain its matching React types.
         "@types/react": "~19.1.0",
         "expo": EXPO_SDK_VERSION,
         "react": REACT_VERSION,
@@ -600,7 +599,7 @@ def main() -> int:
         cancel_false(backend_quality)
         or sha_scoped_cancellation(backend_quality)
         or ref_scoped_cancellation(backend_quality)
-        or ci_preserves_main_run_evidence(backend_quality),
+        or pr_only_ref_or_sha_scoped_cancellation(backend_quality),
         "Backend Quality concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
