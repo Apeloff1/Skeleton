@@ -1,0 +1,117 @@
+name: Sealed Context Guard
+
+# Additive exact-head regression for the draft security feature. Never a
+# replacement for Backend Quality, Merge Readiness or release certification.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'skeleton/ai/runtime/inference/local.py'
+      - 'skeleton/ai/runtime/inference/guarded_service.py'
+      - 'skeleton/ai/runtime/inference/canonical_snapshot_reader.py'
+      - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
+      - 'skeleton/ai/runtime/inference/canonical_execution_source_factory.py'
+      - 'skeleton/ai/runtime/inference/canonical_owner_source_loader.py'
+      - 'skeleton/persistence/mongo_execution_source_binding.py'
+      - 'skeleton/persistence/mongo_source_epoch.py'
+      - 'skeleton/persistence/memory_repository.py'
+      - 'skeleton/testing/test_canonical_execution_source_factory.py'
+      - 'skeleton/testing/test_mongo_source_epoch.py'
+      - 'skeleton/testing/test_mongo_execution_source_binding.py'
+      - 'skeleton/ai/runtime/inference/canonical_source_custody.py'
+      - 'skeleton/ai/runtime/inference/native_tokenizer_guard.py'
+      - 'skeleton/api/server.py'
+      - 'skeleton/ai/runtime/inference/guarded_composition.py'
+      - 'skeleton/ai/runtime/inference/deployment.py'
+      - 'skeleton/ai/runtime/inference/llama_cpp.py'
+      - 'skeleton/ai/runtime/inference/catalog.py'
+      - 'skeleton/ai/runtime/inference/native_transformer.py'
+      - 'skeleton/ai/runtime/inference/native_guard_binding.py'
+      - 'skeleton/provider_runtime.py'
+      - 'skeleton/context/**'
+      - 'skeleton/persistence/sealed_memento_*.py'
+      - 'skeleton/persistence/mongo_memento_repository.py'
+      - 'backend/core/conversations.py'
+      - 'skeleton/testing/test_mongo_memento_repository.py'
+      - 'skeleton/testing/test_guarded_local_provider.py'
+      - 'skeleton/testing/test_guarded_composition.py'
+      - 'skeleton/testing/test_native_guard_binding.py'
+      - 'skeleton/testing/test_guarded_application_startup.py'
+      - 'skeleton/testing/test_engine_submission_snapshot.py'
+      - 'skeleton/testing/test_canonical_source_custody.py'
+      - 'skeleton/testing/test_canonical_owner_source_loader.py'
+      - 'skeleton/testing/test_native_tokenizer_guard.py'
+      - 'skeleton/testing/test_guarded_registry_activation.py'
+      - 'skeleton/testing/test_guarded_local_service.py'
+      - 'skeleton/testing/test_pre_delivery_guard.py'
+      - 'skeleton/testing/test_delivery_*.py'
+      - 'skeleton/testing/test_sealed_*.py'
+      - 'pyproject.toml'
+      - '.github/workflows/sealed-context-guard.yml'
+  push:
+    branches:
+      - feat/sealed-context-sandwich-v1-20261027
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sealed-context-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-inference-guard:
+    name: Exact-head local inference and delivery contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - name: Install bounded regression dependencies
+        run: python -m pip install --disable-pip-version-check -e . 'pytest>=8,<9' 'pytest-asyncio>=1.4,<2' 'PyJWT>=2,<3' 'python-dotenv>=1,<2'
+      - name: Compile changed production boundaries
+        run: |
+          python -m compileall -q skeleton/context skeleton/persistence skeleton/ai/runtime/inference backend/core/conversations.py
+      - name: Verify canonical metadata and AI-tree parity
+        run: |
+          python scripts/check_root_package_metadata_parity.py
+          python -m unittest discover -s tests -p 'test_root_package_metadata_parity.py' -q
+          python scripts/check_ai_file_tree.py
+      - name: Verify canonical conversation and immutable workflow pin regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: |
+          python -m pytest -q \
+            backend/tests/test_conversation_storage_admission.py \
+            backend/tests/test_dragon_conversation_binding.py \
+            backend/tests/test_supervisor_workflow_contract.py
+      - name: Local model and guarded provider regression
+        env:
+          PYTHONPATH: '.:backend'
+        run: |
+          python -m pytest -q \
+            skeleton/testing/test_local_inference.py \
+            skeleton/testing/test_guarded_local_provider.py \
+            skeleton/testing/test_guarded_composition.py \
+            skeleton/testing/test_native_guard_binding.py \
+            skeleton/testing/test_guarded_application_startup.py \
+            skeleton/testing/test_engine_submission_snapshot.py \
+            skeleton/testing/test_canonical_source_custody.py \
+            skeleton/testing/test_canonical_execution_source_factory.py \
+            skeleton/testing/test_mongo_source_epoch.py \
+            skeleton/testing/test_mongo_execution_source_binding.py \
+            skeleton/testing/test_canonical_owner_source_loader.py \
+            skeleton/testing/test_native_tokenizer_guard.py \
+            skeleton/testing/test_guarded_registry_activation.py \
+            skeleton/testing/test_guarded_local_service.py \
+            skeleton/testing/test_pre_delivery_guard.py \
+            skeleton/testing/test_delivery_schema.py \
+            skeleton/testing/test_delivery_regex.py \
+            skeleton/testing/test_mongo_memento_repository.py \
+            skeleton/testing/test_sealed_*.py
