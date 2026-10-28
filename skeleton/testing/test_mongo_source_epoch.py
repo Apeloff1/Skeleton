@@ -344,6 +344,7 @@ async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
     mongo = object.__new__(MongoMementoAuthority)
     mongo.conversation = SimpleNamespace(
         canonical_source_epoch=owner,
+        memento_witness=SimpleNamespace(read=AsyncMock(), compare_and_set=AsyncMock()),
         _admit_storage=AsyncMock(),
     )
     binding = ContextBinding("tenant", "actor", "thread", "local", "policy")
@@ -364,6 +365,25 @@ async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
     assert mongo.conversation._admit_storage.await_count == 0
 
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    # A protected actor cannot publish a legacy archive, even when it has a
+    # usable writer epoch and the raw memento primitive is reachable.
+    with pytest.raises(MongoSourceEpochError, match="witnessed custody"):
+        await mongo.publish(
+            archive=archive, expected_head=genesis, expected_thread_version=1,
+            stream="user", ciphertext=ciphertext,
+        )
+    assert await read(owner) == 2
+    # A claimed witnessed write without a bound external witness also denies
+    # before acquiring the actor epoch.
+    saved = mongo.conversation.memento_witness
+    mongo.conversation.memento_witness = None
+    with pytest.raises(MongoSourceEpochError, match="independent witness"):
+        await mongo.publish(
+            archive=archive, expected_head=genesis, expected_thread_version=1,
+            stream="user", ciphertext=ciphertext, custody_mode="witnessed",
+        )
+    mongo.conversation.memento_witness = saved
+    assert await read(owner) == 2
     # The test deliberately leaves the mutation method unimplemented: only the
     # ownership preflight is under test. Denied calls never begin Mongo writes.
     with pytest.raises(MongoSourceEpochError, match="actor missing"):
