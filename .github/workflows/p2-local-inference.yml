@@ -1,0 +1,72 @@
+name: P2 Local Inference
+
+# Manual acceptance path; no hosted credentials or downloaded model weights.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-local-inference-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-inference:
+    name: CPU local inference (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    env:
+      PYTHONPATH: ".:backend"
+      PYTHONHASHSEED: "0"
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+      VECLIB_MAXIMUM_THREADS: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up supported Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install CPU inference and test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          -e '.[dev,local-inference]' pytest==9.1.1
+
+      - name: Run offline local activation, inference and physical drain acceptance
+        run: >-
+          python -m pytest --import-mode=importlib -q --tb=short
+          backend/tests/test_model_catalog_reconciliation.py
+          skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_engine_execution_service.py
+          skeleton/testing/test_jeeves_game_engine_runtime.py
+          skeleton/testing/test_llama_cpp_local_inference.py
+          skeleton/testing/test_local_inference.py
+          skeleton/testing/test_local_inference_cancellation.py
+          skeleton/testing/test_local_model_artifact_intake.py
+          skeleton/testing/test_local_model_builder.py
+          skeleton/testing/test_local_model_console_capability_v2.py
+          skeleton/testing/test_local_model_deployment.py
+          skeleton/testing/test_local_provider_runtime_guards.py
+          skeleton/testing/test_native_runtime_local_provider.py
+          skeleton/testing/test_native_transformer_local_inference.py
+          skeleton/testing/test_native_transformer_provider_boundary.py
+          skeleton/testing/test_p2_local_inference_workflow.py
+          skeleton/testing/test_provider_runtime_schema_parity.py
+          tests/flgb/test_flgb_02_local_model_bridge.py
+          tests/flgb/test_flgb_02_native_runtime.py
+          tests/test_ai_local_inference_cancellation.py
+          tests/test_native_transformer_stops.py
+          tests/test_provider_runtime_boundary.py
