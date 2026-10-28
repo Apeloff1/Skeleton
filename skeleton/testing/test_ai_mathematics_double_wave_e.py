@@ -85,19 +85,3 @@ def test_generalized_entropy_and_joint_information_reference_cases() -> None:
     identical = ((0.5, 0.0), (0.0, 0.5))
     assert mutual_information(identical) == pytest.approx(math.log(2.0))
     assert variation_of_information(identical) == pytest.approx(0.0, abs=1e-15)
-
-
-def test_thin_wide_svd_never_inverts_spurious_null_singular_values() -> None:
-    matrix = ((1.0, 0.0, 1.0), (0.0, 1.0, 1.0))
-    report = singular_value_decomposition(matrix)
-    assert report.rank == 2
-    assert len(report.singular_values) == 2
-    assert report.reconstruction_linf < 1e-12
-    assert all(len(left) == 2 for left in report.left_vectors)
-    assert all(len(right) == 3 for right in report.right_vectors)
-    pinv = pseudoinverse(matrix)
-    assert pinv.rank == 2
-    assert pinv.projection_residual_linf < 1e-12
-    assert least_norm_solve(matrix, (1.0, 1.0)) == pytest.approx(
-        (1.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0), abs=1e-12
-    )

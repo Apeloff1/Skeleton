@@ -3,23 +3,30 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
  * /marketplace — Creator Marketplace (one-time game purchases via Stripe).
  *
  * Browse listed games, buy access through Stripe Checkout, see your purchases,
- * and list your own games for sale. Private buyer/creator identity is authenticated.
+ * and list your own games for sale. Buyer/creator identity is a local visitor id.
  */
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
-  StyleSheet, SafeAreaView, Platform, Modal, RefreshControl,
+  StyleSheet, SafeAreaView, Platform, Image, Modal, RefreshControl,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import api from '../src/utils/apiClient';
-import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { awardXp } from '../src/utils/liveops';
-import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
-import { creatorRequestCurrent, resolveCreatorPrincipal } from '../src/product/creatorIdentity';
+import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 
 const BACKEND = CANONICAL_API_BASE || '';
+
+async function getVisitorId(): Promise<string> {
+  let id = await safeGetItem('mkt_visitor_id');
+  if (!id) {
+    id = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    await safeSetItem('mkt_visitor_id', id);
+  }
+  return id;
+}
 
 type Listing = {
   playable_id: string; title: string; genre: string; price_usd: number;
@@ -32,14 +39,14 @@ function Cover({ id, hasCover, size = 56 }: { id: string; hasCover?: boolean; si
   if (!hasCover || err) {
     return <View style={[styles.coverFallback, { width: size, height: size }]}><Text style={{ fontSize: size * 0.4 }}>🎮</Text></View>;
   }
-  return <PrivateImage uri={`${BACKEND}/api/playable/${id}/cover.png`} style={{ width: size, height: size, borderRadius: 10, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
+  return <Image source={{ uri: `${BACKEND}/api/playable/${id}/cover.png` }} style={{ width: size, height: size, borderRadius: 10, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
 }
 
 export default function Marketplace() {
   const router = useRouter();
   const haptics = useHaptics();
   const params = useLocalSearchParams<{ session_id?: string; cancelled?: string; sell?: string }>();
-  const [principal, setPrincipal] = React.useState('');
+  const [visitor, setVisitor] = React.useState('');
   const [tab, setTab] = React.useState<'browse' | 'owned'>('browse');
   const [sort, setSort] = React.useState<'newest' | 'price_low' | 'price_high' | 'bestselling'>('newest');
   const [listings, setListings] = React.useState<Listing[]>([]);
@@ -51,69 +58,40 @@ export default function Marketplace() {
   const [sellId, setSellId] = React.useState('');
   const [sellPrice, setSellPrice] = React.useState('4.99');
   const [sellMsg, setSellMsg] = React.useState('');
-  const [accountEpoch, setAccountEpoch] = React.useState(getAuthEpoch);
-  const session = React.useRef(new AbortController());
-
-  React.useEffect(() => {
-    const reset = () => {
-      session.current.abort(); session.current = new AbortController();
-      setPrincipal(''); setOwned([]); setListings([]); setLoading(true);
-      setBuying(null); setBanner(null); setTab('browse');
-      setSellModal(false); setSellId(''); setSellPrice('4.99'); setSellMsg('');
-      setAccountEpoch(getAuthEpoch());
-    };
-    const unsubscribe = subscribeAuthChanges(reset);
-    if (accountEpoch !== getAuthEpoch()) reset();
-    return () => { unsubscribe(); session.current.abort(); };
-  }, []);
 
   const loadListings = React.useCallback(async () => {
-    const signal = session.current.signal;
-    if (!creatorRequestCurrent(accountEpoch, signal)) return;
     setLoading(true);
-    const r = await api.get<{ listings: Listing[] }>(`/api/marketplace/listings?sort=${sort}`, { signal, timeoutMs: 12000 });
-    if (!creatorRequestCurrent(accountEpoch, signal)) return;
+    const r = await api.get<{ listings: Listing[] }>(`/api/marketplace/listings?sort=${sort}`, { timeoutMs: 12000 });
     if (r.ok && r.data) setListings(r.data.listings || []);
     setLoading(false);
-  }, [sort, accountEpoch]);
+  }, [sort]);
 
-  const loadOwned = React.useCallback(async () => {
-    const signal = session.current.signal;
-    try {
-      const id = await resolveCreatorPrincipal(signal, accountEpoch);
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      const r = await api.get<{ purchases: Listing[] }>(`/api/marketplace/purchases?buyer_id=${encodeURIComponent(id)}`, { signal, timeoutMs: 12000 });
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      setPrincipal(id);
-      if (r.ok && r.data) setOwned(r.data.purchases || []);
-    } catch {
-      if (creatorRequestCurrent(accountEpoch, signal)) { setPrincipal(''); setOwned([]); setBanner('Sign in to open your purchases and creator account.'); }
-    }
-  }, [accountEpoch]);
+  const loadOwned = React.useCallback(async (vid: string) => {
+    const r = await api.get<{ purchases: Listing[] }>(`/api/marketplace/purchases?buyer_id=${encodeURIComponent(vid)}`, { timeoutMs: 12000 });
+    if (r.ok && r.data) setOwned(r.data.purchases || []);
+  }, []);
 
-  React.useEffect(() => { void loadOwned(); }, [loadOwned]);
+  React.useEffect(() => { getVisitorId().then((v) => { setVisitor(v); loadOwned(v); }); }, [loadOwned]);
   React.useEffect(() => { loadListings(); }, [loadListings]);
 
   // Return from Stripe Checkout: poll the session status.
   React.useEffect(() => {
     const sid = params.session_id;
-    if (!sid || !principal) return;
-    const signal = session.current.signal;
+    if (!sid || !visitor) return;
     let cancelled = false;
     (async () => {
       setBanner('⏳ Confirming your payment…');
-      for (let i = 0; i < 8 && !cancelled && creatorRequestCurrent(accountEpoch, signal); i++) {
-        const r = await api.get<any>(`/api/marketplace/checkout/status/${encodeURIComponent(sid)}`, { signal, timeoutMs: 12000 });
-        if (cancelled || !creatorRequestCurrent(accountEpoch, signal)) return;
+      for (let i = 0; i < 8 && !cancelled; i++) {
+        const r = await api.get<any>(`/api/marketplace/checkout/status/${sid}`, { timeoutMs: 12000 });
         const ps = r.data?.payment_status;
-        if (ps === 'paid') { setBanner('✅ Purchase complete — game unlocked!'); haptics.notify('success'); awardXp('purchase'); loadOwned(); setTab('owned'); return; }
+        if (ps === 'paid') { setBanner('✅ Purchase complete — game unlocked!'); haptics.notify('success'); awardXp('purchase'); loadOwned(visitor); setTab('owned'); return; }
         if (ps === 'expired' || r.data?.status === 'expired') { setBanner('⚠️ Checkout session expired.'); return; }
         await new Promise((res) => setTimeout(res, 2000));
       }
-      if (!cancelled && creatorRequestCurrent(accountEpoch, signal)) setBanner('⌛ Still processing — check "My Games" shortly.');
+      if (!cancelled) setBanner('⌛ Still processing — check "My Games" shortly.');
     })();
     return () => { cancelled = true; };
-  }, [params.session_id, principal, haptics, loadOwned, accountEpoch]);
+  }, [params.session_id, visitor, haptics, loadOwned]);
 
   React.useEffect(() => { if (params.cancelled) setBanner('Checkout cancelled.'); }, [params.cancelled]);
 
@@ -124,55 +102,37 @@ export default function Marketplace() {
   }, [params.sell]);
 
   const buy = React.useCallback(async (l: Listing) => {
-    const signal = session.current.signal;
-    if (buying || !creatorRequestCurrent(accountEpoch, signal)) return;
+    if (!visitor || buying) return;
     haptics.selection();
     setBuying(l.playable_id);
-    try {
-      const buyer = await resolveCreatorPrincipal(signal, accountEpoch);
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      const origin = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : BACKEND;
-      const r = await api.post<{ url?: string; error?: string; owned?: boolean }>(
-        '/api/marketplace/checkout', { playable_id: l.playable_id, buyer_id: buyer, origin_url: origin }, { signal, timeoutMs: 20000 });
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      if (r.data?.owned) { setBanner('You already own this game.'); setTab('owned'); loadOwned(); return; }
-      const url = r.data?.url;
-      if (!r.ok || !url) { setBanner(r.data?.error || 'Could not start checkout.'); return; }
-      if (Platform.OS === 'web' && typeof window !== 'undefined') { window.location.href = url; }
-      else { await WebBrowser.openBrowserAsync(url); if (creatorRequestCurrent(accountEpoch, signal)) loadOwned(); }
-    } catch {
-      if (creatorRequestCurrent(accountEpoch, signal)) setBanner('Sign in to continue with this purchase.');
-    } finally {
-      if (creatorRequestCurrent(accountEpoch, signal)) setBuying(null);
-    }
-  }, [buying, haptics, loadOwned, accountEpoch]);
+    const origin = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : BACKEND;
+    const r = await api.post<{ url?: string; error?: string; owned?: boolean }>(
+      '/api/marketplace/checkout', { playable_id: l.playable_id, buyer_id: visitor, origin_url: origin }, { timeoutMs: 20000 });
+    setBuying(null);
+    if (r.data?.owned) { setBanner('You already own this game.'); setTab('owned'); loadOwned(visitor); return; }
+    const url = r.data?.url;
+    if (!r.ok || !url) { setBanner(r.data?.error || 'Could not start checkout.'); return; }
+    if (Platform.OS === 'web' && typeof window !== 'undefined') { window.location.href = url; }
+    else { await WebBrowser.openBrowserAsync(url); /* user returns; they can pull to refresh */ loadOwned(visitor); }
+  }, [visitor, buying, haptics, loadOwned]);
 
   const submitListing = React.useCallback(async () => {
-    const signal = session.current.signal;
-    if (!creatorRequestCurrent(accountEpoch, signal)) return;
     const price = parseFloat(sellPrice);
     if (!sellId.trim() || isNaN(price)) { setSellMsg('Enter a game id and a valid price.'); return; }
     setSellMsg('Listing…');
-    try {
-      const creator = await resolveCreatorPrincipal(signal, accountEpoch);
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      const r = await api.post<{ ok?: boolean; error?: string; similarity_warning?: { title?: string; similarity?: number } | null }>(
-        '/api/marketplace/list', { playable_id: sellId.trim(), price_usd: price, creator_id: creator, summary: '' }, { signal, timeoutMs: 12000 });
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      if (r.data?.ok) {
-        const w = r.data.similarity_warning;
-        if (w && typeof w.similarity === 'number') {
-          setSellMsg(`✅ Listed! ⚠️ Note: ${Math.round(w.similarity * 100)}% similar to “${w.title || 'another game'}” — make sure it's your original work.`);
-          setSellId(''); loadListings(); haptics.notify('success');
-        } else {
-          setSellMsg('✅ Listed!'); setSellModal(false); setSellId(''); loadListings(); haptics.notify('success');
-        }
+    const r = await api.post<{ ok?: boolean; error?: string; similarity_warning?: { title?: string; similarity?: number } | null }>(
+      '/api/marketplace/list', { playable_id: sellId.trim(), price_usd: price, creator_id: visitor, summary: '' }, { timeoutMs: 12000 });
+    if (r.data?.ok) {
+      const w = r.data.similarity_warning;
+      if (w && typeof w.similarity === 'number') {
+        setSellMsg(`✅ Listed! ⚠️ Note: ${Math.round(w.similarity * 100)}% similar to “${w.title || 'another game'}” — make sure it's your original work.`);
+        setSellId(''); loadListings(); haptics.notify('success');
+      } else {
+        setSellMsg('✅ Listed!'); setSellModal(false); setSellId(''); loadListings(); haptics.notify('success');
       }
-      else setSellMsg(r.data?.error || 'Failed to list.');
-    } catch {
-      if (creatorRequestCurrent(accountEpoch, signal)) setSellMsg('Sign in to list your own game.');
     }
-  }, [sellId, sellPrice, loadListings, haptics, accountEpoch]);
+    else setSellMsg(r.data?.error || 'Failed to list.');
+  }, [sellId, sellPrice, visitor, loadListings, haptics]);
 
   const data = tab === 'browse' ? listings : owned;
 
@@ -189,7 +149,7 @@ export default function Marketplace() {
 
       <View style={styles.tabs}>
         <TouchableOpacity testID="mkt-tab-browse" style={[styles.tab, tab === 'browse' && styles.tabActive]} onPress={() => setTab('browse')}><Text style={[styles.tabTxt, tab === 'browse' && styles.tabTxtActive]}>Browse</Text></TouchableOpacity>
-        <TouchableOpacity testID="mkt-tab-owned" style={[styles.tab, tab === 'owned' && styles.tabActive]} onPress={() => { setTab('owned'); loadOwned(); }}><Text style={[styles.tabTxt, tab === 'owned' && styles.tabTxtActive]}>My Games ({owned.length})</Text></TouchableOpacity>
+        <TouchableOpacity testID="mkt-tab-owned" style={[styles.tab, tab === 'owned' && styles.tabActive]} onPress={() => { setTab('owned'); loadOwned(visitor); }}><Text style={[styles.tabTxt, tab === 'owned' && styles.tabTxtActive]}>My Games ({owned.length})</Text></TouchableOpacity>
       </View>
 
       {tab === 'browse' ? (
@@ -205,7 +165,7 @@ export default function Marketplace() {
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
         refreshControl={<RefreshControl refreshing={loading} tintColor="#A78BFA"
-          onRefresh={() => { void loadListings(); void loadOwned(); }} />}
+          onRefresh={() => { loadListings(); if (visitor) loadOwned(visitor); }} />}
       >
         {loading ? <ActivityIndicator color="#A78BFA" style={{ marginTop: 40 }} /> : null}
         {!loading && data.length === 0 ? (

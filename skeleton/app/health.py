@@ -111,19 +111,7 @@ def probe_application(
     for service in manifest.services:
         if service.name not in active:
             continue
-        # Internal databases without an HTTP endpoint are not HTTP probed.
-        # But a declared public HTTP service must never disappear silently
-        # from the full-profile readiness verdict if its path is missing.
-        if not service.public_url:
-            continue
-        if not service.health_path:
-            results.append(ProbeResult(
-                service=service.name,
-                url=service.public_url,
-                ok=False,
-                status=None,
-                detail="no public HTTP health probe declared",
-            ))
+        if not service.public_url or not service.health_path:
             continue
         configured_url = (public_url_overrides or {}).get(service.name)
         effective = replace(service, public_url=configured_url) if configured_url else service

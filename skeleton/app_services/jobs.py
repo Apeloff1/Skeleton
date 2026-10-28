@@ -35,10 +35,6 @@ class LeaseLost(RuntimeError):
     pass
 
 
-class OwnedJobConflict(ValueError):
-    """An existing job cannot prove the submitted owner/body binding."""
-
-
 class SqliteJobQueue:
     def __init__(self, db: Database, *, clock: Callable[[], float] = time.time) -> None:
         self.db, self.clock = db, clock
@@ -83,39 +79,6 @@ class SqliteJobQueue:
                 c.execute("UPDATE jobs SET actor_id=?, tenant_id=? WHERE job_id=?",
                           (actor_id, tenant_id, jid))
         return self.get(jid)  # type: ignore[return-value]
-
-    def enqueue_owned(self, kind: str, payload: Mapping[str, Any], *, actor_id: str,
-                      tenant_id: str, request_hash: str, timeout_s: float,
-                      execution_id: Optional[str] = None, project_id: Optional[str] = None,
-                      idempotency_key: Optional[str] = None, legacy_key: Optional[str] = None,
-                      max_attempts: int = 1, correlation_id: str = "",
-                      prepare_payload: Optional[Callable[[Any, str], tuple[Mapping[str, Any], str]]] = None
-                      ) -> tuple[Job, bool]:
-        """Publish ownership and ready work in the same existing queue transaction."""
-        if max_attempts < 1 or not actor_id or not tenant_id or not request_hash:
-            raise ValueError("owned jobs require an owner, request hash and positive max_attempts")
-        now = self.clock()
-        jid = f"job_{uuid.uuid4().hex}"
-        with self.db.tx() as c:
-            for key in dict.fromkeys(k for k in (idempotency_key, legacy_key) if k):
-                prior = c.execute("SELECT * FROM jobs WHERE idempotency_key=?", (key,)).fetchone()
-                if prior is not None:
-                    if (prior["actor_id"] != actor_id or prior["tenant_id"] != tenant_id
-                            or prior["kind"] != kind or prior["request_hash"] != request_hash
-                            or prior["project_id"] != project_id or not prior["execution_id"]):
-                        raise OwnedJobConflict("idempotency owner or request body mismatch")
-                    return self._job(prior), True
-            if prepare_payload is not None:
-                payload, execution_id = prepare_payload(c, jid)
-            c.execute(
-                "INSERT INTO jobs (job_id,kind,status,payload,max_attempts,run_after,correlation_id,"
-                "idempotency_key,created_at,updated_at,actor_id,tenant_id,project_id,execution_id,"
-                "timeout_s,request_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (jid, kind, "queued", json.dumps(dict(payload), sort_keys=True), max_attempts, now,
-                 correlation_id, idempotency_key, now, now, actor_id, tenant_id, project_id,
-                 execution_id or jid, float(timeout_s), request_hash))
-            row = c.execute("SELECT * FROM jobs WHERE job_id=?", (jid,)).fetchone()
-            return self._job(row), False
 
     def claim(self, worker_id: str, *, kinds: Optional[Sequence[str]] = None,
               lease_s: float = 60.0) -> Optional[Job]:

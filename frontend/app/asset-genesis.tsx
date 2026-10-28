@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
-import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -351,7 +350,7 @@ export default function AssetGenesis() {
                           return (
                             <TouchableOpacity key={a.asset_id} testID={`ag-pick-${a.asset_id}`}
                               onPress={() => setSelected(prev => ({ ...prev, [k]: a.asset_id }))} activeOpacity={0.85}>
-                              <PrivateImage uri={`${BACKEND}/api/assets/genesis/${a.asset_id}.png`}
+                              <Image source={{ uri: `${BACKEND}/api/assets/genesis/${a.asset_id}.png` }}
                                 style={[s.pickThumb, on && s.pickThumbOn]} resizeMode="cover" />
                             </TouchableOpacity>
                           );
@@ -394,7 +393,7 @@ export default function AssetGenesis() {
           <View style={s.galleryGrid}>
             {gallery.map(a => (
               <View key={a.asset_id} testID={`ag-asset-${a.asset_id}`} style={[s.gCell, { width: thumb }]}>
-                <PrivateImage uri={`${BACKEND}/api/assets/genesis/${a.asset_id}.png`}
+                <Image source={{ uri: `${BACKEND}/api/assets/genesis/${a.asset_id}.png` }}
                   style={{ width: thumb - 12, height: thumb - 12, borderRadius: 8, backgroundColor: '#1E293B' }} resizeMode="cover" />
                 <Text style={s.gKind} numberOfLines={1}>{KIND_EMOJI[a.kind] || '•'} {a.kind}</Text>
               </View>

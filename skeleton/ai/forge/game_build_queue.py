@@ -4,9 +4,11 @@
 ``build_playable_game``. Progress goes through ``ctx.progress`` and
 ``ctx.heartbeat``.
 
-The durable queue owner is ``skeleton.app_services.job_api`` (see
-``docs/contracts/job_queue.md``). Every call delegates to that API when it is
-available. An optional in-process fallback implements the same ``enqueue`` / ``JobHandle`` /
+Internal Systems #4097 (head ``959eec134``) owns the real queue in
+``skeleton.app_services.job_api`` (see ``docs/contracts/job_queue.md``). That
+module is not on main yet, and this branch does not vendor its persistence
+stack. When the import succeeds, every call delegates to that API. Until
+then an in-process queue implements the same ``enqueue`` / ``JobHandle`` /
 ``JobContext`` surface, including one worker so a build cannot block the
 request thread. Projects ``POST /builds`` already enqueues kind ``game.build``;
 this handler accepts that payload and the product route payload.
@@ -207,21 +209,14 @@ class _FallbackQueue:
         idempotency_key: Optional[str] = None,
         correlation_id: Optional[str] = None,
         timeout_s: float = DEFAULT_TIMEOUT_S,
-        request_digest: Optional[str] = None,
     ) -> JobHandle:
         if not actor_id or not tenant_id:
             raise ValueError("actor_id and tenant_id are required")
         if not (0 < float(timeout_s) <= 6 * 3600):
             raise ValueError("timeout_s must be in (0, 21600]")
-        if project_id:
-            raise ValueError("project-linked jobs require the durable queue owner")
-        if request_digest is not None and (not isinstance(request_digest, str) or len(request_digest) != 64
-                or any(char not in "0123456789abcdef" for char in request_digest)):
-            raise ValueError("request_digest must be a SHA-256 hex digest")
         body = dict(payload)
-        digest = request_digest if request_digest is not None else request_hash(kind, body)
-        scoped = ("owned:" + hashlib.sha256(json.dumps([tenant_id, actor_id, kind, idempotency_key],
-                  separators=(",", ":")).encode()).hexdigest()) if idempotency_key else None
+        digest = request_hash(kind, body)
+        scoped = f"{tenant_id}:{actor_id}:{kind}:{idempotency_key}" if idempotency_key else None
         now = self.clock()
         with self._lock:
             if scoped and scoped in self._by_idempotency:
@@ -300,12 +295,6 @@ class _FallbackQueue:
     def get_by_execution(self, execution_id: str) -> Optional[str]:
         with self._lock:
             return self._by_execution.get(execution_id)
-
-    def get_identity(self, job_id: str) -> dict[str, str]:
-        with self._lock:
-            row = self._jobs[job_id]
-            return {key: row.get(key, "") for key in
-                    ("job_id", "execution_id", "kind", "actor_id", "tenant_id")}
 
     def cancel(self, job_id: str) -> bool:
         with self._lock:
@@ -447,7 +436,7 @@ def _backend():
 
 
 def using_internal_systems_queue() -> bool:
-    """True when the canonical durable job API is available."""
+    """True when #4097's ``skeleton.app_services.job_api`` imported."""
     _backend()
     return _using_real
 
@@ -458,13 +447,11 @@ def register_handler(kind: str, fn: Callable[..., Any]) -> None:
 
 def enqueue(kind: str, payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
             project_id: Optional[str] = None, idempotency_key: Optional[str] = None,
-            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S,
-            request_digest: Optional[str] = None) -> JobHandle:
+            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S) -> JobHandle:
     try:
         handle = _backend().enqueue(
             kind, payload, actor_id=actor_id, tenant_id=tenant_id, project_id=project_id,
             idempotency_key=idempotency_key, correlation_id=correlation_id, timeout_s=timeout_s,
-            request_digest=request_digest,
         )
     except Exception as exc:
         if exc.__class__.__name__ == "IdempotencyMismatch" and not isinstance(exc, IdempotencyMismatch):
@@ -524,23 +511,13 @@ def enqueue_game_build(payload: Mapping[str, Any], **kwargs: Any) -> JobHandle:
     return enqueue(BUILD_KIND, payload, **kwargs)
 
 
-def execution_view(execution_id: str, *, actor_id: Optional[str] = None,
-                   tenant_id: Optional[str] = None) -> dict[str, Any]:
+def execution_view(execution_id: str) -> dict[str, Any]:
     """Status document for ``GET /api/v1/game/build/{execution_id}``."""
     from skeleton.forge.game_builder import RUN_SCHEMA
 
     job_id = get_by_execution(execution_id)
     if not job_id:
         raise KeyError(execution_id)
-    if actor_id is not None or tenant_id is not None:
-        backend = _backend()
-        identity = backend.get_identity(job_id)
-        if not isinstance(identity, Mapping):
-            identity = vars(identity)
-        if (not actor_id or not tenant_id or identity.get("actor_id") != actor_id
-                or identity.get("tenant_id") != tenant_id or identity.get("kind") != BUILD_KIND
-                or identity.get("execution_id") != execution_id):
-            raise KeyError(execution_id)
     status = get_status(job_id)
     result = get_result(job_id)
     return {

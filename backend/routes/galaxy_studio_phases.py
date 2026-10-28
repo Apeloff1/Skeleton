@@ -31,7 +31,7 @@ from routes.jeeves_master_build import (
 
 
 def _phase_vision(build, t, g, gi, v, sy, la, ins, complexity, age_target):
-    files = _gs._new_phase_files(build)
+    files = {}
     files["DESIGN_DOCUMENT.md"] = _gen_design_doc(t, g, gi, v, sy, la, ins, complexity, age_target)
     files["app.json"] = _gen_app_json(t, g)
     files["package.json"] = _gen_package_json(t)
@@ -61,8 +61,6 @@ def _phase_vision(build, t, g, gi, v, sy, la, ins, complexity, age_target):
         narrative_files = _gs._gen_narrative_vault_docs(build, t, g, gi)
         if isinstance(narrative_files, dict):
             files.update(narrative_files)
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _ne:
         print(f"[GALAXY][vision] narrative injection skipped: {_ne}")
     # ═══ GAME KNOWLEDGE VAULT INJECTION (500 DBs → no lazy agents) ═══
@@ -73,8 +71,6 @@ def _phase_vision(build, t, g, gi, v, sy, la, ins, complexity, age_target):
         gk_files = _gs._gen_game_knowledge_docs(build, t, g)
         if isinstance(gk_files, dict):
             files.update(gk_files)
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _ge:
         print(f"[GALAXY][vision] game-knowledge injection skipped: {_ge}")
     return files
@@ -84,7 +80,7 @@ def _phase_vision(build, t, g, gi, v, sy, la, ins, complexity, age_target):
 # PHASE 2: BROADENED SCOPE — Expanded stores, types, constants
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_scope(build, t, g, gi, v, sy, la, ins, m):
-    files = _gs._new_phase_files(build)
+    files = {}
     files["store/entityStore.ts"] = _gen_entity_store(t, g)
     files["store/inventoryStore.ts"] = _gen_inventory_store(t, g)
     files["store/combatStore.ts"] = _gen_combat_store(t, g)
@@ -111,7 +107,7 @@ def _phase_scope(build, t, g, gi, v, sy, la, ins, m):
 # PHASE 3: CORE MECHANICS — Screens, input, combat, movement
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_mechanics(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     all_screens = [
         "GameScreen", "SettingsScreen", "InventoryScreen", "AchievementsScreen",
         "LeaderboardScreen", "ShopScreen", "LevelSelectScreen", "ProfileScreen",
@@ -143,7 +139,7 @@ def _phase_mechanics(build, t, g):
 # PHASE 4: WORLD GENERATION — Procedural terrain, dungeons, biomes
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_world_gen(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     procgen = [
         ("noise_generator", "Perlin/simplex/worley noise with octaves, persistence, lacunarity, domain warping"),
         ("dungeon_generator", "BSP/cellular automata dungeon with rooms, corridors, traps, secrets, boss rooms"),
@@ -168,7 +164,7 @@ def _phase_world_gen(build, t, g):
 # PHASE 5: PHYSICS & MATH — Physics engine, collision, pathfinding
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_physics_math(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     files["utils/mathUtils.ts"] = _gen_math_utils(t, g)
     files["utils/colorUtils.ts"] = _gen_color_utils(t, g)
     physics_files = [
@@ -190,7 +186,7 @@ def _phase_physics_math(build, t, g):
 # PHASE 6: GRAPHICS & RENDERING — Shaders, VFX, post-processing
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_graphics(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     shaders = [
         ("pbr_material", "PBR with metallic/roughness, normal mapping, AO, emission, parallax"),
         ("toon_shader", "Cel/toon shading with edge detection, color ramps, specular bands, hatching"),
@@ -218,7 +214,7 @@ def _phase_graphics(build, t, g):
 # PHASE 7: ASSETS & MEDIA — Data databases, UI components
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_assets(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     databases = [
         ("items_database", "500+ items: weapons, armor, consumables, materials, keys, quest items, mounts, pets"),
         ("enemies_database", "Enemy definitions with stats, abilities, loot tables, AI profiles, spawn rules"),
@@ -253,7 +249,7 @@ def _phase_assets(build, t, g):
 # PHASE 8: AI & BEHAVIOR — Behavior trees, NPC logic, enemy AI
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_ai_behavior(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     ai = [
         ("bt_enemy_melee", "Melee enemy: patrol-detect-chase-attack-retreat-heal-call_backup"),
         ("bt_enemy_ranged", "Ranged enemy: position-aim-fire-cover-reload-reposition-suppress"),
@@ -287,7 +283,7 @@ def _phase_ai_behavior(build, t, g):
 # PHASE 9: NETWORKING & SCALE UP — Multiplayer + scale expansion
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_networking(build, t, g, m, v, sy, la, ins):
-    files = _gs._new_phase_files(build)
+    files = {}
     net = [
         ("protocol", "Binary protocol with message types, serialization, versioning, compression"),
         ("client", "Game client with connection, reconnection, heartbeat, encryption, buffering"),
@@ -311,7 +307,7 @@ def _phase_networking(build, t, g, m, v, sy, la, ins):
 # PHASE 10: BALANCING & TUNING — Game balance, economy, difficulty
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_balancing(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     balance = [
         ("difficultyManager", "Dynamic difficulty with player skill tracking, scaling curves, adaptive AI, rubber banding"),
         ("economyBalancer", "Economy tuning with currency sinks/faucets, inflation curves, market simulation, price floor/ceiling"),
@@ -364,8 +360,6 @@ def _extract_active_mutations(build: dict):
                     continue
             if any(x > 0 for x in vals.values()):
                 out.append((phase_id[:48], vals))
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _e:
         print(f"[GALAXY mutations] _extract_active_mutations failed: {_e}")
     return out[:32]  # safety bound on the number of active axes
@@ -642,10 +636,10 @@ export function listMutations(): string[] {{ return Object.keys(MUTATION_REGISTR
 '''
 
 
-def _gen_all_mutation_permutations(active, t: str, g: str, build=None) -> dict:
+def _gen_all_mutation_permutations(active, t: str, g: str) -> dict:
     """Materialise the mutation permutation codebase (capped) + the runtime engine."""
     import itertools
-    files: dict = _gs._new_phase_files(build)
+    files: dict = {}
     active_map = {mid: vals for mid, vals in active}
     ids = [mid for mid, _ in active]
 
@@ -683,7 +677,7 @@ def _gen_all_mutation_permutations(active, t: str, g: str, build=None) -> dict:
 # PHASE 11: UNIQUE PERMUTATIONS — Variations, randomization, mutations
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_permutations(build, t, g, m):
-    files = _gs._new_phase_files(build)
+    files = {}
     perms = [
         ("itemPermutator", "Item variation engine with random affixes, rarity tiers, synergy bonuses, visual variants, naming"),
         ("enemyMutator", "Enemy mutation system with stat modifiers, ability swaps, elemental affinities, elite/champion tiers"),
@@ -713,43 +707,35 @@ def _phase_permutations(build, t, g, m):
     try:
         active = _extract_active_mutations(build)
         if active:
-            mut_files = _gen_all_mutation_permutations(active, t, g, build=build)
+            mut_files = _gen_all_mutation_permutations(active, t, g)
             files.update(mut_files)
             build["mutation_permutation_files"] = len(mut_files)
             build["mutation_active_axes"] = [mid for mid, _ in active]
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _me:
         print(f"[GALAXY mutations] permutation generation failed (non-fatal): {_me}")
 
     # ── 40 Capability Systems (each with its own mutation permutation engine) ──
     try:
         from routes import galaxy_studio_capabilities as _caps
-        cap_files = _caps.generate_all_capabilities(build, t, g, files_factory=lambda: _gs._new_phase_files(build))
+        cap_files = _caps.generate_all_capabilities(build, t, g)
         files.update(cap_files)
         build["capability_files"] = len(cap_files)
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _ce:
         print(f"[GALAXY capabilities] generation failed (non-fatal): {_ce}")
 
     # ── Maximal Game Development Pipeline (8-stage AAA orchestrator) ──
     try:
         from routes import galaxy_studio_gamedev_pipeline as _gdp
-        pipe_files = _gdp.generate_gamedev_pipeline(build, t, g, files_factory=lambda: _gs._new_phase_files(build))
+        pipe_files = _gdp.generate_gamedev_pipeline(build, t, g)
         files.update(pipe_files)
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _pe2:
         print(f"[GALAXY gamedev-pipeline] generation failed (non-fatal): {_pe2}")
 
     # ── Agent self-sufficiency datasets (local knowledge fabric) ──
     try:
         from routes import galaxy_studio_datasets as _ds
-        ds_files = _ds.generate_datasets(build, t, g, files_factory=lambda: _gs._new_phase_files(build))
+        ds_files = _ds.generate_datasets(build, t, g)
         files.update(ds_files)
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _de:
         print(f"[GALAXY datasets] generation failed (non-fatal): {_de}")
 
@@ -760,7 +746,7 @@ def _phase_permutations(build, t, g, m):
 # PHASE 12: ENHANCEMENT & OPTIMIZATION — Performance, caching, memory
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_enhancement(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     enhance = [
         ("cacheService", "Multi-layer cache with LRU, TTL, invalidation, prefetch, compression, persistence"),
         ("eventBus", "Event bus with pub/sub, typed events, middleware, replay, dead letter queue, batching"),
@@ -789,7 +775,7 @@ def _phase_enhancement(build, t, g):
 # PHASE 13: STATE OF THE ART — Cutting-edge: ML, neural, procedural
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_sota(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     sota = [
         ("neuralPathfinding", "Neural network pathfinding with learned navigation meshes, dynamic obstacle prediction, fleet behavior"),
         ("mlDifficultyPredictor", "ML difficulty prediction with player behavior analysis, engagement scoring, churn prevention"),
@@ -991,7 +977,7 @@ def _phase_animations_pack(build: dict, t: str, g: str) -> dict:
     coverage = max(3, min(len(_ANIM_PATTERNS), int(len(_ANIM_PATTERNS) * fluid / 10)))
     # Variants: at high fluidity we emit multiple tuned variants per pattern
     variants = max(1, min(4, 1 + fluid // 3))
-    out: dict = _gs._new_phase_files(build)
+    out: dict = {}
     idx = 0
     for (name, desc) in _ANIM_PATTERNS[:coverage]:
         for v in range(variants):
@@ -1033,8 +1019,6 @@ def _phase_animations_pack(build: dict, t: str, g: str) -> dict:
     # Controlled by `locomotion_depth` (0..10) and `locomotion_style`.
     try:
         out.update(_phase_locomotion_pack(build, t, g))
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _lerr:
         print(f"[GALAXY] locomotion pack skipped: {_lerr}")
 
@@ -1105,7 +1089,7 @@ def _phase_locomotion_pack(build: dict, t: str, g: str) -> dict:
     tuning = _LOCOMOTION_STYLE_TUNING[style]
     # Coverage: pick first N verbs proportional to depth.
     cov = max(4, min(len(_LOCOMOTION_VERBS), int(len(_LOCOMOTION_VERBS) * depth / 10)))
-    out: dict = _gs._new_phase_files(build)
+    out: dict = {}
 
     for i, (verb, desc) in enumerate(_LOCOMOTION_VERBS[:cov], 1):
         out[f"locomotion/{verb}.ts"] = (
@@ -1268,7 +1252,7 @@ def _phase_story_style_pack(build: dict, t: str, g: str) -> dict:
     """Emit files reflecting every Story & Style slider value. This is how
     each questionnaire choice visibly modifies the generated file tree."""
     import json as _json
-    out: dict = _gs._new_phase_files(build)
+    out: dict = {}
 
     storyline = str(build.get("storyline_style", "heroic")).lower()
     tone = str(build.get("game_tone", "epic")).lower()
@@ -1428,7 +1412,7 @@ def _phase_story_style_pack(build: dict, t: str, g: str) -> dict:
 # PHASE 14: POLISH & JUICE — UX, accessibility, localization, feel
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_polish(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     polish_components = [
         ("ScreenTransition", "Screen transitions with slide, fade, dissolve, iris, custom shaders"),
         ("ToastNotification", "Toast notifications with queue, priority, icons, actions, auto-dismiss"),
@@ -1456,8 +1440,6 @@ def _phase_polish(build, t, g):
     # At fluidity 0 we emit nothing; at 10 we emit 120 files.
     try:
         files.update(_phase_animations_pack(build, t, g))
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _apack_err:
         print(f"[GALAXY] animations pack skipped: {_apack_err}")
     # Polish screens
@@ -1475,7 +1457,7 @@ def _phase_polish(build, t, g):
 # PHASE 15: TESTING & QA — Test suites, validation, integration
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_testing(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     tests = [
         "combatEngine", "inventoryManager", "questEngine", "economySystem",
         "aiDirector", "worldGenerator", "craftingSystem", "progressionEngine",
@@ -1505,7 +1487,7 @@ def _phase_testing(build, t, g):
 # PHASE 16: FINAL COMPILATION — Layout, build manifests, assembly
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_compilation(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     all_screens = build.get("_all_screens", ["GameScreen"])
     files["app/_layout.tsx"] = _gen_layout_code(t, g, all_screens)
 
@@ -1550,7 +1532,7 @@ def _phase_compilation(build, t, g):
 # PHASE: SYSTEM DESIGN — Core system architecture files
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_system(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     systems = [
         ("systemKernel", "Core system kernel with process scheduling, memory management, resource allocation, signal handling"),
         ("eventDispatcher", "System event dispatcher with priority queues, async handlers, bubbling, capture, middleware hooks"),
@@ -1572,7 +1554,7 @@ def _phase_system(build, t, g):
 # PHASE: FRAMEWORK SELECTION — Framework config, adapters, abstractions
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_framework(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     frameworks = [
         ("frameworkCore", "Core framework with dependency injection, lifecycle hooks, module system, configuration"),
         ("renderFramework", "Rendering framework adapter with scene graph, draw calls, batching, culling, LOD"),
@@ -1592,7 +1574,7 @@ def _phase_framework(build, t, g):
 # PHASE: ENGINE CORE — Core engine systems, ECS, rendering pipeline
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_engine(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     engine_parts = [
         ("ecsEngine", "Entity Component System with archetype storage, system scheduling, query optimization, prefabs"),
         ("renderPipeline", "Render pipeline with forward/deferred paths, shadow pass, post-processing stack, GPU culling"),
@@ -1615,7 +1597,7 @@ def _phase_engine(build, t, g):
 # PHASE: ARCHITECTURE BLUEPRINT — Design patterns, modules, interfaces
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_architecture(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     arch_parts = [
         ("moduleLoader", "Dynamic module loader with lazy loading, circular detection, tree shaking, code splitting"),
         ("serviceLocator", "Service locator with singleton/transient/scoped lifetimes, auto-wiring, mocking support"),
@@ -1637,7 +1619,7 @@ def _phase_architecture(build, t, g):
 # PHASE: LORE & MYTHOLOGY — World-building, history, factions
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_lore(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     lore_data = [
         ("world_history_database", "Complete world history spanning eras, cataclysms, golden ages, dark periods, prophecies"),
         ("factions_lore_database", "Faction lore with origins, beliefs, conflicts, alliances, heroes, betrayals, civil wars"),
@@ -1657,7 +1639,7 @@ def _phase_lore(build, t, g):
 # PHASE: GAMEPLAY SYSTEMS — Core gameplay loops, progression, economy
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_gameplay(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     gameplay = [
         ("questEngine", "Quest engine with chains, branches, dynamic objectives, timers, fail states, party quests"),
         ("craftingSystem", "Crafting with recipes, discovery, quality tiers, station requirements, experimentation"),
@@ -1677,7 +1659,7 @@ def _phase_gameplay(build, t, g):
 # PHASE: ENVIRONMENT & ECOLOGY — Biomes, wildlife, day/night, weather
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_environment(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     env_systems = [
         ("biomeManager", "Biome management with transitions, layered vegetation, temperature, humidity, elevation"),
         ("weatherSystem", "Dynamic weather with precipitation, wind, storms, lightning, fog, seasonal patterns"),
@@ -1697,7 +1679,7 @@ def _phase_environment(build, t, g):
 # PHASE: PLOT & INTRIGUE — Story arcs, conspiracies, political drama
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_plot_intrigue(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     plot_systems = [
         ("plotEngine", "Plot engine with branching story arcs, consequence chains, character motivations, dramatic tension curves, climax timing"),
         ("intrigueManager", "Intrigue manager with conspiracy networks, secret alliances, betrayal triggers, double agents, trust mechanics"),
@@ -1720,8 +1702,6 @@ def _phase_plot_intrigue(build, t, g):
     # real files into the build tree. This runs once per build in batch 1.
     try:
         files.update(_phase_story_style_pack(build, t, g))
-    except _gs.GalaxyBuildStopped:
-        raise
     except Exception as _spk_err:
         print(f"[GALAXY] story_style pack skipped: {_spk_err}")
     return files
@@ -1731,7 +1711,7 @@ def _phase_plot_intrigue(build, t, g):
 # PHASE: VISUAL EFFECTS — Particle systems, post-processing, FX
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_vfx(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     vfx_systems = [
         ("particleSystem", "GPU particle system with emitters, forces, collisions, sub-emitters, trails, ribbons"),
         ("decalSystem", "Decal system with projection, blending, pooling, atlas, fading, normal blending"),
@@ -1757,7 +1737,7 @@ def _phase_vfx(build, t, g):
 # PHASE: SOUND EFFECTS — SFX systems, foley, impact sounds
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_sfx(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     sfx_systems = [
         ("sfxManager", "SFX manager with pooling, priority, 3D positioning, attenuation, occlusion, ducking"),
         ("footstepSystem", "Footstep system with surface detection, speed variation, material layers, wetness"),
@@ -1776,7 +1756,7 @@ def _phase_sfx(build, t, g):
 # PHASE: SOUND ENGINE — Audio pipeline, mixing, spatialization
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_sound(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     sound = [
         ("audioMixer", "Audio mixer with bus hierarchy, sends, inserts, side-chain, automation, snapshots"),
         ("spatialAudio", "Spatial audio with HRTF, distance attenuation, doppler, reverb zones, propagation"),
@@ -1794,7 +1774,7 @@ def _phase_sound(build, t, g):
 # PHASE: MUSIC & SOUNDTRACK — Adaptive music, composition, layers
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_music(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     music = [
         ("musicDirector", "Music director with context awareness, intensity tracking, transition rules, silence management"),
         ("adaptiveMusic", "Adaptive music with horizontal/vertical layers, stingers, crossfades, beat-synced transitions"),
@@ -1813,7 +1793,7 @@ def _phase_music(build, t, g):
 # PHASE: AMBIANCE & ATMOSPHERE — Environmental audio, mood, tension
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_ambiance(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     ambiance = [
         ("ambianceEngine", "Ambiance engine with layered soundscapes, distance-based blending, transitions, weather integration"),
         ("moodSystem", "Mood system with tension curves, dynamic soundtrack mixing, lighting adaptation, NPC behavior"),
@@ -1831,7 +1811,7 @@ def _phase_ambiance(build, t, g):
 # PHASE: CINEMATICS & CAMERA — Camera systems, cutscene framework
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_cinematics(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     cinematics = [
         ("cameraSystem", "Camera system with modes (orbit, follow, free, fixed), transitions, constraints, shake"),
         ("cinematicDirector", "Cinematic director with timeline, keyframes, camera rails, focus pulls, letterbox"),
@@ -1849,7 +1829,7 @@ def _phase_cinematics(build, t, g):
 # PHASE: CUTSCENES & DIALOGUE — Narrative delivery, voice, choices
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_cutscenes(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     cutscenes = [
         ("cutscenePlayer", "Cutscene player with scripted sequences, camera control, actor choreography, skip handling"),
         ("dialogueEngine", "Dialogue engine with branching trees, conditions, variables, emotional tags, voice sync"),
@@ -1868,7 +1848,7 @@ def _phase_cutscenes(build, t, g):
 # PHASE: TUTORIAL & ONBOARDING — Player guidance, tooltips, help
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_tutorial(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     tutorial = [
         ("tutorialManager", "Tutorial manager with step sequences, skip detection, adaptive pacing, completion tracking"),
         ("tooltipSystem", "Tooltip system with context-aware hints, positioning, dismissal, frequency control"),
@@ -1885,7 +1865,7 @@ def _phase_tutorial(build, t, g):
 # PHASE: MENU SYSTEM — Main menu, pause, HUD navigation
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_menu(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     menus = [
         ("mainMenuController", "Main menu with animated background, button navigation, version display, news ticker"),
         ("pauseMenuController", "Pause menu with resume, settings, save/load, quit confirm, background blur"),
@@ -1908,7 +1888,7 @@ def _phase_menu(build, t, g):
 # PHASE: SETTINGS & CONFIG — User preferences, keybinds, accessibility
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_settings(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     settings = [
         ("settingsManager", "Settings manager with categories, presets, per-profile, import/export, cloud sync"),
         ("keybindManager", "Keybind manager with action mapping, rebinding, conflict detection, gamepad support"),
@@ -1928,7 +1908,7 @@ def _phase_settings(build, t, g):
 # PHASE: BACKEND SYSTEMS — Server logic, API, database, auth
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_backend(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     backend = [
         ("apiRouter", "API router with versioning, rate limiting, authentication, request validation, response shaping"),
         ("databaseService", "Database service with connection pooling, migration, seeding, query builder, transactions"),
@@ -1950,7 +1930,7 @@ def _phase_backend(build, t, g):
 # PHASE: MIDDLEWARE LAYER — Request processing, transforms, validation
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_middleware(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     mw = [
         ("corsMiddleware", "CORS middleware with origin whitelist, credentials, preflight, dynamic policy"),
         ("rateLimitMiddleware", "Rate limit middleware with sliding window, token bucket, per-route, IP/user tracking"),
@@ -1971,7 +1951,7 @@ def _phase_middleware(build, t, g):
 # PHASE: FRONTEND UI — User interface components, layouts, themes
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_frontend(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     frontend = [
         ("ThemeProvider", "Theme provider with dark/light modes, custom palettes, dynamic switching, animations"),
         ("LayoutManager", "Layout manager with responsive breakpoints, orientation, safe areas, split views"),
@@ -1995,7 +1975,7 @@ def _phase_frontend(build, t, g):
 # PHASE: COMPLEXITY & DEPTH — Deep systems, meta-game, endgame
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_complexity(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     complexity = [
         ("metaGameEngine", "Meta-game engine with prestige systems, cross-run upgrades, unlockables, legacy bonuses"),
         ("endgameContent", "Endgame content with raid tiers, mythic modes, leaderboards, seasonal challenges"),
@@ -2014,7 +1994,7 @@ def _phase_complexity(build, t, g):
 # PHASE: INTRICACY & DETAIL — Micro-details, polish, interactables
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_intricacy(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     intricacy = [
         ("microInteractions", "Micro-interactions with hover states, button depress, scroll momentum, haptic feedback"),
         ("environmentDetail", "Environment detail with cloth physics, paper scatter, liquid sloshing, dust particles"),
@@ -2032,7 +2012,7 @@ def _phase_intricacy(build, t, g):
 # PHASE: EASTER EGGS & SECRETS — Hidden content, secrets, references
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_easter_eggs(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     eggs = [
         ("secretManager", "Secret manager with trigger conditions, unlock tracking, hint system, achievement links"),
         ("hiddenRooms", "Hidden room system with entrance detection, puzzle locks, reward tables, atmosphere"),
@@ -2050,7 +2030,7 @@ def _phase_easter_eggs(build, t, g):
 # PHASE: ADVANCED IMMERSION — Haptics, sensory, environmental response
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_immersion(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     immersion = [
         ("hapticEngine", "Haptic feedback with contextual vibration patterns, intensity curves, device-specific profiles"),
         ("dynamicWeather", "Dynamic weather response with player gear effects, visibility, movement speed, shelter mechanic"),
@@ -2068,7 +2048,7 @@ def _phase_immersion(build, t, g):
 # PHASE: ADVANCED PSYCHOLOGY — Player engagement, flow, motivation
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_psychology(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     psych = [
         ("flowManager", "Flow state manager with challenge/skill balance, zone detection, difficulty micro-adjustment"),
         ("engagementTracker", "Engagement tracker with session analysis, churn prediction, re-engagement hooks"),
@@ -2087,7 +2067,7 @@ def _phase_psychology(build, t, g):
 # PHASE: FINE TUNING — Final pass optimization, config, runtime tweaks
 # ═══════════════════════════════════════════════════════════════════════
 def _phase_fine_tuning(build, t, g):
-    files = _gs._new_phase_files(build)
+    files = {}
     tuning = [
         ("performanceTuner", "Performance tuner with frame budget, draw call reduction, texture streaming, LOD bias"),
         ("memoryOptimizer", "Memory optimizer with allocation tracking, leak detection, pool tuning, GC scheduling"),
@@ -2107,7 +2087,7 @@ def _phase_fine_tuning(build, t, g):
 def _phase_generic(build, t, g, phase_info):
     """Generic phase generator for phases without dedicated functions.
     Uses _expand_massive() to generate substantial code files for any phase."""
-    files = _gs._new_phase_files(build)
+    files = {}
     phase_id = phase_info["id"]
     phase_name = phase_info["name"]
     agents = phase_info["agents"]

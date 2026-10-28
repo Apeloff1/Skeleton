@@ -22,7 +22,7 @@ Out of scope here: APK/EAS export, deploy, multiplayer, and the standalone-AI la
 
 **Tier 1, contract (runs everywhere, no backend).** Asserts the routes exist, the screen sources keep their flow wiring (welcome flag and redirect, auth endpoints, fail-closed sign-in, generator handoff, library open), and drives the real pure modules (`journeyCatalog.ts`, `buildJobLifecycle.ts`) through each flow. Runs in CI via `yarn test:product-journeys` (Frontend job) and alone via `yarn test:app-foundation`.
 
-**Tier 2, live (opt-in).** With `SKELETON_E2E_BASE_URL` set, one test drives the real backend over HTTP: bootstrap, register, sign in, verify `/me`, reject a wrong password, and verify that public registration grants only the viewer role and cannot create builds. A bounded three-file build, observation with the production `watchBuildJob`, and retained-partial library verification additionally require `SKELETON_E2E_OPERATOR_TOKEN_FILE` pointing to a private file containing a valid editor/admin token. The test requires enforced authentication and never upgrades the public consumer account. Its three-file ceiling intentionally stops the mandatory pipeline: it verifies `artifact_file_budget_exhausted`, exactly three durable files, no fabricated completed phases, and fully drained workers. This is a bounded install and recovery probe, not successful end-to-end game creation. `SKELETON_E2E_MAX_CHECKS` bounds the watch (default 120). The live suite is skipped when the base URL is unset; build mutation steps are skipped when the private operator token file is absent.
+**Tier 2, live (opt-in).** With `SKELETON_E2E_BASE_URL` set, one test drives the real backend over HTTP: bootstrap, register, sign in, verify `/me`, reject a wrong password, create a build from a brief, start it, watch it with the production `watchBuildJob` until terminal, and confirm it appears in the library. `SKELETON_E2E_MAX_CHECKS` bounds the watch (default 120). Skipped, not failed, when the variable is unset.
 
 **Tier 3, browser (planned).** Playwright against `yarn export:web` output, using the existing `testID`s (`gate-email`, `gate-pass`, `gate-submit`, `gate-error`, `gate-google`). Not added yet because it needs new dependencies and a `yarn.lock` regeneration; tracked as a follow-up. Until then Shirt 1 covers the UI layer manually with the cases below.
 
@@ -61,7 +61,7 @@ Out of scope here: APK/EAS export, deploy, multiplayer, and the standalone-AI la
 ## How Shirt 1 runs it
 
 1. Tier 1: `cd frontend && yarn install --frozen-lockfile && yarn test:app-foundation`. All cases pass, the live case reports skipped.
-2. Tier 2: start the stack (backend on `:8001` with Mongo), then `SKELETON_E2E_BASE_URL=http://localhost:8001 SKELETON_E2E_OPERATOR_TOKEN_FILE=/private/path/operator-token yarn test:app-foundation`. Record the `watch outcome` diagnostic line.
+2. Tier 2: start the stack (backend on `:8001` with Mongo), then `SKELETON_E2E_BASE_URL=http://localhost:8001 yarn test:app-foundation`. Record the `watch outcome` diagnostic line.
 3. Manual: `yarn web`, run every `-M` case in a fresh browser profile.
 4. File each red case as a GitHub issue titled `[QA][F<n>-<id>] <case>` with severity, repro steps, expected vs actual, and the commit SHA. Sev1/Sev2 block rollout until fixed and re-verified.
 5. Report the run (SHA, tier results, issues filed) to Carrol.

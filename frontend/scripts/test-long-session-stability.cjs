@@ -22,13 +22,6 @@ function loadTS(filename, mocks = {}) {
   const mod = { exports: {} };
   compileFunction(output.outputText, ['require', 'module', 'exports'])(
     id => {
-      if (id === './apiClient') return {
-        subscribeApiSessionChanges: () => () => {},
-        prepareApiRequest: async (_url, headers = {}, signal = new AbortController().signal) => ({
-          headers, signal, epoch: 0, cacheNamespace: 'anonymous-test-session', authenticated: false,
-          current: () => !signal.aborted, dispose() {},
-        }),
-      };
       if (id === './requestRecoveryPolicy') return loadTS('src/utils/requestRecoveryPolicy.ts');
       assert.ok(Object.hasOwn(mocks, id), filename + ': unexpected import ' + id);
       return mocks[id];
@@ -272,16 +265,13 @@ test('circuit reset cannot let an old request delete its replacement', async () 
   const reply = id => ({ ok: true, status: 200, text: async () => JSON.stringify({ id }) });
   try {
     const first = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
-    await settle(); // Account initialization precedes request admission.
     net.resetCircuit();
     const second = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
-    await settle();
     assert.equal(resolvers.length, 2);
     resolvers[0](reply('first'));
     await first;
     await settle();
     const third = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
-    await settle();
     assert.equal(resolvers.length, 2, 'the second request should still be coalesced');
     resolvers[1](reply('second'));
     assert.deepEqual((await second).data, { id: 'second' });

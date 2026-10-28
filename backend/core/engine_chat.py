@@ -184,7 +184,6 @@ class EngineChat:
         self._provider_selection: str | None = None
         self._model_selection: str | None = None
         self._max_output_tokens: int | None = None
-        self._max_model_turns = 4
         self._params: dict[str, Any] = {}
         self._history: list[dict[str, str]] = []
         # A bounded projection can eventually repeat its exact text. Keep the
@@ -268,14 +267,6 @@ class EngineChat:
         if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= 131072:
             raise EngineTextError("max_output_tokens is outside allowed range")
         self._max_output_tokens = max_tokens
-        return self
-
-    def with_max_model_turns(self, max_model_turns: int) -> "EngineChat":
-        """Lower the existing canonical turn allowance; never grant more work."""
-        self._require_idle()
-        if type(max_model_turns) is not int or not 1 <= max_model_turns <= 4:
-            raise EngineTextError("max_model_turns may only lower the existing limit within [1,4]")
-        self._max_model_turns = max_model_turns
         return self
 
     def with_params(self, **params: Any) -> "EngineChat":
@@ -458,7 +449,6 @@ class EngineChat:
                 "data_class": self.data_class,
                 "purpose": self.purpose,
                 **({} if self._cooperation is None else {"cooperation": self._cooperation}),
-                **({} if self._max_model_turns == 4 else {"max_model_turns": self._max_model_turns}),
                 **(
                     {}
                     if self._provider_selection is None
@@ -526,7 +516,6 @@ class EngineChat:
             temperature=self._params.get("temperature"),
             structured_output_schema=self._structured_output_schema,
             cooperation=self._cooperation,
-            max_model_turns=self._max_model_turns,
         )
         if self._turn_idempotency_key is not None and self._completed_explicit_request is not None:
             if request != self._completed_explicit_request:

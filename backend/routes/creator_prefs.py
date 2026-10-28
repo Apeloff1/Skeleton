@@ -12,19 +12,16 @@ block to the build prompt.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_identity, project_router, scoped_database
-
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 
-router = project_router(prefix="/api/creator", tags=["creator-preferences"])
+router = APIRouter(prefix="/api/creator", tags=["creator-preferences"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 ART_STYLES = ["any", "neon", "pixel", "minimal", "flat", "retro", "hand-drawn", "vaporwave", "monochrome"]
 DIFFICULTIES = ["any", "chill", "balanced", "hardcore"]
@@ -58,8 +55,6 @@ def _clean(p: dict) -> dict:
 
 @router.get("/preferences/{creator_id}")
 async def get_prefs(creator_id: str):
-    if creator_id != project_identity()["owner_id"]:
-        raise HTTPException(403, "Creator identity mismatch")
     doc = await _db.creator_preferences.find_one({"creator_id": creator_id}, {"_id": 0})
     prefs = _clean(doc or {})
     return {"creator_id": creator_id, "preferences": prefs,
@@ -69,8 +64,6 @@ async def get_prefs(creator_id: str):
 
 @router.put("/preferences/{creator_id}")
 async def put_prefs(creator_id: str, body: PrefsBody):
-    if creator_id != project_identity()["owner_id"]:
-        raise HTTPException(403, "Creator identity mismatch")
     prefs = _clean(body.model_dump())
     await _db.creator_preferences.update_one(
         {"creator_id": creator_id},
@@ -86,8 +79,6 @@ async def preference_bias(creator_id: str) -> str:
     or '' when the creator has none. Pure-additive; never overrides the brief."""
     if not creator_id:
         return ""
-    if creator_id != project_identity()["owner_id"]:
-        raise HTTPException(403, "Creator identity mismatch")
     doc = await _db.creator_preferences.find_one({"creator_id": creator_id}, {"_id": 0})
     if not doc:
         return ""

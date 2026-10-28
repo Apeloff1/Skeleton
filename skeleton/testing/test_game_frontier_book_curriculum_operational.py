@@ -8,7 +8,6 @@ from __future__ import annotations
 from hashlib import sha256
 from io import BytesIO
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 import unittest
 from zipfile import ZipFile

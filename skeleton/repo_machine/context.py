@@ -70,31 +70,14 @@ def _bounded(payload: dict, limit: int) -> dict:
     # nonidentity sections deterministically until the serialized result fits.
     for name in (
         "entrypoints", "files", "topology", "findings", "work",
-        "subsystems", "coordination", "intelligence", "metrics", "health",
+        "subsystems", "coordination", "execution", "intelligence",
+        "metrics", "health",
     ):
-        # Execution constraints and failed-work state are authoritative, not
-        # advisory evidence. Never silently discard them to fit a token budget.
         compact.pop(name, None)
         if _fits(compact, limit):
             return compact
-
-    # Only execution plan detail (not state/identity/constraints) is shrinkable.
-    while not _fits(compact, limit):
-        execution = compact.get("execution")
-        if not isinstance(execution, dict):
-            break
-        reduced = dict(execution)
-        changed = False
-        for field in ("steps", "parallel_batches"):
-            items = reduced.get(field)
-            if isinstance(items, list) and items:
-                reduced[field] = items[: len(items) // 2]
-                changed = True
-        if not changed:
-            break
-        compact["execution"] = reduced
     if not _fits(compact, limit):
-        raise ValueError("required repository context exceeds byte_limit")
+        raise ValueError("context identity exceeds byte limit")
     return compact
 
 

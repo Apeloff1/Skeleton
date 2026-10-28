@@ -12,7 +12,6 @@ from skeleton.ai.runtime.deferred.reconciliation import DeferredOutcomeReconcile
 def _started(tmp_path):
     registry = build_registry()
     record = registry.get("VOL-160")
-    record.transition("implementation_candidate")
     record.transition("verified")
     record.transition("enabled")
     journal = SqliteDeferredExecutionJournal(tmp_path / "reconcile.sqlite3")
@@ -64,7 +63,6 @@ def test_reconciles_success_without_redispatch(tmp_path):
 
     restarted = DeferredExecutor(build_registry(), journal=SqliteDeferredExecutionJournal(tmp_path / "reconcile.sqlite3"))
     restarted_record = restarted.registry.get("VOL-160")
-    restarted_record.transition("implementation_candidate")
     restarted_record.transition("verified")
     restarted_record.transition("enabled")
     restarted.register_handler("VOL-160", lambda payload: pytest.fail("reconciled effect must never redispatch"), handler_identity=restarted_record.spec.handler)

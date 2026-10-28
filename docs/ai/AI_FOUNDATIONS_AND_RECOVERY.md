@@ -122,26 +122,6 @@ artifacts rather than manufacturing completed phases or accumulating an
 unbounded in-memory fallback. Inspect the actual failure and restore capacity
 before starting replacement work.
 
-A positive explicit `target_files` is a ceiling on unique generated paths for
-the main build. It overrides scale text and size hints, disables delivery
-padding, and applies to nested and fallback generation. When it interrupts an
-unfinished phase, the build reports `artifact_file_budget_exhausted` and retains
-the accepted partial files durably, including through manual advance. A tiny
-installation probe therefore proves bounded generation and retention; it does
-not prove a completed or playable game. Later artifact jobs retain their own
-bounds.
-
-Galaxy's shared HTTP dispatch uses the existing account role policy. Build and
-artifact reads require sign-in; mutations require an editor and vault
-maintenance requires an administrator. New builds retain the verified account
-and tenant identity, which also scopes source/status reads, private lists and
-derived build jobs across extracted routers. Old unowned installation records
-remain available only to the administrator in the default installation tenant;
-they are not assigned to whichever consumer signs in next. Global storage and
-service controls also require that installation administrator. HTTP source
-pruning requires one explicit authorized build; an empty request cannot erase
-every build's source history.
-
 Expansion, ZIP and APK preparation share that same physical slot in the backend
 process. This is not a distributed multi-host lease. Expansions
 save small chunks; packaging streams vault files in workers instead of loading

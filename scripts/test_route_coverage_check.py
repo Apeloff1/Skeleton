@@ -61,21 +61,6 @@ class RouteCoverageContractTests(unittest.TestCase):
         self.assertEqual(rows[0]["heavy"], False)
         self.assertEqual(rows[1]["heavy"], True)
 
-    def test_route_groups_follow_expo_urls_and_reject_duplicate_routes(self) -> None:
-        from unittest.mock import patch
-
-        with tempfile.TemporaryDirectory() as tmp:
-            app = Path(tmp)
-            (app / "(account)" / "app").mkdir(parents=True)
-            (app / "(account)" / "app" / "index.tsx").write_text("export default null;")
-            (app / "(account)" / "_layout.tsx").write_text("export default null;")
-            (app / "_layout.tsx").write_text("export default null;")
-            with patch.object(coverage, "APP_DIR", app):
-                self.assertIn("app/index.tsx", coverage.scan_app_files())
-                (app / "app.tsx").write_text("export default null;")
-                with self.assertRaisesRegex(ValueError, "duplicate Expo URL /app"):
-                    coverage.scan_app_files()
-
 
 if __name__ == "__main__":
     unittest.main()

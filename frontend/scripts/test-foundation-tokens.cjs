@@ -120,9 +120,9 @@ function walkNoUndefined(value, trail, seen = new Set()) {
 }
 
 const load = makeLoader();
-const tokens = load('src/theme/tokens.ts');
-const skins = load('src/theme/skins.ts');
-const F = load('src/theme/foundation/index.ts');
+const tokens = load('theme/tokens.ts');
+const skins = load('theme/skins.ts');
+const F = load('theme/foundation/index.ts');
 
 const THEME_KEYS = ['mode', 'isDark', 'skinId', 'statusBarStyle', 'colors', 'status',
   'surfaces', 'gradients', 'type', 'fontFamily', 'hudType', 'spacing', 'breathing',
@@ -201,7 +201,7 @@ test('light mode ignores dark skins; unknown skins fall back to canonical', () =
 });
 
 test('canonical colours: true cyan, blue alias and tokens.ts canonical snapshot', () => {
-  const fresh = makeLoader()('src/theme/tokens.ts');
+  const fresh = makeLoader()('theme/tokens.ts');
   same(fresh.canonicalColors.dark, fresh.default.colorModes.dark);
   same(fresh.canonicalColors.light, fresh.default.colorModes.light);
   assert.ok(Object.isFrozen(fresh.canonicalColors.dark));
@@ -215,10 +215,10 @@ test('canonical colours: true cyan, blue alias and tokens.ts canonical snapshot'
 
 test('a skin mutation before import does not leak into the canonical dark theme', () => {
   const l = makeLoader();
-  const t = l('src/theme/tokens.ts');
-  const s = l('src/theme/skins.ts');
+  const t = l('theme/tokens.ts');
+  const s = l('theme/skins.ts');
   Object.assign(t.default.colors, s.SKIN_BY_ID.hyperwave.colors); // what skinStore does at import
-  const f = l('src/theme/foundation/index.ts');
+  const f = l('theme/foundation/index.ts');
   assert.equal(f.getTheme('dark').colors.primary, '#8B5CF6');
   assert.equal(f.getTheme('dark').colors.bg, '#070B16');
   assert.equal(f.getTheme('dark', 'hyperwave').colors.primary, '#c026d3');
@@ -273,10 +273,10 @@ test('dark elevation is border-first, light uses shadows (UI_ART_KIT §2.4)', ()
 
 test('tokens.ts is the single edit point: no hex literals outside it', () => {
   const files = [
-    'src/theme/skins.ts', 'src/constants/themes.ts', 'src/hooks/useTheme.ts',
+    'theme/skins.ts', 'constants/themes.ts', 'hooks/useTheme.ts',
     'src/theme/deluxe.ts', 'src/skeletonForge/components/theme.ts',
-    ...fs.readdirSync(path.join(ROOT, 'src/theme/foundation'))
-      .filter(f => f.endsWith('.ts')).map(f => 'src/theme/foundation/' + f),
+    ...fs.readdirSync(path.join(ROOT, 'theme/foundation'))
+      .filter(f => f.endsWith('.ts')).map(f => 'theme/foundation/' + f),
   ];
   for (const relative of files) {
     const file = fs.readFileSync(path.join(ROOT, relative), 'utf8');
@@ -286,8 +286,8 @@ test('tokens.ts is the single edit point: no hex literals outside it', () => {
 
 test('compatibility layers keep their export names and resolve from tokens.ts', () => {
   const l = makeLoader();
-  const t = l('src/theme/tokens.ts');
-  const sk = l('src/theme/skins.ts');
+  const t = l('theme/tokens.ts');
+  const sk = l('theme/skins.ts');
   assert.deepEqual(Object.keys(sk).sort(),
     ['DEFAULT_SKIN', 'SKINS', 'SKIN_BY_ID', 'onPrimaryFor', 'primaryTint'].sort());
   assert.equal(sk.DEFAULT_SKIN, t.DEFAULT_SKIN_ID);
@@ -311,7 +311,7 @@ test('compatibility layers keep their export names and resolve from tokens.ts', 
 });
 
 test('lint:ci guard: no named export duplicates a default-object binding (import/no-named-as-default-member)', () => {
-  const t = makeLoader()('src/theme/tokens.ts');
+  const t = makeLoader()('theme/tokens.ts');
   const named = Object.keys(t).filter(k => k !== 'default' && k !== '__esModule');
   const dup = named.filter(k => Object.prototype.hasOwnProperty.call(t.default, k));
   assert.deepEqual(dup, [], 'tokens.ts named exports also on default: ' + dup.join(', '));

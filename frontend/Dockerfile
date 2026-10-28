@@ -14,18 +14,19 @@ COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-concurrency 4 --network-timeout 120000 \
-    && node ./scripts/patch-node-modules.js \
-    && yarn cache clean
+    yarn install --frozen-lockfile --non-interactive --ignore-scripts \
+    && node ./scripts/patch-node-modules.js
 
 # Stage 2: Development
 FROM deps AS development
+WORKDIR /app
 COPY . .
 EXPOSE 3000 8081 19000 19001 19002
 CMD ["npx", "expo", "start", "--web", "--port", "3000"]
 
 # Stage 3: Web Build
 FROM deps AS builder
+WORKDIR /app
 # Expo inlines public endpoints into the exported browser bundle. These are
 # public URLs only; model credentials remain confined to the engine.
 ARG EXPO_PUBLIC_BACKEND_URL=http://localhost:8001

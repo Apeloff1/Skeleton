@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from skeleton.testing.local_inference_fixtures import local_serving_resources  # noqa: F401
-
 import skeleton.ai.runtime.training.evaluation_store as store_module
 from skeleton.ai.runtime.training.evaluation import EvaluationLedger
 from skeleton.ai.runtime.training.verifier import (

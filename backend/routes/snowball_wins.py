@@ -6,20 +6,17 @@
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
-
-from routes.playable_access import project_router, reauthorize_project_context, scoped_database
 from skeleton.context.instruction_policy import InstructionPolicy
 import os
 import re
 from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from core.databases import client as _MONGO
 
-router = project_router(prefix="/api/wins", tags=["wins"])
+router = APIRouter(prefix="/api/wins", tags=["wins"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 PROJ = {"_id": 0}
 
 # Agent cast that learns from each build (mirrors jeeves_voice.AGENT_CAST keys).
@@ -111,14 +108,11 @@ async def pitch(pid: str):
     text = None
     llm_used = False
     if brief:
-        scope = await reauthorize_project_context(mutate=True)
         try:
             import uuid
             from core.engine_chat import EngineChat, UserMessage
             chat = EngineChat(
                 session_id=f"pitch-{uuid.uuid4().hex[:8]}",
-                tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
-                data_class="confidential",
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.snowball-wins.marketing-pitch",
                     version="1",
@@ -128,11 +122,8 @@ async def pitch(pid: str):
             import asyncio
             resp = await asyncio.wait_for(chat.send_message(UserMessage(
                 text=f"Write ONE vivid 2-sentence store pitch for '{title}' ({genre}). Premise: {brief}")), timeout=30)
-            await reauthorize_project_context(mutate=True)
             text = (resp.content if hasattr(resp, "content") else str(resp)).strip()
             llm_used = bool(text)
-        except HTTPException:
-            raise
         except Exception:
             text = None
     if not text:

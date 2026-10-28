@@ -189,34 +189,6 @@ class OfflineAISession:
         self.history = restored
         return len(restored) // 2
 
-    def save_history_backup(self, path: str | Path) -> str:
-        """Retain the standalone shell's original model-bound backup format."""
-        if isinstance(self, DurableOfflineAISession):
-            raise OfflineAIError("use durable conversation export for this session")
-        if isinstance(self.backend, NativeRuntimeLocalModel):
-            self.backend.assert_identity()
-        else:
-            self.backend._assert_artifacts_stable()
-        from .offline_history import backup_history
-
-        return backup_history(path, self.model_digest, self.history)
-
-    def restore_history_backup(self, path: str | Path) -> int:
-        """Restore verified shell context without replacing durable authority."""
-        if isinstance(self, DurableOfflineAISession):
-            raise OfflineAIError("use durable conversation import for this session")
-        if self.history:
-            raise OfflineAIError("start a new conversation before importing a manual backup")
-        if isinstance(self.backend, NativeRuntimeLocalModel):
-            self.backend.assert_identity()
-        else:
-            self.backend._assert_artifacts_stable()
-        from .offline_history import restore_history
-
-        restored = restore_history(path, self.model_digest)
-        self.history = restored
-        return len(restored) // 2
-
     def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
             raise OfflineAIError("message must contain 1-4096 characters")

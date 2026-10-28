@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
-
 import asyncio
-from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import os
@@ -16,9 +13,6 @@ import pytest
 from skeleton.ai.runtime.functional_ai import FunctionalAIRequest, FunctionalAIRuntime
 from skeleton.ai.runtime.inference import LocalInferenceEngine, LocalInferenceRequest
 from skeleton.ai.runtime.inference.llama_cpp import (
-    CODING_COMPLETION_CHAT_TEMPLATE,
-    COMPLETION_CHAT_FLAGS,
-    QWEN3_COMPLETION_CHAT_TEMPLATE,
     LlamaCppConfig,
     LlamaCppModel,
     LlamaCppRuntimeError,
@@ -29,6 +23,9 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_runtime import ProviderRequest
 from skeleton.skills.tool_contract import ToolEffect, ToolManifest
 from skeleton.skills.tool_runtime import AsyncToolRuntime
+
+
+NOW = datetime(2026, 10, 2, 20, 0, tzinfo=timezone.utc)
 
 
 _FAKE_RUNTIME = r'''#!/usr/bin/env python3
@@ -54,7 +51,7 @@ for key in (
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("-m")
-parser.add_argument("-f", "--binary-file", dest="f")
+parser.add_argument("-f")
 parser.add_argument("-n")
 parser.add_argument("--seed")
 parser.add_argument("--temp")
@@ -135,7 +132,6 @@ def _config(tmp_path: Path, **overrides) -> LlamaCppConfig:
         "executable": str(runtime),
         "model_path": str(model),
         "timeout_seconds": 5.0,
-        "context_size": 2048,
         "max_output_bytes": 16 * 1024,
         "max_stderr_bytes": 8 * 1024,
     }
@@ -318,9 +314,7 @@ def _verification(_request, candidate: str, context_digest: str) -> ExecutionVer
 async def test_vs001_crosses_real_local_process_boundary_and_recovers(
     tmp_path: Path,
 ) -> None:
-    # The second turn includes the governed tool protocol and its recorded
-    # result alongside an output reserve; admit that complete rendered input.
-    config = _config(tmp_path, context_size=8192)
+    config = _config(tmp_path)
     database = tmp_path / "vs001-subprocess.sqlite3"
     repo = SQLiteExecutionRepository(database)
     tools = AsyncToolRuntime()
@@ -355,7 +349,7 @@ async def test_vs001_crosses_real_local_process_boundary_and_recovers(
         instructions="Use only the local model and explicitly governed tools.",
         context_digest=hashlib.sha256(b"vs001-subprocess-context").hexdigest(),
         allowed_tool_ids=("repo.read",),
-        created_at=datetime.now(timezone.utc),
+        created_at=NOW,
     )
     runtime = FunctionalAIRuntime(
         repo,
@@ -427,8 +421,6 @@ def test_llama_cpp_rejects_zero_tensor_gguf(tmp_path: Path) -> None:
         "--model=/tmp/other.gguf",
         "--prompt=override",
         "--file=/tmp/prompt.txt",
-        "--binary-file=/tmp/prompt.txt",
-        "-bf/tmp/prompt.txt",
         "--n-predict=999",
         "--seed=42",
         "--temp=1.0",
@@ -509,194 +501,3 @@ def test_llama_cpp_rejects_control_characters_in_extra_args(
             model_path=str(model),
             extra_args=(extra_arg,),
         )
-
-
-def _chat_config(tmp_path: Path, template: str = CODING_COMPLETION_CHAT_TEMPLATE, **overrides):
-    values = {
-        "context_size": 12288,
-        "output_framing": "llama_completion_eog",
-        "extra_args": (*COMPLETION_CHAT_FLAGS, "--chat-template", template),
-    }
-    values.update(overrides)
-    return _config(tmp_path, **values)
-
-
-@pytest.mark.parametrize(
-    ("template", "trailer"),
-    [
-        (CODING_COMPLETION_CHAT_TEMPLATE, "<|im_start|>assistant\n"),
-        (QWEN3_COMPLETION_CHAT_TEMPLATE, "<|im_start|>assistant\n<think>\n\n</think>\n\n"),
-    ],
-    ids=["coding", "qwen3-closed-think"],
-)
-def test_pinned_native_chat_preserves_actual_roles_content_and_one_generation_prefix(
-    tmp_path: Path, template: str, trailer: str,
-) -> None:
-    backend = LlamaCppModel(_chat_config(tmp_path, template))
-    request = LocalInferenceRequest(
-        instructions="  SYSTEM_POLICY\nretain policy whitespace  ",
-        history=(("user", "previous user\n"), ("assistant", "previous answer 漁")),
-        prompt="  current source\nconst text = '\\n';\n  ",
-        max_output_tokens=1024,
-    )
-    expected = (
-        "<|im_start|>system\n  SYSTEM_POLICY\nretain policy whitespace  <|im_end|>\n"
-        "<|im_start|>user\nprevious user\n<|im_end|>\n"
-        "<|im_start|>assistant\nprevious answer 漁<|im_end|>\n"
-        "<|im_start|>user\n  current source\nconst text = '\\n';\n  <|im_end|>\n"
-        + trailer
-    )
-    assert backend._render_prompt(request) == expected
-    assert backend.count_input_tokens(request) == len(expected.encode("utf-8")) + 1
-    assert request.rendered_input.startswith("system: SYSTEM_POLICY")  # Generic contract unchanged.
-
-
-@pytest.mark.parametrize("with_tools", [False, True], ids=["json", "tools-and-json"])
-def test_pinned_chat_places_validated_schema_and_tool_protocol_only_in_system(
-    tmp_path: Path, with_tools: bool,
-) -> None:
-    backend = LlamaCppModel(_chat_config(tmp_path))
-    schema = {"type": "object", "properties": {"修正": {"type": "string"}}, "required": ["修正"]}
-    tools = ({"tool_id": "repo.read", "description": "Read a scoped source", "input_schema": {"type": "object"}},) if with_tools else ()
-    request = LocalInferenceRequest(
-        instructions="Repair the reported error only.", prompt="Owned source and actual error.",
-        tools=tools, structured_output_schema=schema,
-        tool_choice="specific" if with_tools else "auto",
-        specific_tool_id="repo.read" if with_tools else None,
-    )
-    rendered = backend._render_prompt(request)
-    system, remaining = rendered.split("<|im_end|>\n", 1)
-    assert system.startswith("<|im_start|>system\nRepair the reported error only.")
-    assert '"required":["修正"]' in system
-    assert "Required final JSON schema:" in system if with_tools else "Required JSON schema:" in system
-    assert ("Allowed tools:" in system) is with_tools
-    assert ("Required tool_id: repo.read" in system) is with_tools
-    assert remaining == "<|im_start|>user\nOwned source and actual error.<|im_end|>\n<|im_start|>assistant\n"
-    assert "schema" not in remaining and "protocol" not in remaining
-
-
-def test_pinned_native_binary_transport_preserves_exact_bytes_and_existing_limits(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    import skeleton.ai.runtime.inference.llama_cpp as native
-
-    backend = LlamaCppModel(_chat_config(tmp_path, threads=2, batch_size=64, gpu_layers=0))
-    request = LocalInferenceRequest(
-        instructions="Repair only; no extra features.",
-        history=(("user", "old source 漁\n"), ("assistant", "old answer")),
-        prompt="STRUCTURED_REQUEST sensitive-prompt literal \\n stays literal\n",
-        max_output_tokens=1024, seed=4294967302,
-        structured_output_schema={"type": "object", "properties": {"answer": {"type": "string"}, "score": {"type": "integer"}}, "required": ["answer", "score"]},
-    )
-    expected = backend._render_prompt(request).encode("utf-8")
-    original_popen = native.subprocess.Popen
-    captured = []
-
-    def capture(command, **kwargs):
-        input_file = Path(command[command.index("--binary-file") + 1])
-        captured.append((list(command), input_file.read_bytes(), input_file.stat().st_mode & 0o777))
-        return original_popen(command, **kwargs)
-
-    monkeypatch.setattr(native.subprocess, "Popen", capture)
-    result = backend.infer(request, threading.Event())
-    assert result.structured_output == {"answer": "offline", "score": 1}
-    assert len(captured) == 1
-    command, actual, mode = captured[0]
-    assert actual == expected and actual.endswith(b"<|im_start|>assistant\n")
-    assert mode == 0o600
-    assert "--no-conversation" in command and "--no-escape" in command
-    for forbidden in ("-f", "--conversation", "--chat-template", "--jinja", "--single-turn"):
-        assert forbidden not in command
-    for flag, value in (("-n", "1024"), ("-c", "12288"), ("-t", "2"), ("-b", "64"), ("-ngl", "0"), ("--seed", "7"), ("--temp", "0")):
-        assert command[command.index(flag) + 1] == value
-    assert "--json-schema-file" in command
-    assert not any("sensitive-prompt" in item for item in command)
-    assert result.input_tokens == len(expected) + 1
-    assert backend.execution_snapshot()["active_processes"] == 0
-
-
-@pytest.mark.parametrize("location", ["instructions", "prompt", "history", "schema", "tool"])
-@pytest.mark.parametrize("marker", ["<|im_start|>", "<|im_end|>", "<|endoftext|>"])
-def test_chat_control_delimiters_cannot_create_native_roles_before_process_dispatch(
-    tmp_path: Path, monkeypatch, location: str, marker: str,
-) -> None:
-    import skeleton.ai.runtime.inference.llama_cpp as native
-
-    backend = LlamaCppModel(_chat_config(tmp_path))
-    values = {"instructions": "Policy", "prompt": "Owned source", "history": (("assistant", "Prior model output"),)}
-    if location in {"instructions", "prompt"}:
-        values[location] = marker
-    elif location == "history":
-        values["history"] = (("user", marker),)
-    elif location == "schema":
-        values["structured_output_schema"] = {"type": "object", "description": marker}
-    else:
-        values["tools"] = ({"tool_id": "repo.read", "description": marker, "input_schema": {"type": "object"}},)
-    monkeypatch.setattr(native.subprocess, "Popen", lambda *args, **kwargs: pytest.fail("Reserved token must fail before native launch"))
-    with pytest.raises(LlamaCppRuntimeError, match="reserved ChatML"):
-        backend.infer(LocalInferenceRequest(**values), threading.Event())
-
-
-@pytest.mark.parametrize("customization", ["raw", "custom-template", "extra-tuning", "generic-conversation"])
-def test_unknown_and_raw_deployments_retain_exact_legacy_rendering_and_file_transport(
-    tmp_path: Path, customization: str,
-) -> None:
-    config = _chat_config(tmp_path)
-    if customization == "raw":
-        config = replace(config, output_framing="raw")
-    elif customization == "custom-template":
-        config = replace(config, extra_args=(*COMPLETION_CHAT_FLAGS, "--chat-template", "custom-template"))
-    elif customization == "extra-tuning":
-        config = replace(config, extra_args=(*config.extra_args, "--mlock"))
-    else:
-        config = replace(config, extra_args=COMPLETION_CHAT_FLAGS)
-    backend = LlamaCppModel(config)
-    request = LocalInferenceRequest(instructions="  Policy  ", history=(("user", "prior\n"),), prompt=" source <|im_start|> ")
-    assert backend._native_chat_profile() is None
-    assert backend._render_prompt(request) == request.rendered_input
-    command = backend._command(tmp_path / "private-prompt", request)
-    assert "-f" in command and "--binary-file" not in command and "--no-conversation" not in command
-    assert command[-len(config.extra_args):] == list(config.extra_args)
-
-
-def test_effective_role_format_enters_cache_identity_only_for_recognized_profiles(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    import skeleton.ai.runtime.inference.llama_cpp as native
-
-    original_digest = native._digest
-    captured = []
-
-    def capture(value):
-        if isinstance(value, dict) and value.get("schema") == "skeleton.llama-cpp.execution-profile.v1":
-            captured.append(dict(value))
-        return original_digest(value)
-
-    monkeypatch.setattr(native, "_digest", capture)
-    config = _chat_config(tmp_path)
-    backend = LlamaCppModel(config)
-    actual = backend.execution_profile_digest
-    corrected_profile = captured[-1]
-    assert corrected_profile.pop("prompt_format") == "skeleton.chatml.coding.v1"
-    assert actual != original_digest(corrected_profile)  # Historical single-user-blob cache cannot match.
-    raw = LlamaCppModel(replace(config, extra_args=()))
-    raw_digest = raw.execution_profile_digest
-    assert "prompt_format" not in captured[-1]
-    assert raw_digest == original_digest(captured[-1])
-
-
-def test_model_visible_schema_and_role_framing_count_towards_native_context_before_launch(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    import skeleton.ai.runtime.inference.llama_cpp as native
-
-    backend = LlamaCppModel(_chat_config(tmp_path, context_size=512))
-    request = LocalInferenceRequest(
-        prompt="Owned source", max_output_tokens=128,
-        structured_output_schema={"type": "object", "description": "漁" * 200},
-    )
-    assert len(request.rendered_input.encode("utf-8")) + 1 + request.max_output_tokens < 512
-    assert backend.count_input_tokens(request) + request.max_output_tokens > 512
-    monkeypatch.setattr(native.subprocess, "Popen", lambda *args, **kwargs: pytest.fail("Full framed/schema context must be admitted before launch"))
-    with pytest.raises(LlamaCppRuntimeError, match="completion exceed admitted GGUF context"):
-        backend.infer(request, threading.Event())

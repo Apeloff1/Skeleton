@@ -18,24 +18,21 @@ Shares the codegen helpers + Mongo handle with routes.playable.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from routes.playable import (
-    PlayableModelFailure,
     _db, _GAME_SYS, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
 )
 from routes.asset_genesis import recompute_asset_status
-from routes.playable_htmlutils import inject_into_head, passes_playability_gate
+from routes.playable_htmlutils import inject_into_head
 
-router = project_router(prefix="/api/playable", tags=["playable"])
+router = APIRouter(prefix="/api/playable", tags=["playable"])
 
 # render-relevant kinds + the JS key we expose them under (character → player alias)
 _KEY_ALIAS = {"character": "player"}
@@ -130,16 +127,12 @@ async def _do_artwire(pid: str, selected: dict | None = None) -> dict:
     )
     try:
         routed = await asyncio.to_thread(_llm_in_thread, prompt, _ARTWIRE_SYS, _GAME_ENSEMBLE)
-    except (PlayableModelFailure, HTTPException):
-        # The shared runner owns uncertain execution and revoked authority.
-        # Neither may become a completed "not applied" mutation result.
-        raise
     except Exception:
         return {"playable_id": pid, "applied": False, "error": "artwire model unavailable"}
     new_html, removed = _sanitize(_extract_html(routed.get("content", "")))
     val = _validate(new_html)
     floor = max(PLAYABILITY_THRESHOLD, prev_score - 15)
-    if not new_html or not passes_playability_gate(val, floor):
+    if not new_html or val["score"] < floor:
         return {"playable_id": pid, "applied": False, "score": val["score"],
                 "missing": val.get("missing", []), "prev_score": prev_score}
     # deterministically inject the real data-URI registry

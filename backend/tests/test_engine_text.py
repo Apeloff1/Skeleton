@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from dataclasses import replace
 from types import SimpleNamespace
 from uuid import NAMESPACE_URL, uuid5
 
@@ -75,60 +74,6 @@ class _TenantScopedInventoryFixture:
                 "supports_temperature": True,
             }],
         }
-
-
-def test_default_model_turn_allowance_preserves_existing_request_identity():
-    request = EngineTextRequest(instructions="Existing immutable rules.", prompt="Keep the original request.",
-                                idempotency_key="stable-key")
-    assert request.request_identity_digest == "10fc4a1c1b8d70e6837fd3b4471f6029588a1e197a2e0933ef76831d71fb87b4"
-    assert replace(request, max_model_turns=4).request_identity_digest == request.request_identity_digest
-    assert replace(request, max_model_turns=1).request_identity_digest != request.request_identity_digest
-
-
-@pytest.mark.parametrize("value", [0, 5, -1, True, False, 1.0, "1", None])
-def test_text_turn_allowance_rejects_invalid_bounds_before_engine_dispatch(value):
-    with pytest.raises(EngineTextError, match="max_model_turns"):
-        EngineTextRequest(instructions="Rules", prompt="No dispatch", idempotency_key="invalid-limit",
-                          max_model_turns=value)
-
-
-@pytest.mark.asyncio
-async def test_single_turn_request_compiles_actual_canonical_command_budget():
-    commands = []
-    class Client(_TenantScopedInventoryFixture):
-        config = EngineClientConfig(base_url="http://engine.test", execution_timeout_s=5)
-        async def execute(self, command):
-            commands.append(command)
-            return replace(_terminal(command.execution_request.execution_id), operation_id=command.operation.operation_id)
-    request = EngineTextRequest(instructions="Propose bounded inert edits.", prompt="One response only.",
-                                idempotency_key="single-model-turn", max_model_turns=1)
-    result = await execute_engine_text(request, client=Client())
-    assert result.text == "engine answer" and len(commands) == 1
-    assert commands[0].execution_request.resource_budget["max_model_turns"] == 1
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("structured", [None, {"edits": "not-an-array"}], ids=["missing-json", "invalid-json-shape"])
-async def test_invalid_structured_response_cannot_trigger_another_provider_turn_under_cap_one(structured):
-    from skeleton.testing.test_execution_runtime import FakeProvider, _request, _runtime, _text_response, _now
-    from skeleton.persistence.execution_repository import SQLiteExecutionRepository
-    from skeleton.skills.tool_runtime import AsyncToolRuntime
-    schema = {"type": "object", "properties": {"edits": {"type": "array", "items": {"type": "string"}}},
-              "required": ["edits"], "additionalProperties": False}
-    provider = FakeProvider([replace(_text_response("invalid structured response", response_id="only-response"),
-                                     structured_output=structured)])
-    repo = SQLiteExecutionRepository()
-    request = _request(budget={"max_model_turns": 1, "max_provider_attempts": 2, "max_tool_calls": 1},
-                       context_policy={"structured_output_schema": schema})
-    result = await _runtime(repo, provider, AsyncToolRuntime()).start(
-        request, instructions="Return only the structured patch proposal.", prompt="Repair the exact existing source.",
-        context_digest="a" * 64, now=_now(),
-    )
-    assert len(provider.requests) == 1
-    assert result.result.status == "failed"
-    assert result.result.usage["error_code"] == "model_turn_budget_exhausted"
-    assert repo.result(request.execution_id).final_output is None
-    repo.close()
 
 @pytest.mark.asyncio
 async def test_engine_text_compiles_bounded_tool_free_command() -> None:
@@ -469,8 +414,7 @@ def test_engine_text_evidence_contract_is_bounded_and_unique() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("original_turns", [4, 1], ids=["original-default", "original-lowered"])
-async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence(original_turns) -> None:
+async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence() -> None:
     original_request = EngineTextRequest(
         instructions="Rules",
         prompt="Same canonical question",
@@ -479,7 +423,6 @@ async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence(or
         actor_id="backend-ai",
         data_class="public",
         capability="assistant.compat",
-        max_model_turns=original_turns,
     )
 
     class RecoveringClient:
@@ -494,7 +437,6 @@ async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence(or
             self.wait_calls = 0
             self.operation_id = None
             self.execution_id = None
-            self.legacy_binding = False
 
         async def terminal_result_if_available(
             self,
@@ -564,7 +506,7 @@ async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence(or
                         str(uuid5(
                             NAMESPACE_URL,
                             "backend-engine-prompt:" + self.operation_id
-                            + (":prompt" if self.legacy_binding else ":prompt:" + original_request.request_identity_digest),
+                            + ":prompt:" + original_request.request_identity_digest,
                         )),
                         sha256(original_request.prompt.encode("utf-8")).hexdigest(),
                     ),
@@ -607,11 +549,6 @@ async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence(or
             client=client,
         )
 
-    # A lower limit is a different command, even if the caller reuses the old
-    # explicit idempotency key after a durable terminal result exists.
-    with pytest.raises(EngineTextError, match="different request semantics"):
-        await execute_engine_text(replace(original_request, max_model_turns=1 if original_turns == 4 else 4), client=client)
-
     # Exact replay recovers the verified result and never reruns the engine.
     result = await execute_engine_text(original_request, client=client)
 
@@ -634,11 +571,3 @@ async def test_engine_text_recovers_exact_replay_and_rejects_changed_evidence(or
     )
     assert client.execute_calls == 0
     assert client.wait_calls == 0
-    client.legacy_binding = True
-    if original_turns == 4:
-        legacy = await execute_engine_text(original_request, client=client)
-        assert legacy.text == "original durable answer"
-    else:
-        with pytest.raises(EngineTextError, match="different request semantics"):
-            await execute_engine_text(original_request, client=client)
-    assert client.execute_calls == client.wait_calls == 0

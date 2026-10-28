@@ -8,46 +8,10 @@ from __future__ import annotations
 from argparse import ArgumentParser
 from hashlib import sha256
 from pathlib import Path
-import os
-import stat
-import tempfile
 from .dragon_native_projects import render_native_project
 from .dragon_native_targets import STYLES
 from .dragon_game_mechanics import Mechanic
 from .dragon_game_design import GameDesign,load_design
-
-
-def _preflight_output(path: Path, *, directory: bool = False) -> None:
-    for current in (path, *path.parents):
-        try:
-            mode = current.lstat().st_mode
-        except FileNotFoundError:
-            continue
-        if stat.S_ISLNK(mode):
-            raise ValueError("refusing symlinked output paths")
-        requires_directory = directory or current != path
-        if requires_directory and not stat.S_ISDIR(mode):
-            raise ValueError("output parent must be a directory")
-        if not requires_directory and not stat.S_ISREG(mode):
-            raise ValueError("output must be a regular file")
-
-
-def _replace_source(path: Path, content: str) -> None:
-    descriptor, temporary = tempfile.mkstemp(prefix=".dragon-source-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        # Replacement changes this directory entry, preserving any external
-        # hard link to the previous inode instead of truncating its contents.
-        os.replace(temporary, path)
-    finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-
 
 def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
               style:str="arcade_score_attack", overwrite:bool=False,
@@ -58,8 +22,9 @@ def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
         target,title,style=design.target,design.title,design.genre
     if style not in STYLES:
         raise ValueError("unknown original game style")
-    output_dir=output_dir.expanduser().absolute()
-    _preflight_output(output_dir, directory=True)
+    output_dir=output_dir.expanduser().resolve()
+    if output_dir.is_symlink():
+        raise ValueError("refusing to write to symlinked project root")
     identity=sha256((title+"\0"+target+"\0"+style+
                      ("\0"+design.digest if design is not None else "")).encode()).hexdigest()
     project=render_native_project(
@@ -70,22 +35,15 @@ def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
     # Prevent accidental replacement of existing user project files.
     if output_dir.exists() and any(output_dir.iterdir()) and not overwrite:
         raise FileExistsError("destination is not empty; choose another folder")
-    # Validate the complete generated source set before overwriting any file.
-    destinations={}
-    for name in project.files:
-        member=Path(name)
-        if member.is_absolute() or not member.parts or ".." in member.parts or "\\" in name:
-            raise ValueError("generated source path must remain inside the project")
-        dest=output_dir/member
-        _preflight_output(dest)
-        destinations[name]=dest
     output_dir.mkdir(parents=True,exist_ok=True)
     created={}
     for name,content in sorted(project.files.items()):
-        dest=destinations[name]
+        dest=output_dir/name
         dest.parent.mkdir(parents=True,exist_ok=True)
-        _preflight_output(dest)
-        _replace_source(dest,content)
+        # Never follow symlinks, even in user-selected existing directories.
+        if dest.is_symlink() or dest.parent.is_symlink():
+            raise ValueError("refusing symlinked output paths")
+        dest.write_text(content,encoding="utf-8")
         created[name]=sha256(content.encode()).hexdigest()
     return created
 

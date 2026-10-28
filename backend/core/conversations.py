@@ -40,7 +40,6 @@ from skeleton.contracts.conversation import (
     ConversationThread,
     ConversationThreadState,
 )
-from skeleton.persistence.mongo_source_epoch import fence_conversation_write
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
@@ -216,8 +215,6 @@ class MongoConversationAuthority:
         governance_inventory_reader: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_engine_target_executor: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_retention_planner: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
-        memento_witness: Any | None = None,
-        canonical_source_epoch: Any | None = None,
     ) -> None:
         self.database = database
         if callable(getattr(database, "with_options", None)):
@@ -231,9 +228,6 @@ class MongoConversationAuthority:
         self.governance_inventory_reader = governance_inventory_reader
         self.governance_engine_target_executor = governance_engine_target_executor
         self.governance_retention_planner = governance_retention_planner
-        # Optional separately administered rollback/tombstone witness for encrypted archives.
-        self.memento_witness = memento_witness
-        self.canonical_source_epoch = canonical_source_epoch
         # Installed only through the trusted application lifespan.
         self.dragon_projection = None
         self.dragon_projection_outcomes = {"written": 0, "skipped": 0, "degraded": 0}
@@ -569,12 +563,6 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Delete one conversation plus its explicitly linked governed records."""
 
-        if getattr(self, "canonical_source_epoch", None) is not None:
-            # This operation may cascade to OTHER actors and storage owners.
-            # An actor-scoped epoch does not prove their deletion custody.
-            raise ConversationStorageUnavailable(
-                "protected governed deletion requires a cross-owner retirement fence"
-            )
         initial = await self.get_thread(
             thread_id,
             tenant_id=tenant_id,
@@ -686,10 +674,6 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Execute one tenant retention plan across engine and conversation owners."""
 
-        if getattr(self, "canonical_source_epoch", None) is not None:
-            raise ConversationStorageUnavailable(
-                "protected tenant retention requires a cross-owner retirement fence"
-            )
         # Expire Dragon's tenant-scoped derived summaries even when the
         # canonical governance plan has no parent records due in this sweep.
         projection = getattr(self, "dragon_projection", None)
@@ -801,10 +785,6 @@ class MongoConversationAuthority:
         record_ids: tuple[str, ...] | None = None,
         reason: str = "tenant-request",
     ) -> Mapping[str, Any]:
-        if getattr(self, "canonical_source_epoch", None) is not None:
-            raise ConversationStorageUnavailable(
-                "protected governed deletion requires a cross-owner retirement fence"
-            )
         planner = self.governance_deletion_planner
         acker = self.governance_deletion_acker
         if planner is None or acker is None:
@@ -872,59 +852,6 @@ class MongoConversationAuthority:
                         owner_id=affected_owner,
                         thread_id=affected_thread_id,
                     )
-
-        # A derived encrypted archive can retain deleted message bytes. Fence
-        # memento publication and purge ciphertext before the first canonical
-        # physical deletion, including message-only and retention operations.
-        # Threads without a sealed head follow the existing deletion path.
-        if actions:
-            affected_thread_ids = {
-                str(query["_id"] if kind == "thread" else query["thread_id"])
-                for _order, kind, query, _raw in actions
-            }
-            for affected_thread_id in sorted(affected_thread_ids):
-                try:
-                    memento_owner = await self.threads.find_one(
-                        {"_id": affected_thread_id, "tenant_id": str(tenant_id)},
-                    )
-                except PyMongoError as exc:
-                    raise ConversationStorageUnavailable(
-                        "memento deletion authority lookup failed"
-                    ) from exc
-                if memento_owner is not None and "_sealed_memento_head" in memento_owner:
-                    owner_id = str(memento_owner.get("owner_id") or "")
-                    if not owner_id:
-                        raise ConversationStorageUnavailable(
-                            "memento deletion owner identity unavailable"
-                        )
-                    from skeleton.persistence.mongo_memento_repository import (
-                        MongoMementoAuthority, memento_retirement_requires_witness,
-                    )
-
-                    witnessed = memento_retirement_requires_witness(
-                        memento_owner, witness_present=self.memento_witness is not None,
-                    )
-                    memento = MongoMementoAuthority(self)
-                    if not witnessed:
-                        # Only explicitly enrolled legacy archives may use this purge.
-                        await memento.retire_thread(
-                            tenant_id=str(tenant_id), owner_id=owner_id,
-                            thread_id=affected_thread_id,
-                        )
-                    else:
-                        # Tombstone the external witness before physical deletion;
-                        # this path does not need to decrypt private message data.
-                        from skeleton.persistence.sealed_memento_witness import (
-                            WitnessedMongoMementoAuthority,
-                        )
-
-                        await WitnessedMongoMementoAuthority(
-                            memento, witness=self.memento_witness,
-                        ).retire_bound_thread(
-                            tenant_id=str(tenant_id), owner_id=owner_id,
-                            thread_id=affected_thread_id,
-                            binding_digest=memento_owner.get("_sealed_memento_binding"),
-                        )
 
         actions.sort(key=lambda item: (item[0], item[3]["record_id"]))
         deleted: list[str] = []
@@ -1125,18 +1052,6 @@ class MongoConversationAuthority:
         except PyMongoError as exc:
             raise ConversationStorageUnavailable("conversation indexes are unavailable") from exc
 
-        # Enrolled archives cannot publish safely until their unique serial
-        # index and tenant deletion index are durably provisioned at startup.
-        if self.memento_witness is not None:
-            from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
-
-            try:
-                await MongoMementoAuthority(self).ensure_indexes()
-            except Exception as exc:
-                raise ConversationStorageUnavailable(
-                    "witnessed memento indexes are unavailable"
-                ) from exc
-
     @staticmethod
     def _authorized_filter(
         thread_id: str,
@@ -1150,7 +1065,6 @@ class MongoConversationAuthority:
             "owner_id": owner_id,
         }
 
-    @fence_conversation_write
     async def create_thread(
         self,
         *,
@@ -1255,7 +1169,6 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         return tuple(_thread_from_doc(doc) for doc in docs)
 
-    @fence_conversation_write
     async def rename_thread(
         self,
         thread_id: str,
@@ -1355,13 +1268,6 @@ class MongoConversationAuthority:
     ) -> ConversationThread:
         """Complete or discard the single exact-next prepared append, if any."""
 
-        # Recovery updates the canonical message and thread collections. Even
-        # internal callers must hold this actor's durable writer epoch; a
-        # future read/replay caller cannot silently bypass public decorators.
-        epoch = getattr(self, "canonical_source_epoch", None)
-        if epoch is not None:
-            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)
-
         thread = await self.get_thread(
             thread_id,
             tenant_id=tenant_id,
@@ -1459,7 +1365,6 @@ class MongoConversationAuthority:
             pass
         return _thread_from_doc(updated)
 
-    @fence_conversation_write
     async def append_message(
         self,
         message: ConversationMessage,
@@ -1621,7 +1526,6 @@ class MongoConversationAuthority:
             raise ConversationNotFound(message_id)
         return doc.get("_chat_execution")
 
-    @fence_conversation_write
     async def bind_chat_execution(
         self,
         thread_id: str,
@@ -1774,7 +1678,6 @@ class MongoConversationAuthority:
             for record in rows
         ]
 
-    @fence_conversation_write
     async def chat_dispatch(
         self, thread_id, message_id, *, tenant_id, owner_id, record_digest, action="read"
     ):
@@ -1823,7 +1726,6 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("chat admission state is unavailable") from exc
         return None if doc is None else doc.get("_chat_dispatch")
 
-    @fence_conversation_write
     async def append_user_message(
         self,
         thread_id: str,
@@ -1865,7 +1767,6 @@ class MongoConversationAuthority:
             expected_thread_version=expected_thread_version,
         )
 
-    @fence_conversation_write
     async def commit_assistant_message(
         self,
         thread_id: str,
@@ -1928,7 +1829,6 @@ class MongoConversationAuthority:
             expected_thread_version=expected_thread_version,
         )
 
-    @fence_conversation_write
     async def regenerate_assistant_message(
         self,
         thread_id: str,
@@ -2066,14 +1966,11 @@ class MongoConversationAuthority:
         after_sequence: int = 0,
         limit: int = 100,
     ) -> tuple[ConversationMessage, ...]:
-        if getattr(self, "canonical_source_epoch", None) is not None:
-            thread = await self.get_thread(
-                thread_id, tenant_id=tenant_id, owner_id=owner_id,
-            )
-        else:
-            thread = await self._recover_prepared(
-                thread_id, tenant_id=tenant_id, owner_id=owner_id,
-            )
+        thread = await self._recover_prepared(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
         if isinstance(after_sequence, bool) or not isinstance(after_sequence, int) or after_sequence < 0:
             raise ValueError("after_sequence must be a non-negative integer")
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
@@ -2106,16 +2003,7 @@ class MongoConversationAuthority:
     async def active_transcript(
         self, thread_id: str, *, tenant_id: str, owner_id: str
     ) -> tuple[ConversationMessage, ...]:
-        # Protected source reads must not perform opportunistic writes outside
-        # the writer epoch. Normal conversation owners retain WAL recovery.
-        if getattr(self, "canonical_source_epoch", None) is not None:
-            thread = await self.get_thread(
-                thread_id, tenant_id=tenant_id, owner_id=owner_id,
-            )
-        else:
-            thread = await self._recover_prepared(
-                thread_id, tenant_id=tenant_id, owner_id=owner_id,
-            )
+        thread = await self._recover_prepared(thread_id, tenant_id=tenant_id, owner_id=owner_id)
         if thread.message_sequence == 0:
             return ()
         query = {"thread_id": thread_id, "sequence": {"$lte": thread.message_sequence}}
@@ -2178,7 +2066,6 @@ class MongoConversationAuthority:
         lineage.reverse()
         return tuple(lineage)
 
-    @fence_conversation_write
     async def edit_user_message(
         self,
         thread_id: str,
@@ -2292,7 +2179,6 @@ class MongoConversationAuthority:
             raise ConversationNotFound(user_message_id)
         return self._bound_user_request_refs(_message_from_doc(doc), doc)
 
-    @fence_conversation_write
     async def bind_user_request_refs(
         self,
         thread_id: str,
@@ -2456,7 +2342,6 @@ class MongoConversationAuthority:
             thread_data_class=thread.data_class,
         )
 
-    @fence_conversation_write
     async def bind_user_engine_command(
         self,
         thread_id: str,
@@ -2630,7 +2515,6 @@ class MongoConversationAuthority:
             )
         )
 
-    @fence_conversation_write
     async def bind_regeneration_request(
         self,
         thread_id: str,
@@ -2754,7 +2638,6 @@ class MongoConversationAuthority:
             raise ConversationStorageUnavailable("regeneration dispatch state is malformed")
         return dict(state)
 
-    @fence_conversation_write
     async def transition_regeneration_dispatch(
         self,
         record: Mapping[str, Any],
@@ -2901,14 +2784,7 @@ class MongoConversationAuthority:
         ):
             raise ValueError("expected_thread_version must be a positive integer")
         for _attempt in range(3):
-            if getattr(self, "canonical_source_epoch", None) is not None:
-                thread = await self.get_thread(
-                    thread_id, tenant_id=tenant_id, owner_id=owner_id,
-                )
-            else:
-                thread = await self._recover_prepared(
-                    thread_id, tenant_id=tenant_id, owner_id=owner_id,
-                )
+            thread = await self._recover_prepared(thread_id, tenant_id=tenant_id, owner_id=owner_id)
             if expected_thread_version is not None and thread.version != expected_thread_version:
                 raise ConversationConflict("thread version conflict; reconstruct the current conversation")
             messages, cursor, tip = await self._active_lineage_page(
@@ -3172,7 +3048,6 @@ class MongoConversationAuthority:
             "attachments_embedded": False,
         }
 
-    @fence_conversation_write
     async def set_state(
         self,
         thread_id: str,

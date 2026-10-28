@@ -20,13 +20,6 @@ function loadTS(filename, mocks = {}) {
   const mod = { exports: {} };
   compileFunction(output.outputText, ['require', 'module', 'exports'])(
     id => {
-      if (id === './apiClient') return {
-        subscribeApiSessionChanges: () => () => {},
-        prepareApiRequest: async (_url, headers = {}, signal = new AbortController().signal) => ({
-          headers, signal, epoch: 0, cacheNamespace: 'anonymous-test-session', authenticated: false,
-          current: () => !signal.aborted, dispose() {},
-        }),
-      };
       if (id === './requestRecoveryPolicy') return loadTS('src/utils/requestRecoveryPolicy.ts');
       assert.ok(Object.hasOwn(mocks, id), filename + ' unexpected import ' + id);
       return mocks[id];
@@ -172,7 +165,6 @@ test('raw and decoded responses are never coalesced into a mismatched type', asy
   try {
     const json = client.rget('/same', { cacheTtlMs: 0, retries: 0 });
     const raw = client.rget('/same', { cacheTtlMs: 0, retries: 0, rawText: true });
-    await settle(); // Account initialization precedes request admission.
     assert.equal(count, 2);
     resolveFirst(reply('{"ok":true}'));
     resolveSecond(reply('{"ok":true}'));
@@ -196,7 +188,6 @@ test('different response budgets do not share an in-flight promise', async () =>
   try {
     const strict = client.rget('/large', { cacheTtlMs: 0, retries: 0, maxResponseChars: 1024 });
     const large = client.rget('/large', { cacheTtlMs: 0, retries: 0, maxResponseChars: 4096 });
-    await settle(); // Account initialization precedes request admission.
     assert.equal(count, 2);
     resolvers[0](reply('x'.repeat(2000)));
     resolvers[1](reply('x'.repeat(2000)));
@@ -309,7 +300,6 @@ test('old requests never repopulate cache after an explicit reset', async () => 
   global.fetch = () => new Promise(resolve => { resolveNetwork = resolve; });
   try {
     const old = client.rget('/stale', { retries: 0 });
-    await settle(); // Reset an admitted request, not pending auth initialization.
     client.resetCircuit();
     resolveNetwork(reply({ old: true }));
     await old;

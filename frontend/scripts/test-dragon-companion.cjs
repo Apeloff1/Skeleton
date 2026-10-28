@@ -14,6 +14,6 @@ ok(model.includes("case'distill_complete'"),'distillation completion must be its
 ok(!model.includes("case'distill_complete'")||!/case'distill_complete'[^\n]*glasses:true/.test(model),'glasses stay on during distillation, not after it is sealed');
 ok(model.includes('companionFromCapture'),'capture events must have a separate companion projection');
 ok(chat.includes('DragonCompanionPanel'),'companion must be mounted in Jeeves workspace');
-const crawler=fs.readFileSync(path.join(__dirname,'../src/features/Jeeves/CrawlerWorkspace.tsx'),'utf8');
+const crawler=fs.readFileSync(path.join(__dirname,'../features/Jeeves/CrawlerWorkspace.tsx'),'utf8');
 ok(crawler.includes('companionFromCapture'),'crawler workspace must show the dragon from recorded capture events');
 console.log('dragon companion contract ok');

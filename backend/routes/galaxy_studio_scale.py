@@ -20,17 +20,6 @@ def _parse_scale(scale_text: str, target_files: int = 0, target_size_gb: float =
     """
     text = scale_text.lower().replace(",", "").replace("_", "") if scale_text else ""
 
-    # An explicit file count is an execution ceiling. Natural-language scale,
-    # size hints, fusion and legacy delivery floors must not enlarge it.
-    if isinstance(target_files, int) and not isinstance(target_files, bool) and target_files > 0:
-        return {
-            "target_files": target_files,
-            "explicit_target_files": target_files,
-            "target_size_gb": target_size_gb,
-            "multiplier": max(1, (target_files + 499) // 500),
-            "scale_label": _scale_label(target_files, target_size_gb),
-        }
-
     parsed_files = target_files
     parsed_size = target_size_gb
 

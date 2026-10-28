@@ -9,8 +9,6 @@ core/routes_registry.py is append-managed and this module is already registered
 and quality-owned.
 """
 
-from routes.playable_access import project_router, scoped_database
-
 import os
 from fastapi import APIRouter, Body, Query
 from datetime import datetime, timezone
@@ -23,9 +21,8 @@ import routes.game_kb_polish  # noqa: F401 — boot-time polish wiring into game
 import routes.game_kb_ext_a  # noqa: F401 — boot-time extended forge stages (part A)
 import routes.game_kb_ext_b  # noqa: F401 — boot-time extended forge stages (part B)
 
-router = project_router(prefix="/api/quality-control", tags=["quality-control"])
+router = APIRouter(prefix="/api/quality-control", tags=["quality-control"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 CURRENT_YEAR = datetime.now().year
 

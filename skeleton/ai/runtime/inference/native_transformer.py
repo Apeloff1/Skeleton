@@ -6,7 +6,7 @@ import hashlib
 import json
 import threading
 import time
-from typing import Any, Callable
+from typing import Any
 
 from skeleton.ai.model_runtime import (
     GenerationConfig,
@@ -349,38 +349,17 @@ def build_native_transformer_adapter(
     max_concurrency: int = 1,
     max_queue_size: int = 256,
     max_batch_size: int = 256,
-    require_guarded_inference: bool = False,
-    guarded_components: Any | None = None,
-    guarded_components_factory: Callable[[NativeTransformerModel], Any] | None = None,
 ) -> LocalModelAdapter:
-    """Build canonical transformer; protected mode requires trusted composition."""
-    from skeleton.provider_runtime import ProviderPolicyError
-    if type(require_guarded_inference) is not bool:
-        raise ProviderPolicyError("protected transformer mode must be explicit")
-    if require_guarded_inference:
-        from .guarded_composition import ProtectedLocalComponents
-        if (guarded_components is None) == (guarded_components_factory is None):
-            raise ProviderPolicyError("protected transformer requires exactly one trusted component source")
-        if guarded_components is not None and not isinstance(guarded_components, ProtectedLocalComponents):
-            raise ProviderPolicyError("protected transformer lacks trusted components")
-        if guarded_components_factory is not None and not callable(guarded_components_factory):
-            raise ProviderPolicyError("protected transformer requires trusted component factory")
-    elif guarded_components is not None or guarded_components_factory is not None:
-        raise ProviderPolicyError("protected components require enforced transformer mode")
+    """Build the canonical provider-neutral adapter for the owned transformer."""
     backend = NativeTransformerModel(runtime, model_id=model_id)
-    if guarded_components_factory is not None:
-        try:
-            guarded_components = guarded_components_factory(backend)
-        except Exception as exc:
-            raise ProviderPolicyError("native guarded component factory failed closed") from exc
-        if not isinstance(guarded_components, ProtectedLocalComponents):
-            raise ProviderPolicyError("native guarded component factory returned untrusted dependencies")
     engine = LocalInferenceEngine(
         backend, cache_size=cache_size, max_concurrency=max_concurrency,
         max_queue_size=max_queue_size, max_batch_size=max_batch_size,
-        require_guarded_context=require_guarded_inference,
     )
-    artifact_status = {
+    return LocalModelAdapter(
+        engine,
+        default_seed=default_seed,
+        artifact_status={
             "kind": "native_transformer",
             "model_digest": backend.model_digest,
             "runtime_digest": backend.runtime_digest,
@@ -388,15 +367,7 @@ def build_native_transformer_adapter(
             "architecture_digest": runtime.architecture.digest,
             "device": runtime.device.to_dict(),
             "generation_limits": backend.generation_limits(),
-    }
-    if require_guarded_inference:
-        from .guarded_composition import compose_protected_local_adapter
-        return compose_protected_local_adapter(
-            engine, components=guarded_components, default_seed=default_seed,
-            artifact_status=artifact_status,
-        )
-    return LocalModelAdapter(
-        engine, default_seed=default_seed, artifact_status=artifact_status,
+        },
     )
 
 

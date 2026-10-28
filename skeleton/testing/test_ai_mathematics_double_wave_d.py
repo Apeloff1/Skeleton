@@ -58,9 +58,7 @@ def test_discrete_probability_zero_support_fails_closed() -> None:
 def test_stable_special_functions_are_inverse_or_log_domain_consistent() -> None:
     for value in (-20.0, -2.0, 0.0, 3.0, 20.0):
         probability = stable_sigmoid(value)
-        # Near +/-20, a float probability loses log-odds precision at the
-        # representable-unit boundary; 1e-8 is below that rounding floor.
-        assert stable_logit(probability) == pytest.approx(value, abs=1e-7)
+        assert stable_logit(probability) == pytest.approx(value, abs=1e-8)
         softplus = stable_softplus(value)
         assert inverse_softplus(softplus) == pytest.approx(value, abs=1e-9)
     assert stable_sigmoid(30.0) > 0.999999999999

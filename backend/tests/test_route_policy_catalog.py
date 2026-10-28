@@ -20,7 +20,7 @@ def principal() -> VerifiedPrincipal:
 
 
 def test_catalog_version_and_summary_are_stable_and_report_only():
-    assert ROUTE_POLICY_CATALOG_VERSION == "2026-10-25.v4"
+    assert ROUTE_POLICY_CATALOG_VERSION == "2026-10-03.v3"
     summary = catalog_summary()
     assert summary["version"] == ROUTE_POLICY_CATALOG_VERSION
     assert summary["enforcement"] == "report_only"

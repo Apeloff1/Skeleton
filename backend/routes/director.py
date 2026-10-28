@@ -9,17 +9,15 @@ routes/director.py — Director Agent HTTP surface (Manifest Items 16, 17, 20).
 """
 from __future__ import annotations
 
-from routes.playable_access import owned_galaxy_source, project_router, reauthorize_project_context, scoped_database
-
 import asyncio
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from core.director_agent import director
 
-router = project_router(prefix="/api/galaxy-studio/director", tags=["director"], project_aliases=("build_id",))
+router = APIRouter(prefix="/api/galaxy-studio/director", tags=["director"])
 
 
 class ValidateBody(BaseModel):
@@ -57,7 +55,6 @@ async def director_state(build_id: str):
 @router.get("/{build_id}/plan/{stage}")
 async def director_plan(build_id: str, stage: str):
     """Preview the ordered plan (sub-forges + dependency cascade) for a stage."""
-    await reauthorize_project_context(mutate=True)
     return director.plan_stage(build_id, stage)
 
 

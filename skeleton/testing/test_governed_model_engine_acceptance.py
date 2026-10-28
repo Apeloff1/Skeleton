@@ -183,11 +183,6 @@ def governed_artifact(request, tmp_path, monkeypatch):
         assert receipt["update_count"] == 8
 
     monkeypatch.setenv("AI_PROVIDER", "local")
-    # Intentional test-only legacy reference route. Production startup
-    # requires a registered guarded service and trusted tokenizer authority.
-    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "0")
-    monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
-    monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
     monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(arguments["output_path"]))
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", "0")
     monkeypatch.setenv("AI_LOCAL_MODEL_CACHE_SIZE", "8")
@@ -322,7 +317,7 @@ async def _engine_stack(tmp_path, algorithm):
             ]
         ),
     )
-    registry = ProviderRegistry.from_env(require_guarded_local=False)
+    registry = ProviderRegistry.from_env()
     coordinator = EngineExecutionCoordinator(
         service,
         provider_registry=registry,

@@ -441,9 +441,7 @@ class DragonCrawlerApplication:
                 if key not in {"principal_email", "scope", "consent_id", "request_digest"}
             }
             if grant
-            else {"enabled": False, "state": "not_authorized", "epoch": 0,
-                  "slices_started": 0, "max_slices": 0, "expires_at": None,
-                  "next_run_at": None, "stop_reason": None}
+            else {"enabled": False, "state": "not_authorized", "slices_started": 0}
         )
         current = status["consent_current"]
         status["capabilities"] = {

@@ -289,10 +289,9 @@ service readiness and recovery boundaries.
 - Docker service health, AI availability, native target readiness and production
   acceptance are separate states. This repository does not certify every console,
   arbitrary-ROM semantic understanding, or superiority over commercial games.
-- Adaptive serving, operational learning and maintenance remain an implementation
-  candidate. The current installation pass runs automated tests and real workflows;
-  [installation evidence and release blockers](docs/ai/CONSUMER_READINESS_2026-10-23.md)
-  distinguish verified behavior from consumer and enterprise qualification.
+- Adaptive serving, operational MLP learning and maintenance are a construction
+  draft, not enterprise certification. No automated tests were run for this build,
+  as requested; implementation and compilation do not establish production quality.
 
 Exact historical observations are in the
 [creation qualification](docs/ai/STUDIO_CREATION_QUALIFICATION_2026-10-15.md).

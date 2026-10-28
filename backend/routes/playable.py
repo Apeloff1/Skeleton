@@ -26,68 +26,17 @@ import time
 import json
 import uuid
 import asyncio
-import logging
 from datetime import datetime, timezone, timedelta
 
-from fastapi import HTTPException, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from core.databases import client as _SHARED_MONGO_CLIENT
-from core.engine_text import EngineTextError, EngineTextContextError
-from core.engine_client import EngineExecutionFailed, EngineAuthorizationError, EngineRequestRejectedError
-from core.model_catalog import ModelSelectionError
-from skeleton.vault.data_governance import DataGovernanceDenied
 from routes.llm_router import MODEL_CATALOG, ROUTING_POLICY
-from routes.playable_access import (
-    assert_project_access, bind_project_source, project_identity, project_router,
-    reauthorize_project_context, reauthorize_project_principal, scoped_database,
-)
 
-router = project_router(prefix="/api/playable", tags=["playable"])
-_db = scoped_database(_SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")])
+router = APIRouter(prefix="/api/playable", tags=["playable"])
+_db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
 PROJ = {"_id": 0}
-_log = logging.getLogger(__name__)
-
-
-class PlayableModelFailure(RuntimeError):
-    """Safe model failure that cannot authorize another generation attempt."""
-
-    def __init__(self, code: str, *, unconfirmed: bool = False, request_key: str | None = None):
-        self.code, self.unconfirmed, self.request_key = code, unconfirmed, request_key
-        super().__init__("Model execution could not be confirmed; retain this job." if unconfirmed
-                         else "Model generation is unavailable for this project.")
-
-    def public(self):
-        return {"error": str(self), "error_code": self.code, "retry_same_request": self.unconfirmed,
-                "engine_request_key": self.request_key}
-
-
-def _model_failure(error: EngineTextError, request_key: str | None):
-    causes = []
-    current = error
-    while current is not None and len(causes) < 8:
-        causes.append(current)
-        current = current.__cause__
-    if any(isinstance(item, (DataGovernanceDenied, EngineAuthorizationError, EngineRequestRejectedError)) for item in causes):
-        return PlayableModelFailure("project_model_transfer_denied", request_key=request_key)
-    if any(isinstance(item, (EngineTextContextError, ModelSelectionError)) for item in causes):
-        return PlayableModelFailure("project_model_context_unavailable", request_key=request_key)
-    if any(isinstance(item, EngineExecutionFailed) for item in causes):
-        return PlayableModelFailure("project_model_execution_failed", request_key=request_key)
-    return PlayableModelFailure("project_model_execution_unconfirmed", unconfirmed=True, request_key=request_key)
-
-
-def _require_model_content(routed):
-    if routed.get("error") or not isinstance(routed.get("content"), str) or not routed["content"].strip():
-        raise PlayableModelFailure("project_model_generation_failed")
-
-
-def _model_request_key(chat, prompt):
-    try:
-        key = chat._idempotency_key(prompt)
-        return key if isinstance(key, str) and 0 < len(key) <= 1024 else None
-    except Exception:
-        return None
 
 PLAYABILITY_THRESHOLD = int(os.environ.get("PLAYABLE_MIN_SCORE", "70"))
 # Provider-diverse codegen ensemble (mirrors the router's gameplay_code policy).
@@ -99,7 +48,7 @@ MAX_REPAIR = int(os.environ.get("PLAYABLE_MAX_REPAIR", "2"))
 # Quality-driven refinement: total refine budget (structural + judge-driven quality passes).
 # Each pass is an extra LLM round, so keep this modest (1 = one quality elevation pass).
 MAX_REFINE = int(os.environ.get("PLAYABLE_MAX_REFINE", "1"))
-# VII.1 — model-review recommendation floor, never a runtime/release grant.
+# VII.1 — judge gate: minimum overall eval score to mark the build "shippable".
 EVAL_SHIP_MIN = int(os.environ.get("PLAYABLE_EVAL_SHIP_MIN", "60"))
 # Rigorous quality target: keep re-refining (within budget) until the judge's
 # overall meets this bar. Higher ⇒ more intricate, more polished output.
@@ -107,10 +56,6 @@ QUALITY_TARGET = int(os.environ.get("PLAYABLE_QUALITY_TARGET", "85"))
 # Adaptive latency guard: skip the (expensive) quality-refinement pass if the
 # build has already consumed this many seconds — keeps total wall time bounded.
 QUALITY_TIME_BUDGET = int(os.environ.get("PLAYABLE_QUALITY_TIME_BUDGET", "210"))
-# Complete HTML needs a different finite output envelope from ordinary chat.
-# Catalog, context, operation and physical runtime limits still validate it.
-CODEGEN_OUTPUT_TOKENS = 2048
-JUDGE_OUTPUT_TOKENS = 256
 
 # ── EXPANSION "DELUXE" CEILING-LIFT ──────────────────────────────────────────
 # Expansion is the flagship deluxe mode: bigger, richer, judge-elevated. Its
@@ -163,8 +108,7 @@ features. Output ONLY the HTML document."""
 
 
 from routes.playable_htmlutils import (  # HTML codegen utils (split out)
-    _extract_html, _sanitize, _validate, _extract_json, passes_playability_gate,
-    model_review_projection, playable_html_digest,
+    _extract_html, _sanitize, _validate, _extract_json,
 )
 
 
@@ -175,22 +119,6 @@ _REPAIR_SYS = _GAME_SYS + (
     "playability checks. Fix EVERY issue (missing canvas, game loop, input "
     "handling, state machine, offline-safety, etc.) and return the ENTIRE "
     "corrected HTML document — never a diff, never prose, never markdown fences."
-)
-
-# Runtime errors require preserving and repairing the existing game, rather
-# than expanding the original design brief. Keep this policy small and stable
-# so source code and the actual browser report remain the dominant context.
-_RUNTIME_REPAIR_POLICY = InstructionPolicy(
-    policy_id="backend.playable.runtime-repair",
-    version="2",
-    instructions=(
-        "Propose minimal literal edits to repair the reported runtime error in the supplied offline HTML5 game. "
-        "Return ONLY JSON matching the response schema: schema_version 1 and an edits array of find/replace strings. "
-        "Copy each nonempty find string exactly from CURRENT_HTML, including whitespace and quotes; it must occur "
-        "exactly once. Propose at most eight nonoverlapping edits. Fix the actual error and broken controls first, "
-        "preserving all other game code, mechanics and assets. Do not rewrite the document or return HTML, markdown, "
-        "prose, paths or commands. The server owns the target and source digest; no digest echo is required."
-    ),
 )
 
 # Judge-driven quality elevation: keep the game runnable while raising depth,
@@ -221,9 +149,7 @@ async def _resolve_brief(brief: str, spec_id: str) -> tuple:
     """Turn either a raw brief or a stored design-spec into the build prompt +
     title/genre. Returns (prompt, title, genre)."""
     if spec_id:
-        spec = await bind_project_source("design_specs", "spec_id", spec_id)
-        if not spec or not spec.get("gdd"):
-            raise HTTPException(404, "Design spec not found")
+        spec = await _db.design_specs.find_one({"spec_id": spec_id}, PROJ)
         if spec and spec.get("gdd"):
             g = spec["gdd"]
             mech = "; ".join(
@@ -246,8 +172,6 @@ async def _resolve_brief(brief: str, spec_id: str) -> tuple:
 
 
 class GenerateBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     brief: str = ""
     spec_id: str = ""
     title: str = ""
@@ -257,74 +181,29 @@ class GenerateBody(BaseModel):
     derive_mode: str = ""
 
 
-async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None,
-                     instruction_policy: InstructionPolicy | None = None,
-                     structured_output_schema: dict | None = None, max_model_turns: int | None = None) -> dict:
-    """Execute canonical scoped model work from a worker's event loop.
-
-    Historical ensemble names remain advisory. Canonical engine routing owns
-    provider failover; feature code cannot retry an uncertain bridge failure.
-    """
+async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
+    """Run a provider-diverse LLM ensemble (fallback) WITHOUT touching the
+    main-loop Mongo client — safe to drive from a fresh loop inside a thread."""
     from core.engine_chat import EngineChat, UserMessage
     sid = f"playable-{uuid.uuid4().hex[:8]}"
     for i, model in enumerate(ensemble):
-        # The worker thread carries the request context, but must revalidate the
-        # current account before every provider attempt, including fallbacks.
-        reauthorize_project_principal(mutate=True, sources=True)
-        identity = project_identity()
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
-        chat = None
-        dispatch_started = False
         try:
-            policy = instruction_policy or InstructionPolicy(
-                policy_id="backend.playable.generation", version="1", instructions=system.strip(),
-            )
-            if policy.instructions != system.strip():
-                raise ValueError("playable instruction policy content mismatch")
             chat = EngineChat(
                 session_id=sid,
-                tenant_id=identity["tenant_id"],
-                actor_id=identity["owner_id"],
-                data_class="confidential",
-                instruction_policy=policy,
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.playable.generation",
+                    version="1",
+                    instructions=system.strip(),
+                ),
             ).with_model(provider, model)
-            # Every HTML mutation helper shares this finite feature default;
-            # judges explicitly request their smaller 256-token envelope.
-            chat.with_max_tokens(CODEGEN_OUTPUT_TOKENS if max_output_tokens is None else max_output_tokens)
-            if max_model_turns is not None:
-                chat.with_max_model_turns(max_model_turns)
-            if structured_output_schema is not None:
-                chat.with_json_schema(structured_output_schema)
-            dispatch_started = True
             resp = await chat.send_message(UserMessage(text=prompt))
-            reauthorize_project_principal(mutate=True, sources=True)
             content = resp.content if hasattr(resp, "content") else str(resp)
-            return {"content": content, "model": "engine-routed", "provider": "skeleton-engine",
-                    "operation_id": getattr(resp, "operation_id", None),
-                    "execution_id": getattr(resp, "execution_id", None),
-                    "context_id": getattr(resp, "context_id", None),
-                    "context_digest": getattr(resp, "context_digest", None),
-                    "provider_receipts": list(getattr(resp, "provider_receipts", ())),
+            return {"content": content, "model": model, "provider": provider,
                     "latency_ms": int((time.time() - t0) * 1000), "attempts": i + 1}
-        except HTTPException:
-            raise
-        except EngineTextError as exc:
-            # Canonical execution owns routing and uncertain-dispatch recovery.
-            # A typed failure cannot become a fresh provider or repair request.
-            request_key = _model_request_key(chat, prompt)
-            failure = _model_failure(exc, request_key)
-            _log.warning("Playable model request failed code=%s exception=%s", failure.code, type(exc).__name__)
-            raise failure from exc
-        except Exception as exc:
-            # An unexpected bridge/receipt failure after dispatch is uncertain,
-            # regardless of whether its type is a recognized engine exception.
-            request_key = _model_request_key(chat, prompt)
-            failure = PlayableModelFailure(
-                "project_model_execution_unconfirmed" if dispatch_started else "project_model_configuration_unavailable",
-                unconfirmed=dispatch_started, request_key=request_key)
-            _log.warning("Playable bridge failed code=%s exception=%s", failure.code, type(exc).__name__)
-            raise failure from exc
+        except Exception:  # provider error → next in ensemble
+            pass
     return {"content": "", "error": "llm_request_failed", "model": None, "provider": None}
 
 
@@ -332,9 +211,7 @@ async def _llm_async(prompt: str, system: str, ensemble: list, *, max_output_tok
 _LLM_SEM = threading.Semaphore(int(os.environ.get("LLM_MAX_CONCURRENCY", "3")))
 
 
-def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_tokens: int | None = None,
-                   instruction_policy: InstructionPolicy | None = None,
-                   structured_output_schema: dict | None = None, max_model_turns: int | None = None) -> dict:
+def _llm_in_thread(prompt: str, system: str, ensemble: list) -> dict:
     """Blocking entrypoint executed in a worker thread (own event loop) so the
     underlying LLM call never freezes the server's main event loop.
 
@@ -342,9 +219,7 @@ def _llm_in_thread(prompt: str, system: str, ensemble: list, *, max_output_token
     wire/polish jobs can't stampede the model providers or starve the thread pool.
     Threads simply wait their turn here — the event loop stays free."""
     with _LLM_SEM:
-        return asyncio.run(_llm_async(prompt, system, ensemble, max_output_tokens=max_output_tokens,
-                                      instruction_policy=instruction_policy,
-                                      structured_output_schema=structured_output_schema, max_model_turns=max_model_turns))
+        return asyncio.run(_llm_async(prompt, system, ensemble))
 
 
 async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str = "studio",
@@ -370,9 +245,7 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
     repairs_left, refines_left = max_repair, (0 if depth == "fast" else base_refine)
     t_start = time.time()
 
-    routed = await asyncio.to_thread(_llm_in_thread, prompt, system, _GAME_ENSEMBLE,
-                                     max_output_tokens=CODEGEN_OUTPUT_TOKENS)
-    _require_model_content(routed)
+    routed = await asyncio.to_thread(_llm_in_thread, prompt, system, _GAME_ENSEMBLE)
     html, removed = _sanitize(_extract_html(routed.get("content", "")))
     val = _validate(html)
     trail = [{"attempt": 1, "kind": "generate", "score": val["score"],
@@ -380,7 +253,7 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
     best = {"routed": routed, "html": html, "removed": removed, "val": val, "evaluation": None}
 
     # ── phase 1: structural repairs (bounded by max_repair) ──
-    while not passes_playability_gate(best["val"], PLAYABILITY_THRESHOLD) and repairs_left > 0:
+    while best["val"]["score"] < PLAYABILITY_THRESHOLD and repairs_left > 0:
         repairs_left -= 1
         repair_prompt = (
             f"ORIGINAL BRIEF/PROMPT:\n{prompt}\n\n"
@@ -388,18 +261,15 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
             f"checks: {', '.join(best['val']['missing']) or 'none'}.\n\n"
             f"PREVIOUS HTML (fix it, return the FULL corrected document):\n{best['html'][:html_ctx] or '(empty output)'}"
         )
-        r2 = await asyncio.to_thread(_llm_in_thread, repair_prompt, _REPAIR_SYS, _GAME_ENSEMBLE,
-                                    max_output_tokens=CODEGEN_OUTPUT_TOKENS)
-        _require_model_content(r2)
+        r2 = await asyncio.to_thread(_llm_in_thread, repair_prompt, _REPAIR_SYS, _GAME_ENSEMBLE)
         h2, rem2 = _sanitize(_extract_html(r2.get("content", "")))
         v2 = _validate(h2)
         trail.append({"attempt": len(trail) + 1, "kind": "structural_repair", "score": v2["score"],
                       "intricacy": v2.get("intricacy"), "missing": v2["missing"], "model": r2.get("model")})
-        if (passes_playability_gate(v2, PLAYABILITY_THRESHOLD)
-            and not passes_playability_gate(best["val"], PLAYABILITY_THRESHOLD)) or v2["score"] > best["val"]["score"]:
+        if v2["score"] > best["val"]["score"]:
             best = {"routed": r2, "html": h2, "removed": rem2, "val": v2, "evaluation": None}
 
-    structurally_ok = bool(best["html"]) and passes_playability_gate(best["val"], PLAYABILITY_THRESHOLD)
+    structurally_ok = bool(best["html"]) and best["val"]["score"] >= PLAYABILITY_THRESHOLD
 
     # ── phase 2: judge-driven quality refinement (bounded by max_refine) ──
     if structurally_ok:
@@ -418,12 +288,10 @@ async def _codegen_quality_loop(prompt: str, system: str, brief: str, depth: str
                 f"Also strengthen any missing depth: {', '.join(best['val']['missing']) or 'none'}.\n\n"
                 f"CURRENT HTML (upgrade it, return the FULL document):\n{best['html'][:html_ctx]}"
             )
-            r3 = await asyncio.to_thread(_llm_in_thread, quality_prompt, _QUALITY_SYS, _GAME_ENSEMBLE,
-                                        max_output_tokens=CODEGEN_OUTPUT_TOKENS)
-            _require_model_content(r3)
+            r3 = await asyncio.to_thread(_llm_in_thread, quality_prompt, _QUALITY_SYS, _GAME_ENSEMBLE)
             h3, rem3 = _sanitize(_extract_html(r3.get("content", "")))
             v3 = _validate(h3)
-            cand_ok = bool(h3) and passes_playability_gate(v3, PLAYABILITY_THRESHOLD)
+            cand_ok = bool(h3) and v3["score"] >= PLAYABILITY_THRESHOLD
             ev3 = await _judge_eval(h3, brief) if cand_ok else {"available": False}
             trail.append({"attempt": len(trail) + 1, "kind": "quality_repair", "score": v3["score"],
                           "intricacy": v3.get("intricacy"), "eval_overall": ev3.get("overall"),
@@ -442,15 +310,13 @@ async def _judge_eval(html: str, brief: str) -> dict:
     playability / coherence / fun / polish and returns a ship/polish/reject
     verdict. Offloaded to a worker thread; never raises."""
     if not html:
-        return model_review_projection({"available": False, "reason": "no html to evaluate"})
+        return {"available": False, "reason": "no html to evaluate"}
     prompt = (f"BRIEF:\n{brief or '(none)'}\n\nGAME HTML (may be truncated):\n{html[:14000]}\n\nScore this game.")
-    routed = await asyncio.to_thread(_llm_in_thread, prompt, _JUDGE_SYS, _JUDGE_ENSEMBLE,
-                                     max_output_tokens=JUDGE_OUTPUT_TOKENS)
+    routed = await asyncio.to_thread(_llm_in_thread, prompt, _JUDGE_SYS, _JUDGE_ENSEMBLE)
     data = _extract_json(routed.get("content", ""))
     if not data:
-        return model_review_projection({"available": False, "reason": routed.get("error") or "judge returned no JSON",
-                "judge_model": routed.get("model"), "source_digest": playable_html_digest(html)},
-                current_source_digest=playable_html_digest(html))
+        return {"available": False, "reason": routed.get("error") or "judge returned no JSON",
+                "judge_model": routed.get("model")}
 
     def _clamp(v):
         try:
@@ -468,14 +334,14 @@ async def _judge_eval(html: str, brief: str) -> dict:
     length = str(data.get("length", "")).lower()
     if length not in ("short", "medium", "long"):
         length = "medium"
-    return model_review_projection({
+    return {
         "available": True, **axes, "overall": overall, "verdict": verdict,
         "difficulty": difficulty, "length": length,
         "critique": str(data.get("critique", ""))[:400],
         "top_fix": str(data.get("top_fix", ""))[:300],
         "judge_model": routed.get("model"),
-        "source_digest": playable_html_digest(html),
-    }, current_source_digest=playable_html_digest(html))
+        "shippable": overall >= EVAL_SHIP_MIN,
+    }
 
 
 async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str,
@@ -484,23 +350,16 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
     """Shared pipeline: rigorous quality loop (codegen → structural repair →
     judge-driven quality refinement) → persist. Used by fresh generation."""
     gen_system = _GAME_SYS_FAST if depth == "fast" else _GAME_SYS
-    await reauthorize_project_context(mutate=True)
     gen = await _codegen_quality_loop(prompt, gen_system, remix_of_brief or brief, depth)
-    await reauthorize_project_context(mutate=True)
     routed, html, removed, val = gen["routed"], gen["html"], gen["removed"], gen["val"]
     llm_error = routed.get("error")
-    structurally_ok = bool(html) and passes_playability_gate(val, PLAYABILITY_THRESHOLD)
+    structurally_ok = bool(html) and val["score"] >= PLAYABILITY_THRESHOLD
 
-    html_digest = playable_html_digest(html)
-    evaluation = model_review_projection(
-        gen.get("evaluation") or {"available": False, "reason": "skipped — failed structural gate"},
-        current_source_digest=html_digest,
-    )
+    evaluation = gen.get("evaluation") or {"available": False, "reason": "skipped — failed structural gate"}
     status = "ready" if structurally_ok else "failed"
 
     pid = uuid.uuid4().hex
     doc = {
-        **project_identity(),
         "playable_id": pid,
         "title": title,
         "genre": genre,
@@ -508,7 +367,6 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
         "spec_id": spec_id or None,
         "parent_id": parent_id or None,
         "html": html,
-        "html_digest": html_digest,
         "bytes": len(html),
         "status": status,
         "playability_score": val["score"],
@@ -522,18 +380,16 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
         "provider": routed.get("provider"),
         "latency_ms": routed.get("latency_ms"),
         "llm_error": llm_error,
-        "engine_operation_id": routed.get("operation_id"),
-        "engine_execution_id": routed.get("execution_id"),
-        "engine_context_id": routed.get("context_id"),
-        "engine_context_digest": routed.get("context_digest"),
-        "engine_provider_receipts": routed.get("provider_receipts", []),
         "depth": depth,
         "forged_from": forged_from or None,
         "derive_mode": derive_mode or None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "version": 1,
     }
-    await _db.playables.insert_one(dict(doc))
+    try:
+        await _db.playables.insert_one(dict(doc))
+    except Exception:
+        pass
     # VII.5 auto-gate: deterministic content-policy scan at creation so unsafe
     # content never reaches the public catalogue. block→hidden, review→review.
     try:
@@ -549,8 +405,6 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
         if mod != "ok":
             await _audit("auto_scan", pid, "system",
                          {"verdict": scan["verdict"], "flags": len(scan["flags"]), "moderation_status": mod})
-    except HTTPException:
-        raise
     except Exception:
         pass
     out = {k: v for k, v in doc.items() if k != "html"}
@@ -560,23 +414,15 @@ async def _persist(prompt: str, title: str, genre: str, brief: str, spec_id: str
 
 async def _do_generate(brief: str, spec_id: str, title_override: str, depth: str = "studio", creator_id: str = "", forged_from: str = "", derive_mode: str = "") -> dict:
     """Fresh generation from a brief or design-spec."""
-    await reauthorize_project_context(mutate=True)
-    identity = project_identity()
-    if creator_id and creator_id != identity["owner_id"]:
-        raise HTTPException(403, "Creator identity mismatch")
-    if forged_from:
-        await assert_project_access(forged_from)
     prompt, title, genre = await _resolve_brief(brief, spec_id)
     if title_override:
         title = title_override
     # Per-creator Studio Preferences bias (additive; brief still wins).
     try:
         from routes.creator_prefs import preference_bias
-        bias = await preference_bias(identity["owner_id"])
+        bias = await preference_bias(creator_id)
         if bias:
             prompt = f"{prompt}{bias}"
-    except HTTPException:
-        raise
     except Exception:
         pass
     return await _persist(prompt, title, genre, brief, spec_id, "", "", depth, forged_from, derive_mode)
@@ -595,16 +441,6 @@ def _validate_body(body: "GenerateBody") -> str:
     return ""
 
 
-async def _assert_generation_sources(body: GenerateBody) -> None:
-    await reauthorize_project_context(mutate=True)
-    if body.creator_id and body.creator_id != project_identity()["owner_id"]:
-        raise HTTPException(403, "Creator identity mismatch")
-    if body.spec_id:
-        await _resolve_brief(body.brief, body.spec_id)
-    if body.forged_from:
-        await assert_project_access(body.forged_from)
-
-
 @router.post("/generate")
 async def generate(body: GenerateBody):
     """Generate synchronously (can run 60-180s with repair+eval). Prefer
@@ -612,39 +448,19 @@ async def generate(body: GenerateBody):
     err = _validate_body(body)
     if err:
         return {"error": err}
-    await _assert_generation_sources(body)
-    try:
-        return await _do_generate((body.brief or "").strip(), body.spec_id, body.title, body.depth, body.creator_id, body.forged_from, body.derive_mode)
-    except PlayableModelFailure as exc:
-        raise HTTPException(503, exc.public()) from exc
+    return await _do_generate((body.brief or "").strip(), body.spec_id, body.title, body.depth, body.creator_id)
 
 
 async def _run_job(job_id: str, coro):
     """Background runner — full generation never hits a request timeout."""
     try:
-        await reauthorize_project_context(mutate=True)
         out = await coro
-        await reauthorize_project_context(mutate=True)
         out["job_id"] = job_id
         out["job_status"] = "done"
-        await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": out})
-    except PlayableModelFailure as exc:
-        await reauthorize_project_context(mutate=True)
-        await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": {
-            **exc.public(), "job_status": "unconfirmed" if exc.unconfirmed else "error"}})
-    except HTTPException:
-        # Revoked/moved accounts and projects cannot publish a late result or
-        # turn the failed authorization into a new job through an upsert.
-        raise
+        await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": out}, upsert=True)
     except Exception:
-        await reauthorize_project_context(mutate=True)
         await _db.playable_jobs.update_one(
-            {"job_id": job_id}, {"$set": {"job_status": "error", "error": "generation_failed"}})
-    finally:
-        # An authorization failure before first await must not leave an already
-        # created coroutine pending or run its private work during cleanup.
-        if asyncio.iscoroutine(coro):
-            coro.close()
+            {"job_id": job_id}, {"$set": {"job_status": "error", "error": "generation_failed"}}, upsert=True)
 
 
 @router.post("/generate/async")
@@ -654,10 +470,8 @@ async def generate_async(body: GenerateBody):
     err = _validate_body(body)
     if err:
         return {"error": err}
-    await _assert_generation_sources(body)
     job_id = uuid.uuid4().hex
     await _db.playable_jobs.insert_one({
-        **project_identity(),
         "job_id": job_id, "job_status": "running", "kind": "generate",
         "brief": (body.brief or "").strip()[:500],
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -669,8 +483,6 @@ async def generate_async(body: GenerateBody):
 
 
 class VoteBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     opponent_id: str = ""
     winner_id: str = ""
 
@@ -727,8 +539,6 @@ def _brief_from_build(b: dict) -> tuple:
 
 
 class ImportBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     build_id: str = ""
     depth: str = "studio"
 
@@ -737,21 +547,12 @@ async def _get_build(bid: str) -> dict:
     """Find a Galaxy build by id in the active collection or the archive
     (completed builds are moved to galaxy_build_archive by the watchdog)."""
     b = await _db.galaxy_builds.find_one({"build_id": bid}, {"_id": 0})
-    if b:
-        return await bind_project_source("galaxy_builds", "build_id", bid)
     if not b:
         b = await _db.galaxy_build_archive.find_one({"build_id": bid}, {"_id": 0})
-        if b:
-            return await bind_project_source("galaxy_build_archive", "build_id", bid)
     return b or {}
 
 
 async def _do_import(build: dict, depth: str) -> dict:
-    await reauthorize_project_context(mutate=True)
-    # A captured source document is not continuing authority after the request.
-    build = await _get_build(str(build.get("build_id") or ""))
-    if not build:
-        raise HTTPException(404, "Build not found")
     prompt, title, genre = _brief_from_build(build)
     brief = f"(imported from Galaxy build {build.get('build_id')})"
     out = await _persist(prompt, title, genre, brief, "", "", "", depth)
@@ -761,8 +562,6 @@ async def _do_import(build: dict, depth: str) -> dict:
             {"$set": {"source_build_id": build.get("build_id"), "imported": True}})
         out["source_build_id"] = build.get("build_id")
         out["imported"] = True
-    except HTTPException:
-        raise
     except Exception:
         pass
     return out
@@ -795,10 +594,9 @@ async def import_build_async(body: ImportBody):
         return {"error": "build_id required"}
     build = await _get_build(bid)
     if not build:
-        raise HTTPException(404, "Build not found")
+        return {"error": "build not found in vault"}
     job_id = uuid.uuid4().hex
     await _db.playable_jobs.insert_one({
-        **project_identity(),
         "job_id": job_id, "job_status": "running", "kind": "import",
         "source_build_id": bid, "created_at": datetime.now(timezone.utc).isoformat(),
     })
@@ -842,17 +640,20 @@ async def get_job(job_id: str):
     doc = await _db.playable_jobs.find_one({"job_id": job_id}, PROJ)
     if not doc:
         return {"error": "not found", "job_status": "unknown"}
-    # Age is an observation gap, never proof that execution failed or drained.
-    # Preserve the original job/request identity after a slow call or restart.
+    # self-heal orphaned jobs: an async task that was killed by a server restart
+    # leaves its doc stuck "running" forever — expire it so the UI stops spinning.
     if doc.get("job_status") == "running":
         created = doc.get("created_at")
         try:
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(str(created))).total_seconds()
         except Exception:
             age = 0
-        if age > 480:
-            doc["observation_stale"] = True
-            doc["observation_code"] = "job_progress_unobserved"
+        if age > 480:  # 8 min hard ceiling — frees a stage if a forge task was killed by a restart
+            await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": {
+                "job_status": "error", "error": "job interrupted (likely a server restart) — please retry",
+                "swept_at": datetime.now(timezone.utc).isoformat()}})
+            doc["job_status"] = "error"
+            doc["error"] = "job interrupted (likely a server restart) — please retry"
     return doc
 
 
@@ -925,7 +726,7 @@ async def validate_playable(pid: str):
         "playable_id": pid, "title": doc.get("title"), "status": doc.get("status"),
         "stored_playability_score": doc.get("playability_score"),
         "recomputed_score": val["score"],
-        "passes_gate": passes_playability_gate(val, PLAYABILITY_THRESHOLD),
+        "passes_gate": val["score"] >= PLAYABILITY_THRESHOLD,
         "threshold": PLAYABILITY_THRESHOLD,
         "checks": val["checks"], "missing": val["missing"], "intricacy": val["intricacy"],
         "signals": val.get("signals", {}), "depth_hits": val.get("depth_hits", 0),

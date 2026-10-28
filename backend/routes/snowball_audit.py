@@ -11,8 +11,6 @@ mechanical_coherence · world_density · asset_coverage · build_readiness · fr
 """
 from __future__ import annotations
 
-from routes.playable_access import project_identity, project_router, scoped_database, reauthorize_project_context
-
 import os
 from datetime import datetime, timezone
 
@@ -22,9 +20,8 @@ from core.databases import client as _MONGO
 from routes.canon_graph import build_graph, _compute_issues
 from routes.snowball import _LADDER, _compile_gdd
 
-router = project_router(prefix="/api/snowball", tags=["snowball"])
+router = APIRouter(prefix="/api/snowball", tags=["snowball"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 DELIVER_THRESHOLD = 95  # hard floor: every level + LLM quality must reach this to ship
 
@@ -142,12 +139,8 @@ async def _llm_quality(pid: str, title: str, gdd: str) -> dict:
         "\"notes\":\"<=160 chars\"}. quality = overall craft/consistency/completeness; "
         "parse_confidence = how cleanly structured & unambiguous the doc is to machine-parse. "
         "Be strict: reserve 95+ for genuinely shippable, coherent, complete work.")
-    scope = await reauthorize_project_context(mutate=True)
     res = await route_complete("reasoning", gdd[:14000], system=system,
-                               tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
-                               data_class="confidential",
                                session_id=f"snaudit-{pid}", timeout_s=60, use_cache=False)
-    await reauthorize_project_context(mutate=True)
     quality = parse_conf = 0
     notes = ""
     if not res.get("error"):
@@ -180,7 +173,7 @@ async def _llm_quality(pid: str, title: str, gdd: str) -> dict:
             hits = 0
             for nm in names:
                 tok = (nm.split() or [nm])[0]
-                r = await _rag_retrieve(pid, q=tok, k=3, scope=scope)
+                r = await _rag_retrieve(pid, q=tok, k=3)
                 if (r or {}).get("hits"):
                     hits += 1
             recall = _clip(hits / len(names) * 100)
@@ -196,7 +189,6 @@ async def _llm_quality(pid: str, title: str, gdd: str) -> dict:
 async def snowball_audit(pid: str, deep: bool = Query(True)):
     """🩺 The 10-level quality scorecard + hard 95 delivery gate.
     deep=true (default) runs the LLM quality + parse-confidence + RAG recall confirmation."""
-    await reauthorize_project_context(mutate=True)
     g = await _db.playables.find_one(
         {"playable_id": pid},
         {"_id": 0, "title": 1, "genre": 1, "derive_mode": 1,
@@ -252,7 +244,6 @@ async def snowball_audit(pid: str, deep: bool = Query(True)):
 @router.get("/{pid}/scorecard.png")
 async def scorecard_png(pid: str):
     """🖼️ Shareable 1080² scorecard PNG of the 10 audit levels + gate verdict (big-win i)."""
-    await reauthorize_project_context(mutate=True)
     from fastapi.responses import Response
     from PIL import Image, ImageDraw, ImageFont
     import io

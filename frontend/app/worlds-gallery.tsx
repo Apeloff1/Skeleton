@@ -7,11 +7,10 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  StyleSheet, SafeAreaView, RefreshControl, useWindowDimensions,
+  StyleSheet, SafeAreaView, Image, RefreshControl, useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
-import PrivateImage from '../src/components/PrivateImage';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -63,7 +62,7 @@ export default function WorldsGallery() {
               {worlds.map((w) => (
                 <TouchableOpacity key={w.world_id} testID={`wg-world-${w.world_id}`} style={[styles.card, { width: cardW }]}
                   onPress={() => router.push('/worldforge' as any)}>
-                  <PrivateImage uri={thumbUrl(w)} style={{ width: cardW, height: cardW, backgroundColor: '#04040a' }} resizeMode="cover" />
+                  <Image source={{ uri: thumbUrl(w) }} style={{ width: cardW, height: cardW, backgroundColor: '#04040a' }} resizeMode="cover" />
                   <View style={{ padding: 10 }}>
                     <Text style={styles.cardName} numberOfLines={1}>{w.name}</Text>
                     <Text style={styles.cardMeta} numberOfLines={1}>{w.scale} · {w.palette}</Text>

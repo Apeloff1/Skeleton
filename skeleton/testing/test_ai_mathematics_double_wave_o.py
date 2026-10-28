@@ -60,9 +60,7 @@ def test_welch_mann_whitney_and_anova_reference_cases() -> None:
 def test_golden_section_and_nelder_mead_find_known_minima() -> None:
     golden = golden_section_minimize(lambda x: (x - 2.5) ** 2 + 3.0, -10.0, 10.0)
     assert golden.converged
-    # Around a quadratic minimum plus a constant, objective values become
-    # indistinguishable inside ~sqrt(ulp(3.0)); require realistic x precision.
-    assert golden.minimizer == pytest.approx(2.5, abs=5e-8)
+    assert golden.minimizer == pytest.approx(2.5, abs=1e-8)
     assert golden.objective == pytest.approx(3.0, abs=1e-12)
 
     nelder = nelder_mead(

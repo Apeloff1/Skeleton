@@ -31,7 +31,7 @@ import sys
 import time
 from typing import List, Tuple, Union
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 
 #  A route entry is either ``(module_path, attribute_name)`` or
 #  ``(module_path, attribute_name, url_prefix)``.
@@ -116,19 +116,11 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             if router is None:
                 skipped_names.append(f"{module_path} (attr {attr!r} missing)")
                 continue
-            admission = {}
-            router_prefix = str(getattr(router, "prefix", "")).rstrip("/")
-            if router_prefix == "/api/galaxy-studio" or router_prefix.startswith("/api/galaxy-studio/"):
-                # Galaxy's extracted sibling routers share the same private
-                # build/artifact owner even when mounted independently.
-                from routes.galaxy_studio_access import galaxy_request_access
-
-                admission["dependencies"] = [Depends(galaxy_request_access)]
             prior_routes = len(app.routes)
             if prefix:
-                app.include_router(router, prefix=prefix, **admission)
+                app.include_router(router, prefix=prefix)
             else:
-                app.include_router(router, **admission)
+                app.include_router(router)
             newly_mounted = app.routes[prior_routes:]
             # A caller or integration shim might append an unrelated direct
             # route while discarding the requested router. A changed route

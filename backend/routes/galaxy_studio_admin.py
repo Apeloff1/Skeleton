@@ -15,7 +15,6 @@ Shared state (``_active_runners``, ``_background_tasks``, ``_builds``,
 from __future__ import annotations
 
 from fastapi import APIRouter
-from routes.galaxy_studio_access import record_query, record_visible
 
 from routes.galaxy_studio_state import (
     TOTAL_BATCHES,
@@ -63,13 +62,11 @@ async def list_resumable_builds():
     try:
         from services.database import db as _db
         cursor = _db.galaxy_builds.find(
-            {**record_query(), "status": {"$in": ["building", "paused"]}},
+            {"status": {"$in": ["building", "paused"]}},
         ).sort("created_at", -1).limit(50)
         docs = await cursor.to_list(length=50)
         out: list[dict] = []
         for d in docs:
-            if not record_visible(d):
-                continue
             d.pop("_id",        None)
             d.pop("files",      None)
             d.pop("_gen_cache", None)
@@ -103,7 +100,7 @@ async def list_my_builds(limit: int = 50, status: str = ""):
     """
     try:
         from services.database import db as _db
-        query: dict = record_query()
+        query: dict = {}
         if status:
             query["status"] = status
         cursor = _db.galaxy_builds.find(
@@ -116,8 +113,6 @@ async def list_my_builds(limit: int = 50, status: str = ""):
         docs = await cursor.to_list(length=min(limit, 200))
         out: list[dict] = []
         for d in docs:
-            if not record_visible(d):
-                continue
             bid = d.get("build_id", "")
             vault_present = False
             try:

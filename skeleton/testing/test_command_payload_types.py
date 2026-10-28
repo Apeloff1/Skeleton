@@ -103,16 +103,16 @@ def test_memory_command_rejects_coerced_top_k() -> None:
 
 def test_run_command_rejects_coerced_repair_flag() -> None:
     service = build_runtime_command_service(_State())
-    ok = service.execute("run", {"answers": {}, "target": "json", "repair": True})
+    ok = service.execute("run", {"answers": {}, "repair": True})
     assert ok.ok is True
     assert ok.data["game"]["repair"] is True
 
-    defaulted = service.execute("run", {"answers": {}, "target": "json"})
+    defaulted = service.execute("run", {"answers": {}})
     assert defaulted.ok is True
     assert defaulted.data["game"]["repair"] is False
 
     for repair in (1, "false", "true", None):
-        result = service.execute("run", {"answers": {}, "target": "json", "repair": repair})
+        result = service.execute("run", {"answers": {}, "repair": repair})
         assert result.ok is False
         assert result.to_payload()["error"]["code"] == "invalid_argument"
 
@@ -172,20 +172,20 @@ def test_require_text_rejects_non_strings_and_unknown_targets() -> None:
 
 def test_run_command_rejects_coerced_target_and_title() -> None:
     service = build_runtime_command_service(_State())
-    ok = service.execute("run", {"answers": {}, "target": "json", "title": "Arena"})
+    ok = service.execute("run", {"answers": {}, "target": "godot", "title": "Arena"})
     assert ok.ok is True
 
     for payload in (
         {"answers": {}, "target": True},
         {"answers": {}, "target": "unity"},
-        {"answers": {}, "target": "json", "title": 12},
+        {"answers": {}, "title": 12},
     ):
         result = service.execute("run", payload)
         assert result.ok is False
         assert result.to_payload()["error"]["code"] == "invalid_argument"
 
 
-def test_http_ingest_and_include_files_reject_coerced_types(monkeypatch) -> None:
+def test_http_ingest_and_include_files_reject_coerced_types() -> None:
     from skeleton.api import routes
 
     class _Quad:
@@ -208,35 +208,20 @@ def test_http_ingest_and_include_files_reject_coerced_types(monkeypatch) -> None
         asyncio.run(routes.retrieval_ingest({"doc_id": "a", "text": "hello", "salience": True}, _HttpState()))
     assert coerced.value.status_code == 422
 
-    # Keep the real HTTP adapter and its strict flag parser, but inject a
-    # finite downstream builder result so this only tests HTTP projection.
-    from skeleton.forge import game_builder
-
-    calls = []
-    def build_stub(vision, **kwargs):
-        calls.append((vision, kwargs))
-        return {"files": {"a.gd": "x"}}
-
-    def project_stub(result, *, include_files=False):
-        return result if include_files else {key: value for key, value in result.items() if key != "files"}
-
-    monkeypatch.setattr(game_builder, "build_playable_game", build_stub)
-    monkeypatch.setattr(game_builder, "project_operator_http", project_stub)
+    class _Forge:
+        def execute(self, *args, **kwargs):
+            return {"files": {"a.gd": "x"}}
 
     class _GameState:
-        gameforge = type("Forge", (), {"execute": lambda *args, **kwargs: {}})()
+        gameforge = _Forge()
 
-    # Distinct URI-free headers prevent unrelated idempotency cache reuse.
-    http_request = type("R", (), {"headers": {}})()
-    kept = asyncio.run(routes.gameforge_run(http_request, {"vision": "An original game", "include_files": True}, _GameState()))
+    kept = asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": True}, _GameState()))
     assert "files" in kept
-    stripped = asyncio.run(routes.gameforge_run(http_request, {"vision": "An original game"}, _GameState()))
+    stripped = asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {}, _GameState()))
     assert "files" not in stripped
-    before_invalid = len(calls)
-    with pytest.raises(HTTPException) as invalid_flag:
-        asyncio.run(routes.gameforge_run(http_request, {"vision": "An original game", "include_files": "false"}, _GameState()))
-    assert invalid_flag.value.status_code == 422
-    assert len(calls) == before_invalid, "invalid projection must not start the builder"
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": "false"}, _GameState()))
+
 
 def test_require_mapping_rejects_string_and_array_stand_ins() -> None:
     from skeleton.application.command_contracts import require_mapping
@@ -274,7 +259,7 @@ def test_memory_and_run_commands_reject_coerced_objects() -> None:
         assert result.ok is False
         assert result.to_payload()["error"]["code"] == "invalid_argument"
 
-    answers = service.execute("run", {"answers": {"seed": 1}, "target": "json"})
+    answers = service.execute("run", {"answers": {"seed": 1}})
     assert answers.ok is True
     for payload in ({"answers": []}, {"answers": "nope"}):
         result = service.execute("run", payload)

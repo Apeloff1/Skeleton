@@ -9,20 +9,18 @@ the game. The job reports per-step progress so the UI can show a live checklist.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-from routes.playable import _db, _run_job, PlayableModelFailure
+from routes.playable import _db, _run_job
 from routes.playable_sentience import _do_sentience
 from routes.playable_physics import _do_physics
 from routes.playable_aesthetics import _do_aesthetics
 
-router = project_router(prefix="/api/playable", tags=["playable"])
+router = APIRouter(prefix="/api/playable", tags=["playable"])
 
 _STEPS = [
     ("sentience", "👾 Living NPCs", _do_sentience),
@@ -43,10 +41,6 @@ async def _do_polish(pid: str, job_id: str) -> dict:
         }})
         try:
             res = await fn(pid)
-        except (PlayableModelFailure, HTTPException):
-            # The shared runner retains uncertain model custody and authority
-            # denials. Neither permits starting another model-backed step.
-            raise
         except Exception:  # a single step failing must not abort the chain
             res = {"applied": False, "error": "polish_step_failed"}
         ok = bool(res.get("applied"))

@@ -13,7 +13,6 @@ import json
 import asyncio
 
 from routes.playable import _GAME_ENSEMBLE, _llm_in_thread
-from fastapi import HTTPException
 
 # HARDCODED — maximal quality. Not configurable. Do not lower.
 MIN_QUALITY = 95
@@ -58,8 +57,6 @@ async def audit_quality(kind: str, content: str, simulate: bool = False,
     try:
         routed = await asyncio.to_thread(_llm_in_thread, prompt, _AUDIT_SYS, _GAME_ENSEMBLE)
         data = _parse(routed.get("content", "")) or {}
-    except HTTPException:
-        raise
     except Exception:
         data = {}
     factors = data.get("factors") or {}

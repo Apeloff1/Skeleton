@@ -103,11 +103,10 @@ class _UnavailableRegistry:
     def require_active(self):
         raise ProviderUnavailableError("deterministic outage")
 
-    def require_for_context(self, _context_policy):
+    def require_for_context(self, context_policy):
+        assert context_policy["tenant_id"] == "tenant-a"
+        assert "provider_selection" not in context_policy
         return self.require_active()
-
-    def runtime_serving_engines(self):
-        return ()
 
 
 class _Registry:
@@ -117,11 +116,12 @@ class _Registry:
     def require_active(self):
         return self.provider
 
-    def require_for_context(self, _context_policy):
+    def require_for_context(self, context_policy):
+        # Match the production registry's context-scoped entry point. These
+        # fixtures intentionally cover only the default deterministic route.
+        assert context_policy["tenant_id"] == "tenant-a"
+        assert "provider_selection" not in context_policy
         return self.require_active()
-
-    def runtime_serving_engines(self):
-        return ()
 
 
 def _service(tmp_path, *, prefix: str = "golden") -> EngineExecutionService:

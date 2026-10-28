@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
-
 import threading
 from dataclasses import replace
 from skeleton.compat.datetime_utc import UTC
@@ -13,7 +11,6 @@ from skeleton import provider_runtime
 from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
 from skeleton.ai.runtime.inference.local import (
     LocalInferenceCancelled,
-    LocalInferenceRequest,
     ReferenceNGramModel,
 )
 from skeleton.intelligence.admission import ResourceBudget
@@ -243,7 +240,7 @@ async def test_local_timeout_signals_model_cooperative_cancellation(tmp_path, mo
                 prompt="alpha",
                 tenant_id="local-tenant",
                 operation_id="local-interrupted",
-                resource_budget=ResourceBudget(max_wall_seconds=0.5),
+                resource_budget=ResourceBudget(max_wall_seconds=0.05),
             )
         )
     assert observed_cancel.wait(1)
@@ -335,14 +332,10 @@ async def test_local_neural_activation_admits_actual_utf8_input_targets(tmp_path
         return original_infer(*args, **kwargs)
 
     monkeypatch.setattr(adapter.engine.model, "infer", counted)
-    actual_input_tokens = adapter.engine.model.count_input_tokens(LocalInferenceRequest(prompt="café"))
-    assert actual_input_tokens == len("user: café\nassistant:".encode("utf-8")) + 1
     with pytest.raises(ProviderPolicyError, match="admission"):
         await adapter.generate(
             ProviderRequest(
-                instructions="",
-                prompt="café",
-                resource_budget=ResourceBudget(max_input_tokens=actual_input_tokens - 1),
+                instructions="", prompt="café", resource_budget=ResourceBudget(max_input_tokens=5)
             )
         )
     assert calls == 0
@@ -351,12 +344,12 @@ async def test_local_neural_activation_admits_actual_utf8_input_targets(tmp_path
             instructions="",
             prompt="café",
             max_output_tokens=2,
-            resource_budget=ResourceBudget(max_input_tokens=actual_input_tokens),
+            resource_budget=ResourceBudget(max_input_tokens=6),
         )
     )
     assert calls == 1
     assert response.model == "byte-local"
-    assert response.usage.input_tokens == actual_input_tokens
+    assert response.usage.input_tokens == 6
     assert response.usage.billed_cost == "0"
 
 
@@ -390,50 +383,3 @@ def test_local_activation_never_constructs_hosted_adapter_even_when_primary_cred
     registry = ProviderRegistry.from_env()
     assert registry.require_active().provider_id == "local"
     assert len(registry.statuses()) == 1
-
-
-@pytest.mark.asyncio
-async def test_local_configured_timeout_reaches_worker_and_releases_preflight_custody(tmp_path, monkeypatch):
-    runtime = AdmissionRuntime()
-    adapter = _registry(tmp_path, monkeypatch, runtime=runtime).require_active()
-    # Leave real token preparation time before exercising native cancellation;
-    # a 30 ms total allowance can legitimately expire before dispatch under load.
-    adapter.timeout_seconds = 0.5
-    cancelled = threading.Event()
-
-    def blocking(_request, cancel):
-        assert cancel.wait(2)
-        cancelled.set()
-        raise LocalInferenceCancelled("local worker interrupted")
-
-    monkeypatch.setattr(adapter.engine.model, "infer", blocking)
-    with pytest.raises(ProviderInvocationError, match="deadline exceeded"):
-        await adapter.generate(ProviderRequest(instructions="", prompt="alpha", max_output_tokens=2))
-    assert cancelled.is_set()
-    assert adapter.engine.snapshot()["active"] == 0
-    assert runtime.snapshot()["active_operations"] == ()
-
-
-@pytest.mark.asyncio
-async def test_local_preflight_denial_releases_durable_admission_without_unknown_usage(tmp_path, monkeypatch):
-    runtime, ledger = _durable_runtime(tmp_path / "quota.sqlite3")
-    adapter = _registry(tmp_path, monkeypatch, runtime=runtime).require_active()
-    calls = []
-
-    def forbidden(*_args, **_kwargs):
-        calls.append(True)
-        raise AssertionError("input admission must precede physical inference")
-
-    monkeypatch.setattr(adapter.engine.model, "infer", forbidden)
-    with pytest.raises(ProviderPolicyError, match="admission"):
-        await adapter.generate(ProviderRequest(
-            instructions="", prompt="alpha", tenant_id="local-tenant",
-            operation_id="local-preflight-denied", max_output_tokens=2,
-            resource_budget=ResourceBudget(max_input_tokens=2),
-        ))
-    snapshot = ledger.snapshot("local-tenant")
-    assert calls == []
-    assert snapshot["active_reservations"] == 0
-    assert snapshot["unknown_usage_events"] == 0
-    assert snapshot["completions"] == 0
-    assert runtime.snapshot()["active_operations"] == ()

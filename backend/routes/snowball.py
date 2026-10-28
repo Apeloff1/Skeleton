@@ -14,8 +14,6 @@ GET /api/snowball/{pid} returns the ordered ladder + the growing GDD + a "snowba
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import os
 import time
 from datetime import datetime, timezone
@@ -25,9 +23,8 @@ from fastapi.responses import PlainTextResponse
 from core.databases import client as _MONGO
 from core.stage_vault import vault_for_stage, vault_brief
 
-router = project_router(prefix="/api/snowball", tags=["snowball"])
+router = APIRouter(prefix="/api/snowball", tags=["snowball"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 # ── Execution modes: Manual · Auto · Agentic/Jeeves ─────────────────────────
 _EXEC_MODES = {

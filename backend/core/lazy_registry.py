@@ -192,7 +192,6 @@ _LOADERS = {
     'core.phase_gates': lambda: importlib.import_module('core.phase_gates'),
     'core.platoons': lambda: importlib.import_module('core.platoons'),
     'core.playable_game': lambda: importlib.import_module('core.playable_game'),
-    'core.playable_literal_patch': lambda: importlib.import_module('core.playable_literal_patch'),
     'core.playable_simulation': lambda: importlib.import_module('core.playable_simulation'),
     'core.player_runtime': lambda: importlib.import_module('core.player_runtime'),
     'core.policy_repository': lambda: importlib.import_module('core.policy_repository'),

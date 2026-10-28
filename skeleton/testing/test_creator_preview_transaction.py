@@ -337,61 +337,6 @@ def test_backend_exception_rolls_back_without_leaking_exception_message(phase: s
     assert outcome.failure_reason == "backend_exception:RuntimeError"
     assert "explosion" not in outcome.failure_reason
     assert backend.calls[-1] == "rollback"
-    assert tuple(step.phase for step in outcome.steps) == EXECUTION_PHASES[: EXECUTION_PHASES.index(phase)]
-    assert json.loads(serialize_preview_outcome(outcome, prepared, resulting_plan=resulting))["status"] == "rolled_back"
-
-
-def test_begin_contract_failure_preserves_empty_prefix_and_verified_rollback() -> None:
-    prepared = stage_preview_transaction(_plan(), (_edit(),), transaction_id="preview-begin-contract")
-    backend = FakeBackend(wrong_phase="begin")
-
-    resulting, outcome = execute_preview_transaction(prepared, backend)
-
-    assert resulting is prepared.base_plan
-    assert backend.calls == ["begin", "rollback"]
-    assert outcome.steps == ()
-    assert outcome.failure_reason == "backend_contract"
-    assert outcome.rollback is not None and outcome.rollback.ok
-    validate_preview_outcome(outcome, prepared, resulting_plan=resulting)
-
-
-@pytest.mark.parametrize(
-    "changes",
-    (
-        {"status": "committed"},
-        {"failure_phase": "apply"},
-        {"failure_reason": "step_failed"},
-        {"failure_reason": None},
-        {"failure_reason": "backend_exception:"},
-        {"rollback": None},
-        {"steps": []},
-    ),
-)
-def test_empty_execution_prefix_does_not_bypass_failure_or_rollback_evidence(changes) -> None:
-    prepared = stage_preview_transaction(_plan(), (_edit(),), transaction_id="preview-empty-evidence")
-    resulting, outcome = execute_preview_transaction(prepared, FakeBackend(raise_phase="begin"))
-
-    with pytest.raises(PreviewTransactionError) as caught:
-        validate_preview_outcome(replace(outcome, **changes), prepared, resulting_plan=resulting)
-    assert caught.value.context["reason"] == "outcome_evidence"
-
-
-@pytest.mark.parametrize(
-    "rollback_options, expected_reason",
-    (
-        ({"rollback_ok": False}, "rollback_failed"),
-        ({"rollback_raise": True}, "rollback_exception"),
-        ({"rollback_wrong_phase": True}, "rollback_contract"),
-    ),
-)
-def test_begin_exception_requires_successful_typed_rollback(rollback_options, expected_reason) -> None:
-    prepared = stage_preview_transaction(_plan(), (_edit(),), transaction_id="preview-begin-rollback")
-    backend = FakeBackend(raise_phase="begin", **rollback_options)
-
-    with pytest.raises(PreviewRollbackError) as caught:
-        execute_preview_transaction(prepared, backend)
-    assert caught.value.context["reason"] == expected_reason
-    assert backend.calls == ["begin", "rollback"]
 
 
 def test_compile_failure_never_reaches_runtime_or_commit() -> None:

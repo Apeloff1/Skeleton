@@ -433,7 +433,7 @@ class EvaluationModelSource:
                 raise MeasuredVerifierError("training artifact and receipt identity mismatch")
             if model.model_digest != receipt.model_digest or model.model_id != receipt.model_id:
                 raise MeasuredVerifierError("actual model does not match issued training receipt")
-            if canonical(model.to_dict()) != canonical(artifact.as_dict()["payload"]):
+            if canonical(model.to_dict()) != canonical(artifact.payload):
                 raise MeasuredVerifierError("actual local weights do not match the issued training artifact")
 
         return cls(

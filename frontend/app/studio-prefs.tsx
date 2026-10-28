@@ -4,87 +4,55 @@
  * that bias every future game this creator generates.
  * Backed by GET/PUT /api/creator/preferences/{creator_id}.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator,
   StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
-import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
-import { creatorRequestCurrent, resolveCreatorPrincipal } from '../src/product/creatorIdentity';
+import { getVisitorId } from '../src/utils/liveops';
 import { C, S, R } from '../src/theme/deluxe';
 
 type Prefs = { genres: string[]; art_style: string; difficulty: string; tone: string; constitution: string; avoid: string };
 type Options = { art_styles: string[]; difficulties: string[]; tones: string[] };
 
 const GENRE_CHOICES = ['arcade', 'puzzle', 'platformer', 'shooter', 'runner', 'strategy', 'rpg', 'rhythm'];
-const emptyPrefs = (): Prefs => ({ genres: [], art_style: 'any', difficulty: 'balanced', tone: 'any', constitution: '', avoid: '' });
-const emptyOptions = (): Options => ({ art_styles: [], difficulties: [], tones: [] });
 
 export default function StudioPrefs() {
   const router = useRouter();
-  const [prefs, setPrefs] = useState<Prefs>(emptyPrefs);
-  const [opts, setOpts] = useState<Options>(emptyOptions);
+  const [prefs, setPrefs] = useState<Prefs>({ genres: [], art_style: 'any', difficulty: 'balanced', tone: 'any', constitution: '', avoid: '' });
+  const [opts, setOpts] = useState<Options>({ art_styles: [], difficulties: [], tones: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
-  const [ready, setReady] = useState(false);
-  const [accountEpoch, setAccountEpoch] = useState(getAuthEpoch);
-  const session = useRef(new AbortController());
 
   useEffect(() => {
-    const reset = () => {
-      session.current.abort(); session.current = new AbortController();
-      setPrefs(emptyPrefs()); setOpts(emptyOptions()); setReady(false);
-      setSaving(false); setLoading(true); setSavedMsg(''); setAccountEpoch(getAuthEpoch());
-    };
-    const unsubscribe = subscribeAuthChanges(reset);
-    if (accountEpoch !== getAuthEpoch()) reset();
-    return () => { unsubscribe(); session.current.abort(); };
+    (async () => {
+      const cid = await getVisitorId();
+      const r = await api.get<{ preferences: Prefs; options: Options }>(`/api/creator/preferences/${cid}`, { timeoutMs: 12000 });
+      if (r.ok && r.data) { setPrefs(r.data.preferences); setOpts(r.data.options); }
+      setLoading(false);
+    })();
   }, []);
 
-  useEffect(() => {
-    const signal = session.current.signal;
-    (async () => {
-      try {
-        const cid = await resolveCreatorPrincipal(signal, accountEpoch);
-        if (!creatorRequestCurrent(accountEpoch, signal)) return;
-        const r = await api.get<{ preferences: Prefs; options: Options }>(`/api/creator/preferences/${encodeURIComponent(cid)}`, { signal, timeoutMs: 12000 });
-        if (!creatorRequestCurrent(accountEpoch, signal)) return;
-        if (r.ok && r.data?.preferences && r.data?.options) {
-          setPrefs(r.data.preferences); setOpts(r.data.options); setReady(true);
-        } else setSavedMsg('Could not load studio preferences. Sign in and open this page again.');
-      } catch {
-        if (creatorRequestCurrent(accountEpoch, signal)) setSavedMsg('Sign in to load your studio preferences.');
-      } finally {
-        if (creatorRequestCurrent(accountEpoch, signal)) setLoading(false);
-      }
-    })();
-  }, [accountEpoch]);
-
-  const savePreferences = useCallback(async (openPreview: boolean) => {
-    const signal = session.current.signal;
-    if (!ready || saving || !creatorRequestCurrent(accountEpoch, signal)) return;
+  const save = useCallback(async () => {
     setSaving(true); setSavedMsg('');
-    try {
-      const cid = await resolveCreatorPrincipal(signal, accountEpoch);
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      const r = await api.put(`/api/creator/preferences/${encodeURIComponent(cid)}`, prefs, { signal, timeoutMs: 12000 });
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      if (!r.ok) { setSavedMsg('Could not save. Try again.'); return; }
-      setSavedMsg('✓ Saved — future games will follow these preferences.');
-      if (openPreview) {
-        const g = prefs.genres[0] || 'arcade';
-        const brief = `a fun ${prefs.difficulty !== 'any' ? prefs.difficulty + ' ' : ''}${g} game showcasing my studio style`;
-        router.push(`/playable?brief=${encodeURIComponent(brief)}` as any);
-      }
-    } catch {
-      if (creatorRequestCurrent(accountEpoch, signal)) setSavedMsg('Could not save. Sign in and try again.');
-    } finally {
-      if (creatorRequestCurrent(accountEpoch, signal)) setSaving(false);
-    }
-  }, [prefs, router, ready, saving, accountEpoch]);
+    const cid = await getVisitorId();
+    const r = await api.put(`/api/creator/preferences/${cid}`, prefs, { timeoutMs: 12000 });
+    setSaving(false);
+    setSavedMsg(r.ok ? '✓ Saved — future games will follow these preferences.' : 'Could not save. Try again.');
+  }, [prefs]);
+
+  const preview = useCallback(async () => {
+    setSaving(true); setSavedMsg('');
+    const cid = await getVisitorId();
+    await api.put(`/api/creator/preferences/${cid}`, prefs, { timeoutMs: 12000 });
+    setSaving(false);
+    const g = prefs.genres[0] || 'arcade';
+    const brief = `a fun ${prefs.difficulty !== 'any' ? prefs.difficulty + ' ' : ''}${g} game showcasing my studio style`;
+    router.push(`/playable?brief=${encodeURIComponent(brief)}` as any);
+  }, [prefs, router]);
 
   const toggleGenre = (g: string) => setPrefs((p) => ({
     ...p, genres: p.genres.includes(g) ? p.genres.filter((x) => x !== g) : (p.genres.length < 6 ? [...p.genres, g] : p.genres),
@@ -140,10 +108,10 @@ export default function StudioPrefs() {
             />
 
             {savedMsg ? <Text style={styles.savedMsg}>{savedMsg}</Text> : null}
-            <TouchableOpacity testID="prefs-save" disabled={saving || !ready} style={[styles.saveBtn, (saving || !ready) && { opacity: 0.6 }]} onPress={() => savePreferences(false)}>
+            <TouchableOpacity testID="prefs-save" disabled={saving} style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={save}>
               <Text style={styles.saveTxt}>{saving ? 'Saving…' : 'Save preferences'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="prefs-preview" disabled={saving || !ready} style={[styles.previewBtn, (saving || !ready) && { opacity: 0.6 }]} onPress={() => savePreferences(true)}>
+            <TouchableOpacity testID="prefs-preview" disabled={saving} style={[styles.previewBtn, saving && { opacity: 0.6 }]} onPress={preview}>
               <Text style={styles.previewTxt}>⚡ Preview your preferences →</Text>
             </TouchableOpacity>
           </ScrollView>

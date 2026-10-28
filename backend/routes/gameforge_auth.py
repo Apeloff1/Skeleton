@@ -201,19 +201,6 @@ def get_current_user(token: Annotated[str | None, Depends(oauth2_scheme)]):
     )
 
 
-def require_authenticated_identity(user=Depends(get_current_user)) -> dict[str, str]:
-    """Resolve private-data scope from the authenticated principal in every mode."""
-    if not isinstance(user, dict) or user.get("dev_mode"):
-        raise HTTPException(status_code=401, detail="Authentication required", headers={"WWW-Authenticate": "Bearer"})
-    owner = user.get("email") or user.get("user_id")
-    if not isinstance(owner, str) or not owner.strip() or owner.strip() == "anonymous":
-        raise HTTPException(status_code=401, detail="Authentication required")
-    tenant = user.get("tenant_id") if user.get("tenant_id") is not None else "default"
-    if not isinstance(tenant, str) or not tenant.strip():
-        raise HTTPException(status_code=403, detail="Tenant identity is unavailable")
-    return {"tenant_id": tenant.strip(), "owner_id": owner.strip()}
-
-
 def require_role(min_role: Role):
     """Dependency enforcing a minimum role when auth policy requires it.
 

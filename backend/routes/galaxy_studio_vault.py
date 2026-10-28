@@ -21,7 +21,6 @@ import zipfile
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from routes.galaxy_studio_access import record_visible
 
 from routes.galaxy_studio_state import (
     _vault_entries,
@@ -103,7 +102,7 @@ async def vault_list() -> dict:
     the operator.
     """
     await get_all_vault_entries()
-    entries = sorted((entry for entry in _vault_entries.values() if record_visible(entry)), key=lambda e: e["created_at"], reverse=True)
+    entries = sorted(_vault_entries.values(), key=lambda e: e["created_at"], reverse=True)
     zips = [e for e in entries if e["type"] == "zip"]
     apks = [e for e in entries if e["type"] == "apk"]
     return {
@@ -145,7 +144,7 @@ async def vault_download(vault_id: str):
     await get_all_vault_entries()
     safe_vid = _safe_segment(vault_id, what="vault_id")
     entry = _vault_entries.get(safe_vid) or _vault_entries.get(vault_id)
-    if not entry or not record_visible(entry):
+    if not entry:
         raise HTTPException(404, "Vault entry not found")
     if not entry.get("path"):
         raise HTTPException(404, "Artifact file is not available; inspect its submission status.")

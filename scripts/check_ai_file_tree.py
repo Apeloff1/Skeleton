@@ -97,34 +97,6 @@ def _content_equivalent(source: Path, destination: Path) -> bool:
     return False
 
 
-# Only these mirrored retrieval modules intentionally retarget sibling imports.
-# A literal, line-anchored rewrite is the entire approved deviation: neither
-# arbitrary AST differences nor unrelated file contents can pass parity.
-_RETRIEVAL_IMPORT_MIRRORS = frozenset({
-    "index.py", "ingest.py", "pipeline.py", "query.py",
-})
-
-
-def _retrieval_import_mirror_equivalent(source: Path, destination: Path) -> bool:
-    if (
-        source.name not in _RETRIEVAL_IMPORT_MIRRORS
-        or source.parent != ROOT / "skeleton/retrieval"
-        or destination != ROOT / "skeleton/ai/runtime/retrieval" / source.name
-    ):
-        return False
-    try:
-        canonical = source.read_text(encoding="utf-8")
-        staged = destination.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return False
-    expected, count = re.subn(
-        r"(?m)^from skeleton\.retrieval\.",
-        "from skeleton.ai.runtime.retrieval.",
-        canonical,
-    )
-    return bool(count) and staged == expected
-
-
 def _display_path(path: Path) -> str:
     try:
         return str(path.relative_to(ROOT))
@@ -220,10 +192,7 @@ def _compare(
                 )
             )
             continue
-        if not (
-            _content_equivalent(src[rel], governed_dst[rel])
-            or _retrieval_import_mirror_equivalent(src[rel], governed_dst[rel])
-        ):
+        if not _content_equivalent(src[rel], governed_dst[rel]):
             errors.append(f"tree semantic/content drift: {_display_path(source)}/{rel}")
     return errors
 

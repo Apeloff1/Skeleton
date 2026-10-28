@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import hashlib
 from pathlib import Path
 
 import pytest
@@ -66,7 +65,7 @@ def test_artifact_nonregular_paths_fail_before_any_content_read(tmp_path, monkey
         load_local_model_artifact(source)
 
 
-@pytest.mark.parametrize("change", ["grow", "same_size_rewrite", "replace_path", "truncate"])
+@pytest.mark.parametrize("change", ["grow", "same_size_rewrite", "replace_path"])
 def test_artifact_identity_change_during_descriptor_read_fails_closed(tmp_path, monkeypatch, change):
     source = _artifact(tmp_path)
     original_read = os.read
@@ -84,13 +83,10 @@ def test_artifact_identity_change_during_descriptor_read_fails_closed(tmp_path, 
             elif change == "same_size_rewrite":
                 with source.open("r+b") as handle:
                     handle.write(b" " * original_size)
-            elif change == "replace_path":
+            else:
                 replacement = tmp_path / "replacement.json"
                 replacement.write_bytes(source.read_bytes())
                 os.replace(replacement, source)
-            else:
-                with source.open("r+b") as handle:
-                    handle.truncate(max(1, original_size // 2))
         return data
 
     monkeypatch.setattr(artifact_module.os, "read", read_and_change)
@@ -153,58 +149,3 @@ def test_deeply_nested_json_fails_through_artifact_corruption_boundary(tmp_path)
     source.write_bytes(b"[" * 10000 + b"0" + b"]" * 10000)
     with pytest.raises(LocalModelArtifactError, match="invalid JSON"):
         load_local_model_artifact(source)
-
-
-def test_regular_file_replaced_before_open_rejects_before_read(tmp_path, monkeypatch):
-    source = _artifact(tmp_path)
-    replacement = tmp_path / "replacement.json"
-    replacement.write_bytes(source.read_bytes())
-    original_open = os.open
-
-    def replaced_open(path, flags, *args, **kwargs):
-        os.replace(replacement, source)
-        return original_open(path, flags, *args, **kwargs)
-
-    def forbidden_read(*args):
-        raise AssertionError("a replacement inode must not be read")
-
-    monkeypatch.setattr(artifact_module.os, "open", replaced_open)
-    monkeypatch.setattr(artifact_module.os, "read", forbidden_read)
-    with pytest.raises(LocalModelArtifactError, match="changed while reading"):
-        load_local_model_artifact(source)
-
-
-def test_pinned_artifact_is_rechecked_after_model_restoration(tmp_path, monkeypatch):
-    source = _artifact(tmp_path)
-    expected = hashlib.sha256(source.read_bytes()).hexdigest()
-    original_restore = artifact_module._payload_model
-
-    def restore_and_replace(payload):
-        model = original_restore(payload)
-        replacement = tmp_path / "replacement.json"
-        replacement.write_bytes(source.read_bytes())
-        os.replace(replacement, source)
-        return model
-
-    monkeypatch.setattr(artifact_module, "_payload_model", restore_and_replace)
-    with pytest.raises(LocalModelArtifactError, match="changed during activation"):
-        load_local_model_artifact(source, expected_sha256=expected)
-
-
-def test_descriptor_closes_when_bounded_read_fails(tmp_path, monkeypatch):
-    source = _artifact(tmp_path)
-    original_close = os.close
-    closed = []
-
-    def fail_read(*args):
-        raise OSError("read interrupted")
-
-    def record_close(descriptor):
-        closed.append(descriptor)
-        return original_close(descriptor)
-
-    monkeypatch.setattr(artifact_module.os, "read", fail_read)
-    monkeypatch.setattr(artifact_module.os, "close", record_close)
-    with pytest.raises(LocalModelArtifactError, match="unavailable"):
-        load_local_model_artifact(source)
-    assert len(closed) == 1

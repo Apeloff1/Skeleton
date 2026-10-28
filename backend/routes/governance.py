@@ -17,8 +17,6 @@ it is trivially testable and never blocks the event loop.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database, reauthorize_project_context
-
 import os
 import re
 import uuid
@@ -31,9 +29,8 @@ from pydantic import BaseModel
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.anti_farm import allow as _allow
 
-router = project_router(prefix="/api/governance", tags=["governance"])
+router = APIRouter(prefix="/api/governance", tags=["governance"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 # Reports threshold at which a game is auto-escalated to the review queue.
 AUTO_REVIEW_REPORTS = 3
@@ -312,7 +309,6 @@ APPEAL_SLA_DAYS = 7  # open appeals older than this auto-resolve as 'expired'
 async def appeals(status: str = Query("open"), limit: int = Query(50, le=200)):
     # Lazy SLA enforcement: auto-expire stale open appeals (treated as denied;
     # the game stays restricted, but the appeal no longer blocks the queue).
-    await reauthorize_project_context(mutate=True)
     from datetime import timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(days=APPEAL_SLA_DAYS)).isoformat()
     await _db.content_appeals.update_many(

@@ -9,13 +9,12 @@ never blocked, even when LLM enrichment is requested.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from fastapi import APIRouter
+from pydantic import BaseModel
 
 from core import churn_2_service as churn
-from routes.galaxy_studio_access import private_build_access
 
-router = APIRouter(prefix="/api/churn", tags=["churn"], dependencies=[Depends(private_build_access)])
+router = APIRouter(prefix="/api/churn", tags=["churn"])
 
 
 # ── model catalog (full list — premium + free, all providers) ────────────────
@@ -72,11 +71,6 @@ def job(job_id: str):
     return churn.get_job(job_id)
 
 
-@router.post("/job/{job_id}/cancel")
-def cancel_job(job_id: str):
-    return churn.cancel_job(job_id)
-
-
 # ── runs history ─────────────────────────────────────────────────────────────
 @router.get("/{build_id}/runs")
 def runs(build_id: str, limit: int = 30):
@@ -98,12 +92,11 @@ def apply(build_id: str, gid: str, req: ApplyReq):
 class DaemonReq(BaseModel):
     enabled: bool
     interval_s: int | None = None
-    build_ids: list[str] | None = Field(default=None, max_length=25)
 
 
 @router.post("/daemon/toggle")
 def daemon_toggle(req: DaemonReq):
-    return churn.toggle_daemon(req.enabled, req.interval_s, build_ids=req.build_ids)
+    return churn.toggle_daemon(req.enabled, req.interval_s)
 
 
 @router.get("/daemon/status")

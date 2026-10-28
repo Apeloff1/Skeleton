@@ -8,8 +8,6 @@ use deeper paths (/{pid}/cover…, /{pid}/cover.png, /{pid}/card.png) so they ne
 shadow the GET /{pid} catch-all in routes.playable.
 """
 from __future__ import annotations
-
-from routes.playable_access import project_router, reauthorize_project_context, scoped_database
 from skeleton.context.instruction_policy import InstructionPolicy
 
 import os
@@ -17,13 +15,13 @@ import uuid
 import base64
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from routes.playable import _db
 
-router = project_router(prefix="/api/playable", tags=["playable"])
+router = APIRouter(prefix="/api/playable", tags=["playable"])
 
 
 # ── VI.3 Creator Marketplace: AI concept-art cover thumbnails (Nano Banana) ──
@@ -38,12 +36,9 @@ async def _generate_cover_b64(title: str, genre: str, brief: str) -> str | None:
         "lighting, polished game-marketing splash-screen style, dynamic central focal subject, "
         "rich depth. No text, no words, no logos, no watermark, no UI." + PHOTOREAL_SUFFIX
     )
-    scope = await reauthorize_project_context(mutate=True)
     try:
         chat = (EngineChat(
                     session_id=f"cover-{uuid.uuid4().hex[:8]}",
-                    tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
-                    data_class="confidential",
                     instruction_policy=InstructionPolicy(
                         policy_id="backend.playable-cover.image-generation",
                         version="1",
@@ -56,11 +51,8 @@ async def _generate_cover_b64(title: str, genre: str, brief: str) -> str | None:
                 .with_params(modalities=["image", "text"]))
         _text, images = await asyncio.wait_for(
             chat.send_message_multimodal_response(UserMessage(text=prompt)), timeout=60)
-        await reauthorize_project_context(mutate=True)
         if images and images[0].get("data"):
             return upscale_b64(images[0]["data"])
-    except HTTPException:
-        raise
     except Exception:
         return None
     return None
@@ -96,7 +88,6 @@ async def cover_options(pid: str, count: int = Query(3, ge=2, le=3)):
         _generate_cover_b64(doc.get("title", ""), doc.get("genre", ""), doc.get("brief", ""))
         for _ in range(count)
     ], return_exceptions=True)
-    await reauthorize_project_context(mutate=True)
     options = [r for r in results if isinstance(r, str) and r]
     if not options:
         return {"playable_id": pid, "count": 0, "error": "cover generation failed"}

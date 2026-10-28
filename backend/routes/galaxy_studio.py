@@ -34,7 +34,7 @@ DO NOT split in a single PR — instead extract ONE sub-module at a time,
 running ``pytest`` + ``curl /api/galaxy-studio/*`` between each step.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, AliasChoices
 from core.exec_guard import code_execution_enabled, execution_disabled_response
@@ -46,14 +46,10 @@ import uuid, os, json, zipfile, tempfile, subprocess, shutil
 import time as _build_clock
 import asyncio  # module-level (used by background build + expansion launchers)
 from contextlib import asynccontextmanager
-from routes.galaxy_studio_access import galaxy_request_access, record_identity, record_visible
 
 load_dotenv()
 
-router = APIRouter(
-    prefix="/api/galaxy-studio", tags=["galaxy-studio"],
-    dependencies=[Depends(galaxy_request_access)],
-)
+router = APIRouter(prefix="/api/galaxy-studio", tags=["galaxy-studio"])
 
 # Mount the catalog delegators sub-router EARLY (before the dynamic
 # /pipeline/{build_id} route is defined below) so the STATIC /pipeline/catalog
@@ -236,7 +232,6 @@ async def _save_build(build):
         _heavy = {
             "files",
             "_gen_cache",
-            "_file_budget_owner",
             "_code_refs",
             "_nv_samples",
             "_gk_samples",
@@ -291,12 +286,6 @@ async def _save_build(build):
                 from core.databases import content_db as _cdb
                 minimal = {
                     "build_id": build.get("build_id"),
-                    # Size reduction cannot discard authorization, explicit
-                    # execution ceilings or the durable artifact owner.
-                    **{key: build[key] for key in (
-                        "tenant_id", "owner_id", "target_files", "scale_info",
-                        "_vault_active", "_vault_file_count", "_vault_preserved", "created_at",
-                    ) if key in build},
                     "title": build.get("title"),
                     "genre": build.get("genre"),
                     "status": build.get("status"),
@@ -419,8 +408,7 @@ def _normalize_build(doc: dict) -> dict:
 
 async def _load_build(build_id: str):
     if build_id in _builds:
-        cached = _builds[build_id]
-        return _normalize_build(cached) if record_visible(cached) else None
+        return _normalize_build(_builds[build_id])
     try:
         from services.database import db as _db
         from core.databases import content_db as _cdb
@@ -434,7 +422,7 @@ async def _load_build(build_id: str):
                 _cs.heat_touch("galaxy_builds", hydrate=False)
             except Exception:
                 pass
-            return doc if record_visible(doc) else None
+            return doc
         # Fallback: try thawing if the collection was previously frozen
         try:
             from core import cold_storage as _cs
@@ -443,7 +431,7 @@ async def _load_build(build_id: str):
             if doc:
                 _normalize_build(doc)
                 _builds[build_id] = doc
-                return doc if record_visible(doc) else None
+                return doc
         except Exception:
             pass
     except Exception as e:
@@ -748,81 +736,6 @@ from routes.jeeves_master_build import (
 _TOTAL_BATCHES = 10
 
 
-def _explicit_file_budget(build: dict) -> int | None:
-    """A caller's explicit ceiling applies to main generation, not later jobs."""
-    if _active_artifact_job(build) is not None:
-        return None
-    scale = build.get("scale_info")
-    requested = scale.get("explicit_target_files") if isinstance(scale, dict) else None
-    if isinstance(requested, int) and not isinstance(requested, bool) and requested > 0:
-        return min(requested, max(1, GLOBAL_FILE_BUDGET))
-    return None
-
-
-class _BoundedPhaseFiles(dict):
-    """Share a finite unique-path budget across eager and nested generators.
-
-    Accepted output enters the existing pending file owner immediately, so an
-    exhausted phase can retain real partial artifacts without claiming success.
-    """
-
-    def __init__(self, build: dict, owner: dict):
-        super().__init__()
-        self.build = build
-        self.owner = owner
-
-    def __setitem__(self, name, content):
-        _check_build_continuation(self.build)
-        paths = self.owner["paths"]
-        if name not in paths and len(paths) >= self.owner["limit"]:
-            _mark_build_stop(self.build, "artifact_file_budget_exhausted")
-            raise GalaxyBuildStopped("artifact_file_budget_exhausted")
-        paths.add(name)
-        super().__setitem__(name, content)
-        self.build.setdefault("files", {})[name] = content
-
-    def update(self, values=(), **kwargs):
-        items = values.items() if hasattr(values, "items") else values
-        for name, content in items:
-            self[name] = content
-        for name, content in kwargs.items():
-            self[name] = content
-
-
-def _new_phase_files(build: dict | None) -> dict:
-    if not isinstance(build, dict):
-        return {}
-    limit = _explicit_file_budget(build)
-    if limit is None:
-        return {}
-    _check_build_continuation(build)
-    owner = build.get("_file_budget_owner")
-    if not isinstance(owner, dict) or owner.get("limit") != limit:
-        paths = set((build.get("files") or {}).keys())
-        if build.get("_vault_active"):
-            from core import build_vault as _bv
-            if _bv.get_file_count(build["build_id"]) >= limit:
-                _mark_build_stop(build, "artifact_file_budget_exhausted")
-                raise GalaxyBuildStopped("artifact_file_budget_exhausted")
-            paths.update(_bv.get_file_paths(build["build_id"]))
-        if len(paths) >= limit:
-            _mark_build_stop(build, "artifact_file_budget_exhausted")
-            raise GalaxyBuildStopped("artifact_file_budget_exhausted")
-        owner = {"limit": limit, "paths": paths}
-        build["_file_budget_owner"] = owner
-    return _BoundedPhaseFiles(build, owner)
-
-
-def _check_file_budget(build: dict) -> None:
-    if _explicit_file_budget(build) is None:
-        return
-    _new_phase_files(build)
-    owner = build["_file_budget_owner"]
-    if len(owner["paths"]) >= owner["limit"]:
-        _mark_build_stop(build, "artifact_file_budget_exhausted")
-        raise GalaxyBuildStopped("artifact_file_budget_exhausted")
-
-
 def _generate_batch(build: dict, batch_num: int) -> dict:
     """Generate files for ALL 10 phases within a batch (batch_num: 1-10).
     Each batch processes 10 phases simultaneously with triple-retry per phase
@@ -833,10 +746,6 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
     if cache_key in build["_gen_cache"]:
         cached = build["_gen_cache"][cache_key]
         if isinstance(cached, dict) and len(cached) > 0:
-            if _explicit_file_budget(build) is not None:
-                accepted = _new_phase_files(build)
-                accepted.update(cached)
-                return accepted
             return cached
 
     # Code-library ref pull (from 32M-line snippet DB). CRITICAL: this runs
@@ -896,7 +805,6 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
     print(f"[GALAXY] ═══ BATCH {batch_num}/10: {batch_name} — Processing {len(phase_ids)} phases ═══")
 
     for phase_id in phase_ids:
-        _check_file_budget(build)
         _check_build_resources(build)
         MAX_RETRIES = 3
         last_error = None
@@ -978,7 +886,7 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
     # Clamp for safety
     weight = max(0.0, min(3.0, weight))
     BATCH_CAP = 24000
-    BATCH_FLOOR = 0 if _explicit_file_budget(build) is not None else int(800 * weight)      # 0 → skipped, 1.0 → 800, 2.0 → 1600
+    BATCH_FLOOR = int(800 * weight)      # 0 → skipped, 1.0 → 800, 2.0 → 1600
     if weight == 0.0:
         # Honor skip: emit a single marker file and return
         marker = {
@@ -986,10 +894,8 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
                 f"# Batch {batch_num} ({BATCH_NAMES.get(batch_num,'?')}) skipped by user (weight=0)\n"
             )
         }
-        accepted = _new_phase_files(build)
-        accepted.update(marker)
-        build["_gen_cache"][cache_key] = accepted
-        return accepted
+        build["_gen_cache"][cache_key] = marker
+        return marker
     _check_build_continuation(build)
     if batch_files:
         if len(batch_files) > BATCH_CAP:
@@ -1021,11 +927,11 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
 from routes.galaxy_studio_padding import _expand_compact, _generate_floor_padding
 
 
-def _generate_fallback_files(batch_id: int, title: str, genre: str, phase_name: str, error: str, build=None) -> dict:
+def _generate_fallback_files(batch_id: int, title: str, genre: str, phase_name: str, error: str) -> dict:
     """Emergency fallback generator — produces valid files even when phase function crashes.
     Massively expanded: 60 substantial modules instead of 5, so a single failed
     phase still contributes meaningfully to the AAA build."""
-    files = _new_phase_files(build)
+    files = {}
     prefix = f"fallback_phase_{batch_id}"
     domains = [
         "core", "entities", "systems", "combat", "ai", "ui", "hud", "menus",
@@ -1207,7 +1113,7 @@ def _gen_narrative_vault_docs(build: dict, title: str, genre: str, genre_info: d
     """Synchronous narrative doc generator. Reads vault via a short-lived
     motor client so the sync phase_vision flow stays self-contained.
     Returns `{path: content}` for write-through into the build files."""
-    out: dict = _new_phase_files(build)
+    out: dict = {}
     try:
         import asyncio
         from core import narrative_vault as _nv
@@ -1249,8 +1155,6 @@ def _gen_narrative_vault_docs(build: dict, title: str, genre: str, genre_info: d
                 samples = loop.run_until_complete(_fetch_vault_samples(bucket))
             finally:
                 loop.close()
-        except GalaxyBuildStopped:
-            raise
         except Exception:
             samples = {}
 
@@ -1418,8 +1322,6 @@ Before any narrative payload is written to disk, the Playwright sub-swarm must:
             ])
             out["docs/STYLE_MANIFEST.md"] = "\n".join(sm_lines) + "\n"
 
-    except GalaxyBuildStopped:
-        raise
     except Exception:
         out["docs/NARRATIVE_VAULT_BIBLE.md"] = f"# {title} — Narrative Vault\n\n(vault injection unavailable)\n"
     return out
@@ -1465,7 +1367,7 @@ def _gen_game_knowledge_docs(build: dict, title: str, genre: str) -> dict:
       - docs/AGENTS_NO_LAZY_MANDATE.md (mandate forcing every phase to cite ≥3 topics)
     Also stashes `build["_gk_context"]` so downstream phases can surface it.
     """
-    out: dict = _new_phase_files(build)
+    out: dict = {}
     try:
         import asyncio
         import json as _json
@@ -1500,8 +1402,6 @@ def _gen_game_knowledge_docs(build: dict, title: str, genre: str) -> dict:
                 samples = loop.run_until_complete(_fetch_game_knowledge_samples(bucket))
             finally:
                 loop.close()
-        except GalaxyBuildStopped:
-            raise
         except Exception:
             samples = {}
 
@@ -1585,12 +1485,8 @@ def _gen_game_knowledge_docs(build: dict, title: str, genre: str) -> dict:
                 "topic_keys": list(knowledge_map.keys()),
                 "axes": list(_gkv.VARIATION_AXES)[:12],
             }
-        except GalaxyBuildStopped:
-            raise
         except Exception:
             pass
-    except GalaxyBuildStopped:
-        raise
     except Exception:
         out["docs/GAME_KNOWLEDGE_VAULT.md"] = (
             f"# {title} — Game Knowledge Vault\n\n(vault injection unavailable)\n"
@@ -1632,9 +1528,10 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
     ★ HARDENING LAYER (2026-04-20) ★
     Every path is wrapped in try/except so a bug, missing DB, malformed
     build dict, or thread-unsafe global NEVER crashes the pipeline.
-    Generation returns files or the legacy fallback for content errors.
-    Stop, deadline and file-budget boundaries propagate to the existing runner;
-    they must never trigger replacement output or a false successful phase.
+    Guaranteed contract:
+      • Always returns a dict[str, str]
+      • Always returns at least a stub file on catastrophic failure
+      • Never raises — the outer pipeline trusts this to be total.
     """
     # ── Input guard ─────────────────────────────────────────────────
     try:
@@ -1649,11 +1546,9 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
         m = sc.get("multiplier", 1) if isinstance(sc, dict) else 1
         complexity = build.get("complexity", "moderate")
         age_target = build.get("age_target", "teen")
-    except GalaxyBuildStopped:
-        raise
     except Exception as _ig:
         print(f"[GALAXY _call_phase_func] input guard triggered: {_ig}")
-        return _generate_fallback_files(0, "Untitled", "rpg", phase_id, f"input_guard: {_ig}", build=build)
+        return _generate_fallback_files(0, "Untitled", "rpg", phase_id, f"input_guard: {_ig}")
 
     # ── Phase spec lookup ───────────────────────────────────────────
     phase_info = None
@@ -1662,8 +1557,6 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
             if p.get("id") == phase_id:
                 phase_info = p
                 break
-    except GalaxyBuildStopped:
-        raise
     except Exception:
         phase_info = None
     if phase_info is None:
@@ -1687,14 +1580,8 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
                     result = func(build, t, g)
                 # Contract check
                 if isinstance(result, dict) and result:
-                    if _explicit_file_budget(build) is None or isinstance(result, _BoundedPhaseFiles):
-                        return result
-                    accepted = _new_phase_files(build)
-                    accepted.update(result)
-                    return accepted
+                    return result
                 print(f"[GALAXY phase][{phase_id}] dedicated returned empty — falling back to generic")
-            except GalaxyBuildStopped:
-                raise
             except Exception as _pe:
                 print(f"[GALAXY phase][{phase_id}] dedicated FAILED: {_pe} — falling back to generic")
 
@@ -1702,28 +1589,19 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
     try:
         result = _phase_generic(build, t, g, phase_info)
         if isinstance(result, dict) and result:
-            if _explicit_file_budget(build) is None or isinstance(result, _BoundedPhaseFiles):
-                return result
-            accepted = _new_phase_files(build)
-            accepted.update(result)
-            return accepted
+            return result
         print(f"[GALAXY phase][{phase_id}] generic returned empty — using fallback stub")
-    except GalaxyBuildStopped:
-        raise
     except Exception as _ge:
         print(f"[GALAXY phase][{phase_id}] generic FAILED: {_ge} — using fallback stub")
 
     # ── Tertiary path: fallback files (guaranteed to work) ──────────
     try:
         return _generate_fallback_files(phase_info.get("batch", 0), t, g, phase_info.get("name", phase_id),
-                                         "phase_all_paths_failed", build=build)
-    except GalaxyBuildStopped:
-        raise
+                                         "phase_all_paths_failed")
     except Exception as _fe:
         # Final safety net — even the fallback generator failed.
         print(f"[GALAXY phase][{phase_id}] fallback FAILED: {_fe} — returning stub")
-        accepted = _new_phase_files(build)
-        accepted.update({
+        return {
             f"stubs/{phase_id}/emergency_stub.ts": (
                 f"// Emergency stub for phase '{phase_id}' — all generators failed.\n"
                 f"// title={t} genre={g}\n"
@@ -1735,8 +1613,7 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
                 f"  error: 'all_phase_generators_failed',\n"
                 f"}};\n"
             )
-        })
-        return accepted
+        }
 
 
 def _expand_for_scale(files: dict, title: str, genre: str, multiplier: int, vision: str, systems: str, laws: str, instructions: str):
@@ -1979,7 +1856,6 @@ def _create_build(title: str, genre: str, subgenre: str, description: str, compl
         "download_url": None,
         "created_at": datetime.utcnow().isoformat(),
         "completed_at": None,
-        **record_identity(),
     }
 
     # Initialize phases
@@ -2082,37 +1958,19 @@ async def _advance_build(build_id: str) -> dict:
     finally:
         build["_bg_drain_pending"] = _physical_build_workers(build_id) > 0
         await _drain_build_workers(build_id)
+        build["_bg_drain_pending"] = False
+        build.pop("_bg_deadline_monotonic", None)
+        if build.get("_bg_stop_requested"):
+            build["_gen_cache"] = {}
+            build["status"] = build.get("_bg_stop_target", "failed")
+            build["_bg_status"] = build["status"]
+            build["_bg_partial_artifacts"] = bool(build.get("_vault_active") or build.get("files"))
         try:
-            build.pop("_bg_deadline_monotonic", None)
-            if build.get("_bg_stop_requested"):
-                build["_gen_cache"] = {}
-                try:
-                    if not build.get("_vault_write_failed"):
-                        await _await_build_io(build, _flush_to_vault, build, True)
-                    from core import build_vault as _bv
-
-                    preserved = await _await_build_io(build, _bv.preserve_on_failure, build_id)
-                    build["_vault_preserved"] = bool(preserved)
-                except Exception:
-                    build["_vault_preserved"] = bool(build.get("_vault_active"))
+            await _save_build(build)
         finally:
-            # Manual generation owns the same accepted partial files and
-            # physical writes as the background runner, including on stop.
-            await _drain_build_workers(build_id)
-            build["_bg_drain_pending"] = False
-            build.pop("_file_budget_owner", None)
-            if build.get("_bg_stop_requested"):
-                build["status"] = build.get("_bg_stop_target", "failed")
-                build["_bg_status"] = build["status"]
-                build.pop("completed_at", None)
-                build.pop("_bg_completed", None)
-                build["_bg_partial_artifacts"] = bool(build.get("_vault_active") or build.get("files"))
-            try:
-                await _save_build(build)
-            finally:
-                _active_runners.discard(build_id)
-                if _background_tasks.get(build_id) is owner:
-                    _background_tasks.pop(build_id, None)
+            _active_runners.discard(build_id)
+            if _background_tasks.get(build_id) is owner:
+                _background_tasks.pop(build_id, None)
 
 
 def _get_phase_synergies(phase_id: str) -> list:
@@ -3072,7 +2930,6 @@ async def _run_background_build(build_id: str, duration_minutes: int = 15, resum
             try:
                 if build is not None:
                     build["_bg_drain_pending"] = False
-                    build.pop("_file_budget_owner", None)
                     if build.get("_bg_stop_requested"):
                         build["status"] = build.get("_bg_stop_target", "failed")
                         build["_bg_status"] = build["status"]
@@ -3109,7 +2966,6 @@ async def _run_background_build_inner(
     await _save_build_required(build)
     for batch_num in range(max(1, resume_from_batch), TOTAL_BATCHES + 1):
         _check_build_continuation(build)
-        await _await_build_io(build, _check_file_budget, build)
         await _await_build_io(build, _check_build_resources, build)
         build["_bg_current_batch"] = batch_num
         build["_bg_last_heartbeat"] = datetime.utcnow().isoformat()
@@ -3173,9 +3029,7 @@ async def _run_background_build_inner(
     if all(int(value or 0) >= 9 for value in sliders):
         floor_target += 125000
     fusion = max(1.0, min(1.6, float(build.get("fusion_multiplier", 1.0) or 1.0)))
-    # Explicitly bounded builds receive real phase outputs only. Padding is
-    # not evidence of quality and must not inflate a caller's file ceiling.
-    floor_target = 0 if _explicit_file_budget(build) is not None else min(int(floor_target * fusion), GLOBAL_FILE_BUDGET)
+    floor_target = min(int(floor_target * fusion), GLOBAL_FILE_BUDGET)
     from core import build_vault as _bv
 
     current_files = await asyncio.to_thread(_bv.get_file_count, build_id)
@@ -3803,7 +3657,6 @@ def _vault_save(build_id: str, vault_type: str, title: str, file_path: str, extr
         "size_human": _format_bytes(size),
         "created_at": datetime.utcnow().isoformat(),
         **extra,
-        **{key: value for key, value in _builds.get(build_id, record_identity()).items() if key in {"tenant_id", "owner_id"}},
     }
     _vault_entries[vault_id] = entry
     return entry
@@ -5102,8 +4955,6 @@ async def galaxy_active_jobs():
         if not _build_has_live_work(build_id):
             continue
         if build_id == _VAULT_ADMIN_SLOT:
-            if record_identity():
-                continue
             jobs.append(
                 {
                     "build_id": build_id,
@@ -5114,8 +4965,6 @@ async def galaxy_active_jobs():
             )
             continue
         build = _builds.get(build_id) or {}
-        if not record_visible(build):
-            continue
         operation = _active_artifact_job(build)
         if operation:
             kind = {"expansion": "expand", "native_apk": "apk"}.get(

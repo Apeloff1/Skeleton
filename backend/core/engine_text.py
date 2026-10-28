@@ -89,11 +89,8 @@ class EngineTextRequest:
 
     structured_output_schema: Mapping[str, Any] | None = None
     cooperation: Mapping[str, Any] | None = None
-    max_model_turns: int = 4
 
     def __post_init__(self) -> None:
-        if type(self.max_model_turns) is not int or not 1 <= self.max_model_turns <= 4:
-            raise EngineTextError("max_model_turns may only lower the existing limit within [1,4]")
         if self.cooperation is not None:
             from skeleton.intelligence.cooperation import normalize_cooperation_policy
 
@@ -295,7 +292,6 @@ class EngineTextRequest:
                     else {"structured_output_schema": self.structured_output_schema}
                 ),
                 **({} if self.cooperation is None else {"cooperation": self.cooperation}),
-                **({} if self.max_model_turns == 4 else {"max_model_turns": self.max_model_turns}),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -364,7 +360,6 @@ def _terminal_response(
         and request.temperature is None
         and request.structured_output_schema is None
         and request.cooperation is None
-        and request.max_model_turns == 4
         and legacy_prompt in snapshot
     ):
         raise EngineTextError("chat idempotency identity was reused with different request semantics")
@@ -690,7 +685,7 @@ async def execute_engine_text(
         created_at=now,
         deadline=now + timedelta(seconds=active_client.config.execution_timeout_s),
         trace_id="engine-text:" + operation_id,
-        max_model_turns=request.max_model_turns,
+        max_model_turns=4,
         max_output_tokens=budget.reserved_output_tokens,
         provider_id=selection["selection_provider_id"],
         model_id=selection["selection_model_id"],

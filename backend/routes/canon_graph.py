@@ -8,8 +8,6 @@ mentions a Faction → member_of). This is the schematic's graph-DB layer over t
 """
 from __future__ import annotations
 
-from routes.playable_access import project_identity, project_router, reauthorize_project_context, scoped_database
-
 import json
 import os
 import re
@@ -20,9 +18,8 @@ from pydantic import BaseModel
 from core.databases import client as _MONGO
 from routes.canon_rag import _entity_name, _entity_text
 
-router = project_router(prefix="/api/graph", tags=["graph"])
+router = APIRouter(prefix="/api/graph", tags=["graph"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 
 def _extract_json_array(text: str) -> list:
@@ -238,12 +235,8 @@ async def heal_canon(pid: str):
               f"GAPS TO HEAL:\n{gaps_txt}\n\n"
               f"Return exactly {len(fixable)} fix objects, one per gap, in order.")
 
-    scope = await reauthorize_project_context(mutate=True)
     res = await route_complete("creative", prompt, system=system,
-                               tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
-                               data_class="confidential",
                                session_id=f"heal-{pid}", timeout_s=90, use_cache=False)
-    await reauthorize_project_context(mutate=True)
     if res.get("error"):
         return {"game_id": pid, "title": g.get("title", ""), "error": res["error"],
                 "fixable_count": len(fixable), "fixes": []}

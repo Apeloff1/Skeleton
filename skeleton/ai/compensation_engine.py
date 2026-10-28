@@ -66,9 +66,4 @@ class CompensationEngine:
         expected = self.authorize(spec, authority_scope=permit.authority_scope)
         if permit != expected:
             raise PermissionError("stale or forged compensation permit")
-        self._ledger.transition(
-            spec.effect,
-            EffectState.COMPENSATING,
-            evidence_digest=permit.digest,
-            expected_head_digest=permit.effect_head_digest,
-        )
+        self._ledger.transition(spec.effect, EffectState.COMPENSATING, evidence_digest=permit.digest)

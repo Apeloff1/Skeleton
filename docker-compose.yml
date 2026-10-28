@@ -132,8 +132,6 @@ services:
       # Durable build artifacts share the backend_data volume, never the 64MiB /tmp tmpfs.
       - GALAXY_BUILDS_VAULT_DIR=/app/data/builds_vault
       - CURIOSITY_DATA_ROOT=/app/data/curiosity
-      # Build artifacts share the existing durable backend volume, not /tmp.
-      - GALAXY_BUILDS_VAULT_DIR=/app/data/builds_vault
       - CURIOSITY_IDLE_ENABLED=${CURIOSITY_IDLE_ENABLED:-false}
       - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be initialized by Skeleton setup}
       - GF_KEYHOLDER_SEED=${GF_KEYHOLDER_SEED:?GF_KEYHOLDER_SEED must be initialized by Skeleton setup}

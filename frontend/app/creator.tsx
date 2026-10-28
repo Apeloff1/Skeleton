@@ -3,8 +3,7 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
  * /creator — Creator Dashboard (DELUXE).
  * A premium command center: glass hero with Battle-Pass tier over a cinematic
  * gradient, KPI tiles (Revenue / Sales / Plays / Games), and the creator's
- * listed games with live status. Private records use the signed-in principal;
- * the anonymous visitor ID remains limited to battle-pass activity.
+ * listed games with live status. Identity = local visitor id (shared w/ marketplace).
  */
 import React from 'react';
 import {
@@ -15,11 +14,8 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import api from '../src/utils/apiClient';
-import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { getVisitorId } from '../src/utils/liveops';
-import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
-import { creatorRequestCurrent, resolveCreatorPrincipal } from '../src/product/creatorIdentity';
 import { C, S, R } from '../src/theme/deluxe';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -33,12 +29,11 @@ type Listing = {
   moderation_note?: string;
 };
 type Totals = { games: number; active: number; sales: number; revenue_usd: number; plays: number };
-const EMPTY_TOTALS: Totals = { games: 0, active: 0, sales: 0, revenue_usd: 0, plays: 0 };
 
 function Cover({ id, hasCover, size = 52 }: { id: string; hasCover?: boolean; size?: number }) {
   const [err, setErr] = React.useState(false);
   if (!hasCover || err) return <View style={[styles.coverFallback, { width: size, height: size }]}><Text style={{ fontSize: size * 0.42 }}>🎮</Text></View>;
-  return <PrivateImage uri={`${BACKEND}/api/playable/${id}/cover.png`} style={{ width: size, height: size, borderRadius: R.md, backgroundColor: C.surface2 }} onError={() => setErr(true)} />;
+  return <Image source={{ uri: `${BACKEND}/api/playable/${id}/cover.png` }} style={{ width: size, height: size, borderRadius: R.md, backgroundColor: C.surface2 }} onError={() => setErr(true)} />;
 }
 
 function Kpi({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -53,11 +48,9 @@ function Kpi({ label, value, accent }: { label: string; value: string; accent?: 
 export default function CreatorDashboard() {
   const router = useRouter();
   const haptics = useHaptics();
-  const [principal, setPrincipal] = React.useState('');
-  const [accountEpoch, setAccountEpoch] = React.useState(getAuthEpoch);
-  const accountRequest = React.useRef(new AbortController());
+  const [visitor, setVisitor] = React.useState('');
   const [listings, setListings] = React.useState<Listing[]>([]);
-  const [totals, setTotals] = React.useState<Totals>(EMPTY_TOTALS);
+  const [totals, setTotals] = React.useState<Totals>({ games: 0, active: 0, sales: 0, revenue_usd: 0, plays: 0 });
   const [tier, setTier] = React.useState(1);
   const [xp, setXp] = React.useState(0);
   const [nextXp, setNextXp] = React.useState<number | null>(null);
@@ -66,79 +59,38 @@ export default function CreatorDashboard() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [creators, setCreators] = React.useState<any[]>([]);
   const [notifs, setNotifs] = React.useState<any[]>([]);
-  const [loadError, setLoadError] = React.useState('');
 
-  const load = React.useCallback(async (epoch: number, signal: AbortSignal) => {
-    try {
-      const [cid, visitor] = await Promise.all([resolveCreatorPrincipal(signal, epoch), getVisitorId()]);
-      if (!creatorRequestCurrent(epoch, signal)) return;
-      setPrincipal(cid); setLoadError('');
-      const options = { timeoutMs: 12000, signal };
-      const [mine, pass, trending, notes] = await Promise.all([
-        api.get<{ listings: Listing[]; totals: Totals }>(`/api/marketplace/mine?creator_id=${encodeURIComponent(cid)}`, options),
-        api.get<any>(`/api/liveops/pass?visitor_id=${encodeURIComponent(visitor)}`, options),
-        api.get<{ creators: any[] }>(`/api/marketplace/creators/trending?limit=10`, options),
-        api.get<{ notifications: any[] }>(`/api/governance/notifications/${encodeURIComponent(cid)}`, options),
-      ]);
-      if (!creatorRequestCurrent(epoch, signal)) return;
-      if (mine.ok && mine.data) { setListings(mine.data.listings || []); setTotals(mine.data.totals || EMPTY_TOTALS); }
-      if (trending.ok && trending.data) setCreators(trending.data.creators || []);
-      if (notes.ok && notes.data) setNotifs(notes.data.notifications || []);
-      if (!mine.ok || !notes.ok) setLoadError('Your creator records could not be loaded. Sign in or pull to refresh.');
-      if (pass.ok && pass.data) {
-        setXp(pass.data.xp || 0); setTier(pass.data.tier || 1); setNextXp(pass.data.next_xp ?? null);
-        const t = (pass.data.tiers || []).find((x: any) => x.tier === pass.data.tier);
-        setReward(t?.reward || '');
-      }
-    } catch {
-      if (creatorRequestCurrent(epoch, signal)) setLoadError('Sign in to load your creator records, then pull to refresh.');
-    } finally {
-      if (creatorRequestCurrent(epoch, signal)) { setLoading(false); setRefreshing(false); }
+  const load = React.useCallback(async (vid: string) => {
+    const [mine, pass, trending, notes] = await Promise.all([
+      api.get<{ listings: Listing[]; totals: Totals }>(`/api/marketplace/mine?creator_id=${encodeURIComponent(vid)}`, { timeoutMs: 12000 }),
+      api.get<any>(`/api/liveops/pass?visitor_id=${encodeURIComponent(vid)}`, { timeoutMs: 12000 }),
+      api.get<{ creators: any[] }>(`/api/marketplace/creators/trending?limit=10`, { timeoutMs: 12000 }),
+      api.get<{ notifications: any[] }>(`/api/governance/notifications/${encodeURIComponent(vid)}`, { timeoutMs: 12000 }),
+    ]);
+    if (mine.ok && mine.data) { setListings(mine.data.listings || []); setTotals(mine.data.totals); }
+    if (trending.ok && trending.data) setCreators(trending.data.creators || []);
+    if (notes.ok && notes.data) setNotifs(notes.data.notifications || []);
+    if (pass.ok && pass.data) {
+      setXp(pass.data.xp || 0); setTier(pass.data.tier || 1); setNextXp(pass.data.next_xp ?? null);
+      const t = (pass.data.tiers || []).find((x: any) => x.tier === pass.data.tier);
+      setReward(t?.reward || '');
     }
   }, []);
 
-  React.useEffect(() => {
-    const reset = () => {
-      accountRequest.current.abort(); accountRequest.current = new AbortController();
-      setPrincipal(''); setListings([]); setTotals(EMPTY_TOTALS); setCreators([]); setNotifs([]);
-      setTier(1); setXp(0); setNextXp(null); setReward(''); setLoading(true); setRefreshing(false);
-      setLoadError(''); setAccountEpoch(getAuthEpoch());
-    };
-    const unsubscribe = subscribeAuthChanges(reset);
-    if (accountEpoch !== getAuthEpoch()) reset();
-    return () => { unsubscribe(); accountRequest.current.abort(); };
-  }, []);
+  React.useEffect(() => { getVisitorId().then(async (v) => { setVisitor(v); await load(v); setLoading(false); }); }, [load]);
 
-  React.useEffect(() => { void load(accountEpoch, accountRequest.current.signal); }, [accountEpoch, load]);
-
-  const onRefresh = React.useCallback(async () => {
-    const signal = accountRequest.current.signal;
-    if (!creatorRequestCurrent(accountEpoch, signal)) return;
-    setRefreshing(true); await load(accountEpoch, signal);
-  }, [accountEpoch, load]);
+  const onRefresh = React.useCallback(async () => { setRefreshing(true); await load(visitor); setRefreshing(false); }, [visitor, load]);
 
   const dismissNotifs = React.useCallback(async () => {
-    const signal = accountRequest.current.signal;
-    if (!creatorRequestCurrent(accountEpoch, signal)) return;
-    try {
-      const cid = await resolveCreatorPrincipal(signal, accountEpoch);
-      if (!creatorRequestCurrent(accountEpoch, signal)) return;
-      const result = await api.post(`/api/governance/notifications/${encodeURIComponent(cid)}/ack`, {}, { timeoutMs: 12000, signal });
-      if (creatorRequestCurrent(accountEpoch, signal)) {
-        if (result.ok) setNotifs([]);
-        else setLoadError('Notifications could not be dismissed. Pull to refresh and retry.');
-      }
-    } catch {
-      if (creatorRequestCurrent(accountEpoch, signal)) setLoadError('Sign in again to dismiss your notifications.');
-    }
-  }, [accountEpoch]);
+    setNotifs([]);
+    if (visitor) await api.post(`/api/governance/notifications/${encodeURIComponent(visitor)}/ack`, {}, { timeoutMs: 12000 });
+  }, [visitor]);
 
   const progress = nextXp ? Math.min(1, xp / nextXp) : 1;
 
   return (
     <SafeAreaView style={styles.safe} testID="creator-dashboard">
       <ScrollView contentContainerStyle={{ paddingBottom: S.xxxl }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.brand} />}>
-        {loadError ? <Text testID="cd-error" accessibilityRole="alert" style={{ color: C.textDim, padding: S.md }}>{loadError}</Text> : null}
         {notifs.length > 0 ? (
           <View style={styles.notifBanner} testID="cd-appeal-notifs">
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -172,7 +124,7 @@ export default function CreatorDashboard() {
                 <View style={[styles.badge, l.active ? styles.badgeLive : styles.badgeOff]}><Text style={[styles.badgeTxt, { color: l.active ? C.success : C.textMute }]}>{l.active ? 'LIVE' : 'OFF'}</Text></View>
               </TouchableOpacity>
             ))}
-            {creators.length > 0 ? <View testID="cd-trending"><View style={styles.sectionHead}><Text style={styles.sectionTitle}>TRENDING CREATORS</Text><Text style={styles.small}>by revenue · sales · plays</Text></View>{creators.map((c) => { const isMe = c.creator_id === principal; const medal = c.rank === 1 ? '🥇' : c.rank === 2 ? '🥈' : c.rank === 3 ? '🥉' : `#${c.rank}`; const name = isMe ? 'You' : `Creator ${String(c.creator_id).replace(/^v_/, '').slice(0, 5)}`; return <View key={c.creator_id} testID={`cd-creator-${c.rank}`} style={[styles.row, isMe && styles.rowMe]}><Text style={styles.rankTxt}>{medal}</Text><View style={{ flex: 1, marginLeft: S.md, minWidth: 0 }}><Text style={[styles.rowTitle, isMe && { color: C.brand2 }]} numberOfLines={1}>{name}</Text><Text style={styles.rowSub}>{c.games} game{c.games === 1 ? '' : 's'} · 🛒 {c.sales} · ▶ {c.plays}</Text></View><Text style={styles.revTxt}>${(c.revenue_usd || 0).toFixed(2)}</Text></View>; })}</View> : null}
+            {creators.length > 0 ? <View testID="cd-trending"><View style={styles.sectionHead}><Text style={styles.sectionTitle}>TRENDING CREATORS</Text><Text style={styles.small}>by revenue · sales · plays</Text></View>{creators.map((c) => { const isMe = c.creator_id === visitor; const medal = c.rank === 1 ? '🥇' : c.rank === 2 ? '🥈' : c.rank === 3 ? '🥉' : `#${c.rank}`; const name = isMe ? 'You' : `Creator ${String(c.creator_id).replace(/^v_/, '').slice(0, 5)}`; return <View key={c.creator_id} testID={`cd-creator-${c.rank}`} style={[styles.row, isMe && styles.rowMe]}><Text style={styles.rankTxt}>{medal}</Text><View style={{ flex: 1, marginLeft: S.md, minWidth: 0 }}><Text style={[styles.rowTitle, isMe && { color: C.brand2 }]} numberOfLines={1}>{name}</Text><Text style={styles.rowSub}>{c.games} game{c.games === 1 ? '' : 's'} · 🛒 {c.sales} · ▶ {c.plays}</Text></View><Text style={styles.revTxt}>${(c.revenue_usd || 0).toFixed(2)}</Text></View>; })}</View> : null}
           </View>
         )}
       </ScrollView>

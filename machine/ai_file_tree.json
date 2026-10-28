@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "461e429e1a23cce2d98975d007f9e20e8698f2aa",
+      "source_git_object_sha": "0d4cec755cde3e3a7e13ab4537ae34767ffa4dd2",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "461e429e1a23cce2d98975d007f9e20e8698f2aa",
+      "source_git_object_sha": "0d4cec755cde3e3a7e13ab4537ae34767ffa4dd2",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -130,7 +130,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "a447d8f161c9f5fe0973c4583fb1a7a94d63810b",
+      "source_git_object_sha": "4ab3bdd0a4b349f667760db5a984bc9ad55e66d7",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "4004e942e7b8e0246e01ff47d4e8c27ecb839329",
+      "source_git_object_sha": "cffb99b2670e95264734fe25f92f969388291a1b",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -398,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "67de82b09d495e90675ed646b50fd7233582aa2e",
+      "source_git_object_sha": "41b65d6e8e6712727db3d55273e736be31bb207e",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "201232fc8c292dd24e8e8e20bf23660962d78088",
+      "source_git_object_sha": "d010d373bcd78107fa917108677bc4d50d29b443",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1269,7 +1269,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "b9559674c4e2d454b719a6e4113708d07996a189",
+      "source_git_object_sha": "97e5331920e7fad1ee5ea5a889f8cc3ec9b6d5e2",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1499,7 +1499,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "b72b2c8393eb1178dd2421f841e67fa48c984290",
+      "source_git_object_sha": "0ee20c6e4032706848696dfb959a1c80c17d7dbd",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2282,7 +2282,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "c5165a0051384b5600d34166ee31bbfa61c23907",
+      "source_git_object_sha": "6130ce0d12d9e29ae379f1bd1a723315a77c0e32",
       "role": "Repository model, impact, workgraph, governance, stewardship, ownership-aware maintenance, and bounded cleanup authority for autonomous repository engineering.",
       "work_package_refs": [
         "WP-W11",
@@ -2720,7 +2720,7 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "78bfd4f83ea74946ed8779493e319e253ebd0338",
+      "source_git_object_sha": "a4f34521b7f55e11122ec297b77a0778e7cd1138",
       "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
@@ -3148,7 +3148,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "b71b9d8ab5740a50a7d9df4db8a3acd6e5a7194e",
-      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -5210,7 +5210,7 @@
       "source": "backend/core/collection_agents.py",
       "destination": "skeleton/ai/compat/backend_core/collection_agents.py",
       "kind": "file",
-      "source_git_object_sha": "da5ade1981f33f9cbbcd5656b42b4e1aeee37a59",
+      "source_git_object_sha": "a43464dedbd4b35f454fde7871b137181657797a",
       "role": "Legacy collection-agent implementation staged for convergence into canonical agent ownership.",
       "work_package_refs": [
         "WP-W12"
@@ -8635,7 +8635,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
+      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
       "volume_refs": [
         "VOL-006",
         "VOL-007",
@@ -10608,37 +10608,7 @@
       "skeleton/api/engine_routes.py",
       "backend/core/dragon_crawler.py",
       "backend/core/dragon_runtime.py",
-      "backend/routes/ai.py",
-      "skeleton/contracts/ai_workflows.py",
-      "backend/core/engine_client.py",
-      "backend/core/chat_turns.py",
-      "backend/core/build_watchdog.py",
-      "backend/routes/galaxy_studio.py",
-      "backend/routes/galaxy_studio_resilience.py",
-      "backend/routes/galaxy_studio_watchdog.py",
-      "frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx",
-      "frontend/src/product/aiWorkflowClient.ts",
-      "frontend/src/product/buildJobLifecycle.ts",
-      "frontend/src/product/runtimeOptimizationClient.ts",
-      "skeleton/api/engine_runtime.py",
-      "skeleton/api/server.py",
-      "skeleton/provider_runtime.py",
-      "backend/core/build_vault.py",
-      "backend/routes/galaxy_studio_files.py",
-      "backend/routes/galaxy_studio_vault.py",
-      "backend/routes/galaxy_studio_vault_admin.py",
-      "backend/services/binary_builder.py",
-      "backend/routes/app_runtime.py",
-      "backend/routes/gameforge_auth.py",
-      "frontend/src/features/Setup",
-      "frontend/src/product/appBootstrapClient.ts",
-      "frontend/src/product/appHealthClient.ts",
-      "frontend/src/product/appReadinessClient.ts",
-      "frontend/src/product/chatController.ts",
-      "frontend/src/product/useChatController.ts",
-      "frontend/src/auth/gameforgeAuth.ts",
-      "frontend/src/utils/apiClient.ts",
-      "skeleton/app/first_install.py"
+      "backend/routes/ai.py"
     ],
     "source_metadata": "Affected current-branch canonical source-object identities reference the staged implementation tree. Historical signatures and qualification state are preserved; no import cutover or verification signature is created.",
     "refreshed_source_mappings": [
@@ -10648,10 +10618,10 @@
       "AIFT-PERSISTENCE",
       "AIFT-INTELLIGENCE",
       "AIFT-JEEVES",
-      "AIFT-ENGINE-API"
+      "AIFT-ENGINE-API",
+      "AIFT-LEARNING",
+      "AIFT-FORGE"
     ],
-    "operator_and_learning_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation",
-    "studio_foundation_pass": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.studio_foundation_pass",
-    "operational_gap_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.operational_gap_continuation"
+    "operator_and_learning_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation"
   }
 }

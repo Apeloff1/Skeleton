@@ -77,8 +77,6 @@ __all__ = [
     "ReferenceNGramModel",
     "build_llama_cpp_adapter",
     "build_native_transformer_adapter",
-    "build_guarded_native_transformer_adapter",
-    "native_transformer_guard_components",
     "detect_consumer_hardware_budget",
     "estimate_gqa_kv_bytes_per_token",
     "inspect_gguf",
@@ -97,8 +95,6 @@ from importlib import import_module as _inference_import_module
 _NATIVE_EXPORTS = {
     "NativeTransformerModel": ".native_transformer",
     "build_native_transformer_adapter": ".native_transformer",
-    "build_guarded_native_transformer_adapter": ".native_guard_binding",
-    "native_transformer_guard_components": ".native_guard_binding",
 }
 
 
@@ -112,8 +108,8 @@ def __getattr__(name: str):
     module = _NATIVE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    # This dispatch table contains only static audited module paths. Its
-    # values are not derived from user input, model output, or configuration.
-    value = getattr(_inference_import_module(module, __name__), name)
+    # Both admitted exports share one known implementation owner. Never feed
+    # a dispatch-table value into an executable import operation.
+    value = getattr(_inference_import_module(".native_transformer", __name__), name)
     globals()[name] = value
     return value

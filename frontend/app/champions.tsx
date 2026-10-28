@@ -9,10 +9,10 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  StyleSheet, SafeAreaView, Platform, RefreshControl, } from 'react-native';
+  StyleSheet, SafeAreaView, Platform, RefreshControl, Image,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
-import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
 import theme from '../src/theme/tokens';
 
@@ -35,7 +35,7 @@ function weekLabel(iso: string) {
 function ChampCover({ c, size }: { c: Champion; size: number }) {
   const [err, setErr] = React.useState(false);
   if (c.has_cover && !err) {
-    return <PrivateImage uri={`${BACKEND}/api/playable/${c.playable_id}/cover.png`} style={{ width: size, height: size, borderRadius: R.md, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
+    return <Image source={{ uri: `${BACKEND}/api/playable/${c.playable_id}/cover.png` }} style={{ width: size, height: size, borderRadius: R.md, backgroundColor: '#141414' }} onError={() => setErr(true)} />;
   }
   return <View style={{ width: size, height: size, borderRadius: R.md, backgroundColor: '#16203a', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: size * 0.42 }}>🎮</Text></View>;
 }

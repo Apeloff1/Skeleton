@@ -18,8 +18,6 @@ Buyer/creator identity is a client-generated visitor id (no auth layer yet).
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database, reauthorize_project_context
-
 import os
 import uuid
 from datetime import datetime, timezone
@@ -33,9 +31,8 @@ from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest,
 )
 
-router = project_router(prefix="/api", tags=["marketplace"])
+router = APIRouter(prefix="/api", tags=["marketplace"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "") or None
@@ -280,7 +277,6 @@ async def _finalize_purchase(txn: dict):
 async def checkout_status(session_id: str, request: Request):
     """Poll Stripe for the session's payment status; record the purchase on first
     'paid'. Safe to poll repeatedly (idempotent)."""
-    await reauthorize_project_context(mutate=True)
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})

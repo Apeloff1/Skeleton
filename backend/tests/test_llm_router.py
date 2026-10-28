@@ -25,10 +25,10 @@ class TestSemanticCacheKey:
         b = _canonical("reply   with exactly one word:  pong!!!")
         assert a == b, f"canonical mismatch: {a!r} != {b!r}"
 
-    def test_cache_key_preserves_exact_executable_prompt(self):
+    def test_cache_key_stable_across_cosmetic_variants(self):
         k1 = _cache_key("fast", "", "Reply with exactly one word: PONG")
         k2 = _cache_key("fast", "", "reply with exactly one word: pong!!!")
-        assert k1 != k2
+        assert k1 == k2
 
     def test_cache_key_differs_by_task(self):
         assert _cache_key("fast", "", "hello") != _cache_key("code", "", "hello")

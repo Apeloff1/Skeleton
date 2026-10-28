@@ -150,35 +150,12 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _registered_build_module(module: str):
-    """Structural #807 evidence imports only canonical batch-plan modules."""
-    if module == "skeleton.build.asset_pipeline":
-        return importlib.import_module("skeleton.build.asset_pipeline")
-    if module == "skeleton.build.build_observability":
-        return importlib.import_module("skeleton.build.build_observability")
-    if module == "skeleton.build.cache_contract":
-        return importlib.import_module("skeleton.build.cache_contract")
-    if module == "skeleton.build.incremental_graph":
-        return importlib.import_module("skeleton.build.incremental_graph")
-    if module == "skeleton.build.parallel_scheduler":
-        return importlib.import_module("skeleton.build.parallel_scheduler")
-    if module == "skeleton.build.release_graph":
-        return importlib.import_module("skeleton.build.release_graph")
-    if module == "skeleton.build.remote_build":
-        return importlib.import_module("skeleton.build.remote_build")
-    if module == "skeleton.repo_intelligence.batch_plan":
-        return importlib.import_module("skeleton.repo_intelligence.batch_plan")
-    if module == "skeleton.repo_intelligence.git_index":
-        return importlib.import_module("skeleton.repo_intelligence.git_index")
-    raise ImportError("module not registered in the build lane evidence inventory")
-
-
 def audit_batch(spec: BatchEvidence, *, root: Path = REPO_ROOT, title: str = "") -> BatchResult:
     res = BatchResult(spec.batch_id, title)
     for module, symbols in sorted(spec.modules.items()):
         res.checked += 1
         try:
-            mod = _registered_build_module(module)
+            mod = importlib.import_module(module)
         except Exception as exc:  # fail closed: any import failure is a regression
             res.problems.append(f"import {module}: {type(exc).__name__}")
             continue
