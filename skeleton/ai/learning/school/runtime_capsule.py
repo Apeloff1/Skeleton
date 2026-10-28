@@ -28,6 +28,15 @@ from skeleton.learning.school.session_audit import (
 )
 
 
+def _load_reviewed_school_owner(module_name: str):
+    """Resolve only fixed canonical or governed school modules."""
+    if module_name == "skeleton.ai.learning.school.decision_ledger":
+        return importlib.import_module("skeleton.ai.learning.school.decision_ledger")
+    if module_name == "skeleton.ai.learning.school.runtime_replay":
+        return importlib.import_module("skeleton.ai.learning.school.runtime_replay")
+    raise ImportError("unregistered school module owner")
+
+
 def _trusted_twin_instance(
     value: object,
     canonical_type: type[object],
@@ -40,7 +49,7 @@ def _trusted_twin_instance(
     if isinstance(value, canonical_type):
         return True
     try:
-        module = importlib.import_module(twin_module)
+        module = _load_reviewed_school_owner(twin_module)
         twin_type = getattr(module, twin_name)
     except (ImportError, AttributeError):
         return False
