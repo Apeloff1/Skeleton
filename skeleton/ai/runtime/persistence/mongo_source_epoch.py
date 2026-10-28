@@ -232,6 +232,40 @@ def fence_memory_tombstone(method):
     return guarded
 
 
+def fence_memento_write(method):
+    """Include canonical ciphertext publication/erasure in actor writer custody.
+
+    The memento archive is derivative of the canonical conversation, but its
+    frame transaction and retirement mutate that conversation's stored head.
+    They must participate in the very same actor-scoped majority-durable epoch.
+    """
+    from functools import wraps
+
+    @wraps(method)
+    async def guarded(self, *args, **kwargs):
+        conversation = getattr(self, "conversation", None)
+        epoch = getattr(conversation, "canonical_source_epoch", None)
+        if epoch is None:
+            return await method(self, *args, **kwargs)
+        if "archive" in kwargs:
+            from skeleton.context.sealed_memento import SealedMementoArchive
+
+            archive = kwargs["archive"]
+            if not isinstance(archive, SealedMementoArchive):
+                raise MongoSourceEpochError("canonical memento archive binding required")
+            tenant_id, actor_id = archive.binding.tenant_id, archive.binding.owner_id
+        else:
+            tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
+        if (not isinstance(tenant_id, str) or not isinstance(actor_id, str)
+                or not tenant_id or not actor_id):
+            raise MongoSourceEpochError("canonical memento mutation actor missing")
+        async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
+            return await method(self, *args, **kwargs)
+
+    guarded.__canonical_source_writer_fence__ = "memento"
+    return guarded
+
+
 # This is an IN-PROCESS, versioned inventory of the known canonical source
 # mutation surfaces. It is not proof of external deployment writer coverage:
 # unregistered services and direct database operations still need operator audit.
@@ -293,5 +327,5 @@ def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, 
 __all__ = [
     "MongoSourceEpochError", "MongoCanonicalSourceEpoch", "fence_conversation_write",
     "fence_memory_commit", "fence_memory_tombstone",
-    "verify_canonical_source_writer_inventory",
+    "verify_canonical_source_writer_inventory", "fence_memento_write",
 ]
