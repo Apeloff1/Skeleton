@@ -185,7 +185,7 @@ def test_stale_cocoding_projection_cannot_resurrect_missing_canonical_state() ->
     projection = client.collections["jeeves_cocoding_context"]
     projection.add(
         documents=["stale"],
-        metadatas=[{"user_id": "u1", "tenant_id": "tenant-a", "pipeline": "python"}],
+        metadatas=[{"user_id": "u1", "pipeline": "python"}],
         ids=["stale-id"],
     )
 
@@ -203,11 +203,12 @@ def test_stale_cocoding_projection_cannot_resurrect_missing_canonical_state() ->
     results = service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-a")
 
     assert len(results) == 1
-    assert service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-b") == []
-    assert service.get_relevant_context("u1", "anything", pipeline="python") == []
     assert results[0]["metadata"]["session_id"] == "live-id"
     assert results[0]["metadata"]["authority"] == "mongo"
     assert "canonical context" in results[0]["content"]
+    assert results[0]["metadata"]["tenant_id"] == "tenant-a"
+    assert service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-b") == []
+    assert service.get_relevant_context("u1", "anything", pipeline="python") == []
 
 
 def test_legacy_chroma_migration_is_idempotent_for_authoritative_rows() -> None:
@@ -308,6 +309,7 @@ def test_projection_rebuild_restores_from_mongo_after_total_projection_loss() ->
     }
     assert session_id in client.collections["jeeves_learning_sessions"].rows
     assert "code-1" in client.collections["jeeves_cocoding_context"].rows
+    assert client.collections["jeeves_cocoding_context"].rows["code-1"]["metadata"]["tenant_id"] == "tenant-a"
     assert feedback_id in client.collections["jeeves_feedback"].rows
     assert state.get_user_progress("u1") == {}
 

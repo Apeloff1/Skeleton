@@ -1,7 +1,7 @@
 'use strict';
 
 /** Scoped, offline Yarn v1 security custody; does not suppress Dependabot.
- * Advisory snapshot: 2026-10-16. Default fails while an affected unpatched
+ * Advisory snapshot: 2026-10-28. Default fails while an affected unpatched
  * dependency remains. Use --report-only to generate non-acceptance evidence.
  */
 const fs = require('node:fs');
@@ -12,12 +12,21 @@ const PATCHES = Object.freeze({
   'brace-expansion': { fixed: { 1: '1.1.21', 2: '2.1.7', 3: '3.0.9', 5: '5.0.12' }, advisory: 'GHSA-q2hr-2g5m-vwhr' },
   'decode-uri-component': { fixed: { 0: '0.5.0' }, advisory: 'GHSA-vcc3-ghjq-m6fr' },
   'http-cache-semantics': { fixed: { 4: '4.2.1' }, advisory: 'GHSA-ch52-4w7c-c8xp' },
+  undici: { fixed: { 6: '6.28.1', 7: '7.29.1', 8: '8.10.2' }, advisory: 'GHSA-rfgv-xxqx-mfg5' },
 });
 const UNPATCHED = Object.freeze({
-  braces: { affectedUpTo: '3.0.3', advisory: 'GHSA-vfj7-8cjw-p6xm' },
   'node-forge': { affectedUpTo: '1.4.0', advisory: 'GHSA-86w9-cpqp-85rv' },
+  deepmerge: { affectedFrom: '4.2.0', affectedUpTo: '4.3.1', advisory: 'GHSA-gcqx-w48m-w2h4' },
 });
-const TRACKED = Object.freeze([...Object.keys(PATCHES), ...Object.keys(UNPATCHED)]);
+// GitHub withdrew the reviewed braces advisory on 2026-10-23 (not practically exploitable).
+// Preserve provenance; never automatically dismiss any other platform alert.
+const WITHDRAWN = Object.freeze({
+  braces: {
+    advisory: 'GHSA-vfj7-8cjw-p6xm', withdrawnAt: '2026-10-23',
+    source: 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm',
+  },
+});
+const TRACKED = Object.freeze([...Object.keys(PATCHES), ...Object.keys(UNPATCHED), ...Object.keys(WITHDRAWN)]);
 
 function versionParts(value) {
   if (typeof value !== 'string' || !/^\d+\.\d+\.\d+$/.test(value))
@@ -94,17 +103,25 @@ function auditLock(source) {
   for (const name of TRACKED) {
     const matches = byName.get(name) || [];
     if (!matches.length) {
-      findings.push({ name, status: 'not_in_lock', advisory: (PATCHES[name] || UNPATCHED[name]).advisory,
+      findings.push({ name, status: 'not_in_lock', advisory: (PATCHES[name] || UNPATCHED[name] || WITHDRAWN[name]).advisory,
         parents: [], versions: [] });
       continue;
     }
     const versions = [...new Set(matches.map(x => x.version))].sort();
     const directParents = [...(parents.get(name) || [])].sort();
-    const policy = PATCHES[name] || UNPATCHED[name];
+    const policy = PATCHES[name] || UNPATCHED[name] || WITHDRAWN[name];
     let status = 'patched_in_lock';
-    if (UNPATCHED[name]) {
-      status = versions.every(v => compareVersions(v, policy.affectedUpTo) <= 0)
-        ? 'unpatched_affected' : 'requires_advisory_reverification';
+    if (WITHDRAWN[name]) {
+      // Validate every pinned version even for withdrawn advisories.
+      versions.forEach(versionParts);
+      status = 'withdrawn_advisory';
+    } else if (UNPATCHED[name]) {
+      const affected = versions.some(v =>
+        compareVersions(v, policy.affectedUpTo) <= 0 &&
+        (!policy.affectedFrom || compareVersions(v, policy.affectedFrom) >= 0));
+      status = affected ? 'unpatched_affected'
+        : versions.some(v => compareVersions(v, policy.affectedUpTo) > 0)
+          ? 'requires_advisory_reverification' : 'not_affected';
     } else {
       status = versions.every(v => {
         const major = versionParts(v)[0];
@@ -112,13 +129,16 @@ function auditLock(source) {
         return fixed && compareVersions(v, fixed) >= 0;
       }) ? 'patched_in_lock' : 'patch_required';
     }
-    findings.push({ name, status, advisory: policy.advisory, versions, parents: directParents });
+    findings.push({
+      name, status, advisory: policy.advisory, versions, parents: directParents,
+      ...(WITHDRAWN[name] ? { withdrawn_on: policy.withdrawnAt, advisory_source: policy.source } : {}),
+    });
   }
-  const outstanding = findings.filter(x => !['patched_in_lock', 'not_in_lock'].includes(x.status));
+  const outstanding = findings.filter(x => !['patched_in_lock', 'not_in_lock', 'not_affected', 'withdrawn_advisory'].includes(x.status));
   return {
     schema: 'skeleton.frontend.yarn.security-custody.v1',
-    advisory_snapshot: '2026-10-16',
-    scope: 'six historically reported packages only; not complete Dependabot or production bundle inventory',
+    advisory_snapshot: '2026-10-28',
+    scope: 'eight documented packages only; not a complete Dependabot or production bundle inventory',
     lockfile_entries: entries.length,
     findings, outstanding: outstanding.map(x => x.name),
     release_accepted: outstanding.length === 0,

@@ -18,12 +18,12 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Path, Query, Depends, HTTPException
+from pydantic import BaseModel, Field, ConfigDict
 
 from core.databases import client as _SHARED_MONGO_CLIENT
-from routes.gameforge_auth import require_authenticated_identity
 from routes.llm_router import route_complete
+from routes.gameforge_auth import require_authenticated_identity
 
 router = APIRouter(prefix="/api/agent-memory", tags=["agent-memory"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
@@ -52,16 +52,6 @@ def _guard(content: str) -> str:
     return ""
 
 
-def _owned_memories(rows, scope: dict[str, str], agent_id: str | None = None) -> list[dict]:
-    """Validate authority again before materializing a private result or prompt."""
-    return [
-        row for row in rows
-        if isinstance(row, dict)
-        and all(row.get(key) == value for key, value in scope.items())
-        and (agent_id is None or row.get("agent_id") == agent_id)
-    ]
-
-
 class RememberBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -73,7 +63,7 @@ class RememberBody(BaseModel):
 
 
 @router.post("/remember")
-async def remember(body: RememberBody, scope=Depends(require_authenticated_identity)):
+async def remember(body: RememberBody, scope: dict[str, str] = Depends(require_authenticated_identity)):
     """Store one episodic memory for an agent. Returns the stored memory id."""
     agent_id = (body.agent_id or "").strip()
     if not agent_id:
@@ -84,9 +74,9 @@ async def remember(body: RememberBody, scope=Depends(require_authenticated_ident
     importance = max(0.0, min(1.0, float(body.importance or 0.5)))
     tags = [str(t).strip().lower() for t in (body.tags or []) if str(t).strip()][:12]
     mem = {
-        **scope,
         "memory_id": uuid.uuid4().hex,
         "agent_id": agent_id,
+        **scope,
         "content": body.content.strip(),
         "kind": (body.kind or "episode").strip().lower(),
         "importance": importance,
@@ -97,7 +87,7 @@ async def remember(body: RememberBody, scope=Depends(require_authenticated_ident
     try:
         await _db.agent_memories.insert_one(dict(mem))
     except Exception as exc:
-        raise HTTPException(503, "Memory storage is unavailable") from exc
+        raise HTTPException(status_code=503, detail="Memory persistence unavailable") from exc
     return {k: v for k, v in mem.items()}
 
 
@@ -114,17 +104,19 @@ def _score(mem: dict, q_tokens: set, idx: int, total: int) -> float:
 @router.get("/recall")
 async def recall(agent_id: str = Query(...), q: str = Query(""),
                  limit: int = Query(8, ge=1, le=30), kind: str = Query(""),
-                 scope=Depends(require_authenticated_identity)):
+                 scope: dict[str, str] = Depends(require_authenticated_identity)):
     """Recall an agent's most relevant memories for a query (keyword × recency ×
     importance). Empty q ⇒ most recent + most important."""
     agent_id = (agent_id or "").strip()
     if not agent_id:
         return {"error": "agent_id required"}
-    filt = {**scope, "agent_id": agent_id}
+    filt = {"agent_id": agent_id, **scope}
     if kind.strip():
         filt["kind"] = kind.strip().lower()
     pool = await _db.agent_memories.find(filt, PROJ).sort("created_at", -1).limit(200).to_list(200)
-    pool = _owned_memories(pool, scope, agent_id)
+    pool = [m for m in pool if m.get("agent_id") == agent_id
+            and (not kind.strip() or m.get("kind") == kind.strip().lower())
+            and all(m.get(key) == value for key, value in scope.items())]
     q_tokens = _tokens(q)
     total = len(pool)
     ranked = sorted(
@@ -144,7 +136,7 @@ class ReflectBody(BaseModel):
 
 
 @router.post("/reflect")
-async def reflect(body: ReflectBody, scope=Depends(require_authenticated_identity)):
+async def reflect(body: ReflectBody, scope: dict[str, str] = Depends(require_authenticated_identity)):
     """★ SELF-REFLECTION — distil the agent's recent episodes into a durable lesson
     via the Model Router, and store it as a high-importance 'reflection' memory."""
     agent_id = (body.agent_id or "").strip()
@@ -152,9 +144,11 @@ async def reflect(body: ReflectBody, scope=Depends(require_authenticated_identit
         return {"error": "agent_id required"}
     window = max(3, min(int(body.window or 12), 50))
     recent = await _db.agent_memories.find(
-        {**scope, "agent_id": agent_id, "kind": {"$ne": "reflection"}}, PROJ
+        {"agent_id": agent_id, **scope, "kind": {"$ne": "reflection"}}, PROJ
     ).sort("created_at", -1).limit(window).to_list(window)
-    recent = _owned_memories(recent, scope, agent_id)
+    recent = [m for m in recent if m.get("agent_id") == agent_id
+              and m.get("kind") != "reflection"
+              and all(m.get(key) == value for key, value in scope.items())]
     if len(recent) < 3:
         return {"error": "not enough episodes to reflect on (need ≥3)", "have": len(recent)}
     episodes = "\n".join(f"- ({m.get('kind')}) {m.get('content')}" for m in reversed(recent))
@@ -165,19 +159,15 @@ async def reflect(body: ReflectBody, scope=Depends(require_authenticated_identit
     prompt = (f"RECENT EPISODES (oldest → newest):\n{episodes}\n\n"
               + (f"FOCUS: {body.focus.strip()}\n\n" if body.focus.strip() else "")
               + "Write the single lesson the agent should remember:")
-    routed = await route_complete(
-        "reasoning", prompt, system=system, use_cache=False,
-        tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
-        data_class="confidential",
-    )
+    routed = await route_complete("reasoning", prompt, system=system, use_cache=False,
+                                  tenant_id=scope["tenant_id"], actor_id=scope["owner_id"])
     insight = (routed.get("content") or "").strip()
     if not insight:
         return {"error": routed.get("error") or "reflection model returned nothing",
                 "model": routed.get("model")}
     insight = insight[:MAX_CONTENT]
     mem = {
-        **scope,
-        "memory_id": uuid.uuid4().hex, "agent_id": agent_id, "content": insight,
+        "memory_id": uuid.uuid4().hex, "agent_id": agent_id, **scope, "content": insight,
         "kind": "reflection", "importance": 0.9,
         "tags": ["reflection"], "keywords": sorted(_tokens(insight))[:40],
         "reflected_on": [m.get("memory_id") for m in recent if m.get("memory_id")],
@@ -186,21 +176,21 @@ async def reflect(body: ReflectBody, scope=Depends(require_authenticated_identit
     try:
         await _db.agent_memories.insert_one(dict(mem))
     except Exception as exc:
-        raise HTTPException(503, "Memory storage is unavailable") from exc
+        raise HTTPException(status_code=503, detail="Memory persistence unavailable") from exc
     return {"agent_id": agent_id, "reflection": {k: v for k, v in mem.items()},
             "episodes_considered": len(recent)}
 
 
 @router.get("/agents")
 async def list_agents(limit: int = Query(50, ge=1, le=200),
-                      scope=Depends(require_authenticated_identity)):
+                      scope: dict[str, str] = Depends(require_authenticated_identity)):
     """All agents that have memories, with counts + last activity (newest first)."""
     pipeline = [
         {"$match": dict(scope)},
         {"$group": {
             "_id": "$agent_id",
-            "tenant_id": {"$first": "$tenant_id"},
             "owner_id": {"$first": "$owner_id"},
+            "tenant_id": {"$first": "$tenant_id"},
             "memories": {"$sum": 1},
             "reflections": {"$sum": {"$cond": [{"$eq": ["$kind", "reflection"]}, 1, 0]}},
             "last_at": {"$max": "$created_at"},
@@ -210,7 +200,7 @@ async def list_agents(limit: int = Query(50, ge=1, le=200),
         {"$limit": limit},
     ]
     rows = await _db.agent_memories.aggregate(pipeline).to_list(limit)
-    rows = _owned_memories(rows, scope)
+    rows = [row for row in rows if all(row.get(key) == value for key, value in scope.items())]
     agents = [{"agent_id": r["_id"], "memories": r["memories"], "reflections": r["reflections"],
                "last_at": r["last_at"], "avg_importance": round(r.get("avg_importance") or 0, 3)}
               for r in rows]
@@ -219,11 +209,12 @@ async def list_agents(limit: int = Query(50, ge=1, le=200),
 
 @router.get("/{agent_id}/profile")
 async def agent_profile(agent_id: str = Path(..., min_length=1, max_length=200),
-                        scope=Depends(require_authenticated_identity)):
+                        scope: dict[str, str] = Depends(require_authenticated_identity)):
     """An agent's memory profile: counts, top tags, and recent reflections."""
     agent_id = agent_id.strip()
-    all_mems = await _db.agent_memories.find({**scope, "agent_id": agent_id}, PROJ).to_list(1000)
-    all_mems = _owned_memories(all_mems, scope, agent_id)
+    all_mems = await _db.agent_memories.find({"agent_id": agent_id, **scope}, PROJ).to_list(1000)
+    all_mems = [m for m in all_mems if m.get("agent_id") == agent_id
+                and all(m.get(key) == value for key, value in scope.items())]
     if not all_mems:
         return {"agent_id": agent_id, "memories": 0, "reflections": [], "top_tags": [], "by_kind": {}}
     by_kind, tag_count = {}, {}
@@ -241,20 +232,21 @@ async def agent_profile(agent_id: str = Path(..., min_length=1, max_length=200),
 
 @router.delete("/{agent_id}")
 async def clear_agent(agent_id: str = Path(..., min_length=1, max_length=200),
-                      scope=Depends(require_authenticated_identity)):
+                      scope: dict[str, str] = Depends(require_authenticated_identity)):
     """Forget all of an agent's memories (admin / reset)."""
-    res = await _db.agent_memories.delete_many({**scope, "agent_id": agent_id.strip()})
+    res = await _db.agent_memories.delete_many({"agent_id": agent_id.strip(), **scope})
     return {"agent_id": agent_id, "deleted": res.deleted_count}
 
 
 @router.get("/{agent_id}/bias")
 async def agent_bias(agent_id: str, max_chars: int = Query(900, ge=200, le=2000),
-                     scope=Depends(require_authenticated_identity)):
+                     scope: dict[str, str] = Depends(require_authenticated_identity)):
     """🧠 A compact, prepend-ready 'bias' block distilled from the agent's durable
     reflections + strongest themes — so past lessons actually shape new generations."""
     agent_id = (agent_id or "").strip()
-    mems = await _db.agent_memories.find({**scope, "agent_id": agent_id}, PROJ).to_list(1000)
-    mems = _owned_memories(mems, scope, agent_id)
+    mems = await _db.agent_memories.find({"agent_id": agent_id, **scope}, PROJ).to_list(1000)
+    mems = [m for m in mems if m.get("agent_id") == agent_id
+            and all(m.get(key) == value for key, value in scope.items())]
     reflections = sorted([m for m in mems if m.get("kind") == "reflection"],
                          key=lambda m: (m.get("importance", 0), m.get("created_at") or ""),
                          reverse=True)[:6]

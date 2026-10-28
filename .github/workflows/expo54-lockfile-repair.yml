@@ -1,12 +1,8 @@
 name: Expo 54 lockfile repair artifact
 
 on:
+  # Owner-invoked artifact repair; not an automatic CI admission.
   workflow_dispatch:
-  push:
-    branches:
-      - repair/expo54-lockfile-20261027
-    paths:
-      - '.github/workflows/expo54-lockfile-repair.yml'
 
 permissions:
   contents: read

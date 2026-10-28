@@ -209,7 +209,6 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     const password = `Qa-${Math.random().toString(36).slice(2)}-pass`;
     const reg = await call('POST', '/api/auth/register', { email, password });
     assert.equal(reg.ok, true, `register HTTP ${reg.status}`);
-    assert.equal(reg.data?.role, 'viewer', 'fresh registrations must not gain editor rights');
     const login = await call('POST', '/api/auth/login', { email, password });
     assert.equal(login.ok, true, `login HTTP ${login.status}`);
     assert.ok(login.data?.access_token, 'login must return a token');
@@ -223,33 +222,26 @@ test('LIVE F1-F5: bootstrap → register/sign-in → create from brief → watch
     assert.equal(anon.ok, true,
       `/me without token HTTP ${anon.status} source=${anon.rejectionSource} reason=${failureReason}`);
     assert.equal(anon.data?.authenticated, false, 'no token must not be authenticated');
-    ctx.token = login.data.access_token;
-    ctx.email = email;
-    ctx.password = password;
+    assert.equal(me.data?.user?.role, 'viewer', 'registration must not grant write privileges');
+    ctx.viewerToken = login.data.access_token;
+    // Authorized build creation requires a separately provisioned editor/admin.
+    // CI supplies an ephemeral admin via the backend's canonical seed contract.
+    const adminEmail = process.env.SKELETON_E2E_ADMIN_EMAIL;
+    const adminPassword = process.env.SKELETON_E2E_ADMIN_PASSWORD;
+    assert.ok(adminEmail && adminPassword, 'live write flow needs ephemeral admin credentials');
+    const admin = await call('POST', '/api/auth/login', { email: adminEmail, password: adminPassword });
+    assert.equal(admin.ok, true, `ephemeral admin login HTTP ${admin.status}`);
+    assert.equal(admin.data?.role, 'admin', 'seeded account must be an admin');
+    const adminMe = await call('GET', '/api/auth/me', undefined, admin.data.access_token);
+    assert.equal(adminMe.data?.user?.role, 'admin', 'admin session must revalidate');
+    ctx.token = admin.data.access_token;
   });
   await t.test('F3-03 create from brief and start the build', async () => {
     need('token');
-    need('email');
-    need('password');
     const brief = { title: 'QA Foundation Probe', genre: 'Action', description: 'Small arena brawler used by the QA foundation suite.' };
-    // The anonymous/newly registered role must remain unable to create a build.
-    const denied = await call('POST', '/api/galaxy-studio/create', brief, ctx.token);
-    assert.equal(denied.status, 403, `new viewer must not create builds (HTTP ${denied.status})`);
-    // Use only the admin-only public RBAC endpoint to promote the E2E identity.
-    // These high-entropy credentials exist solely inside the disposable CI stack.
-    const adminEmail = process.env.GAMEFORGE_SEED_ADMIN_EMAIL;
-    const adminPassword = process.env.GAMEFORGE_SEED_ADMIN_PASSWORD;
-    assert.ok(adminEmail && adminPassword, 'ephemeral CI admin must be explicitly configured');
-    const admin = await call('POST', '/api/auth/login', { email: adminEmail, password: adminPassword });
-    assert.equal(admin.ok, true, `E2E admin login HTTP ${admin.status}`);
-    assert.equal(admin.data?.role, 'admin', 'E2E bootstrap account must be administrator');
-    const promoted = await call('POST', '/api/auth/set-role',
-      { email: ctx.email, role: 'editor' }, admin.data.access_token);
-    assert.equal(promoted.ok, true, `editor promotion HTTP ${promoted.status}`);
-    const editor = await call('POST', '/api/auth/login', { email: ctx.email, password: ctx.password });
-    assert.equal(editor.ok, true, `editor login HTTP ${editor.status}`);
-    assert.equal(editor.data?.role, 'editor');
-    ctx.token = editor.data.access_token;
+    // Viewer denial is part of the live security contract, not a test failure.
+    const denied = await call('POST', '/api/galaxy-studio/create', brief, ctx.viewerToken);
+    assert.equal(denied.status, 403, 'new viewer must not create a build');
     const created = await call('POST', '/api/galaxy-studio/create', brief, ctx.token);
     assert.equal(created.ok, true, `create HTTP ${created.status}`);
     const buildId = validBuildId(created.data?.build_id);
