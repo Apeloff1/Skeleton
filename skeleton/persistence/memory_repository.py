@@ -1607,6 +1607,7 @@ class MongoMemoryRepository:
                             namespace=proposal.namespace,
                         ),
                         "memory_id": current.memory_id,
+                        "subject_id": proposal.subject_id,
                         "version": proposal.expected_version,
                         "state": MemoryState.ACTIVE.value,
                     },
@@ -1796,6 +1797,11 @@ class MongoMemoryRepository:
             namespace=namespace,
             include_tombstoned=True,
         )
+        # The public fence discovers the actor before taking custody. Recheck
+        # the freshly loaded record *inside* the epoch, before any revision or
+        # tombstone mutation: an externally reassigned record cannot be retired
+        # under a stale actor's writer token.
+        self._require_canonical_writer(tenant_id=tenant_id, actor_id=current.subject_id)
         if current.state is MemoryState.TOMBSTONED:
             if expected_version not in {current.version, current.version - 1}:
                 raise MemoryConflict("memory version conflict")
@@ -1813,6 +1819,7 @@ class MongoMemoryRepository:
             {
                 **self._scope(tenant_id=tenant_id, namespace=namespace),
                 "memory_id": current.memory_id,
+                "subject_id": current.subject_id,
                 "version": expected_version,
                 "state": MemoryState.ACTIVE.value,
             },
