@@ -71,7 +71,7 @@ jobs:
           # rejected normal/force cancellation with HTTP 409 on Oct 27. Keep
           # them visible in queued counts. Retry one rotating canary each
           # six-hour window (and on explicit dispatch or workflow changes).
-          # A successful canary releases the remaining known IDs for this
+          # A canary with verified terminal status releases remaining IDs for this
           # sweep; newer unlisted obsolete runs remain fully eligible.
           provider_conflict_probe_interval_seconds = 6 * 3600
           provider_conflict_recovered = False
@@ -778,8 +778,17 @@ jobs:
                       transient.discard(run_id)
                       accepted += 1
                       if run_id in provider_conflict_run_ids:
-                          provider_conflict_recovered = True
-                          print(f'Provider cancellation recovery confirmed by run {run_id}')
+                          # An accepted REST cancellation request is not proof
+                          # of terminal state: GitHub may keep a stuck record
+                          # queued even after acknowledging the request.
+                          if run_completed(run_id):
+                              provider_conflict_recovered = True
+                              print(f'Provider terminal recovery confirmed by run {run_id}')
+                          else:
+                              print(
+                                  f'Provider cancellation acknowledged but not terminal: '
+                                  f'run={run_id}'
+                              )
                   elif status == 404 or (
                       status in {409, 422} and run_completed(run_id)
                   ):
