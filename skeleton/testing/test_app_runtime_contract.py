@@ -5,6 +5,9 @@ import importlib
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
+
+from starlette.requests import Request
 
 from skeleton.app.assembly import find_repo_root
 
@@ -25,7 +28,7 @@ def test_runtime_status_aggregates_backend_engine_and_mongo(monkeypatch):
             assert name == "ping"
             return {"ok": 1}
 
-    def fake_engine(timeout_s: float):
+    async def fake_engine(timeout_s: float):
         assert timeout_s == 0.5
         return {
             "name": "skeleton",
@@ -104,18 +107,19 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
 def test_ready_endpoint_uses_http_status_for_whole_app_verdict(monkeypatch):
     runtime = _runtime_module()
 
-    async def healthy(_timeout_ms: int):
+    async def healthy(_timeout_ms: int, *, state=None):
         return {"ok": True, "services": []}
 
-    async def degraded(_timeout_ms: int):
+    async def degraded(_timeout_ms: int, *, state=None):
         return {"ok": False, "services": []}
 
     monkeypatch.setattr(runtime, "_runtime_status", healthy)
-    healthy_response = asyncio.run(runtime.app_ready(500))
+    request = Request({"type": "http", "app": SimpleNamespace(state=SimpleNamespace())})
+    healthy_response = asyncio.run(runtime.app_ready(request, timeout_ms=500))
     assert healthy_response.status_code == 200
 
     monkeypatch.setattr(runtime, "_runtime_status", degraded)
-    degraded_response = asyncio.run(runtime.app_ready(500))
+    degraded_response = asyncio.run(runtime.app_ready(request, timeout_ms=500))
     assert degraded_response.status_code == 503
 
 
