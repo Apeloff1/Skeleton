@@ -65,16 +65,39 @@ start = time.monotonic()
 
 
 def request(method: str, path: str) -> tuple[int, object]:
-    req = urllib.request.Request(
-        API_ROOT + path, headers=HEADERS,
-        method=method, data=b"" if method == "DELETE" else None,
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=20) as reply:
-            body = reply.read()
-            return reply.status, json.loads(body) if body else None
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.read(1000).decode("utf-8", errors="replace")
+    """Retry safe reads only; never replay an ambiguous DELETE.
+
+    GitHub occasionally returns transient 5xx responses while its Actions
+    scheduler is saturated. A DELETE may already have taken effect even if
+    its response was lost, so all mutations remain strictly single-attempt.
+    """
+    attempts = 3 if method == "GET" else 1
+    for attempt in range(attempts):
+        req = urllib.request.Request(
+            API_ROOT + path, headers=HEADERS,
+            method=method, data=b"" if method == "DELETE" else None,
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=12) as reply:
+                body = reply.read()
+                return reply.status, json.loads(body) if body else None
+        except urllib.error.HTTPError as exc:
+            detail = exc.read(1000).decode("utf-8", errors="replace")
+            if (
+                method == "GET" and exc.code in (500, 502, 503, 504)
+                and attempt + 1 < attempts
+            ):
+                time.sleep(1 << attempt)
+                continue
+            return exc.code, detail
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if method == "GET" and attempt + 1 < attempts:
+                time.sleep(1 << attempt)
+                continue
+            raise RuntimeError(
+                f"GitHub {method} {path} transport failed without reliable result"
+            ) from exc
+    raise RuntimeError(f"GitHub {method} {path} exhausted safe read attempts")
 
 
 def get(path: str) -> object:

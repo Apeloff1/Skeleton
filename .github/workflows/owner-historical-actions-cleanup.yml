@@ -17,16 +17,18 @@ permissions: {}
 jobs:
   owner-cleanup:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.number == 3902 &&
-       github.event.issue.pull_request == null &&
-       github.event.comment.body == '/owner-historical-cleanup-30-macos-v3' &&
-       github.actor == github.repository_owner)
+      github.actor == github.repository_owner &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.number == 3902 &&
+        github.event.issue.pull_request == null &&
+        github.event.comment.body == '/owner-historical-cleanup-30-macos-v3'))
     concurrency:
       group: owner-historical-actions-cleanup-v4-macos-${{ github.repository }}
       cancel-in-progress: false
-    runs-on: macos-15
+    # The ARM pool executed the successful queue-drain recovery; avoid the
+    # stalled macOS cleanup admission lane.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 14
     permissions:
       actions: write
@@ -48,4 +50,5 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: "1"
         run: python3 scripts/owner_historical_actions_cleanup.py
