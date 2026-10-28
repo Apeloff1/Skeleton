@@ -330,25 +330,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "platform"
-prefixes = ["skeleton/storage/"]
-owner = "platform-runtime"
-criticality = "high"
-purpose = "Canonical governed storage and content-addressed persistence substrate."
-audience = "both"
-lifecycle = "canonical"
-
-[[zone]]
-name = "build-delivery"
-prefixes = ["skeleton/ops/cockpit/"]
-owner = "delivery-plane"
-criticality = "high"
-purpose = "Release cockpit checks, readiness evidence and delivery operations."
-audience = "both"
-lifecycle = "canonical"
-
-[[zone]]
-name = "platform"
-prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
+prefixes = ["skeleton/storage/", "skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
 owner = "platform-runtime"
 criticality = "high"
 purpose = "State, storage, networking, native execution, observability and resilience substrate."
@@ -375,7 +357,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
+prefixes = ["skeleton/ops/cockpit/","skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
