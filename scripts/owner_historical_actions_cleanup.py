@@ -288,6 +288,17 @@ def main() -> int:
                 f"HTTP {status}; moving to independently verified IDs"
             )
             continue
+        if status == 404:
+            # Another authorized worker may have completed this exact cleanup.
+            # Never claim our DELETE succeeded without its own 204 response.
+            confirmed_absent, _ = request("GET", f"/actions/runs/{run_id}")
+            if confirmed_absent != 404:
+                raise RuntimeError(
+                    f"Run {run_id} returned DELETE 404 but GET {confirmed_absent}"
+                )
+            counters["already_absent_or_moved"] += 1
+            print(f"Independently confirmed already absent: run={run_id}")
+            continue
         if status != 204:
             raise RuntimeError(
                 f"Unexpected DELETE response for run {run_id}: HTTP {status}"

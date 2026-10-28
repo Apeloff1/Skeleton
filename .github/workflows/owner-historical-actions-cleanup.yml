@@ -22,9 +22,10 @@ jobs:
        (github.event_name == 'issue_comment' &&
         github.event.issue.number == 3902 &&
         github.event.issue.pull_request == null &&
-        github.event.comment.body == '/owner-historical-cleanup-30-macos-v3'))
+        github.event.comment.body == '/owner-historical-cleanup-30-arm-v5'))
     concurrency:
-      group: owner-historical-actions-cleanup-v4-macos-${{ github.repository }}
+      # A queued macOS v4 job must not occupy the ARM runner's recovery slot.
+      group: owner-historical-actions-cleanup-v5-arm-${{ github.repository }}
       cancel-in-progress: false
     # The ARM pool executed the successful queue-drain recovery; avoid the
     # stalled macOS cleanup admission lane.
