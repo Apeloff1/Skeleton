@@ -36,6 +36,7 @@ jobs:
   changes:
     name: "Change Scope"
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     outputs:
       frontend: ${{ steps.scope.outputs.frontend }}
       backend: ${{ steps.scope.outputs.backend }}
@@ -55,6 +56,7 @@ jobs:
     needs: changes
     name: "Backend Lint"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults: {run: {working-directory: ./backend}}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -76,6 +78,7 @@ jobs:
     needs: changes
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
@@ -125,6 +128,7 @@ jobs:
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
       - name: GameForge walk -> materialise -> runnable Godot tree
+        timeout-minutes: 6
         env: {PYTHONPATH: "."}
         run: |
           set -euo pipefail
@@ -143,6 +147,7 @@ jobs:
     needs: changes
     name: "Java Batch Accelerators"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
@@ -177,6 +182,7 @@ jobs:
     needs: changes
     name: "Assembly Vector Accelerators"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
@@ -222,6 +228,7 @@ jobs:
     needs: changes
     name: "Jeeves School Reasoning"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
@@ -239,6 +246,7 @@ jobs:
     needs: changes
     name: "Cockpit Smoke"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
@@ -252,6 +260,7 @@ jobs:
     if: needs.changes.outputs.backend == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
     name: "Backend Test"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [changes, backend-lint]
     defaults: {run: {working-directory: ./backend}}
     services:
@@ -287,6 +296,7 @@ jobs:
     if: needs.changes.outputs.backend == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
     name: "Backend Import Smoke"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [changes, backend-lint]
     defaults: {run: {working-directory: ./backend}}
     steps:
@@ -309,6 +319,7 @@ jobs:
     needs: changes
     name: "Frontend"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults: {run: {working-directory: ./frontend}}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -355,6 +366,7 @@ jobs:
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [skeleton-test, java-accelerators, assembly-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
     # Build-only image validation. Publishing belongs to the release workflows,
     # so this lane never pushes and needs no packages:write or secrets. Skipped

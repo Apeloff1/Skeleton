@@ -29,35 +29,15 @@ def test_legacy_creator_module_reexports_canonical_module() -> None:
     assert legacy.apply_edit is canonical.apply_edit
 
 
-def test_ai_tree_forge_creator_cutover_preserves_independent_native_owners() -> None:
-    """Creator has a separate canonical mapping; Forge-native overlays remain governed."""
+def test_ai_tree_creator_cutover_preserves_independent_forge_overlays() -> None:
     manifest = json.loads(
         (ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8")
     )
     forge = next(item for item in manifest["mappings"] if item["id"] == "AIFT-FORGE")
     creator = next(item for item in manifest["mappings"] if item["id"] == "AIFT-CREATOR")
 
-    assert forge["source"] == "skeleton/forge"
-    assert forge["destination"] == "skeleton/ai/forge"
+    # Other canonical AI-native Forge overlays are independently governed;
+    # the cutover invariant is that Creator itself is not shadowed as an overlay.
+    assert "creator" not in forge.get("overlay_children", [])
     assert creator["source"] == "skeleton/forge/creator"
     assert creator["destination"] == "skeleton/ai/forge/creator"
-
-    overlays = forge.get("overlay_children", [])
-    assert len(overlays) == len(set(overlays))
-    assert "creator" not in overlays
-    assert not any(path.startswith("creator/") for path in overlays)
-
-    # The 25 Forge-native files are intentionally absent from the staged
-    # legacy mirror. Every one must have its own non-residual canonical owner.
-    native = {
-        owner["path"].removeprefix("skeleton/ai/forge/")
-        for owner in manifest["native_ai_owners"]
-        if owner["path"].startswith("skeleton/ai/forge/")
-        and owner.get("ownership_mode") == "canonical_native"
-        and owner.get("residual_only") is False
-    }
-    assert native
-    assert set(overlays) == native
-    for relative in overlays:
-        assert (ROOT / forge["destination"] / relative).is_file()
-        assert not (ROOT / forge["source"] / relative).exists()

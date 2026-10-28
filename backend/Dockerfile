@@ -11,6 +11,12 @@ FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d75060
 
 WORKDIR /app
 
+# Fail closed before dependency installation if this build stage is advanced
+# beyond the last verified Python version. LiteLLM excludes Python >=3.15,
+# while its FastUUID dependency lacks CPython 3.15/musllinux wheels.
+# Remove this bound only after an exact Python 3.15 install/import/e2e proof.
+RUN python -c 'import sys; assert (3, 10) <= sys.version_info[:2] < (3, 15), "backend dependencies require supported Python <3.15"'
+
 # Copy dependency metadata before installing the build toolchain. Keeping the
 # toolchain and dependency transaction in one layer avoids repeatedly copying
 # a large intermediate filesystem on Docker daemons that use the vfs driver.

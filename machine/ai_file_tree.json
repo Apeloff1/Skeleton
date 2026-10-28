@@ -2282,7 +2282,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "6130ce0d12d9e29ae379f1bd1a723315a77c0e32",
+      "source_git_object_sha": "a1a9573012fafda4d5229f29eecbe1b3bd4554a6",
       "role": "Repository model, impact, workgraph, governance, stewardship, ownership-aware maintenance, and bounded cleanup authority for autonomous repository engineering.",
       "work_package_refs": [
         "WP-W11",

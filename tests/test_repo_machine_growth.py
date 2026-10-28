@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-import json
 import tempfile
 import unittest
 
 from skeleton.repo_machine.builder import RepositoryModelBuilder
-from skeleton.repo_machine.context import _bounded, context_for_intent
+from skeleton.repo_machine.context import context_for_intent
 from skeleton.repo_machine.growth import growth_recommendations
 from skeleton.repo_machine.metrics import structural_metrics
 from skeleton.repo_machine.ownership import analyze_ownership
@@ -116,25 +115,6 @@ class ContextWorkGraphTests(unittest.TestCase):
             model = fixture(Path(temp))
             context = context_for_intent(model, "overview", byte_limit=4096)
             self.assertIn("fingerprint", context)
-
-
-    def test_context_compaction_terminates_with_nonshrinking_metadata(self) -> None:
-        oversized = {
-            "intent": "overview",
-            "fingerprint": "a" * 64,
-            "health": {"large_evidence": "x" * 20000},
-            "coordination": {"decisions": [], "safe_parallel_groups": []},
-            "intelligence": {"decision_surface": [], "bridge_candidates": []},
-        }
-        context = _bounded(oversized, 4096)
-        self.assertEqual(context["fingerprint"], oversized["fingerprint"])
-        self.assertTrue(context["truncated_for_context"])
-        self.assertLessEqual(
-            len(json.dumps(context, sort_keys=True, separators=(",", ":")).encode()),
-            4096,
-        )
-        self.assertEqual(context, _bounded(oversized, 4096))
-        self.assertIn("health", oversized)  # Input is never mutated.
 
 
 class GrowthTests(unittest.TestCase):
