@@ -348,6 +348,30 @@ class MongoMementoAuthority:
             doc = await threads.find_one(scoped)
             if doc is None:
                 raise SealedContextBoundaryError("conversation deletion scope unauthorized")
+            if _HEAD_FIELD in doc or _CUSTODY_FIELD in doc:
+                witness = getattr(self.conversation, "memento_witness", None)
+                witnessed = memento_retirement_requires_witness(
+                    doc, witness_present=callable(getattr(witness, "read", None)),
+                )
+                if witnessed:
+                    # The tombstone must already be externally durable. A
+                    # Mongo-only deletion is never a substitute for witnessed
+                    # retirement, even if the caller bypasses the facade.
+                    from skeleton.persistence.sealed_memento_witness import WitnessPosition
+
+                    binding = doc.get(_BINDING_FIELD)
+                    if (not isinstance(binding, str) or len(binding) != 64
+                            or any(ch not in "0123456789abcdef" for ch in binding)):
+                        raise MongoMementoUnavailable("witnessed retirement binding unavailable")
+                    try:
+                        position = await witness.read(binding_digest=binding)
+                    except Exception as exc:
+                        raise MongoMementoUnavailable("independent retirement witness unavailable") from exc
+                    if (not isinstance(position, WitnessPosition)
+                            or position.binding_digest != binding or not position.retired):
+                        raise MongoMementoUnavailable(
+                            "independent retirement tombstone not acknowledged"
+                        )
             result = await threads.update_one(
                 scoped, {"$set": {_RETIRED_FIELD: True}},
             )
