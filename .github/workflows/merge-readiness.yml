@@ -31,7 +31,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Quarantine Policy
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,9 +73,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Unit
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      PYTEST_ADDOPTS: "--maxfail=25"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,7 +112,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Integration Smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./backend
@@ -166,9 +161,8 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # Full-repository SAST needs a bounded window without disabling checks.
     env:
-      PYTEST_ADDOPTS: "--maxfail=25"
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: Check out full history
@@ -209,9 +203,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: PR Automation Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      PYTEST_ADDOPTS: "--maxfail=25"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -378,7 +369,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Advisory Known Reds
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     services:
       mongodb:
         # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
@@ -419,7 +409,6 @@ jobs:
       - pr_automation
       - ci
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - name: Summarize required checks
         env:

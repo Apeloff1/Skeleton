@@ -43,6 +43,7 @@ dependencies = [
   "pymongo==4.19.0",
   "pydantic[email]>=2.14.1",
   "pydantic-settings>=2.15.0",
+  "regex>=2026.5.9,<2027",  # timeout-aware fail-closed output validation
   "uvicorn[standard]>=0.54.0",
 ]
 

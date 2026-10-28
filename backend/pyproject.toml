@@ -2,7 +2,7 @@
 # Tutolage Backend - Modern Python Project Configuration
 # ============================================================================
 # Package manager: uv | Linter/Formatter: ruff | Testing: pytest | Types: mypy
-# Canonical backend runtime/tooling baseline: Python 3.11 + Ruff 0.9.x.
+# Canonical backend runtime/tooling baseline: Python 3.11 + Ruff 0.17.2.
 # ============================================================================
 
 [project]
