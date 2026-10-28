@@ -77,7 +77,7 @@ def _parse_scale(scale_text: str, target_files: int = 0, target_size_gb: float =
     # Calculate scale multiplier — AGGRESSIVE, ALWAYS USE LARGER
     file_mult = max(10, parsed_files // 100) if parsed_files > 0 else 10
     size_mult = max(10, int(parsed_size * 100)) if parsed_size > 0 else 10  # 100 multiplier per GB
-    multiplier = max(file_mult, size_mult)  # Always use the LARGER multiplier
+    multiplier = 1 if isinstance(target_files, int) and not isinstance(target_files, bool) and target_files > 0 else max(file_mult, size_mult)  # Explicit file budgets must not amplify generation
 
     # Target files: derive from multiplier if not explicitly set
     effective_files = parsed_files
