@@ -90,9 +90,9 @@ class _Registry:
             raise ValueError("test registry does not own the requested provider/model")
         return self.require_active()
 
-    def runtime_serving_engines(self) -> tuple[_Provider, ...]:
-        """Expose the registry-owned serving engines for shutdown accounting."""
-        return (self.provider,)
+    def runtime_serving_engines(self) -> tuple[()]:
+        """Hosted test providers are not local engines with pressure snapshots."""
+        return ()
 
     def statuses(self) -> list[dict[str, object]]:
         return [{
