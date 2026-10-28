@@ -212,6 +212,10 @@ class WitnessedMongoMementoAuthority:
         if epoch is None:
             yield
         else:
+            if getattr(conversation, "memento_witness", None) is not self.witness:
+                raise MementoWitnessUnavailable(
+                    "protected source requires the same configured independent witness"
+                )
             async with epoch.writer(tenant_id=tenant_id, actor_id=owner_id):
                 yield
 
