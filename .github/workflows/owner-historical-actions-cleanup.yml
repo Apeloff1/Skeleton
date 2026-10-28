@@ -11,12 +11,13 @@ on:
     types: [completed]
   workflow_dispatch:
 
-# No broad cancellation, no security-gate bypass: only one immutable approved
-# list of 30 old runs, gated by the single canary being proven deleted.
+# The first deletion and the frozen 30-ID cleanup share ONE runner job.
+# A new v2 concurrency lane can escape the old queued v1 controller.
+# Current-head CI and security protections remain independent and unchanged.
 permissions: {}
 
 concurrency:
-  group: owner-historical-actions-cleanup-v1-${{ github.repository }}
+  group: owner-historical-actions-cleanup-v2-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:

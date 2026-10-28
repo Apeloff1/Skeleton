@@ -1,7 +1,9 @@
 """Owner-authorized recovery for immutable, jobless GitHub Actions tombstones.
 
-The first archived canary MUST have completed successfully and disappeared
-before this script can issue any DELETE. Every further run gets two independent
+The original canary may be queued behind the same congestion it is intended to
+fix. This standalone owner job revalidates the first archived tombstone itself,
+deletes it only after two complete immutable checks, and requires a verified GET
+404 before working on the other 30. Every further run also gets two independent
 live safety checks. Source-of-truth is GitHub, not the aged queue listing.
 """
 from __future__ import annotations
@@ -17,6 +19,17 @@ REPO = "Apeloff1/Skeleton"
 CANARY_RUN = 40625466138
 CANARY_SHA = "5e9a6eaf214e13188e262f4e271209b7e4f5e026"
 FIRST_TOMBSTONE = 34952509012
+# Authoritative pre-deletion canary identity. This does not authorize any
+# other run; the remaining entries are frozen separately in MANIFEST.
+FIRST_ROW = {
+    "id": 34952509012,
+    "head_sha": "c29683c96673ef5ef6fff775a5fd9053e1bbf795",
+    "created_at": "2026-09-15T09:26:44Z",
+    "head_branch": "frontier/work-live12",
+    "event": "pull_request",
+    "path": ".github/workflows/ci.yml",
+    "name": "CI/CD",
+}
 API_ROOT = "https://api.github.com/repos/" + REPO
 LIMIT_SECONDS = 500
 MAX_DELETES = 30
@@ -151,11 +164,71 @@ def validate(row: dict[str, object]) -> bool:
     return True
 
 
+def recover_canary_in_this_worker() -> bool:
+    """Avoid the two-job scheduling deadlock without weakening the canary.
+
+    If the original canary succeeded, honor it. Otherwise the same worker
+    validates and removes the exact first tombstone, verifying HTTP 404 before
+    any of the thirty subsequent destructive requests.
+    """
+    if canary_proved():
+        print("Original canary has verified success and terminal removal")
+        return True
+    status, original = request("GET", f"/actions/runs/{CANARY_RUN}")
+    if status != 200 or not isinstance(original, dict):
+        raise RuntimeError("Cannot verify original canary execution identity")
+    if (
+        original.get("id") != CANARY_RUN
+        or original.get("head_sha") != CANARY_SHA
+        or original.get("path") != ".github/workflows/historical-zero-job-canary.yml"
+    ):
+        raise RuntimeError("Original canary identity changed")
+    if original.get("status") == "in_progress":
+        print("Original canary running; avoid concurrent deletion and defer")
+        return False
+    status, target = request("GET", f"/actions/runs/{FIRST_TOMBSTONE}")
+    if status == 404:
+        # The target may have been deleted independently. Without a successful
+        # archived canary, provenance cannot be proven: refuse bulk mutation.
+        print("First tombstone absent but canary evidence incomplete; defer")
+        return False
+    if status != 200 or not isinstance(target, dict):
+        raise RuntimeError("Cannot verify historical canary target")
+    if target.get("updated_at") != "2026-09-15T09:26:44Z":
+        raise RuntimeError("Historical canary mutation timestamp changed")
+    if not validate(FIRST_ROW):
+        return False
+    # Race guard: original workflow might enter the runner while this one is
+    # checking. Re-read its status before the mutation boundary.
+    check_status, live_original = request("GET", f"/actions/runs/{CANARY_RUN}")
+    if (
+        check_status != 200 or not isinstance(live_original, dict)
+        or live_original.get("status") == "in_progress"
+    ):
+        print("Cannot prove isolated canary worker; deferring")
+        return False
+    if not validate(FIRST_ROW):
+        return False
+    code, _ = request("DELETE", f"/actions/runs/{FIRST_TOMBSTONE}")
+    if code != 204:
+        raise RuntimeError(
+            f"GitHub refused owner historical canary deletion: HTTP {code}; "
+            "no other tombstone will be touched"
+        )
+    final_status, _ = request("GET", f"/actions/runs/{FIRST_TOMBSTONE}")
+    if final_status != 404:
+        raise RuntimeError(
+            f"Canary DELETE accepted but not verified: HTTP {final_status}"
+        )
+    print(f"First historical tombstone {FIRST_TOMBSTONE} verified deleted")
+    return True
+
+
 def main() -> int:
     if len(MANIFEST) != 30 or len({r["id"] for r in MANIFEST}) != 30:
         raise RuntimeError("Owner manifest tampered or incomplete")
-    if not canary_proved():
-        print("No mutation: first historical canary not successful AND absent")
+    if not recover_canary_in_this_worker():
+        print("Historical delete gate remains closed; no further mutations")
         return 0
     counters = {"confirmed_deleted": 0, "already_absent_or_moved": 0,
                 "provider_refusal": 0, "skipped_by_budget": 0}
@@ -191,7 +264,7 @@ def main() -> int:
     if summary:
         with open(summary, "a", encoding="utf-8") as output:
             output.write("## Owner-ordered historical Actions cleanup\n")
-            output.write("Canary: completed success and original run GET 404\n")
+            output.write("Canary: original success or independently verified first DELETE; GET 404\n")
             for key, value in counters.items():
                 output.write(f"- {key}: {value}\n")
     return 1 if counters["provider_refusal"] else 0
