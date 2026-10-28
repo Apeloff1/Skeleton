@@ -20,7 +20,7 @@ from skeleton.automation.dependabot_merge_policy import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-AUTOMERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "dependabot-automerge.yml"
+AUTOMERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "automerge-control-plane.yml"
 DEPENDENCY_REVIEW_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "dependency-review.yml"
 SCRIPT = REPO_ROOT / "skeleton" / "automation" / "dependabot_merge_policy.py"
 
@@ -56,14 +56,22 @@ def _runs(required=DEFAULT_REQUIRED_WORKFLOWS, *, conclusion="success", status="
     ]
 
 
-def test_workflow_uses_trusted_dependency_free_entrypoint() -> None:
+def test_active_automerge_workflow_preserves_trusted_dependabot_boundary() -> None:
+    """The retired Dependabot-only workflow must not be recreated as a second writer."""
     text = AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
-    assert "python skeleton/automation/dependabot_merge_policy.py" in text
-    assert "python -m skeleton.automation.dependabot_merge_policy" not in text
     assert "pull_request_target" not in text
-    assert "Dependency Review" in text
+    assert "github.event.workflow_run.conclusion == 'success'" in text
+    assert "github.event.workflow_run.event == 'pull_request'" in text
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in text
+    assert "needs:\n      - validate" in text
+    assert "python scripts/check_automerge_contract.py" in text
+    assert "python -m skeleton.pr_automation.automerge_cli" in text
+    assert 'AUTOMERGE_ALLOW_DEPENDABOT_WITHOUT_OPT_IN: "true"' in text
+    assert 'AUTOMERGE_MERGE_METHOD: "squash"' in text
+    assert 'AUTOMERGE_FAIL_ON_GRAPH_ERROR: "true"' in text
+    assert "dependabot-automerge.yml" not in text
 
 
 def test_policy_script_starts_without_project_dependencies() -> None:

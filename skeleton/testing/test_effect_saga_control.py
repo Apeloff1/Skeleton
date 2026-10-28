@@ -63,6 +63,26 @@ def test_compensation_permit_is_bound_to_exact_success_head():
     assert ledger.head(effect.idempotency_key).state is EffectState.COMPENSATING
 
 
+def test_compensation_cannot_bypass_permit_with_plain_ledger_transition():
+    ledger = SideEffectLedger()
+    effect = identity()
+    succeed(ledger, effect)
+    prior = ledger.head(effect.idempotency_key)
+    with pytest.raises(PermissionError, match="permit-bound"):
+        ledger.transition(effect, EffectState.COMPENSATING, evidence_digest="f" * 64)
+    assert ledger.head(effect.idempotency_key) == prior
+
+    engine = CompensationEngine(ledger)
+    spec = CompensationSpec(effect, "refund-charge", "refund")
+    permit = engine.authorize(spec, authority_scope="payments")
+    engine.begin(spec, permit)
+    assert ledger.head(effect.idempotency_key).state is EffectState.COMPENSATING
+
+    # Both a duplicate and a stale success-head permit must be rejected.
+    with pytest.raises(PermissionError, match="only succeeded effects"):
+        engine.begin(spec, permit)
+
+
 def test_compensation_scope_cannot_escalate_authority():
     ledger = SideEffectLedger()
     effect = identity()

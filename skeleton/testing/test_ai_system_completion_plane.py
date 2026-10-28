@@ -95,6 +95,7 @@ def _local_model() -> LocalModelAdapter:
                 model_id="system-completion-local",
                 model_digest=model_digest,
                 runner=runner,
+                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
@@ -138,7 +139,11 @@ async def _functional_run(
     *,
     database_name: str = "ai-system-completion.sqlite3",
     request_id: str = "ai-system-completion-e2e",
+    created_at: datetime | None = None,
 ):
+    if created_at is None:
+        # A live model call must not inherit historical fixed-time fixtures.
+        created_at = datetime.now(timezone.utc)
     database = tmp_path / database_name
     repository = SQLiteExecutionRepository(database)
     tools = AsyncToolRuntime()
@@ -174,7 +179,7 @@ async def _functional_run(
         instructions="Use the local model and governed tool only.",
         context_digest=hashlib.sha256(b"system-completion-context").hexdigest(),
         allowed_tool_ids=("repo.read",),
-        created_at=NOW,
+        created_at=created_at,
     )
     runtime = FunctionalAIRuntime(
         repository,
@@ -292,13 +297,13 @@ def _staged_finalization_recovery(
             execution_request.execution_id,
             state,
             expected_version=execution.version,
-            now=NOW,
+            now=request.created_at,
         )
 
     intent = repository.stage_finalization(
         terminal,
         expected_execution_version=execution.version,
-        now=NOW,
+        now=request.created_at,
     )
     intent_digest = intent.intent_digest
     repository.close()
@@ -311,7 +316,7 @@ def _staged_finalization_recovery(
     assert recovered_intent.intent_digest == intent_digest
     reopened.finalize_staged(
         execution_request.execution_id,
-        now=NOW,
+        now=request.created_at,
     )
     recovered_result = reopened.result(execution_request.execution_id)
     intent_cleared = (
@@ -544,6 +549,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         tmp_path,
         database_name="ai-system-completion-replay.sqlite3",
         request_id=request.request_id,
+        created_at=request.created_at,
     )
     replay_terminal = replay_run.execution.result
     assert replay_terminal is not None

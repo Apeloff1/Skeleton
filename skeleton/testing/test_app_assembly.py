@@ -168,7 +168,9 @@ def test_default_smoke_profile_has_frontend_backend_and_engine():
 
 def test_frontend_clients_share_canonical_runtime_endpoints():
     root = find_repo_root(Path(__file__))
-    resolver = (root / "frontend/utils/apiBase.ts").read_text(encoding="utf-8")
+    # Frontend sources live in src/; the historical root-level paths were
+    # removed by the app assembly migration.
+    resolver = (root / "frontend/src/utils/apiBase.ts").read_text(encoding="utf-8")
 
     assert "export const API_BASE" in resolver
     assert "export const SKELETON_API_BASE" in resolver
@@ -176,12 +178,12 @@ def test_frontend_clients_share_canonical_runtime_endpoints():
     assert "EXPO_PUBLIC_SKELETON_URL" in resolver
 
     expected_imports = {
-        "frontend/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
-        "frontend/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
-        "frontend/src/utils/apiClient.ts": "import { API_BASE } from '../../utils/apiBase';",
-        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from '../../utils/apiBase';",
-        "frontend/utils/safeFetch.ts": "import { API_BASE } from './apiBase';",
-        "frontend/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/utils/apiClient.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/utils/api.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
     }
     for relative, expected in expected_imports.items():
         source = (root / relative).read_text(encoding="utf-8")
@@ -190,7 +192,7 @@ def test_frontend_clients_share_canonical_runtime_endpoints():
 
 def test_frontend_skeleton_health_matches_engine_liveness_contract():
     root = find_repo_root(Path(__file__))
-    client = (root / "frontend/services/skeleton.ts").read_text(encoding="utf-8")
+    client = (root / "frontend/src/services/skeleton.ts").read_text(encoding="utf-8")
     routes = (root / "skeleton/api/routes.py").read_text(encoding="utf-8")
 
     assert "'/api/v1/health/live'" in client
@@ -273,7 +275,7 @@ def test_wait_for_application_rejects_invalid_budget():
 
 def test_all_launcher_paths_converge_on_product_shell():
     root = find_repo_root(Path(__file__))
-    launch = (root / "frontend/components/LaunchCascade.tsx").read_text(encoding="utf-8")
+    launch = (root / "frontend/src/components/LaunchCascade.tsx").read_text(encoding="utf-8")
     welcome = (root / "frontend/app/welcome.tsx").read_text(encoding="utf-8")
     safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
 
@@ -301,12 +303,16 @@ def test_production_web_ingress_routes_both_application_apis():
     assert "proxy_pass http://backend:8001;" in nginx
 
 
-def test_frontend_security_probe_supplies_compose_upstream_names():
+def test_frontend_live_probe_uses_compose_network_and_fails_on_bad_readiness():
     root = find_repo_root(Path(__file__))
-    workflow = (root / ".github/workflows/dependency-security.yml").read_text(encoding="utf-8")
+    workflow = (root / ".github/workflows/app-foundation-e2e.yml").read_text(encoding="utf-8")
 
-    assert "--add-host skeleton:127.0.0.1" in workflow
-    assert "--add-host backend:127.0.0.1" in workflow
+    # Compose provides service-name DNS. Manual loopback overrides would
+    # conceal invalid upstream service discovery in production-like E2E.
+    assert "docker compose -f docker-compose.yml up -d mongo skeleton backend frontend" in workflow
+    assert 'wait_for "${SKELETON_E2E_WEB_URL}/healthz" frontend' in workflow
+    assert "--add-host skeleton:127.0.0.1" not in workflow
+    assert "--add-host backend:127.0.0.1" not in workflow
 
 
 def test_backend_does_not_claim_skeleton_api_v1_prefix():
@@ -458,7 +464,7 @@ def test_public_product_readiness_route_is_registered():
 
 def test_product_routes_are_registered_in_canonical_route_registry():
     root = find_repo_root(Path(__file__))
-    registry = (root / "frontend/utils/routeRegistry.ts").read_text(encoding="utf-8")
+    registry = (root / "frontend/src/utils/routeRegistry.ts").read_text(encoding="utf-8")
 
     for route in (
         "/product",
@@ -697,6 +703,7 @@ def test_full_profile_uses_custom_chroma_published_port(tmp_path):
 def test_full_profile_probes_custom_chroma_health(monkeypatch):
     from skeleton.app.health import ProbeResult, probe_application
 
+    assert load_manifest().service("chroma").health_path == "/api/v2/heartbeat"
     seen = []
 
     def probe(service, *, timeout):
@@ -712,6 +719,32 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
         full=True, public_url_overrides={"chroma": "http://localhost:8222"},
     )
     assert ("chroma", "http://localhost:8222") in seen
+
+def test_full_profile_missing_http_health_path_fails_closed(monkeypatch):
+    from dataclasses import replace
+    from skeleton.app.health import ProbeResult, probe_application
+
+    manifest = load_manifest()
+    broken = replace(
+        manifest,
+        services=tuple(
+            replace(service, health_path="") if service.name == "chroma" else service
+            for service in manifest.services
+        ),
+    )
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_url",
+        lambda service, *, timeout: ProbeResult(service.name, service.public_url, True, 200, "healthy"),
+    )
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_http",
+        lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
+    )
+    results = probe_application(manifest=broken, full=True)
+    chroma = next(result for result in results if result.service == "chroma")
+    assert chroma.ok is False
+    assert chroma.detail == "no public HTTP health probe declared"
+
 
 def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
     from skeleton.app.assembly import preflight

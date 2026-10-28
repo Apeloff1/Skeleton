@@ -197,5 +197,7 @@ def test_product_shell_uses_single_runtime_readiness_source():
     assert "getProductReadiness" not in product
     assert "health?.product?.available" in product
     assert "product: runtime.product" in health
-    assert "public_readiness()" in runtime
+    # This synchronous control-plane probe now executes off the event loop.
+    assert "from core.product_control_runtime import public_readiness" in runtime
+    assert "asyncio.to_thread(public_readiness)" in runtime
     assert '"product": product_readiness' in runtime

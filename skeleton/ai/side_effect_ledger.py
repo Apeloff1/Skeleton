@@ -30,11 +30,11 @@ _QUARANTINED = frozenset({EffectState.UNKNOWN, EffectState.RECONCILIATION_REQUIR
 _ALLOWED = {
     EffectState.PREPARED: {EffectState.IN_FLIGHT},
     EffectState.IN_FLIGHT: {EffectState.SUCCEEDED, EffectState.FAILED, EffectState.UNKNOWN},
-    EffectState.FAILED: {EffectState.PREPARED, EffectState.COMPENSATING},
+    EffectState.FAILED: {EffectState.PREPARED},
     EffectState.UNKNOWN: {EffectState.RECONCILIATION_REQUIRED},
     EffectState.COMPENSATING: {EffectState.COMPENSATED, EffectState.RECONCILIATION_REQUIRED},
     EffectState.RECONCILIATION_REQUIRED: {EffectState.FAILED, EffectState.SUCCEEDED, EffectState.COMPENSATED},
-    EffectState.SUCCEEDED: set(),
+    EffectState.SUCCEEDED: {EffectState.COMPENSATING},
     EffectState.COMPENSATED: set(),
 }
 
@@ -113,16 +113,43 @@ class SideEffectLedger:
                 raise ValueError("effect event chain mismatch")
             if event.state not in _ALLOWED[prior.state]:
                 raise PermissionError(f"illegal effect transition {prior.state.value}->{event.state.value}")
+            if event.state is EffectState.COMPENSATING and event.evidence_digest is None:
+                raise PermissionError("compensation requires bound permit evidence")
         self._events.append(event)
         self._heads[key] = event
         return event.digest
 
     def transition(self, identity: EffectIdentity, state: EffectState, *, evidence_digest: str | None = None) -> EffectEvent:
+        if state is EffectState.COMPENSATING:
+            raise PermissionError("compensation requires authorized permit-bound transition")
         prior = self._heads.get(identity.idempotency_key)
         if prior is None:
             event = EffectEvent(identity, 1, state, evidence_digest=evidence_digest)
         else:
             event = EffectEvent(identity, prior.sequence + 1, state, prior.digest, evidence_digest)
+        self.append(event)
+        return event
+
+    def begin_compensation(
+        self,
+        identity: EffectIdentity,
+        *,
+        expected_head_digest: str,
+        permit_digest: str,
+    ) -> EffectEvent:
+        """Append one permit-bound compensation start against its exact success head."""
+        prior = self.head(identity.idempotency_key)
+        if prior.identity != identity or prior.state is not EffectState.SUCCEEDED:
+            raise PermissionError("compensation requires exact succeeded effect identity")
+        if prior.digest != expected_head_digest:
+            raise PermissionError("compensation permit has stale or forged success head")
+        event = EffectEvent(
+            identity,
+            prior.sequence + 1,
+            EffectState.COMPENSATING,
+            prior.digest,
+            permit_digest,
+        )
         self.append(event)
         return event
 
