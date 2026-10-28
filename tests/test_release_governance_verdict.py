@@ -75,7 +75,11 @@ class ReleaseGovernanceVerdictTests(unittest.TestCase):
 
     def test_later_success_does_not_hide_earlier_failure(self):
         self.assertEqual(
-            assess(SHA, branch(), green() + [run("Malware Gate", conclusion="failure", run_id=50)])["verdict"],
+            assess(
+                SHA,
+                branch(),
+                green() + [run("Malware Gate", conclusion="failure", run_id=50)],
+            )["verdict"],
             "BLOCKED",
         )
 

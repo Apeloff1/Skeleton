@@ -371,7 +371,10 @@ def test_workflow_path_is_under_repository_root():
 def test_automatic_merge_refuses_unprotected_default_branch_before_mutating() -> None:
     """A policy document alone must not authorize direct/squash merging."""
     reconcile = _line_block(_workflow_text(), "reconcile:")
-    assert 'gh api --method GET "/repos/${GITHUB_REPOSITORY}/branches/${AUTOMERGE_DEFAULT_BRANCH}"' in reconcile
+    assert (
+        'gh api --method GET "/repos/${GITHUB_REPOSITORY}/branches/${AUTOMERGE_DEFAULT_BRANCH}"'
+        in reconcile
+    )
     assert '--jq \'.protected\'' in reconcile
     assert 'if [[ "$protected" != "true" ]]; then' in reconcile
     assert "exit 1" in reconcile
