@@ -65,7 +65,10 @@ existing Chroma containers and their data until a verified recovery and migratio
 plan is available. The current source includes a full-profile heartbeat check and
 a [persistence warning](../APP_ASSEMBLY.md#application-surfaces); the mismatch is
 not yet fixed. The default profile does not require Chroma for bounded lexical
-retrieval.
+retrieval. A new `scripts/chroma_backup.py` can copy and hash both legacy
+stores from an already stopped container. This has not been exercised against
+the target installation and does not migrate, restore or permit recreation.
+The full-profile hold remains active.
 
 The latest observed AI repair completed one model turn but proposed eight
 identical edits that would introduce a `const` reassignment error. The existing
@@ -90,6 +93,21 @@ triggers were retired while their definitions and results were preserved. The
 restored Windows installer workflow is manual-only and adds no automatic trigger.
 Actual native Windows, WSL2, Docker Desktop and `Setup.exe` execution remain
 unverified until a Windows run completes successfully.
+
+## Subsequent source repairs (not deployment evidence)
+
+PR #4357 now includes a fail-closed share-link origin from operator
+configuration, encoded untrusted identifiers and Host-header regression
+coverage. Project-scoped authorization remains in place. Duplicate edge
+gateway registration and duplicate backend vault settings were removed.
+The `PUBLIC_APP_URL` Compose setting defaults for local development; external
+production deployments require a trusted HTTPS origin.
+
+The manual-only Windows Installer workflow was registered separately on
+`main`. This makes an exact-source Windows qualification runnable but is
+not a completed hosted installer build or real WSL2/Docker Desktop/laptop proof.
+The remaining CI, security, installer and browser validations must run against
+the latest PR SHA rather than historical passing results.
 
 ## Verification and remaining gates
 
