@@ -104,7 +104,13 @@ def backup_legacy_chroma(output: Path, *, container: str = CONTAINER) -> dict:
     The output must be a previously nonexistent path; on any failure no
     completed backup is published, and the original container remains intact.
     """
-    output = Path(output).expanduser().absolute()
+    requested = Path(output).expanduser().absolute()
+    if requested.parent.is_symlink():
+        raise BackupRejected("backup parent cannot be a symlink")
+    output = requested.resolve(strict=False)
+    repository_root = Path(__file__).resolve().parents[1]
+    if output == repository_root or repository_root in output.parents:
+        raise BackupRejected("private Chroma backups must be outside the repository")
     if output.exists() or output.is_symlink():
         raise BackupRejected("backup destination already exists; never overwrite evidence")
     parent = output.parent
