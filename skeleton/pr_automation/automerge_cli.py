@@ -375,6 +375,16 @@ def run(argv: Sequence[str] | None = None) -> int:
             ),
         )
 
+        # Workflow-only guards are insufficient: CLI invocations can otherwise
+        # bypass a missing GitHub branch rule and perform direct mutations.
+        # The branch read is live, not inferred from a committed policy file.
+        if policy.mode is not MergeMode.OBSERVE:
+            branch_policy = client.branch_policy(default_branch)
+            if not branch_policy.protected:
+                raise AutoMergeGitHubError(
+                    "auto-merge mutation denied: default branch protection is not enabled"
+                )
+
         report = reconcile(
             client,
             policy,

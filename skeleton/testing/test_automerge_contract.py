@@ -381,3 +381,15 @@ def test_automatic_merge_refuses_unprotected_default_branch_before_mutating() ->
     assert reconcile.index('if [[ "$protected" != "true" ]]') < reconcile.index(
         "python -m skeleton.pr_automation.automerge_cli"
     )
+
+
+
+def test_cli_reconciliation_checks_live_branch_protection_before_mutation() -> None:
+    """Direct CLI entry must reject unprotected base even outside Actions."""
+    source = (PACKAGE / "automerge_cli.py").read_text(encoding="utf-8")
+    guard = "branch_policy = client.branch_policy(default_branch)"
+    denial = "auto-merge mutation denied: default branch protection is not enabled"
+    assert guard in source
+    assert denial in source
+    assert "if policy.mode is not MergeMode.OBSERVE:" in source
+    assert source.index(guard) < source.index("report = reconcile(")
