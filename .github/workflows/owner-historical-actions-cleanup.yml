@@ -1,0 +1,55 @@
+name: Owner-ordered historical Actions cleanup
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+# Admin-triggered issue comment provides a distinct GitHub event admission path.
+# macOS uses a separate hosted-runner pool from stalled Linux cleanup runs.
+# No push/PR fanout; the one owner-authored issue command is strictly validated.
+# Current-head CI and security protections remain independent and unchanged.
+permissions: {}
+
+# Apply concurrency at JOB scope, after the exact owner-command if gate.
+# Otherwise any unrelated issue_comment can cancel pending owner work before
+# it ever reaches a runner, even when that comment's job would be skipped.
+jobs:
+  owner-cleanup:
+    if: >-
+      github.actor == github.repository_owner &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.number == 3902 &&
+        github.event.issue.pull_request == null &&
+        github.event.comment.body == '/owner-historical-cleanup-30-arm-v5'))
+    concurrency:
+      # A queued macOS v4 job must not occupy the ARM runner's recovery slot.
+      group: owner-historical-actions-cleanup-v5-arm-${{ github.repository }}
+      cancel-in-progress: false
+    # The ARM pool executed the successful queue-drain recovery; avoid the
+    # stalled macOS cleanup admission lane.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 14
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Read only the approved owner cleanup implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/owner_historical_actions_cleanup.py
+          sparse-checkout-cone-mode: false
+      - name: Compile the bounded historical cleanup logic
+        shell: bash
+        run: python3 -m py_compile scripts/owner_historical_actions_cleanup.py
+      - name: Apply owner-approved immutable cleanup only after proven canary removal
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: "1"
+        run: python3 scripts/owner_historical_actions_cleanup.py

@@ -226,14 +226,26 @@ function patchNodeForgeNestedDigestAlgorithm() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '1.4.0') {
+  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
+  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
+  // Never silently trust a version bump as proof of this security fix.
+  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 
-  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: node-forge 1.4.0 checks the
-  // outer DigestInfo element count but not the nested DigestAlgorithm count.
-  // This is the upstream #1152 fix shape, applied fail-closed until a patched
-  // npm release exists.
+  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
+  // nested-count patch for both vulnerable upstream parser shapes.
+  // patchSecurityFile rejects unrecognized source before any security bypass.
+  // Reject ambiguous mixed sources: a stray hardened marker must not hide
+  // another original vulnerable conditional behind the idempotence shortcut.
+  const rsaSource = fs.readFileSync(
+    path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
+  const unpatchedDigestInfo = /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/;
+  const nestedArityCheck = /obj\.value\[0\]\.value\.length !==/;
+  if (unpatchedDigestInfo.test(rsaSource) && nestedArityCheck.test(rsaSource)) {
+    throw new Error('[patch-node-modules] node-forge mixed DigestInfo patch states');
+  }
+
   patchSecurityFile(
     'node_modules/node-forge/lib/rsa.js',
     /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/,
