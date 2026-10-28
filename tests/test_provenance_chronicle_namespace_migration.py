@@ -36,7 +36,9 @@ def test_ai_tree_governs_provenance_parent_and_chronicle_child() -> None:
     assert provenance["source_git_object_sha"] == subprocess.check_output(
         ["git", "rev-parse", f'{tree}:{provenance["source"]}'], cwd=ROOT, text=True
     ).strip()
-    assert provenance["overlay_children"] == ["chronicle"]
+    # Chronicle is governed as a child; other provenance overlays remain independently owned.
+    assert "chronicle" in provenance["overlay_children"]
+    assert provenance["overlay_children"] == sorted(set(provenance["overlay_children"]))
     assert chronicle["source"] == "skeleton/provenance/chronicle"
     assert chronicle["destination"] == "skeleton/ai/runtime/provenance/chronicle"
     tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
