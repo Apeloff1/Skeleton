@@ -166,6 +166,51 @@ class TrafficManagerObservationTests(unittest.TestCase):
             {10, 99},
         )
 
+    def test_frozen_candidate_requires_fresh_zero_job_github_proof(self) -> None:
+        from skeleton.automation.traffic_manager import PROVIDER_ORPHAN_EVIDENCE
+        run_id, (sha, timestamp, name, event) = next(iter(PROVIDER_ORPHAN_EVIDENCE.items()))
+        frozen = {
+            "databaseId": run_id, "name": name, "event": event,
+            "status": "queued", "conclusion": None, "headSha": sha,
+            "createdAt": timestamp, "updatedAt": timestamp,
+        }
+
+        def gh(args):
+            url = args[1]
+            if "/jobs?" in url:
+                return [{"totalCount": 0}]
+            if "status=queued" in url or "per_page=100" in url and "status=" not in url:
+                return [dict(frozen)]
+            return []
+
+        with patch("skeleton.automation.traffic_manager._gh_json", side_effect=gh):
+            rows = _observe_runs("Apeloff1/Skeleton")
+        self.assertEqual(len(rows), 1)
+        self.assertIs(rows[0].get("providerOrphanJobsVerified"), True)
+
+    def test_job_api_error_or_nonzero_count_preserves_queue(self) -> None:
+        from skeleton.automation.traffic_manager import PROVIDER_ORPHAN_EVIDENCE, TrafficManagerError
+        run_id, (sha, timestamp, name, event) = next(iter(PROVIDER_ORPHAN_EVIDENCE.items()))
+        frozen = {
+            "databaseId": run_id, "name": name, "event": event,
+            "status": "queued", "conclusion": None, "headSha": sha,
+            "createdAt": timestamp, "updatedAt": timestamp,
+        }
+        for mode in ("api_error", "nonzero", "wrong_shape"):
+            def gh(args):
+                url = args[1]
+                if "/jobs?" in url:
+                    if mode == "api_error":
+                        raise TrafficManagerError("provider unavailable")
+                    return [{"totalCount": 1}] if mode == "nonzero" else []
+                if "status=queued" in url:
+                    return [dict(frozen)]
+                return []
+            with patch("skeleton.automation.traffic_manager._gh_json", side_effect=gh):
+                rows = _observe_runs("Apeloff1/Skeleton")
+            self.assertEqual(len(rows), 1)
+            self.assertNotIn("providerOrphanJobsVerified", rows[0])
+
     def test_active_status_query_deduplicates_recent_history(self) -> None:
         active = run(
             name="CI/CD",
@@ -347,10 +392,10 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
         self.assertEqual(policy.cooldown_seconds, 5 * 60)
         self.assertEqual(policy.maintenance_interval_seconds, 10 * 60)
 
-    def test_provider_tombstones_do_not_permanently_block_capacity(self) -> None:
-        tombstones = tuple(
+    def test_age_alone_never_quarantines_live_queued_work(self) -> None:
+        old = tuple(
             run(
-                name="CI/CD" if i % 2 == 0 else "Frontier Contracts",
+                name="CI/CD",
                 status="queued",
                 conclusion="",
                 database_id=3000 + i,
@@ -358,30 +403,23 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             )
             for i in range(8)
         )
-        decision = evaluate(
-            snapshot(runs=tombstones),
-            policy=self.policy,
-            force=True,
-        )
-        self.assertTrue(decision.admit)
-        self.assertEqual(decision.provider_tombstones, 8)
-        self.assertEqual(decision.queued_runs, 0)
-        self.assertEqual(decision.active_runs, 0)
-        self.assertEqual(decision.critical_active, 0)
-        self.assertFalse(decision.relieve)
-        self.assertEqual(decision.relief_reason, "none")
+        decision = evaluate(snapshot(runs=old), policy=self.policy, force=True)
+        self.assertFalse(decision.admit)
+        self.assertEqual(decision.reason, "stale-queue-pressure")
+        self.assertEqual(decision.provider_tombstones, 0)
+        self.assertEqual(decision.queued_runs, 8)
+        self.assertTrue(decision.relieve)
 
-    def test_recent_queue_still_blocks_when_old_tombstones_exist(self) -> None:
-        old = tuple(
-            run(
-                name="CI/CD",
-                status="queued",
-                conclusion="",
-                database_id=3100 + i,
-                updated_at="2027-01-13T07:00:00Z",
-            )
-            for i in range(6)
-        )
+    def test_verified_pinned_orphans_are_excluded_but_recent_queue_blocks(self) -> None:
+        from skeleton.automation.traffic_manager import PROVIDER_ORPHAN_EVIDENCE
+        old = []
+        for run_id, (sha, timestamp, name, event) in list(PROVIDER_ORPHAN_EVIDENCE.items())[:6]:
+            old.append({
+                "databaseId": run_id, "name": name, "event": event,
+                "status": "queued", "conclusion": None,
+                "headSha": sha, "createdAt": timestamp, "updatedAt": timestamp,
+                "providerOrphanJobsVerified": True,
+            })
         recent = tuple(
             run(
                 name=f"Recent queued {i}",
@@ -392,15 +430,51 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             )
             for i in range(3)
         )
-        decision = evaluate(
-            snapshot(runs=old + recent),
-            policy=self.policy,
-            force=True,
-        )
+        decision = evaluate(snapshot(runs=tuple(old) + recent), policy=self.policy, force=True)
         self.assertFalse(decision.admit)
         self.assertEqual(decision.provider_tombstones, 6)
         self.assertEqual(decision.queued_runs, 3)
         self.assertEqual(decision.reason, "queue-capacity-exhausted")
+
+    def test_verified_pinned_orphans_do_not_block_capacity(self) -> None:
+        from skeleton.automation.traffic_manager import PROVIDER_ORPHAN_EVIDENCE
+        old = tuple({
+            "databaseId": run_id, "name": name, "event": event,
+            "status": "queued", "conclusion": None,
+            "headSha": sha, "createdAt": timestamp, "updatedAt": timestamp,
+            "providerOrphanJobsVerified": True,
+        } for run_id, (sha, timestamp, name, event) in list(PROVIDER_ORPHAN_EVIDENCE.items())[:8])
+        decision = evaluate(snapshot(runs=old), policy=self.policy, force=True)
+        self.assertTrue(decision.admit)
+        self.assertEqual(decision.provider_tombstones, 8)
+        self.assertEqual(decision.queued_runs, 0)
+        self.assertEqual(decision.active_runs, 0)
+        self.assertFalse(decision.relieve)
+
+    def test_pinned_identity_drift_or_missing_job_proof_fails_closed(self) -> None:
+        from skeleton.automation.traffic_manager import PROVIDER_ORPHAN_EVIDENCE
+        run_id, (sha, timestamp, name, event) = next(iter(PROVIDER_ORPHAN_EVIDENCE.items()))
+        original = {
+            "databaseId": run_id, "name": name, "event": event,
+            "status": "queued", "conclusion": None,
+            "headSha": sha, "createdAt": timestamp, "updatedAt": timestamp,
+            "providerOrphanJobsVerified": True,
+        }
+        for mutation in (
+            {"providerOrphanJobsVerified": False},
+            {"updatedAt": "2027-01-14T00:00:00Z"},
+            {"headSha": "b" * 40},
+            {"status": "in_progress"},
+            {"conclusion": "success"},
+            {"event": "push"},
+        ):
+            decision = evaluate(
+                snapshot(runs=({**original, **mutation},)),
+                policy=self.policy,
+                force=True,
+            )
+            self.assertEqual(decision.provider_tombstones, 0, mutation)
+            self.assertEqual(decision.active_runs, 1 if mutation.get("status") != "completed" else 0)
 
     def test_critical_lane_contention_blocks(self) -> None:
         runs = (
