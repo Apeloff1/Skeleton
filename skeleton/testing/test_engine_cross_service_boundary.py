@@ -21,7 +21,9 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_runtime import (
     FinishReason,
     ProviderResponse,
+    ProviderUnavailableError,
     ProviderUsage,
+    provider_context_selection,
 )
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -73,39 +75,24 @@ class _Provider:
 
 
 class _Registry:
-    """Expose the scoped inventory contract used by the real provider registry."""
+    """Test registry that publishes the strict tenant-scoped model identity."""
+
+    active_id = "fake"
+    available = True
 
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
-        self.active_id = provider.provider_id
-        self.available = provider.available
 
-    def require_active(self):
-        return self.provider
-
-    def require_for_context(self, context_policy):
-        """Honor the coordinator's scoped provider-selection interface."""
-        selection = context_policy.get("provider_selection") or {}
-        if selection and (selection.get("provider_id"), selection.get("model_id")) != (self.provider.provider_id, self.provider.model):
-            raise ValueError("test registry does not own the requested provider/model")
-        return self.require_active()
-
-    def runtime_serving_engines(self) -> tuple[()]:
-        """Hosted test providers are not local engines with pressure snapshots."""
-        return ()
-
-    def statuses(self) -> list[dict[str, object]]:
+    def statuses(self) -> list[dict]:
         return [{
             "id": self.provider.provider_id,
             "model": self.provider.model,
             "available": self.provider.available,
             "active": True,
-            "fallback": False,
-            "architecture_acknowledged": True,
             "configured": True,
-            "readiness_code": "ready",
-            "execution_mode": "hosted",
+            "architecture_acknowledged": True,
             "credential_free": False,
+            "execution_mode": "hosted",
             "capabilities": ["text-generation"],
             "context_window": 128_000,
             "max_output_tokens": 16_384,
@@ -114,6 +101,27 @@ class _Registry:
             "tokenizer": "approximate_text",
             "supports_temperature": True,
         }]
+
+    def require_active(self):
+        return self.provider
+
+    def require_selected(self, provider_id: str, model_id: str):
+        if (provider_id, model_id) != (self.provider.provider_id, self.provider.model):
+            raise ProviderUnavailableError("selected provider/model is not configured")
+        return self.require_active()
+
+    def require_for_context(self, context_policy):
+        selection = provider_context_selection(context_policy)
+        if selection is None:
+            selected = self.require_active()
+        else:
+            selected = self.require_selected(selection["provider_id"], selection["model_id"])
+        if context_policy.get("provider_model") not in (None, selected.model):
+            raise ProviderUnavailableError("model override differs from configured selection")
+        return selected
+
+    def runtime_serving_engines(self):
+        return ()
 
 
 def _service(tmp_path, *, tenant_ids=frozenset({"tenant-a"}), scopes=None):
@@ -274,8 +282,7 @@ async def test_cross_service_tenant_and_scope_denial_never_reach_provider(tmp_pa
     )
     tenant_client = _client(_app(tenant_service, tenant_coordinator))
 
-    # Tenant access is denied at the scoped model-inventory boundary, before submission.
-    with pytest.raises(EngineTextError, match="canonical model selection or context settings are unavailable"):
+    with pytest.raises(EngineTextError, match="canonical engine text execution failed"):
         await execute_engine_text(
             _request(tenant_id="tenant-b", key="tenant-denied"),
             client=tenant_client,

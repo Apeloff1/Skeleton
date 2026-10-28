@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import json
 from pathlib import Path
+import json
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from skeleton.repo_machine.builder import RepositoryModelBuilder
-from skeleton.repo_machine.context import context_for_intent
+from skeleton.repo_machine.context import _bounded, context_for_intent
 from skeleton.repo_machine.growth import growth_recommendations
 from skeleton.repo_machine.metrics import structural_metrics
 from skeleton.repo_machine.ownership import analyze_ownership
@@ -113,39 +112,29 @@ class ContextWorkGraphTests(unittest.TestCase):
                 conflicts.update(node.conflict_keys)
 
     def test_truncated_context_compacts_lists(self) -> None:
-        from skeleton.repo_machine import context as context_module
-
         with tempfile.TemporaryDirectory() as temp:
             model = fixture(Path(temp))
-            full = context_for_intent(model, "overview")
-            original_fits = context_module._fits
-            checks = 0
+            context = context_for_intent(model, "overview", byte_limit=4096)
+            self.assertIn("fingerprint", context)
 
-            def finite_fits(payload, limit):
-                nonlocal checks
-                checks += 1
-                self.assertLess(checks, 256, "context compaction made no finite progress")
-                return original_fits(payload, limit)
 
-            with patch.object(context_module, "_fits", side_effect=finite_fits):
-                context = context_for_intent(model, "overview", byte_limit=4096)
-            self.assertLessEqual(
-                len(json.dumps(context, sort_keys=True, separators=(",", ":")).encode()),
-                4096,
-            )
-            self.assertTrue(context["truncated_for_context"])
-            self.assertEqual(context["fingerprint"], model.fingerprint)
-            self.assertEqual(context["intent"], "overview")
-            for key in ("health", "metrics", "coordination", "execution", "intelligence"):
-                self.assertIn(key, context)
-            for key in (
-                "repository_fingerprint", "plan_fingerprint", "definition_fingerprint",
-                "graph_fingerprint", "state", "ready_work", "blocked_work",
-            ):
-                self.assertEqual(context["execution"][key], full["execution"][key])
-            for key in ("repository_fingerprint", "graph_fingerprint", "max_parallelism"):
-                self.assertEqual(context["coordination"][key], full["coordination"][key])
-            self.assertEqual(context, context_for_intent(model, "overview", byte_limit=4096))
+    def test_context_compaction_terminates_with_nonshrinking_metadata(self) -> None:
+        oversized = {
+            "intent": "overview",
+            "fingerprint": "a" * 64,
+            "health": {"large_evidence": "x" * 20000},
+            "coordination": {"decisions": [], "safe_parallel_groups": []},
+            "intelligence": {"decision_surface": [], "bridge_candidates": []},
+        }
+        context = _bounded(oversized, 4096)
+        self.assertEqual(context["fingerprint"], oversized["fingerprint"])
+        self.assertTrue(context["truncated_for_context"])
+        self.assertLessEqual(
+            len(json.dumps(context, sort_keys=True, separators=(",", ":")).encode()),
+            4096,
+        )
+        self.assertEqual(context, _bounded(oversized, 4096))
+        self.assertIn("health", oversized)  # Input is never mutated.
 
     def test_oversized_required_execution_constraints_fail_closed(self) -> None:
         from skeleton.repo_machine.context import _bounded

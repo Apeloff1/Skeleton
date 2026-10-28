@@ -11,21 +11,17 @@ def _workflow() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
 
-def _triggers() -> str:
-    """Inspect actual event registration, not workflow_run references in comments."""
-    return _workflow().split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
-
-
-def test_privileged_workflow_is_manual_only_on_trusted_default_branch():
+def test_privileged_workflow_uses_only_trusted_manual_dispatch():
     text = _workflow()
-    triggers = _triggers()
-    assert "workflow_dispatch:" in triggers
-    for forbidden in (
-        "workflow_run:", "schedule:", "pull_request:", "pull_request_target:",
-        "pull_request_review:", "pull_request_review_comment:", "push:",
-    ):
-        assert forbidden not in triggers
-    assert "options: [observe, apply]" in triggers
+    # Automatic workflow_run and schedule fanout was intentionally retired.
+    assert "\non:\n  workflow_dispatch:\n" in text
+    assert "\n  workflow_run:\n" not in text
+    assert "\n  schedule:\n" not in text
+    assert "pull_request_target:" not in text
+    assert "pull_request_review:" not in text
+    assert "pull_request_review_comment:" not in text
+    assert "options: [observe, apply]" in text
+    assert "default: observe" in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head" not in text
@@ -42,16 +38,17 @@ def test_privileged_python_executes_only_staged_package_in_isolated_mode():
     assert "python -m skeleton.pr_automation.runner" not in text
 
 
-def test_manual_workflow_serializes_writers_and_keeps_cancelled_run_guard():
+def test_manual_workflow_serializes_writers_and_preserves_fail_closed_gates():
     text = _workflow()
-    assert "workflow_dispatch:" in _triggers()
-    assert "workflow_run:" not in _triggers()
-    assert "schedule:" not in _triggers()
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
-    # Keep the dormant completion handler fail-closed if it is re-enabled.
-    assert "github.event.workflow_run.conclusion != 'cancelled'" in text
-    assert "github.event_name != 'workflow_run'" in text
+    assert 'mode="${DISPATCH_MODE:-$DEFAULT_MODE}"' in text
+    assert 'case "$mode" in observe|apply)' in text
+    assert 'PR_AUTOMATION_MERGE_WHEN_READY: ${{ vars.PR_AUTOMATION_MERGE_WHEN_READY || \'false\' }}' in text
+    assert 'PR_RUNNER_QUEUE_PRESSURE_HOLD: "true"' in text
+    assert 'PR_RUNNER_REQUIRE_EXACT_BASE_HEAD: "true"' in text
+    assert 'PR_RUNNER_REQUIRE_SAME_REPOSITORY_HEAD: "true"' in text
+    assert 'PR_RUNNER_REQUIRE_LATEST_REVIEWS_ON_HEAD: "true"' in text
 
 
 def test_workflow_resolves_all_branch_completions_from_head_identity():

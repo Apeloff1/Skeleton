@@ -10,72 +10,94 @@ from .model import RepositoryModel
 from .query import RepositoryQuery
 from .workgraph import build_work_graph
 Intent=Literal["overview","repair","architecture","testing","security","documentation","performance"]
-MAX_CONTEXT_BYTES=48_000
-def _fits(payload,limit): return len(json.dumps(payload,sort_keys=True,separators=(",",":")).encode())<=limit
-def _bounded(payload,limit):
+MAX_CONTEXT_BYTES = 48_000
+# Each pass halves every reducible sequence. A previously compact surface
+# cannot report fictitious progress and keep CI stuck in repeated JSON dumps.
+_CONTEXT_SURFACES = (
+    "files", "entrypoints", "work", "findings", "subsystems",
+    "topology", "coordination", "intelligence",
+)
+_NESTED_SURFACES = (
+    "edges", "cycles", "decisions", "decision_surface",
+    "counterfactual_surface", "bridge_candidates", "safe_parallel_groups",
+)
+
+
+def _fits(payload: dict, limit: int) -> bool:
+    return len(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()) <= limit
+
+
+def _shrink_surface(value: object) -> tuple[object, bool]:
+    """Halve retained evidence with strictly decreasing finite list lengths."""
+    if isinstance(value, list) and value:
+        return value[: len(value) // 2], True
+    if not isinstance(value, dict):
+        return value, False
+    reduced = dict(value)
+    changed = False
+    for name in _NESTED_SURFACES:
+        items = reduced.get(name)
+        if isinstance(items, list) and items:
+            reduced[name] = items[: len(items) // 2]
+            changed = True
+    return (reduced, True) if changed else (value, False)
+
+
+def _bounded(payload: dict, limit: int) -> dict:
     compact = dict(payload)
     compact["truncated_for_context"] = False
     if _fits(compact, limit):
         return compact
+
     compact["truncated_for_context"] = True
-    optional_lists = {
-        "topology": ("edges", "cycles"),
-        "coordination": ("decisions", "ranked_decisions", "safe_parallel_groups"),
-        "intelligence": (
-            "decision_surface", "counterfactual_surface", "bridge_candidates",
-            "safe_parallel_groups",
-        ),
-    }
-    while not _fits(compact,limit):
+    while True:
+        # One serialization per pass, not once per key or an unbounded loop
+        # over unchanged coordination/intelligence metadata.
+        if _fits(compact, limit):
+            return compact
         changed = False
-        for key in ("files","work","findings","subsystems","topology","coordination","intelligence"):
-            value = compact.get(key)
-            candidate = value
-            if isinstance(value, list) and value:
-                candidate = value[:len(value) // 2]
-            elif isinstance(value, dict) and key in optional_lists:
-                candidate = dict(value)
-                for field in optional_lists[key]:
-                    rows = value.get(field)
-                    if isinstance(rows, list) and rows:
-                        candidate[field] = rows[:len(rows) // 2]
-            if candidate != value:
-                compact[key] = candidate
+        for name in _CONTEXT_SURFACES:
+            if name not in compact:
+                continue
+            updated, reduced = _shrink_surface(compact[name])
+            if reduced:
+                compact[name] = updated
                 changed = True
-            if _fits(compact, limit):
-                return compact
         if not changed:
             break
+
+    # The fixed summaries alone can exceed a small context budget. Remove
+    # nonidentity sections deterministically until the serialized result fits.
+    for name in (
+        "entrypoints", "files", "topology", "findings", "work",
+        "subsystems", "coordination", "intelligence", "metrics", "health",
+    ):
+        # Execution constraints and failed-work state are authoritative, not
+        # advisory evidence. Never silently discard them to fit a token budget.
+        compact.pop(name, None)
+        if _fits(compact, limit):
+            return compact
+
+    # Only execution plan detail (not state/identity/constraints) is shrinkable.
+    while not _fits(compact, limit):
+        execution = compact.get("execution")
+        if not isinstance(execution, dict):
+            break
+        reduced = dict(execution)
+        changed = False
+        for field in ("steps", "parallel_batches"):
+            items = reduced.get(field)
+            if isinstance(items, list) and items:
+                reduced[field] = items[: len(items) // 2]
+                changed = True
+        if not changed:
+            break
+        compact["execution"] = reduced
     if not _fits(compact, limit):
-        keep = {
-            "intent", "fingerprint", "health", "metrics", "coordination",
-            "execution", "intelligence", "truncated_for_context",
-        }
-        compact = {key: value for key, value in compact.items() if key in keep}
-        # Retain plan identities, readiness/blocked constraints and execution
-        # state. Only advisory step/zone detail can shrink in the final summary.
-        while not _fits(compact, limit):
-            changed = False
-            for key, fields in (
-                ("execution", ("steps", "parallel_batches")),
-                ("metrics", ("zones",)),
-            ):
-                value = compact.get(key)
-                if not isinstance(value, dict):
-                    continue
-                candidate = dict(value)
-                for field in fields:
-                    rows = value.get(field)
-                    if isinstance(rows, list) and rows:
-                        candidate[field] = rows[:len(rows) // 2]
-                if candidate != value:
-                    compact[key] = candidate
-                    changed = True
-                if _fits(compact, limit):
-                    return compact
-            if not changed:
-                raise ValueError("required repository context exceeds byte_limit")
+        raise ValueError("required repository context exceeds byte_limit")
     return compact
+
+
 def context_for_intent(model:RepositoryModel,intent:Intent="overview",*,byte_limit:int=MAX_CONTEXT_BYTES):
     if isinstance(byte_limit,bool) or not isinstance(byte_limit,int) or not 4096<=byte_limit<=256000: raise ValueError("byte_limit must be in [4096,256000]")
     query=RepositoryQuery(model); graph=build_work_graph(model,limit=32)

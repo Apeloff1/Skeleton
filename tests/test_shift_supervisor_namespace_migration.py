@@ -39,11 +39,32 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
     assert legacy is canonical
 
 
-def test_shift_supervisor_state_reader_is_canonical_without_retired_workflow(tmp_path: Path) -> None:
-    from skeleton.automation.shift_supervisor.__main__ import _read_state
+def test_shift_supervisor_control_failover_uses_canonical_state_reader(tmp_path: Path) -> None:
+    """The retired shift workflow cannot supply state authority or execution."""
+    from core.shift_supervisor.__main__ import main as legacy_main
+    from skeleton.automation.shift_supervisor.__main__ import (
+        _read_state,
+        _write_state,
+        main as canonical_main,
+    )
 
-    old_workflow = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "shift-supervisor-control.yml"
-    assert not old_workflow.exists()
-    state = tmp_path / "state.json"
-    state.write_text('{"version":1,"plan_items":[],"workers":[],"revisions":[]}', encoding="utf-8")
-    assert _read_state(state) == {"version": 1, "plan_items": [], "workers": [], "revisions": []}
+    # The compatibility CLI must delegate to the canonical, bounded entrypoint.
+    assert legacy_main is canonical_main
+    state = {
+        "version": 1,
+        "plan_items": [],
+        "workers": [],
+        "revisions": [],
+    }
+    state_file = tmp_path / "shift-supervisor-state.txt"
+    _write_state(state_file, state)
+    assert state_file.read_text(encoding="utf-8").startswith("gz:v1:")
+    assert _read_state(state_file) == state
+    # Never restore an obsolete privileged CI workflow merely to make the test pass.
+    assert not (
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "shift-supervisor-control.yml"
+    ).exists()
+
