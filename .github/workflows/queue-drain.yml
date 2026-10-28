@@ -13,6 +13,13 @@ on:
 # v7 restores an independent bounded cleanup lane after v6 remained queued
 # while an unrelated ARM owner-cleanup job successfully obtained a runner.
 # One worker and one pending wake coalesce future triggers.
+# Every run has a distinct admission identity so an older workflow-level
+# reservation cannot block the lightweight cleanup worker. The job-level
+# lock below still serializes all worker executions in this repository.
+concurrency:
+  group: queue-drain-admission-v9-${{ github.run_id }}
+  cancel-in-progress: false
+
 permissions: {}
 
 jobs:
