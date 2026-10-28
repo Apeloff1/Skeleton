@@ -28,7 +28,20 @@ def _trusted_named_instance(value: object, type_name: str, *module_names: str) -
 
     for module_name in module_names:
         try:
-            module = importlib.import_module(module_name)
+            if module_name == "skeleton.ai.learning.school.decision_ledger":
+                module = importlib.import_module("skeleton.ai.learning.school.decision_ledger")
+            elif module_name == "skeleton.ai.learning.school.runtime_attestation":
+                module = importlib.import_module("skeleton.ai.learning.school.runtime_attestation")
+            elif module_name == "skeleton.ai.learning.school.runtime_replay":
+                module = importlib.import_module("skeleton.ai.learning.school.runtime_replay")
+            elif module_name == "skeleton.learning.school.decision_ledger":
+                module = importlib.import_module("skeleton.learning.school.decision_ledger")
+            elif module_name == "skeleton.learning.school.runtime_attestation":
+                module = importlib.import_module("skeleton.learning.school.runtime_attestation")
+            elif module_name == "skeleton.learning.school.runtime_replay":
+                module = importlib.import_module("skeleton.learning.school.runtime_replay")
+            else:
+                continue
             candidate = getattr(module, type_name)
         except (ImportError, AttributeError):
             continue

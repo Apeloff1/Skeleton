@@ -30,7 +30,14 @@ def _trusted_twin_instance(
     if isinstance(value, canonical_type):
         return True
     try:
-        module = importlib.import_module(twin_module)
+        if twin_module == "skeleton.ai.learning.school.decision_ledger":
+            module = importlib.import_module("skeleton.ai.learning.school.decision_ledger")
+        elif twin_module == "skeleton.ai.learning.school.runtime_replay":
+            module = importlib.import_module("skeleton.ai.learning.school.runtime_replay")
+        elif twin_module == "skeleton.ai.learning.school.session_runtime":
+            module = importlib.import_module("skeleton.ai.learning.school.session_runtime")
+        else:
+            return False
         twin_type = getattr(module, twin_name)
     except (ImportError, AttributeError):
         return False
