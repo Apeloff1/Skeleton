@@ -329,6 +329,24 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "governed-storage"
+prefixes = ["skeleton/storage/"]
+owner = "platform-runtime"
+criticality = "high"
+purpose = "Canonical governed storage and content-addressed persistence substrate."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "release-cockpit"
+prefixes = ["skeleton/ops/cockpit/"]
+owner = "delivery-plane"
+criticality = "high"
+purpose = "Release cockpit checks, readiness evidence and delivery operations."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "platform"
 prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
 owner = "platform-runtime"
