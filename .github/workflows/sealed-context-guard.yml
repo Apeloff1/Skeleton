@@ -51,7 +51,7 @@ on:
       - 'backend/routes/share.py'
       - 'backend/tests/test_share_page_security.py'
       - 'scripts/chroma_backup.py'
-      - 'tests/test_chroma_backup.py'
+      - 'skeleton/testing/test_chroma_backup.py'
       - 'skeleton/testing/test_delivery_*.py'
       - 'skeleton/testing/test_sealed_*.py'
       - 'pyproject.toml'
@@ -130,4 +130,4 @@ jobs:
         run: |
           python -m pytest -q \
             backend/tests/test_share_page_security.py \
-            tests/test_chroma_backup.py
+            skeleton/testing/test_chroma_backup.py
