@@ -9,6 +9,8 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from routes.playable_access import project_identity, project_router, reauthorize_project_context, scoped_database
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
@@ -28,7 +30,7 @@ import os
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-router = APIRouter(prefix="/imagine", tags=["Image Generation"])
+router = project_router(prefix="/imagine", tags=["Image Generation"])
 
 IMAGE_PROMPT_ENHANCEMENT_POLICY = InstructionPolicy(
     policy_id="backend.image.prompt-enhancement",
@@ -53,12 +55,15 @@ STYLE_PRESETS = {
 
 def _cache_db():
     from core.databases import client as _MONGO
-    return _MONGO[os.environ.get("DB_NAME", "test_database")]
+    return scoped_database(_MONGO[os.environ.get("DB_NAME", "test_database")])
 
 
 def _cache_key(prompt: str, size: str, provider: str) -> str:
     import hashlib
-    return hashlib.sha256(f"{provider}|{size}|{prompt}".encode("utf-8")).hexdigest()
+    import json
+    scope = project_identity()
+    material = [scope["tenant_id"], scope["owner_id"], provider, size, prompt]
+    return hashlib.sha256(json.dumps(material, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 async def _cache_get(key: str) -> Optional[dict]:
@@ -117,14 +122,15 @@ class ImageEditRequest(BaseModel):
 
 async def generate_with_openai(prompt: str, size: str, quality: str, count: int) -> dict:
     """Generate images through the authenticated Skeleton engine media boundary."""
+    scope = await reauthorize_project_context(mutate=True)
     try:
         client = EngineClient.from_env()
         if client is None:
             raise EngineClientError("engine is not configured")
         operation_id = str(uuid.uuid4())
         response = await client.generate_image(
-            actor_id="image-generation",
-            tenant_id="default",
+            actor_id=scope["owner_id"],
+            tenant_id=scope["tenant_id"],
             operation_id=operation_id,
             prompt=prompt,
             size=size,
@@ -132,6 +138,7 @@ async def generate_with_openai(prompt: str, size: str, quality: str, count: int)
             count=count,
             trace_id="image-generation:" + operation_id,
         )
+        await reauthorize_project_context(mutate=True)
         return {
             "provider": response.get("provider", "skeleton-engine"),
             "model": response.get("model", "engine-routed"),
@@ -340,12 +347,14 @@ async def generate_cover(request: CoverRequest):
     if request.pid and cover_b64:
         try:
             db = _cache_db()
+            db = scoped_database(db)
             await db.playables.update_one(
                 {"playable_id": request.pid},
                 {"$set": {"cover_image": cover_b64, "cover_updated_at": datetime.utcnow().isoformat()}})
             stored = True
         except Exception:
             pass
+    await reauthorize_project_context(mutate=True)
     return {
         "status": result.get("status", "unknown"), "provider": result.get("provider"),
         "model": result.get("model"), "pid": request.pid, "stored": stored,
@@ -360,6 +369,7 @@ async def create_variation(request: ImageVariationRequest):
     if request.provider != "openai":
         raise HTTPException(status_code=409, detail="Requested image provider is not declared")
     request_id = str(uuid.uuid4())
+    scope = await reauthorize_project_context(mutate=True)
     try:
         image_bytes = base64.b64decode(request.image_base64, validate=True)
         client = EngineClient.from_env()
@@ -367,13 +377,14 @@ async def create_variation(request: ImageVariationRequest):
             raise EngineClientError("engine is not configured")
         response = await client.create_image_variation(
             image_bytes,
-            actor_id="image-generation",
-            tenant_id="default",
+            actor_id=scope["owner_id"],
+            tenant_id=scope["tenant_id"],
             operation_id=request_id,
             count=request.count,
             size="1024x1024",
             trace_id="image-variation:" + request_id,
         )
+        await reauthorize_project_context(mutate=True)
         return {
             "id": request_id,
             "status": "success",
@@ -394,6 +405,7 @@ async def edit_image(request: ImageEditRequest):
     if request.provider != "openai":
         raise HTTPException(status_code=409, detail="Requested image provider is not declared")
     request_id = str(uuid.uuid4())
+    scope = await reauthorize_project_context(mutate=True)
     try:
         image_bytes = base64.b64decode(request.image_base64, validate=True)
         mask_bytes = (
@@ -407,13 +419,14 @@ async def edit_image(request: ImageEditRequest):
         response = await client.edit_image(
             image_bytes,
             prompt=request.prompt,
-            actor_id="image-generation",
-            tenant_id="default",
+            actor_id=scope["owner_id"],
+            tenant_id=scope["tenant_id"],
             operation_id=request_id,
             mask=mask_bytes,
             size="1024x1024",
             trace_id="image-edit:" + request_id,
         )
+        await reauthorize_project_context(mutate=True)
         images = response.get("images", [])
         if not isinstance(images, list) or not images:
             raise EngineClientError("engine image edit returned no image")
@@ -442,6 +455,7 @@ async def enhance_prompt(
     if provider not in {"openai", "auto"}:
         raise HTTPException(status_code=409, detail="Requested provider is not declared")
     request_id = str(uuid.uuid4())
+    scope = await reauthorize_project_context(mutate=True)
     enhancement_prompt = f"""Create an enhanced, detailed image generation prompt based on:
 
 Original: {prompt}
@@ -464,13 +478,16 @@ Output only the enhanced prompt, no explanations."""
                 instructions=IMAGE_PROMPT_ENHANCEMENT_POLICY.instructions,
                 prompt=enhancement_prompt,
                 idempotency_key="image-prompt-enhancement:" + request_id,
-                actor_id="image-generation",
+                actor_id=scope["owner_id"],
+                tenant_id=scope["tenant_id"],
+                data_class="confidential",
                 capability="assistant.compat",
                 verification_profile="assistant_proposal",
                 max_output_tokens=2_048,
                 purpose="image-prompt-enhancement",
             )
         )
+        await reauthorize_project_context(mutate=True)
         return {
             "id": request_id,
             "original_prompt": prompt,
