@@ -116,6 +116,7 @@ async def test_explicit_legacy_reference_artifact_runs_without_hosted_provider(
     assert result.text == "answer complete"
     assert result.usage.billed_cost == "0"
     assert adapter.require_guarded_inference is False
-    # Legacy operation is explicitly NOT an independently governed receipt.
-    assert result.governance_decision_id is None
-    assert result.admission_decision_id is None
+    # Legacy mode disables context guarding, not the mandatory provider
+    # governance and usage-admission receipts on the canonical adapter.
+    assert isinstance(result.governance_decision_id, str) and result.governance_decision_id
+    assert isinstance(result.admission_decision_id, str) and result.admission_decision_id
