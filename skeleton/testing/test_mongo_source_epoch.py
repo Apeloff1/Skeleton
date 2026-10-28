@@ -330,3 +330,42 @@ async def test_protected_memory_tombstone_rechecks_actor_under_writer_epoch():
     repo.get = original
     with pytest.raises(MongoSourceEpochError, match="quarantined"):
         await read(owner, tenant="tenant-a", actor="user-a")
+
+
+@pytest.mark.asyncio
+async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
+    """Sidecar writes must not bypass the same conversation-source custody."""
+    from unittest.mock import AsyncMock
+    from skeleton.context.sealed_memento import MementoCatalogHead, MementoRecord, SealedMementoArchive
+    from skeleton.context.sealed_sandwich import ContextBinding, ContextSandwichCodec
+    from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
+
+    owner = epoch()
+    mongo = object.__new__(MongoMementoAuthority)
+    mongo.conversation = SimpleNamespace(
+        canonical_source_epoch=owner,
+        _admit_storage=AsyncMock(),
+    )
+    binding = ContextBinding("tenant", "actor", "thread", "local", "policy")
+    archive = SealedMementoArchive(
+        ContextSandwichCodec({"key": b"k" * 32}, active_key_id="key"), binding,
+    )
+    genesis = MementoCatalogHead()
+    ciphertext, _ = archive.seal(MementoRecord(1, "user", b"message"), previous=genesis)
+    assert getattr(MongoMementoAuthority.publish, "__canonical_source_writer_fence__") == "memento"
+    assert getattr(MongoMementoAuthority.retire_thread, "__canonical_source_writer_fence__") == "memento"
+    with pytest.raises(MongoSourceEpochError, match="writer epoch not owned|admission unavailable"):
+        await mongo.publish(
+            archive=archive, expected_head=genesis, expected_thread_version=1,
+            stream="user", ciphertext=ciphertext, custody_mode="witnessed",
+        )
+    with pytest.raises(MongoSourceEpochError, match="writer epoch not owned|admission unavailable"):
+        await mongo.retire_thread(tenant_id="tenant", owner_id="actor", thread_id="thread")
+    assert mongo.conversation._admit_storage.await_count == 0
+
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    # The test deliberately leaves the mutation method unimplemented: only the
+    # ownership preflight is under test. Denied calls never begin Mongo writes.
+    with pytest.raises(MongoSourceEpochError, match="actor missing"):
+        await mongo.retire_thread(tenant_id="tenant", owner_id=None, thread_id="thread")
+    assert await read(owner) == 2
