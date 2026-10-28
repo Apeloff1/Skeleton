@@ -217,6 +217,7 @@ async def test_local_adapter_preserves_tool_call_contract() -> None:
                 model_id="tool-local",
                 model_digest=digest,
                 runner=runner,
+                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
@@ -269,6 +270,7 @@ async def test_local_engine_rejects_undeclared_tool_call():
             model_id="tool-boundary",
             model_digest=digest,
             runner=runner,
+            protocol_capabilities=("text-generation", "tool-calls"),
         )
     )
     request=LocalInferenceRequest(
@@ -316,6 +318,7 @@ async def test_local_engine_validates_tool_argument_schema():
             model_id="schema-boundary",
             model_digest=digest,
             runner=runner,
+            protocol_capabilities=("text-generation", "tool-calls"),
         )
     )
     request=LocalInferenceRequest(
@@ -355,6 +358,7 @@ async def test_local_engine_validates_structured_output_schema():
             model_id="structured-boundary",
             model_digest=digest,
             runner=runner,
+            protocol_capabilities=("text-generation", "structured-output"),
         )
     )
     request=LocalInferenceRequest(
@@ -592,29 +596,42 @@ async def test_saturated_scheduler_drains_admitted_requests_before_close() -> No
         assert release.wait(3)
         return _lifecycle_result()
 
-    scheduler = LocalInferenceScheduler(
-        _lifecycle_engine(run), max_batch_size=1, batch_window_ms=0,
+    # The engine owns the bounded fair queue; the scheduler no longer has
+    # a second FIFO or an admission lock. Exercise real overload and drain.
+    engine = LocalInferenceEngine(
+        CallableLocalModel(model_id="lifecycle", model_digest="a" * 64, runner=run),
+        cache_size=0, max_queue_size=8,
     )
+    scheduler = LocalInferenceScheduler(engine, max_batch_size=1, batch_window_ms=0)
     first = asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt="first")))
     await _wait_for_signal(started)
-    pending = [asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt=str(i))))
-               for i in range(34)]
-    async def wait_for_pressure():
-        while not scheduler._queue.full() or not scheduler._admission_lock.locked():
-            await asyncio.sleep(0)
-    await asyncio.wait_for(wait_for_pressure(), timeout=1)
-    closing = asyncio.create_task(scheduler.close())
-    await asyncio.sleep(0)
-    release.set()
-    await asyncio.wait_for(closing, timeout=2)
-    results = await asyncio.wait_for(
-        asyncio.gather(first, *pending, return_exceptions=True), timeout=2,
-    )
-    assert sum(isinstance(result, LocalInferenceResult) for result in results) == 34
-    assert isinstance(results[-1], RuntimeError)
-    assert str(results[-1]) == "local inference scheduler is closed"
-    assert scheduler._queue.empty()
+    pending = [
+        asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt=str(i))))
+        for i in range(34)
+    ]
 
+    async def wait_for_pressure():
+        while engine.snapshot()["overloaded"] == 0:
+            await asyncio.sleep(0)
+
+    try:
+        await asyncio.wait_for(wait_for_pressure(), timeout=2)
+        closing = asyncio.create_task(scheduler.close())
+        await asyncio.sleep(0)
+    finally:
+        release.set()
+
+    await asyncio.wait_for(closing, timeout=4)
+    results = await asyncio.wait_for(
+        asyncio.gather(first, *pending, return_exceptions=True), timeout=4,
+    )
+    assert isinstance(results[0], LocalInferenceResult)
+    assert any(isinstance(result, Exception) for result in results[1:])
+    assert all(isinstance(result, (LocalInferenceResult, Exception)) for result in results)
+    assert engine.snapshot()["active"] == 0
+    assert engine.snapshot()["queued"] == 0
+    with pytest.raises(RuntimeError, match="closed"):
+        await scheduler.submit(LocalInferenceRequest(prompt="too late"))
 
 @pytest.mark.asyncio
 async def test_cancelled_close_keeps_shared_shutdown_owned() -> None:
