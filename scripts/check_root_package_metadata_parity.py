@@ -14,6 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _setup_requirements(raw: str) -> list[str]:
+    """Ignore configparser multiline layout blanks, not invalid requirements."""
+    return _requirements([line.strip() for line in raw.splitlines() if line.strip()])
+
+
 def _requirements(values: object) -> list[str]:
     if not isinstance(values, list) or any(
         not isinstance(value, str) or not value.strip() for value in values
@@ -47,7 +52,7 @@ def validate(pyproject_text: str, setup_text: str) -> list[str]:
     cfg.read_string(setup_text)
     declared = _requirements(project["project"]["dependencies"])
     setup = cfg.get("options", "install_requires")
-    from_setup = _requirements([line.strip() for line in setup.splitlines() if line.strip()])
+    from_setup = _setup_requirements(setup)
     issues: list[str] = []
     _validate_unique_packages(declared, "pyproject core", issues)
     _validate_unique_packages(from_setup, "setup.cfg core", issues)
@@ -66,7 +71,7 @@ def validate(pyproject_text: str, setup_text: str) -> list[str]:
     if not isinstance(optional, dict):
         raise ValueError("optional-dependencies must be a mapping")
     setup_extras = {
-        name: _requirements([line.strip() for line in raw.splitlines() if line.strip()])
+        name: _setup_requirements(raw)
         for name, raw in cfg.items("options.extras_require")
     }
     for extra in sorted(set(optional) | set(setup_extras)):
