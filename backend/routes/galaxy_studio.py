@@ -3152,30 +3152,9 @@ async def _run_background_build_inner(
             raise GalaxyBuildStopped("artifact_file_budget_exhausted")
         await asyncio.to_thread(_worker_cooldown, context=f"after-batch-{batch_num}")
 
-    # Preserve the existing requested delivery floor while keeping physical
-    # custody and at most one small unharvested result. No RAM fallback on I/O
-    # failure and no further submissions until a durable append is confirmed.
-    complexity = int(build.get("complexity", 60) or 60)
-    floor_target = max(50000, 50000 + (complexity - 50) * 2500)
-    sliders = [
-        build.get(key, 0)
-        for key in (
-            "graphics_era",
-            "world_size",
-            "ai_complexity",
-            "physics_realism",
-            "narrative_branching",
-            "multiplayer_max",
-        )
-    ]
-    if any(int(value or 0) >= 8 for value in sliders):
-        floor_target += 75000
-    if all(int(value or 0) >= 9 for value in sliders):
-        floor_target += 125000
-    fusion = max(1.0, min(1.6, float(build.get("fusion_multiplier", 1.0) or 1.0)))
-    # Explicitly bounded builds receive real phase outputs only. Padding is
-    # not evidence of quality and must not inflate a caller's file ceiling.
-    floor_target = 0 if _explicit_file_budget(build) is not None else (min(int(floor_target * fusion), GLOBAL_FILE_BUDGET) if GLOBAL_FILE_BUDGET > 0 else int(floor_target * fusion))
+    # Do not impose an arbitrary minimum or synthesize filler files to meet
+    # a count. Actual durable generator output determines delivered size.
+    floor_target = 0
     from core import build_vault as _bv
 
     current_files = await asyncio.to_thread(_bv.get_file_count, build_id)
