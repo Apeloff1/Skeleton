@@ -13,14 +13,15 @@ on:
 # v7 restores an independent bounded cleanup lane after v6 remained queued
 # while an unrelated ARM owner-cleanup job successfully obtained a runner.
 # One worker and one pending wake coalesce future triggers.
-concurrency:
-  group: queue-drain-v7-${{ github.repository }}
-  cancel-in-progress: false
-
 permissions: {}
 
 jobs:
   drain:
+    # Keep a single active drainer, but admit the workflow before competing
+    # for job-level concurrency; this avoids provider-stuck workflow pending.
+    concurrency:
+      group: queue-drain-worker-v8-${{ github.repository }}
+      cancel-in-progress: false
     # Main failures still trigger immediate recovery. Cancelled/skipped main
     # head checks are supersession tombstones, not useful new queue evidence.
     # The schedule still recovers capacity if no checks complete successfully.
