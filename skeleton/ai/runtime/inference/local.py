@@ -15,6 +15,8 @@ runtimes plug into CallableLocalModel without changing cognitive orchestration.
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
 import hashlib
 import json
 import math
@@ -1708,7 +1710,10 @@ class LocalInferenceEngine:
         max_concurrency: int = 1,
         max_batch_size: int = 256,
         max_queue_size: int = 256,
+        require_guarded_context: bool = False,
     ) -> None:
+        if type(require_guarded_context) is not bool:
+            raise ProviderPolicyError("guarded engine mode must be explicit")
         if not hasattr(model, "infer") or not hasattr(model, "model_digest"):
             raise TypeError("model must implement LocalModelBackend")
         if isinstance(cache_size, bool) or not isinstance(cache_size, int) or cache_size < 0:
@@ -1726,6 +1731,14 @@ class LocalInferenceEngine:
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= upper:
                 raise ValueError(f"{name} must be between 1 and {upper}")
         self.model = model
+        self.require_guarded_context = require_guarded_context
+        self._verified_guard_owner: Any | None = None
+        # The scope is task-local, exact-request bound, and always revoked in
+        # a finally block. It is an in-process integration fence, not a sandbox
+        # against arbitrary trusted Python code.
+        self._guard_scope: ContextVar[tuple[str, str, asyncio.Task[Any]] | None] = ContextVar(
+            "skeleton.local.verified_context", default=None,
+        )
         self.cache_size = cache_size
         self.max_concurrency = max_concurrency
         self.max_batch_size = max_batch_size
@@ -2890,6 +2903,64 @@ class LocalInferenceEngine:
                 break
         return size
 
+    def _bind_verified_guard(self, guard: Any) -> None:
+        """Bind exactly one composition-owned verifier, before protected use."""
+        from skeleton.context.pre_delivery_guard import GuardedLocalInference
+        if (not self.require_guarded_context
+                or not isinstance(guard, GuardedLocalInference)
+                or guard.engine is not self):
+            raise ProviderPolicyError("local engine cannot bind a foreign guard")
+        if self._verified_guard_owner is not None and self._verified_guard_owner is not guard:
+            raise ProviderPolicyError("verified local guard identity cannot be replaced")
+        self._verified_guard_owner = guard
+
+    @contextmanager
+    def _verified_guard_scope(
+        self, request: LocalInferenceRequest, *, context_root: str,
+        token_echo: str | None, reviewer_id: str, guard_identity: Any,
+    ):
+        """Scoped permit available only after the independent preflight gate."""
+        if not self.require_guarded_context:
+            raise ProviderPolicyError("verified scope is unavailable on legacy local engines")
+        if guard_identity is not self._verified_guard_owner or self._verified_guard_owner is None:
+            raise ProviderPolicyError("local inference rejected unregistered guard identity")
+        if (not isinstance(request, LocalInferenceRequest)
+                or not isinstance(context_root, str)
+                or request.context_digest != context_root
+                or not isinstance(token_echo, str) or len(token_echo) != 64
+                or not isinstance(reviewer_id, str) or not reviewer_id):
+            raise ProviderPolicyError("local verified scope lacks bound preflight evidence")
+        task = asyncio.current_task()
+        if task is None:
+            raise ProviderPolicyError("guarded local permit requires active asyncio task")
+        token = self._guard_scope.set((request.digest, context_root, task))
+        try:
+            yield
+        finally:
+            self._guard_scope.reset(token)
+
+    def _require_guard_scope(
+        self, request: LocalInferenceRequest, *, allow_worker_thread: bool = False,
+    ) -> None:
+        if not self.require_guarded_context:
+            return
+        permit = self._guard_scope.get()
+        if (not isinstance(request, LocalInferenceRequest)
+                or permit is None
+                or permit[:2] != (request.digest, request.context_digest)):
+            raise ProviderPolicyError("local inference requires verified context admission")
+        try:
+            task = asyncio.current_task()
+        except RuntimeError:
+            # The canonical engine's admitted tokenizer/memory preflight runs
+            # in asyncio.to_thread, which carries ContextVars but has no loop.
+            # A worker may prepare data, not invoke async generation itself.
+            if allow_worker_thread:
+                return
+            raise ProviderPolicyError("guarded local generation requires owning asyncio task")
+        if task is not permit[2]:
+            raise ProviderPolicyError("guarded local permit cannot move into a child task")
+
     def prepare_input(
         self,
         request: LocalInferenceRequest,
@@ -2904,6 +2975,7 @@ class LocalInferenceEngine:
         """
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
+        self._require_guard_scope(request, allow_worker_thread=True)
         for name, value in (("scope_id", scope_id), ("tenant_scope_id", tenant_scope_id)):
             if value is not None and (not isinstance(value, str) or not value or len(value) > 512):
                 raise ValueError(f"{name} must be a non-empty bounded string")
@@ -3082,6 +3154,7 @@ class LocalInferenceEngine:
         """
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
+        self._require_guard_scope(request)
         if work_class not in {"interactive", "background"}:
             raise ValueError("local work_class must be interactive or background")
         for name, value in (
@@ -3382,6 +3455,8 @@ class LocalInferenceEngine:
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
+        if self.require_guarded_context:
+            raise ProviderPolicyError("guarded local batches require per-request verification")
         if work_class not in {"interactive", "background"}:
             raise ValueError("local work_class must be interactive or background")
         for name, value in (
@@ -3661,12 +3736,39 @@ class LocalModelAdapter(ProviderAdapter):
         *,
         default_seed: int = 0,
         artifact_status: Mapping[str, object] | None = None,
+        guarded_service: Any | None = None,
+        require_guarded_inference: bool = False,
     ) -> None:
+        # Protected local operations may not fall through to the plain
+        # scheduler/cache path. A trusted composition root supplies the
+        # canonical snapshot reader and independent review policy.
+        if type(require_guarded_inference) is not bool:
+            raise ProviderPolicyError("guard-required mode must be explicit")
+        if require_guarded_inference:
+            from .guarded_service import CanonicalGuardedLocalService
+            if (not isinstance(guarded_service, CanonicalGuardedLocalService)
+                    or guarded_service.guard.engine is not engine):
+                raise ProviderPolicyError("guard-required local route lacks its own verified engine")
+        elif guarded_service is not None:
+            raise ProviderPolicyError("guarded service cannot be supplied without enforced routing")
+        self.guarded_service = guarded_service
+        self.require_guarded_inference = require_guarded_inference
+        if require_guarded_inference and not engine.require_guarded_context:
+            raise ProviderPolicyError("guarded adapter requires fail-closed engine-side admission")
+        if require_guarded_inference:
+            engine._bind_verified_guard(guarded_service.guard)
         self.engine = engine
         self.model = engine.model.model_id
         self._activated_model_digest = engine.model.model_digest
         self.default_seed = default_seed
         self._artifact_status = None if artifact_status is None else dict(artifact_status)
+        # Capture an immutable *content* pin; the legacy metadata alias remains
+        # testable but mutations never become new trusted execution authority.
+        self._artifact = self._artifact_status
+        self._artifact_activation_digest = (
+            None if self._artifact_status is None
+            else _digest(self._artifact_status)
+        )
 
     @property
     def available(self) -> bool:
@@ -3708,9 +3810,87 @@ class LocalModelAdapter(ProviderAdapter):
         """Return the exact configured route's bounded input/execution contract."""
         return self.engine.execution_contract(model_id=self.model)
 
+    def execution_identity(self) -> dict[str, Any]:
+        """Detached artifact/seed pin for a durable owner to persist and compare.
+
+        This value is not itself a checkpoint: only the execution repository
+        can make an atomic, monotonic checkpoint CAS before dispatch.
+        """
+        from skeleton.provider_runtime import ProviderUnavailableError
+
+        artifact = self._artifact_status
+        if not isinstance(artifact, dict) or self._artifact_activation_digest is None:
+            raise ProviderUnavailableError("local execution identity lacks activated artifact evidence")
+        try:
+            if _digest(artifact) != self._artifact_activation_digest:
+                raise ValueError("activated artifact receipt changed after admission")
+            fields = ("schema", "model_id", "model_digest", "artifact_sha256",
+                      "artifact_bytes", "reference")
+            if any(field not in artifact for field in fields):
+                raise ValueError("local execution identity lacks required artifact fields")
+            for field in ("schema", "model_id", "reference"):
+                value = artifact[field]
+                if (type(value) is not str or not value or len(value) > 256
+                        or any(ord(character) < 32 for character in value)):
+                    raise ValueError("local execution identity includes invalid artifact identity")
+            for field in ("artifact_sha256", "model_digest"):
+                value = artifact[field]
+                if (type(value) is not str or len(value) != 64
+                        or any(ch not in "0123456789abcdef" for ch in value)):
+                    raise ValueError("local execution identity includes invalid digest")
+            if (type(artifact["artifact_bytes"]) is not int
+                    or not 1 <= artifact["artifact_bytes"] <= 1024**4):
+                raise ValueError("local execution identity has invalid artifact byte count")
+            if (artifact["model_id"] != self.model
+                    or artifact["model_digest"] != self._activated_model_digest
+                    or self.engine.model.model_digest != self._activated_model_digest):
+                raise ValueError("local execution identity drift from activated weights")
+            if not artifact["reference"].startswith(
+                ("local-model-artifact:", "local-model-deployment:")
+            ):
+                raise ValueError("local execution identity reference is not content addressed")
+            reference_digest = artifact["reference"].rsplit(":", 1)[-1]
+            expected_digest = (
+                artifact.get("manifest_digest")
+                if artifact["reference"].startswith("local-model-deployment:")
+                else artifact["artifact_sha256"]
+            )
+            if reference_digest != expected_digest:
+                raise ValueError("local execution identity reference digest mismatch")
+            if type(self.default_seed) is not int or not 0 <= self.default_seed < 2**64:
+                raise ValueError("local execution identity seed is invalid")
+            # Never return a live mapping or filesystem path. The only allowed
+            # keys are the artifact loader's stable content-addressed receipt
+            # and explicitly declared catalog/deployment provenance fields.
+            allowed = set(fields) | {
+                "source_model_id", "catalog_digest", "catalog_entry_digest",
+                "catalog_source_sha256", "manifest_digest", "runtime_digest",
+                "runtime_kind",
+            }
+            if set(artifact) - allowed:
+                raise ValueError("local execution identity has unknown artifact fields")
+            for field in set(artifact) - set(fields):
+                value = artifact[field]
+                if type(value) is not str or not value or len(value) > 256:
+                    raise ValueError("local execution identity has invalid extra field")
+                if field.endswith("digest") or field.endswith("sha256"):
+                    if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                        raise ValueError("local execution identity has invalid provenance digest")
+            receipt = json.loads(_stable_json(artifact))
+        except (TypeError, ValueError, OverflowError, UnicodeError) as exc:
+            raise ProviderUnavailableError("local execution identity failed artifact validation") from exc
+        return {
+            "schema_version": "skeleton.local_provider.execution_identity.v1",
+            "provider_id": self.provider_id,
+            "model_id": self.model,
+            "artifact": receipt,
+            "inference": {"default_seed": self.default_seed},
+        }
+
     def status(self) -> dict[str, Any]:
         status = super().status()
         status["execution_mode"] = "local"
+        status["guard_required"] = self.require_guarded_inference
         status["network_policy"] = "none"
         status["model_digest"] = self.engine.model.model_digest
         status["runtime_digest"] = self.runtime_digest
@@ -3811,6 +3991,21 @@ class LocalModelAdapter(ProviderAdapter):
             tool_choice=choice,
             specific_tool_id=(str(request.specific_tool_id).strip() if choice == "specific" else None),
         )
+        if self.require_guarded_inference:
+            # Compiler context_digest and native Merkle root are distinct
+            # namespaces. A durable, independently authorized snapshot reader
+            # may derive the latter after verifying the *exact* provider
+            # envelope against its stored compiled handoff.
+            projector = getattr(self.guarded_service.snapshots, "prepare_provider", None)
+            if projector is not None:
+                if not callable(projector):
+                    raise ProviderPolicyError("canonical guarded context projector is unavailable")
+                admitted_root = await projector(request)
+                if (not isinstance(admitted_root, str)
+                        or len(admitted_root) != 64
+                        or any(ch not in "0123456789abcdef" for ch in admitted_root)):
+                    raise ProviderPolicyError("durable native context root is invalid")
+                local_request = replace(local_request, context_digest=admitted_root)
         remaining = float(budget.max_wall_seconds) - (time.monotonic() - started)
         if request.deadline is not None:
             if (
@@ -3864,20 +4059,107 @@ class LocalModelAdapter(ProviderAdapter):
         remaining = serving_deadline - time.monotonic()
         if remaining <= 0:
             raise LocalInferenceCancelled("local inference deadline exceeded during preparation")
+        execution_options = {
+            "work_class": work_class,
+            "scope_id": cache_scope,
+            "preemption_scope_id": preemption_scope,
+            "deadline": serving_deadline,
+            "resource_max_input_tokens": budget.max_input_tokens,
+            "resource_max_output_tokens": budget.max_output_tokens,
+        }
         try:
-            result = await asyncio.wait_for(
-                self.engine.generate(
-                    local_request,
-                    work_class=work_class,
-                    scope_id=cache_scope,
-                    preemption_scope_id=preemption_scope,
-                    tenant_scope_id=tenant_scope,
-                    deadline=serving_deadline,
-                    resource_max_input_tokens=budget.max_input_tokens,
-                    resource_max_output_tokens=budget.max_output_tokens,
-                ),
-                timeout=remaining,
-            )
+            if self.require_guarded_inference:
+                # This is the only provider route while protected mode is on.
+                # Its guard must resolve authoritative context, check native
+                # preparation, perform model inference (including cache hits),
+                # and recheck the snapshot before any answer is returned.
+                if not isinstance(effective_tenant, str) or not effective_tenant:
+                    raise ProviderPolicyError("guarded local inference requires tenant authority")
+                if not isinstance(request.context_id, str) or not request.context_id:
+                    raise ProviderPolicyError("guarded local inference requires canonical context")
+                if not isinstance(local_request.context_digest, str) or not local_request.context_digest:
+                    raise ProviderPolicyError("guarded local inference requires independently pinned context digest")
+                if local_request.tools:
+                    raise ProviderPolicyError("guarded local tool calls require independently verified execution")
+                from skeleton.context.pre_delivery_guard import DeliveryContract
+                contract = (
+                    DeliveryContract("json", json_schema=local_request.structured_output_schema)
+                    if local_request.structured_output_schema is not None
+                    else DeliveryContract()
+                )
+                async def invoke_verified() -> Any:
+                    # An engine-owned durable reader must be activated for
+                    # this *exact* native digest inside the wait_for task, not
+                    # in the parent task where ContextVar inheritance could
+                    # accidentally confer the wrong execution identity.
+                    reader = self.guarded_service.snapshots
+                    binder = getattr(reader, "bind_execution", None)
+                    if binder is None:
+                        scope = nullcontext()
+                    else:
+                        if not callable(binder):
+                            raise ProviderPolicyError("durable snapshot binding is not callable")
+                        if not isinstance(request.execution_id, str) or not request.execution_id:
+                            raise ProviderPolicyError("durable guarded route requires engine execution ID")
+                        scope = binder(
+                            execution_id=request.execution_id,
+                            tenant_id=effective_tenant,
+                            context_id=request.context_id,
+                            request_digest=local_request.digest,
+                        )
+                    with scope:
+                        return await self.guarded_service.generate(
+                            local_request,
+                            tenant_scope_id=effective_tenant,
+                            context_id=request.context_id,
+                            contract=contract,
+                            **execution_options,
+                        )
+
+                generation = await asyncio.wait_for(
+                    invoke_verified(), timeout=remaining,
+                )
+                from .guarded_service import GuardedGeneration
+                from skeleton.context.pre_delivery_guard import PreDeliveryReceipt
+                if (not isinstance(generation, GuardedGeneration)
+                        or not isinstance(generation.receipt, PreDeliveryReceipt)
+                        or not isinstance(generation.result, LocalInferenceResult)):
+                    raise ProviderPolicyError("guarded local response lacks verified delivery receipt")
+                result = generation.result
+                receipt = generation.receipt
+                if (receipt.request_digest != local_request.digest
+                        or receipt.context_root != local_request.context_digest
+                        or not receipt.token_echo_sha256
+                        or not isinstance(receipt.token_sequence_sha256, str)
+                        or len(receipt.token_sequence_sha256) != 64
+                        or any(ch not in "0123456789abcdef"
+                               for ch in receipt.token_sequence_sha256)
+                        or not receipt.reviewer_id
+                        or receipt.response_sha256 != hashlib.sha256(
+                            result.text.encode("utf-8")
+                        ).hexdigest()):
+                    raise ProviderPolicyError("guarded local receipt does not match delivered payload")
+                if result.tool_calls:
+                    raise ProviderPolicyError("unverified local tool calls cannot escape guarded route")
+                if result.structured_output is not None:
+                    if local_request.structured_output_schema is None:
+                        raise ProviderPolicyError("unsolicited structured output bypassed guarded contract")
+                    from skeleton.context.delivery_schema import parse_and_validate_delivery_json
+                    parsed = parse_and_validate_delivery_json(
+                        result.text, local_request.structured_output_schema,
+                    )
+                    if not isinstance(parsed, dict) or (
+                        _stable_json(dict(result.structured_output)) != _stable_json(parsed)
+                    ):
+                        raise ProviderPolicyError("structured output differs from verified delivery text")
+            else:
+                result = await asyncio.wait_for(
+                    self.engine.generate(
+                        local_request, tenant_scope_id=tenant_scope,
+                        **execution_options,
+                    ),
+                    timeout=remaining,
+                )
         except TimeoutError as exc:
             raise LocalInferenceCancelled("local inference deadline exceeded") from exc
         except LocalInputBudgetError as exc:

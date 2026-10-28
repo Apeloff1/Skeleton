@@ -1,5 +1,4 @@
 """Native training and model-improvement runtime surfaces."""
-from importlib import import_module
 
 from .data import (
     DataQualityReport,
@@ -129,36 +128,12 @@ _LAZY_EXPORTS = {
 }
 
 
-def _load_trusted_lazy_module(module_name: str):
-    """Import from the repository-owned export map using only literal targets."""
-    if module_name == "checkpoint_archive":
-        return import_module(".checkpoint_archive", __name__)
-    if module_name == "data":
-        return import_module(".data", __name__)
-    if module_name == "distributed_trainer":
-        return import_module(".distributed_trainer", __name__)
-    if module_name == "elastic_trainer":
-        return import_module(".elastic_trainer", __name__)
-    if module_name == "learning_pipeline":
-        return import_module(".learning_pipeline", __name__)
-    if module_name == "neural_trainer":
-        return import_module(".neural_trainer", __name__)
-    if module_name == "observability":
-        return import_module(".observability", __name__)
-    if module_name == "preference_trainer":
-        return import_module(".preference_trainer", __name__)
-    if module_name == "verifier":
-        return import_module(".verifier", __name__)
-    raise ImportError("unregistered lazy export module")
-
-
-
 def __getattr__(name: str):
     for module_name, names in _LAZY_EXPORTS.items():
         if name in names:
             from importlib import import_module
 
-            value = getattr(_load_trusted_lazy_module(module_name), name)
+            value = getattr(import_module("." + module_name, __name__), name)
             globals()[name] = value
             return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

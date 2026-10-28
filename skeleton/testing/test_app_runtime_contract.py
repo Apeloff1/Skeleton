@@ -25,7 +25,7 @@ def test_runtime_status_aggregates_backend_engine_and_mongo(monkeypatch):
             assert name == "ping"
             return {"ok": 1}
 
-    async def fake_engine(timeout_s: float):
+    def fake_engine(timeout_s: float):
         assert timeout_s == 0.5
         return {
             "name": "skeleton",
@@ -77,16 +77,17 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
 
     monkeypatch.setattr(runtime, "core_db", FailedDB())
     monkeypatch.setattr(runtime, "public_readiness", lambda: (_ for _ in ()).throw(RuntimeError("readiness unavailable")))
-    async def fake_engine(_timeout):
-        return {
+    monkeypatch.setattr(
+        runtime,
+        "_probe_engine",
+        lambda _timeout: {
             "name": "skeleton",
             "ok": True,
             "status": 200,
             "latency_ms": 1,
             "detail": "healthy",
-        }
-
-    monkeypatch.setattr(runtime, "_probe_engine", fake_engine)
+        },
+    )
 
     payload = asyncio.run(runtime._runtime_status(250))
 
@@ -103,22 +104,18 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
 def test_ready_endpoint_uses_http_status_for_whole_app_verdict(monkeypatch):
     runtime = _runtime_module()
 
-    async def healthy(_timeout_ms: int, *, state=None):
+    async def healthy(_timeout_ms: int):
         return {"ok": True, "services": []}
 
-    async def degraded(_timeout_ms: int, *, state=None):
+    async def degraded(_timeout_ms: int):
         return {"ok": False, "services": []}
 
-    from fastapi import FastAPI
-    from starlette.requests import Request
-
-    request = Request({"type": "http", "app": FastAPI(), "method": "GET", "path": "/api/app/ready", "headers": []})
     monkeypatch.setattr(runtime, "_runtime_status", healthy)
-    healthy_response = asyncio.run(runtime.app_ready(request, 500))
+    healthy_response = asyncio.run(runtime.app_ready(500))
     assert healthy_response.status_code == 200
 
     monkeypatch.setattr(runtime, "_runtime_status", degraded)
-    degraded_response = asyncio.run(runtime.app_ready(request, 500))
+    degraded_response = asyncio.run(runtime.app_ready(500))
     assert degraded_response.status_code == 503
 
 

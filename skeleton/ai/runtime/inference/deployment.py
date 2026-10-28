@@ -338,6 +338,8 @@ class LocalModelDeployment:
         max_concurrency: int = 1,
         max_queue_size: int = 256,
         max_batch_size: int = 256,
+        require_guarded_inference: bool = False,
+        guarded_components: Any | None = None,
     ) -> LocalModelAdapter:
         adapter = build_llama_cpp_adapter(
             self.llama_cpp_config(rehash_artifacts_each_run=rehash_artifacts_each_run),
@@ -346,6 +348,8 @@ class LocalModelDeployment:
             max_concurrency=max_concurrency,
             max_queue_size=max_queue_size,
             max_batch_size=max_batch_size,
+            require_guarded_inference=require_guarded_inference,
+            guarded_components=guarded_components,
         )
         model = adapter.engine.model
         if not isinstance(model, LlamaCppModel):
@@ -358,6 +362,8 @@ class LocalModelDeployment:
         return LocalModelAdapter(
             adapter.engine,
             default_seed=default_seed,
+            guarded_service=adapter.guarded_service,
+            require_guarded_inference=adapter.require_guarded_inference,
             artifact_status={
                 "schema": SCHEMA,
                 "model_id": model.model_id,
@@ -502,6 +508,8 @@ def load_local_model_adapter(
     max_concurrency: int = 1,
     max_queue_size: int = 256,
     max_batch_size: int = 256,
+    require_guarded_inference: bool = False,
+    guarded_components: Any | None = None,
 ) -> LocalModelAdapter:
     return LocalModelDeployment.load(manifest_path).adapter(
         cache_size=cache_size,
@@ -510,6 +518,8 @@ def load_local_model_adapter(
         max_concurrency=max_concurrency,
         max_queue_size=max_queue_size,
         max_batch_size=max_batch_size,
+        require_guarded_inference=require_guarded_inference,
+        guarded_components=guarded_components,
     )
 
 

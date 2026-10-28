@@ -90,14 +90,7 @@ def test_frozen_packages_import_without_warnings(name: str) -> None:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            if name == "persist":
-                module = importlib.import_module("skeleton.persist")
-            elif name == "storage":
-                module = importlib.import_module("skeleton.storage")
-            elif name == "state":
-                module = importlib.import_module("skeleton.state")
-            else:
-                raise ValueError("unknown frozen persistence package")
+            module = importlib.import_module(module_name)
         assert NOTICE in (module.__doc__ or "")
     finally:
         sys.modules.update(saved)

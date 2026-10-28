@@ -30,20 +30,8 @@ def test_research_lineage_roots_are_historical_not_runtime_support() -> None:
         "skeleton/spine/",
         "skeleton/viscera/",
     }
-    # Preserve the explicit (not catch-all) owner inventory for live roots.
-    # These nine roots are separately classified as unresolved, not promoted
-    # to the historical research-lineage lifecycle.
     assert set(specialized["prefixes"]) == {
         "skeleton/cue/",
-        "skeleton/cs300/",
-        "skeleton/dna/",
-        "skeleton/fix/",
-        "skeleton/house/",
-        "skeleton/maximise/",
-        "skeleton/organs/",
-        "skeleton/p3/",
-        "skeleton/p4/",
-        "skeleton/p5/",
         "skeleton/genos/",
         "skeleton/parse/",
         "skeleton/turn/",

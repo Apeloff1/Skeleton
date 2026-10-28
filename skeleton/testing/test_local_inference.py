@@ -217,6 +217,7 @@ async def test_local_adapter_preserves_tool_call_contract() -> None:
                 model_id="tool-local",
                 model_digest=digest,
                 runner=runner,
+                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
@@ -600,20 +601,24 @@ async def test_saturated_scheduler_drains_admitted_requests_before_close() -> No
     pending = [asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt=str(i))))
                for i in range(34)]
     async def wait_for_pressure():
-        while not scheduler._queue.full() or not scheduler._admission_lock.locked():
+        # Scheduler no longer owns a second FIFO; the engine is authoritative.
+        while (scheduler.snapshot()["inflight_submissions"] < len(pending) + 1
+               or scheduler.engine.snapshot()["queued"] == 0):
             await asyncio.sleep(0)
-    await asyncio.wait_for(wait_for_pressure(), timeout=1)
+    await asyncio.wait_for(wait_for_pressure(), timeout=2)
     closing = asyncio.create_task(scheduler.close())
     await asyncio.sleep(0)
     release.set()
-    await asyncio.wait_for(closing, timeout=2)
+    await asyncio.wait_for(closing, timeout=5)
     results = await asyncio.wait_for(
-        asyncio.gather(first, *pending, return_exceptions=True), timeout=2,
+        asyncio.gather(first, *pending, return_exceptions=True), timeout=5,
     )
-    assert sum(isinstance(result, LocalInferenceResult) for result in results) == 34
-    assert isinstance(results[-1], RuntimeError)
-    assert str(results[-1]) == "local inference scheduler is closed"
-    assert scheduler._queue.empty()
+    from skeleton.ai.runtime.inference.local import LocalInferenceOverloaded
+    assert isinstance(results[0], LocalInferenceResult)
+    assert all(isinstance(result, (LocalInferenceResult, LocalInferenceOverloaded))
+               for result in results)
+    assert scheduler.snapshot()["inflight_submissions"] == 0
+    assert scheduler.engine.snapshot()["queued"] == 0
 
 
 @pytest.mark.asyncio

@@ -100,28 +100,28 @@ class _SequenceProvider:
 
 
 class _UnavailableRegistry:
-    def require_for_context(self, _context_policy):
+    def require_active(self):
         raise ProviderUnavailableError("deterministic outage")
 
-    def runtime_serving_engines(self):
-        # The outage fixture has no locally owned engines to shut down.
-        return ()
+    def require_for_context(self, context_policy):
+        assert context_policy["tenant_id"] == "tenant-a"
+        assert "provider_selection" not in context_policy
+        return self.require_active()
 
 
 class _Registry:
     def __init__(self, provider) -> None:
         self.provider = provider
 
-    def require_for_context(self, _context_policy):
-        # Stage-7 fixtures implement the current, context-scoped registry
-        # contract. The previously used require_active() was retired and
-        # caused the coordinator to fail before exercising any journey logic.
+    def require_active(self):
         return self.provider
 
-    def runtime_serving_engines(self):
-        # A test provider only simulates completion; it is not a runtime-owned
-        # serving engine. Keep shutdown's real registry contract explicit.
-        return ()
+    def require_for_context(self, context_policy):
+        # Match the production registry's context-scoped entry point. These
+        # fixtures intentionally cover only the default deterministic route.
+        assert context_policy["tenant_id"] == "tenant-a"
+        assert "provider_selection" not in context_policy
+        return self.require_active()
 
 
 def _service(tmp_path, *, prefix: str = "golden") -> EngineExecutionService:
