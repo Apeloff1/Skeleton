@@ -49,6 +49,24 @@ recreation can still remove the container and its writable-layer data. App-owned
 layout and migration are qualified; ordinary default-profile startup is available.
 Preserve both sources until their authority is resolved.
 
+For an existing installation, a **non-destructive custody backup** command
+is available after an operator quiesces all Chroma writers and stops the old
+Chroma container. Keep the backup outside the repository:
+
+```bash
+docker stop tutolage-chroma
+python scripts/chroma_backup.py --output "$HOME/chroma-custody-backup"
+```
+
+This reads the stopped container's `/data` and legacy
+`/chroma/chroma` mount separately, records bounded SHA-256 file manifests,
+rechecks container identity and mounts, and refuses existing destinations,
+links, unsafe state and unexpected mounts. It does **not** remove the
+container, change volume mounts, restore data, prove SQLite consistency or
+authorize `--full` startup. Verified restore, database integrity, writer
+fencing and recreation evidence remain mandatory before migration acceptance.
+Keep the original container and both stores after backup success.
+
 The backend and Skeleton API remain separate processes during consolidation.
 Combining them prematurely would create route, dependency, startup, and
 security regressions. They are one application at the operational boundary
