@@ -176,7 +176,7 @@ PHASES_PER_BATCH = 10
 #   (4) at the start of every floor-pass chunk harvest loop.
 # Anything that touches "files" must honour this constant.
 # ═══════════════════════════════════════════════════════════════════════
-GLOBAL_FILE_BUDGET = int(os.environ.get("GALAXY_FILE_BUDGET", "25000"))
+GLOBAL_FILE_BUDGET = int(os.environ.get("GALAXY_FILE_BUDGET", "0"))  # 0 disables the optional file-count ceiling
 
 # Add computed pct to each phase entry
 for _i, _p in enumerate(BUILD_PHASES):
@@ -755,7 +755,7 @@ def _explicit_file_budget(build: dict) -> int | None:
     scale = build.get("scale_info")
     requested = scale.get("explicit_target_files") if isinstance(scale, dict) else None
     if isinstance(requested, int) and not isinstance(requested, bool) and requested > 0:
-        return min(requested, max(1, GLOBAL_FILE_BUDGET))
+        return min(requested, GLOBAL_FILE_BUDGET) if GLOBAL_FILE_BUDGET > 0 else requested
     return None
 
 
@@ -3148,7 +3148,7 @@ async def _run_background_build_inner(
             }
         )
         await _save_build_required(build)
-        if build["file_count"] >= GLOBAL_FILE_BUDGET and batch_num < TOTAL_BATCHES:
+        if GLOBAL_FILE_BUDGET > 0 and build["file_count"] >= GLOBAL_FILE_BUDGET and batch_num < TOTAL_BATCHES:
             raise GalaxyBuildStopped("artifact_file_budget_exhausted")
         await asyncio.to_thread(_worker_cooldown, context=f"after-batch-{batch_num}")
 
@@ -3175,7 +3175,7 @@ async def _run_background_build_inner(
     fusion = max(1.0, min(1.6, float(build.get("fusion_multiplier", 1.0) or 1.0)))
     # Explicitly bounded builds receive real phase outputs only. Padding is
     # not evidence of quality and must not inflate a caller's file ceiling.
-    floor_target = 0 if _explicit_file_budget(build) is not None else min(int(floor_target * fusion), GLOBAL_FILE_BUDGET)
+    floor_target = 0 if _explicit_file_budget(build) is not None else (min(int(floor_target * fusion), GLOBAL_FILE_BUDGET) if GLOBAL_FILE_BUDGET > 0 else int(floor_target * fusion))
     from core import build_vault as _bv
 
     current_files = await asyncio.to_thread(_bv.get_file_count, build_id)
@@ -4640,7 +4640,9 @@ async def _run_expansion_bg(build_id: str, exp_type: str, description: str, mult
     try:
         async with _artifact_operation(build, "expansion"):
             before = await _await_build_io(build, _vault_total_files, build)
-            target = max(1, min(GLOBAL_FILE_BUDGET, int(scale.get("target_files") or before * 4 or 800)))
+            target = max(1, int(scale.get("target_files") or before * 4 or 800))
+            if GLOBAL_FILE_BUDGET > 0:
+                target = min(target, GLOBAL_FILE_BUDGET)
             exp["files_before"] = before
             exp["target_files"] = target
             stats = await _await_build_io(
