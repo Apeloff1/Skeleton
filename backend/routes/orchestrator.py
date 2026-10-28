@@ -5,12 +5,13 @@ BuildPlan DAG, execute it (async), and re-plan from any node.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from routes.galaxy_studio_access import private_build_access
 
 from core import autonomous_orchestrator as orch
 
-router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"])
+router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"], dependencies=[Depends(private_build_access)])
 
 
 class PlanReq(BaseModel):
