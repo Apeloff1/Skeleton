@@ -443,7 +443,7 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
             tenant_id="tenant", actor_id="owner", context_id="t1",
         ) == 4
         page = await mongo.read_window(archive=archive)
-        assert [record.content for record in page.records] == [b"initial"]
+        assert [record.payload for record in page.records] == [b"initial"]
         deleted = await mongo.retire_thread(
             tenant_id="tenant", owner_id="owner", thread_id="t1",
         )
