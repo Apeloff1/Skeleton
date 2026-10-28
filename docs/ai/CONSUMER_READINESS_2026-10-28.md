@@ -18,17 +18,25 @@ The VM still runs the October 26 engine and backend images built from `99a75ea8`
 and the frontend image built from `704fd359`. Current source fixes, including
 the planner changes below, have not been exercised in a newly built installation.
 The idle doctor reported platform, configuration and services ready with no next
-steps. Approximately 2.9 GiB remained free, below the guarded headroom for a cold
-image build. A new session's private Compose overlay was updated with its proxy
-address, but existing containers were not recreated and retain their earlier proxy
-configuration. Local health and doctor results therefore do not establish that a
-new outbound crawler capture will work in the current session.
+steps. After a clean task-owned checkout was removed, with its branch and commit
+retained, approximately 3.8 GiB remained free. A guarded cold image build needs
+about 6 GiB of free space. The backend was recreated from the same previously
+installed image with the current session proxy after idle, space and identity
+checks; its data mounts, images, volumes and unrelated containers were preserved.
+The engine still has its earlier proxy configuration. Current source changes
+remain undeployed.
 
 Previously observed finite workflows include authenticated chat and reload,
 owner-scoped source access, a consent-bound public capture, original-world human
 and AI play, two training episodes and source export. Those observations remain
 bounded to the earlier installation and are not universal emulation or quality
 certification.
+
+After the backend proxy update, a fresh bounded capture from example.com retained
+one document and its provenance using two requests and 1,154 bytes. An exact run
+replay matched; the source remained unreviewed and an anonymous request was denied.
+This is a current-session crawler observation, not a general network or source
+quality guarantee.
 
 ## Changes and open issues
 
@@ -74,8 +82,8 @@ overlap and do not constitute a full repository pass. The full provider-bootstra
 scan subsequently passed on the final runtime source.
 
 The historical broader campaign recorded 52,149 passes, 2,674 failures, 269
-errors and 215 skips across 4,442 files. Current-source image rollout, fresh
-crawler verification, a working generated-game browser observation, dependency
+errors and 215 skips across 4,442 files. Current-source image rollout, a working
+generated-game browser observation, dependency
 advisory review and a Chroma persistence migration remain open. The legacy
 GameForge governed-export adapter also remains unavailable without its remote
 artifact-delivery owner. The VM has no approved native console core, and
