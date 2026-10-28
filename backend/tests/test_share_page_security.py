@@ -40,6 +40,12 @@ def test_production_origin_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("ENVIRONMENT", "production")
     with pytest.raises(ValueError, match="PUBLIC_APP_URL"):
         share._app_origin()
+    monkeypatch.setenv("PUBLIC_APP_URL", "http://localhost:3000")
+    with pytest.raises(ValueError, match="HTTPS"):
+        share._app_origin()
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.test?")
+    with pytest.raises(ValueError, match="canonical origin"):
+        share._app_origin()
 
 
 def test_share_identifiers_are_encoded_as_one_component() -> None:
@@ -69,3 +75,22 @@ def test_share_playable_uses_configured_origin_and_encoded_id(
     assert "/api/playable/game%26admin%3Dtrue%23fragment/cover.png" in page
     assert "playable?id=game%26admin%3Dtrue%23fragment" in page
     assert "playable?id=game&admin=true" not in page
+
+
+def test_tournament_cover_link_encodes_champion_identifier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Tournaments:
+        async def find_one(self, _query, _projection):
+            return {"name": "League", "champion_id": "player&admin=true"}
+    class Database:
+        tournaments = Tournaments()
+
+    monkeypatch.setattr(share, "_db", Database())
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.test")
+    request = Request({"type": "http", "method": "GET", "path": "/",
+                       "headers": [(b"host", b"attacker.example")]})
+    response = asyncio.run(share.share_tournament("spring", request))
+    page = response.body.decode("utf-8")
+    assert "/api/playable/player%26admin%3Dtrue/cover.png" in page
+    assert "attacker.example" not in page
