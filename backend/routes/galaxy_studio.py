@@ -479,6 +479,9 @@ def _reject_synthetic_artifact(path: str, content: str) -> None:
         raise GalaxyBuildStopped("synthetic_expansion_padding_rejected")
     if normalized.startswith("skipped/") and normalized.endswith(".md"):
         raise GalaxyBuildStopped("synthetic_skipped_phase_marker_rejected")
+    # Legacy floor-pass output is count padding, not authored game content.
+    if normalized.startswith("aaa_delivery_floor/"):
+        raise GalaxyBuildStopped("synthetic_floor_padding_rejected")
 
 
 def _flush_to_vault(build: dict, force: bool = False, threshold: int = _VAULT_FLUSH_THRESHOLD) -> int:
