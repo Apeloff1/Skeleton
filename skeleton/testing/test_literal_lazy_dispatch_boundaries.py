@@ -10,18 +10,8 @@ from unittest.mock import patch
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[2]
-NAMESPACES = (
-    ("skeleton", "skeleton/__init__.py", "SkeletonError", "import_module"),
-    ("skeleton.inference", "skeleton/inference/__init__.py", "InferenceUsage", "import_module"),
-    ("skeleton.jeeves.ai", "skeleton/jeeves/ai/__init__.py", "CreatorRunbook", "_import_module"),
-    ("skeleton.ai.agents.jeeves.ai", "skeleton/ai/agents/jeeves/ai/__init__.py",
-     "CreatorRunbook", "_import_module"),
-)
-
-
-def _load_reviewed_namespace(namespace: str):
-    """Keep test imports on literal, explicitly enumerated namespace targets."""
+def _import_reviewed_namespace(namespace: str):
+    """Import only the four source-controlled lazy-export fixtures."""
     if namespace == "skeleton":
         return importlib.import_module("skeleton")
     if namespace == "skeleton.inference":
@@ -30,7 +20,17 @@ def _load_reviewed_namespace(namespace: str):
         return importlib.import_module("skeleton.jeeves.ai")
     if namespace == "skeleton.ai.agents.jeeves.ai":
         return importlib.import_module("skeleton.ai.agents.jeeves.ai")
-    raise ImportError("unregistered test namespace")
+    raise ImportError("unregistered lazy export fixture")
+
+
+ROOT = Path(__file__).resolve().parents[2]
+NAMESPACES = (
+    ("skeleton", "skeleton/__init__.py", "SkeletonError", "import_module"),
+    ("skeleton.inference", "skeleton/inference/__init__.py", "InferenceUsage", "import_module"),
+    ("skeleton.jeeves.ai", "skeleton/jeeves/ai/__init__.py", "CreatorRunbook", "_import_module"),
+    ("skeleton.ai.agents.jeeves.ai", "skeleton/ai/agents/jeeves/ai/__init__.py",
+     "CreatorRunbook", "_import_module"),
+)
 
 
 @pytest.mark.parametrize("namespace,path,symbol,importer", NAMESPACES)
@@ -55,7 +55,7 @@ def test_dispatch_imports_are_literal_and_match_source_controlled_map(
         for call in calls
     ), "an export dispatcher must never derive an executable import target"
     approved = {call.args[0].value for call in calls}
-    module = _load_reviewed_namespace(namespace)
+    module = _import_reviewed_namespace(namespace)
     owners = module._HOST_EXPORTS.values() if hasattr(module, "_HOST_EXPORTS") else (
         item[0] for item in module._LAZY_EXPORTS.values()
     )
@@ -66,7 +66,7 @@ def test_dispatch_imports_are_literal_and_match_source_controlled_map(
 def test_approved_symbol_dispatches_one_literal_module(
     namespace: str, path: str, symbol: str, importer: str,
 ) -> None:
-    module = _load_reviewed_namespace(namespace)
+    module = _import_reviewed_namespace(namespace)
     marker = object()
     original = module.__dict__.get(symbol)
     existed = symbol in module.__dict__
@@ -87,7 +87,7 @@ def test_approved_symbol_dispatches_one_literal_module(
 def test_unknown_export_never_executes_import(
     namespace: str, path: str, symbol: str, importer: str,
 ) -> None:
-    module = _load_reviewed_namespace(namespace)
+    module = _import_reviewed_namespace(namespace)
     with patch.object(module, importer) as loader:
         with pytest.raises(AttributeError):
             module.__getattr__("unregistered_dynamic_export")
@@ -98,7 +98,7 @@ def test_unknown_export_never_executes_import(
 def test_corrupted_export_owner_fails_closed_before_import(
     namespace: str, path: str, symbol: str, importer: str,
 ) -> None:
-    module = _load_reviewed_namespace(namespace)
+    module = _import_reviewed_namespace(namespace)
     exports = module._HOST_EXPORTS if hasattr(module, "_HOST_EXPORTS") else module._LAZY_EXPORTS
     saved = exports[symbol]
     try:

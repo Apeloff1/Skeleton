@@ -39,7 +39,13 @@ def test_canonical_backlog_preserves_edge_case_lifecycle_without_false_closure()
         # Planned source maturity is distinct from the backlog review state.
         # Review requires accountable work-package provenance; it is neither
         # evidence of a passing test nor permission to close an edge case.
-        assert source["status"] == "planned"
+        assert source["status"] in {"planned", "in_progress", "evidence_pending"}
+        if source["status"] == "evidence_pending":
+            # Evidence inventory is not release certification. Preserve explicit
+            # pending status while exact-head gate receipts are still absent.
+            assert source["evidence"]
+            assert source.get("accepted_risk") is None
+            assert source.get("disposition", "").endswith("_pending_exact_head_ci")
         expected = {"planned", "in-review"}
         if source["evidence"]:
             expected.add("evidence_pending")

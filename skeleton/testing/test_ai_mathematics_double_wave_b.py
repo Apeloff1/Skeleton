@@ -31,7 +31,10 @@ def test_robust_location_resists_single_extreme_outlier() -> None:
 
 def test_modified_z_scores_flag_extreme_observation() -> None:
     scores = modified_z_scores((1.0, 1.1, 0.9, 1.05, 100.0))
-    assert max(abs(value) for value in scores[:-1]) < 2.0
+    # The 0.9 observation has a valid modified z-score of about -2.023; it is
+    # not an outlier under the conventional 3.5 modified-z cutoff.
+    assert max(abs(value) for value in scores[:-1]) < 3.5
+    assert scores[2] == pytest.approx(-2.0234692505882435, abs=1e-12)
     assert abs(scores[-1]) > 100.0
     with pytest.raises(MathInvariantError, match="MAD is zero"):
         modified_z_scores((1.0, 1.0, 1.0, 2.0, 1.0))

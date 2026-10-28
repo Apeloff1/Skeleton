@@ -5,8 +5,8 @@ import importlib
 from typing import Any
 
 
-def _registered_stratum(stratum: int):
-    """Only the thirty shipped strata can satisfy CS-300 admission."""
+def _load_stratum(stratum: int):
+    """Only the thirty tracked CS300 strata may be executed."""
     if stratum == 1:
         return importlib.import_module("skeleton.cs300.strata.s01")
     if stratum == 2:
@@ -67,11 +67,11 @@ def _registered_stratum(stratum: int):
         return importlib.import_module("skeleton.cs300.strata.s29")
     if stratum == 30:
         return importlib.import_module("skeleton.cs300.strata.s30")
-    raise ValueError("unknown CS-300 stratum")
+    raise ValueError("unregistered CS300 stratum")
 
 
 def admit(layer_id: str, card: dict[str, Any]) -> dict[str, Any]:
     ordinal = int(layer_id.rsplit("-", 1)[1])
     stratum = (ordinal - 1) // 10 + 1
-    module = _registered_stratum(stratum)
+    module = _load_stratum(stratum)
     return module.admit(layer_id, card)

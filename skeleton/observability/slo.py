@@ -201,15 +201,6 @@ class SLOAssessment:
         })
 
 
-def _load_trusted_slo_twin(twin_module: str):
-    """Bound mirrored-type imports to this module's reviewed literal targets."""
-    if twin_module == "skeleton.ai.runtime.observability.slo":
-        return importlib.import_module("skeleton.ai.runtime.observability.slo")
-    if twin_module == "skeleton.observability.slo":
-        return importlib.import_module("skeleton.observability.slo")
-    raise ImportError("unregistered trusted twin module")
-
-
 def _trusted_observability_twin(
     value: object,
     local_type: type[object],
@@ -226,7 +217,12 @@ def _trusted_observability_twin(
         else "skeleton.observability.slo"
     )
     try:
-        module = _load_trusted_slo_twin(twin_module)
+        if twin_module == "skeleton.ai.runtime.observability.slo":
+            module = importlib.import_module("skeleton.ai.runtime.observability.slo")
+        elif twin_module == "skeleton.observability.slo":
+            module = importlib.import_module("skeleton.observability.slo")
+        else:
+            return False
         twin_type = getattr(module, twin_name)
     except (ImportError, AttributeError):
         return False
