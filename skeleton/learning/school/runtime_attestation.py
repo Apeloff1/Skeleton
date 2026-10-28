@@ -23,12 +23,29 @@ from skeleton.learning.school.session_audit import (
 )
 
 
+def _load_reviewed_school_owner(module_name: str):
+    """Resolve only fixed canonical or governed school modules."""
+    if module_name == "skeleton.learning.school.decision_ledger":
+        return importlib.import_module("skeleton.learning.school.decision_ledger")
+    if module_name == "skeleton.ai.learning.school.decision_ledger":
+        return importlib.import_module("skeleton.ai.learning.school.decision_ledger")
+    if module_name == "skeleton.learning.school.runtime_replay":
+        return importlib.import_module("skeleton.learning.school.runtime_replay")
+    if module_name == "skeleton.ai.learning.school.runtime_replay":
+        return importlib.import_module("skeleton.ai.learning.school.runtime_replay")
+    if module_name == "skeleton.learning.school.runtime_attestation":
+        return importlib.import_module("skeleton.learning.school.runtime_attestation")
+    if module_name == "skeleton.ai.learning.school.runtime_attestation":
+        return importlib.import_module("skeleton.ai.learning.school.runtime_attestation")
+    raise ImportError("unregistered school module owner")
+
+
 def _trusted_named_instance(value: object, type_name: str, *module_names: str) -> bool:
     """Accept only named types from the canonical or governed mirror modules."""
 
     for module_name in module_names:
         try:
-            module = importlib.import_module(module_name)
+            module = _load_reviewed_school_owner(module_name)
             candidate = getattr(module, type_name)
         except (ImportError, AttributeError):
             continue
