@@ -1355,6 +1355,13 @@ class MongoConversationAuthority:
     ) -> ConversationThread:
         """Complete or discard the single exact-next prepared append, if any."""
 
+        # Recovery updates the canonical message and thread collections. Even
+        # internal callers must hold this actor's durable writer epoch; a
+        # future read/replay caller cannot silently bypass public decorators.
+        epoch = getattr(self, "canonical_source_epoch", None)
+        if epoch is not None:
+            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)
+
         thread = await self.get_thread(
             thread_id,
             tenant_id=tenant_id,
