@@ -10,10 +10,11 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# v6 isolates improved main supersession recovery from the old queue lane.
+# v7 restores an independent bounded cleanup lane after v6 remained queued
+# while an unrelated ARM owner-cleanup job successfully obtained a runner.
 # One worker and one pending wake coalesce future triggers.
 concurrency:
-  group: queue-drain-v6-${{ github.repository }}
+  group: queue-drain-v7-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
