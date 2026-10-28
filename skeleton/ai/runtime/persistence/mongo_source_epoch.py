@@ -183,6 +183,7 @@ def fence_conversation_write(method):
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             return await method(self, *args, **kwargs)
 
+    guarded.__canonical_source_writer_fence__ = "conversation"
     return guarded
 
 
@@ -202,6 +203,7 @@ def fence_memory_commit(method):
         async with epoch.writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id):
             return await method(self, proposal, *args, **kwargs)
 
+    guarded.__canonical_source_writer_fence__ = "memory_commit"
     return guarded
 
 
@@ -225,10 +227,70 @@ def fence_memory_tombstone(method):
         async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
             return await method(self, memory_id, *args, **kwargs)
 
+    guarded.__canonical_source_writer_fence__ = "memory_tombstone"
     return guarded
+
+
+# This is an IN-PROCESS, versioned inventory of the known canonical source
+# mutation surfaces. It is not proof of external deployment writer coverage:
+# unregistered services and direct database operations still need operator audit.
+_CONVERSATION_WRITER_METHODS = (
+    "create_thread", "rename_thread", "append_message",
+    "bind_chat_execution", "chat_dispatch", "append_user_message",
+    "commit_assistant_message", "regenerate_assistant_message",
+    "edit_user_message", "bind_user_request_refs",
+    "bind_user_engine_command", "bind_regeneration_request",
+    "transition_regeneration_dispatch", "set_state",
+)
+_MEMORY_WRITER_METHODS = {
+    "commit": "memory_commit",
+    "tombstone": "memory_tombstone",
+}
+_MEMORY_INTERNAL_MUTATION_METHODS = (
+    "_ensure_revision_and_projection", "_recover_reservation",
+    "_reserve", "_release_failed_reservation", "_commit_reservation",
+)
+
+
+def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, epoch: Any) -> None:
+    """Fail closed if an expected production Mongo mutation loses writer custody.
+
+    This detects missing decorators or subclass overrides of the known canonical
+    entrypoints. It does not assert that independently deployed readers, other
+    owners, backups, restorers or raw Mongo clients have been reconciled.
+    """
+    from core.conversations import MongoConversationAuthority
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+
+    if not isinstance(epoch, MongoCanonicalSourceEpoch):
+        raise MongoSourceEpochError("canonical source requires majority-durable epoch")
+    if not isinstance(conversation, MongoConversationAuthority):
+        raise MongoSourceEpochError("canonical conversation must be production Mongo authority")
+    if type(memory) is not MongoMemoryRepository:
+        raise MongoSourceEpochError("canonical memory must be production Mongo repository")
+    if (conversation.canonical_source_epoch is not epoch
+            or memory.canonical_source_epoch is not epoch):
+        raise MongoSourceEpochError("canonical owners must share one installed epoch")
+
+    for name in _CONVERSATION_WRITER_METHODS:
+        expected = getattr(MongoConversationAuthority, name, None)
+        active = getattr(type(conversation), name, None)
+        if (active is not expected
+                or getattr(active, "__canonical_source_writer_fence__", None) != "conversation"):
+            raise MongoSourceEpochError("unfenced canonical conversation writer: " + name)
+    for name, fence in _MEMORY_WRITER_METHODS.items():
+        method = getattr(MongoMemoryRepository, name, None)
+        if getattr(method, "__canonical_source_writer_fence__", None) != fence:
+            raise MongoSourceEpochError("unfenced canonical memory writer: " + name)
+    for name in _MEMORY_INTERNAL_MUTATION_METHODS:
+        if not callable(getattr(MongoMemoryRepository, name, None)):
+            raise MongoSourceEpochError("missing fenced Mongo memory mutation helper: " + name)
+    if not callable(getattr(MongoMemoryRepository, "_require_canonical_writer", None)):
+        raise MongoSourceEpochError("missing internal Mongo memory writer guard")
 
 
 __all__ = [
     "MongoSourceEpochError", "MongoCanonicalSourceEpoch", "fence_conversation_write",
     "fence_memory_commit", "fence_memory_tombstone",
+    "verify_canonical_source_writer_inventory",
 ]
