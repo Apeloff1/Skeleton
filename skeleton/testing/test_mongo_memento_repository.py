@@ -455,3 +455,54 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
             await mongo.trusted_head(archive=archive)
 
     asyncio.run(scenario())
+
+
+def test_witnessed_memento_purge_requires_independent_retirement_tombstone(suite):
+    """Raw Mongo erasure cannot bypass the independent witness CAS boundary."""
+    from skeleton.persistence.sealed_memento_witness import (
+        WitnessPosition, _binding_digest,
+    )
+
+    owner, mongo, archive, _ = suite
+    scope = _binding_digest(archive)
+
+    async def scenario():
+        genesis = MementoCatalogHead()
+        wire, head = archive.seal(
+            MementoRecord(1, "user", b"confidential"), previous=genesis,
+        )
+        assert await mongo.publish(
+            archive=archive, expected_head=genesis, expected_thread_version=3,
+            stream="user", ciphertext=wire, custody_mode="witnessed",
+        ) == head
+
+        with pytest.raises(MongoMementoUnavailable, match="independent retirement"):
+            await mongo.retire_thread(
+                tenant_id="tenant", owner_id="owner", thread_id="t1",
+            )
+        assert len(owner.database.rows["conversation_memento_frames"]) == 1
+
+        class Witness:
+            retired = False
+
+            async def read(self, *, binding_digest):
+                assert binding_digest == scope
+                return WitnessPosition(scope, 2, head, retired=self.retired)
+
+        witness = Witness()
+        owner.memento_witness = witness
+        with pytest.raises(MongoMementoUnavailable, match="tombstone not acknowledged"):
+            await mongo.retire_thread(
+                tenant_id="tenant", owner_id="owner", thread_id="t1",
+            )
+        assert len(owner.database.rows["conversation_memento_frames"]) == 1
+
+        witness.retired = True
+        assert await mongo.retire_thread(
+            tenant_id="tenant", owner_id="owner", thread_id="t1",
+        ) == 1
+        assert not owner.database.rows["conversation_memento_frames"]
+        with pytest.raises(SealedContextBoundaryError, match="retired"):
+            await mongo.trusted_head(archive=archive)
+
+    asyncio.run(scenario())
