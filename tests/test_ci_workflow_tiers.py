@@ -33,6 +33,17 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
 
+    def test_one_shot_triggers_are_manual_and_local_ai_stays_automatic(self):
+        for name in ("historical-zero-job-canary.yml", "expo54-lockfile-repair.yml",
+                     "local-ai-boilerplate.yml"):
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertEqual(events(source), {"workflow_dispatch"})
+        backend = (ROOT / ".github/workflows/backend-quality.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            "python -m pytest -q --noconftest skeleton/testing/test_local_ai_boilerplate.py",
+            backend,
+        )
+
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
