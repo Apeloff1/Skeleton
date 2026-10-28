@@ -71,7 +71,7 @@ Focused merged-source suites passed across installation, provider execution,
 repository context, local inference and private media; the planner capacity
 suite passed 35 cases and the native inference suite passed 77 cases. These runs
 overlap and do not constitute a full repository pass. The full provider-bootstrap
-scan was still running when this status was prepared.
+scan subsequently passed on the final runtime source.
 
 The historical broader campaign recorded 52,149 passes, 2,674 failures, 269
 errors and 215 skips across 4,442 files. Current-source image rollout, fresh
