@@ -10,10 +10,11 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# v6 isolates improved main supersession recovery from the old queue lane.
-# One worker and one pending wake coalesce future triggers.
+# v7 enters a dedicated ARM recovery lane instead of waiting behind the
+# already-queued v6 x64 drainer. One worker and one pending wake coalesce
+# subsequent v7 triggers without cancelling active recovery or CI evidence.
 concurrency:
-  group: queue-drain-v6-${{ github.repository }}
+  group: queue-drain-v7-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -26,13 +27,12 @@ jobs:
     permissions:
       actions: write
       contents: read
-    # Place the Python-only cleanup worker on the ARM recovery pool instead
-    # of competing with broad x64 PR validation. Safety comes from the
-    # exact-head and stale-PR guards, not runner architecture.
-    # Queue recovery must remain schedulable when the ARM runner pool is
-    # saturated. This job uses only portable Python stdlib and Bash;
-    # the exact-head and security-safe cancellation rules are unchanged.
-    runs-on: ubuntu-latest
+    # Use the independently functioning ARM recovery pool: the older v6
+    # ubuntu-latest drainer is itself queued behind x64 PR validation.
+    # Housekeeping already executes successfully on ubuntu-24.04-arm.
+    # This job uses portable Python stdlib and Bash. Preserve all existing
+    # current-head, immutable-main, and security-custody cancellation fences.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
@@ -67,11 +67,14 @@ jobs:
           cancellation_attempts = 0
           budget_exhausted = False
 
-          # GitHub returned HTTP 409 to both cancellation endpoints on all
-          # 28 independently verified stale, non-security run IDs at 22:55Z
-          # (Actions run 38650689441). Do not exhaust quota every ten minutes.
-          # Keep these runs visible in raw queued counts and retry on Oct 22.
-          provider_conflict_retry_after = 1792627200
+          # These exact IDs were independently proven obsolete but GitHub still
+          # rejected normal/force cancellation with HTTP 409 on Oct 27. Keep
+          # them visible in queued counts. Retry one rotating canary each
+          # six-hour window (and on explicit dispatch or workflow changes).
+          # A canary with verified terminal status releases remaining IDs for this
+          # sweep; newer unlisted obsolete runs remain fully eligible.
+          provider_conflict_probe_interval_seconds = 6 * 3600
+          provider_conflict_recovered = False
           provider_conflict_run_ids = frozenset({
               38320664775,
               38320665862,
@@ -549,6 +552,25 @@ jobs:
                           queued_by_id[observed_id] = observed
               queued = list(queued_by_id.values())
               active = list_runs(run_status='in_progress')
+              # A rotating provider-stuck canary samples recovery without
+              # exhausting Actions REST budgets on every hourly sweep. All
+              # candidates must still pass the usual obsolescence checks.
+              provider_conflict_canary_id = None
+              probe_allowed = (
+                  os.environ.get('GITHUB_EVENT_NAME') in {'push', 'workflow_dispatch'}
+                  or time.gmtime().tm_hour % 6 == 0
+              )
+              if probe_allowed and not provider_conflict_recovered:
+                  known_live = sorted(
+                      int(run.get('id') or 0)
+                      for run in queued
+                      if int(run.get('id') or 0) in provider_conflict_run_ids
+                  )
+                  if known_live:
+                      provider_conflict_canary_id = known_live[
+                          (int(time.time()) // provider_conflict_probe_interval_seconds)
+                          % len(known_live)
+                      ]
               # The highest run ID is the newest live sweep of this exact
               # controller lane. No completed/failed/non-live replacement can
               # authorize retiring a still-queued controller.
@@ -581,7 +603,11 @@ jobs:
                   run_id = int(run.get('id') or 0)
                   if not run_id or run_id == current or run_id in attempted:
                       continue
-                  if run_id in provider_conflict_run_ids and time.time() < provider_conflict_retry_after:
+                  if (
+                      run_id in provider_conflict_run_ids
+                      and not provider_conflict_recovered
+                      and run_id != provider_conflict_canary_id
+                  ):
                       totals['provider_conflicts_backed_off'] += 1
                       local['provider_conflicts_backed_off'] += 1
                       continue
@@ -751,6 +777,18 @@ jobs:
                       attempted.add(run_id)
                       transient.discard(run_id)
                       accepted += 1
+                      if run_id in provider_conflict_run_ids:
+                          # An accepted REST cancellation request is not proof
+                          # of terminal state: GitHub may keep a stuck record
+                          # queued even after acknowledging the request.
+                          if run_completed(run_id):
+                              provider_conflict_recovered = True
+                              print(f'Provider terminal recovery confirmed by run {run_id}')
+                          else:
+                              print(
+                                  f'Provider cancellation acknowledged but not terminal: '
+                                  f'run={run_id}'
+                              )
                   elif status == 404 or (
                       status in {409, 422} and run_completed(run_id)
                   ):
@@ -763,6 +801,10 @@ jobs:
                       # later sweep or scheduled invocation can reclaim it;
                       # only terminally classify once GitHub reports completion.
                       transient.add(run_id)
+                      if run_id in provider_conflict_run_ids:
+                          # A provider-stuck 409 does not become a success;
+                          # retry it on a later probe, not four times here.
+                          attempted.add(run_id)
                       deferred += 1
                   else:
                       attempted.add(run_id)
@@ -785,6 +827,8 @@ jobs:
                   f'coalesced_control_plane_queued={local["coalesced_control_plane_queued"]} '
                   f'obsolete_main_observers_queued={local["obsolete_main_observers_queued"]} '
                   f'provider_conflicts_backed_off={local["provider_conflicts_backed_off"]} '
+                  f'provider_canary={provider_conflict_canary_id or 0} '
+                  f'provider_recovered={provider_conflict_recovered} '
                   f'obsolete_main={local["obsolete_main"]} '
                   f'obsolete_main_active={local["obsolete_main_active"]} '
                   f'obsolete_pr_queued={local["obsolete_pr_queued"]} '
@@ -829,8 +873,11 @@ jobs:
                       f'{totals["obsolete_main_observers_queued"]}\n'
                   )
                   handle.write(
-                      '- Provider 409 conflict run observations backed off until Oct 22: '
+                      '- Provider 409 conflict observations held for bounded canary retry: '
                       f'{totals["provider_conflicts_backed_off"]}\n'
+                  )
+                  handle.write(
+                      f'- Provider cancellation recovery confirmed: {provider_conflict_recovered}\n'
                   )
                   handle.write(
                       f'- Obsolete main selections: {totals["obsolete_main"]}\n'

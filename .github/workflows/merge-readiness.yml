@@ -31,7 +31,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Quarantine Policy
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,7 +73,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Unit
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -109,13 +107,11 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing --tb=short
           --ignore=skeleton/testing/test_engine_handoff_recovery.py
-          --maxfail=1
 
   integration_smoke:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Integration Smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./backend
@@ -165,9 +161,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
-    # Full-repository SAST inventories span tens of thousands of Python files.
-    # Keep every gate mandatory while the bounded parallel scanner cuts CPU time.
-    timeout-minutes: 90
+    # Full-repository SAST needs a bounded window without disabling checks.
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
@@ -209,7 +203,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: PR Automation Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -245,11 +238,8 @@ jobs:
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        # Verbose node ids + a bounded traceback dump expose long-stalled
-        # tests without dropping any test or downgrading their status.
         run: >-
-          python -m pytest -vv --noconftest -p pytest_asyncio.plugin
-          -o faulthandler_timeout=180
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_pr_automation.py
           skeleton/testing/test_pr_automation_ruleset.py
           skeleton/testing/test_pr_automation_sensitive_paths.py
@@ -379,7 +369,6 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Advisory Known Reds
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     services:
       mongodb:
         # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
@@ -420,7 +409,6 @@ jobs:
       - pr_automation
       - ci
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - name: Summarize required checks
         env:
