@@ -282,7 +282,8 @@ async def test_cross_service_tenant_and_scope_denial_never_reach_provider(tmp_pa
     )
     tenant_client = _client(_app(tenant_service, tenant_coordinator))
 
-    with pytest.raises(EngineTextError, match="canonical engine text execution failed"):
+    # An unauthorized tenant is rejected during model catalog admission, before any execution.
+    with pytest.raises(EngineTextError, match="canonical model selection or context settings are unavailable"):
         await execute_engine_text(
             _request(tenant_id="tenant-b", key="tenant-denied"),
             client=tenant_client,
