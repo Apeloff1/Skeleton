@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import html
 import json
+from urllib.parse import quote, urlencode, urlsplit
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -16,6 +17,40 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 
 router = APIRouter(prefix="/api/share", tags=["share"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+
+
+def _app_origin() -> str:
+    """Use an operator-supplied origin, never the request Host header."""
+    raw = os.environ.get("PUBLIC_APP_URL", "").strip()
+    if not raw:
+        if os.environ.get("ENVIRONMENT", "").strip().lower() in {
+            "production", "prod", "staging",
+        }:
+            raise ValueError("PUBLIC_APP_URL is required outside development")
+        raw = "http://localhost:3000"
+    parsed = urlsplit(raw)
+    if (not parsed.hostname or parsed.username is not None
+            or parsed.password is not None or parsed.fragment or parsed.query
+            or parsed.path not in ("", "/") or "\\" in raw):
+        raise ValueError("PUBLIC_APP_URL must be a plain absolute origin")
+    if parsed.scheme != "https" and not (
+        parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    ):
+        raise ValueError("PUBLIC_APP_URL must use HTTPS outside local development")
+    # Reject malformed ports and URL authority suffixes before using the origin.
+    port = parsed.port
+    if not parsed.netloc or (port is not None and not 1 <= port <= 65535):
+        raise ValueError("invalid PUBLIC_APP_URL authority")
+    return raw.rstrip("/")
+
+
+def _safe_link_id(value: str) -> str:
+    """Keep untrusted identifiers as one URL component, never URL syntax."""
+    if not isinstance(value, str) or not 1 <= len(value) <= 128:
+        raise ValueError("invalid share identifier")
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+        raise ValueError("invalid share identifier")
+    return quote(value, safe="")
 
 
 def _page(title: str, desc: str, image: str, deep_link: str) -> str:
@@ -56,32 +91,32 @@ text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:800}}p{{co
 
 @router.get("/playable/{pid}", response_class=HTMLResponse)
 async def share_playable(pid: str, request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = _app_origin()
     g = await _db.playables.find_one(
         {"playable_id": pid}, {"_id": 0, "title": 1, "genre": 1, "has_cover": 1,
                                "evaluation.overall": 1, "plays": 1})
-    base = _APP
     if not g:
         return HTMLResponse(_page("Game not found", "This game is unavailable.",
                                   f"{base}/icon.png", f"{base}/playable"), status_code=404)
     overall = (g.get("evaluation") or {}).get("overall")
     desc = f"A {g.get('genre','arcade')} game on Galaxy Studio" + (f" · scored {overall}/100" if overall else "") + \
            (f" · {g.get('plays')} plays" if g.get("plays") else "") + ". Play it now!"
-    image = f"{base}/api/playable/{pid}/cover.png"
-    return HTMLResponse(_page(g.get("title", "Untitled Game"), desc, image, f"{base}/playable?id={pid}"))
+    encoded_pid = _safe_link_id(pid)
+    image = f"{base}/api/playable/{encoded_pid}/cover.png"
+    deep_link = f"{base}/playable?{urlencode({'id': pid})}"
+    return HTMLResponse(_page(g.get("title", "Untitled Game"), desc, image, deep_link))
 
 
 @router.get("/tournament/{tid}", response_class=HTMLResponse)
 async def share_tournament(tid: str, request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = _app_origin()
     t = await _db.tournaments.find_one({"tournament_id": tid}, {"_id": 0})
-    base = _APP
     if not t:
         return HTMLResponse(_page("Tournament not found", "This bracket is unavailable.",
                                   f"{base}/icon.png", f"{base}/tournaments"), status_code=404)
     champ_img = f"{base}/icon.png"
     if t.get("champion_id"):
-        champ_img = f"{base}/api/playable/{t['champion_id']}/cover.png"
+        champ_img = f"{base}/api/playable/{_safe_link_id(t['champion_id'])}/cover.png"
     status = "🏆 Champion crowned!" if t.get("status") == "complete" else f"⚔️ Live · Round {t.get('current_round',0)+1}"
     desc = f"Bracket of {t.get('size')} · {status} — vote for your favourite game!"
     return HTMLResponse(_page(t.get("name", "Tournament"), desc, champ_img, f"{base}/tournaments"))
