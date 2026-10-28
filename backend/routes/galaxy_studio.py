@@ -4488,36 +4488,8 @@ def _generate_expansion_files(
                     ),
                 )
 
-    # ═══ SAFEGUARD: Guarantee 4X target is met ═══
-    # If we're still short, generate additional procedural filler files
-    current_count = generated_count
-    if current_count < target_expansion_files:
-        deficit = target_expansion_files - current_count
-        filler_categories = [
-            ("animations", "animation state machine with blend trees, transitions, IK targets, root motion"),
-            ("configs", "configuration preset with gameplay tuning parameters, balance values, difficulty curves"),
-            ("tests", "comprehensive test suite with unit tests, integration tests, edge cases, mocks"),
-            ("localization", "localization strings with translations, pluralization, RTL support, formatting"),
-            ("achievements", "achievement definition with conditions, rewards, progress tracking, display data"),
-            ("tutorials", "tutorial step with highlight targets, instruction text, validation, skip logic"),
-        ]
-        filler_idx = 0
-        while generated_count < target_expansion_files:
-            cat_name, cat_desc = filler_categories[filler_idx % len(filler_categories)]
-            path = f"expansions/{cat_name}/generated_{filler_idx:05d}.ts"
-            if path not in existing_files:
-                _add(
-                    path,
-                    _gen_data_file(
-                        f"gen_{cat_name}_{filler_idx}",
-                        f"{cat_desc} — procedurally generated expansion file #{filler_idx}",
-                        title,
-                        genre,
-                    ),
-                )
-            filler_idx += 1
-            if filler_idx > len(existing_files) + target_expansion_files * 2:
-                break  # Safety valve
+    # Keep only genuine expansion outputs. A requested target is a planning
+    # goal, not permission to pad the result with synthetic filler files.
 
     return None
 
