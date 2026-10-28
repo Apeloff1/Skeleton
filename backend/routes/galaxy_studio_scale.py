@@ -96,7 +96,8 @@ def _parse_scale(scale_text: str, target_files: int = 0, target_size_gb: float =
     effective_files = max(effective_files, MIN_FILES_FLOOR)
 
     return {
-        "target_files": effective_files,
+        "explicit_target_files": target_files if isinstance(target_files, int) and not isinstance(target_files, bool) and target_files > 0 else None,
+        "target_files": target_files if isinstance(target_files, int) and not isinstance(target_files, bool) and target_files > 0 else effective_files,
         "target_size_gb": parsed_size,
         "multiplier": multiplier,
         "scale_label": _scale_label(effective_files, parsed_size),
