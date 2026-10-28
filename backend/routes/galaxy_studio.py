@@ -3985,7 +3985,7 @@ def _generate_expansion_files(
     vision = build.get("game_vision", "")
     from core import build_vault as _bv
 
-    existing_files = {item["path"] for item in _bv.list_file_paths(build["build_id"], limit=300000)}
+    existing_files = {item["path"] for item in _bv.list_file_paths(build["build_id"], limit=None)}
     existing_files.update((build.get("files") or {}).keys())
     generated_count = 0
 
