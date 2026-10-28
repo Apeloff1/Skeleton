@@ -211,7 +211,7 @@ requests keep their identity and explicit Stop intent. Setup shows database heal
 before sign-in and clears account-specific observations when the account changes.
 See [failure recovery and artifact operations](docs/ai/AI_FOUNDATIONS_AND_RECOVERY.md)
 for partial expansion/package results, interrupted cleanup and uncertain remote
-submissions. The [installed verification report](docs/ai/CONSUMER_READINESS_2026-10-26.md)
+submissions. The [installed verification report](docs/ai/CONSUMER_READINESS_2026-10-28.md)
 records finite recovery observations and remaining reliability limits.
 The advanced policy form uses the server's actual editable fields and installed
 capacity limits. Administrators can also preview and download bounded pages of
@@ -304,7 +304,7 @@ service readiness and recovery boundaries.
   arbitrary-ROM semantic understanding, or superiority over commercial games.
 - Adaptive serving, operational learning and maintenance remain an implementation
   candidate. The current installation pass runs automated tests and real workflows;
-  [installation evidence and release blockers](docs/ai/CONSUMER_READINESS_2026-10-26.md)
+  [installation evidence and release blockers](docs/ai/CONSUMER_READINESS_2026-10-28.md)
   distinguish verified behavior from consumer and enterprise qualification.
 
 Exact historical observations are in the
