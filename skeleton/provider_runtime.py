@@ -3405,9 +3405,15 @@ class ProviderRegistry:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         retain_unavailable: bool = False,
+        guarded_components: Any | None = None,
+        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         try:
-            return cls._from_env(admission_runtime=admission_runtime)
+            return cls._from_env(
+                admission_runtime=admission_runtime,
+                guarded_components=guarded_components,
+                require_guarded_local=require_guarded_local,
+            )
         except ProviderUnavailableError:
             if not retain_unavailable or os.getenv("AI_PROVIDER", "openai").strip().lower() != "local":
                 raise
@@ -3440,8 +3446,32 @@ class ProviderRegistry:
         cls,
         *,
         admission_runtime: AdmissionRuntime | None = None,
+        guarded_components: Any | None = None,
+        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
+        raw_guard = os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower()
+        if raw_guard not in {"", "0", "false", "1", "true"}:
+            raise ProviderUnavailableError("invalid AI_LOCAL_GUARD_REQUIRED policy")
+        if require_guarded_local is not None and type(require_guarded_local) is not bool:
+            raise ProviderUnavailableError("local guard policy must be a boolean")
+        development_legacy = (
+            active == "local" and raw_guard in {"0", "false"}
+            and require_guarded_local is False and guarded_components is None
+            and os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() == "development"
+            and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
+        )
+        if active == "local" and (raw_guard in {"0", "false"} or require_guarded_local is False) and not development_legacy:
+            raise ProviderUnavailableError("unguarded local model requires explicit development-only authorization")
+        guarded_required = raw_guard in {"1", "true"} or require_guarded_local is True or guarded_components is not None
+        if guarded_required and active != "local":
+            raise ProviderUnavailableError("guarded local dependencies require AI_PROVIDER=local")
+        if guarded_required:
+            from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+            if not isinstance(guarded_components, ProtectedLocalComponents):
+                raise ProviderUnavailableError("guard-required local startup lacks trusted dependencies")
+            if raw_guard in {"0", "false"} or require_guarded_local is False:
+                raise ProviderUnavailableError("guarded local startup cannot disable its enforcement")
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         secondary_values = {
@@ -3489,9 +3519,11 @@ class ProviderRegistry:
                         catalog_path,
                         cache_size=cache_size,
                         default_seed=default_seed,
+                        require_guarded_inference=guarded_required,
+                        guarded_components=guarded_components,
                         **capacity,
                     )
-                except (LocalModelCatalogError, OSError, TypeError, ValueError) as exc:
+                except (LocalModelCatalogError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider catalog failed activation") from exc
                 configured = {id(adapter): guarded(adapter) for adapter in activation.adapters}
                 return cls(
@@ -3515,9 +3547,11 @@ class ProviderRegistry:
                         cache_size=cache_size,
                         default_seed=default_seed,
                         rehash_artifacts_each_run=True,
+                        require_guarded_inference=guarded_required,
+                        guarded_components=guarded_components,
                         **capacity,
                     )
-                except (LocalModelDeploymentError, OSError, TypeError, ValueError) as exc:
+                except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
                 return cls([guarded(adapter)], active="local")
             try:
@@ -3529,16 +3563,23 @@ class ProviderRegistry:
                 )
 
                 loaded = load_local_model_artifact(model_path)
-                local_adapter = LocalModelAdapter(
-                    LocalInferenceEngine(
+                engine = LocalInferenceEngine(
                         loaded.model,
                         cache_size=cache_size,
+                        require_guarded_context=guarded_required,
                         **capacity,
-                    ),
-                    default_seed=default_seed,
-                    artifact_status=loaded.receipt.as_dict(),
                 )
-            except (LocalModelArtifactError, TypeError, ValueError) as exc:
+                if guarded_required:
+                    from skeleton.ai.runtime.inference.guarded_composition import compose_protected_local_adapter
+                    local_adapter = compose_protected_local_adapter(
+                        engine, components=guarded_components,
+                        default_seed=default_seed, artifact_status=loaded.receipt.as_dict(),
+                    )
+                else:
+                    local_adapter = LocalModelAdapter(
+                        engine, default_seed=default_seed, artifact_status=loaded.receipt.as_dict(),
+                    )
+            except (LocalModelArtifactError, ProviderPolicyError, TypeError, ValueError) as exc:
                 raise ProviderUnavailableError("local provider model artifact failed activation") from exc
             return cls(
                 [guarded(local_adapter)],

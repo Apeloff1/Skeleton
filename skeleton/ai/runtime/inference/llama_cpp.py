@@ -1692,8 +1692,18 @@ def build_llama_cpp_adapter(
     max_concurrency: int = 1,
     max_queue_size: int = 256,
     max_batch_size: int = 256,
+    require_guarded_inference: bool = False,
+    guarded_components: Any | None = None,
 ) -> LocalModelAdapter:
-    """Build an offline adapter, optionally applying measured consumer limits."""
+    """Build offline adapter; protected mode has no unguarded fallback."""
+    if type(require_guarded_inference) is not bool:
+        raise LlamaCppRuntimeError("protected local mode must be explicit")
+    if require_guarded_inference:
+        from .guarded_composition import ProtectedLocalComponents
+        if not isinstance(guarded_components, ProtectedLocalComponents):
+            raise LlamaCppRuntimeError("protected local deployment lacks trusted components")
+    elif guarded_components is not None:
+        raise LlamaCppRuntimeError("protected components require enforced local mode")
     if consumer_budget is not None:
         try:
             model_bytes = Path(config.model_path).stat().st_size
@@ -1704,16 +1714,20 @@ def build_llama_cpp_adapter(
             consumer_budget,
             model_bytes=model_bytes,
         ).configuration
-    return LocalModelAdapter(
-        LocalInferenceEngine(
-            LlamaCppModel(config),
-            cache_size=cache_size,
-            max_concurrency=max_concurrency,
-            max_queue_size=max_queue_size,
-            max_batch_size=max_batch_size,
-        ),
-        default_seed=default_seed,
+    engine = LocalInferenceEngine(
+        LlamaCppModel(config),
+        cache_size=cache_size,
+        max_concurrency=max_concurrency,
+        max_queue_size=max_queue_size,
+        max_batch_size=max_batch_size,
+        require_guarded_context=require_guarded_inference,
     )
+    if require_guarded_inference:
+        from .guarded_composition import compose_protected_local_adapter
+        return compose_protected_local_adapter(
+            engine, components=guarded_components, default_seed=default_seed,
+        )
+    return LocalModelAdapter(engine, default_seed=default_seed)
 
 
 __all__ = [

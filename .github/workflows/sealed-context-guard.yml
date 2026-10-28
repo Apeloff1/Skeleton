@@ -22,6 +22,8 @@ on:
       - 'skeleton/ai/runtime/inference/canonical_source_custody.py'
       - 'skeleton/ai/runtime/inference/native_tokenizer_guard.py'
       - 'skeleton/api/server.py'
+      - 'skeleton/api/engine_runtime.py'
+      - 'skeleton/intelligence/execution_runtime.py'
       - 'skeleton/ai/runtime/inference/guarded_composition.py'
       - 'skeleton/ai/runtime/inference/deployment.py'
       - 'skeleton/ai/runtime/inference/llama_cpp.py'
@@ -39,6 +41,7 @@ on:
       - 'skeleton/testing/test_native_guard_binding.py'
       - 'skeleton/testing/test_guarded_application_startup.py'
       - 'skeleton/testing/test_engine_submission_snapshot.py'
+      - 'skeleton/testing/test_engine_checkpoint_upgrade.py'
       - 'skeleton/testing/test_canonical_source_custody.py'
       - 'skeleton/testing/test_canonical_owner_source_loader.py'
       - 'skeleton/testing/test_native_tokenizer_guard.py'
@@ -74,7 +77,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install bounded regression dependencies
-        run: python -m pip install --disable-pip-version-check -e . 'pytest>=8,<9' 'pytest-asyncio>=1.4,<2' 'PyJWT>=2,<3' 'python-dotenv>=1,<2'
+        run: python -m pip install --disable-pip-version-check -e . 'pytest>=8,<9' 'pytest-asyncio>=1.4,<2' 'PyJWT>=2,<3' 'python-dotenv>=1,<2' 'regex>=2026.9.29,<2027'
       - name: Compile changed production boundaries
         run: |
           python -m compileall -q skeleton/context skeleton/persistence skeleton/ai/runtime/inference backend/core/conversations.py
@@ -102,6 +105,7 @@ jobs:
             skeleton/testing/test_native_guard_binding.py \
             skeleton/testing/test_guarded_application_startup.py \
             skeleton/testing/test_engine_submission_snapshot.py \
+            skeleton/testing/test_engine_checkpoint_upgrade.py \
             skeleton/testing/test_canonical_source_custody.py \
             skeleton/testing/test_canonical_execution_source_factory.py \
             skeleton/testing/test_mongo_source_epoch.py \

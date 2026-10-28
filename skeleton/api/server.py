@@ -79,6 +79,9 @@ class ServerState:
         self.operation_runtime: Optional[Any] = None
         self.engine_execution_service: Optional[Any] = None
         self.engine_execution_coordinator: Optional[Any] = None
+        # Trusted application-owned local guard, never sourced from HTTP or
+        # environment payloads. Bound once before engine startup.
+        self._engine_local_guard_components: Optional[Any] = None
         self.engine_tool_receipt_store: Optional[Any] = None
         self.engine_admission_runtime: Optional[Any] = None
         self.engine_execution_admission_runtime: Optional[Any] = None
@@ -279,18 +282,30 @@ class ServerState:
             MongoMemoryLifecycleAdapter,
         )
 
-        if database is None:
-            from motor.motor_asyncio import AsyncIOMotorClient
+        # Protected local inference must use the exact canonical memory owner
+        # whose writes participate in the shared durable source epoch. Creating
+        # a second unfenced repository would invalidate admission/postflight.
+        mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+        if mongo_owners is not None:
+            if database is not None:
+                raise RuntimeError("protected canonical memory owner cannot be overridden")
+            _, repository, _, shared_epoch, _ = mongo_owners
+            if (not isinstance(repository, MongoMemoryRepository)
+                    or repository.canonical_source_epoch is not shared_epoch):
+                raise RuntimeError("protected canonical memory writer is not epoch-fenced")
+        else:
+            if database is None:
+                from motor.motor_asyncio import AsyncIOMotorClient
 
-            mongo = get_settings().mongo
-            client = AsyncIOMotorClient(
-                mongo.uri,
-                serverSelectionTimeoutMS=mongo.timeout_ms,
-            )
-            database = client[mongo.database]
-            self.canonical_memory_mongo_client = client
+                mongo = get_settings().mongo
+                client = AsyncIOMotorClient(
+                    mongo.uri,
+                    serverSelectionTimeoutMS=mongo.timeout_ms,
+                )
+                database = client[mongo.database]
+                self.canonical_memory_mongo_client = client
 
-        repository = MongoMemoryRepository(database)
+            repository = MongoMemoryRepository(database)
         await repository.ensure_indexes()
 
         governance = self.bind_governance_registry()
@@ -653,6 +668,98 @@ class ServerState:
         self.operation_runtime = None
         self.intelligence = self.intelligence_core
 
+    def configure_engine_local_guard(self, components: Any) -> None:
+        """Install exactly one trusted local inference guard before startup.
+
+        The independent reader/reviewer/tokenizer must be assembled by the
+        application owner. Neither model output nor an API request can select
+        these dependencies. Never replace a running guard after activation.
+        """
+        from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+
+        if not isinstance(components, ProtectedLocalComponents):
+            raise TypeError("engine local guard requires trusted application components")
+        if (self.engine_execution_coordinator is not None
+                or self.engine_execution_service is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("engine local guard must be configured before startup")
+        if self._engine_local_guard_components is not None:
+            raise RuntimeError("engine local guard may not be rebound")
+        self._engine_local_guard_components = components
+
+    def configure_engine_canonical_sources(self, *, factory: Any, policy_sha256: str) -> None:
+        """Bind trusted persisted execution->source owners before engine startup.
+
+        Components still require an attested native backend, independent reviewer
+        and sampler. No provider request is allowed to choose these owners.
+        """
+        from skeleton.ai.runtime.inference.canonical_execution_source_factory import (
+            CanonicalExecutionSourceFactory,
+        )
+
+        if not isinstance(factory, CanonicalExecutionSourceFactory):
+            raise TypeError("production canonical source owner factory required")
+        if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
+                or any(char not in "0123456789abcdef" for char in policy_sha256)):
+            raise ValueError("independently pinned canonical instruction digest required")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("canonical source owners must be configured before startup")
+        if (getattr(self, "_engine_canonical_sources", None) is not None
+                or getattr(self, "_engine_canonical_mongo_owners", None) is not None):
+            raise RuntimeError("canonical source owners cannot be replaced")
+        self._engine_canonical_sources = (factory, policy_sha256)
+
+    def configure_engine_canonical_mongo_owners(
+        self, *, conversation: Any, shared_epoch: Any, policy_sha256: str,
+        memory: Any | None = None, memory_namespace: str | None = None,
+    ) -> None:
+        """Select real canonical Mongo owners for per-execution guarded admission.
+
+        The trusted application owner supplies the SAME source epoch installed
+        on its conversation and memory writers. At service startup we build the
+        resolver from the actual durable engine and existing canonical chat
+        command, not from HTTP or an archived handoff.
+        """
+        from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
+
+        if not isinstance(shared_epoch, MongoCanonicalSourceEpoch):
+            raise TypeError("majority-backed canonical writer epoch required")
+        if getattr(conversation, "canonical_source_epoch", None) is not shared_epoch:
+            raise RuntimeError("canonical conversation owner must enforce installed writer epoch")
+        if (memory is not None
+                and getattr(memory, "canonical_source_epoch", None) is not shared_epoch):
+            raise RuntimeError("canonical memory owner must enforce same writer epoch")
+        if (memory is None and memory_namespace is not None
+                or memory is not None and not memory_namespace):
+            raise ValueError("memory owner and namespace must be supplied together")
+        if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
+                or any(char not in "0123456789abcdef" for char in policy_sha256)):
+            raise ValueError("trusted canonical policy digest required")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("canonical source owner wiring must precede engine startup")
+        if (getattr(self, "_engine_canonical_sources", None) is not None
+                or getattr(self, "_engine_canonical_mongo_owners", None) is not None):
+            raise RuntimeError("canonical source owner wiring cannot be replaced")
+        self._engine_canonical_mongo_owners = (
+            conversation, memory, memory_namespace, shared_epoch, policy_sha256,
+        )
+
+    @staticmethod
+    def _activate_engine_provider_registry(
+        *, admission_runtime: Any, guarded_local_components: Any | None,
+    ) -> Any:
+        """One canonical registry path for trusted startup policy injection."""
+        from skeleton.provider_runtime import ProviderRegistry
+
+        return ProviderRegistry.from_env(
+            admission_runtime=admission_runtime, retain_unavailable=True,
+            guarded_components=guarded_local_components,
+        )
+
     def bind_engine_execution_service(
         self,
         *,
@@ -667,6 +774,18 @@ class ServerState:
             raise RuntimeError("engine shutdown must finish before execution authority can start")
         if self.engine_execution_service is not None:
             return self.engine_execution_service
+
+        # This entrypoint is also used directly by product code. Enforce the
+        # same trusted writer inventory here, not only in create_app's
+        # optional bootstrap, BEFORE opening any local execution resources.
+        mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+        if mongo_owners is not None:
+            from skeleton.persistence.mongo_source_epoch import verify_canonical_source_writer_inventory
+
+            conversation, memory, _, shared_epoch, _ = mongo_owners
+            verify_canonical_source_writer_inventory(
+                conversation=conversation, memory=memory, epoch=shared_epoch,
+            )
 
         from pathlib import Path
 
@@ -698,7 +817,6 @@ class ServerState:
         from skeleton.persistence.execution_repository import (
             SQLiteExecutionRepository,
         )
-        from skeleton.provider_runtime import ProviderRegistry
         from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 
         settings = get_settings().engine
@@ -813,6 +931,10 @@ class ServerState:
                 else None
             ),
         )
+        # Freeze any application-owned verifier composition before building
+        # the provider graph. Without it, the compatibility default can still
+        # activate unguarded local inference unless the guard is required.
+        guarded_local_components = self._engine_local_guard_components
         service = EngineExecutionService(
             repository,
             submissions,
@@ -824,13 +946,54 @@ class ServerState:
             ),
         )
         try:
+            # The actual durable service only exists here: assemble a task-scoped
+            # canonical owner reader AFTER its construction and BEFORE model startup.
+            # Explicit canonical source wiring requires an installed native guard.
+            canonical_sources = getattr(self, "_engine_canonical_sources", None)
+            mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+            if mongo_owners is not None:
+                from skeleton.ai.runtime.inference.canonical_execution_source_factory import (
+                    CanonicalExecutionSourceFactory,
+                )
+                from skeleton.persistence.mongo_execution_source_binding import (
+                    MongoExecutionConversationResolver,
+                )
+                conversation, memory, memory_namespace, shared_epoch, policy_sha256 = mongo_owners
+                canonical_sources = (
+                    CanonicalExecutionSourceFactory(
+                        conversation=conversation,
+                        resolver=MongoExecutionConversationResolver(
+                            conversation=conversation, engine_service=service,
+                        ),
+                        memory=memory, memory_namespace=memory_namespace,
+                        shared_epoch=shared_epoch,
+                    ),
+                    policy_sha256,
+                )
+            if canonical_sources is not None:
+                if guarded_local_components is None:
+                    raise RuntimeError("canonical owners require protected native components")
+                from dataclasses import replace
+                from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+                    ScopedEngineCompiledSnapshotReader,
+                )
+
+                source_factory, policy_sha256 = canonical_sources
+                guarded_local_components = replace(
+                    guarded_local_components,
+                    snapshots=ScopedEngineCompiledSnapshotReader(
+                        service=service,
+                        source_authority_factory=source_factory,
+                        policy_sha256=policy_sha256,
+                    ),
+                )
             coordinator = EngineExecutionCoordinator(
                 service,
                 # Acquire exclusive execution custody before activating model
                 # graphs, so a duplicate worker cannot allocate another catalog.
-                provider_registry_factory=lambda: ProviderRegistry.from_env(
+                provider_registry_factory=lambda: self._activate_engine_provider_registry(
                     admission_runtime=provider_admission_runtime,
-                    retain_unavailable=True,
+                    guarded_local_components=guarded_local_components,
                 ),
                 finalization_binding_hook=(
                     self.bind_verified_memory_finalization
@@ -1122,7 +1285,56 @@ async def _close_realtime(app: Any) -> None:
         await hub.aclose()
 
 
-def create_app() -> Any:
+async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -> None:
+    """Allow deployer-owned native and canonical Mongo authorities before engine startup.
+
+    Never source a bootstrap from an HTTP request, environment variable or
+    persisted conversation. The trusted application composition must install
+    its attested native backend, reviewer, real canonical owners and the shared
+    majority-durable writer epoch. Missing authorities abort startup.
+    """
+    if bootstrap is None:
+        return
+    if not callable(bootstrap):
+        raise TypeError("trusted protected bootstrap must be callable")
+    if (state.engine_execution_service is not None
+            or state.engine_execution_coordinator is not None
+            or state._engine_shutdown_pending):
+        raise RuntimeError("protected bootstrap must precede engine startup")
+    from inspect import isawaitable
+
+    result = bootstrap(state)
+    if isawaitable(result):
+        await result
+    elif result is not None:
+        raise TypeError("protected bootstrap must not return an authority")
+    mongo_owners = getattr(state, "_engine_canonical_mongo_owners", None)
+    if (state._engine_local_guard_components is None
+            or mongo_owners is None or mongo_owners[1] is None):
+        raise RuntimeError(
+            "protected bootstrap requires native guard, canonical conversation "
+            "and memory owners, and one shared durable writer epoch"
+        )
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+
+    conversation, memory, _, shared_epoch, _ = mongo_owners
+    if (not isinstance(memory, MongoMemoryRepository)
+            or memory.canonical_source_epoch is not shared_epoch):
+        raise RuntimeError("protected bootstrap requires the real epoch-fenced Mongo memory authority")
+    if (not callable(getattr(conversation, "get_thread", None))
+            or not callable(getattr(conversation, "active_transcript", None))
+            or conversation.canonical_source_epoch is not shared_epoch):
+        raise RuntimeError("protected bootstrap requires a live epoch-fenced conversation authority")
+    from skeleton.persistence.mongo_source_epoch import verify_canonical_source_writer_inventory
+
+    # Inventory verifies the real Mongo implementation's known mutation
+    # entrypoints, rather than trusting arbitrary objects with matching names.
+    verify_canonical_source_writer_inventory(
+        conversation=conversation, memory=memory, epoch=shared_epoch,
+    )
+
+
+def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
     from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle, ServicePhase
 
     fastapi = _get_fastapi()
@@ -1204,6 +1416,8 @@ def create_app() -> Any:
     install_gate(app, policy=gate_policy)
     from skeleton.api.agent_edge_mount import install_registered_agent_edge
     install_registered_agent_edge(app)
+    from skeleton.api.agent_edge_mount import install_registered_agent_edge
+    install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS
     # admits a browser origin; protected commands still need engine authority.
     app.add_middleware(
@@ -1223,10 +1437,14 @@ def create_app() -> Any:
         state.bind_governance_registry()
         state.bind_canonical_artifact_store()
         state.bind_canonical_retrieval_index()
+        # A deployment-provided bootstrap is the only path to protected native
+        # mode. It must bind trusted owners BEFORE service/provider activation.
+        await _run_trusted_protected_bootstrap(state, trusted_protected_bootstrap)
         state.bind_engine_execution_service(
             runtime_lifecycle=runtime_lifecycle,
         )
-        if _canonical_memory_mongo_configured():
+        if (_canonical_memory_mongo_configured()
+                or getattr(state, "_engine_canonical_mongo_owners", None) is not None):
             await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
         _bind_realtime(app, state)
@@ -1315,5 +1533,11 @@ def create_app() -> Any:
     return app
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
-    uvicorn = _get_uvicorn(); app = create_app(); uvicorn.run(app, host=host, port=port)
+def run_server(
+    host: str = "0.0.0.0", port: int = 8000, *,
+    trusted_protected_bootstrap: Any = None,
+) -> None:
+    """Run with the same deployer-owned composition as create_app()."""
+    uvicorn = _get_uvicorn()
+    app = create_app(trusted_protected_bootstrap=trusted_protected_bootstrap)
+    uvicorn.run(app, host=host, port=port)

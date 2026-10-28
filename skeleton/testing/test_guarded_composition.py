@@ -115,6 +115,65 @@ def test_protected_composition_executes_twice_with_per_call_authority():
     asyncio.run(scenario())
 
 
+def test_registry_preserves_protected_admission_and_context(tmp_path, monkeypatch):
+    """The provider facade must not bypass the inner guarded execution path."""
+    from dataclasses import replace
+
+    from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+    from skeleton.context.sealed_sandwich import SealedContextIntegrityError
+    from skeleton.provider_runtime import ProviderRegistry
+
+    engine, reader, request = protected_fixture()
+    artifact = tmp_path / "reference.json"
+    write_local_model_artifact(engine.model, artifact)
+    monkeypatch.setenv("AI_PROVIDER", "local")
+    monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(artifact))
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "1")
+    for name in (
+        "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH",
+        "AI_SECONDARY_API_KEY", "AI_SECONDARY_BASE_URL", "AI_SECONDARY_MODEL",
+        "AI_VERIFICATION_MODEL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    registry = ProviderRegistry.from_env(
+        require_guarded_local=True, guarded_components=secure_components(reader),
+    )
+    adapter = registry.require_active()
+
+    async def scenario():
+        result = await adapter.generate(request)
+        assert adapter.require_guarded_inference is True
+        assert reader.reads == 2
+        assert result.context_digest == request.context_digest
+        assert result.governance_decision_id is not None
+        with pytest.raises(SealedContextIntegrityError):
+            await adapter.generate(replace(request, prompt="tampered"))
+
+    asyncio.run(scenario())
+
+
+def test_registry_retains_unavailable_after_guard_attestation_denial(tmp_path, monkeypatch):
+    from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+    from skeleton.provider_runtime import ProviderRegistry, ProviderUnavailableError
+
+    engine, reader, _ = protected_fixture()
+    artifact = tmp_path / "reference.json"
+    write_local_model_artifact(engine.model, artifact)
+    monkeypatch.setenv("AI_PROVIDER", "local")
+    monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(artifact))
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "1")
+    for name in ("AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH"):
+        monkeypatch.delenv(name, raising=False)
+    components = secure_components(reader, attestor=lambda *_args: False)
+    with pytest.raises(ProviderUnavailableError):
+        ProviderRegistry.from_env(require_guarded_local=True, guarded_components=components)
+    registry = ProviderRegistry.from_env(
+        require_guarded_local=True, guarded_components=components, retain_unavailable=True,
+    )
+    with pytest.raises(ProviderUnavailableError):
+        registry.require_active()
+
+
 def test_protected_component_contract_rejects_missing_dependencies():
     engine, reader, _ = protected_fixture()
     with pytest.raises(ProviderPolicyError, match="verify_native_tokenizer"):

@@ -116,6 +116,9 @@ async def test_explicit_legacy_reference_artifact_runs_without_hosted_provider(
     assert result.text == "answer complete"
     assert result.usage.billed_cost == "0"
     assert adapter.require_guarded_inference is False
-    # Legacy operation is explicitly NOT an independently governed receipt.
-    assert result.governance_decision_id is None
-    assert result.admission_decision_id is None
+    # Generic transfer-policy admission does not claim sealed-context review.
+    assert result.governance_decision_id is not None
+    assert result.context_id is None
+    assert result.context_digest is None
+    assert result.execution_receipt_digest is None
+    assert result.admission_decision_id is not None

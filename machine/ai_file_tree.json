@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "461e429e1a23cce2d98975d007f9e20e8698f2aa",
+      "source_git_object_sha": "e9704b1af00ef7c7ced2c2623dc7a3704a699034",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "461e429e1a23cce2d98975d007f9e20e8698f2aa",
+      "source_git_object_sha": "e9704b1af00ef7c7ced2c2623dc7a3704a699034",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -217,7 +217,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "80da3080936e25e3e15546a2050e5c04857632a9",
+      "source_git_object_sha": "396186a610cd2ad3296216efa953e72e280d2084",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -398,7 +398,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "67de82b09d495e90675ed646b50fd7233582aa2e",
+      "source_git_object_sha": "8e90248e1264b8ab314a6c26440d7ed9f600100f",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -590,7 +590,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "0fb27d4656687597af77db3638defd2bb88c093d",
+      "source_git_object_sha": "7a60d3b559d25c6eeb3e28f2dfb0ad8abbfc384a",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
