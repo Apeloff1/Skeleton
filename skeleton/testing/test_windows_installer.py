@@ -229,6 +229,17 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
 
+
+def test_windows_installer_workflow_is_manual_and_read_only():
+    source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    triggers = source.split("\npermissions:", 1)[0]
+    assert "workflow_dispatch:" in triggers
+    assert "pull_request:" not in triggers and "push:" not in triggers
+    assert "pull_request_target:" not in source
+    assert "permissions:\n  contents: read\n" in source
+    artifact = source.split("      - name: Upload Windows installer\n", 1)[1]
+    assert "if: always()" not in artifact
+
 def test_windows_installer_packages_jeeves_curriculum_and_mirror_routes():
     workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
     launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")

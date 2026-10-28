@@ -22,6 +22,9 @@ See the original Git history before this commit for the pre-slim CI design.
 
 ## Restored
 
+- `windows-installer.yml` — restored as a manual-only Windows installer build and
+  smoke check. The archived copy remains inactive; a run must pass on the exact
+  source revision before its artifact is considered qualified.
 - `ci.yml` — restored to `.github/workflows/ci.yml` by #4104 as a reusable
   workflow called from the required **Merge Readiness** aggregate (one run per
   head, per-ref cancel-in-progress, change-scoped job skips). The copy in this
