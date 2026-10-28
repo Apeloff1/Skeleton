@@ -29,6 +29,14 @@ The existing `DB_NAME` selects the backend Mongo database. Curiosity state uses
 the existing backend data volume at `/app/data/curiosity`; the read-only container
 root is not a writable state location.
 
+The optional `--full` Chroma service has an unresolved persistence mismatch:
+the pinned image writes to `/data`, while its named volume is mounted at
+`/chroma/chroma`. Data in the container's `/data` can be lost on removal or
+recreation. Before using `--full`, restarting an existing Chroma installation,
+or running `app down` or direct Compose teardown, follow the
+[Chroma persistence and recovery warning](../APP_ASSEMBLY.md#application-surfaces).
+The default profile does not require Chroma for bounded lexical retrieval.
+
 Open `http://localhost:3000/setup` with the default ports. The setup page remains
 readable before login and when the API is unavailable. It observes capabilities
 separately and provides commands to copy into the host terminal. Create an

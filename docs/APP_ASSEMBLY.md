@@ -27,6 +27,24 @@ and one operator command.
 | `mongo` | durable state | local-only host binding |
 | `chroma` | optional vector store | `http://localhost:8000` with `--full` |
 
+**Chroma persistence is not ready for durable use.** The pinned Chroma 1.5.9
+image loads `/config.yaml` with `persist_path: /data`. Its configuration loader
+does not use the Compose `PERSIST_DIRECTORY` setting, and the existing
+`chroma_data` volume is mounted at `/chroma/chroma`, not `/data`. Data written
+to `/data` can therefore reside in the container's writable layer and be lost
+when that container is removed. Health checks do not establish persistence.
+The default profile does not start the optional Chroma service.
+
+If Chroma has been used, preserve its existing container and the legacy
+`chroma_data` volume before starting, recreating or removing services. Quiesce
+clients and stop Chroma gracefully; retain a complete, consistent backup of its
+`/data` directory, including SQLite journals, and a separate backup of the
+legacy volume. Verify the backups and their integrity before planning migration.
+Do not automatically combine or overwrite the two stores. `app down`, direct
+`docker compose down`, and Compose recreation can remove the container and its
+writable-layer data. An automated migration to a durable `/data` mount has not
+yet been qualified; preserve both sources until their authority is resolved.
+
 The backend and Skeleton API remain separate processes during consolidation.
 Combining them prematurely would create route, dependency, startup, and
 security regressions. They are one application at the operational boundary
@@ -356,7 +374,7 @@ python -m skeleton app check --runtime
 python -m skeleton app up
 # app up waits for frontend + backend + engine readiness before success
 
-# Include optional Chroma
+# Include optional Chroma (review the persistence warning above first)
 python -m skeleton app up --full
 
 # Inspect / operate
@@ -365,6 +383,7 @@ python -m skeleton app smoke
 python -m skeleton app logs backend
 python -m skeleton app logs -f
 python -m skeleton app config
+# Preserve any existing Chroma /data before stopping and removing containers
 python -m skeleton app down
 ```
 

@@ -235,6 +235,10 @@ services:
     # This service has no auth boundary here, so never bind it publicly.
     ports:
       - "127.0.0.1:${CHROMA_PORT:-8000}:8000"
+    # The pinned Chroma 1.5.9 config writes to /data and does not read the
+    # legacy PERSIST_DIRECTORY setting below. This mount does not persist /data.
+    # Preserve any existing container's /data before recreating or removing it;
+    # see the full-profile recovery warning in docs/APP_ASSEMBLY.md.
     volumes:
       - chroma_data:/chroma/chroma
     environment:
