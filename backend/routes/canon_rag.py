@@ -15,9 +15,10 @@ import os
 import re
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 
 from core.databases import client as _MONGO
+from routes.gameforge_auth import require_authenticated_identity
 
 router = APIRouter(prefix="/api/rag", tags=["rag"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
@@ -71,9 +72,24 @@ def chunks_from_arts(arts: dict) -> list:
     return out
 
 
-async def _arts(pid: str) -> dict:
-    kb = await _db.game_kb.find_one({"game_id": pid}, {"_id": 0, "artifacts": 1})
-    return (kb or {}).get("artifacts") or {}
+async def _arts(pid: str, *, scope: dict[str, str] | None = None) -> dict:
+    # Internal callers without an authenticated identity cannot inspect private KB.
+    if not scope:
+        return {}
+    project = await _db.playables.find_one({"playable_id": pid, **scope})
+    if (
+        not isinstance(project, dict)
+        or any(project.get(key) != value for key, value in scope.items())
+        or project.get("state") != "active"
+    ):
+        raise HTTPException(status_code=404, detail="Project not found")
+    kb = await _db.game_kb.find_one(
+        {"game_id": pid, **scope},
+        {"_id": 0, "artifacts": 1, "owner_id": 1, "tenant_id": 1},
+    )
+    if not isinstance(kb, dict) or any(kb.get(key) != value for key, value in scope.items()):
+        return {}
+    return kb.get("artifacts") or {}
 
 
 def _score(query_tokens: set, chunk: dict) -> float:
@@ -85,9 +101,9 @@ def _score(query_tokens: set, chunk: dict) -> float:
     return overlap + (overlap / (len(ct) ** 0.5))
 
 
-async def _recall(pid: str, query: str, k: int = 5) -> list:
+async def _recall(pid: str, query: str, k: int = 5, *, scope: dict[str, str] | None = None) -> list:
     """Top-k relevant canon chunks for a query (used by agents before generating)."""
-    arts = await _arts(pid)
+    arts = await _arts(pid, scope=scope)
     chunks = chunks_from_arts(arts)
     qt = set(_tok(query))
     if not qt or not chunks:
@@ -108,9 +124,9 @@ def recall_block(hits: list) -> str:
 
 
 @router.get("/{pid}/memory")
-async def memory_stats(pid: str):
+async def memory_stats(pid: str, scope: dict[str, str] = Depends(require_authenticated_identity)):
     """🧠 Size + composition of the canon memory store."""
-    arts = await _arts(pid)
+    arts = await _arts(pid, scope=scope)
     chunks = chunks_from_arts(arts)
     by_type: dict = {}
     for c in chunks:
@@ -120,7 +136,8 @@ async def memory_stats(pid: str):
 
 
 @router.get("/{pid}/retrieve")
-async def retrieve(pid: str, q: str = "", k: int = 5):
+async def retrieve(pid: str, q: str = "", k: int = 5,
+                   scope: dict[str, str] = Depends(require_authenticated_identity)):
     """🔎 Retrieve the top-k canon chunks relevant to a query."""
-    hits = await _recall(pid, q, k)
+    hits = await _recall(pid, q, k, scope=scope)
     return {"game_id": pid, "query": q, "k": k, "count": len(hits), "hits": hits}
