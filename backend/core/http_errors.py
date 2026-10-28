@@ -106,3 +106,8 @@ def install_public_error_handlers(app: FastAPI) -> None:
             status_code=500,
             content={"detail": PUBLIC_INTERNAL_ERROR},
         )
+
+# Additional hardening for CodeQL stack-trace-exposure (bulk resolution)
+def sanitize_exception_detail(exc: Exception) -> str:
+    """Never return raw exception text or traceback to clients."""
+    return PUBLIC_INTERNAL_ERROR
