@@ -98,19 +98,49 @@ def test_up_command_is_deterministic_and_shell_free():
     assert "skeleton" in command
 
 
-def test_full_up_command_enables_optional_profile():
-    command = compose_command("up", full=True, build=False)
+def test_full_up_is_blocked_until_chroma_persistence_is_qualified():
+    with pytest.raises(ValueError, match="Chroma.*data"):
+        compose_command("up", full=True, build=False)
 
-    assert command[:6] == (
-        "docker",
-        "compose",
-        "-f",
-        "docker-compose.yml",
-        "--profile",
-        "full",
-    )
-    assert command[6:8] == ("up", "-d")
-    assert "chroma" in command
+
+def test_app_down_stops_all_declared_profiles_without_removing_data():
+    command = compose_command("down")
+    assert command[:4] == ("docker", "compose", "-f", "docker-compose.yml")
+    assert command[4:] == ("--profile", "full", "stop")
+    assert "down" not in command and "--remove-orphans" not in command
+    assert "--volumes" not in command and "-v" not in command
+
+
+def test_cli_refuses_unsafe_full_start_before_preflight_or_compose(monkeypatch, capsys):
+    from skeleton.app import cli
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Full startup must not dispatch or change configuration")
+
+    monkeypatch.setattr(cli, "preflight", forbidden)
+    monkeypatch.setattr(cli, "_run_compose", forbidden)
+    assert cli.run_app_cli(["up", "--full"]) == 1
+    assert "Chroma" in capsys.readouterr().out
+
+
+def test_app_compose_dispatch_disables_inherited_orphan_removal(monkeypatch, tmp_path):
+    import subprocess
+
+    from skeleton.app import cli
+
+    observed = {}
+
+    def runner(command, **kwargs):
+        observed.update(kwargs["env"])
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
+    monkeypatch.setenv("SKELETON_TEST_SETTING", "preserved")
+    monkeypatch.setattr(cli.subprocess, "run", runner)
+    assert cli._run_compose(("docker", "compose", "up"), tmp_path,
+                            env_overrides={"COMPOSE_REMOVE_ORPHANS": "1"}) == 0
+    assert observed["COMPOSE_REMOVE_ORPHANS"] == "0"
+    assert observed["SKELETON_TEST_SETTING"] == "preserved"
 
 
 def test_logs_reject_unknown_service():

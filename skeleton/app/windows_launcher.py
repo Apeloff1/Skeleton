@@ -149,6 +149,7 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=90,
+            env={**os.environ, "COMPOSE_REMOVE_ORPHANS": "0"},
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"Unable to stop services: {type(exc).__name__}; check Docker Desktop"

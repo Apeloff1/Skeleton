@@ -268,8 +268,7 @@ function PlayableContent() {
   const shareGame = React.useCallback(async () => {
     if (!game) return;
     haptics.selection();
-    // Prefer the in-app deep link (opens the game with full play + evolve/remix).
-    // On web, an absolute /playable?id= URL; on native, the codedock:// scheme.
+    // This is an owner-scoped deep link, not publication or buyer access.
     const url = Platform.OS === 'web'
       ? (typeof window !== 'undefined' ? `${window.location.origin}/playable?id=${game.playable_id}` : `${BACKEND}/playable?id=${game.playable_id}`)
       : `codedock://playable?id=${game.playable_id}`;
@@ -280,7 +279,6 @@ function PlayableContent() {
         await Clipboard.setStringAsync(url);
       }
       setCopied(true); haptics.notify('success'); setTimeout(() => setCopied(false), 2000);
-      awardXp('share');
     } catch {
       setError('Could not copy link.');
     }
@@ -619,14 +617,14 @@ function PlayableContent() {
         return;
       }
       if (d.job_status === 'done' && d.status === 'failed') {
-        setError(`Generation did not produce a runnable game (score ${d.playability_score}/100, missing: ${(d.missing_checks || []).join(', ')}). Try again or refine the brief.`);
+        setError(`Generation did not meet the structural checks (score ${d.playability_score}/100, missing: ${(d.missing_checks || []).join(', ')}). Try again or refine the brief.`);
         setBusy(false); haptics.notify('error'); return;
       }
       if (d.job_status === 'error') {
         setError(d.error || 'generation failed'); setBusy(false); haptics.notify('error'); return;
       }
       if (['cancelled', 'canceled'].includes(d.job_status)) setError('The backend confirmed this job was cancelled.');
-      else setError('The backend finished this job without a runnable playable result.');
+      else setError('The backend finished this job without a generated preview.');
     } catch {
       if (current()) setObservationMessage('The job reference or its latest status could not be verified. Keep this page open; resume checks the original job without submitting another build.');
     } finally {
@@ -924,7 +922,7 @@ function PlayableContent() {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
-          <Text style={styles.subtitle}>🕹️ Brief → real, self-contained game you play right here.</Text>
+          <Text style={styles.subtitle}>🕹️ Generate a self-contained game preview and try it here.</Text>
 
           {(savedJob || observationMessage || restoringJob) && <View testID="pl-job-observation" style={styles.panel}>
             <Text style={styles.panelTitle}>Saved build observation</Text>
@@ -1077,8 +1075,9 @@ function PlayableContent() {
 
               <View style={styles.metaRow}>
                 <Text style={styles.gameTitle} numberOfLines={1}>{game.title}</Text>
-                <Text style={styles.scoreBadge}>▶ {game.playability_score}/100</Text>
+                <Text style={styles.scoreBadge}>Structure {game.playability_score}/100</Text>
               </View>
+              <Text testID="pl-runtime-unverified" style={styles.metaSub}>Browser gameplay has not been independently verified. Try the preview and check its controls.</Text>
               {game.evaluation && game.evaluation.available && (game.evaluation.difficulty || game.evaluation.length) ? (
                 <View testID="pl-tags" style={styles.tagRow}>
                   {game.evaluation.difficulty ? (
@@ -1104,7 +1103,7 @@ function PlayableContent() {
               <Text style={styles.metaSub}>
                 {game.genre} · {game.model || 'ai'} · {(game.bytes / 1024).toFixed(1)} KB
                 {typeof game.intricacy === 'number' ? ` · 🧬 intricacy ${game.intricacy}/7` : ''}
-                {(() => { const n = (game.repair_trail || []).filter((t: any) => t.kind === 'quality_repair').length; return n ? ` · ✨ quality-refined ×${n}` : ''; })()}
+                {(() => { const n = (game.repair_trail || []).filter((t: any) => t.kind === 'quality_repair').length; return n ? ` · ✨ model revisions ×${n}` : ''; })()}
                 {game.repair_trail && (game.repair_trail).some((t: any) => t.kind === 'structural_repair') ? ' · 🔧 repaired' : ''}
                 {game.parent_id ? ' · 🎚️ derived' : ''}
               </Text>
@@ -1239,11 +1238,12 @@ function PlayableContent() {
               {game.evaluation && game.evaluation.available ? (
                 <View testID="pl-eval" style={styles.evalBox}>
                   <View style={styles.evalHead}>
-                    <Text style={styles.evalTitle}>🧪 Judge ({game.evaluation.judge_model}) · {game.evaluation.overall}/100</Text>
-                    <Text style={[styles.verdict, game.evaluation.verdict === 'ship' ? styles.vShip : game.evaluation.verdict === 'reject' ? styles.vReject : styles.vPolish]}>
-                      {(game.evaluation.verdict || '').toUpperCase()}
+                    <Text style={styles.evalTitle}>🧪 Model assessment ({game.evaluation.judge_model || 'model'}) · {game.evaluation.overall}/100</Text>
+                    <Text style={[styles.verdict, styles.vPolish]}>
+                      ADVISORY
                     </Text>
                   </View>
+                  <Text style={styles.evalAxes}>Model opinion only; it does not verify gameplay or approve release.</Text>
                   <Text style={styles.evalAxes}>
                     Playability {game.evaluation.playability} · Coherence {game.evaluation.coherence} · Fun {game.evaluation.fun} · Polish {game.evaluation.polish}
                   </Text>
@@ -1333,7 +1333,7 @@ function PlayableContent() {
                   <Text style={styles.smallBtnTxt}>✨ One-Tap Polish</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="pl-share" style={[styles.smallBtn, styles.smallBtnShare]} onPress={shareGame}>
-                  <Text style={styles.smallBtnTxt}>{copied ? '✓ Copied' : '🔗 Share'}</Text>
+                  <Text style={styles.smallBtnTxt}>{copied ? '✓ Copied' : '🔗 Copy private link'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="pl-regen" style={[styles.smallBtn, styles.smallBtnAlt]} onPress={generate}>
                   <Text style={styles.smallBtnTxt}>✨ New game</Text>
@@ -1347,8 +1347,8 @@ function PlayableContent() {
                 <TouchableOpacity testID="pl-collect-btn" style={[styles.smallBtn, styles.smallBtnCollect]} onPress={openCollModal}>
                   <Text style={styles.smallBtnTxt}>📚 Save</Text>
                 </TouchableOpacity>
-                <TouchableOpacity testID="pl-sell-btn" style={[styles.smallBtn, styles.smallBtnSell]} onPress={() => { haptics.selection(); router.push(`/marketplace?sell=${game.playable_id}` as any); }}>
-                  <Text style={styles.smallBtnTxt}>🛒 Sell</Text>
+                <TouchableOpacity testID="pl-sell-btn" style={[styles.smallBtn, styles.smallBtnSell]} onPress={() => { haptics.selection(); router.push('/marketplace' as any); }}>
+                  <Text style={styles.smallBtnTxt}>🛒 Marketplace</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="pl-tournament-btn" style={[styles.smallBtn, styles.smallBtnTrn]} onPress={() => { haptics.selection(); router.push('/tournaments' as any); }}>
                   <Text style={styles.smallBtnTxt}>🏆 Compete</Text>

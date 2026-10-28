@@ -32,8 +32,10 @@ root is not a writable state location.
 The optional `--full` Chroma service has an unresolved persistence mismatch:
 the pinned image writes to `/data`, while its named volume is mounted at
 `/chroma/chroma`. Data in the container's `/data` can be lost on removal or
-recreation. Before using `--full`, restarting an existing Chroma installation,
-or running `app down` or direct Compose teardown, follow the
+recreation. App-owned full-profile startup is blocked until safe migration is
+qualified. App-owned `app down` stops containers without removing them; direct
+Compose teardown and older app versions can still remove writable data. Before
+operating on an existing Chroma installation, follow the
 [Chroma persistence and recovery warning](../APP_ASSEMBLY.md#application-surfaces).
 The default profile does not require Chroma for bounded lexical retrieval.
 
@@ -112,9 +114,11 @@ required if the default directory is incomplete or contains another deployment.
 For the optional coding profile, choose a separate directory and follow the
 [coding profile guide](LOCAL_CODING_PROFILE.md).
 
-Direct native Windows model preparation is not qualified: an existing empty
-destination cannot pass the Unix owner check, and Windows file and hard-link
-semantics still require real Windows validation. The native Linux x86-64 WSL shell
+Direct native Windows acquisition is refused before transfer: Windows directory
+ownership, readonly hard-link cleanup and container mount semantics still require
+real Windows validation. The existing verification path for complete pinned
+deployments remains available without downloading, subject to host filesystem
+support. The native Linux x86-64 WSL shell
 does not need `--prepare-for-container`; that explicit flag is required when
 preparing on another host and does not establish successful Windows-host preparation.
 WSL preparation targets

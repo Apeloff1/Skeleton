@@ -40,10 +40,14 @@ If Chroma has been used, preserve its existing container and the legacy
 clients and stop Chroma gracefully; retain a complete, consistent backup of its
 `/data` directory, including SQLite journals, and a separate backup of the
 legacy volume. Verify the backups and their integrity before planning migration.
-Do not automatically combine or overwrite the two stores. `app down`, direct
-`docker compose down`, and Compose recreation can remove the container and its
-writable-layer data. An automated migration to a durable `/data` mount has not
-yet been qualified; preserve both sources until their authority is resolved.
+Do not automatically combine or overwrite the two stores. App-owned `app down`
+and the Windows launcher Stop now stop declared services without removing their
+containers. App-owned Compose calls also disable automatic orphan removal even
+when `COMPOSE_REMOVE_ORPHANS` is set in the environment. Direct `docker compose down`, older app versions and Compose
+recreation can still remove the container and its writable-layer data. App-owned
+`up --full` and `install --full --start` are blocked until a durable `/data`
+layout and migration are qualified; ordinary default-profile startup is available.
+Preserve both sources until their authority is resolved.
 
 The backend and Skeleton API remain separate processes during consolidation.
 Combining them prematurely would create route, dependency, startup, and
@@ -284,8 +288,9 @@ service names do not resolve in the browser. Production exports embed these
 public endpoints at build time, so rebuild the frontend after changing them;
 restarting an existing static image cannot change its bundle. Set
 `CORS_ORIGINS` to the explicit browser origin(s), including custom ports.
-A normal `app down` retains
-application and database volumes. Ordinary startup failures do not require
+A normal `app down` stops all declared profiles and retains their containers,
+writable layers and database volumes. It does not remove orphans. Direct Compose
+teardown is not protected by this app-owned behavior. Ordinary startup failures do not require
 deleting volumes or rotating secrets.
 
 ### Pre-compilation readiness
@@ -374,7 +379,7 @@ python -m skeleton app check --runtime
 python -m skeleton app up
 # app up waits for frontend + backend + engine readiness before success
 
-# Include optional Chroma (review the persistence warning above first)
+# Full-profile startup is blocked until the persistence warning is resolved
 python -m skeleton app up --full
 
 # Inspect / operate
@@ -383,7 +388,7 @@ python -m skeleton app smoke
 python -m skeleton app logs backend
 python -m skeleton app logs -f
 python -m skeleton app config
-# Preserve any existing Chroma /data before stopping and removing containers
+# Stops declared services while preserving containers and their writable layers
 python -m skeleton app down
 ```
 

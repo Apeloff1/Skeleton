@@ -142,6 +142,23 @@ async function crashedGame(f) {
   return tree;
 }
 
+test('a model ship recommendation and structural score do not claim browser qualification', async t => {
+  const f = fixture(); t.after(() => f.unmount()); f.params.id = GAME;
+  const defaultGet = f.wire.get;
+  f.wire.get = async (url, options) => url === '/api/playable/' + GAME
+    ? { ok: true, status: 200, data: game({ evaluation: {
+      available: true, overall: 90, verdict: 'ship', playability: 90,
+      advisory: true, runtime_checked: false, shippable: false,
+    } }) } : defaultGet(url, options);
+  const tree = await f.flush();
+  assert.match(text(find(tree, 'pl-runtime-unverified')), /gameplay has not been independently verified/i);
+  assert.match(text(tree), /Structure\s+90\s*\/100/);
+  assert.match(text(find(tree, 'pl-eval')), /Model assessment/);
+  assert.match(text(find(tree, 'pl-eval')), /ADVISORY/);
+  assert.doesNotMatch(text(find(tree, 'pl-eval')), /\bSHIP\b/);
+  assert.ok(find(tree, 'pl-webview'), 'Owner can still inspect the generated preview');
+});
+
 test('reload displays the original owner-scoped job and engine key without any automatic observation or generation', async t => {
   const first = fixture(); await first.seed(); first.unmount();
   const f = fixture(first.disk); t.after(() => f.unmount()); const tree = await f.flush();

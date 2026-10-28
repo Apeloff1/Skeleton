@@ -10246,6 +10246,19 @@
       "authority": "Existing authenticated account/tenant and canonical source guards precede confidential model transfer. Worldforge and orchestrator retain their existing confidential-capable domains. No new provider, service, store or capability owner; no change to the INTERNAL legacy fallback or public/governance ceilings.",
       "failure": "A canonical model denial cannot become a provider fallback or empty structural repair. Unconfirmed execution retains the exact request key and nonterminal job custody; successful artifacts retain canonical engine execution/context/provider receipt references.",
       "feature_output_budget": "Playable HTML generation/structural repair/refinement requests at most 2048 output tokens; source-bound literal runtime-repair proposals request at most 1024 and the judge requests 256. Existing canonical catalog/context/operation/phase/physical limits remain authoritative. No global model limit increase.",
+      "playable_raw_response_custody": {
+        "owner": "backend/routes/playable.py:get_playable_raw",
+        "authority": "Existing authenticated account, tenant and source access checks remain authoritative. Generated HTML is untrusted even when a private owner can read it.",
+        "transport": "Direct raw HTML responses use an opaque-origin CSP sandbox with scripts and pointer lock, deny in-document network requests, forms, frames and app-origin access, reject embedding, and carry private no-store, nosniff and no-referrer headers. Top-level navigation remains subject to browser sandbox behavior. Existing authenticated bounded fetch and separately sandboxed preview remain supported.",
+        "quality": "Structural scores and model opinions are advisory; no HTML parsing, client assertion or model verdict establishes runtime qualification. Preview remains available to the owner for explicit observation."
+      },
+      "playable_marketplace_release_custody": {
+        "owner": "backend/routes/marketplace.py:create_listing,checkout",
+        "state": "unavailable",
+        "reason": "The generated HTML surface lacks a trusted source-bound browser qualification owner and the current playable access model is owner-scoped rather than buyer-entitled.",
+        "admission": "Reject new marketplace listings and new checkout sessions with a stable actionable 503 before database mutation or payment-provider dispatch, regardless of stored model scores or historical release flags. Existing listing reads, payment status and webhook handlers remain unchanged under their existing authority; external webhook delivery is not qualified.",
+        "reenablement": "Declare and verify a source-bound runtime qualification owner, buyer entitlement and delivery authority, and race-safe lifecycle checks before allowing new sales; model verdicts and structural scores are not release evidence."
+      },
       "runtime_repair_literal_patch": {
         "status": "implementation_candidate",
         "owner": "backend/routes/playable_repair.py",
@@ -10264,6 +10277,13 @@
         "acceptance": "Bounded parser/apply negatives plus actual scoped worker/model-response/CAS regressions, foreign/revoked/concurrent-source denials, unchanged old source on every failure, pinned canonical receipt lineage and actual installed repair/browser proof; source tests alone do not grant runtime or shipping qualification."
       },
       "acceptance": "Real route privacy middleware plus EngineChat and EngineText bridge tests, authenticated/foreign/public negatives, and installed original-game generation are required. Source changes alone confer no quality or enterprise grade."
+    },
+    "chroma_lifecycle_custody": {
+      "status": "implementation_candidate",
+      "owner": "skeleton/app/assembly.py:compose_command",
+      "full_profile": "Current optional Chroma full-profile startup is refused before setup or Compose mutation because the pinned image writes /data outside the configured named volume. Read-only planning and the default application profile remain available.",
+      "teardown": "App-owned down and Windows launcher Stop use Compose stop with every declared profile. App-owned Compose dispatch forces COMPOSE_REMOVE_ORPHANS=0 after environment overrides. This stops known services without removing containers, writable layers, volumes, images or orphans; it applies across Windows and Unix without inspecting Docker process output.",
+      "recovery": "Preserve and separately back up existing Chroma container /data and legacy volume; do not retarget or merge them automatically. Direct Docker and Compose operations remain outside this app-owned safety boundary. Full profile requires a qualified durable mount and explicit migration before re-enablement."
     },
     "local_model_provisioning_contract": "machine/ai_local_model_provisioning.json",
     "session_evidence": "machine/ai_first_install_session_evidence_2026-10-15.json",

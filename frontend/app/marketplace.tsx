@@ -185,6 +185,7 @@ export default function Marketplace() {
         <TouchableOpacity testID="mkt-sell" onPress={() => { setSellMsg(''); setSellModal(true); }} style={styles.sellBtn}><Text style={styles.sellBtnTxt}>＋ Sell</Text></TouchableOpacity>
       </View>
 
+      <View testID="mkt-sales-unavailable" style={styles.bannerBox}><Text style={styles.bannerTxt}>Selling and purchasing games is unavailable until gameplay and buyer access can be verified. Existing payment status remains available.</Text></View>
       {banner ? <View testID="mkt-banner" style={styles.bannerBox}><Text style={styles.bannerTxt}>{banner}</Text></View> : null}
 
       <View style={styles.tabs}>
@@ -209,7 +210,7 @@ export default function Marketplace() {
       >
         {loading ? <ActivityIndicator color="#A78BFA" style={{ marginTop: 40 }} /> : null}
         {!loading && data.length === 0 ? (
-          <Text style={styles.empty}>{tab === 'browse' ? 'No games listed yet. Tap “＋ Sell” to list one (use a game id from /playable).' : 'No purchases yet.'}</Text>
+          <Text style={styles.empty}>{tab === 'browse' ? 'No games listed yet.' : 'No purchases yet.'}</Text>
         ) : null}
         {data.map((l) => (
           <View key={l.playable_id} testID={`mkt-row-${l.playable_id}`} style={styles.row}>

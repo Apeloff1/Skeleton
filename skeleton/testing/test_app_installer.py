@@ -32,6 +32,19 @@ def _read_values(path: Path) -> dict[str, str]:
     return values
 
 
+def test_unsafe_full_install_is_rejected_before_any_setup_or_child_process(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("Unsafe full profile must fail before setup or process dispatch")
+
+    monkeypatch.setattr("skeleton.app.installer.inspect_host", forbidden)
+    monkeypatch.setattr("skeleton.app.installer.ensure_runtime_environment", forbidden)
+    receipt = install_application(tmp_path, full=True, start=True, runner=forbidden)
+    assert not receipt.ok
+    assert receipt.phases[0].name == "chroma-persistence"
+    assert "/data" in receipt.phases[0].detail
+    assert not list(tmp_path.iterdir())
+
+
 def _test_mongo_uri(user: str, password: str, host: str, database: str, *, srv: bool = False) -> str:
     """Build fixture URIs without embedding any credential-bearing URI in source.
 
@@ -262,6 +275,7 @@ def test_setup_preserves_external_mongo_when_local_credentials_are_repaired(tmp_
 
 
 def test_installer_validates_compose_with_start_mode_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
     report = PreloadReport(
         root=tmp_path,
         platform="test",
@@ -289,6 +303,7 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
     assert env["FRONTEND_BUILD_TARGET"] == "production"
     assert env["FRONTEND_CONTAINER_PORT"] == "8080"
     assert env["NODE_ENV"] == "production"
+    assert env["COMPOSE_REMOVE_ORPHANS"] == "0"
 
 @pytest.mark.parametrize(
     ("host", "srv"),

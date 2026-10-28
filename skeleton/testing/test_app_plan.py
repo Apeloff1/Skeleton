@@ -115,7 +115,7 @@ def test_compose_up_consumes_the_same_planned_order():
     assert command[-len(plan.services):] == plan.services
 
 
-def test_compose_profiles_are_derived_from_manifest_services():
+def test_compose_stop_profiles_are_derived_from_manifest_services():
     from dataclasses import replace
 
     from skeleton.app.assembly import compose_command
@@ -128,9 +128,19 @@ def test_compose_profiles_are_derived_from_manifest_services():
     )
     customized = replace(manifest, services=services)
 
-    command = compose_command("up", manifest=customized, full=True, build=False)
+    command = compose_command("down", manifest=customized)
 
     assert "--profile" in command
     profile_index = command.index("--profile")
     assert command[profile_index + 1] == "vector"
     assert "full" not in command[: profile_index + 2]
+    assert command[-1] == "stop"
+
+
+def test_chroma_cannot_be_started_via_a_custom_default_plan():
+    from skeleton.app.assembly import compose_command
+
+    manifest = load_manifest()
+    customized = replace(manifest, default_services=(*manifest.default_services, "chroma"))
+    with pytest.raises(ValueError, match="Chroma.*data"):
+        compose_command("up", manifest=customized)

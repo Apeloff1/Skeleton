@@ -167,6 +167,7 @@ test('unmounted preferences ignore a native adapter completing its private read 
 
 test('marketplace private purchase queries and creator listing assertions use canonical identity', async () => {
   const f = screenFixture('marketplace'); await f.settle();
+  assert.match(f.snapshot(), /Selling and purchasing games is unavailable until gameplay and buyer access can be verified/);
   assert.ok(f.calls.some(call => call.url === '/api/marketplace/purchases?buyer_id=creator%2Bone%40example.test'));
   f.field('mkt-sell').onPress(); f.render(); f.field('mkt-sell-id').onChangeText('owned-game'); f.render();
   await f.field('mkt-sell-submit').onPress();
