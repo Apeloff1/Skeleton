@@ -3406,10 +3406,13 @@ class ProviderRegistry:
         admission_runtime: AdmissionRuntime | None = None,
         retain_unavailable: bool = False,
         guarded_components: Any | None = None,
+        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         try:
             return cls._from_env(
-                admission_runtime=admission_runtime, guarded_components=guarded_components,
+                admission_runtime=admission_runtime,
+                guarded_components=guarded_components,
+                require_guarded_local=require_guarded_local,
             )
         except ProviderUnavailableError:
             if not retain_unavailable or os.getenv("AI_PROVIDER", "openai").strip().lower() != "local":
@@ -3444,13 +3447,16 @@ class ProviderRegistry:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         guarded_components: Any | None = None,
+        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         if guarded_components is not None:
             from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
 
-            if active != "local" or not isinstance(guarded_components, ProtectedLocalComponents):
+            if active != "local":
                 raise ProviderPolicyError("protected local components require a trusted local provider")
+            if not isinstance(guarded_components, ProtectedLocalComponents):
+                raise ProviderUnavailableError("local guarded inference requires trusted dependencies")
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         secondary_values = {
@@ -3467,6 +3473,22 @@ class ProviderRegistry:
             raise ProviderUnavailableError("local model catalogs require AI_PROVIDER=local")
 
         if active == "local":
+            # Environment variables alone cannot authorize disabling guarded inference.
+            guard_policy = os.getenv("AI_LOCAL_GUARD_REQUIRED", "1").strip().lower()
+            if guard_policy not in {"0", "1", "false", "true"}:
+                raise ProviderUnavailableError("invalid AI_LOCAL_GUARD_REQUIRED policy")
+            opt_out_requested = guard_policy in {"0", "false"}
+            if opt_out_requested:
+                if (
+                    require_guarded_local is not False
+                    or os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() != "development"
+                    or os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "").strip() != "unsafe-local-dev-only"
+                ):
+                    raise ProviderUnavailableError(
+                        "development-only local guard opt-out requires trusted caller authorization"
+                    )
+            elif guarded_components is None:
+                raise ProviderUnavailableError("local guarded inference requires trusted dependencies")
             if any(secondary_values.values()):
                 raise ProviderUnavailableError(
                     "local provider mode forbids secondary external provider configuration"
@@ -3484,7 +3506,7 @@ class ProviderRegistry:
                 default_cache_size=0 if catalog_path or deployment_path else 128
             )
             local_admission = admission_runtime or AdmissionRuntime()
-            require_guarded_inference = guarded_components is not None
+            require_guarded_inference = not opt_out_requested or guarded_components is not None
 
             def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
                 return _GovernedLocalAdapter(
