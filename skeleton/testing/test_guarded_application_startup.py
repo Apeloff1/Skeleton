@@ -317,6 +317,7 @@ def test_canonical_application_source_factory_configuration_is_one_time():
 def test_trusted_protected_bootstrap_requires_complete_real_owner_registration():
     from types import SimpleNamespace
     from skeleton.api.server import _run_trusted_protected_bootstrap
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
     from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
     from skeleton.testing.test_mongo_source_epoch import Database
 
@@ -329,8 +330,17 @@ def test_trusted_protected_bootstrap_requires_complete_real_owner_registration()
         assert empty.engine_execution_service is None
 
         epoch = MongoCanonicalSourceEpoch(Database())
-        memory = SimpleNamespace(canonical_source_epoch=epoch)
-        conversation = SimpleNamespace(canonical_source_epoch=epoch)
+
+        class MemoryDatabase:
+            def __getitem__(self, name):
+                return object()
+
+        memory = MongoMemoryRepository(MemoryDatabase(), canonical_source_epoch=epoch)
+        conversation = SimpleNamespace(
+            canonical_source_epoch=epoch,
+            get_thread=lambda *args, **kwargs: None,
+            active_transcript=lambda *args, **kwargs: (),
+        )
         components = trusted_components(reader(CanonicalLoader()))
         state = ServerState()
 
@@ -348,6 +358,37 @@ def test_trusted_protected_bootstrap_requires_complete_real_owner_registration()
         state.engine_execution_service = object()
         with pytest.raises(RuntimeError, match="precede engine startup"):
             await _run_trusted_protected_bootstrap(state, compose)
+
+        # Reject an in-memory stand-in for canonical memory before creating
+        # an execution service; identical epoch attribute alone proves nothing.
+        impostor = ServerState()
+
+        def fake_memory_owner(target):
+            target.configure_engine_local_guard(components)
+            target.configure_engine_canonical_mongo_owners(
+                conversation=conversation,
+                memory=SimpleNamespace(canonical_source_epoch=epoch),
+                memory_namespace="memory", shared_epoch=epoch,
+                policy_sha256="a" * 64,
+            )
+
+        with pytest.raises(RuntimeError, match="real epoch-fenced Mongo memory"):
+            await _run_trusted_protected_bootstrap(impostor, fake_memory_owner)
+        assert impostor.engine_execution_service is None
+
+        fake_conversation = ServerState()
+
+        def fake_conversation_owner(target):
+            target.configure_engine_local_guard(components)
+            target.configure_engine_canonical_mongo_owners(
+                conversation=SimpleNamespace(canonical_source_epoch=epoch),
+                memory=memory, memory_namespace="memory",
+                shared_epoch=epoch, policy_sha256="a" * 64,
+            )
+
+        with pytest.raises(RuntimeError, match="live epoch-fenced conversation"):
+            await _run_trusted_protected_bootstrap(fake_conversation, fake_conversation_owner)
+        assert fake_conversation.engine_execution_service is None
 
         # A guard without canonical source owners must not bring up a
         # supposedly protected local provider or mutate the engine service.
