@@ -31,6 +31,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Quarantine Policy
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,6 +74,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Unit
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -112,6 +114,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Integration Smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./backend
@@ -142,7 +145,7 @@ jobs:
           SKIP_HEAVY_SEED: "true"
           PYTHONPATH: ".."
         run: >-
-          uv run python -c "import server; assert server.app is not None;
+          uv run --no-sync python -c "import server; assert server.app is not None;
           print('server import: OK')"
       - name: Run canonical cross-subsystem integration matrix
         working-directory: .
@@ -161,7 +164,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
-    # Full-repository SAST needs a bounded window without disabling checks.
+    timeout-minutes: 120
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
@@ -203,6 +206,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: PR Automation Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -240,6 +244,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          -vv -o faulthandler_timeout=120
           skeleton/testing/test_pr_automation.py
           skeleton/testing/test_pr_automation_ruleset.py
           skeleton/testing/test_pr_automation_sensitive_paths.py
@@ -369,6 +374,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Advisory Known Reds
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       mongodb:
         # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
@@ -409,6 +415,7 @@ jobs:
       - pr_automation
       - ci
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Summarize required checks
         env:
