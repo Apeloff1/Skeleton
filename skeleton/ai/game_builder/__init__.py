@@ -551,11 +551,140 @@ _KNOWLEDGE_EXPORTS = {
 }
 
 
+def _load_reviewed_export_module(module_name: str):
+    """Exact literal-only dispatch for reviewed lazy module owners."""
+    if module_name == ".evolution_practice":
+        return _game_builder_import_module(".evolution_practice", __name__)
+    if module_name == ".asset_credits":
+        return _game_builder_import_module(".asset_credits", __name__)
+    if module_name == ".release_pipeline":
+        return _game_builder_import_module(".release_pipeline", __name__)
+    if module_name == ".sega_reproducibility":
+        return _game_builder_import_module(".sega_reproducibility", __name__)
+    if module_name == ".native_retro_artifact":
+        return _game_builder_import_module(".native_retro_artifact", __name__)
+    if module_name == ".native_binary_structure":
+        return _game_builder_import_module(".native_binary_structure", __name__)
+    if module_name == ".native_release_intake":
+        return _game_builder_import_module(".native_release_intake", __name__)
+    if module_name == ".release_trust_anchor":
+        return _game_builder_import_module(".release_trust_anchor", __name__)
+    if module_name == ".release_assurance":
+        return _game_builder_import_module(".release_assurance", __name__)
+    if module_name == ".media_similarity":
+        return _game_builder_import_module(".media_similarity", __name__)
+    if module_name == ".plagiarism_guard":
+        return _game_builder_import_module(".plagiarism_guard", __name__)
+    if module_name == ".legal_native_export":
+        return _game_builder_import_module(".legal_native_export", __name__)
+    if module_name == ".legal_census":
+        return _game_builder_import_module(".legal_census", __name__)
+    if module_name == ".legal_paths":
+        return _game_builder_import_module(".legal_paths", __name__)
+    if module_name == ".legal_port_bridge":
+        return _game_builder_import_module(".legal_port_bridge", __name__)
+    if module_name == ".archive_import":
+        return _game_builder_import_module(".archive_import", __name__)
+    if module_name == ".evolution_archive":
+        return _game_builder_import_module(".evolution_archive", __name__)
+    if module_name == ".game_boy_color_native_export":
+        return _game_builder_import_module(".game_boy_color_native_export", __name__)
+    if module_name == ".game_boy_native_export":
+        return _game_builder_import_module(".game_boy_native_export", __name__)
+    if module_name == ".sms_native_export":
+        return _game_builder_import_module(".sms_native_export", __name__)
+    if module_name == ".sms_rom":
+        return _game_builder_import_module(".sms_rom", __name__)
+    if module_name == ".vectrex_native_export":
+        return _game_builder_import_module(".vectrex_native_export", __name__)
+    if module_name == ".vectrex_rom":
+        return _game_builder_import_module(".vectrex_rom", __name__)
+    if module_name == ".coleco_native_export":
+        return _game_builder_import_module(".coleco_native_export", __name__)
+    if module_name == ".coleco_rom":
+        return _game_builder_import_module(".coleco_rom", __name__)
+    if module_name == ".msx1_native_export":
+        return _game_builder_import_module(".msx1_native_export", __name__)
+    if module_name == ".msx1_rom":
+        return _game_builder_import_module(".msx1_rom", __name__)
+    if module_name == ".spectrum_native_export":
+        return _game_builder_import_module(".spectrum_native_export", __name__)
+    if module_name == ".spectrum_tap":
+        return _game_builder_import_module(".spectrum_tap", __name__)
+    if module_name == ".apple2_native_export":
+        return _game_builder_import_module(".apple2_native_export", __name__)
+    if module_name == ".atari8_native_export":
+        return _game_builder_import_module(".atari8_native_export", __name__)
+    if module_name == ".dos_native_export":
+        return _game_builder_import_module(".dos_native_export", __name__)
+    if module_name == ".native_evolution_cli":
+        return _game_builder_import_module(".native_evolution_cli", __name__)
+    if module_name == ".native_portfolio_cli":
+        return _game_builder_import_module(".native_portfolio_cli", __name__)
+    if module_name == ".c64_native_export":
+        return _game_builder_import_module(".c64_native_export", __name__)
+    if module_name == ".game_boy_memory_replay":
+        return _game_builder_import_module(".game_boy_memory_replay", __name__)
+    if module_name == ".nes_native_export":
+        return _game_builder_import_module(".nes_native_export", __name__)
+    if module_name == ".evolution_native_sources":
+        return _game_builder_import_module(".evolution_native_sources", __name__)
+    if module_name == ".desktop_native_export":
+        return _game_builder_import_module(".desktop_native_export", __name__)
+    if module_name == ".editor_platforms":
+        return _game_builder_import_module(".editor_platforms", __name__)
+    if module_name == ".platform_registry":
+        return _game_builder_import_module(".platform_registry", __name__)
+    if module_name == ".port_planner":
+        return _game_builder_import_module(".port_planner", __name__)
+    if module_name == ".reviewed_knowledge":
+        return _game_builder_import_module(".reviewed_knowledge", __name__)
+    if module_name == ".knowledge_rights_bridge":
+        return _game_builder_import_module(".knowledge_rights_bridge", __name__)
+    if module_name == ".playable_world":
+        return _game_builder_import_module(".playable_world", __name__)
+    if module_name == ".playable_simulation":
+        return _game_builder_import_module(".playable_simulation", __name__)
+    if module_name == ".playable_export":
+        return _game_builder_import_module(".playable_export", __name__)
+    if module_name == ".playable_compiler":
+        return _game_builder_import_module(".playable_compiler", __name__)
+    if module_name == ".playability_analysis":
+        return _game_builder_import_module(".playability_analysis", __name__)
+    if module_name == ".dual_runtime_export":
+        return _game_builder_import_module(".dual_runtime_export", __name__)
+    if module_name == ".authored_tiles":
+        return _game_builder_import_module(".authored_tiles", __name__)
+    if module_name == ".studio_tool_fabric":
+        return _game_builder_import_module(".studio_tool_fabric", __name__)
+    if module_name == ".mirror_room_runtime":
+        return _game_builder_import_module(".mirror_room_runtime", __name__)
+    if module_name == ".original_game_studio":
+        return _game_builder_import_module(".original_game_studio", __name__)
+    if module_name == ".consumer_release_assurance":
+        return _game_builder_import_module(".consumer_release_assurance", __name__)
+    if module_name == ".studio_execution_plane":
+        return _game_builder_import_module(".studio_execution_plane", __name__)
+    if module_name == ".companion_curriculum":
+        return _game_builder_import_module(".companion_curriculum", __name__)
+    if module_name == ".tiled_map_import":
+        return _game_builder_import_module(".tiled_map_import", __name__)
+    if module_name == ".living_story_runtime":
+        return _game_builder_import_module(".living_story_runtime", __name__)
+    if module_name == ".living_story_export":
+        return _game_builder_import_module(".living_story_export", __name__)
+    if module_name == ".living_story_mirror":
+        return _game_builder_import_module(".living_story_mirror", __name__)
+    if module_name == ".living_story_authoring":
+        return _game_builder_import_module(".living_story_authoring", __name__)
+    raise ImportError("unregistered lazy export owner")
+
+
 def __getattr__(name: str):
     module = _KNOWLEDGE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = getattr(_game_builder_import_module(module, __name__), name)
+    value = getattr(_load_reviewed_export_module(module), name)
     globals()[name] = value
     return value
 
