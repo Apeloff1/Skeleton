@@ -204,11 +204,98 @@ _GOVERNANCE_EXPORTS = {
 }
 
 
+def _load_reviewed_export_module(module_name: str):
+    """Exact literal dispatch across reviewed optional runtime modules."""
+    if module_name == ".shadow_candidate_gate":
+        return _training_import_module(".shadow_candidate_gate", __name__)
+    if module_name == ".model_release_journal":
+        return _training_import_module(".model_release_journal", __name__)
+    if module_name == ".shadow_weight_pipeline":
+        return _training_import_module(".shadow_weight_pipeline", __name__)
+    if module_name == ".shadow_weight_store":
+        return _training_import_module(".shadow_weight_store", __name__)
+    if module_name == ".temporal_facts":
+        return _training_import_module(".temporal_facts", __name__)
+    if module_name == ".temporal_retrieval":
+        return _training_import_module(".temporal_retrieval", __name__)
+    if module_name == ".temporal_drift":
+        return _training_import_module(".temporal_drift", __name__)
+    if module_name == ".temporal_research_authority":
+        return _training_import_module(".temporal_research_authority", __name__)
+    if module_name == ".lifecycle_proof":
+        return _training_import_module(".lifecycle_proof", __name__)
+    if module_name == ".promotion_lifecycle":
+        return _training_import_module(".promotion_lifecycle", __name__)
+    if module_name == ".temporal_signals":
+        return _training_import_module(".temporal_signals", __name__)
+    if module_name == ".bitemporal_authority":
+        return _training_import_module(".bitemporal_authority", __name__)
+    if module_name == ".temporal_freshness":
+        return _training_import_module(".temporal_freshness", __name__)
+    if module_name == ".temporal_provenance":
+        return _training_import_module(".temporal_provenance", __name__)
+    if module_name == ".temporal_custody":
+        return _training_import_module(".temporal_custody", __name__)
+    if module_name == ".temporal_revocation":
+        return _training_import_module(".temporal_revocation", __name__)
+    if module_name == ".temporal_quarantine":
+        return _training_import_module(".temporal_quarantine", __name__)
+    if module_name == ".temporal_replay":
+        return _training_import_module(".temporal_replay", __name__)
+    if module_name == ".temporal_benchmark":
+        return _training_import_module(".temporal_benchmark", __name__)
+    if module_name == ".temporal_invariants":
+        return _training_import_module(".temporal_invariants", __name__)
+    if module_name == ".temporal_uncertainty":
+        return _training_import_module(".temporal_uncertainty", __name__)
+    if module_name == ".temporal_causality":
+        return _training_import_module(".temporal_causality", __name__)
+    if module_name == ".temporal_abstention":
+        return _training_import_module(".temporal_abstention", __name__)
+    if module_name == ".temporal_consistency":
+        return _training_import_module(".temporal_consistency", __name__)
+    if module_name == ".temporal_intelligence":
+        return _training_import_module(".temporal_intelligence", __name__)
+    if module_name == ".temporal_ensemble":
+        return _training_import_module(".temporal_ensemble", __name__)
+    if module_name == ".temporal_certificate":
+        return _training_import_module(".temporal_certificate", __name__)
+    if module_name == ".temporal_certificate_registry":
+        return _training_import_module(".temporal_certificate_registry", __name__)
+    if module_name == ".temporal_learning_control":
+        return _training_import_module(".temporal_learning_control", __name__)
+    if module_name == ".temporal_admission":
+        return _training_import_module(".temporal_admission", __name__)
+    if module_name == ".temporal_promotion":
+        return _training_import_module(".temporal_promotion", __name__)
+    if module_name == ".temporal_budget":
+        return _training_import_module(".temporal_budget", __name__)
+    if module_name == ".temporal_counterfactual":
+        return _training_import_module(".temporal_counterfactual", __name__)
+    if module_name == ".temporal_editing":
+        return _training_import_module(".temporal_editing", __name__)
+    if module_name == ".temporal_intervals":
+        return _training_import_module(".temporal_intervals", __name__)
+    if module_name == ".shadow_weights":
+        return _training_import_module(".shadow_weights", __name__)
+    if module_name == ".shadow_weight_ledger":
+        return _training_import_module(".shadow_weight_ledger", __name__)
+    if module_name == ".shadow_weight_intake":
+        return _training_import_module(".shadow_weight_intake", __name__)
+    if module_name == ".shadow_training_handoff":
+        return _training_import_module(".shadow_training_handoff", __name__)
+    if module_name == ".shadow_idle_training":
+        return _training_import_module(".shadow_idle_training", __name__)
+    if module_name == ".shadow_native_trainer":
+        return _training_import_module(".shadow_native_trainer", __name__)
+    raise ImportError("unregistered lazy export owner")
+
+
 def __getattr__(name: str):
     module = _GOVERNANCE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = getattr(_training_import_module(module, __name__), name)
+    value = getattr(_load_reviewed_export_module(module), name)
     globals()[name] = value
     return value
 
