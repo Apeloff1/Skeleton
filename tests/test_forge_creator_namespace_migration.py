@@ -36,6 +36,9 @@ def test_ai_tree_forge_is_overlay_free_after_creator_cutover() -> None:
     forge = next(item for item in manifest["mappings"] if item["id"] == "AIFT-FORGE")
     creator = next(item for item in manifest["mappings"] if item["id"] == "AIFT-CREATOR")
 
-    assert not forge.get("overlay_children")
+    # The parent mapping retains independently governed Forge overlays after the creator cutover.
+    # Creator must be a dedicated child mapping, not an overlay of the parent.
+    assert "creator" not in forge.get("overlay_children", [])
+    assert forge.get("overlay_children") == sorted(set(forge.get("overlay_children", [])))
     assert creator["source"] == "skeleton/forge/creator"
     assert creator["destination"] == "skeleton/ai/forge/creator"
