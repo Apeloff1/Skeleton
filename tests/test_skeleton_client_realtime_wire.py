@@ -261,8 +261,8 @@ def test_build_stream_preserves_service_bearer_and_attester_with_scoped_job():
         ),
         1,
     )
-    # The pump thread may reconnect (zero-delay backoff) before the generator
-    # is closed, so assert on every request rather than an exact count.
+    # The bounded event pump may reconnect before its generator is closed.
+    # All emitted requests still need valid principal scope and job custody.
     assert seen
     for req in seen:
         assert req.headers["authorization"] == "Bearer test-only-token"

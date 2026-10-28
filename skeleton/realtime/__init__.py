@@ -17,7 +17,6 @@ from .envelope import (
     parse_cursor,
 )
 from .guard import PayloadSecretGuard, RealtimeSecretError
-from .limits import realtime_limits_from_env
 from .hub import (
     EventAccess,
     PresenceMember,
@@ -31,7 +30,6 @@ from .sinks import HubJobEventSink, JobEventPublisher, NullJobEventPublisher, at
 from .slo import SLO_TARGETS, RealtimeSLO
 
 __all__ = [
-    "realtime_limits_from_env",
     "CHANNELS",
     "CONTROL_TYPES",
     "ControlEvent",

@@ -20,32 +20,18 @@ build/agent events whose hub-side owner is its own principal. With
 execution-events checks (service bearer token, verified attester,
 ``engine:events`` grant, actor/tenant ownership) run via
 ``engine_routes.authorize_execution_events`` before a job grant is issued.
-
-Verified-tenant plain streams: ``actor_id`` + ``tenant_id`` without
-``job_id`` are accepted only from the engine backend service (bearer token +
-verified attester, ``engine_routes.authorize_tenant_stream``). The stream
-principal becomes the actor and the subscription carries the verified tenant,
-so the owner receives its own tenant-scoped build/agent events (live and
-replay). A bare attester claiming a tenant gets 401.
-
-Limits (Jenkins S2-1/S2-5): oversized presence ``meta`` -> 413, full presence
-scope -> 422, per-principal stream cap -> 429 with ``Retry-After``.
-Cursors are ``<id>-<epoch>`` (legacy ``<id>`` accepted); a foreign epoch
-gets ``stream.reset`` (S2-6).
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from skeleton.realtime import CHANNELS, EnvelopeError, RealtimeAuthError, RealtimeHub
-from skeleton.realtime.envelope import parse_resume_cursor
+from skeleton.realtime import CHANNELS, EnvelopeError, RealtimeAuthError, RealtimeHub, parse_cursor
 from skeleton.realtime.guard import RealtimeSecretError
-from skeleton.realtime.hub import RealtimeCapacityError, RealtimeLimitError
 from skeleton.realtime.sse import SSE_MEDIA_TYPE, sse_body, sse_headers
 
 router = APIRouter(tags=["realtime"])
@@ -76,9 +62,9 @@ def _channels(raw: Optional[str]) -> tuple:
     return wanted
 
 
-def _cursor(last_event_id: Optional[str], cursor: Optional[str]) -> Tuple[Optional[int], Optional[str]]:
+def _cursor(last_event_id: Optional[str], cursor: Optional[str]) -> Optional[int]:
     try:
-        return parse_resume_cursor(last_event_id) if last_event_id else parse_resume_cursor(cursor)
+        return parse_cursor(last_event_id) if last_event_id else parse_cursor(cursor)
     except EnvelopeError:
         raise HTTPException(status_code=422, detail={"error": "invalid_cursor"}) from None
 
@@ -89,34 +75,14 @@ def open_stream(
     principal: str,
     channels: tuple,
     job_id: Optional[str],
-    cursor: Any,
+    cursor: Optional[int],
     max_events: Optional[int] = None,
     job_grant: Optional[str] = None,
-    tenant: Optional[str] = None,
 ) -> StreamingResponse:
-    """Subscribe and return the SSE response. Shared with filtered views.
-
-    ``cursor`` is ``(seq, epoch)`` from :func:`_cursor` (a bare int is
-    accepted for backwards compatibility).
-    """
+    """Subscribe and return the SSE response. Shared with filtered views."""
     hub = get_hub(request.app)
-    seq, epoch = cursor if isinstance(cursor, tuple) else (cursor, None)
     try:
-        sub = hub.subscribe(
-            channels,
-            principal=principal,
-            cursor=seq,
-            cursor_epoch=epoch,
-            job_id=job_id,
-            job_grant=job_grant,
-            tenant=tenant,
-        )
-    except RealtimeCapacityError as exc:
-        raise HTTPException(
-            status_code=429,
-            detail={"error": "too_many_streams", "limit": hub.max_streams_per_principal},
-            headers={"Retry-After": str(exc.retry_after_s)},
-        ) from None
+        sub = hub.subscribe(channels, principal=principal, cursor=cursor, job_id=job_id, job_grant=job_grant)
     except RealtimeAuthError:
         raise HTTPException(status_code=403, detail={"error": "channel_forbidden"}) from None
     except EnvelopeError as exc:
@@ -150,13 +116,6 @@ async def events_stream(
     wanted = _channels(channels)
     parsed_cursor = _cursor(last_event_id, cursor)
     job_grant: Optional[str] = None
-    tenant: Optional[str] = None
-    if job_id is None and (actor_id is not None or tenant_id is not None):
-        if not actor_id or not tenant_id:
-            raise HTTPException(status_code=422, detail={"error": "tenant_scope_required", "required": ["actor_id", "tenant_id"]})
-        from skeleton.api.engine_routes import authorize_tenant_stream
-
-        principal, tenant = authorize_tenant_stream(request, actor_id=actor_id, tenant_id=tenant_id)
     if job_id is not None:
         if not actor_id or not tenant_id:
             raise HTTPException(status_code=422, detail={"error": "job_scope_required", "required": ["actor_id", "tenant_id"]})
@@ -172,7 +131,6 @@ async def events_stream(
         cursor=parsed_cursor,
         max_events=max_events,
         job_grant=job_grant,
-        tenant=tenant,
     )
 
 
@@ -205,8 +163,6 @@ async def presence_action(
         return hub.presence(body.action, client_id=body.client_id, scope=body.scope, principal=principal, meta=body.meta)
     except RealtimeAuthError:
         raise HTTPException(status_code=403, detail={"error": "presence_forbidden"}) from None
-    except RealtimeLimitError as exc:
-        raise HTTPException(status_code=exc.status, detail={"error": exc.code, "reason": str(exc)}) from None
     except (EnvelopeError, RealtimeSecretError) as exc:
         raise HTTPException(status_code=422, detail={"error": "invalid_presence", "reason": str(exc)}) from None
 

@@ -1467,15 +1467,7 @@ class CognitiveExecutionRuntime:
             context_id=(
                 None if context_policy.get("context_id") is None else str(context_policy["context_id"])
             ),
-            # A bare local execution context hash is NOT compiled source
-            # custody. Transfer context identity/digest only when the
-            # execution has a canonical bound context ID; the provider
-            # independently requires a source snapshot and compiler version.
-            context_digest=(
-                str(context_digest)
-                if context_policy.get("context_id") is not None
-                else None
-            ),
+            context_digest=str(context_digest),
             context_source_snapshot=tuple(source_snapshot),
             context_compiler_version=(
                 None

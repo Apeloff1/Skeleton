@@ -20,9 +20,6 @@ Behaviour (ADR-realtime-transport §4):
 * 401/403 (:class:`RealtimeAuthError`), 503 ``seal_unavailable``
   (:class:`RealtimeSealUnavailable`) and any connect error with
   ``retryable=False`` (e.g. 422) are raised immediately, never retried;
-* ``stream.reauth`` (server max stream lifetime, S2-4) -> reconnect
-  immediately from the same cursor; the transport mints a fresh seal on
-  every ``open`` and the backoff is neither advanced nor slept;
 * abandoning the generator (``aclose()`` / ``break``) closes the open stream.
 """
 
@@ -32,7 +29,7 @@ import asyncio
 import time
 from typing import Any, AsyncIterator, Callable, Dict, Optional, Sequence, Union
 
-from skeleton.realtime.envelope import CHANNELS, STREAM_LAGGED, STREAM_REAUTH, STREAM_RESET, ControlEvent, RealtimeEvent
+from skeleton.realtime.envelope import CHANNELS, STREAM_LAGGED, STREAM_RESET, ControlEvent, RealtimeEvent
 
 from .backoff import ReconnectBackoff
 from .errors import (
@@ -83,7 +80,6 @@ class RealtimeClient:
             "duplicates_skipped": 0,
             "lagged": 0,
             "resets": 0,
-            "reauths": 0,
         }
 
     def close(self) -> None:
@@ -91,7 +87,7 @@ class RealtimeClient:
 
     @property
     def _last_seq(self) -> int:
-        return int(str(self.last_event_id).split("-", 1)[0]) if self.last_event_id else 0
+        return int(self.last_event_id) if self.last_event_id else 0
 
     async def _next(self, iterator: AsyncIterator[Any]) -> Any:
         return await asyncio.wait_for(iterator.__anext__(), timeout=self.dead_stream_s)
@@ -145,14 +141,9 @@ class RealtimeClient:
                             yield item
                             immediate = True
                             break
-                        if item.type == STREAM_REAUTH:
-                            self.stats["reauths"] = self.stats.get("reauths", 0) + 1
-                            yield item
-                            immediate = True
-                            break
                         if item.type == STREAM_RESET:
                             self.stats["resets"] += 1
-                            head = item.payload.get("head_cursor") or item.payload.get("head_id")
+                            head = item.payload.get("head_id")
                             self.last_event_id = str(head) if head else None
                             if self.on_reset is not None:
                                 result = self.on_reset(item)
@@ -166,8 +157,7 @@ class RealtimeClient:
                     if item.seq <= self._last_seq:
                         self.stats["duplicates_skipped"] += 1
                         continue
-                    raw = getattr(stream, "last_id", None)
-                    self.last_event_id = raw if raw and str(raw).split("-", 1)[0] == item.id else item.id
+                    self.last_event_id = item.id
                     self.stats["events"] += 1
                     yield item
             except (RealtimeProtocolError, RealtimeConnectError, OSError):

@@ -219,7 +219,7 @@ async def _collect_runtime_status(timeout_ms: int) -> dict[str, object]:
         }
 
     return {
-        "ok": all(bool(item["ok"]) for item in services) and bool(product_readiness["available"]),
+        "ok": all(bool(item["ok"]) for item in services),
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "application": bootstrap["application"],
         "contract": bootstrap["contract"],

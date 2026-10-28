@@ -56,18 +56,13 @@ KNOWN_EVENT_TYPES: Dict[str, Tuple[str, ...]] = {
 
 STREAM_RESET = "stream.reset"
 STREAM_LAGGED = "stream.lagged"
-#: Max stream lifetime reached (Jenkins S2-4): reconnect now with a fresh
-#: seal, from the same cursor, without backoff. Payload
-#: ``{"reason": "max_lifetime", "lifetime_s": n, "cursor": "<id>-<epoch>"}``.
-STREAM_REAUTH = "stream.reauth"
-CONTROL_TYPES: Tuple[str, ...] = (STREAM_RESET, STREAM_LAGGED, STREAM_REAUTH)
+CONTROL_TYPES: Tuple[str, ...] = (STREAM_RESET, STREAM_LAGGED)
 
 ENVELOPE_FIELDS: Tuple[str, ...] = ("v", "id", "ts", "channel", "type", "payload", "job_id", "correlation_id")
 
 _TYPE_RE = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$")
 _IDENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$")
 _ID_RE = re.compile(r"^[0-9]{1,19}$")
-_EPOCH_RE = re.compile(r"^[0-9a-f]{1,16}$")
 
 
 class EnvelopeError(ValueError):
@@ -144,36 +139,12 @@ def parse_cursor(raw: Optional[str]) -> Optional[int]:
     return int(text)
 
 
-def parse_resume_cursor(raw: Optional[str]) -> Tuple[Optional[int], Optional[str]]:
-    """Parse ``<id>`` (legacy) or ``<id>-<epoch>`` -> ``(seq, epoch)``.
-
-    The hub writes ``id: <id>-<epoch>`` SSE lines (Jenkins S2-6) so a cursor
-    issued by another process / an earlier hub instance is detected and gets
-    ``stream.reset`` instead of a silently wrong replay.
-    """
-    if raw is None or not str(raw).strip():
-        return None, None
-    text = str(raw).strip()
-    seq_text, sep, epoch = text.partition("-")
-    if sep and not _EPOCH_RE.match(epoch):
-        raise EnvelopeError("cursor epoch must be 1-16 lowercase hex characters")
-    return parse_cursor(seq_text), (epoch if sep else None)
-
-
-def _json_strict(body: Any, **kwargs: Any) -> str:
-    """``json.dumps`` without ``default=str``: non-JSON-native values are refused."""
-    try:
-        return json.dumps(body, allow_nan=False, **kwargs)
-    except (TypeError, ValueError) as exc:
-        raise EnvelopeError(f"payload is not JSON-native: {exc}") from None
-
-
 def _payload_size(payload: Mapping[str, Any]) -> int:
-    return len(_json_strict(payload, separators=(",", ":")).encode("utf-8"))
+    return len(json.dumps(payload, separators=(",", ":"), default=str).encode("utf-8"))
 
 
 def _dumps(body: Mapping[str, Any]) -> str:
-    return _json_strict(body, separators=(",", ":"), sort_keys=True)
+    return json.dumps(body, separators=(",", ":"), sort_keys=True, default=str)
 
 
 @dataclass(frozen=True)
@@ -311,13 +282,11 @@ __all__ = [
     "RealtimeEvent",
     "SCHEMA_VERSION",
     "STREAM_LAGGED",
-    "STREAM_REAUTH",
     "STREAM_RESET",
     "channel_for_type",
     "format_ts",
     "now_rfc3339",
     "parse_cursor",
-    "parse_resume_cursor",
     "parse_ts",
     "ts_from_ms",
     "ts_to_ms",

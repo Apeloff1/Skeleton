@@ -27,31 +27,11 @@ Implements ADR ``docs/architecture/ADR-realtime-transport.md`` (PR #4101):
   the engine actor/service checks. The same check runs on live fan-out AND on
   ring replay. Unowned build/agent events are delivered to nobody but
   job-grant holders.
-* **Bounds** (Jenkins S2-1/S2-5): presence ``meta`` is capped at
-  ``presence_meta_max_bytes`` serialized (default 2048) and each scope holds
-  at most ``presence_max_members_per_scope`` members (default 256); both are
-  checked BEFORE anything is stored. Each principal may hold at most
-  ``max_streams_per_principal`` concurrent streams (default 8).
-* **Presence scoping** (S2-2): a principal always sees its own presence; it
-  sees other members of a scope (snapshot, join/leave fan-out, replay, and
-  ``GET /presence?scope=``) only if ``presence_scope_authorizer(principal,
-  scope)`` allows it. The default allows nothing beyond the principal's own
-  members (fail closed).
-* **Stream lifetime** (S2-4): a subscription expires after
-  ``max_stream_lifetime_s`` (default 900 s); the stream loop then emits
-  ``stream.reauth`` and closes so the client re-seals.
-* **Single-process** (S2-6): the hub is in-memory per process. Every hub has
-  a random ``epoch`` that is written into SSE cursors (``<id>-<epoch>``); a
-  cursor carrying another epoch, or a legacy cursor outside this hub's id
-  range, always gets ``stream.reset``. Serve realtime from one worker; a
-  shared bus is future work (ADR §6).
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
-import secrets
 import threading
 import time
 import uuid
@@ -63,7 +43,6 @@ from .envelope import (
     CHANNEL_PRESENCE,
     CHANNELS,
     STREAM_LAGGED,
-    STREAM_REAUTH,
     STREAM_RESET,
     ControlEvent,
     EnvelopeError,
@@ -77,40 +56,13 @@ from .slo import RealtimeSLO
 
 Frame = Union[RealtimeEvent, ControlEvent]
 Authorizer = Callable[[str, str], bool]
-ScopeAuthorizer = Callable[[str, str], bool]
 
 PRESENCE_ACTIONS = ("join", "heartbeat", "leave")
 DEFAULT_SCOPE = "app"
-DEFAULT_PRESENCE_META_MAX_BYTES = 2048
-DEFAULT_PRESENCE_MAX_MEMBERS_PER_SCOPE = 256
-DEFAULT_MAX_STREAMS_PER_PRINCIPAL = 8
-DEFAULT_MAX_STREAM_LIFETIME_S = 900.0
 
 
 class RealtimeAuthError(PermissionError):
     """Principal may not subscribe to / act on the requested channel."""
-
-
-class RealtimeLimitError(ValueError):
-    """A request exceeded a hub bound; ``status`` is the HTTP code to return."""
-
-    def __init__(self, message: str, *, status: int = 422, code: str = "limit_exceeded") -> None:
-        super().__init__(message)
-        self.status = status
-        self.code = code
-
-
-class RealtimeCapacityError(RuntimeError):
-    """Per-principal stream cap reached; retry after ``retry_after_s``."""
-
-    def __init__(self, message: str, *, retry_after_s: int = 5) -> None:
-        super().__init__(message)
-        self.retry_after_s = int(retry_after_s)
-
-
-def deny_all_scopes(principal: str, scope: str) -> bool:
-    """Default presence scope authorizer: only a principal's own members."""
-    return False
 
 
 def deny_all_authorizer(principal: str, channel: str) -> bool:
@@ -136,7 +88,6 @@ class EventAccess:
 
     owner: Optional[str] = None
     tenant: Optional[str] = None
-    scope: Optional[str] = None
 
 
 def _wall_ms() -> float:
@@ -154,12 +105,8 @@ class Subscription:
         max_queue: int,
         job_id: Optional[str] = None,
         job_grant: Optional[str] = None,
-        tenant: Optional[str] = None,
     ) -> None:
         self.id = uuid.uuid4().hex
-        # Server-verified tenant (never a client claim taken on trust): set
-        # only by callers that ran the engine actor/tenant check.
-        self.tenant = tenant
         self.hub = hub
         self.channels = channels
         self.principal = principal
@@ -170,7 +117,6 @@ class Subscription:
         self.max_queue = max_queue
         self.head_at_connect = 0
         self.replayed = 0
-        self.last_delivered_id: Optional[str] = None
         self.dropped = 0
         self._queue: Deque[Frame] = deque()
         self._events_queued = 0
@@ -180,13 +126,6 @@ class Subscription:
         except RuntimeError:
             self._loop = None
         self._wake = asyncio.Event() if self._loop is not None else None
-        lifetime = hub.max_stream_lifetime_s
-        self.expires_at: Optional[float] = (time.monotonic() + lifetime) if lifetime and lifetime > 0 else None
-
-    def remaining_lifetime(self, now: Optional[float] = None) -> Optional[float]:
-        if self.expires_at is None:
-            return None
-        return self.expires_at - (time.monotonic() if now is None else now)
 
     @property
     def closed(self) -> bool:
@@ -198,11 +137,7 @@ class Subscription:
         if event.channel == CHANNEL_PRESENCE:
             # Presence is scoped to its verified producer, not public scope metadata.
             access = self.hub._access.get(event.seq)
-            if access is None or access.tenant is not None:
-                return False
-            if access.owner == self.principal:
-                return True
-            return access.scope is not None and self.hub.scope_allowed(self.principal, access.scope)
+            return access is not None and access.owner == self.principal and access.tenant is None
         if self.job_id is not None and event.job_id != self.job_id:
             return False
         if self.job_grant is not None and event.job_id == self.job_grant:
@@ -212,13 +147,11 @@ class Subscription:
         # A principal reused in multiple tenants must not see tenant-scoped
         # events through an unfiltered channel. Those events require a
         # per-execution grant obtained from the engine ownership gate above.
-        # Verified-tenant subscriptions: owner AND tenant must both match
-        # (or both tenants be None). Owner scope stays per-actor.
         return (
             access is not None
             and access.owner is not None
             and access.owner == self.principal
-            and access.tenant == self.tenant
+            and access.tenant is None
         )
 
     # -- producer side (hub lock held) ------------------------------------
@@ -353,12 +286,6 @@ class RealtimeHub:
         authorizer: Optional[Authorizer] = None,
         clock_ms: Callable[[], float] = _wall_ms,
         id_seed: Optional[int] = None,
-        presence_meta_max_bytes: int = DEFAULT_PRESENCE_META_MAX_BYTES,
-        presence_max_members_per_scope: int = DEFAULT_PRESENCE_MAX_MEMBERS_PER_SCOPE,
-        presence_scope_authorizer: Optional[ScopeAuthorizer] = None,
-        max_streams_per_principal: int = DEFAULT_MAX_STREAMS_PER_PRINCIPAL,
-        max_stream_lifetime_s: float = DEFAULT_MAX_STREAM_LIFETIME_S,
-        epoch: Optional[str] = None,
     ) -> None:
         if replay_capacity < 1 or subscriber_queue < 1:
             raise ValueError("replay_capacity and subscriber_queue must be >= 1")
@@ -367,15 +294,6 @@ class RealtimeHub:
         self.heartbeat_interval_s = float(heartbeat_interval_s)
         self.presence_ttl_s = float(presence_ttl_s)
         self.max_subscribers = int(max_subscribers)
-        if presence_meta_max_bytes < 2 or presence_max_members_per_scope < 1 or max_streams_per_principal < 1:
-            raise ValueError("presence/stream caps must be positive")
-        self.presence_meta_max_bytes = int(presence_meta_max_bytes)
-        self.presence_max_members_per_scope = int(presence_max_members_per_scope)
-        self.presence_scope_authorizer: ScopeAuthorizer = presence_scope_authorizer or deny_all_scopes
-        self.max_streams_per_principal = int(max_streams_per_principal)
-        self.max_stream_lifetime_s = float(max_stream_lifetime_s)
-        #: Per-process instance id written into SSE cursors (S2-6).
-        self.epoch = epoch or secrets.token_hex(4)
         self.guard = guard or PayloadSecretGuard()
         self.slo = slo or RealtimeSLO()
         self.authorizer: Authorizer = authorizer or _default_authorizer
@@ -402,26 +320,6 @@ class RealtimeHub:
     def _ts(self) -> str:
         return ts_from_ms(self._clock())
 
-    def cursor_for(self, event_id: str) -> str:
-        """SSE ``id:`` / resume cursor for one of this hub's event ids."""
-        return f"{event_id}-{self.epoch}"
-
-    def scope_allowed(self, principal: str, scope: str) -> bool:
-        try:
-            return bool(principal) and bool(self.presence_scope_authorizer(principal, scope))
-        except Exception:
-            return False
-
-    def _member_visible(self, member: "PresenceMember", principal: Optional[str]) -> bool:
-        return principal is None or member.principal == principal or self.scope_allowed(principal, member.scope)
-
-    def reauth_event(self, sub: "Subscription") -> ControlEvent:
-        payload: Dict[str, Any] = {"reason": "max_lifetime", "lifetime_s": self.max_stream_lifetime_s}
-        last = getattr(sub, "last_delivered_id", None)
-        if last:
-            payload["cursor"] = self.cursor_for(last)
-        return ControlEvent(type=STREAM_REAUTH, ts=self._ts(), payload=payload)
-
     # -- publish -----------------------------------------------------------
     def publish(
         self,
@@ -433,7 +331,6 @@ class RealtimeHub:
         correlation_id: Optional[str] = None,
         owner: Optional[str] = None,
         tenant: Optional[str] = None,
-        scope: Optional[str] = None,
     ) -> RealtimeEvent:
         """Validate, secret-scrub, store and fan out one event. Thread-safe.
 
@@ -471,8 +368,8 @@ class RealtimeHub:
             if len(self._ring) == self._ring.maxlen:
                 self._access.pop(self._ring[0].seq, None)
             self._ring.append(event)
-            if owner or tenant or scope:
-                self._access[event.seq] = EventAccess(owner or None, tenant or None, scope or None)
+            if owner or tenant:
+                self._access[event.seq] = EventAccess(owner or None, tenant or None)
             for sub in self._subs.values():
                 if sub.wants(event):
                     dropped = sub._offer(event)
@@ -492,22 +389,17 @@ class RealtimeHub:
         cursor: Optional[int] = None,
         job_id: Optional[str] = None,
         job_grant: Optional[str] = None,
-        cursor_epoch: Optional[str] = None,
-        tenant: Optional[str] = None,
     ) -> Subscription:
         """Register a consumer; replays from ``cursor`` (exclusive) when retained.
 
         ``job_grant`` must only be passed by callers that already ran the
         engine actor/service authorization for that execution id.
-        ``cursor_epoch`` is the epoch parsed from an ``<id>-<epoch>`` cursor;
-        a foreign epoch always yields ``stream.reset``.
         """
         wanted = tuple(dict.fromkeys(validate_channel(c) for c in channels))
         if not wanted:
             raise EnvelopeError(f"subscribe needs at least one channel from {CHANNELS}")
         validate_identifier(job_id, "job_id")
         validate_identifier(job_grant, "job_grant")
-        validate_identifier(tenant, "tenant")
         if job_grant is not None and job_id not in (None, job_grant):
             raise RealtimeAuthError("job_grant does not cover the requested job_id")
         if not principal:
@@ -522,22 +414,11 @@ class RealtimeHub:
             if self._closed or len(self._subs) >= self.max_subscribers:
                 self.slo.record_connect(False)
                 raise RuntimeError("realtime hub closed or at subscriber capacity")
-            held = sum(1 for s in self._subs.values() if s.principal == principal)
-            if held >= self.max_streams_per_principal:
-                self.slo.record_connect(False)
-                raise RealtimeCapacityError(
-                    f"principal holds {held} streams (cap {self.max_streams_per_principal})",
-                    retry_after_s=max(1, int(self.heartbeat_interval_s // 3) or 1),
-                )
-            sub = Subscription(self, wanted, principal, self.subscriber_queue, job_id, job_grant, tenant)
+            sub = Subscription(self, wanted, principal, self.subscriber_queue, job_id, job_grant)
             sub.head_at_connect = self._seq
             if cursor is not None:
                 oldest = self._ring[0].seq if self._ring else self._seq + 1
-                if cursor_epoch is not None and cursor_epoch != self.epoch:
-                    reset_reason = "cursor_foreign_instance"
-                elif cursor < self._seed:
-                    reset_reason = "cursor_foreign_instance"
-                elif cursor > self._seq:
+                if cursor > self._seq:
                     reset_reason = "cursor_ahead_of_stream"
                 elif cursor + 1 < oldest and cursor < self._seq:
                     reset_reason = "cursor_aged_out"
@@ -559,7 +440,6 @@ class RealtimeHub:
                                 "reason": reset_reason,
                                 "cursor": str(cursor),
                                 "head_id": str(self._seq),
-                                "head_cursor": self.cursor_for(str(self._seq)),
                                 "oldest_id": self._ring[0].id if self._ring else None,
                             },
                         )
@@ -591,7 +471,7 @@ class RealtimeHub:
         members = sorted(
             (m.to_dict() for m in self._presence.values()
              if (scope is None or m.scope == scope)
-             and self._member_visible(m, principal)),
+             and (principal is None or m.principal == principal)),
             key=lambda m: (m["scope"], m["client_id"]),
         )
         return RealtimeEvent(
@@ -627,25 +507,8 @@ class RealtimeHub:
             self._touch(client_id, principal, scope, meta, announce=True)
         return self.presence_snapshot(scope, principal=principal)
 
-    def _check_meta(self, meta: Optional[Mapping[str, Any]]) -> None:
-        if not meta:
-            return
-        try:
-            size = len(json.dumps(meta, separators=(",", ":"), allow_nan=False).encode("utf-8"))
-        except (TypeError, ValueError):
-            raise RealtimeLimitError("presence meta must be JSON-native", status=422, code="invalid_presence_meta") from None
-        if size > self.presence_meta_max_bytes:
-            raise RealtimeLimitError(
-                f"presence meta is {size} bytes (max {self.presence_meta_max_bytes})",
-                status=413,
-                code="presence_meta_too_large",
-            )
-
     def _touch(self, client_id: str, principal: str, scope: str, meta: Optional[Mapping[str, Any]], *, announce: bool) -> PresenceMember:
-        # Bounds first (S2-1): nothing is stored or scrubbed for an oversized meta.
-        self._check_meta(meta)
         clean_meta, hits = self.guard.scrub(meta or {})
-        self._check_meta(clean_meta)
         self.slo.record_redactions(hits)
         now = self._clock()
         with self._lock:
@@ -653,14 +516,6 @@ class RealtimeHub:
             existing = self._presence.get(key)
             if existing is not None and existing.principal != principal:
                 raise RealtimeAuthError("client_id is held by another principal")
-            if existing is None:
-                in_scope = sum(1 for m in self._presence.values() if m.scope == scope)
-                if in_scope >= self.presence_max_members_per_scope:
-                    raise RealtimeLimitError(
-                        f"presence scope {scope!r} is full ({self.presence_max_members_per_scope} members)",
-                        status=422,
-                        code="presence_scope_full",
-                    )
             if existing is not None:
                 existing.last_seen_ms = now
                 if meta:
@@ -669,7 +524,7 @@ class RealtimeHub:
             member = PresenceMember(client_id, principal, scope, ts_from_ms(now), now, clean_meta)
             self._presence[key] = member
         if announce:
-            self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict(), owner=principal, scope=scope)
+            self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict(), owner=principal)
         return member
 
     def _leave(self, client_id: str, principal: str, scope: str, *, reason: str) -> bool:
@@ -680,7 +535,7 @@ class RealtimeHub:
             del self._presence[(scope, client_id)]
         payload = member.to_dict()
         payload["reason"] = reason
-        self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=principal, scope=scope)
+        self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=principal)
         return True
 
     def sweep_presence(self, now_ms: Optional[float] = None) -> List[PresenceMember]:
@@ -695,14 +550,14 @@ class RealtimeHub:
             payload = m.to_dict()
             payload["reason"] = "heartbeat_timeout"
             self.slo.record_presence_timeout()
-            self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=m.principal, scope=m.scope)
+            self.publish(CHANNEL_PRESENCE, "presence.left", payload, owner=m.principal)
         return expired
 
     def presence_snapshot(self, scope: str = DEFAULT_SCOPE, *, principal: Optional[str] = None) -> Dict[str, Any]:
         validate_identifier(scope, "scope")
         with self._lock:
             members = sorted((m.to_dict() for m in self._presence.values()
-                              if m.scope == scope and self._member_visible(m, principal)),
+                              if m.scope == scope and (principal is None or m.principal == principal)),
                              key=lambda m: m["client_id"])
             head = str(self._seq)
         return {"scope": scope, "members": members, "count": len(members), "head_id": head}
@@ -752,12 +607,6 @@ class RealtimeHub:
                 "presence_members": len(self._presence),
                 "heartbeat_interval_s": self.heartbeat_interval_s,
                 "presence_ttl_s": self.presence_ttl_s,
-                "presence_meta_max_bytes": self.presence_meta_max_bytes,
-                "presence_max_members_per_scope": self.presence_max_members_per_scope,
-                "max_subscribers": self.max_subscribers,
-                "max_streams_per_principal": self.max_streams_per_principal,
-                "max_stream_lifetime_s": self.max_stream_lifetime_s,
-                "epoch": self.epoch,
                 "closed": self._closed,
             }
 
@@ -771,10 +620,6 @@ __all__ = [
     "PRESENCE_ACTIONS",
     "PresenceMember",
     "RealtimeAuthError",
-    "RealtimeCapacityError",
-    "RealtimeLimitError",
-    "ScopeAuthorizer",
-    "deny_all_scopes",
     "RealtimeHub",
     "Subscription",
 ]

@@ -1216,32 +1216,6 @@ def authorize_execution_events(
     return principal, snapshot
 
 
-def authorize_tenant_stream(
-    request: Request,
-    *,
-    actor_id: str,
-    tenant_id: str,
-    service_token: str | None = None,
-) -> tuple[str, str]:
-    """Verify an actor/tenant claim for a plain realtime stream (no job id).
-
-    Same trust boundary as the engine execution routes: the claim is only
-    accepted from the backend service that presents the engine bearer token
-    together with a gate-verified attester (``_verified_service_principal``);
-    a bare attester can never claim a tenant. Returns ``(actor_id,
-    tenant_id)``: the stream principal is the actor (events' hub-side owner)
-    and the tenant is server-verified. Raises ``HTTPException`` otherwise.
-    """
-    if service_token is None:
-        service_token = _engine_service_token()
-    _verified_service_principal(request, service_token)
-    actor = (actor_id or "").strip()
-    tenant = (tenant_id or "").strip()
-    if not actor or not tenant:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="actor_id and tenant_id required")
-    return actor, tenant
-
-
 @router.get("/executions/{execution_id}/events")
 def execution_events(
     execution_id: str,

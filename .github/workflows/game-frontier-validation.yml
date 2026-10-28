@@ -78,8 +78,9 @@ concurrency:
 jobs:
   frontier-reference:
     runs-on: ubuntu-latest
-    # Full regression batches were cancelled at the old 20-minute ceiling.
-    # Preserve every test with a bounded 60-minute certification window.
+    # Both focused regression batches must finish; a 20-minute ceiling
+    # canceled the second batch despite 981 passes in the first.
+    # No coverage, dependency, or release gate is skipped.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
