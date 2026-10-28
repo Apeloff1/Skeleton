@@ -372,6 +372,7 @@ async def route_complete(
     *,
     tenant_id: str = "default",
     actor_id: str = "llm-router",
+    data_class: str = "internal",
     provider_id: str | None = None,
     model_id: str | None = None,
     idempotency_key: str | None = None,
@@ -394,6 +395,9 @@ async def route_complete(
         "task": task,
     }
     scope = {"tenant_id": tenant_id, "actor_id": actor_id}
+    # Classification is an exact authorization/cache partition, not a hint.
+    if not isinstance(data_class, str) or data_class not in {"public", "internal", "confidential", "restricted"}:
+        return {**public, "error": "Invalid data classification.", "error_code": "request_invalid"}
     # Legacy planning names cannot be authorization, including on a cache hit.
     if model:
         _STATS["errors"] += 1
@@ -449,6 +453,7 @@ async def route_complete(
             prompt,
             **scope,
             session_id=session_id,
+            data_class=data_class,
             provider_id=provider_id,
             model_id=model_id,
             max_output_tokens=max_output_tokens,
@@ -462,6 +467,7 @@ async def route_complete(
                 instruction_policy=LLM_ROUTER_POLICY,
                 tenant_id=tenant_id,
                 actor_id=actor_id,
+                data_class=data_class,
                 capability="assistant.compat",
                 verification_profile="assistant_proposal",
                 turn_idempotency_key=key_for_turn,
