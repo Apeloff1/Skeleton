@@ -16,9 +16,8 @@ def test_share_page_escapes_markup_and_script_boundaries() -> None:
     assert '\\u003cimg src=x onerror=alert(1)\\u003e' in page
     assert 'href="https://app.example.invalid/&quot;&gt;&lt;img' in page
 
-from urllib.parse import parse_qs, urlsplit
-
 import asyncio
+
 import pytest
 from starlette.requests import Request
 
@@ -47,7 +46,7 @@ def test_share_identifiers_are_encoded_as_one_component() -> None:
     encoded = share._safe_link_id("x?admin=true&#fragment")
     assert "?" not in encoded and "&" not in encoded and "#" not in encoded
     with pytest.raises(ValueError):
-        share._safe_link_id("bad\\nname")
+        share._safe_link_id("bad\nname")
 
 
 def test_share_playable_uses_configured_origin_and_encoded_id(
