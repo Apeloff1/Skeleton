@@ -145,9 +145,11 @@ class TrafficManagerObservationTests(unittest.TestCase):
         )
 
         def fake_gh(args: list[str]) -> list[dict[str, object]]:
-            if args[0] == "run":
-                return [completed]
+            # Observation uses REST projections for both history and active
+            # statuses; keep the test faithful to the production API shape.
             endpoint = args[1]
+            if "status=" not in endpoint:
+                return [completed]
             return [hidden_active] if "status=in_progress" in endpoint else []
 
         with patch(
@@ -170,9 +172,9 @@ class TrafficManagerObservationTests(unittest.TestCase):
         )
 
         def fake_gh(args: list[str]) -> list[dict[str, object]]:
-            if args[0] == "run":
-                return [active]
             endpoint = args[1]
+            if "status=" not in endpoint:
+                return [active]
             return [dict(active)] if "status=queued" in endpoint else []
 
         with patch(
