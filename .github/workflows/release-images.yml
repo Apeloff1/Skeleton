@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      checks: read
       packages: write
     env:
       REGISTRY: ghcr.io

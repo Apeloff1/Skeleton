@@ -55,6 +55,24 @@ class ReleaseGovernanceVerdictTests(unittest.TestCase):
     def test_missing_required_check_binding_denies_release(self):
         self.assertEqual(assess(SHA, branch(checks=False), green())["verdict"], "BLOCKED")
 
+    def test_reduced_branch_metadata_requires_correct_app_publisher(self):
+        metadata = branch(checks=False)
+        metadata["protection"]["required_status_checks"]["contexts"] = ["Merge Readiness"]
+        evidence = [{
+            "head_sha": SHA,
+            "name": "Merge Readiness",
+            "status": "completed",
+            "conclusion": "success",
+            "app": {"id": 15368},
+        }]
+        self.assertEqual(
+            assess(SHA, metadata, green(), check_runs=evidence)["verdict"], "READY"
+        )
+        evidence[0]["app"]["id"] = 999
+        self.assertEqual(
+            assess(SHA, metadata, green(), check_runs=evidence)["verdict"], "BLOCKED"
+        )
+
     def test_stale_tag_sha_denies_release(self):
         self.assertEqual(assess(SHA, branch(sha="b" * 40), green())["verdict"], "BLOCKED")
 
@@ -100,6 +118,16 @@ class ReleaseGovernanceVerdictTests(unittest.TestCase):
                 return branch()
             return {"total_count": 4, "workflow_runs": green()}
         with self.assertRaisesRegex(ValueError, "truncated"):
+            collect("Apeloff1/Skeleton", SHA, "main", fake_api)
+
+    def test_incomplete_check_run_inventory_fails_closed(self):
+        def fake_api(path):
+            if "/branches/" in path:
+                return branch()
+            if "/check-runs?" in path:
+                return {"total_count": 2, "check_runs": [{}]}
+            return {"total_count": 3, "workflow_runs": green()}
+        with self.assertRaisesRegex(ValueError, "check-run inventory truncated"):
             collect("Apeloff1/Skeleton", SHA, "main", fake_api)
 
     def test_malformed_workflow_id_blocks(self):

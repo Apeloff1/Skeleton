@@ -48,6 +48,7 @@ def assess(
     workflow_runs: list[dict[str, Any]],
     *,
     branch_name: str = "main",
+    check_runs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Classify exact-head release preconditions; missing evidence never passes."""
     if not SHA_PATTERN.fullmatch(sha):
@@ -64,12 +65,34 @@ def assess(
     protection = branch.get("protection")
     status = protection.get("required_status_checks") if isinstance(protection, dict) else None
     checks = status.get("checks") if isinstance(status, dict) else None
-    if not isinstance(checks, list) or not any(
+    contexts = status.get("contexts") if isinstance(status, dict) else None
+    if check_runs is None:
+        check_runs = []
+    if not isinstance(check_runs, list) or any(not isinstance(r, dict) for r in check_runs):
+        raise ValueError("malformed check-run evidence")
+    pinned = isinstance(checks, list) and any(
         isinstance(c, dict)
         and c.get("context") == REQUIRED_CHECK
         and c.get("app_id") == GITHUB_ACTIONS_APP_ID
         for c in checks
-    ):
+    )
+    # Branch metadata is sometimes reduced to a contexts[] list. In that
+    # case demand a matching *successful* exact-head check-run published by
+    # the expected GitHub Actions app, not an unauthenticated name alone.
+    context_attested = (
+        isinstance(contexts, list)
+        and REQUIRED_CHECK in contexts
+        and any(
+            c.get("head_sha") == sha
+            and c.get("name") == REQUIRED_CHECK
+            and c.get("status") == "completed"
+            and c.get("conclusion") == "success"
+            and isinstance(c.get("app"), dict)
+            and c["app"].get("id") == GITHUB_ACTIONS_APP_ID
+            for c in check_runs
+        )
+    )
+    if not (pinned or context_attested):
         blocking.append("required Merge Readiness context/app binding is not verifiable")
     if not isinstance(workflow_runs, list):
         raise ValueError("GitHub workflow inventory was not a list")
@@ -141,7 +164,17 @@ def collect(repo: str, sha: str, branch: str, get: Callable[[str], Any] = gh_get
     count = data.get("total_count")
     if not isinstance(count, int) or count > len(data["workflow_runs"]) or count < 0:
         raise ValueError("workflow inventory is truncated; no release certification")
-    return assess(sha, branch_info, data["workflow_runs"], branch_name=branch)
+    check_data = get(path + "/commits/" + sha + "/check-runs?per_page=100")
+    if not isinstance(check_data, dict) or not isinstance(check_data.get("check_runs"), list):
+        raise ValueError("exact-head check-run inventory is missing")
+    check_count = check_data.get("total_count")
+    if (not isinstance(check_count, int) or isinstance(check_count, bool)
+            or check_count < 0 or check_count > len(check_data["check_runs"])):
+        raise ValueError("exact-head check-run inventory truncated")
+    return assess(
+        sha, branch_info, data["workflow_runs"],
+        branch_name=branch, check_runs=check_data["check_runs"],
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
