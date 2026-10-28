@@ -80,14 +80,16 @@ async def _arts(pid: str, *, scope: dict[str, str] | None = None) -> dict:
     if (
         not isinstance(project, dict)
         or any(project.get(key) != value for key, value in scope.items())
+        or project.get("playable_id") != pid
         or project.get("state") != "active"
     ):
         raise HTTPException(status_code=404, detail="Project not found")
     kb = await _db.game_kb.find_one(
         {"game_id": pid, **scope},
-        {"_id": 0, "artifacts": 1, "owner_id": 1, "tenant_id": 1},
+        {"_id": 0, "game_id": 1, "artifacts": 1, "owner_id": 1, "tenant_id": 1},
     )
-    if not isinstance(kb, dict) or any(kb.get(key) != value for key, value in scope.items()):
+    if (not isinstance(kb, dict) or kb.get("game_id") != pid
+            or any(kb.get(key) != value for key, value in scope.items())):
         return {}
     return kb.get("artifacts") or {}
 

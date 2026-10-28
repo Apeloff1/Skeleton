@@ -114,7 +114,9 @@ async def recall(agent_id: str = Query(...), q: str = Query(""),
     if kind.strip():
         filt["kind"] = kind.strip().lower()
     pool = await _db.agent_memories.find(filt, PROJ).sort("created_at", -1).limit(200).to_list(200)
-    pool = [m for m in pool if all(m.get(key) == value for key, value in scope.items())]
+    pool = [m for m in pool if m.get("agent_id") == agent_id
+            and (not kind.strip() or m.get("kind") == kind.strip().lower())
+            and all(m.get(key) == value for key, value in scope.items())]
     q_tokens = _tokens(q)
     total = len(pool)
     ranked = sorted(
@@ -144,7 +146,9 @@ async def reflect(body: ReflectBody, scope: dict[str, str] = Depends(require_aut
     recent = await _db.agent_memories.find(
         {"agent_id": agent_id, **scope, "kind": {"$ne": "reflection"}}, PROJ
     ).sort("created_at", -1).limit(window).to_list(window)
-    recent = [m for m in recent if all(m.get(key) == value for key, value in scope.items())]
+    recent = [m for m in recent if m.get("agent_id") == agent_id
+              and m.get("kind") != "reflection"
+              and all(m.get(key) == value for key, value in scope.items())]
     if len(recent) < 3:
         return {"error": "not enough episodes to reflect on (need ≥3)", "have": len(recent)}
     episodes = "\n".join(f"- ({m.get('kind')}) {m.get('content')}" for m in reversed(recent))
@@ -185,6 +189,8 @@ async def list_agents(limit: int = Query(50, ge=1, le=200),
         {"$match": dict(scope)},
         {"$group": {
             "_id": "$agent_id",
+            "owner_id": {"$first": "$owner_id"},
+            "tenant_id": {"$first": "$tenant_id"},
             "memories": {"$sum": 1},
             "reflections": {"$sum": {"$cond": [{"$eq": ["$kind", "reflection"]}, 1, 0]}},
             "last_at": {"$max": "$created_at"},
@@ -207,7 +213,8 @@ async def agent_profile(agent_id: str = Path(..., min_length=1, max_length=200),
     """An agent's memory profile: counts, top tags, and recent reflections."""
     agent_id = agent_id.strip()
     all_mems = await _db.agent_memories.find({"agent_id": agent_id, **scope}, PROJ).to_list(1000)
-    all_mems = [m for m in all_mems if all(m.get(key) == value for key, value in scope.items())]
+    all_mems = [m for m in all_mems if m.get("agent_id") == agent_id
+                and all(m.get(key) == value for key, value in scope.items())]
     if not all_mems:
         return {"agent_id": agent_id, "memories": 0, "reflections": [], "top_tags": [], "by_kind": {}}
     by_kind, tag_count = {}, {}
@@ -238,7 +245,8 @@ async def agent_bias(agent_id: str, max_chars: int = Query(900, ge=200, le=2000)
     reflections + strongest themes — so past lessons actually shape new generations."""
     agent_id = (agent_id or "").strip()
     mems = await _db.agent_memories.find({"agent_id": agent_id, **scope}, PROJ).to_list(1000)
-    mems = [m for m in mems if all(m.get(key) == value for key, value in scope.items())]
+    mems = [m for m in mems if m.get("agent_id") == agent_id
+            and all(m.get(key) == value for key, value in scope.items())]
     reflections = sorted([m for m in mems if m.get("kind") == "reflection"],
                          key=lambda m: (m.get("importance", 0), m.get("created_at") or ""),
                          reverse=True)[:6]
