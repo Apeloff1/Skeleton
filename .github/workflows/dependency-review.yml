@@ -18,6 +18,8 @@ on:
       - '**/package-lock.json'
       - '**/npm-shrinkwrap.json'
       - '**/yarn.lock'
+      - 'frontend/scripts/audit-known-yarn-advisories.cjs'
+      - 'frontend/scripts/test-known-yarn-advisories.cjs'
       - '**/pnpm-lock.yaml'
       - '**/go.mod'
       - '**/go.sum'
@@ -63,6 +65,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Validate fail-closed Yarn advisory custody
+        run: node --test frontend/scripts/test-known-yarn-advisories.cjs
+
+      - name: Report known unpatched advisories without dismissing them
+        run: node frontend/scripts/audit-known-yarn-advisories.cjs --report-only
 
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0

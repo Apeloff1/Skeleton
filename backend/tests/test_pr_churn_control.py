@@ -350,8 +350,28 @@ def test_retired_churn_and_active_queue_recovery_keep_separate_boundaries() -> N
         encoding="utf-8"
     )
     assert "  drain:\n" in current
-    assert "    runs-on: ubuntu-latest\n" in current
+    assert "    runs-on: ubuntu-slim\n" in current
     assert "cancel-in-progress: false" in current
     assert "  wake-housekeeping:\n" not in current
     assert "if stale_pr_run(run, open_pr_heads):" in current
     assert "if security_lane:" in current
+
+
+def test_temporary_owner_maintenance_requires_manual_admission() -> None:
+    root = Path(__file__).resolve().parents[2] / ".github/workflows"
+    for filename in (
+        "expo54-lockfile-repair.yml",
+        "historical-zero-job-canary.yml",
+        "owner-historical-actions-cleanup.yml",
+    ):
+        source = (root / filename).read_text(encoding="utf-8")
+        assert "on:\n  " in source
+        assert "  workflow_dispatch:" in source
+        assert "\n  push:" not in source
+        assert "\n  issue_comment:" not in source
+
+    canary = (root / "historical-zero-job-canary.yml").read_text(encoding="utf-8")
+    owner = (root / "owner-historical-actions-cleanup.yml").read_text(encoding="utf-8")
+    assert "GH_ACTOR: ${{ github.actor }}" in canary
+    assert "os.environ.get('GH_ACTOR') != REPO.split('/')[0]" in canary
+    assert "github.actor == github.repository_owner" in owner
