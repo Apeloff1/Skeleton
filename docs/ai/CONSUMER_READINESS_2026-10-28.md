@@ -84,10 +84,12 @@ offline browser lifecycle cases. A workflow and archive suite passed 43 cases
 and 12 subtests. A separate minimal-dependency probe passed 76 cases and skipped
 five requiring PyTorch. These overlapping checks do not replace running on Windows.
 
-The full workflow secret-output scan passed. The CI tier gate failed at its
-existing count of 22 automatic triggers against a limit of 20; the restored
-Windows installer workflow is manual-only and adds no automatic trigger. Actual
-native Windows, WSL2, Docker Desktop and `Setup.exe` execution remain unverified.
+The full workflow secret-output and CI tier checks pass. The tier initially
+found 22 automatic triggers against a limit of 20; two completed one-shot
+triggers were retired while their definitions and results were preserved. The
+restored Windows installer workflow is manual-only and adds no automatic trigger.
+Actual native Windows, WSL2, Docker Desktop and `Setup.exe` execution remain
+unverified until a Windows run completes successfully.
 
 ## Verification and remaining gates
 

@@ -18,6 +18,10 @@ To recover a specialized validation, restore only that file to
 Archive is not evidence that retired gates passed. Before making a release,
 run the relevant deeper validation and review any regressions separately.
 
+`historical-zero-job-canary.yml` is retained here after its single fixed-target
+recovery completed successfully on 2026-10-28; the targeted run returned 404 on
+subsequent observation. It is not a general-purpose cleanup workflow.
+
 See the original Git history before this commit for the pre-slim CI design.
 
 ## Restored
