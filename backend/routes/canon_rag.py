@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from core.databases import client as _MONGO
 from routes.gameforge_auth import require_authenticated_identity
+from routes.playable_access import _available as _source_available
 
 router = APIRouter(prefix="/api/rag", tags=["rag"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
@@ -79,9 +80,8 @@ async def _arts(pid: str, *, scope: dict[str, str] | None = None) -> dict:
     project = await _db.playables.find_one({"playable_id": pid, **scope})
     if (
         not isinstance(project, dict)
-        or any(project.get(key) != value for key, value in scope.items())
         or project.get("playable_id") != pid
-        or project.get("state") != "active"
+        or not _source_available(project, scope)
     ):
         raise HTTPException(status_code=404, detail="Project not found")
     kb = await _db.game_kb.find_one(
