@@ -1,32 +1,30 @@
 name: Owner-ordered historical Actions cleanup
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/owner-historical-actions-cleanup.yml'
-      - 'scripts/owner_historical_actions_cleanup.py'
-  workflow_run:
-    workflows: ['Historical Actions zero-job canary recovery']
-    types: [completed]
+  issue_comment:
+    types: [created]
   workflow_dispatch:
 
-# The first deletion and the frozen 30-ID cleanup share ONE runner job.
-# A new v2 concurrency lane can escape the old queued v1 controller.
+# Admin-triggered issue comment provides a distinct GitHub event admission path.
+# macOS uses a separate hosted-runner pool from stalled Linux cleanup runs.
+# No push/PR fanout; the one owner-authored issue command is strictly validated.
 # Current-head CI and security protections remain independent and unchanged.
 permissions: {}
 
 concurrency:
-  group: owner-historical-actions-cleanup-v2-${{ github.repository }}
+  group: owner-historical-actions-cleanup-v3-macos-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   owner-cleanup:
     if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.id == 40625466138 &&
-       github.event.workflow_run.conclusion == 'success')
-    runs-on: ubuntu-24.04-arm
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.number == 3902 &&
+       github.event.issue.pull_request == null &&
+       github.event.comment.body == '/owner-historical-cleanup-30-macos-v3' &&
+       github.actor == github.repository_owner)
+    runs-on: macos-15
     timeout-minutes: 14
     permissions:
       actions: write

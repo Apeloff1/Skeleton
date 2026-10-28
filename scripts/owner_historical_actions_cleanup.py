@@ -52,7 +52,7 @@ token = os.environ.get("GH_TOKEN", "")
 if (
     not token or os.environ.get("GITHUB_REPOSITORY") != REPO
     or os.environ.get("GITHUB_REF") != "refs/heads/main"
-    or os.environ.get("GITHUB_EVENT_NAME") not in {"push", "workflow_run", "workflow_dispatch"}
+    or os.environ.get("GITHUB_EVENT_NAME") not in {"push", "workflow_run", "workflow_dispatch", "issue_comment"}
 ):
     raise SystemExit("Refusing non-main / unauthenticated owner clean-up")
 HEADERS = {
