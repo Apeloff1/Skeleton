@@ -1,0 +1,50 @@
+name: Expo 54 lockfile repair artifact
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - repair/expo54-lockfile-20261027
+    paths:
+      - '.github/workflows/expo54-lockfile-repair.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: expo54-lockfile-repair-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.20.0'
+      - name: Generate lockfile without lifecycle scripts
+        working-directory: frontend
+        run: |
+          corepack enable
+          corepack yarn --version
+          corepack yarn install --ignore-scripts --non-interactive
+      - name: Validate Expo pairing and generated lockfile
+        run: |
+          python scripts/check_expo_runtime_pairing.py
+          node frontend/scripts/check-expo-native-compat.cjs
+      - name: Verify immutable install
+        working-directory: frontend
+        run: corepack yarn install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Confirm resolver did not rewrite dependency manifest
+        run: git diff --exit-code -- frontend/package.json
+      - name: Upload lockfile for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: expo54-validated-yarn-lock
+          path: frontend/yarn.lock
+          if-no-files-found: error
+          retention-days: 3
