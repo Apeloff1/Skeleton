@@ -73,11 +73,39 @@ class _Provider:
 
 
 class _Registry:
+    """Single hosted test provider implementing the public inventory contract."""
+
+    active_id = "fake"
+    available = True
+
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
 
+    def statuses(self):
+        return [{
+            "id": self.active_id,
+            "provider_id": self.active_id,
+            "model": self.provider.model,
+            "available": True,
+            "active": True,
+            "configured": True,
+            "architecture_acknowledged": True,
+            "execution_mode": "hosted",
+            "credential_free": False,
+            "capabilities": ["text-generation"],
+            "context_window": 16384,
+            "max_output_tokens": 1024,
+            "default_output_tokens": 512,
+            "limits_source": "engine_chat_policy",
+            "tokenizer": "approximate_text",
+            "supports_temperature": True,
+        }]
+
     def require_active(self):
         return self.provider
+
+    def require_for_context(self, _context_policy):
+        return self.require_active()
 
 
 def _service(tmp_path, *, tenant_ids=frozenset({"tenant-a"}), scopes=None):
