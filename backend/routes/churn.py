@@ -67,6 +67,12 @@ def run_async(build_id: str, req: RunReq | None = None):
     return {"job_id": jid, "status": "running"}
 
 
+@router.post("/job/{job_id}/cancel")
+def cancel_job(job_id: str):
+    """Cancel only an authenticated, owned churn job."""
+    return churn.cancel_job(job_id)
+
+
 @router.get("/job/{job_id}")
 def job(job_id: str):
     return churn.get_job(job_id)
