@@ -562,3 +562,16 @@ def test_owner_historical_cleanup_uses_dispatch_unique_outer_and_authorized_job_
     assert "github.event.comment.body == '/owner-historical-cleanup-30-arm-v5'" in source
     # Unrelated comments do not share any workflow-level lock.
     assert "group: owner-historical-actions-cleanup-v5-arm-${{ github.repository }}" in source
+
+
+
+def test_owner_historical_cleanup_uses_only_owner_scoped_optional_admin_token() -> None:
+    root = Path(__file__).resolve().parents[2]
+    source = (root / ".github/workflows/owner-historical-actions-cleanup.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "secrets.OWNER_ACTIONS_CLEANUP_TOKEN || github.token" in source
+    assert "github.actor == github.repository_owner" in source
+    assert "github.event.comment.body == '/owner-historical-cleanup-30-arm-v5'" in source
+    assert "scripts/owner_historical_actions_cleanup.py" in source
+    assert "persist-credentials: false" in source

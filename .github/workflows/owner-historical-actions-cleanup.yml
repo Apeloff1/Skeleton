@@ -57,6 +57,9 @@ jobs:
       - name: Apply owner-approved immutable cleanup only after proven canary removal
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Optional fine-grained owner token with Actions:write on this repo.
+          # The standard job token remains the fallback; both paths execute the
+          # identical immutable-ID, canary-first, GET-404-confirmed algorithm.
+          GH_TOKEN: ${{ secrets.OWNER_ACTIONS_CLEANUP_TOKEN || github.token }}
           PYTHONUNBUFFERED: "1"
         run: python3 scripts/owner_historical_actions_cleanup.py

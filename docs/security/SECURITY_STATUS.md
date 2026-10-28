@@ -53,3 +53,7 @@ A security control is unhealthy if a scanner cannot initialize or finish, requir
 ## Maintenance rule
 
 Update this map whenever a security workflow is added, renamed, replaced, or removed; when ownership moves between repository and infrastructure; or after an incident invalidates a documented assumption. Keep the snapshot commit explicit so stale status is visible.
+
+### Optional owner cleanup credential (provider 403 remediation)
+
+The default `github.token` can delete only runs authorized by GitHub's Actions permissions. For the *existing* owner-only historical cleanup workflow, an administrator may configure the fine-grained repository Actions write secret `OWNER_ACTIONS_CLEANUP_TOKEN` via GitHub's secret settings (never commit its value). The workflow falls back to `github.token` when absent. This changes **only the authenticated identity**; immutable manifest validation, canary-before-bulk, two fresh pre-delete checks and GET 404 post-delete verification remain mandatory. A provider refusal still fails the cleanup report; do not bypass a 403 or declare it resolved merely because a new token was supplied. Scope the token to this repository and revoke it after authorized cleanup.

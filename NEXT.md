@@ -32,3 +32,5 @@ Factory-style work, **no Cursor cloud agents**. Source of truth for claims: `art
 | 12 | U20 persistence migration phase | #4122 later | Coder Lead, after arch contracts | L |
 
 Full specs: `artifacts/COS/ISSUES.md`. Assignments: `artifacts/COS/FANOUT.md`.
+
+Owner-only historical cleanup: `.github/workflows/owner-historical-actions-cleanup.yml` supports optional `OWNER_ACTIONS_CLEANUP_TOKEN` from repository Actions secrets (fine-grained Actions write permission, repository scoped). The built-in `github.token` remains the default. This cannot override provider-side 403/409 denial; success requires confirmed HTTP 204 deletion followed by HTTP 404 verification.
