@@ -13,9 +13,24 @@ COPY package.json yarn.lock* ./
 COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
 RUN --mount=type=secret,id=proxy_ca \
+    set -eu; \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    yarn install --frozen-lockfile --non-interactive --ignore-scripts \
-    && node ./scripts/patch-node-modules.js
+    attempt=1; \
+    while :; do \
+      if yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-timeout 120000 > /tmp/yarn-install.log 2>&1; then \
+        cat /tmp/yarn-install.log; \
+        break; \
+      fi; \
+      cat /tmp/yarn-install.log; \
+      if [ "$attempt" -ge 3 ] || ! grep -Eq 'Request failed.*(429|50[0-9]|51[0-9]|52[0-9]|53[0-9])|ETIMEDOUT|ECONNRESET|EAI_AGAIN|socket hang up' /tmp/yarn-install.log; then \
+        rm -f /tmp/yarn-install.log; \
+        exit 1; \
+      fi; \
+      sleep "$((attempt * 5))"; \
+      attempt="$((attempt + 1))"; \
+    done; \
+    rm -f /tmp/yarn-install.log; \
+    node ./scripts/patch-node-modules.js
 
 # Stage 2: Development
 FROM deps AS development
