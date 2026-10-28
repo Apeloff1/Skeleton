@@ -1085,6 +1085,12 @@ class MongoMemoryRepository:
         self.revisions = database[f"{prefix}_revisions"]
         self.projection_outbox = database[f"{prefix}_projection_outbox"]
 
+    def _require_canonical_writer(self, *, tenant_id: str, actor_id: str) -> None:
+        """Require the actor-scoped epoch for internal Mongo source mutations."""
+        epoch = self.canonical_source_epoch
+        if epoch is not None:
+            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=actor_id)
+
     async def ensure_indexes(self) -> None:
         await self.records.create_index(
             [
@@ -1224,6 +1230,7 @@ class MongoMemoryRepository:
         projection_action: str,
         committed_at: datetime,
     ) -> None:
+        self._require_canonical_writer(tenant_id=record.tenant_id, actor_id=record.subject_id)
         revision = MemoryRevision(
             memory_id=record.memory_id,
             tenant_id=record.tenant_id,
@@ -1364,6 +1371,7 @@ class MongoMemoryRepository:
         proposal: MemoryWriteProposal,
         reservation: dict,
     ) -> MemoryRecord | None:
+        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         if reservation.get("status") == "committed":
             snapshot = reservation.get("result")
             if not isinstance(snapshot, dict):
@@ -1422,6 +1430,7 @@ class MongoMemoryRepository:
         memory_id: str,
         instant: datetime,
     ) -> tuple[str, dict]:
+        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         owner_token = str(uuid4())
         reservation = await self.idempotency.find_one_and_update(
             self._idempotency_filter(proposal),
@@ -1466,6 +1475,7 @@ class MongoMemoryRepository:
         proposal: MemoryWriteProposal,
         owner_token: str,
     ) -> None:
+        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         if owner_token in {"replay", ""}:
             return
         await self.idempotency.delete_one(
@@ -1482,6 +1492,7 @@ class MongoMemoryRepository:
         owner_token: str,
         record: MemoryRecord,
     ) -> None:
+        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         result = await self.idempotency.update_one(
             {
                 **self._idempotency_filter(proposal),
