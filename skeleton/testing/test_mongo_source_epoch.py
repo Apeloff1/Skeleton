@@ -184,3 +184,62 @@ async def test_rejected_protected_thread_deletion_does_not_quarantine_writer_epo
         with pytest.raises(MongoSourceEpochError, match="writing"):
             await read(owner)
     assert await read(owner) == 4
+
+
+@pytest.mark.asyncio
+async def test_protected_internal_conversation_recovery_rejects_unfenced_caller():
+    """Prepared WAL repair is a canonical mutation, even when called internally."""
+    from unittest.mock import AsyncMock
+    from core.conversations import MongoConversationAuthority
+
+    owner = epoch()
+    conversation = object.__new__(MongoConversationAuthority)
+    conversation.canonical_source_epoch = owner
+    conversation.get_thread = AsyncMock(return_value="verified-thread")
+    conversation.messages = SimpleNamespace(find_one=AsyncMock(return_value=None))
+    with pytest.raises(MongoSourceEpochError, match="actor"):
+        await conversation._recover_prepared(
+            "thread", tenant_id="tenant", owner_id="actor",
+        )
+    assert conversation.get_thread.await_count == 0
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    async with owner.writer(tenant_id="tenant", actor_id="actor"):
+        assert await conversation._recover_prepared(
+            "thread", tenant_id="tenant", owner_id="actor",
+        ) == "verified-thread"
+    assert await read(owner) == 4
+
+
+@pytest.mark.asyncio
+async def test_internal_mongo_memory_mutations_require_same_actor_writer_epoch():
+    """Public decorators cannot be bypassed via low-level reservation helpers."""
+    from datetime import datetime, timezone
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+
+    owner = epoch()
+    memory = object.__new__(MongoMemoryRepository)
+    memory.canonical_source_epoch = owner
+    proposal = SimpleNamespace(tenant_id="tenant", subject_id="actor")
+    record = SimpleNamespace(tenant_id="tenant", subject_id="actor")
+    now = datetime.now(timezone.utc)
+    operations = (
+        lambda: memory._ensure_revision_and_projection(
+            record, mutation="create", predecessor_version=None,
+            projection_action="upsert", committed_at=now,
+        ),
+        lambda: memory._recover_reservation(proposal, {}),
+        lambda: memory._reserve(proposal, memory_id="memory", instant=now),
+        lambda: memory._release_failed_reservation(proposal, "token"),
+        lambda: memory._commit_reservation(proposal, "token", record),
+    )
+    for operation in operations:
+        with pytest.raises(MongoSourceEpochError, match="actor"):
+            await operation()
+
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    async with owner.writer(tenant_id="tenant", actor_id="actor"):
+        # A no-write replay token is admitted only under the same real writer.
+        await memory._release_failed_reservation(proposal, "replay")
+        with pytest.raises(MongoSourceEpochError, match="actor"):
+            memory._require_canonical_writer(tenant_id="tenant", actor_id="other")
+    assert await read(owner) == 4
