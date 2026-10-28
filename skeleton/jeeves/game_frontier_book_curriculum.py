@@ -47,29 +47,29 @@ PREREQUISITES = {
 }
 
 
-def _load_known_forge_module(path: str):
-    """Resolve only explicitly registered module names, never an arbitrary import."""
+def _load_book_module(path: str):
+    """Literal-only module dispatch, rejecting unregistered book generations."""
+    if path == "game_frontier_studio_worldline_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_worldline_handbooks")
+    if path == "game_frontier_studio_phase_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_phase_handbooks")
     if path == "game_frontier_studio_campaign_handbooks":
         return import_module("skeleton.forge.game_frontier_studio_campaign_handbooks")
     if path == "game_frontier_studio_chronicle_handbooks":
         return import_module("skeleton.forge.game_frontier_studio_chronicle_handbooks")
-    if path == "game_frontier_studio_epic_handbooks":
-        return import_module("skeleton.forge.game_frontier_studio_epic_handbooks")
     if path == "game_frontier_studio_epoch_handbooks":
         return import_module("skeleton.forge.game_frontier_studio_epoch_handbooks")
-    if path == "game_frontier_studio_phase_handbooks":
-        return import_module("skeleton.forge.game_frontier_studio_phase_handbooks")
     if path == "game_frontier_studio_saga_handbooks":
         return import_module("skeleton.forge.game_frontier_studio_saga_handbooks")
-    if path == "game_frontier_studio_worldline_handbooks":
-        return import_module("skeleton.forge.game_frontier_studio_worldline_handbooks")
-    raise ImportError("module outside signed catalog")
+    if path == "game_frontier_studio_epic_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_epic_handbooks")
+    raise StudioError("Unregistered Forge book module")
 
 
 def _module(generation: str):
     for key, path, count in GENERATIONS:
         if generation == key:
-            module = _load_known_forge_module(path)
+            module = _load_book_module(path)
             actual = getattr(module, "BOOK_COUNT", getattr(module, "VOLUME_COUNT", None))
             if actual != count:
                 raise StudioError("Forge book index drift: old references cannot be trusted")

@@ -74,36 +74,35 @@ MILESTONES=tuple(
     for j,operation in enumerate(operations)
 )
 
-def _load_game_scale_module(module: str):
-    """Resolve only explicitly registered module names, never an arbitrary import."""
-    if module == "game_scale_assets":
-        return import_module(".game_scale_assets", __package__)
-    if module == "game_scale_balancing":
-        return import_module(".game_scale_balancing", __package__)
-    if module == "game_scale_campaign":
-        return import_module(".game_scale_campaign", __package__)
-    if module == "game_scale_combat":
-        return import_module(".game_scale_combat", __package__)
-    if module == "game_scale_economy":
-        return import_module(".game_scale_economy", __package__)
-    if module == "game_scale_editor":
-        return import_module(".game_scale_editor", __package__)
-    if module == "game_scale_npc_ai":
-        return import_module(".game_scale_npc_ai", __package__)
-    if module == "game_scale_research":
-        return import_module(".game_scale_research", __package__)
-    if module == "game_scale_story":
-        return import_module(".game_scale_story", __package__)
-    if module == "game_scale_world":
+def _load_catalog_module(module_name: str):
+    """Resolve only immutable reviewed game production domains."""
+    if module_name == ".game_scale_world":
         return import_module(".game_scale_world", __package__)
-    raise ImportError("module outside signed catalog")
-
+    if module_name == ".game_scale_npc_ai":
+        return import_module(".game_scale_npc_ai", __package__)
+    if module_name == ".game_scale_combat":
+        return import_module(".game_scale_combat", __package__)
+    if module_name == ".game_scale_economy":
+        return import_module(".game_scale_economy", __package__)
+    if module_name == ".game_scale_story":
+        return import_module(".game_scale_story", __package__)
+    if module_name == ".game_scale_assets":
+        return import_module(".game_scale_assets", __package__)
+    if module_name == ".game_scale_balancing":
+        return import_module(".game_scale_balancing", __package__)
+    if module_name == ".game_scale_editor":
+        return import_module(".game_scale_editor", __package__)
+    if module_name == ".game_scale_research":
+        return import_module(".game_scale_research", __package__)
+    if module_name == ".game_scale_campaign":
+        return import_module(".game_scale_campaign", __package__)
+    raise ValueError("unregistered game milestone owner")
 
 def game_milestone_by_number(number:int):
     if not isinstance(number,int) or isinstance(number,bool) or not 1<=number<=100:
         raise ValueError("invalid implemented milestone number")
     milestone=MILESTONES[number-1]
-    function=getattr(_load_game_scale_module(milestone.module),milestone.operation)
+    function=getattr(_load_catalog_module(milestone.module),milestone.operation)
     if not callable(function):
         raise RuntimeError("registered milestone is not executable")
     return function

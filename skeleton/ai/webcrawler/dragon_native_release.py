@@ -31,7 +31,9 @@ else:
     _isolated = ModuleType(_isolated_name)
     _isolated.__path__ = [str(Path(__file__).resolve().parent)]
     sys.modules[_isolated_name] = _isolated
-    emit_native_puzzle = import_module("_dragon_native_standalone.dragon_native_puzzle").emit_native_puzzle
+    emit_native_puzzle = import_module(
+        "_dragon_native_standalone.dragon_native_puzzle"
+    ).emit_native_puzzle
 
 RELEASE_NAME="dragon_game.exe" if sys.platform=="win32" else "dragon_game"
 TARGETS={"linux":"pc_linux","windows":"pc_windows","darwin":"pc_macos"}
