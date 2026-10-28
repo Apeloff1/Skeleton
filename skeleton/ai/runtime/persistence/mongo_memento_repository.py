@@ -31,6 +31,8 @@ from skeleton.context.sealed_sandwich import (
     SealedContextReplayError,
 )
 
+from skeleton.persistence.mongo_source_epoch import fence_memento_write
+
 _MAX_READ_BYTES = 16 * 1024 * 1024
 _HEAD_FIELD = "_sealed_memento_head"
 _BINDING_FIELD = "_sealed_memento_binding"
@@ -160,6 +162,7 @@ class MongoMementoAuthority:
         except Exception as exc:
             raise MongoMementoUnavailable("authoritative memento head unavailable") from exc
 
+    @fence_memento_write
     async def publish(
         self, *, archive: SealedMementoArchive, expected_head: MementoCatalogHead,
         expected_thread_version: int, stream: str, ciphertext: bytes,
@@ -322,6 +325,7 @@ class MongoMementoAuthority:
         except Exception as exc:
             raise MongoMementoUnavailable("snapshot archive read failed closed") from exc
 
+    @fence_memento_write
     async def retire_thread(
         self, *, tenant_id: str, owner_id: str, thread_id: str,
     ) -> int:
