@@ -243,3 +243,90 @@ async def test_internal_mongo_memory_mutations_require_same_actor_writer_epoch()
         with pytest.raises(MongoSourceEpochError, match="owner-scoped epoch"):
             memory._require_canonical_writer(tenant_id="tenant", actor_id="other")
     assert await read(owner) == 4
+
+
+@pytest.mark.asyncio
+async def test_stable_epoch_with_residual_writer_token_is_quarantined():
+    """An apparently even epoch is not readable if an old writer still owns it."""
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    assert await read(owner) == 2
+    key = owner._key("tenant", "actor")
+    doc = owner._collection.records[key]
+    doc["writer_token"] = "orphaned-owner"
+    with pytest.raises(MongoSourceEpochError, match="quarantined"):
+        await read(owner)
+    with pytest.raises(MongoSourceEpochError):
+        async with owner.writer(tenant_id="tenant", actor_id="actor"):
+            pass
+    assert doc["epoch"] == 2
+
+
+@pytest.mark.asyncio
+async def test_protected_memory_update_requires_subject_match_in_final_cas():
+    """A record reassigned after the initial read must not be overwritten."""
+    from skeleton.persistence.memory_repository import MemoryConflict, MongoMemoryRepository
+    from skeleton.testing.test_mongo_memory_repository import FakeDatabase, _proposal, _now
+
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant-a", actor_id="user-a")
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db, canonical_source_epoch=owner)
+    created = await repo.commit(_proposal(key="first"), now=_now())
+    records = db["canonical_memory_records"]
+    original_find_one_and_update = records.find_one_and_update
+    captured = []
+
+    async def concurrent_subject_change(query, update, **kwargs):
+        captured.append(dict(query))
+        # An independently administered/external mutation is not protected
+        # by our actor epoch: deny rather than overwriting another actor.
+        for doc in records.docs:
+            if doc.get("memory_id") == created.memory_id:
+                doc["subject_id"] = "foreign-actor"
+        return await original_find_one_and_update(query, update, **kwargs)
+
+    records.find_one_and_update = concurrent_subject_change
+    with pytest.raises(MemoryConflict, match="version conflict"):
+        await repo.commit(
+            _proposal(key="second", content="changed",
+                      target=created.memory_id, version=created.version),
+            now=_now(),
+        )
+    assert len(captured) == 1
+    assert captured[0]["subject_id"] == "user-a"
+    assert records.docs[0]["version"] == created.version
+    assert records.docs[0]["subject_id"] == "foreign-actor"
+    with pytest.raises(MongoSourceEpochError, match="quarantined"):
+        await read(owner, tenant="tenant-a", actor="user-a")
+
+
+@pytest.mark.asyncio
+async def test_protected_memory_tombstone_rechecks_actor_under_writer_epoch():
+    """The actor selected before the writer lock cannot change unnoticed."""
+    from dataclasses import replace
+    from unittest.mock import AsyncMock
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+    from skeleton.testing.test_mongo_memory_repository import FakeDatabase, _proposal, _now
+
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant-a", actor_id="user-a")
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db, canonical_source_epoch=owner)
+    record = await repo.commit(_proposal(key="first"), now=_now())
+    original = repo.get
+    repo.get = AsyncMock(side_effect=(
+        record,
+        replace(record, subject_id="foreign-actor"),
+    ))
+    with pytest.raises(MongoSourceEpochError, match="owner-scoped epoch"):
+        await repo.tombstone(
+            record.memory_id, tenant_id="tenant-a",
+            namespace="assistant", expected_version=record.version,
+        )
+    # No tombstone CAS or revision side effect could execute.
+    assert db["canonical_memory_records"].docs[0]["state"] == "active"
+    assert db["canonical_memory_records"].docs[0]["version"] == record.version
+    repo.get = original
+    with pytest.raises(MongoSourceEpochError, match="quarantined"):
+        await read(owner, tenant="tenant-a", actor="user-a")
