@@ -80,17 +80,16 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
 
     monkeypatch.setattr(runtime, "core_db", FailedDB())
     monkeypatch.setattr(runtime, "public_readiness", lambda: (_ for _ in ()).throw(RuntimeError("readiness unavailable")))
-    monkeypatch.setattr(
-        runtime,
-        "_probe_engine",
-        lambda _timeout: {
+    async def fake_engine(_timeout: float):
+        return {
             "name": "skeleton",
             "ok": True,
             "status": 200,
             "latency_ms": 1,
             "detail": "healthy",
-        },
-    )
+        }
+
+    monkeypatch.setattr(runtime, "_probe_engine", fake_engine)
 
     payload = asyncio.run(runtime._runtime_status(250))
 
