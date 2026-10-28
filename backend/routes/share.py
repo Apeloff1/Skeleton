@@ -33,14 +33,21 @@ def _app_origin() -> str:
             or parsed.password is not None or parsed.fragment or parsed.query
             or parsed.path not in ("", "/") or "\\" in raw):
         raise ValueError("PUBLIC_APP_URL must be a plain absolute origin")
+    production = os.environ.get("ENVIRONMENT", "").strip().lower() in {
+        "production", "prod", "staging",
+    }
     if parsed.scheme != "https" and not (
-        parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        parsed.scheme == "http"
+        and not production
+        and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
     ):
         raise ValueError("PUBLIC_APP_URL must use HTTPS outside local development")
     # Reject malformed ports and URL authority suffixes before using the origin.
     port = parsed.port
     if not parsed.netloc or (port is not None and not 1 <= port <= 65535):
         raise ValueError("invalid PUBLIC_APP_URL authority")
+    if raw.rstrip("/") != f"{parsed.scheme}://{parsed.netloc}":
+        raise ValueError("PUBLIC_APP_URL must be one canonical origin")
     return raw.rstrip("/")
 
 
