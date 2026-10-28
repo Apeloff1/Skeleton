@@ -11,10 +11,9 @@ on:
 # Current-head CI and security protections remain independent and unchanged.
 permissions: {}
 
-concurrency:
-  group: owner-historical-actions-cleanup-v3-macos-${{ github.repository }}
-  cancel-in-progress: false
-
+# Apply concurrency at JOB scope, after the exact owner-command if gate.
+# Otherwise any unrelated issue_comment can cancel pending owner work before
+# it ever reaches a runner, even when that comment's job would be skipped.
 jobs:
   owner-cleanup:
     if: >-
@@ -24,6 +23,9 @@ jobs:
        github.event.issue.pull_request == null &&
        github.event.comment.body == '/owner-historical-cleanup-30-macos-v3' &&
        github.actor == github.repository_owner)
+    concurrency:
+      group: owner-historical-actions-cleanup-v4-macos-${{ github.repository }}
+      cancel-in-progress: false
     runs-on: macos-15
     timeout-minutes: 14
     permissions:
