@@ -178,7 +178,7 @@ def fake_pymongo(monkeypatch):
     read = ModuleType("pymongo.read_concern")
     write = ModuleType("pymongo.write_concern")
     read.ReadConcern = lambda level: SimpleNamespace(level=level)
-    write.WriteConcern = lambda w: SimpleNamespace(w=w, document={"w": w})
+    write.WriteConcern = lambda w, **kwargs: SimpleNamespace(w=w, document={"w": w, **kwargs})
     monkeypatch.setitem(sys.modules, "pymongo", pymongo)
     monkeypatch.setitem(sys.modules, "pymongo.read_concern", read)
     monkeypatch.setitem(sys.modules, "pymongo.write_concern", write)
