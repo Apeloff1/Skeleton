@@ -233,5 +233,61 @@ class AssociatedPRPolicyTests(unittest.TestCase):
 
 
 
+    def test_incomplete_or_invalid_jobs_fail_closed(self):
+        row = self.row()
+        client = GitHubActions("Apeloff1/Skeleton", "token")
+        states = (
+            {"total_count": 2, "jobs": [{"status": "queued"}]},
+            {"total_count": 1, "jobs": [None]},
+            {"total_count": 1, "jobs": [{"status": "invented"}]},
+        )
+        for jobs in states:
+            def api(path):
+                if path.endswith("/actions/runs/567"):
+                    return row
+                if "/commits/" in path:
+                    return [{"number": 99}]
+                if path.endswith("/pulls/99"):
+                    return {
+                        "number": 99, "state": "closed",
+                        "base": {"repo": {"full_name": "Apeloff1/Skeleton"}},
+                        "head": {"sha": self.SHA, "ref": "feat/current"},
+                    }
+                if path.endswith("/jobs?per_page=100"):
+                    return jobs
+                raise AssertionError(path)
+            with self.subTest(jobs=jobs), patch.object(
+                client, "checked_get", side_effect=api
+            ), self.assertRaises(CleanupError):
+                client.unchanged_and_queued(row, now=1_800_000_000,
+                                            current=999)
+
+    @patch("scripts.cancel_stale_actions_queue.time.time",
+           return_value=1_800_000_000)
+    def test_real_cleanup_never_posts_for_current_head(self, _time):
+        row = self.row()
+        client = GitHubActions("Apeloff1/Skeleton", "token")
+        def api(path):
+            if path.endswith("/actions/runs/567"):
+                return row
+            if "/commits/" in path:
+                return [{"number": 99}]
+            if path.endswith("/pulls/99"):
+                return {
+                    "number": 99, "state": "open",
+                    "base": {"repo": {"full_name": "Apeloff1/Skeleton"}},
+                    "head": {"sha": self.SHA, "ref": "feat/current"},
+                }
+            raise AssertionError("unexpected job inventory request: " + path)
+        with patch.object(client, "queued_runs", return_value=[row]), \
+             patch.object(client, "checked_get", side_effect=api), \
+             patch.object(client, "cancel") as cancel:
+            result = cleanup(client, now=1_800_000_000, current=999)
+        cancel.assert_not_called()
+        self.assertEqual(result["already_moved_or_protected"], 1)
+        self.assertEqual(result["cancel_requested"], 0)
+
+
+
 if __name__ == "__main__":
     unittest.main()
