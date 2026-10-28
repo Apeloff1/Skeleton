@@ -15,6 +15,7 @@ recovery procedure reconciles durable evidence. No silent repair is performed.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 import hashlib
 import json
@@ -198,7 +199,38 @@ class WitnessedMongoMementoAuthority:
             raise MementoWitnessDivergence("external head changed during admission")
         return before.head
 
+    @asynccontextmanager
+    async def _source_writer(self, *, tenant_id: str, owner_id: str):
+        """Hold canonical writer custody through both Mongo and external CAS.
+
+        Without this outer scope, Mongo publish can return a stable source
+        epoch while the independent witness still has the previous head.
+        Any failed handoff instead quarantines the actor for operator repair.
+        """
+        conversation = getattr(self.mongo, "conversation", None)
+        epoch = getattr(conversation, "canonical_source_epoch", None)
+        if epoch is None:
+            yield
+        else:
+            async with epoch.writer(tenant_id=tenant_id, actor_id=owner_id):
+                yield
+
     async def publish(
+        self, *, archive: SealedMementoArchive, expected_head: MementoCatalogHead,
+        expected_thread_version: int, stream: str, ciphertext: bytes,
+    ) -> MementoCatalogHead:
+        if not isinstance(archive, SealedMementoArchive):
+            raise SealedContextBoundaryError("authorized encrypted archive required")
+        async with self._source_writer(
+            tenant_id=archive.binding.tenant_id, owner_id=archive.binding.owner_id,
+        ):
+            return await self._publish_with_witness(
+                archive=archive, expected_head=expected_head,
+                expected_thread_version=expected_thread_version,
+                stream=stream, ciphertext=ciphertext,
+            )
+
+    async def _publish_with_witness(
         self, *, archive: SealedMementoArchive, expected_head: MementoCatalogHead,
         expected_thread_version: int, stream: str, ciphertext: bytes,
     ) -> MementoCatalogHead:
@@ -251,6 +283,14 @@ class WitnessedMongoMementoAuthority:
         return page
 
     async def retire_thread(self, *, archive: SealedMementoArchive) -> int:
+        if not isinstance(archive, SealedMementoArchive):
+            raise SealedContextBoundaryError("authorized encrypted archive required")
+        async with self._source_writer(
+            tenant_id=archive.binding.tenant_id, owner_id=archive.binding.owner_id,
+        ):
+            return await self._retire_under_epoch(archive=archive)
+
+    async def _retire_under_epoch(self, *, archive: SealedMementoArchive) -> int:
         """Witness tombstone FIRST, then owner-backed deletion and physical purge.
 
         A failure to purge leaves a permanent witness tombstone and requires
@@ -285,6 +325,24 @@ class WitnessedMongoMementoAuthority:
             raise MementoWitnessIndeterminate("retirement tombstoned; Mongo purge unfinished") from exc
 
     async def retire_bound_thread(
+        self, *, tenant_id: str, owner_id: str, thread_id: str,
+        binding_digest: str,
+    ) -> int:
+        # Reject malformed input before acquiring a durable writer epoch.
+        if any(not isinstance(v, str) or not v or len(v) > 256 for v in (
+            tenant_id, owner_id, thread_id,
+        )):
+            raise SealedContextBoundaryError("invalid governed archive deletion scope")
+        if (not isinstance(binding_digest, str) or len(binding_digest) != 64
+                or any(c not in "0123456789abcdef" for c in binding_digest)):
+            raise SealedContextBoundaryError("invalid stored archive binding")
+        async with self._source_writer(tenant_id=tenant_id, owner_id=owner_id):
+            return await self._retire_bound_under_epoch(
+                tenant_id=tenant_id, owner_id=owner_id,
+                thread_id=thread_id, binding_digest=binding_digest,
+            )
+
+    async def _retire_bound_under_epoch(
         self, *, tenant_id: str, owner_id: str, thread_id: str,
         binding_digest: str,
     ) -> int:
