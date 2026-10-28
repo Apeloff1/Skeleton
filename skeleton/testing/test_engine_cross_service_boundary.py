@@ -21,7 +21,9 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_runtime import (
     FinishReason,
     ProviderResponse,
+    ProviderUnavailableError,
     ProviderUsage,
+    provider_context_selection,
 )
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -73,11 +75,53 @@ class _Provider:
 
 
 class _Registry:
+    """Test registry that publishes the strict tenant-scoped model identity."""
+
+    active_id = "fake"
+    available = True
+
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
 
+    def statuses(self) -> list[dict]:
+        return [{
+            "id": self.provider.provider_id,
+            "model": self.provider.model,
+            "available": self.provider.available,
+            "active": True,
+            "configured": True,
+            "architecture_acknowledged": True,
+            "credential_free": False,
+            "execution_mode": "hosted",
+            "capabilities": ["text-generation"],
+            "context_window": 128_000,
+            "max_output_tokens": 16_384,
+            "default_output_tokens": 4_096,
+            "limits_source": "engine_chat_policy",
+            "tokenizer": "approximate_text",
+            "supports_temperature": True,
+        }]
+
     def require_active(self):
         return self.provider
+
+    def require_selected(self, provider_id: str, model_id: str):
+        if (provider_id, model_id) != (self.provider.provider_id, self.provider.model):
+            raise ProviderUnavailableError("selected provider/model is not configured")
+        return self.require_active()
+
+    def require_for_context(self, context_policy):
+        selection = provider_context_selection(context_policy)
+        if selection is None:
+            selected = self.require_active()
+        else:
+            selected = self.require_selected(selection["provider_id"], selection["model_id"])
+        if context_policy.get("provider_model") not in (None, selected.model):
+            raise ProviderUnavailableError("model override differs from configured selection")
+        return selected
+
+    def runtime_serving_engines(self):
+        return ()
 
 
 def _service(tmp_path, *, tenant_ids=frozenset({"tenant-a"}), scopes=None):

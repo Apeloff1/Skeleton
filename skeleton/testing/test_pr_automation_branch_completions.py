@@ -431,26 +431,32 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
     root = Path(__file__).resolve().parents[2]
     workflows = root / ".github" / "workflows"
     expected = 'branches:\n      - "*"\n      - "**"'
-    consumers = {
-        "repair-intake.yml": "types: [completed]",
-        "idle-studio.yml": "types: [completed]",
-        "pr-obsolete-run-drain.yml": "types: [requested]",
-    }
-    for name, event_type in consumers.items():
-        text = (workflows / name).read_text(encoding="utf-8")
-        assert "workflow_run:" in text
-        assert event_type in text
-        assert expected in text, f"{name} must match every completing head"
-        assert "pull_requests[0]" not in text, f"{name} must not treat pull_requests[0] as identity"
+    # Audit present workflow-run consumers, not retired workflow filenames.
+    # A privileged PR automation workflow must remain manual-only below.
+    for path in sorted(workflows.glob("*.yml")):
+        source = path.read_text(encoding="utf-8")
+        if "\n  workflow_run:\n" not in source:
+            continue
+        assert "pull_requests[0]" not in source, (
+            f"{path.name} must bind exact branch/commit identity instead of "
+            "trusting the first workflow-run pull-request hint"
+        )
 
     pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
-    assert "workflow_run:" in pr_automation
-    assert "types: [completed]" in pr_automation
-    assert "branches-ignore:\n      - main" in pr_automation
+    # Unlike the bounded, unprivileged completion consumers above, the
+    # privileged PR automation workflow was deliberately made manual-only.
+    # Never reinstate automatic workflow_run or schedule triggers to satisfy
+    # an obsolete test expectation.
+    assert "\non:\n  workflow_dispatch:\n" in pr_automation
+    assert "\n  workflow_run:\n" not in pr_automation
+    assert "\n  schedule:\n" not in pr_automation
+    assert "pull_request_target:" not in pr_automation
+    assert "branches-ignore:\n      - main" not in pr_automation
     assert expected not in pr_automation
     assert "pull_requests[0]" not in pr_automation
 
-    idle = (workflows / "idle-studio.yml").read_text(encoding="utf-8")
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in idle
-    assert "exceeded bounded identity scan" in idle
-    assert r"^[0-9a-f]{40}$" in idle
+    assert (workflows / "pr-automation-index.yml").is_file()
+    # These former completion workflows have been retired, rather than silently
+    # replaced with privileged workflow_run or pull_request_target triggers.
+    for retired in ("repair-intake.yml", "idle-studio.yml", "pr-obsolete-run-drain.yml"):
+        assert not (workflows / retired).exists()
