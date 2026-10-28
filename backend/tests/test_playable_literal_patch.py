@@ -50,6 +50,46 @@ def test_unique_anchors_apply_via_canonical_plans_in_descending_original_positio
         result.evidence[0].before_digest = 'changed'
 
 
+def test_identical_repeated_edits_are_applied_once_with_the_same_plan_identity():
+    source = 'const score = 0; other();'
+    edit = ('const score', 'let score')
+    single = apply(source, [edit])
+    repeated = apply(source, [edit, edit, edit])
+    assert repeated.candidate == single.candidate == 'let score = 0; other();'
+    assert repeated.patch_fingerprint == single.patch_fingerprint
+    assert repeated.edit_count == len(repeated.evidence) == 1
+    assert repeated.proposal_edit_count == 3 and single.proposal_edit_count == 1
+
+
+def test_duplicate_raw_edits_count_toward_budget_before_normalization(monkeypatch):
+    calls = []
+    monkeypatch.setattr(patch, 'apply_edit_plan', lambda *args, **kwargs: calls.append(1))
+    anchor, replacement = 'A' * 4096, 'B' * 4096
+    with pytest.raises(patch.LiteralPatchError, match='literal_patch_limit_exceeded'):
+        apply(anchor, [(anchor, replacement)] * 3)
+    with pytest.raises(patch.LiteralPatchError, match='literal_patch_invalid_edits'):
+        apply('one', [('one', 'ONE')] * 9)
+    assert calls == []
+
+
+def test_late_malformed_or_ambiguous_edit_rejects_the_entire_repeated_plan(monkeypatch):
+    calls = []
+    monkeypatch.setattr(patch, 'apply_edit_plan', lambda *args, **kwargs: calls.append(1))
+    source = 'one and two two'
+    for edits, code in [
+        ([('one', 'ONE'), ('one', 'ONE'), ('two', 'TWO')], 'literal_patch_anchor_ambiguous'),
+        ([('one', 'ONE'), ('one', 'ONE'), ('one', 'different')], 'literal_patch_duplicate_edit'),
+        ([('one', 'ONE'), ('one', 'ONE'), ('two', 'two')], 'literal_patch_no_change'),
+    ]:
+        with pytest.raises(patch.LiteralPatchError, match=code):
+            apply(source, edits)
+    response = '{"schema_version":1,"edits":[{"find":"one","replace":"ONE"},'
+    response += '{"find":"one","replace":"ONE"},{"find":"two"}]}'
+    with pytest.raises(patch.LiteralPatchError, match='literal_patch_invalid_schema'):
+        patch.apply_literal_patch(source, response, expected_source_sha256=digest(source))
+    assert calls == []
+
+
 @pytest.mark.parametrize('echo', [False, True])
 def test_source_digest_is_server_owned_and_optional_correct_model_echo_is_accepted(echo):
     source = 'const bestScore = 0;'

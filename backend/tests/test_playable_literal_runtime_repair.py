@@ -1,5 +1,6 @@
 """One canonical model proposal publishes through the scoped source/version CAS."""
 from copy import deepcopy
+from dataclasses import replace
 import json
 from types import SimpleNamespace
 
@@ -68,6 +69,35 @@ def test_real_model_response_publishes_exact_patch_version_bytes_and_pinned_rece
     assert update["$set"]["html"] == expected and update["$set"]["version"] == 8
     review = client.get("/api/playable/patch-game", headers=headers["alice"]).json()["evaluation"]
     assert review["stale"] is True and review["available"] is False and review["shippable"] is False
+
+
+@pytest.mark.parametrize("concurrent_edit", [False, True])
+def test_repeated_model_edit_preserves_raw_counts_and_source_cas(patch_boundary, monkeypatch, concurrent_edit):
+    client, headers, db, engine, commands, _, original = patch_boundary
+    execute = engine.execute
+    edited = HTML.replace("ctx.fillStyle='#123';", "ctx.fillStyle='#ff0';")
+    async def repeat_after_generation(command):
+        terminal = await execute(command)
+        edit = {"find": "ctx.fillStyle='#123';", "replace": "ctx.fillStyle='#124';"}
+        if concurrent_edit:
+            db.playables.rows[0].update(html=edited, version=8, html_digest=playable_html_digest(edited))
+        return replace(terminal, final_output=json.dumps({"schema_version": 1, "edits": [edit] * 3}))
+    monkeypatch.setattr(engine, "execute", repeat_after_generation)
+    response = _repair(client, headers)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(commands) == 1
+    if concurrent_edit:
+        assert data["repaired"] is False and data["error_code"] == "repair_source_changed"
+        assert db.playables.rows[0]["html"] == edited and db.playables.rows[0]["version"] == 8
+        assert db.playables.rows[0]["repair_trail"] == []
+    else:
+        row = db.playables.rows[0]
+        assert data["repaired"] is True and data["version"] == 8
+        assert data["proposal_edit_count"] == row["last_repair"]["proposal_edit_count"] == 3
+        assert data["edit_count"] == row["last_repair"]["edit_count"] == 1
+        assert row["html"] == original["html"].replace("ctx.fillStyle='#123';", "ctx.fillStyle='#124';")
+        assert row["last_repair"]["engine_provider_receipts"] == ["provider:one"]
 
 
 def test_foreign_actor_cannot_dispatch_a_patch_model(patch_boundary):

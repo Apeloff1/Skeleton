@@ -120,6 +120,7 @@ async def _do_repair(pid: str, error: str) -> dict:
     entry = {"attempt": count + 1, "kind": "runtime_literal_patch", "score": val["score"], "error": err,
              "model": routed.get("model"), "source_sha256": source_digest, "result_sha256": result_digest,
              "patch_fingerprint": patch.patch_fingerprint, "edit_count": patch.edit_count,
+             "proposal_edit_count": patch.proposal_edit_count,
              "sanitized_count": len(removed), **lineage}
     # Scope is reauthorized after model work; exact source/version/lifecycle
     # predicates make publication an atomic compare-and-set, never a stale overwrite.
@@ -146,7 +147,8 @@ async def _do_repair(pid: str, error: str) -> dict:
             "raw_path": f"/api/playable/{pid}/raw", "version": version + 1,
             "bytes": len(new_html.encode("utf-8")), "html_digest": result_digest,
             "source_sha256": source_digest, "result_sha256": result_digest,
-            "patch_fingerprint": patch.patch_fingerprint, "edit_count": patch.edit_count, **lineage}
+            "patch_fingerprint": patch.patch_fingerprint, "edit_count": patch.edit_count,
+            "proposal_edit_count": patch.proposal_edit_count, **lineage}
 
 
 @router.post("/{pid}/repair")
