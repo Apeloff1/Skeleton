@@ -24,6 +24,9 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Reproducible Release
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Checkout build A
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,6 +41,16 @@ jobs:
           path: source-b
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Reject release-evidence claims without protected exact-head CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s source-a/tests -p 'test_release_governance_verdict.py' -q
+          python source-a/scripts/release_governance_verdict.py \
+            --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" --branch main
 
       - name: Set up pinned Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
