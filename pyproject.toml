@@ -43,6 +43,7 @@ dependencies = [
   "pymongo==4.19.0",
   "pydantic[email]>=2.14.1",
   "pydantic-settings>=2.15.0",
+  "regex>=2026.5.9,<2027",  # timeout-aware fail-closed output validation
   "uvicorn[standard]>=0.54.0",
 ]
 
@@ -50,7 +51,7 @@ dependencies = [
 dev = ["PyYAML>=6,<7", "pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.28.1,<1", "black>=26.5.1", "mypy>=2.4.0", "ruff>=0.17.2,<0.18"]
 local-inference = ["numpy==2.4.6", "Pillow>=13.0.0,<14"]
 jeeves-production-training = ["torch>=2.5,<3"]
-hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
+hosted-inference = ["openai>=3.37.0,<4", "httpx>=0.28.1,<1"]
 
 [project.scripts]
 skeleton = "skeleton.__main__:main"
