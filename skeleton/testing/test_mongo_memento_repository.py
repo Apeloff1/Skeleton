@@ -404,9 +404,12 @@ def test_witness_configured_canonical_owner_denies_legacy_publication(suite):
 
 
 def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch(suite, monkeypatch):
-    """Real archive-frame transactions are fenced by the canonical writer."""
+    """Witnessed frame transactions and tombstones share actor writer custody."""
     from skeleton.persistence.mongo_source_epoch import (
         MongoCanonicalSourceEpoch, MongoSourceEpochError,
+    )
+    from skeleton.persistence.sealed_memento_witness import (
+        WitnessedMongoMementoAuthority, WitnessPosition, _binding_digest,
     )
     from skeleton.testing.test_mongo_source_epoch import Database
     import pymongo
@@ -418,15 +421,33 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
     conversation, mongo, archive, _ = suite
     writer_epoch = MongoCanonicalSourceEpoch(Database())
     conversation.canonical_source_epoch = writer_epoch
+    scope = _binding_digest(archive)
+
+    class Witness:
+        def __init__(self):
+            self.position = WitnessPosition(scope, 1, MementoCatalogHead())
+
+        async def read(self, *, binding_digest):
+            assert binding_digest == scope
+            return self.position
+
+        async def compare_and_set(self, *, binding_digest, previous, successor):
+            if binding_digest != scope or previous != self.position:
+                return False
+            self.position = successor
+            return True
+
+    witness = Witness()
+    conversation.memento_witness = witness
+    guarded = WitnessedMongoMementoAuthority(mongo, witness=witness)
 
     async def scenario():
+        previous = MementoCatalogHead()
+        wire, expected = archive.seal(
+            MementoRecord(1, "user", b"initial"), previous=previous,
+        )
         with pytest.raises(MongoSourceEpochError, match="writer epoch not owned"):
-            previous = MementoCatalogHead()
-            wire, _ = archive.seal(
-                MementoRecord(1, "user", b"initial"),
-                previous=previous,
-            )
-            await mongo.publish(
+            await guarded.publish(
                 archive=archive, expected_head=previous,
                 expected_thread_version=3, stream="user", ciphertext=wire,
             )
@@ -434,20 +455,19 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
         await writer_epoch.provision_migration_epoch(
             tenant_id="tenant", actor_id="owner",
         )
-        published = await mongo.publish(
+        published = await guarded.publish(
             archive=archive, expected_head=previous,
             expected_thread_version=3, stream="user", ciphertext=wire,
         )
-        assert published.serial == 1
+        assert published == expected
         assert await writer_epoch.read_epoch(
             tenant_id="tenant", actor_id="owner", context_id="t1",
         ) == 4
-        page = await mongo.read_window(archive=archive)
+        page = await guarded.read_window(archive=archive)
         assert [record.payload for record in page.records] == [b"initial"]
-        deleted = await mongo.retire_thread(
-            tenant_id="tenant", owner_id="owner", thread_id="t1",
-        )
+        deleted = await guarded.retire_thread(archive=archive)
         assert deleted == 1
+        assert witness.position.retired
         assert await writer_epoch.read_epoch(
             tenant_id="tenant", actor_id="owner", context_id="t1",
         ) == 6
