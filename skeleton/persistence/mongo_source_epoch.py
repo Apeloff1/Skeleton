@@ -232,6 +232,38 @@ def fence_memory_tombstone(method):
     return guarded
 
 
+# A witnessed Mongo primitive may publish only while its own facade holds
+# both the canonical actor epoch and the independent-witness handoff. This is
+# an in-process routing assertion, not a substitute for external CAS security.
+_ACTIVE_WITNESSED_HANDOFF: ContextVar[tuple[Any, Any, str, str, asyncio.Task[Any]] | None] = (
+    ContextVar("skeleton.canonical_memento_witness_handoff", default=None)
+)
+
+
+@asynccontextmanager
+async def _witnessed_memento_handoff(
+    *, mongo: Any, witness: Any, tenant_id: str, actor_id: str,
+):
+    conversation = getattr(mongo, "conversation", None)
+    epoch = getattr(conversation, "canonical_source_epoch", None)
+    if epoch is None:
+        yield
+        return
+    if witness is not getattr(conversation, "memento_witness", None):
+        raise MongoSourceEpochError("witness handoff does not match canonical owner")
+    epoch.require_actor_writer(tenant_id=tenant_id, actor_id=actor_id)
+    task = asyncio.current_task()
+    if task is None or _ACTIVE_WITNESSED_HANDOFF.get() is not None:
+        raise MongoSourceEpochError("witness handoff must be unique to one writer task")
+    token = _ACTIVE_WITNESSED_HANDOFF.set(
+        (mongo, witness, tenant_id, actor_id, task)
+    )
+    try:
+        yield
+    finally:
+        _ACTIVE_WITNESSED_HANDOFF.reset(token)
+
+
 def fence_memento_write(method):
     """Include canonical ciphertext publication/erasure in actor writer custody.
 
@@ -276,6 +308,14 @@ def fence_memento_write(method):
                 "read", "compare_and_set",
             )):
                 raise MongoSourceEpochError("protected memento requires independent witness")
+            handoff = _ACTIVE_WITNESSED_HANDOFF.get()
+            if (handoff is None or handoff[0] is not self
+                    or handoff[1] is not witness or handoff[2] != tenant_id
+                    or handoff[3] != actor_id
+                    or handoff[4] is not asyncio.current_task()):
+                raise MongoSourceEpochError(
+                    "protected memento publication requires witnessed handoff"
+                )
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             return await method(self, *args, **kwargs)
 
