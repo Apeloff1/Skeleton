@@ -969,14 +969,9 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
     # Clamp for safety
     weight = max(0.0, min(3.0, weight))
     if weight == 0.0:
-        # Honor skip: emit a single marker file and return
-        marker = {
-            f"skipped/{BATCH_NAMES.get(batch_num, 'batch')}.md": (
-                f"# Batch {batch_num} ({BATCH_NAMES.get(batch_num,'?')}) skipped by user (weight=0)\n"
-            )
-        }
+        # A skipped phase produces no artifact. Never fabricate a marker file
+        # that would be counted as generated game content.
         accepted = _new_phase_files(build)
-        accepted.update(marker)
         build["_gen_cache"][cache_key] = accepted
         return accepted
     _check_build_continuation(build)
