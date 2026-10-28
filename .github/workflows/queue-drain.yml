@@ -73,18 +73,11 @@ jobs:
           cancellation_attempts = 0
           budget_exhausted = False
 
-          # These immutable historical runs belong to the separately
-          # authorized owner-only, canary-gated deletion path. Ordinary
-          # cancellation and force-cancellation were refused by GitHub.
-          # Keep them visible in raw queue counts, but never consume this
-          # controller's bounded cancellation budget retrying provider 409s.
-          # Owner cleanup verifies each run again before any DELETE.
+          # The repository owner explicitly released the 19 frozen, jobless
+          # historical run IDs from the queue-drainer's broad backoff list.
+          # Other historical records remain excluded. Current-head, security
+          # lane, and immutable identity checks still apply to all requests.
           owner_historical_run_ids = frozenset({
-              38320664775,
-              38320665862,
-              38320664778,
-              38320296726,
-              37539069791,
               34952531648,
               34952526576,
               34952518480,
@@ -97,22 +90,30 @@ jobs:
               34952526563,
               34952518481,
               34952509059,
-              37655530898,
-              37655496094,
-              37642383890,
-              37642358530,
-              37642355681,
-              37642345734,
-              37655522865,
-              37655521563,
-              37655496139,
-              37642398161,
-              37642398159,
-              37539069375,
-              37642388873,
-              37642398158,
           })
-
+          # Exact-ID allowlist: no unrelated, future, or current-head run can
+          # inherit this owner-approved historical cancellation eligibility.
+          unprotected_historical_heads = {
+              37539069375: '3048d670be32bf3720a5efcb90be20d5479060d6',
+              37539069791: '3048d670be32bf3720a5efcb90be20d5479060d6',
+              37642345734: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642355681: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642358530: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642383890: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642388873: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642398158: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642398159: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642398161: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37655496094: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655496139: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655521563: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655522865: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655530898: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              38320296726: '3293dff9480994d538a10b9e55983c65d649fb1d',
+              38320664775: 'eb71db3ab303d20cfcfeb1f2d67770db560d44f9',
+              38320664778: 'eb71db3ab303d20cfcfeb1f2d67770db560d44f9',
+              38320665862: 'eb71db3ab303d20cfcfeb1f2d67770db560d44f9',
+          }
           # Preserve privileged controllers and per-event receipts from broad
           # last-main supersession. Only explicitly idempotent, queued sweeps
           # may be coalesced when a newer live sweep is independently verified.
@@ -506,6 +507,7 @@ jobs:
               'coalesced_control_plane_queued': 0,
               'obsolete_main_observers_queued': 0,
               'provider_conflicts_backed_off': 0,
+              'historical_unprotected_selected': 0,
               'obsolete_main': 0,
               'obsolete_main_active': 0,
               'duplicates': 0,
@@ -590,6 +592,16 @@ jobs:
               ):
                   run_id = int(run.get('id') or 0)
                   if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if run_id in unprotected_historical_heads:
+                      if (
+                          run.get('status') == 'queued'
+                          and run.get('head_sha') == unprotected_historical_heads[run_id]
+                          and run.get('head_sha') != head
+                      ):
+                          selected.append(run)
+                          totals['historical_unprotected_selected'] += 1
+                          local['historical_unprotected_selected'] += 1
                       continue
                   if run_id in owner_historical_run_ids:
                       totals['provider_conflicts_backed_off'] += 1
@@ -748,6 +760,38 @@ jobs:
                       print('Queue drain write/time budget reached; deferring remaining runs.')
                       break
                   run_id = int(run['id'])
+                  if run_id in unprotected_historical_heads:
+                      # Fresh immutable, queued-only and zero-job proof at the
+                      # mutation boundary; any ambiguity preserves the run.
+                      live_status, live_run = request(
+                          f'/repos/{repo}/actions/runs/{run_id}'
+                      )
+                      jobs_status, jobs = request(
+                          f'/repos/{repo}/actions/runs/{run_id}/jobs?per_page=1'
+                      )
+                      verified = (
+                          live_status == 200
+                          and isinstance(live_run, dict)
+                          and all(
+                              live_run.get(key) == run.get(key)
+                              for key in (
+                                  'id', 'name', 'event', 'path',
+                                  'head_sha', 'created_at', 'updated_at',
+                              )
+                          )
+                          and live_run.get('status') == 'queued'
+                          and live_run.get('conclusion') is None
+                          and live_run.get('head_sha') == unprotected_historical_heads[run_id]
+                          and live_run.get('head_sha') != main_sha()
+                          and jobs_status == 200
+                          and isinstance(jobs, dict)
+                          and jobs.get('total_count') == 0
+                      )
+                      if not verified:
+                          attempted.add(run_id)
+                          deferred += 1
+                          print(f'historical unprotected preflight deferred id={run_id}')
+                          continue
                   cancellation_attempts += 1
                   status = cancel(run_id, security_lane=security_lane(run))
                   if status == 429:
@@ -767,6 +811,13 @@ jobs:
                       attempted.add(run_id)
                       transient.discard(run_id)
                       moved += 1
+                  elif run_id in unprotected_historical_heads and status in {403, 409, 422}:
+                      attempted.add(run_id)
+                      deferred += 1
+                      print(
+                          f'GitHub refused owner-unprotected historical '
+                          f'cancel id={run_id} http={status}; still queued'
+                      )
                   elif status in retryable or status in {409, 422}:
                       # GitHub can return conflict while a queued run is being
                       # scheduled/cancelled internally. Keep it retryable so a
