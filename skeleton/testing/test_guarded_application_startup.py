@@ -535,3 +535,32 @@ def test_direct_engine_startup_rejects_fake_canonical_owner_before_allocating_re
         state.bind_engine_execution_service()
     assert state.engine_execution_service is None
     assert state.engine_execution_coordinator is None
+
+
+def test_writer_inventory_rejects_unfenced_memento_publication(monkeypatch):
+    """Protected engine bootstrap must not silently lose sidecar write fencing."""
+    from core.conversations import MongoConversationAuthority
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+    from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
+    from skeleton.persistence.mongo_source_epoch import (
+        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+        verify_canonical_source_writer_inventory,
+    )
+    from skeleton.testing.test_mongo_source_epoch import Database
+
+    class MemoryDatabase:
+        def __getitem__(self, _name):
+            return object()
+
+    owner = MongoCanonicalSourceEpoch(Database())
+    conversation = object.__new__(MongoConversationAuthority)
+    conversation.canonical_source_epoch = owner
+    memory = MongoMemoryRepository(MemoryDatabase(), canonical_source_epoch=owner)
+    verify_canonical_source_writer_inventory(
+        conversation=conversation, memory=memory, epoch=owner,
+    )
+    monkeypatch.delattr(MongoMementoAuthority.publish, "__canonical_source_writer_fence__")
+    with pytest.raises(MongoSourceEpochError, match="unfenced canonical memento writer: publish"):
+        verify_canonical_source_writer_inventory(
+            conversation=conversation, memory=memory, epoch=owner,
+        )
