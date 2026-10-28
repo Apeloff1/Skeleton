@@ -26,7 +26,7 @@ MAX_PAGES = 10
 MAX_CANCEL_REQUESTS = 80
 REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 API_VERSION = "2022-11-28"
-SHA_PATTERN = re.compile(r"[a-fA-F0-9]{40}\\Z")
+SHA_PATTERN = re.compile(r"[a-fA-F0-9]{40}\Z")
 # These legacy IDs have repeatedly returned provider-side HTTP 409 even
 # after safe ordinary and force-cancel requests. Keep one rotating canary,
 # rather than hammering all of them every fifteen minutes.
