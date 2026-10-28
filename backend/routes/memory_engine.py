@@ -29,9 +29,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from routes.gameforge_auth import require_authenticated_identity
 from services import cag, mag
 
 # ── Boot: prime fillers + start the preemptive warmer ────────────────────────
@@ -77,7 +78,10 @@ async def warm_prefix() -> dict:
 
 
 @router.post("/compose")
-async def compose(body: ComposeRequest) -> dict:
+async def compose(
+    body: ComposeRequest,
+    scope: dict[str, str] = Depends(require_authenticated_identity),
+) -> dict:
     """Compose a KV-cache-optimized prompt: CAG prefix + RAG snippets + query."""
     prefix = cag.jeeves_system_prefix()
     retrieved: list[str] = []
@@ -86,7 +90,8 @@ async def compose(body: ComposeRequest) -> dict:
             from services.rag_service import RAGService
             rag = RAGService()
             hits = rag.get_relevant_context(
-                body.user_id, body.query, pipeline=body.pipeline, limit=body.rag_limit
+                scope["owner_id"], body.query, pipeline=body.pipeline,
+                limit=body.rag_limit, tenant_id=scope["tenant_id"]
             )
             retrieved = [h["content"] for h in hits]
         except Exception:
