@@ -416,6 +416,7 @@ async def _assert_regeneration_sources(record, command, *, tenant_id, owner_id, 
         selected_segments=selected,
         tenant_id=tenant_id,
         owner_id=owner_id,
+        authority=conversation_authority,
     )
     await assert_current_dependencies(
         {"dependencies": dependencies}, user=user, tenant_id=tenant_id, owner_id=owner_id
