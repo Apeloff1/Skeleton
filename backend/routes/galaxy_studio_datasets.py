@@ -254,8 +254,8 @@ def get_dataset_catalog() -> dict:
     }
 
 
-def generate_datasets(build: dict, title: str, genre: str) -> Dict[str, str]:
-    files: Dict[str, str] = {}
+def generate_datasets(build: dict, title: str, genre: str, *, files_factory=None) -> Dict[str, str]:
+    files: Dict[str, str] = files_factory() if files_factory is not None else {}
     try:
         for ds in DATASETS:
             files[f"data/datasets/{_camel(ds['id'])}Dataset.ts"] = _gen_dataset_module(ds, title, genre)
