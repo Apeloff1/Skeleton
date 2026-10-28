@@ -190,10 +190,13 @@ class GitHubActions:
             raise CleanupError("missing job-level cancellation evidence")
         if type(jobs.get("total_count")) is not int or jobs["total_count"] > 100:
             raise CleanupError("job inventory was incomplete")
-        return not any(
-            job.get("status") == "in_progress"
-            for job in jobs["jobs"] if isinstance(job, dict)
-        )
+        if len(jobs["jobs"]) != jobs["total_count"]:
+            raise CleanupError("job inventory count differs from visible jobs")
+        valid_states = {"queued", "pending", "waiting", "in_progress", "completed"}
+        for job in jobs["jobs"]:
+            if not isinstance(job, dict) or job.get("status") not in valid_states:
+                raise CleanupError("untrusted job state in cancellation preflight")
+        return not any(job["status"] == "in_progress" for job in jobs["jobs"])
 
     def cancel(self, run_id: int) -> int:
         code, _ = self.request(
