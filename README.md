@@ -84,20 +84,48 @@ python scripts/install_app.py --production --start
 python -m skeleton app doctor --live --studio --json
 ```
 
-### Windows PowerShell
+### Windows with WSL 2
+
+For the pinned local AI model, use an Ubuntu WSL 2 distribution on an Intel or
+AMD Windows laptop. Install and start Docker Desktop with its WSL 2 backend,
+then enable integration for that Ubuntu distribution in Docker Desktop. Install
+WSL and Ubuntu from PowerShell if they are not already installed:
 
 ```powershell
+wsl --install -d Ubuntu
+```
+
+Restart Windows if prompted, finish Ubuntu's first-run setup, and open Ubuntu.
+Run the following **inside the Ubuntu shell**, keeping the checkout in its Linux
+home directory rather than under `/mnt/c`. Install Git, Python 3 and the Python
+venv package in Ubuntu first if they are missing; `docker compose version` must
+work in that shell before installation:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git python3 python3-venv python3-pip nano
+docker compose version
+uname -m
+cd ~
 git clone https://github.com/Apeloff1/Skeleton.git
 cd Skeleton
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe scripts/install_app.py --production --start
-.\.venv\Scripts\python.exe -m skeleton app doctor --live --studio --json
+# While PR #4357 is open, select the current installation candidate:
+git switch --track origin/codex/consumer-runtime-readiness-2026-10-25
+python3 -m venv .venv
+source .venv/bin/activate
+python scripts/install_app.py --production --start
+python -m skeleton app doctor --live --studio --json
 ```
+
+The `uname -m` result must be `x86_64` for the pinned Linux model/runtime below.
+The branch selection is for this unmerged candidate; default `main` does not yet
+contain all of PR #4357.
 
 Open **http://localhost:3000/setup** first, then **http://localhost:3000/product**.
 The production flag serves the built web app through Nginx. Later commands must
-use the same Python environment. On PowerShell, invoking its Python executable
-directly works without changing execution policy.
+use the same Python environment. Docker Desktop forwards the published local
+ports to the Windows browser. Native PowerShell installation and model preparation
+remain separately unqualified; see the [Windows notes](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md#windows-x64-and-wsl-2).
 
 The installer installs Python dependencies, creates a private `.env`, and starts
 the four application services. Preserve `.env` and Docker data volumes across
@@ -125,7 +153,8 @@ There is no shared administrator password or automatic first-user elevation.
 ### Enable AI
 
 For the optional pinned **Linux x86-64 glibc** CPU model/runtime, explicitly provision
-artifacts, select the deployment in private `.env`, and recreate the engine:
+artifacts, select the deployment in private `.env`, and recreate the engine. Windows
+users following the WSL 2 instructions above run these commands in the Ubuntu shell:
 
 ```bash
 python scripts/provision_local_ai.py --target linux-x86_64-glibc \

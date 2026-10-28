@@ -12,19 +12,22 @@ installation, browser and model observations in detail.
 Two merges reconciled current upstream and studio histories with the installation
 work. The resulting branch is `codex/consumer-runtime-readiness-2026-10-25`;
 [PR #4357](https://github.com/Apeloff1/Skeleton/pull/4357) is an open draft against
-`main`, not a merged release. This report describes source through `3088c797`.
+`main`, not a merged release. The integrated runtime source includes commit
+`3088c797`; subsequent Windows installer workflow changes are under review.
 
 The VM still runs the October 26 engine and backend images built from `99a75ea8`
 and the frontend image built from `704fd359`. Current source fixes, including
 the planner changes below, have not been exercised in a newly built installation.
 The idle doctor reported platform, configuration and services ready with no next
-steps. After a clean task-owned checkout was removed, with its branch and commit
-retained, approximately 3.8 GiB remained free. A guarded cold image build needs
-about 6 GiB of free space. The backend was recreated from the same previously
-installed image with the current session proxy after idle, space and identity
-checks; its data mounts, images, volumes and unrelated containers were preserved.
-The engine still has its earlier proxy configuration. Current source changes
-remain undeployed.
+steps. At the user's request, the inactive Qwen3 rollback model, an old inactive
+frontend image and a clean temporary Jeeves checkout were removed. The active
+coding model and application data were preserved; approximately 5.5 GiB remained
+free after cleanup. A guarded cold image build needs about 6 GiB of free space.
+The backend was recreated from the same previously installed image with the current
+session proxy after idle, space and identity checks; its data mounts and volumes
+were preserved. The engine still has its earlier proxy configuration. Current
+source changes remain undeployed. The user requested no further VM rebuild in this
+pass; the next intended installation target is the Windows laptop.
 
 Previously observed finite workflows include authenticated chat and reload,
 owner-scoped source access, a consent-bound public capture, original-world human
@@ -71,6 +74,20 @@ change that would have normalized identical edits was reverted after examining
 the actual proposal. No successful post-fix game or new browser gameplay proof
 was established. A completed model operation and an advisory model score do not
 certify playable output.
+
+## Windows laptop installation
+
+The intended laptop path is Windows x64 using WSL2 and Docker Desktop. A manual
+Windows installer workflow was restored in the candidate. On Linux, 153 combined
+first-install and Windows contract cases passed, as did four mocked-Windows
+offline browser lifecycle cases. A workflow and archive suite passed 43 cases
+and 12 subtests. A separate minimal-dependency probe passed 76 cases and skipped
+five requiring PyTorch. These overlapping checks do not replace running on Windows.
+
+The full workflow secret-output scan passed. The CI tier gate failed at its
+existing count of 22 automatic triggers against a limit of 20; the restored
+Windows installer workflow is manual-only and adds no automatic trigger. Actual
+native Windows, WSL2, Docker Desktop and `Setup.exe` execution remain unverified.
 
 ## Verification and remaining gates
 

@@ -70,6 +70,58 @@ configuration helper supports repeated `--tenant` flags; include `default` too
 when retaining access for new default-tenant accounts. Reconfiguration still
 requires the helper's original model input and credential-preservation rules.
 
+## Windows x64 and WSL 2
+
+For an Intel or AMD Windows laptop, the recommended path for the pinned Linux
+model is Ubuntu on WSL 2 with Docker Desktop's WSL 2 backend and integration for
+that distribution enabled. Install and start Docker Desktop separately. From
+PowerShell, run `wsl --install -d Ubuntu` if Ubuntu is not installed, restart if
+prompted, and complete Ubuntu's first-run setup. Open the Ubuntu shell and check
+that `docker compose version` works there and `uname -m` reports `x86_64`.
+
+Keep the repository, `.venv`, model and private configuration in the Ubuntu
+Linux filesystem, such as `~/Skeleton`; do not use an `/mnt/c` checkout for this
+recipe. The [Windows first-install commands](../../README.md#windows-with-wsl-2)
+select the current candidate and run the installer inside Ubuntu. Open the published
+`http://localhost:3000/setup` address from a Windows browser.
+
+Create a private UTF-8 password file **outside** the repository. For example,
+in the Ubuntu shell, run the first two commands below, type the password in the
+editor and save it, then run the remaining commands. Choose at least 16 characters
+and at most 72 UTF-8 bytes; replace the email with your own. Do not put the
+password in the command line or shell history:
+
+```bash
+umask 077
+nano "$HOME/.skeleton-owner-password"
+chmod 600 "$HOME/.skeleton-owner-password"
+python -m skeleton app setup --admin-email owner@example.com --admin-password-file "$HOME/.skeleton-owner-password"
+python -m skeleton app up --production --no-build
+```
+
+After installing the Python environment, prepare the default model **inside the
+same Ubuntu checkout**, retaining the existing Compose mount path:
+
+```bash
+python scripts/provision_local_ai.py --target linux-x86_64-glibc --download --context-size 12288 --output ./data/local-ai
+```
+
+Open the existing private `.env` with `nano .env`, set only the selectors shown
+below, and run the listed restart and doctor commands from that same shell. A fresh owner-controlled directory is
+required if the default directory is incomplete or contains another deployment.
+For the optional coding profile, choose a separate directory and follow the
+[coding profile guide](LOCAL_CODING_PROFILE.md).
+
+Direct native Windows model preparation is not qualified: an existing empty
+destination cannot pass the Unix owner check, and Windows file and hard-link
+semantics still require real Windows validation. The native Linux x86-64 WSL shell
+does not need `--prepare-for-container`; that explicit flag is required when
+preparing on another host and does not establish successful Windows-host preparation.
+WSL preparation targets
+the Linux engine container; it does not establish native Windows model execution.
+The Windows Setup executable, cross-platform console support and laptop GPU
+acceleration have not been qualified by the Linux verification VM.
+
 The first-install continuation has been exercised with fresh Mongo, engine,
 production backend and Nginx containers, including actual local-model inference,
 account restart recovery and crawler controls. Desktop and mobile browser
@@ -166,6 +218,7 @@ Set the following values in private `.env` for the read-only Compose model mount
 ```dotenv
 AI_PROVIDER=local
 AI_LOCAL_MODEL_PATH=
+AI_LOCAL_MODEL_CATALOG_PATH=
 AI_LOCAL_DEPLOYMENT_PATH=/app/local-ai/deployment.json
 SKELETON_LOCAL_MODEL_DIR=./data/local-ai
 ```
