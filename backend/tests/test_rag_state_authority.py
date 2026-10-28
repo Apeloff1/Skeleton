@@ -185,11 +185,11 @@ def test_stale_cocoding_projection_cannot_resurrect_missing_canonical_state() ->
     projection = client.collections["jeeves_cocoding_context"]
     projection.add(
         documents=["stale"],
-        metadatas=[{"user_id": "u1", "pipeline": "python"}],
+        metadatas=[{"user_id": "u1", "tenant_id": "tenant-a", "pipeline": "python"}],
         ids=["stale-id"],
     )
 
-    assert service.get_relevant_context("u1", "anything", pipeline="python") == []
+    assert service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-a") == []
 
     service.store_cocoding_context(
         "live-id",
@@ -198,10 +198,13 @@ def test_stale_cocoding_projection_cannot_resurrect_missing_canonical_state() ->
         "canonical context",
         ["print(1)"],
         ["keep Mongo authoritative"],
+        tenant_id="tenant-a",
     )
-    results = service.get_relevant_context("u1", "anything", pipeline="python")
+    results = service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-a")
 
     assert len(results) == 1
+    assert service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-b") == []
+    assert service.get_relevant_context("u1", "anything", pipeline="python") == []
     assert results[0]["metadata"]["session_id"] == "live-id"
     assert results[0]["metadata"]["authority"] == "mongo"
     assert "canonical context" in results[0]["content"]
@@ -280,6 +283,7 @@ def test_projection_rebuild_restores_from_mongo_after_total_projection_loss() ->
         "canonical context",
         ["print(1)"],
         ["ship"],
+        tenant_id="tenant-a",
     )
     feedback_id = service.store_feedback(
         "u1",
