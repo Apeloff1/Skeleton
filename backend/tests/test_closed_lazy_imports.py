@@ -65,7 +65,13 @@ def test_lazy_exports_are_backed_only_by_literal_module_dispatch(path: str, tabl
         assert expected == {".native_transformer"}
         dispatcher = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "__getattr__")
     else:
-        dispatcher = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_load_reviewed_export_owner")
+        dispatchers = [
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name in {"_load_reviewed_export_owner", "_load_trusted_lazy_module"}
+        ]
+        assert len(dispatchers) == 1, path
+        dispatcher = dispatchers[0]
     literal_calls: set[str] = set()
     for node in ast.walk(dispatcher):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
