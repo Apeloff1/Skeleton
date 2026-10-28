@@ -319,6 +319,7 @@ def test_trusted_protected_bootstrap_requires_complete_real_owner_registration()
     from skeleton.api.server import _run_trusted_protected_bootstrap
     from skeleton.persistence.memory_repository import MongoMemoryRepository
     from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
+    from core.conversations import MongoConversationAuthority
     from skeleton.testing.test_mongo_source_epoch import Database
 
     async def scenario():
@@ -336,11 +337,10 @@ def test_trusted_protected_bootstrap_requires_complete_real_owner_registration()
                 return object()
 
         memory = MongoMemoryRepository(MemoryDatabase(), canonical_source_epoch=epoch)
-        conversation = SimpleNamespace(
-            canonical_source_epoch=epoch,
-            get_thread=lambda *args, **kwargs: None,
-            active_transcript=lambda *args, **kwargs: (),
-        )
+        conversation = object.__new__(MongoConversationAuthority)
+        conversation.canonical_source_epoch = epoch
+        conversation.get_thread = lambda *args, **kwargs: None
+        conversation.active_transcript = lambda *args, **kwargs: ()
         components = trusted_components(reader(CanonicalLoader()))
         state = ServerState()
 
@@ -389,6 +389,28 @@ def test_trusted_protected_bootstrap_requires_complete_real_owner_registration()
         with pytest.raises(RuntimeError, match="live epoch-fenced conversation"):
             await _run_trusted_protected_bootstrap(fake_conversation, fake_conversation_owner)
         assert fake_conversation.engine_execution_service is None
+
+        # A subclass cannot substitute a new, unfenced write surface even if
+        # it inherits the real Mongo conversation read implementation.
+        class UnfencedConversation(MongoConversationAuthority):
+            async def append_message(self, *args, **kwargs):
+                return None
+
+        altered = object.__new__(UnfencedConversation)
+        altered.canonical_source_epoch = epoch
+        override = ServerState()
+
+        def overridden_writer(target):
+            target.configure_engine_local_guard(components)
+            target.configure_engine_canonical_mongo_owners(
+                conversation=altered, memory=memory, memory_namespace="memory",
+                shared_epoch=epoch, policy_sha256="a" * 64,
+            )
+
+        from skeleton.persistence.mongo_source_epoch import MongoSourceEpochError
+        with pytest.raises(MongoSourceEpochError, match="unfenced canonical conversation writer: append_message"):
+            await _run_trusted_protected_bootstrap(override, overridden_writer)
+        assert override.engine_execution_service is None
 
         # A guard without canonical source owners must not bring up a
         # supposedly protected local provider or mutate the engine service.
@@ -463,3 +485,30 @@ def test_protected_memory_writer_reuses_same_fenced_owner_without_creating_mongo
             await forged.bind_canonical_memory_writer()
 
     asyncio.run(scenario())
+
+
+def test_run_server_forwards_exact_trusted_native_bootstrap(monkeypatch):
+    from types import SimpleNamespace
+    from skeleton.api.server import run_server
+
+    observed = []
+    deployment = object()
+    application = object()
+
+    monkeypatch.setattr(
+        "skeleton.api.server.create_app",
+        lambda *, trusted_protected_bootstrap: (
+            observed.append(("create", trusted_protected_bootstrap)) or application
+        ),
+    )
+    monkeypatch.setattr(
+        "skeleton.api.server._get_uvicorn",
+        lambda: SimpleNamespace(
+            run=lambda app, *, host, port: observed.append(("serve", app, host, port))
+        ),
+    )
+    run_server(host="127.0.0.1", port=8844, trusted_protected_bootstrap=deployment)
+    assert observed == [
+        ("create", deployment),
+        ("serve", application, "127.0.0.1", 8844),
+    ]
