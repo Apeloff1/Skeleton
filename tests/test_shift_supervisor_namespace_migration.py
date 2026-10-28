@@ -39,17 +39,11 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
     assert legacy is canonical
 
 
-def test_shift_supervisor_control_failover_uses_canonical_state_reader() -> None:
-    workflow = (
-        Path(__file__).resolve().parents[1]
-        / ".github"
-        / "workflows"
-        / "shift-supervisor-control.yml"
-    ).read_text(encoding="utf-8")
-
-    assert (
-        "from skeleton.automation.shift_supervisor.__main__ import _read_state"
-        in workflow
-    )
-    assert "from core.shift_supervisor.__main__ import _read_state" not in workflow
+def test_retired_shift_supervisor_workflow_cannot_restore_legacy_imports() -> None:
+    # The privileged workflow was retired; do not recreate an automatic runner
+    # to satisfy a stale test. The canonical runtime reader remains available.
+    workflow = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "shift-supervisor-control.yml"
+    assert not workflow.exists()
+    from skeleton.automation.shift_supervisor.__main__ import _read_state
+    assert callable(_read_state)
 
