@@ -14,8 +14,8 @@ import subprocess
 import sys
 from typing import Any, Callable
 
-REPO_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\\Z")
-SHA_PATTERN = re.compile(r"[0-9a-f]{40}\\Z")
+REPO_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+SHA_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
 # These workflows execute on every main push. Path-scoped/PR-only workflows
 # are additional negative evidence if present, never invented successes.
 REQUIRED_PUSH = ("Merge Readiness", "Malware Gate", "Secret scanning")

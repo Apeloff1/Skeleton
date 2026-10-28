@@ -45,7 +45,7 @@ class ReleaseGovernanceVerdictTests(unittest.TestCase):
         report = assess(SHA, branch(), green())
         self.assertEqual(report["verdict"], "READY")
         self.assertFalse(report["production_deployment_attested"])
-        self.assertEqual(report["workflow_results"]["Artifact Policy"] if "Artifact Policy" in report["workflow_results"] else "not-pr-required", "not-pr-required")
+        self.assertEqual(report["workflow_results"]["Backend Quality"], "not-triggered (path-scoped)")
 
     def test_unprotected_branch_cannot_be_released(self):
         report = assess(SHA, branch(protected=False), green())
