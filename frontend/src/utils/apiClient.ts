@@ -44,6 +44,8 @@ interface RequestOpts {
   cacheKey?: string;
   cacheTtlMs?: number;
   maxResponseChars?: number;
+  /** Parse bounded plain text without interpreting JSON-looking HTML. */
+  responseType?: 'json' | 'text';
   /** Explicit opt-in only when server-side idempotent replay is verified. */
   serverDedupeVerified?: boolean;
 }
@@ -353,7 +355,8 @@ async function _doFetch<T>(
       }
 
       let data: any = null;
-      try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      if (opts.responseType === 'text') data = text;
+      else { try { data = text ? JSON.parse(text) : null; } catch { data = text; } }
 
       const transient = retryableHttpStatus(res.status);
       if (!res.ok && transient && attempt < maxAttempts - 1) {
