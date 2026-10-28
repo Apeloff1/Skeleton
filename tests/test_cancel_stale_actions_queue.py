@@ -100,7 +100,7 @@ class CleanupPolicyTests(unittest.TestCase):
         out = cleanup(client, now=self.NOW, current=5)
         self.assertEqual(client.posts, [1])
         self.assertEqual(out["older_than_three_hours"], 3)
-        self.assertEqual(out["already_moved"], 2)
+        self.assertEqual(out["already_moved_or_protected"], 2)
         self.assertEqual(out["cancel_requested"], 1)
         self.assertEqual(out["confirmed_cancelled"], 0)
 
@@ -125,6 +125,112 @@ class CleanupPolicyTests(unittest.TestCase):
         out = cleanup(client, now=self.NOW, current=99, dry_run=True)
         self.assertEqual(client.posts, [])
         self.assertEqual(out["considered"], 1)
+
+
+
+class AssociatedPRPolicyTests(unittest.TestCase):
+    """Provider age never supersedes GitHub's current PR-head identity."""
+
+    SHA = "a" * 40
+    NEW_SHA = "b" * 40
+
+    def row(self, *, event="pull_request", sha=None, branch="feat/current"):
+        return {
+            "id": 567, "event": event,
+            "head_sha": self.SHA if sha is None else sha,
+            "head_branch": branch, "status": "queued",
+            "created_at": stamp(1_800_000_000 - 20000),
+            "path": ".github/workflows/merge-readiness.yml",
+            "workflow_id": 42,
+        }
+
+    def check(self, *, state="open", head=None, branch="feat/current",
+              associated=True):
+        client = GitHubActions("Apeloff1/Skeleton", "token")
+        linked = [{"number": 99}] if associated else []
+        pr = {
+            "number": 99, "state": state,
+            "base": {"repo": {"full_name": "Apeloff1/Skeleton"}},
+            "head": {"sha": self.SHA if head is None else head,
+                     "ref": branch},
+        }
+        def api(path):
+            if "/commits/" in path:
+                return linked
+            if path.endswith("/pulls/99"):
+                return pr
+            raise AssertionError(f"unexpected URL {path}")
+        with patch.object(client, "checked_get", side_effect=api):
+            return client.confirmed_obsolete(self.row())
+
+    def test_current_head_required_check_cannot_expire(self):
+        self.assertFalse(self.check(state="open"))
+        self.assertFalse(self.check(state="open", head=self.SHA))
+
+    def test_superseded_pr_head_can_expire(self):
+        self.assertTrue(self.check(state="open", head=self.NEW_SHA))
+
+    def test_closed_pr_run_can_expire(self):
+        self.assertTrue(self.check(state="closed"))
+
+    def test_unassociated_branch_does_not_prove_obsolescence(self):
+        self.assertFalse(self.check(associated=False))
+        self.assertFalse(self.check(branch="feat/unrelated"))
+
+    def test_no_age_only_main_or_dynamic_cleanup(self):
+        client = GitHubActions("Apeloff1/Skeleton", "token")
+        with patch.object(client, "checked_get") as read:
+            self.assertFalse(client.confirmed_obsolete(self.row(event="push")))
+            self.assertFalse(client.confirmed_obsolete(
+                self.row(event="workflow_run")))
+            self.assertFalse(client.confirmed_obsolete(
+                self.row(event="dynamic")))
+            self.assertFalse(client.confirmed_obsolete(
+                self.row(sha="untrusted")))
+            read.assert_not_called()
+
+    def test_invalid_pr_association_fails_closed(self):
+        client = GitHubActions("Apeloff1/Skeleton", "token")
+        with patch.object(client, "checked_get", return_value={"oops": True}):
+            with self.assertRaises(CleanupError):
+                client.confirmed_obsolete(self.row())
+
+    def test_current_head_wins_over_another_obsolete_association(self):
+        client = GitHubActions("Apeloff1/Skeleton", "token")
+        linked = [{"number": 99}, {"number": 100}]
+        def api(path):
+            if "/commits/" in path:
+                return linked
+            number = int(path.rsplit("/", 1)[-1])
+            return {
+                "number": number,
+                "state": "closed" if number == 99 else "open",
+                "base": {"repo": {"full_name": "Apeloff1/Skeleton"}},
+                "head": {"sha": self.SHA, "ref": "feat/current"},
+            }
+        with patch.object(client, "checked_get", side_effect=api):
+            self.assertFalse(client.confirmed_obsolete(self.row()))
+
+    def test_identity_change_between_inventory_and_preflight_fails(self):
+        row = self.row()
+        client = GitHubActions("Apeloff1/Skeleton", "token")
+        detail = dict(row, head_sha=self.NEW_SHA)
+        with patch.object(client, "checked_get", return_value=detail):
+            with self.assertRaises(CleanupError):
+                client.unchanged_and_queued(row, now=1_800_000_000,
+                                           current=999)
+
+    @patch("scripts.cancel_stale_actions_queue.time.time",
+           return_value=1_800_000_000)
+    def test_known_provider_409_is_backed_off_without_post(self, _time):
+        client = FakeGitHub([
+            {"id": 34952509012, "status": "queued",
+             "created_at": stamp(1_800_000_000 - 20000)},
+        ])
+        result = cleanup(client, now=1_800_000_000, current=555)
+        self.assertEqual(client.posts, [])
+        self.assertEqual(result["provider_backed_off"], 1)
+
 
 
 if __name__ == "__main__":
