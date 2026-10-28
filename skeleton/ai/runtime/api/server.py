@@ -1313,6 +1313,13 @@ async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -
             or not callable(getattr(conversation, "active_transcript", None))
             or conversation.canonical_source_epoch is not shared_epoch):
         raise RuntimeError("protected bootstrap requires a live epoch-fenced conversation authority")
+    from skeleton.persistence.mongo_source_epoch import verify_canonical_source_writer_inventory
+
+    # Inventory verifies the real Mongo implementation's known mutation
+    # entrypoints, rather than trusting arbitrary objects with matching names.
+    verify_canonical_source_writer_inventory(
+        conversation=conversation, memory=memory, epoch=shared_epoch,
+    )
 
 
 def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
@@ -1515,5 +1522,11 @@ def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
     return app
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
-    uvicorn = _get_uvicorn(); app = create_app(); uvicorn.run(app, host=host, port=port)
+def run_server(
+    host: str = "0.0.0.0", port: int = 8000, *,
+    trusted_protected_bootstrap: Any = None,
+) -> None:
+    """Run with the same deployer-owned composition as create_app()."""
+    uvicorn = _get_uvicorn()
+    app = create_app(trusted_protected_bootstrap=trusted_protected_bootstrap)
+    uvicorn.run(app, host=host, port=port)
