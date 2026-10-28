@@ -117,7 +117,19 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
                 skipped_names.append(f"{module_path} (attr {attr!r} missing)")
                 continue
             prior_routes = len(app.routes)
-            if prefix:
+            # Independently mounted Galaxy sub-routers must use the same
+            # principal, role and source-identity guard as the main router.
+            # Relying on the main router's dependencies does not protect
+            # separate app.include_router() calls. Public catalog exceptions
+            # remain explicitly defined by galaxy_request_access.
+            mounted_prefix = (prefix or "") + (getattr(router, "prefix", "") or "")
+            if mounted_prefix.startswith("/api/galaxy-studio/"):
+                from fastapi import Depends
+                from routes.galaxy_studio_access import galaxy_request_access
+
+                admission = [Depends(galaxy_request_access)]
+                app.include_router(router, prefix=prefix or "", dependencies=admission)
+            elif prefix:
                 app.include_router(router, prefix=prefix)
             else:
                 app.include_router(router)
