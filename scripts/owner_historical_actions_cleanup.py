@@ -64,6 +64,23 @@ HEADERS = {
 start = time.monotonic()
 
 
+def provider_error_evidence(raw: bytes, request_id: str | None) -> dict[str, str]:
+    """Expose bounded provider diagnostics without logging credentials or raw HTML."""
+    try:
+        parsed = json.loads(raw.decode("utf-8", errors="replace"))
+    except (ValueError, UnicodeDecodeError):
+        parsed = None
+    message = parsed.get("message") if isinstance(parsed, dict) else None
+    if not isinstance(message, str):
+        message = "unavailable; GitHub returned no JSON message"
+    # GitHub request ids are useful for support and are not authentication tokens.
+    request = "".join(
+        char for char in str(request_id or "") if char.isascii()
+        and (char.isalnum() or char in ":-")
+    )[:96]
+    return {"message": message[:240], "request_id": request or "unavailable"}
+
+
 def request(method: str, path: str) -> tuple[int, object]:
     """Retry safe reads only; never replay an ambiguous DELETE.
 
@@ -82,7 +99,10 @@ def request(method: str, path: str) -> tuple[int, object]:
                 body = reply.read()
                 return reply.status, json.loads(body) if body else None
         except urllib.error.HTTPError as exc:
-            detail = exc.read(1000).decode("utf-8", errors="replace")
+            detail = provider_error_evidence(
+                exc.read(1000),
+                exc.headers.get("X-GitHub-Request-Id") if exc.headers else None,
+            )
             if (
                 method == "GET" and exc.code in (500, 502, 503, 504)
                 and attempt + 1 < attempts
@@ -256,6 +276,7 @@ def main() -> int:
     counters = {"confirmed_deleted": 0, "already_absent_or_moved": 0,
                 "provider_refusal": 0, "skipped_by_budget": 0}
     refused_ids: list[int] = []
+    refusal_evidence: list[dict[str, object]] = []
     # Refusals apply to individual immutable runs, not the whole batch.
     # Preserve the refused run and continue only independently proven IDs.
     # Rate limiting or unexpected errors stop immediately.
@@ -283,9 +304,22 @@ def main() -> int:
             # bypass permissions, or infer deletion from a non-204 response.
             counters["provider_refusal"] += 1
             refused_ids.append(run_id)
+            evidence = {
+                "run_id": run_id,
+                "http_status": status,
+                "provider_message": (
+                    detail.get("message", "unavailable")
+                    if isinstance(detail, dict) else "unavailable"
+                ),
+                "github_request_id": (
+                    detail.get("request_id", "unavailable")
+                    if isinstance(detail, dict) else "unavailable"
+                ),
+            }
+            refusal_evidence.append(evidence)
             print(
-                f"Preserving provider-refused historical run {run_id}: "
-                f"HTTP {status}; moving to independently verified IDs"
+                "Provider-refused historical run; preserving source record: "
+                + json.dumps(evidence, sort_keys=True)
             )
             continue
         if status == 404:
@@ -312,6 +346,17 @@ def main() -> int:
         print(f"Owner deletion verified by 404: run={run_id}")
     print("Owner historical cleanup:", json.dumps(counters, sort_keys=True))
     print("Provider-refused historical IDs:", refused_ids)
+    # Upload only bounded refusal diagnostics, not untrusted bodies or tokens.
+    # One immutable run identity per record, useful for GitHub Actions support.
+    report = os.getenv("OWNER_CLEANUP_REPORT_PATH")
+    if report:
+        with open(report, "w", encoding="utf-8") as output:
+            json.dump(
+                {"repository": REPO, "refusals": refusal_evidence,
+                 "counters": counters},
+                output, indent=2, sort_keys=True,
+            )
+            output.write("\n")
     summary = os.getenv("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as output:
@@ -320,6 +365,10 @@ def main() -> int:
             for key, value in counters.items():
                 output.write(f"- {key}: {value}\n")
             output.write(f"- Provider-refused IDs: {refused_ids}\n")
+            output.write(
+                "- HTTP refusal details and request IDs: "
+                "owner-historical-cleanup-refusals.json artifact\n"
+            )
     return 1 if counters["provider_refusal"] else 0
 
 

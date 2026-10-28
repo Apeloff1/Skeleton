@@ -50,10 +50,15 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/owner_historical_actions_cleanup.py
+            tests/test_owner_historical_cleanup_diagnostics.py
           sparse-checkout-cone-mode: false
       - name: Compile the bounded historical cleanup logic
         shell: bash
         run: python3 -m py_compile scripts/owner_historical_actions_cleanup.py
+      - name: Regress sanitized provider refusal diagnostics
+        shell: bash
+        run: python3 -m unittest discover -s tests -p 'test_owner_historical_cleanup_diagnostics.py' -v
+
       - name: Apply owner-approved immutable cleanup only after proven canary removal
         shell: bash
         env:
@@ -62,4 +67,13 @@ jobs:
           # identical immutable-ID, canary-first, GET-404-confirmed algorithm.
           GH_TOKEN: ${{ secrets.OWNER_ACTIONS_CLEANUP_TOKEN || github.token }}
           PYTHONUNBUFFERED: "1"
+          OWNER_CLEANUP_REPORT_PATH: owner-historical-cleanup-refusals.json
         run: python3 scripts/owner_historical_actions_cleanup.py
+      - name: Preserve bounded provider-refusal evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: owner-historical-cleanup-refusals-${{ github.run_id }}
+          path: owner-historical-cleanup-refusals.json
+          if-no-files-found: warn
+          retention-days: 30
