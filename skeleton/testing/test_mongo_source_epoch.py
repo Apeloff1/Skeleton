@@ -368,4 +368,6 @@ async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
     # ownership preflight is under test. Denied calls never begin Mongo writes.
     with pytest.raises(MongoSourceEpochError, match="actor missing"):
         await mongo.retire_thread(tenant_id="tenant", owner_id=None, thread_id="thread")
+    with pytest.raises(MongoSourceEpochError, match="thread missing"):
+        await mongo.retire_thread(tenant_id="tenant", owner_id="actor", thread_id=None)
     assert await read(owner) == 2
