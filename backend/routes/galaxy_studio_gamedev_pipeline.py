@@ -319,8 +319,8 @@ def get_pipeline_catalog() -> dict:
     }
 
 
-def generate_gamedev_pipeline(build: dict, title: str, genre: str) -> Dict[str, str]:
-    files: Dict[str, str] = {}
+def generate_gamedev_pipeline(build: dict, title: str, genre: str, *, files_factory=None) -> Dict[str, str]:
+    files: Dict[str, str] = files_factory() if files_factory is not None else {}
     try:
         files["pipeline/TaskGraph.ts"] = _gen_task_graph(title, genre)
         files["pipeline/QualityGate.ts"] = _gen_quality_gate(title, genre)
