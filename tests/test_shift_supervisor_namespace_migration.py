@@ -39,19 +39,32 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
     assert legacy is canonical
 
 
-def test_shift_supervisor_compat_cli_uses_canonical_state_reader(tmp_path: Path) -> None:
-    # The retired shift-supervisor-control workflow is not an authority.
-    # The supported compatibility CLI delegates to the canonical runtime.
-    legacy = importlib.import_module("core.shift_supervisor.__main__")
-    canonical = importlib.import_module("skeleton.automation.shift_supervisor.__main__")
-    assert legacy.main is canonical.main
+def test_shift_supervisor_control_failover_uses_canonical_state_reader(tmp_path: Path) -> None:
+    """The retired shift workflow cannot supply state authority or execution."""
+    from core.shift_supervisor.__main__ import main as legacy_main
+    from skeleton.automation.shift_supervisor.__main__ import (
+        _read_state,
+        _write_state,
+        main as canonical_main,
+    )
 
-    state_file = tmp_path / "shift-state.json"
-    state_file.write_text('{"version": 1, "plan_items": []}', encoding="utf-8")
-    assert canonical._read_state(state_file) == {"version": 1, "plan_items": []}
-
-    # Malformed persisted state must continue to fail closed.
-    state_file.write_text('{"version":', encoding="utf-8")
-    with pytest.raises(ValueError, match="invalid shift-supervisor state"):
-        canonical._read_state(state_file)
+    # The compatibility CLI must delegate to the canonical, bounded entrypoint.
+    assert legacy_main is canonical_main
+    state = {
+        "version": 1,
+        "plan_items": [],
+        "workers": [],
+        "revisions": [],
+    }
+    state_file = tmp_path / "shift-supervisor-state.txt"
+    _write_state(state_file, state)
+    assert state_file.read_text(encoding="utf-8").startswith("gz:v1:")
+    assert _read_state(state_file) == state
+    # Never restore an obsolete privileged CI workflow merely to make the test pass.
+    assert not (
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "shift-supervisor-control.yml"
+    ).exists()
 

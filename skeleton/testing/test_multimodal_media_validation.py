@@ -293,13 +293,13 @@ def test_missing_or_permissive_optional_image_decoder_fails_closed(monkeypatch):
     with pytest.raises(MultimodalSanitizationError, match="truncated"):
         _admit(_image())
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", False)
-    payload = _image()
-    # Force the genuine optional-import failure without a runtime-selected
-    # delegation through __import__ or a second arbitrary import executor.
-    with monkeypatch.context() as scoped:
-        scoped.setitem(sys.modules, "PIL", None)
+    # A None sentinel triggers Python's normal ModuleNotFoundError path
+    # without replacing the interpreter's global import primitive.
+    # Existing Pillow objects used to create the sample remain intact.
+    with monkeypatch.context() as missing:
+        missing.setitem(sys.modules, "PIL", None)
         with pytest.raises(MultimodalSanitizationError, match="Pillow"):
-            _admit(payload)
+            _admit(_image())
 
 
 def test_constructed_or_mutated_receipts_cannot_bypass_payload_verification():

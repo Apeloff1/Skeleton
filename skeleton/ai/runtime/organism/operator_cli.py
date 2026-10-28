@@ -76,48 +76,51 @@ def _parser(command: str) -> argparse.ArgumentParser:
     return parser
 
 
+def _load_organism_view_module(module: str):
+    """Resolve only explicitly registered module names, never an arbitrary import."""
+    if module == "skeleton.galaxy.lattice":
+        return import_module("skeleton.galaxy.lattice")
+    if module == "skeleton.galaxy.quarantine":
+        return import_module("skeleton.galaxy.quarantine")
+    if module == "skeleton.kernel.coverage":
+        return import_module("skeleton.kernel.coverage")
+    if module == "skeleton.kernel.hot":
+        return import_module("skeleton.kernel.hot")
+    if module == "skeleton.kernel.persist":
+        return import_module("skeleton.kernel.persist")
+    if module == "skeleton.kernel.scoreboard":
+        return import_module("skeleton.kernel.scoreboard")
+    if module == "skeleton.kernel.witness":
+        return import_module("skeleton.kernel.witness")
+    if module == "skeleton.organism.calendar":
+        return import_module("skeleton.organism.calendar")
+    if module == "skeleton.organism.caps":
+        return import_module("skeleton.organism.caps")
+    if module == "skeleton.organism.context_step":
+        return import_module("skeleton.organism.context_step")
+    if module == "skeleton.organism.observe":
+        return import_module("skeleton.organism.observe")
+    if module == "skeleton.organism.path10":
+        return import_module("skeleton.organism.path10")
+    if module == "skeleton.organism.rotctx":
+        return import_module("skeleton.organism.rotctx")
+    if module == "skeleton.organism.runloop":
+        return import_module("skeleton.organism.runloop")
+    if module == "skeleton.organism.satellites":
+        return import_module("skeleton.organism.satellites")
+    if module == "skeleton.organism.stacks":
+        return import_module("skeleton.organism.stacks")
+    if module == "skeleton.social.coverage":
+        return import_module("skeleton.social.coverage")
+    raise ImportError("module outside signed catalog")
+
+
 def _execute(command: str, org: Any, args: Any) -> Any:
     root = getattr(org, "root", None)
     cue = " ".join(args.cue) if command in _CUE else ""
     if command in _VIEWS:
         module, func, mode = _VIEWS[command]
-        if module == "skeleton.galaxy.lattice":
-            owner = import_module("skeleton.galaxy.lattice")
-        elif module == "skeleton.galaxy.quarantine":
-            owner = import_module("skeleton.galaxy.quarantine")
-        elif module == "skeleton.kernel.coverage":
-            owner = import_module("skeleton.kernel.coverage")
-        elif module == "skeleton.kernel.hot":
-            owner = import_module("skeleton.kernel.hot")
-        elif module == "skeleton.kernel.persist":
-            owner = import_module("skeleton.kernel.persist")
-        elif module == "skeleton.kernel.scoreboard":
-            owner = import_module("skeleton.kernel.scoreboard")
-        elif module == "skeleton.kernel.witness":
-            owner = import_module("skeleton.kernel.witness")
-        elif module == "skeleton.organism.calendar":
-            owner = import_module("skeleton.organism.calendar")
-        elif module == "skeleton.organism.caps":
-            owner = import_module("skeleton.organism.caps")
-        elif module == "skeleton.organism.context_step":
-            owner = import_module("skeleton.organism.context_step")
-        elif module == "skeleton.organism.observe":
-            owner = import_module("skeleton.organism.observe")
-        elif module == "skeleton.organism.path10":
-            owner = import_module("skeleton.organism.path10")
-        elif module == "skeleton.organism.rotctx":
-            owner = import_module("skeleton.organism.rotctx")
-        elif module == "skeleton.organism.runloop":
-            owner = import_module("skeleton.organism.runloop")
-        elif module == "skeleton.organism.satellites":
-            owner = import_module("skeleton.organism.satellites")
-        elif module == "skeleton.organism.stacks":
-            owner = import_module("skeleton.organism.stacks")
-        elif module == "skeleton.social.coverage":
-            owner = import_module("skeleton.social.coverage")
-        else:
-            raise RuntimeError("unregistered operator view module")
-        method = getattr(owner, func)
+        method = getattr(_load_organism_view_module(module), func)
         return (method() if mode == "plain" else
                 method(root) if mode == "root" else
                 method(root=root) if mode == "root_kw" else

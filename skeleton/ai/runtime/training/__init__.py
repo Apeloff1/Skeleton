@@ -1,155 +1,164 @@
-from .lifecycle import (
-    LifecycleTransitionReceipt,
-    ModelBillOfMaterials,
-    ModelLifecycleError,
-    ModelLifecycleRegistry,
-    ModelLifecycleState,
-    ModelMigrationDecision,
-)
-from .multimodal import (
-    LearningModality,
-    MultimodalCorpus,
-    MultimodalFoundationError,
-    MultimodalRecord,
-    RetrievalHit,
-    SpeechChunkReceipt,
-    TextProjection,
-)
-from .learning import (
-    CurriculumDecision,
-    CurriculumStage,
-    EpisodeReceipt,
-    LearningProgram,
-    LearningProgramError,
-    ReinforcementEnvironment,
-    VerifierCandidate,
-    VerifierDecision,
-)
-"""P3-T2 provider-independent data, training and multimodal runtime."""
+"""Native training and model-improvement runtime surfaces."""
+from importlib import import_module
 
-from .training import (
-    DistributedTrainingPlan,
-    LocalTrainingControlPlane,
-    MetricGate,
-    PostTrainingReceipt,
-    RecoveryReceipt,
-    TrainingCheckpoint,
-    TrainingControlError,
-    TrainingEvaluationDecision,
-    TrainingObservation,
-    TrainingRun,
-    TrainingShard,
-)
 from .data import (
-    ContentAddressedStore,
-    DataConflictError,
-    DataPlaneError,
     DataQualityReport,
-    DatasetRecord,
+    DataQualityRule,
+    DatasetManifest,
     DatasetRegistry,
-    DatasetTransactionReceipt,
-    IngestionRecord,
+    DatasetSplit,
+    IngestEnvelope,
+    LineageReceipt,
+    SyntheticDataReceipt,
 )
 
 __all__ = [
-    "LifecycleTransitionReceipt",
-    "ModelBillOfMaterials",
-    "ModelLifecycleError",
-    "ModelLifecycleRegistry",
-    "ModelLifecycleState",
-    "ModelMigrationDecision",
-    "LearningModality",
-    "MultimodalCorpus",
-    "MultimodalFoundationError",
-    "MultimodalRecord",
-    "RetrievalHit",
-    "SpeechChunkReceipt",
-    "TextProjection",
-    "CurriculumDecision",
-    "CurriculumStage",
-    "EpisodeReceipt",
-    "LearningProgram",
-    "LearningProgramError",
-    "ReinforcementEnvironment",
-    "VerifierCandidate",
-    "VerifierDecision",
-    "DistributedTrainingPlan",
-    "LocalTrainingControlPlane",
-    "MetricGate",
-    "PostTrainingReceipt",
-    "RecoveryReceipt",
-    "TrainingCheckpoint",
-    "TrainingControlError",
-    "TrainingEvaluationDecision",
-    "TrainingObservation",
-    "TrainingRun",
-    "TrainingShard",
-    "ContentAddressedStore",
-    "DataConflictError",
-    "DataPlaneError",
     "DataQualityReport",
-    "DatasetRecord",
+    "DataQualityRule",
+    "DatasetManifest",
     "DatasetRegistry",
-    "DatasetTransactionReceipt",
-    "IngestionRecord",
+    "DatasetSplit",
+    "IngestEnvelope",
+    "LineageReceipt",
+    "SyntheticDataReceipt",
+]
+
+from .control import (
+    TrainingCheckpoint,
+    TrainingRepository,
+    TrainingRunManifest,
+    TrainingStateError,
+    TrainingTelemetry,
+    WorkerLease,
+)
+
+__all__ += [
+    "TrainingCheckpoint",
+    "TrainingRepository",
+    "TrainingRunManifest",
+    "TrainingStateError",
+    "TrainingTelemetry",
+    "WorkerLease",
+]
+
+from .trainer import LocalTrainingArtifact, ReferenceLocalTrainer, corpus_digest
+from .evaluation import (
+    CandidateQualification,
+    EvaluationCase,
+    EvaluationHarness,
+    EvaluationLedger,
+    EvaluationResult,
+    EvaluationSuite,
+    TrainingEvaluationGate,
+    VerifierReport,
+)
+
+__all__ += [
+    "CandidateQualification",
+    "EvaluationCase",
+    "EvaluationHarness",
+    "EvaluationLedger",
+    "EvaluationResult",
+    "EvaluationSuite",
+    "LocalTrainingArtifact",
+    "ReferenceLocalTrainer",
+    "TrainingEvaluationGate",
+    "VerifierReport",
+    "corpus_digest",
+]
+
+from .post_training import (
+    CurriculumDecision,
+    CurriculumEngine,
+    CurriculumStage,
+    DeterministicRLEnvironment,
+    PostTrainingExperiment,
+    PostTrainingLedger,
+    RLEnvironmentSpec,
+    RLStepReceipt,
+)
+
+__all__ += [
+    "CurriculumDecision",
+    "CurriculumEngine",
+    "CurriculumStage",
+    "DeterministicRLEnvironment",
+    "PostTrainingExperiment",
+    "PostTrainingLedger",
+    "RLEnvironmentSpec",
+    "RLStepReceipt",
 ]
 
 
-# Preserve stable P3 multimodal evidence and measured-rollout APIs from the
-# reconciled source modules without eagerly loading optional runtime backends.
-__all__ += ["VerifierEvaluationReceipt", "MigrationParityCase", "ModelMigrationEvaluationReceipt",
-            "ModelMigrationReceipt", "ModelMigrationRollbackReceipt", "LifecycleBackupReceipt",
-            "ModelLifecyclePersistenceError", "SQLiteModelLifecycleRepository",
-            "MultimodalTrainingManifest", "MultimodalTrainingSample"]
+# Reconcile the previously implemented P3 training adapters without importing
+# optional NumPy/native tooling whenever the training package is imported.
+# Attribute access loads only the requested authority-bound adapter.  Keeping
+# this out of __all__ preserves lightweight wildcard imports on small devices.
+__all__ += ["MaterializedDatasetReceipt", "MaterializedTrainingSource", "SourceAuthorityBinding"]
 
 _LAZY_EXPORTS = {
-    "learning": frozenset({"VerifierEvaluationReceipt"}),
-    "lifecycle": frozenset({"MigrationParityCase", "ModelMigrationEvaluationReceipt",
-                            "ModelMigrationReceipt", "ModelMigrationRollbackReceipt"}),
-    "lifecycle_repository": frozenset({"LifecycleBackupReceipt", "ModelLifecyclePersistenceError",
-                                       "SQLiteModelLifecycleRepository"}),
-    "multimodal": frozenset({"MultimodalTrainingManifest", "MultimodalTrainingSample"}),
-    "content_retrieval": frozenset({
-        "ContentSignalIndex", "ContentFeatureReceipt", "ContentSimilarityHit",
+    "data": frozenset({"MaterializedDatasetReceipt", "MaterializedTrainingSource",
+                       "SourceAuthorityBinding"}),
+    "learning_pipeline": frozenset({
+        "ExecutedCurriculumReceipt", "ExecutedEpisodeReceipt",
+        "ExecutedEvaluationReceipt", "LocalPolicyObservation",
+        "LocalPostTrainingPolicy", "PostTrainingExecutionError",
+        "PostTrainingExecutionSpec", "PostTrainingQualificationReceipt",
+        "PostTrainingRunner",
     }),
-    "rollout": frozenset({
-        "MeasuredModelRollout", "MeasuredRolloutError", "RolloutPlan",
-        "RolloutGatePolicy", "RolloutMeasurementReceipt", "RolloutStageReceipt",
-        "RolloutActionReceipt", "LocalUsageTariff",
+    "elastic_trainer": frozenset({"ElasticLocalTrainer", "ElasticTrainingArtifact"}),
+    "preference_trainer": frozenset({
+        "PreferenceLocalTrainer", "PreferencePair", "PreferenceTrainingArtifact",
     }),
-    "temporal": frozenset({
-        "LiveSpeechExecution", "SpeechFrameEvidence", "SpeechExecutionReceipt",
-        "VideoEvidenceIndex", "TimedMediaFragment", "VideoFragmentEvidence",
-        "VideoTimelineReceipt", "VideoFusionHit",
+    "neural_trainer": frozenset({"NeuralLocalTrainer", "NeuralTrainingArtifact"}),
+    "distributed_trainer": frozenset({
+        "LocalDataParallelTrainer", "LocalDataParallelArtifact",
+    }),
+    "observability": frozenset({
+        "TrainingObserver", "TrainingObservationReport", "TrainingObservationError",
+    }),
+    "checkpoint_archive": frozenset({
+        "TrainingCheckpointArchive", "CheckpointArchiveReceipt",
+        "CheckpointArchiveError", "CheckpointArchiveContents",
+    }),
+    "verifier": frozenset({
+        "EvaluationModelSource", "LocalVerifier", "MeasuredVerifierRunner",
+        "MeasuredVerifierReceipt", "MeasuredVerifierQualification",
+        "MeasuredVerifierError", "VerifierGatePolicy",
     }),
 }
 
 
-def _load_literal_export_module(owner: str):
-    """Resolve only source-declared lazy export owners; never load arbitrary names."""
-    from importlib import import_module
+def _load_trusted_lazy_module(module_name: str):
+    """Import from the repository-owned export map using only literal targets."""
+    if module_name == "checkpoint_archive":
+        return import_module(".checkpoint_archive", __name__)
+    if module_name == "data":
+        return import_module(".data", __name__)
+    if module_name == "distributed_trainer":
+        return import_module(".distributed_trainer", __name__)
+    if module_name == "elastic_trainer":
+        return import_module(".elastic_trainer", __name__)
+    if module_name == "learning_pipeline":
+        return import_module(".learning_pipeline", __name__)
+    if module_name == "neural_trainer":
+        return import_module(".neural_trainer", __name__)
+    if module_name == "observability":
+        return import_module(".observability", __name__)
+    if module_name == "preference_trainer":
+        return import_module(".preference_trainer", __name__)
+    if module_name == "verifier":
+        return import_module(".verifier", __name__)
+    raise ImportError("unregistered lazy export module")
 
-    if owner == ".content_retrieval":
-        return import_module(".content_retrieval", __name__)
-    elif owner == ".learning":
-        return import_module(".learning", __name__)
-    elif owner == ".lifecycle":
-        return import_module(".lifecycle", __name__)
-    elif owner == ".lifecycle_repository":
-        return import_module(".lifecycle_repository", __name__)
-    elif owner == ".multimodal":
-        return import_module(".multimodal", __name__)
-    elif owner == ".rollout":
-        return import_module(".rollout", __name__)
-    elif owner == ".temporal":
-        return import_module(".temporal", __name__)
-    raise ImportError("unregistered lazy export owner: " + repr(owner))
 
 
 def __getattr__(name: str):
     for module_name, names in _LAZY_EXPORTS.items():
         if name in names:
-            value = getattr(_load_literal_export_module("." + module_name), name)
+            from importlib import import_module
+
+            value = getattr(_load_trusted_lazy_module(module_name), name)
             globals()[name] = value
             return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

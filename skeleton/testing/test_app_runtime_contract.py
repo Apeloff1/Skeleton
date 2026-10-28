@@ -5,7 +5,6 @@ import importlib
 import json
 from pathlib import Path
 import sys
-from types import SimpleNamespace
 
 from skeleton.app.assembly import find_repo_root
 
@@ -78,7 +77,7 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
 
     monkeypatch.setattr(runtime, "core_db", FailedDB())
     monkeypatch.setattr(runtime, "public_readiness", lambda: (_ for _ in ()).throw(RuntimeError("readiness unavailable")))
-    async def healthy_engine(_timeout: float):
+    async def fake_engine(_timeout):
         return {
             "name": "skeleton",
             "ok": True,
@@ -87,7 +86,7 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
             "detail": "healthy",
         }
 
-    monkeypatch.setattr(runtime, "_probe_engine", healthy_engine)
+    monkeypatch.setattr(runtime, "_probe_engine", fake_engine)
 
     payload = asyncio.run(runtime._runtime_status(250))
 
@@ -110,8 +109,11 @@ def test_ready_endpoint_uses_http_status_for_whole_app_verdict(monkeypatch):
     async def degraded(_timeout_ms: int, *, state=None):
         return {"ok": False, "services": []}
 
+    from fastapi import FastAPI
+    from starlette.requests import Request
+
+    request = Request({"type": "http", "app": FastAPI(), "method": "GET", "path": "/api/app/ready", "headers": []})
     monkeypatch.setattr(runtime, "_runtime_status", healthy)
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
     healthy_response = asyncio.run(runtime.app_ready(request, 500))
     assert healthy_response.status_code == 200
 

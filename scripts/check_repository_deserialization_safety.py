@@ -8,9 +8,7 @@ coverage fail-closed for missing, unreadable, symlinked, or empty required roots
 
 from __future__ import annotations
 
-from concurrent.futures import ProcessPoolExecutor
 import importlib.util
-import os
 from pathlib import Path
 import sys
 from types import ModuleType
@@ -22,11 +20,6 @@ SCAN_ROOTS = (
     REPO_ROOT / "skeleton",
     REPO_ROOT / "scripts",
 )
-# Bound worker count and transfer batches: all files still receive the same
-# canonical AST policy, and any failed worker fails the entire gate closed.
-PARALLEL_MIN_FILES = 1024
-BATCH_SIZE = 128
-MAX_WORKERS = 2
 
 
 def _load_backend_gate() -> ModuleType:
@@ -71,36 +64,6 @@ def violations(path: Path) -> list[str]:
     return BACKEND_GATE.violations(path)
 
 
-def _scan_batch(paths: list[Path]) -> list[str]:
-    """Run the canonical policy on every member of one deterministic batch."""
-    findings: list[str] = []
-    for path in paths:
-        findings.extend(violations(path))
-    return findings
-
-
-def _scan_files(paths: list[Path]) -> list[str]:
-    """Bound memory and process overhead while preserving complete coverage.
-
-    Imported validator modules and small fixture suites remain single-process
-    so callers can inject isolated test roots without pickle/import surprises.
-    The production CLI parallelizes large scans only; map() propagates worker
-    exceptions, and its results are consumed in input order.
-    """
-    workers = min(MAX_WORKERS, os.cpu_count() or 1)
-    if __name__ != "__main__" or len(paths) < PARALLEL_MIN_FILES or workers < 2:
-        return _scan_batch(paths)
-    batches = (
-        paths[start : start + BATCH_SIZE]
-        for start in range(0, len(paths), BATCH_SIZE)
-    )
-    findings: list[str] = []
-    with ProcessPoolExecutor(max_workers=workers) as executor:
-        for batch_findings in executor.map(_scan_batch, batches):
-            findings.extend(batch_findings)
-    return findings
-
-
 def main() -> int:
     findings: list[str] = []
     root_counts: dict[Path, int] = {root: 0 for root in SCAN_ROOTS}
@@ -128,15 +91,7 @@ def main() -> int:
                 continue
             root_counts[root] += 1
             break
-    try:
-        findings.extend(_scan_files(files))
-    except Exception as exc:
-        print(
-            f"Repository deserialization safety scan failed: "
-            f"source inspection failure ({type(exc).__name__})",
-            file=sys.stderr,
-        )
-        return 1
+        findings.extend(violations(path))
 
     for root, count in root_counts.items():
         if count == 0:

@@ -110,36 +110,3 @@ def test_repository_deserialization_rejects_symlinked_required_root(
 
     assert GATE.main() == 1
     assert "source traversal failure" in capsys.readouterr().err
-
-
-def test_batched_repository_scan_preserves_findings(tmp_path: Path) -> None:
-    """Batched work must not skip unsafe files or rewrite canonical diagnostics."""
-    paths = [tmp_path / f"fixture_{index}.py" for index in range(4)]
-    for path in paths:
-        path.write_text("import json\nvalue = json.loads(payload)\n", encoding="utf-8")
-    paths[1].write_text("import pickle\nvalue = pickle.loads(payload)\n", encoding="utf-8")
-    paths[3].write_text("import yaml\nvalue = yaml.unsafe_load(payload)\n", encoding="utf-8")
-
-    expected = [finding for path in paths for finding in GATE.violations(path)]
-    assert GATE._scan_batch(paths) == expected
-    assert GATE._scan_files(paths) == expected
-
-
-def test_repository_deserialization_fails_closed_on_worker_failure(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    root = tmp_path / "skeleton"
-    root.mkdir()
-    (root / "file.py").write_text("value = 1\n", encoding="utf-8")
-    monkeypatch.setattr(GATE, "SCAN_ROOTS", (root,))
-
-    def broken_worker(_: list[Path]) -> list[str]:
-        raise RuntimeError("private path from worker")
-
-    monkeypatch.setattr(GATE, "_scan_files", broken_worker)
-    assert GATE.main() == 1
-    error = capsys.readouterr().err
-    assert "source inspection failure (RuntimeError)" in error
-    assert "private path from worker" not in error

@@ -42,7 +42,10 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
-    return datetime(2026, 9, 23, 20, 30, tzinfo=timezone.utc)
+    # The engine's durable max_elapsed_seconds is anchored to created_at.
+    # Historical fixture dates silently expire once the wall clock advances.
+    # Truncation keeps repeated setup timestamps stable within each second.
+    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def test_engine_tool_runtime_factory_preserves_canonical_dependencies(tmp_path) -> None:
@@ -124,6 +127,14 @@ class FakeRegistry:
 
             raise ProviderUnavailableError("not configured")
         return self.provider
+
+    def require_for_context(self, _context_policy):
+        # The coordinator selects via the canonical context-aware registry API.
+        return self.require_active()
+
+    def runtime_serving_engines(self):
+        # Hosted and fake providers have no activated local serving owner to drain.
+        return ()
 
 
 def _bundle(*, execution_id: str = "exec-golden"):

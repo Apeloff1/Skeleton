@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any
 
 import pytest
@@ -427,18 +428,57 @@ def test_parse_pr_hints_json_fails_closed_on_malformed_payloads() -> None:
         parse_pr_hints_json("[0]")
 
 
-def test_retired_workflow_run_consumers_cannot_restart_ci_fanout() -> None:
+def test_workflow_run_consumers_match_every_completing_branch() -> None:
     root = Path(__file__).resolve().parents[2]
     workflows = root / ".github" / "workflows"
-    # Retired listeners must not be active; the runner's branch-identity
-    # resolution remains covered by the focused tests above.
-    for name in ("repair-intake.yml", "idle-studio.yml", "pr-obsolete-run-drain.yml"):
-        assert not (workflows / name).exists(), f"{name} must remain retired"
+    expected = 'branches:\n      - "*"\n      - "**"'
+    # Audit present workflow-run consumers, not retired workflow filenames.
+    # A privileged PR automation workflow must remain manual-only below.
+    for path in sorted(workflows.glob("*.yml")):
+        source = path.read_text(encoding="utf-8")
+        if "\n  workflow_run:\n" not in source:
+            continue
+        assert "pull_requests[0]" not in source, (
+            f"{path.name} must bind exact branch/commit identity instead of "
+            "trusting the first workflow-run pull-request hint"
+        )
 
-    text = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
-    assert "\non:\n  workflow_dispatch:\n" in text
-    assert "\n  workflow_run:\n" not in text
-    assert "\n  schedule:\n" not in text
-    assert "args+=(--limit 25)" in text
-    assert '[[ "$pr" =~ ^[0-9]+$ ]]' in text
-    assert "pull_requests[0]" not in text
+    pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
+    # Unlike the bounded, unprivileged completion consumers above, the
+    # privileged PR automation workflow was deliberately made manual-only.
+    # Never reinstate automatic workflow_run or schedule triggers to satisfy
+    # an obsolete test expectation.
+    assert "\non:\n  workflow_dispatch:\n" in pr_automation
+    assert "\n  workflow_run:\n" not in pr_automation
+    assert "\n  schedule:\n" not in pr_automation
+    assert "pull_request_target:" not in pr_automation
+    assert "branches-ignore:\n      - main" not in pr_automation
+    assert expected not in pr_automation
+    assert "pull_requests[0]" not in pr_automation
+
+    assert (workflows / "pr-automation-index.yml").is_file()
+    # These former completion workflows have been retired, rather than silently
+    # replaced with privileged workflow_run or pull_request_target triggers.
+    for retired in ("repair-intake.yml", "idle-studio.yml", "pr-obsolete-run-drain.yml"):
+        assert not (workflows / retired).exists()
+
+
+def test_archived_workflow_run_consumers_stay_disabled_and_index_stays_manual() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflows = root / ".github" / "workflows"
+    # These legacy fan-out workflows were deliberately archived. Reinstating
+    # them solely to satisfy a stale test would multiply privileged automation
+    # and reintroduce congestion; only PR Automation Index remains manual.
+    for name in ("repair-intake.yml", "idle-studio.yml", "pr-obsolete-run-drain.yml"):
+        assert not (workflows / name).exists(), f"{name} must remain archived"
+
+    pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
+    # The index is manual-only; never restore a second privileged automatic
+    # workflow_run fanout just to satisfy a stale consumer contract.
+    trigger_block = pr_automation.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+    # Inspect complete event keys, including the first entry after `on:`.
+    event_keys = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", trigger_block, re.MULTILINE)
+    assert event_keys == ["workflow_dispatch"]
+    assert "pull_requests[0]" not in pr_automation
+    assert "group: pr-automation-index" in pr_automation
+    assert "cancel-in-progress: false" in pr_automation

@@ -204,99 +204,99 @@ _GOVERNANCE_EXPORTS = {
 }
 
 
-def _load_literal_export_module(owner: str):
-    """Resolve only source-declared lazy export owners; never load arbitrary names."""
-
-    if owner == ".bitemporal_authority":
+def _load_trusted_lazy_module(module: str):
+    """Import from the repository-owned export map using only literal targets."""
+    if module == ".bitemporal_authority":
         return _training_import_module(".bitemporal_authority", __name__)
-    elif owner == ".lifecycle_proof":
+    if module == ".lifecycle_proof":
         return _training_import_module(".lifecycle_proof", __name__)
-    elif owner == ".model_release_journal":
+    if module == ".model_release_journal":
         return _training_import_module(".model_release_journal", __name__)
-    elif owner == ".promotion_lifecycle":
+    if module == ".promotion_lifecycle":
         return _training_import_module(".promotion_lifecycle", __name__)
-    elif owner == ".shadow_candidate_gate":
+    if module == ".shadow_candidate_gate":
         return _training_import_module(".shadow_candidate_gate", __name__)
-    elif owner == ".shadow_idle_training":
+    if module == ".shadow_idle_training":
         return _training_import_module(".shadow_idle_training", __name__)
-    elif owner == ".shadow_native_trainer":
+    if module == ".shadow_native_trainer":
         return _training_import_module(".shadow_native_trainer", __name__)
-    elif owner == ".shadow_training_handoff":
+    if module == ".shadow_training_handoff":
         return _training_import_module(".shadow_training_handoff", __name__)
-    elif owner == ".shadow_weight_intake":
+    if module == ".shadow_weight_intake":
         return _training_import_module(".shadow_weight_intake", __name__)
-    elif owner == ".shadow_weight_ledger":
+    if module == ".shadow_weight_ledger":
         return _training_import_module(".shadow_weight_ledger", __name__)
-    elif owner == ".shadow_weight_pipeline":
+    if module == ".shadow_weight_pipeline":
         return _training_import_module(".shadow_weight_pipeline", __name__)
-    elif owner == ".shadow_weight_store":
+    if module == ".shadow_weight_store":
         return _training_import_module(".shadow_weight_store", __name__)
-    elif owner == ".shadow_weights":
+    if module == ".shadow_weights":
         return _training_import_module(".shadow_weights", __name__)
-    elif owner == ".temporal_abstention":
+    if module == ".temporal_abstention":
         return _training_import_module(".temporal_abstention", __name__)
-    elif owner == ".temporal_admission":
+    if module == ".temporal_admission":
         return _training_import_module(".temporal_admission", __name__)
-    elif owner == ".temporal_benchmark":
+    if module == ".temporal_benchmark":
         return _training_import_module(".temporal_benchmark", __name__)
-    elif owner == ".temporal_budget":
+    if module == ".temporal_budget":
         return _training_import_module(".temporal_budget", __name__)
-    elif owner == ".temporal_causality":
+    if module == ".temporal_causality":
         return _training_import_module(".temporal_causality", __name__)
-    elif owner == ".temporal_certificate":
+    if module == ".temporal_certificate":
         return _training_import_module(".temporal_certificate", __name__)
-    elif owner == ".temporal_certificate_registry":
+    if module == ".temporal_certificate_registry":
         return _training_import_module(".temporal_certificate_registry", __name__)
-    elif owner == ".temporal_consistency":
+    if module == ".temporal_consistency":
         return _training_import_module(".temporal_consistency", __name__)
-    elif owner == ".temporal_counterfactual":
+    if module == ".temporal_counterfactual":
         return _training_import_module(".temporal_counterfactual", __name__)
-    elif owner == ".temporal_custody":
+    if module == ".temporal_custody":
         return _training_import_module(".temporal_custody", __name__)
-    elif owner == ".temporal_drift":
+    if module == ".temporal_drift":
         return _training_import_module(".temporal_drift", __name__)
-    elif owner == ".temporal_editing":
+    if module == ".temporal_editing":
         return _training_import_module(".temporal_editing", __name__)
-    elif owner == ".temporal_ensemble":
+    if module == ".temporal_ensemble":
         return _training_import_module(".temporal_ensemble", __name__)
-    elif owner == ".temporal_facts":
+    if module == ".temporal_facts":
         return _training_import_module(".temporal_facts", __name__)
-    elif owner == ".temporal_freshness":
+    if module == ".temporal_freshness":
         return _training_import_module(".temporal_freshness", __name__)
-    elif owner == ".temporal_intelligence":
+    if module == ".temporal_intelligence":
         return _training_import_module(".temporal_intelligence", __name__)
-    elif owner == ".temporal_intervals":
+    if module == ".temporal_intervals":
         return _training_import_module(".temporal_intervals", __name__)
-    elif owner == ".temporal_invariants":
+    if module == ".temporal_invariants":
         return _training_import_module(".temporal_invariants", __name__)
-    elif owner == ".temporal_learning_control":
+    if module == ".temporal_learning_control":
         return _training_import_module(".temporal_learning_control", __name__)
-    elif owner == ".temporal_promotion":
+    if module == ".temporal_promotion":
         return _training_import_module(".temporal_promotion", __name__)
-    elif owner == ".temporal_provenance":
+    if module == ".temporal_provenance":
         return _training_import_module(".temporal_provenance", __name__)
-    elif owner == ".temporal_quarantine":
+    if module == ".temporal_quarantine":
         return _training_import_module(".temporal_quarantine", __name__)
-    elif owner == ".temporal_replay":
+    if module == ".temporal_replay":
         return _training_import_module(".temporal_replay", __name__)
-    elif owner == ".temporal_research_authority":
+    if module == ".temporal_research_authority":
         return _training_import_module(".temporal_research_authority", __name__)
-    elif owner == ".temporal_retrieval":
+    if module == ".temporal_retrieval":
         return _training_import_module(".temporal_retrieval", __name__)
-    elif owner == ".temporal_revocation":
+    if module == ".temporal_revocation":
         return _training_import_module(".temporal_revocation", __name__)
-    elif owner == ".temporal_signals":
+    if module == ".temporal_signals":
         return _training_import_module(".temporal_signals", __name__)
-    elif owner == ".temporal_uncertainty":
+    if module == ".temporal_uncertainty":
         return _training_import_module(".temporal_uncertainty", __name__)
-    raise ImportError("unregistered lazy export owner: " + repr(owner))
+    raise ImportError("unregistered lazy export module")
+
 
 
 def __getattr__(name: str):
     module = _GOVERNANCE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = getattr(_load_literal_export_module(module), name)
+    value = getattr(_load_trusted_lazy_module(module), name)
     globals()[name] = value
     return value
 

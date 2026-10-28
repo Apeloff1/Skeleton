@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from .lifecycle import (
     LifecycleTransitionReceipt,
     ModelBillOfMaterials,
@@ -125,31 +127,32 @@ _LAZY_EXPORTS = {
 }
 
 
-def _load_literal_export_module(owner: str):
-    """Resolve only source-declared lazy export owners; never load arbitrary names."""
-    from importlib import import_module
-
-    if owner == ".content_retrieval":
+def _load_trusted_lazy_module(module_name: str):
+    """Import from the repository-owned export map using only literal targets."""
+    if module_name == "content_retrieval":
         return import_module(".content_retrieval", __name__)
-    elif owner == ".learning":
+    if module_name == "learning":
         return import_module(".learning", __name__)
-    elif owner == ".lifecycle":
+    if module_name == "lifecycle":
         return import_module(".lifecycle", __name__)
-    elif owner == ".lifecycle_repository":
+    if module_name == "lifecycle_repository":
         return import_module(".lifecycle_repository", __name__)
-    elif owner == ".multimodal":
+    if module_name == "multimodal":
         return import_module(".multimodal", __name__)
-    elif owner == ".rollout":
+    if module_name == "rollout":
         return import_module(".rollout", __name__)
-    elif owner == ".temporal":
+    if module_name == "temporal":
         return import_module(".temporal", __name__)
-    raise ImportError("unregistered lazy export owner: " + repr(owner))
+    raise ImportError("unregistered lazy export module")
+
 
 
 def __getattr__(name: str):
     for module_name, names in _LAZY_EXPORTS.items():
         if name in names:
-            value = getattr(_load_literal_export_module("." + module_name), name)
+            from importlib import import_module
+
+            value = getattr(_load_trusted_lazy_module(module_name), name)
             globals()[name] = value
             return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

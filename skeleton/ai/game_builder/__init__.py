@@ -551,141 +551,141 @@ _KNOWLEDGE_EXPORTS = {
 }
 
 
-def _load_literal_export_module(owner: str):
-    """Resolve only source-declared lazy export owners; never load arbitrary names."""
-
-    if owner == ".apple2_native_export":
+def _load_trusted_lazy_module(module: str):
+    """Import from the repository-owned export map using only literal targets."""
+    if module == ".apple2_native_export":
         return _game_builder_import_module(".apple2_native_export", __name__)
-    elif owner == ".archive_import":
+    if module == ".archive_import":
         return _game_builder_import_module(".archive_import", __name__)
-    elif owner == ".asset_credits":
+    if module == ".asset_credits":
         return _game_builder_import_module(".asset_credits", __name__)
-    elif owner == ".atari8_native_export":
+    if module == ".atari8_native_export":
         return _game_builder_import_module(".atari8_native_export", __name__)
-    elif owner == ".authored_tiles":
+    if module == ".authored_tiles":
         return _game_builder_import_module(".authored_tiles", __name__)
-    elif owner == ".c64_native_export":
+    if module == ".c64_native_export":
         return _game_builder_import_module(".c64_native_export", __name__)
-    elif owner == ".coleco_native_export":
+    if module == ".coleco_native_export":
         return _game_builder_import_module(".coleco_native_export", __name__)
-    elif owner == ".coleco_rom":
+    if module == ".coleco_rom":
         return _game_builder_import_module(".coleco_rom", __name__)
-    elif owner == ".companion_curriculum":
+    if module == ".companion_curriculum":
         return _game_builder_import_module(".companion_curriculum", __name__)
-    elif owner == ".consumer_release_assurance":
+    if module == ".consumer_release_assurance":
         return _game_builder_import_module(".consumer_release_assurance", __name__)
-    elif owner == ".desktop_native_export":
+    if module == ".desktop_native_export":
         return _game_builder_import_module(".desktop_native_export", __name__)
-    elif owner == ".dos_native_export":
+    if module == ".dos_native_export":
         return _game_builder_import_module(".dos_native_export", __name__)
-    elif owner == ".dual_runtime_export":
+    if module == ".dual_runtime_export":
         return _game_builder_import_module(".dual_runtime_export", __name__)
-    elif owner == ".editor_platforms":
+    if module == ".editor_platforms":
         return _game_builder_import_module(".editor_platforms", __name__)
-    elif owner == ".evolution_archive":
+    if module == ".evolution_archive":
         return _game_builder_import_module(".evolution_archive", __name__)
-    elif owner == ".evolution_native_sources":
+    if module == ".evolution_native_sources":
         return _game_builder_import_module(".evolution_native_sources", __name__)
-    elif owner == ".evolution_practice":
+    if module == ".evolution_practice":
         return _game_builder_import_module(".evolution_practice", __name__)
-    elif owner == ".game_boy_color_native_export":
+    if module == ".game_boy_color_native_export":
         return _game_builder_import_module(".game_boy_color_native_export", __name__)
-    elif owner == ".game_boy_memory_replay":
+    if module == ".game_boy_memory_replay":
         return _game_builder_import_module(".game_boy_memory_replay", __name__)
-    elif owner == ".game_boy_native_export":
+    if module == ".game_boy_native_export":
         return _game_builder_import_module(".game_boy_native_export", __name__)
-    elif owner == ".knowledge_rights_bridge":
+    if module == ".knowledge_rights_bridge":
         return _game_builder_import_module(".knowledge_rights_bridge", __name__)
-    elif owner == ".legal_census":
+    if module == ".legal_census":
         return _game_builder_import_module(".legal_census", __name__)
-    elif owner == ".legal_native_export":
+    if module == ".legal_native_export":
         return _game_builder_import_module(".legal_native_export", __name__)
-    elif owner == ".legal_paths":
+    if module == ".legal_paths":
         return _game_builder_import_module(".legal_paths", __name__)
-    elif owner == ".legal_port_bridge":
+    if module == ".legal_port_bridge":
         return _game_builder_import_module(".legal_port_bridge", __name__)
-    elif owner == ".living_story_authoring":
+    if module == ".living_story_authoring":
         return _game_builder_import_module(".living_story_authoring", __name__)
-    elif owner == ".living_story_export":
+    if module == ".living_story_export":
         return _game_builder_import_module(".living_story_export", __name__)
-    elif owner == ".living_story_mirror":
+    if module == ".living_story_mirror":
         return _game_builder_import_module(".living_story_mirror", __name__)
-    elif owner == ".living_story_runtime":
+    if module == ".living_story_runtime":
         return _game_builder_import_module(".living_story_runtime", __name__)
-    elif owner == ".media_similarity":
+    if module == ".media_similarity":
         return _game_builder_import_module(".media_similarity", __name__)
-    elif owner == ".mirror_room_runtime":
+    if module == ".mirror_room_runtime":
         return _game_builder_import_module(".mirror_room_runtime", __name__)
-    elif owner == ".msx1_native_export":
+    if module == ".msx1_native_export":
         return _game_builder_import_module(".msx1_native_export", __name__)
-    elif owner == ".msx1_rom":
+    if module == ".msx1_rom":
         return _game_builder_import_module(".msx1_rom", __name__)
-    elif owner == ".native_binary_structure":
+    if module == ".native_binary_structure":
         return _game_builder_import_module(".native_binary_structure", __name__)
-    elif owner == ".native_evolution_cli":
+    if module == ".native_evolution_cli":
         return _game_builder_import_module(".native_evolution_cli", __name__)
-    elif owner == ".native_portfolio_cli":
+    if module == ".native_portfolio_cli":
         return _game_builder_import_module(".native_portfolio_cli", __name__)
-    elif owner == ".native_release_intake":
+    if module == ".native_release_intake":
         return _game_builder_import_module(".native_release_intake", __name__)
-    elif owner == ".native_retro_artifact":
+    if module == ".native_retro_artifact":
         return _game_builder_import_module(".native_retro_artifact", __name__)
-    elif owner == ".nes_native_export":
+    if module == ".nes_native_export":
         return _game_builder_import_module(".nes_native_export", __name__)
-    elif owner == ".original_game_studio":
+    if module == ".original_game_studio":
         return _game_builder_import_module(".original_game_studio", __name__)
-    elif owner == ".plagiarism_guard":
+    if module == ".plagiarism_guard":
         return _game_builder_import_module(".plagiarism_guard", __name__)
-    elif owner == ".platform_registry":
+    if module == ".platform_registry":
         return _game_builder_import_module(".platform_registry", __name__)
-    elif owner == ".playability_analysis":
+    if module == ".playability_analysis":
         return _game_builder_import_module(".playability_analysis", __name__)
-    elif owner == ".playable_compiler":
+    if module == ".playable_compiler":
         return _game_builder_import_module(".playable_compiler", __name__)
-    elif owner == ".playable_export":
+    if module == ".playable_export":
         return _game_builder_import_module(".playable_export", __name__)
-    elif owner == ".playable_simulation":
+    if module == ".playable_simulation":
         return _game_builder_import_module(".playable_simulation", __name__)
-    elif owner == ".playable_world":
+    if module == ".playable_world":
         return _game_builder_import_module(".playable_world", __name__)
-    elif owner == ".port_planner":
+    if module == ".port_planner":
         return _game_builder_import_module(".port_planner", __name__)
-    elif owner == ".release_assurance":
+    if module == ".release_assurance":
         return _game_builder_import_module(".release_assurance", __name__)
-    elif owner == ".release_pipeline":
+    if module == ".release_pipeline":
         return _game_builder_import_module(".release_pipeline", __name__)
-    elif owner == ".release_trust_anchor":
+    if module == ".release_trust_anchor":
         return _game_builder_import_module(".release_trust_anchor", __name__)
-    elif owner == ".reviewed_knowledge":
+    if module == ".reviewed_knowledge":
         return _game_builder_import_module(".reviewed_knowledge", __name__)
-    elif owner == ".sega_reproducibility":
+    if module == ".sega_reproducibility":
         return _game_builder_import_module(".sega_reproducibility", __name__)
-    elif owner == ".sms_native_export":
+    if module == ".sms_native_export":
         return _game_builder_import_module(".sms_native_export", __name__)
-    elif owner == ".sms_rom":
+    if module == ".sms_rom":
         return _game_builder_import_module(".sms_rom", __name__)
-    elif owner == ".spectrum_native_export":
+    if module == ".spectrum_native_export":
         return _game_builder_import_module(".spectrum_native_export", __name__)
-    elif owner == ".spectrum_tap":
+    if module == ".spectrum_tap":
         return _game_builder_import_module(".spectrum_tap", __name__)
-    elif owner == ".studio_execution_plane":
+    if module == ".studio_execution_plane":
         return _game_builder_import_module(".studio_execution_plane", __name__)
-    elif owner == ".studio_tool_fabric":
+    if module == ".studio_tool_fabric":
         return _game_builder_import_module(".studio_tool_fabric", __name__)
-    elif owner == ".tiled_map_import":
+    if module == ".tiled_map_import":
         return _game_builder_import_module(".tiled_map_import", __name__)
-    elif owner == ".vectrex_native_export":
+    if module == ".vectrex_native_export":
         return _game_builder_import_module(".vectrex_native_export", __name__)
-    elif owner == ".vectrex_rom":
+    if module == ".vectrex_rom":
         return _game_builder_import_module(".vectrex_rom", __name__)
-    raise ImportError("unregistered lazy export owner: " + repr(owner))
+    raise ImportError("unregistered lazy export module")
+
 
 
 def __getattr__(name: str):
     module = _KNOWLEDGE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = getattr(_load_literal_export_module(module), name)
+    value = getattr(_load_trusted_lazy_module(module), name)
     globals()[name] = value
     return value
 

@@ -47,25 +47,29 @@ PREREQUISITES = {
 }
 
 
+def _load_known_forge_module(path: str):
+    """Resolve only explicitly registered module names, never an arbitrary import."""
+    if path == "game_frontier_studio_campaign_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_campaign_handbooks")
+    if path == "game_frontier_studio_chronicle_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_chronicle_handbooks")
+    if path == "game_frontier_studio_epic_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_epic_handbooks")
+    if path == "game_frontier_studio_epoch_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_epoch_handbooks")
+    if path == "game_frontier_studio_phase_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_phase_handbooks")
+    if path == "game_frontier_studio_saga_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_saga_handbooks")
+    if path == "game_frontier_studio_worldline_handbooks":
+        return import_module("skeleton.forge.game_frontier_studio_worldline_handbooks")
+    raise ImportError("module outside signed catalog")
+
+
 def _module(generation: str):
     for key, path, count in GENERATIONS:
         if generation == key:
-            if path == "game_frontier_studio_worldline_handbooks":
-                module = import_module("skeleton.forge.game_frontier_studio_worldline_handbooks")
-            elif path == "game_frontier_studio_phase_handbooks":
-                module = import_module("skeleton.forge.game_frontier_studio_phase_handbooks")
-            elif path == "game_frontier_studio_campaign_handbooks":
-                module = import_module("skeleton.forge.game_frontier_studio_campaign_handbooks")
-            elif path == "game_frontier_studio_chronicle_handbooks":
-                module = import_module("skeleton.forge.game_frontier_studio_chronicle_handbooks")
-            elif path == "game_frontier_studio_epoch_handbooks":
-                module = import_module("skeleton.forge.game_frontier_studio_epoch_handbooks")
-            elif path == "game_frontier_studio_saga_handbooks":
-                module = import_module("skeleton.forge.game_frontier_studio_saga_handbooks")
-            elif path == "game_frontier_studio_epic_handbooks":
-                module = import_module("skeleton.forge.game_frontier_studio_epic_handbooks")
-            else:
-                raise StudioError("unregistered Forge book-generation module")
+            module = _load_known_forge_module(path)
             actual = getattr(module, "BOOK_COUNT", getattr(module, "VOLUME_COUNT", None))
             if actual != count:
                 raise StudioError("Forge book index drift: old references cannot be trusted")

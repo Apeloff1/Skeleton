@@ -6,8 +6,9 @@ import importlib
 from typing import Dict, Callable
 from .local_ai_index import SEAMS
 
-# Source-declared seam authority; missing or unknown names fail without imports.
-_SEAM_MODULE_LOADERS = {
+# Literal import targets: 45 indexed core adapters and 200 numbered seams.
+# Keep imports lazy; never interpolate a caller-controlled import string.
+_REGISTERED_SEAM_LOADERS = {
     "local_model_adapter": lambda: importlib.import_module("skeleton.local_ai.local_model_adapter"),
     "local_inference_bridge": lambda: importlib.import_module("skeleton.local_ai.local_inference_bridge"),
     "boilerplate_registry": lambda: importlib.import_module("skeleton.local_ai.boilerplate_registry"),
@@ -256,6 +257,12 @@ _SEAM_MODULE_LOADERS = {
 }
 
 
+def _load_known_seam(name: str):
+    loader = _REGISTERED_SEAM_LOADERS.get(name)
+    if loader is None:
+        raise ImportError("unregistered local-AI seam")
+    return loader()
+
 class GapFiller:
     def __init__(self):
         self.seams: Dict[str, Callable] = {}
@@ -265,7 +272,7 @@ class GapFiller:
     def _load_core(self):
         for name in SEAMS:
             try:
-                mod = _SEAM_MODULE_LOADERS[name]()
+                mod = _load_known_seam(name)
                 if hasattr(mod, "process"):
                     self.seams[name] = mod.process
             except Exception:
@@ -275,7 +282,7 @@ class GapFiller:
         for i in range(200):
             name = f"seam_{i:03d}"
             try:
-                mod = _SEAM_MODULE_LOADERS[name]()
+                mod = _load_known_seam(name)
                 func = getattr(mod, f"process_{i}", None)
                 if func:
                     self.seams[name] = func

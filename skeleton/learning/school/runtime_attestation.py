@@ -23,25 +23,29 @@ from skeleton.learning.school.session_audit import (
 )
 
 
+def _load_trusted_named_module(module_name: str):
+    """Bound mirrored-type imports to this module's reviewed literal targets."""
+    if module_name == "skeleton.ai.learning.school.decision_ledger":
+        return importlib.import_module("skeleton.ai.learning.school.decision_ledger")
+    if module_name == "skeleton.ai.learning.school.runtime_attestation":
+        return importlib.import_module("skeleton.ai.learning.school.runtime_attestation")
+    if module_name == "skeleton.ai.learning.school.runtime_replay":
+        return importlib.import_module("skeleton.ai.learning.school.runtime_replay")
+    if module_name == "skeleton.learning.school.decision_ledger":
+        return importlib.import_module("skeleton.learning.school.decision_ledger")
+    if module_name == "skeleton.learning.school.runtime_attestation":
+        return importlib.import_module("skeleton.learning.school.runtime_attestation")
+    if module_name == "skeleton.learning.school.runtime_replay":
+        return importlib.import_module("skeleton.learning.school.runtime_replay")
+    raise ImportError("unregistered trusted twin module")
+
+
 def _trusted_named_instance(value: object, type_name: str, *module_names: str) -> bool:
     """Accept only named types from the canonical or governed mirror modules."""
 
     for module_name in module_names:
         try:
-            if module_name == "skeleton.ai.learning.school.decision_ledger":
-                module = importlib.import_module("skeleton.ai.learning.school.decision_ledger")
-            elif module_name == "skeleton.ai.learning.school.runtime_attestation":
-                module = importlib.import_module("skeleton.ai.learning.school.runtime_attestation")
-            elif module_name == "skeleton.ai.learning.school.runtime_replay":
-                module = importlib.import_module("skeleton.ai.learning.school.runtime_replay")
-            elif module_name == "skeleton.learning.school.decision_ledger":
-                module = importlib.import_module("skeleton.learning.school.decision_ledger")
-            elif module_name == "skeleton.learning.school.runtime_attestation":
-                module = importlib.import_module("skeleton.learning.school.runtime_attestation")
-            elif module_name == "skeleton.learning.school.runtime_replay":
-                module = importlib.import_module("skeleton.learning.school.runtime_replay")
-            else:
-                continue
+            module = _load_trusted_named_module(module_name)
             candidate = getattr(module, type_name)
         except (ImportError, AttributeError):
             continue

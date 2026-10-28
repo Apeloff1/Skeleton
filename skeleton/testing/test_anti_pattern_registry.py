@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pytest
 from skeleton.eval.antipatterns import *
-def pattern():return AntiPattern("ANTIPATTERN.BROAD_EXCEPT","historically swallowed durable failures",r"except\\s+Exception\\s*:", "catch typed exceptions and preserve failure evidence")
+def pattern():return AntiPattern("ANTIPATTERN.BROAD_EXCEPT","historically swallowed durable failures",r"except\s+Exception\s*:", "catch typed exceptions and preserve failure evidence")
 def test_detector_emits_deterministic_location():
  r=AntiPatternRegistry((pattern(),));f=r.scan("a.py","x=1\nexcept Exception:\n pass");assert f[0].line==2 and f[0].pattern_id=="ANTIPATTERN.BROAD_EXCEPT"
 def test_unexcepted_finding_remains_blocking():
@@ -26,3 +26,18 @@ def test_expiry_clock_rejects_boolean_alias():
  with pytest.raises(AntiPatternError,match="current_tick"):r.unresolved(f,(),True)
 def test_exception_expiry_rejects_boolean_alias():
  with pytest.raises(AntiPatternError):AntiPatternException(pattern().pattern_id,"a.py","OWNER.X","temporary",True)
+
+
+def test_exception_for_one_path_never_masks_another_file():
+ r=AntiPatternRegistry((pattern(),))
+ findings=r.scan("a.py","except Exception:")+r.scan("b.py","except Exception:")
+ grant=AntiPatternException(pattern().pattern_id,"a.py","OWNER.SECURITY","temporary",20)
+ assert tuple(f.path for f in r.unresolved(findings,(grant,),10))==("b.py",)
+
+
+def test_registry_rejects_non_pattern_and_unknown_finding():
+ with pytest.raises(AntiPatternError,match="AntiPattern entries"):
+  AntiPatternRegistry(("not a pattern",))
+ r=AntiPatternRegistry((pattern(),))
+ with pytest.raises(AntiPatternError,match="unknown"):
+  r.unresolved((AntiPatternFinding("ANTIPATTERN.OTHER","a.py",1,"x"),),(),10)

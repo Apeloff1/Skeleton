@@ -29,8 +29,7 @@ from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
-# Use a fresh wall-clock timestamp; the execution runtime enforces a strict
-# 120-second default deadline relative to request.created_at.
+NOW = datetime(2026, 10, 2, 19, 45, tzinfo=timezone.utc)
 
 
 def _effect_model() -> LocalModelAdapter:
@@ -134,6 +133,28 @@ def _effect_manifest() -> ToolManifest:
         data_policy="internal",
         effect=ToolEffect.REVERSIBLE,
     )
+
+
+
+def test_default_functional_request_timestamp_is_live_and_replay_can_be_explicit() -> None:
+    fields = {
+        "request_id": "effectiveness-default-timestamp",
+        "objective": "Test live request identity.",
+        "prompt": "Do not dispatch for this construction-only test.",
+        "instructions": "Use a local model only.",
+        "context_digest": hashlib.sha256(b"default-timestamp").hexdigest(),
+    }
+    before = datetime.now(timezone.utc)
+    request = FunctionalAIRequest(**fields)
+    after = datetime.now(timezone.utc)
+    assert before <= request.created_at <= after
+    assert request.to_execution_request().created_at == request.created_at
+
+    # Historical timestamps remain explicitly representable for replay and
+    # deadline-negative cases; only the omitted default is made live.
+    replay = FunctionalAIRequest(**fields, created_at=NOW)
+    assert replay.created_at == NOW
+
 
 
 @pytest.mark.asyncio

@@ -192,81 +192,81 @@ _LAZY_EXPORTS = {
 }
 
 
-def _load_literal_export_module(owner: str):
-    """Resolve only source-declared lazy export owners; never load arbitrary names."""
-
-    if owner == ".admission_checkpoint":
+def _load_trusted_lazy_module(module_name: str):
+    """Import from the repository-owned export map using only literal targets."""
+    if module_name == ".admission_checkpoint":
         return import_module(".admission_checkpoint", __name__)
-    elif owner == ".admission_redundancy":
+    if module_name == ".admission_redundancy":
         return import_module(".admission_redundancy", __name__)
-    elif owner == ".admission_scheduler":
+    if module_name == ".admission_scheduler":
         return import_module(".admission_scheduler", __name__)
-    elif owner == ".chat_engine":
+    if module_name == ".chat_engine":
         return import_module(".chat_engine", __name__)
-    elif owner == ".chat_protocol":
+    if module_name == ".chat_protocol":
         return import_module(".chat_protocol", __name__)
-    elif owner == ".chat_workspace":
+    if module_name == ".chat_workspace":
         return import_module(".chat_workspace", __name__)
-    elif owner == ".closed_loop_serving":
+    if module_name == ".closed_loop_serving":
         return import_module(".closed_loop_serving", __name__)
-    elif owner == ".conversation_persistence":
+    if module_name == ".conversation_persistence":
         return import_module(".conversation_persistence", __name__)
-    elif owner == ".conversation_service":
+    if module_name == ".conversation_service":
         return import_module(".conversation_service", __name__)
-    elif owner == ".conversation_store":
+    if module_name == ".conversation_store":
         return import_module(".conversation_store", __name__)
-    elif owner == ".execution_telemetry":
+    if module_name == ".execution_telemetry":
         return import_module(".execution_telemetry", __name__)
-    elif owner == ".flgb_model_runtime":
+    if module_name == ".flgb_model_runtime":
         return import_module(".flgb_model_runtime", __name__)
-    elif owner == ".iteration_scheduler":
+    if module_name == ".iteration_scheduler":
         return import_module(".iteration_scheduler", __name__)
-    elif owner == ".native_llm_runtime":
+    if module_name == ".native_llm_runtime":
         return import_module(".native_llm_runtime", __name__)
-    elif owner == ".runtime_checkpoint":
+    if module_name == ".runtime_checkpoint":
         return import_module(".runtime_checkpoint", __name__)
-    elif owner == ".runtime_contracts":
+    if module_name == ".runtime_contracts":
         return import_module(".runtime_contracts", __name__)
-    elif owner == ".runtime_epochs":
+    if module_name == ".runtime_epochs":
         return import_module(".runtime_epochs", __name__)
-    elif owner == ".runtime_feedback":
+    if module_name == ".runtime_feedback":
         return import_module(".runtime_feedback", __name__)
-    elif owner == ".runtime_policy":
+    if module_name == ".runtime_policy":
         return import_module(".runtime_policy", __name__)
-    elif owner == ".runtime_service":
+    if module_name == ".runtime_service":
         return import_module(".runtime_service", __name__)
-    elif owner == ".runtime_signals":
+    if module_name == ".runtime_signals":
         return import_module(".runtime_signals", __name__)
-    elif owner == ".serving_policy":
+    if module_name == ".serving_policy":
         return import_module(".serving_policy", __name__)
-    elif owner == ".serving_telemetry":
+    if module_name == ".serving_telemetry":
         return import_module(".serving_telemetry", __name__)
-    elif owner == ".slo_planner":
+    if module_name == ".slo_planner":
         return import_module(".slo_planner", __name__)
-    elif owner == ".temporal_policy":
+    if module_name == ".temporal_policy":
         return import_module(".temporal_policy", __name__)
-    elif owner == ".text_normalization":
+    if module_name == ".text_normalization":
         return import_module(".text_normalization", __name__)
-    elif owner == ".text_pipeline":
+    if module_name == ".text_pipeline":
         return import_module(".text_pipeline", __name__)
-    elif owner == ".tokenization":
+    if module_name == ".tokenization":
         return import_module(".tokenization", __name__)
-    elif owner == ".training_admission":
+    if module_name == ".training_admission":
         return import_module(".training_admission", __name__)
-    elif owner == ".weight_activation":
+    if module_name == ".weight_activation":
         return import_module(".weight_activation", __name__)
-    elif owner == ".weight_gateway":
+    if module_name == ".weight_gateway":
         return import_module(".weight_gateway", __name__)
-    elif owner == ".weight_shard_store":
+    if module_name == ".weight_shard_store":
         return import_module(".weight_shard_store", __name__)
-    raise ImportError("unregistered lazy export owner: " + repr(owner))
+    raise ImportError("unregistered lazy export module")
+
 
 
 def __getattr__(name: str):
     module_name = _LAZY_EXPORTS.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = getattr(_load_literal_export_module(module_name), name)
+    value = getattr(_load_trusted_lazy_module(module_name), name)
     globals()[name] = value
     return value
 
