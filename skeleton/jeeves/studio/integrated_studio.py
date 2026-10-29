@@ -1,8 +1,8 @@
-"""IntegratedStudio: operational conductor with large AI cycle.
+"""IntegratedStudio: 10x operational conductor.
 """
 from __future__ import annotations
 from typing import Dict, Any
-from .local_ai_large_cycle import large_cycle
+from .local_ai_10x_cycle import cycle_10x
 
 class IntegratedStudio:
     def __init__(self) -> None:
@@ -39,7 +39,7 @@ class IntegratedStudio:
             return {"ok": False, "reason": "floors_failed", "sealed": False}
 
         era_status = self.set_era(self.era)
-        ai_result = large_cycle(brief, self.optical, self.fidelity)
+        ai_result = cycle_10x(brief, self.optical, self.fidelity)
         if not ai_result.get("ok"):
             return {"ok": False, "reason": ai_result.get("reason", "ai_failed"), "sealed": False}
 
@@ -80,7 +80,7 @@ class IntegratedStudio:
             "multiplayer_ok": self.multiplayer_ok,
             "local_ai": ai_result,
             "godot_files": godot.get("files", []),
-            "status": "completionist_operational" if sealed else "incomplete",
+            "status": "completionist_10x" if sealed else "incomplete",
         }
 
     def emit_godot_project(self, brief: str, rooms: int) -> Dict[str, Any]:
@@ -143,5 +143,5 @@ class IntegratedStudio:
             "ai_ok": self.ai_ok,
             "ready": self.optical >= 0.9 and self.fidelity >= 0.92,
             "operational": True,
-            "cycle": "large",
+            "cycle": "10x",
         }
