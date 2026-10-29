@@ -350,7 +350,7 @@ def test_retired_churn_and_active_queue_recovery_keep_separate_boundaries() -> N
         encoding="utf-8"
     )
     assert "  drain:\n" in current
-    assert "    runs-on: ubuntu-latest\n" in current
+    # The recovery worker deliberately uses the independent slim runner pool.\n    assert "    runs-on: ubuntu-slim\n" in current
     assert "cancel-in-progress: false" in current
     assert "  wake-housekeeping:\n" not in current
     assert "if stale_pr_run(run, open_pr_heads):" in current
