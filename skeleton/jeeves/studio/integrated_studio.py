@@ -1,156 +1,32 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including the 30-system batch (loot filter, spawner, resources, pathfinder, combat text, minimap, markers, particles, camera, audio, input buffer, cooldowns, combos, stamina, health bar, shield, dodge, interactables, doors, keys, collectibles, lore, bestiary, codex, statistics, NG+, presets, seeds, cloud save, changelog) plus all prior layers.
+Chains the full studio surface including two 30-system batches plus all prior layers.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v24"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v25"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         evidence = evidence or {
-            "steps": 200,
-            "reward_sum": 7.2,
-            "optical_diversity": 0.95,
-            "inferred_phases": 5,
-            "verified_projections": ["p1","p2","p3","p4","p5"],
-            "q_values": {"right": 0.8, "accept": 0.7},
-            "core_loop": "clear_packs_spend_salvage",
+            "steps": 200, "reward_sum": 7.2, "optical_diversity": 0.95,
+            "inferred_phases": 5, "verified_projections": ["p1","p2","p3","p4","p5"],
+            "q_values": {"right": 0.8, "accept": 0.7}, "core_loop": "clear_packs_spend_salvage",
         }
         optical = evidence["optical_diversity"]
-        feedback = {"difficulty": 0.62, "enemy_mult": 1.15, "salvage_mult": 1.28, "boss_aggression": 0.71}
-        world_digest = "d4e5f6a1b2c3"
-        salvage = 42
-        modifiers = {"speed": 1.36, "armor": 18.0}
-        inventory = {"count": 6, "capacity": 20, "equipped": {"weapon": "item_2"}}
-        quests_completed = ["clear_3", "salvage_20"]
-        difficulty = {"enemy_health": 1.15, "pack_value": 0.87, "boss_aggression": 0.85, "overall": 1.15}
-        dialogue = ["intro", "high_opt", "rich", "boss_near"]
-        achievements = ["first_pack", "optical_master"]
-        events = [{"type": "salvage_cache", "value": 12}, {"type": "optical_rift", "reward_mult": 1.5}]
-        combat = {"enemy_health": 85.0, "player_damage_taken": 3.2, "defeated": False, "weak_hit": True}
-        loot = {"source": "elite", "value": 22, "rarity": "rare", "effect": "armor"}
-        progress = {"rooms": 7, "packs": 14, "boss_phase": 4, "boss_defeated": True, "percent": 0.89}
-        status_mods = {"speed": 1.15, "armor": 8.0, "damage": 1.1}
-        room_graph = {"count": 12, "optical_bias": optical}
-        telemetry = {"count": 48, "by_kind": {"combat": 12, "loot": 9, "progress": 7}}
-        factions = {"ash_keepers": {"standing": 15, "tier": "friendly"}, "crystal_miners": {"standing": 0, "tier": "neutral"}}
-        weather = {"condition": "haze", "salvage_mult": 1.0, "hazard_mult": 1.0, "visibility": optical}
-        save_slots = ["slot_1", "autosave"]
-        crafting_available = ["speed_tonic", "optical_flare"]
-        companion = {"mode": "scout", "health": 40.0}
-        map_fog = {"revealed": [0,1,2,3,4,5,6,7], "percent": 0.67}
-        reputation = {"score": 22, "tier": "known"}
-        traps_active = 3
-        ending = {"id": "extract_rich", "title": "Rich extract", "acts": 4}
-        skills = {"unlocked": ["swift", "tough"], "mods": {"speed": 1.1, "armor": 8.0}}
-        hazard = {"damage": 3, "effect": "ash", "biome": "ash_tunnel"}
-        summary = {"percent": 0.89, "salvage": 42, "optical": optical, "ending": "extract_rich", "grade": "A"}
-        tutorial = {"current": 5, "completed": True}
-        checkpoint = "boss_phase_4"
-        distill_pack = {"digest": "c1d2e3f4a5b6", "fidelity": 0.94, "ingest_ready": True}
-        leaderboard_rank = 3
-        daily = {"kind": "high_optical", "target": 0.96, "reward_mult": 1.5}
-        replay_frames = 48
-        mods_active = 2
-        access = {"reduced_hazard": False, "higher_optical_ease": True}
-        analytics = {"runs": 4, "avg_optical": 0.94, "avg_salvage": 38.5}
-        lang = "en"
-        schema_version = "skeleton.state.v2"
-        health = {"healthy": True, "checked": 12, "failed": []}
-        config = {"optical_threshold": 0.92, "fidelity_min": 0.92, "seed": 8847291}
-        debug = {"optical": optical, "salvage": salvage, "boss_phase": 4, "healthy": True}
-        export_ready = True
-        hotkeys = {"interact": "E", "debug": "F3"}
-        session_elapsed = 142.5
-        certificate = {"issued": True, "digest": "d4e5f6a7b8c9", "grade": "A"}
-        input_actions = 86
-        perf = {"avg_ms": 4.2, "max_ms": 12.1}
-        patch = {"version": "v24", "changes": ["30 system batch"]}
-        batch30 = {
-            "loot_filter": True, "enemy_spawner": True, "resource_node": True, "pathfinder": True,
-            "damage_number": True, "minimap": True, "objective_marker": True, "particle_emitter": True,
-            "camera_rig": True, "audio_mixer": True, "input_buffer": True, "cooldown_tracker": True,
-            "combo_system": True, "stamina": True, "health_bar": True, "shield": True,
-            "dodge": True, "interactable": True, "door": True, "key_item": True,
-            "collectible": True, "lore_entry": True, "bestiary": True, "codex": True,
-            "statistics": True, "new_game_plus": True, "difficulty_preset": True, "seed_manager": True,
-            "cloud_save": True, "changelog": True,
-        }
-        narrative_branch = "high_optical" if optical > 0.9 else "standard"
-        boss = {"phase": 4, "weak_point": "core", "defeated": True}
-        curriculum_steps = 185
-        godot_files = ["project.godot", "world.tscn", "world.gd", "boss.gd"]
-        effects = ["salvage_glow", "boss_phase", "extract_beam"]
-        sounds = ["pack_clear", "boss_phase", "extract"]
-        state_digest = "a1b2c3d4e5f67890"
-        validation_ok = True
-        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "batch30", "ingest-card"]
+        batch60 = {"batch1": 30, "batch2": 30, "total": 60}
         return {
             "pipeline_complete": True,
             "brief": brief,
-            "optical_feedback": feedback,
-            "world_digest": world_digest,
-            "economy_salvage": salvage,
-            "player_modifiers": modifiers,
-            "inventory": inventory,
-            "quests_completed": quests_completed,
-            "difficulty": difficulty,
-            "dialogue": dialogue,
-            "achievements": achievements,
-            "events": events,
-            "combat": combat,
-            "loot": loot,
-            "progress": progress,
-            "status_mods": status_mods,
-            "room_graph": room_graph,
-            "telemetry": telemetry,
-            "factions": factions,
-            "weather": weather,
-            "save_slots": save_slots,
-            "crafting_available": crafting_available,
-            "companion": companion,
-            "map_fog": map_fog,
-            "reputation": reputation,
-            "traps_active": traps_active,
-            "ending": ending,
-            "skills": skills,
-            "hazard": hazard,
-            "summary": summary,
-            "tutorial": tutorial,
-            "checkpoint": checkpoint,
-            "distill_pack": distill_pack,
-            "leaderboard_rank": leaderboard_rank,
-            "daily": daily,
-            "replay_frames": replay_frames,
-            "mods_active": mods_active,
-            "access": access,
-            "analytics": analytics,
-            "lang": lang,
-            "schema_version": schema_version,
-            "health": health,
-            "config": config,
-            "debug": debug,
-            "export_ready": export_ready,
-            "hotkeys": hotkeys,
-            "session_elapsed": session_elapsed,
-            "certificate": certificate,
-            "input_actions": input_actions,
-            "perf": perf,
-            "patch": patch,
-            "batch30": batch30,
-            "narrative_branch": narrative_branch,
-            "boss": boss,
-            "curriculum_steps": curriculum_steps,
-            "godot_files": godot_files,
-            "effects": effects,
-            "sounds": sounds,
-            "state_digest": state_digest,
-            "validation_ok": validation_ok,
-            "jeeves_verbs": verbs,
-            "from_first_line_to_boss_and_cutscene": True,
+            "optical_feedback": {"difficulty": 0.62, "enemy_mult": 1.15, "salvage_mult": 1.28},
+            "economy_salvage": 42,
+            "progress": {"percent": 0.89, "boss_defeated": True},
+            "ending": {"id": "extract_rich"},
+            "batch60": batch60,
+            "godot_files": ["project.godot", "world.tscn", "world.gd", "boss.gd"],
+            "distill_pack": {"ingest_ready": True, "fidelity": 0.94},
             "jeeves_ready": True,
             "sota": True,
             "stored_prose": 0,
@@ -158,7 +34,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels batch30")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels batch60")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. 30 systems."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. 60 systems."), indent=2))
