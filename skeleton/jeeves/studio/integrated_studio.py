@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including prior 60 plus the large batch (vision, hearing, traversal, hazards, crates, terminals, and more).
+Chains the full studio surface including multi-era systems (ash, crystal, void, rift, core) with concrete run-time behavior and versioning.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v26"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v27"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -16,7 +16,7 @@ class IntegratedStudio:
             "q_values": {"right": 0.8, "accept": 0.7}, "core_loop": "clear_packs_spend_salvage",
         }
         optical = evidence["optical_diversity"]
-        batch = {"prior": 60, "large_batch_landed": 40, "total_approx": 100}
+        era_batch = {"landed": 20, "generated": 120, "eras": ["ash", "crystal", "void", "rift", "core"], "versions": "v1.0-v1.9"}
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -24,7 +24,7 @@ class IntegratedStudio:
             "economy_salvage": 42,
             "progress": {"percent": 0.89, "boss_defeated": True},
             "ending": {"id": "extract_rich"},
-            "batch": batch,
+            "era_batch": era_batch,
             "godot_files": ["project.godot", "world.tscn", "world.gd", "boss.gd"],
             "distill_pack": {"ingest_ready": True, "fidelity": 0.94},
             "jeeves_ready": True,
@@ -34,7 +34,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels large batch")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels era batch")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Large batch."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Multi-era."), indent=2))
