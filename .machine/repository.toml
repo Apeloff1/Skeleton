@@ -3,9 +3,10 @@ schema_version = 1
 name = "Skeleton"
 machine_root = ".machine"
 default_owner = "automation-supervisor"
-# Full working-tree machine/code-search coverage needs to exceed the tracked-tree census.
-# Preserve a finite memory/time bound; fail closed if growth exceeds this budget.
-max_files = 80000
+# Full working-tree machine/code-search coverage must include current tracked growth.
+# Retain a finite scan budget; scanner and CI still fail closed on truncation.
+# The previous 80,000-file ceiling truncated the 2026-10-29 exact-head inventory.
+max_files = 100000
 max_file_bytes = 2000000
 max_context_bytes = 30000
 

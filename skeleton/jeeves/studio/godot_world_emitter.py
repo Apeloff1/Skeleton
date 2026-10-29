@@ -11,9 +11,9 @@ class GodotWorldEmitter:
         rooms = world.get("rooms", [])
         room_nodes = []
         for r in rooms[:6]:
-            room_nodes.append(f'[node name=\"Room_{r["id\"]}\" type=\"Node2D\" parent=\".\"]')
-            room_nodes.append(f'biome = \"{r.get(\"biome\", \"ash\")}\"')
-            room_nodes.append(f'difficulty = {r.get(\"difficulty\", 0.5)}')
+            room_nodes.append(f'[node name=\"Room_{r["id"]}\" type=\"Node2D\" parent=\".\"]')
+            room_nodes.append(f'biome = \"{r.get("biome", "ash")}\"')
+            room_nodes.append(f'difficulty = {r.get("difficulty", 0.5)}')
         tscn = """[gd_scene load_steps=2 format=3]\n[ext_resource type=\"Script\" path=\"res://world.gd\" id=\"1\"]\n[node name=\"World\" type=\"Node2D\"]\nscript = ExtResource(\"1\")\n""" + "\\n".join(room_nodes)
         world_gd = """extends Node2D\nvar rooms_cleared: int = 0\nfunc _ready() -> void:\n    print(\"World loaded from conductor\")\nfunc on_room_cleared() -> void:\n    rooms_cleared += 1\n    if rooms_cleared >= 4:\n        _spawn_boss()\nfunc _spawn_boss() -> void:\n    var boss = preload(\"res://boss.tscn\").instantiate()\n    add_child(boss)\n"""
         boss_gd = """extends Node2D\nvar phase: int = 0\nvar health: float = 200.0\nsignal defeated\nfunc take_damage(amt: float) -> void:\n    health -= amt\n    if health <= 0.0:\n        defeated.emit()\n"""
