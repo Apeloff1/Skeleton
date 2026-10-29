@@ -1,10 +1,11 @@
-"""Advanced local AI operational.
-Multi-tier thresholds, weight fusion, optical floors, and ratchet lock.
+"""Advanced local AI operational for end users.
+Multi-tier thresholds, weight fusion, optical floors, ratchet lock, and end-user status.
 """
 from typing import Any, Dict, List
 
 class LocalAIOperational:
     THRESH = {"draft": 0.85, "refine": 0.90, "final": 0.92}
+    MODULES = ["level_gen", "behavior_gen", "asset_respray", "boss_seq", "narrative_branch", "proc_gen", "graphics"]
 
     def run(self, tier: str, weights: Dict[str, float], optical: float, ratchet: float) -> Dict[str, Any]:
         thresh = self.THRESH.get(tier, 0.92)
@@ -21,6 +22,15 @@ class LocalAIOperational:
             "fused": round(fused, 3),
             "weights": weights,
             "next": "advance" if ok else "retry",
-            "modules": ["level_gen", "behavior_gen", "asset_respray", "boss_seq", "narrative_branch", "proc_gen", "graphics"],
-            "schema": "skeleton.local_ai.op.v2",
+            "modules": self.MODULES,
+            "end_user_ready": ok and tier == "final",
+            "schema": "skeleton.local_ai.op.v3",
+        }
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "tiers": list(self.THRESH.keys()),
+            "modules": self.MODULES,
+            "ready": True,
+            "schema": "skeleton.local_ai.status.v1",
         }
