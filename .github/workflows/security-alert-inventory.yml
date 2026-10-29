@@ -4,10 +4,6 @@ name: Security Alert Inventory
 # refresh. No per-PR fanout, no analysis-run cancellation, no alert mutations.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/security-alert-inventory.yml"
   schedule:
     - cron: '19 6 * * *'
 
