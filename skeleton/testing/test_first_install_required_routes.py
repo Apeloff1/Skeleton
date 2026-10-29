@@ -154,7 +154,7 @@ def _registry_server(payload):
             try:
                 self.wfile.write(raw)
             except (BrokenPipeError, ConnectionResetError):
-                pass  # A bounded reader may close before an oversized response ends.
+                pass  # A bounded reader can close before an oversized body ends.
 
         def log_message(self, *args):
             pass

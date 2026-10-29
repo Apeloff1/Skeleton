@@ -62,7 +62,7 @@ def test_lazy_exports_are_backed_only_by_literal_module_dispatch(path: str, tabl
             expected.add(value.value)
     assert expected, path
     if mode == "single":
-        assert expected == {".native_transformer", ".native_guard_binding"}
+        assert expected == {".native_transformer"}
         dispatcher = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "__getattr__")
     else:
         dispatchers = [
@@ -82,7 +82,7 @@ def test_lazy_exports_are_backed_only_by_literal_module_dispatch(path: str, tabl
         assert isinstance(first, ast.Constant) and isinstance(first.value, str)
         literal_calls.add(first.value)
     if mode == "single":
-        assert literal_calls == {".native_transformer", ".native_guard_binding", ".native_runtime"}
+        assert literal_calls == {".native_transformer", ".native_runtime"}
     else:
         assert literal_calls == expected, path
     assert SCANNER.violations(file) == [], path

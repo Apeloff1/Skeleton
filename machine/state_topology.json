@@ -78,13 +78,13 @@
       "volumes": [
         "chroma_data"
       ],
-      "durability": "persistent-volume",
+      "durability": "unqualified: pinned Chroma writes /data in the container writable layer; the legacy named volume is mounted at /chroma/chroma",
       "production_role": "optional vector/retrieval projection",
       "network": "internal network; host binding loopback-only; optional full profile",
       "authentication": "no application auth boundary in compose; never public",
-      "backup": "optional when fully derived; rebuild is preferred",
-      "restore": "re-index from authoritative content/memory sources",
-      "migration": "index schema/version changes rebuild projection",
+      "backup": "Preserve any existing container writable /data and legacy chroma_data volume separately, including consistent SQLite state. Do not assume either source is empty or disposable.",
+      "restore": "Restore only after identifying the authoritative source and verifying a consistent backup; re-index derived content where authorized.",
+      "migration": "Current full-profile startup is blocked until a data-preserving migration and durable /data layout are qualified; direct Docker/Compose operations remain outside app safeguards.",
       "evidence": [
         "docker-compose.yml",
         "skeleton/config/settings.py",

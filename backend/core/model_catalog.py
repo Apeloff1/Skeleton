@@ -556,6 +556,35 @@ def resolve_selection(
     }
 
 
+def selection_may_use_llama_cpp(
+    catalog: Mapping[str, Any], selection: Mapping[str, Any], *, cooperation: Mapping[str, Any] | None = None,
+) -> bool:
+    """Identify declared llama.cpp routes, including automatic fallbacks.
+
+    Inventory does not expose a prompt-template identity, so this is only a
+    route test; callers must not infer an exact native profile from it.
+    """
+    if selection.get("selection_mode") == "explicit":
+        routes = [selection]
+    else:
+        routes = [row for row in catalog.get("models", ()) if row.get("active") or row.get("fallback")]
+    if cooperation is not None:
+        from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+        policy = normalize_cooperation_policy(cooperation)
+        assert policy is not None
+        routes.extend(
+            resolve_selection(catalog, provider_id=pair["provider_id"], model_id=pair["model_id"])
+            for pair in policy["roles"].values()
+        )
+    return any(
+        row.get("execution_mode") == "local"
+        and isinstance(row.get("activation"), Mapping)
+        and row["activation"].get("runtime_kind") == "llama.cpp-cli"
+        for row in routes
+    )
+
+
 def _context_tokenizer(profile: str) -> str:
     """The backend never impersonates an engine-owned native tokenizer."""
 

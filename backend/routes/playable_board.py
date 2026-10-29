@@ -8,6 +8,8 @@ GET paths (/leaderboard, /champions, /staff-picks) win over playable's /{pid}.
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database, reauthorize_project_context
+
 import re
 from datetime import datetime, timezone, timedelta
 
@@ -16,7 +18,7 @@ from pydantic import BaseModel
 
 from routes.playable import _db, _champ_rank
 
-router = APIRouter(prefix="/api/playable", tags=["playable-board"])
+router = project_router(prefix="/api/playable", tags=["playable-board"])
 
 
 @router.get("/leaderboard")
@@ -144,6 +146,7 @@ async def champions(limit: int = Query(26, le=52)):
     """🏛️ Hall of Champions — each ISO week's #1 game, newest first.
     Auto-archives both the current week's leader and (on rollover) the just-
     completed previous week's permanent champion."""
+    await reauthorize_project_context(mutate=True)
     await _record_champion(0)    # current week (live leader)
     await _record_champion(-1)   # previous week (finalize on rollover)
     now = datetime.now(timezone.utc)

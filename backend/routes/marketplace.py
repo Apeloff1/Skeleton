@@ -1,5 +1,5 @@
 """
-VI.3 Creator Marketplace — MONETIZATION (one-time purchase via Stripe Checkout).
+VI.3 Creator Marketplace — legacy one-time purchase via Stripe Checkout.
 
 A creator LISTS a generated game for sale at a price; a buyer purchases one-time
 access through Stripe Checkout. The price is ALWAYS resolved server-side from the
@@ -14,15 +14,20 @@ Flow:
   POST /api/webhook/stripe                    — Stripe webhook (source of truth)
   GET  /api/marketplace/purchases            — a buyer's purchased games
 
-Buyer/creator identity is a client-generated visitor id (no auth layer yet).
+Project routes require an authenticated, scoped account. New listings and
+checkout are unavailable until runtime qualification and buyer delivery exist;
+existing listing reads and payment settlement paths remain in place.
 """
 from __future__ import annotations
+
+from routes.playable_access import project_router, scoped_database, reauthorize_project_context
 
 import os
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -31,13 +36,31 @@ from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest,
 )
 
-router = APIRouter(prefix="/api", tags=["marketplace"])
+router = project_router(prefix="/api", tags=["marketplace"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "") or None
 MIN_PRICE = 0.50
 MAX_PRICE = 500.0
+
+
+def _marketplace_release_unavailable() -> JSONResponse:
+    """Do not accept money without verified gameplay and buyer delivery."""
+    return JSONResponse(status_code=503, content={
+        "error": "Selling and purchasing games is unavailable until gameplay and buyer access can be verified.",
+        "code": "marketplace_release_unavailable",
+    })
+
+
+def _marketplace_release_ready() -> bool:
+    """No runtime qualification or buyer-delivery authority is wired yet.
+
+    This is deliberately not an environment toggle or a model-supplied flag.
+    Re-enabling sales requires an implemented, scoped authority and tests.
+    """
+    return False
 
 _GAME_LIGHT = {
     "_id": 0, "playable_id": 1, "title": 1, "genre": 1, "has_cover": 1, "asset_status": 1,
@@ -70,6 +93,11 @@ async def create_listing(body: ListBody, request: Request):
     """Creator lists a ready playable for one-time sale. Re-listing updates price.
     VII.5: blocks games hidden by moderation, and attaches a near-duplicate
     similarity warning (IP protection) without blocking the listing."""
+    # There is no trusted browser qualification or buyer entitlement owner
+    # for this legacy HTML pipeline. Never turn an advisory score into a sale.
+    if not _marketplace_release_ready():
+        return _marketplace_release_unavailable()
+
     if not rate_ok(request, "mkt_list", rate_per_sec=0.2, burst=6):
         return {"error": "rate_limited", "detail": "Too many listing attempts — slow down."}
     pid = (body.playable_id or "").strip()
@@ -185,6 +213,11 @@ class CheckoutBody(BaseModel):
 async def checkout(body: CheckoutBody, request: Request):
     """Create a Stripe Checkout session. Price is resolved from the listing
     server-side; the client cannot set the amount."""
+    # Historical listings and payment settlement remain readable, but no new
+    # checkout may be created without verified gameplay and buyer delivery.
+    if not _marketplace_release_ready():
+        return _marketplace_release_unavailable()
+
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     pid = (body.playable_id or "").strip()
@@ -277,6 +310,7 @@ async def _finalize_purchase(txn: dict):
 async def checkout_status(session_id: str, request: Request):
     """Poll Stripe for the session's payment status; record the purchase on first
     'paid'. Safe to poll repeatedly (idempotent)."""
+    await reauthorize_project_context(mutate=True)
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})

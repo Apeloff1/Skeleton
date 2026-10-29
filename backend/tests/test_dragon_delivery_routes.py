@@ -179,6 +179,38 @@ def test_delivery_does_not_consume_unrelated_practice_lesson(configured):
     assert client.get('/api/dragon-academy/status').json()['native_attempts']==[]
 
 
+@pytest.mark.parametrize("failure,status", [
+    (PermissionError("reviewed source approval denied"), 403),
+    (sqlite3.OperationalError("reviewed storage unavailable"), 503),
+])
+def test_reviewed_operation_preserves_policy_and_storage_failure_classes(configured,monkeypatch,failure,status):
+    from skeleton.ai.game_builder.dragon_delivery import DragonDelivery
+    client,*_=configured
+
+    def rejected(*args,**kwargs):
+        raise failure
+
+    monkeypatch.setattr(DragonDelivery,"brief",rejected)
+    response=client.post('/api/dragon-academy/delivery/brief',json=payload())
+    assert response.status_code==status,response.text
+
+
+@pytest.mark.parametrize("failure", [
+    PermissionError("private database cannot be opened"),
+    sqlite3.OperationalError("reviewed database unavailable"),
+])
+def test_reviewed_storage_initialization_failure_remains_unavailable(configured,monkeypatch,failure):
+    from core import dragon_delivery_routes
+    client,*_=configured
+
+    def unavailable(*args,**kwargs):
+        raise failure
+
+    monkeypatch.setattr(dragon_delivery_routes,"ReviewedKnowledgeStore",unavailable)
+    response=client.get('/api/dragon-academy/delivery/overview')
+    assert response.status_code==503,response.text
+
+
 def test_knowledge_context_does_not_mask_native_practice_database_failures(configured):
     """A nested practice outage must retain its exception domain."""
     from routes import dragon_delivery as delivery_route

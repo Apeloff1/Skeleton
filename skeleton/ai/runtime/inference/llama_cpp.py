@@ -783,6 +783,21 @@ def _digest(value: object) -> str:
     return hashlib.sha256(_stable_json(value).encode("utf-8")).hexdigest()
 
 
+def llama_cpp_prompt_tokens_upper_bound(request: LocalInferenceRequest) -> int:
+    """Bound known completion profiles without asserting which one is active.
+
+    This sizes bytes only. Actual admission still validates control markers and
+    artifact identity; custom CLI profiles retain their own runtime behavior.
+    """
+    if not isinstance(request, LocalInferenceRequest):
+        raise TypeError("request must be LocalInferenceRequest")
+    profiles = (None, "skeleton.chatml.coding.v1", "skeleton.chatml.qwen3-closed-think.v1")
+    return max(
+        len(LlamaCppModel._render_prompt_for_profile(request, profile, validate_content=False).encode("utf-8")) + 1
+        for profile in profiles
+    )
+
+
 class LlamaCppModel:
     """Run an exact, identity-bound local model through llama.cpp's CLI."""
 
@@ -986,20 +1001,25 @@ class LlamaCppModel:
         return None
 
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
-        profile = self._native_chat_profile()
+        return self._render_prompt_for_profile(request, self._native_chat_profile())
+
+    @classmethod
+    def _render_prompt_for_profile(
+        cls, request: LocalInferenceRequest, profile: str | None, *, validate_content: bool = True,
+    ) -> str:
         if profile is None:
             # Generic local/reference/custom deployments retain their exact
             # historical text protocol and operator-selected CLI behavior.
-            return request.rendered_input + self._prompt_protocol(request)
+            return request.rendered_input + cls._prompt_protocol(request)
 
-        protocol = self._prompt_protocol(request, include_schema=True)
+        protocol = cls._prompt_protocol(request, include_schema=True)
         messages: list[tuple[str, str]] = []
         if request.instructions.strip() or protocol:
             messages.append(("system", request.instructions + protocol))
         messages.extend(request.history)
         messages.append(("user", request.prompt))
         for _, content in messages:
-            if any(marker in content for marker in _CHATML_CONTENT_DELIMITERS):
+            if validate_content and any(marker in content for marker in _CHATML_CONTENT_DELIMITERS):
                 raise LlamaCppRuntimeError("local message contains a reserved ChatML control delimiter")
         rendered = "".join(
             "<|im_start|>" + role + "\n" + content + "<|im_end|>\n"
@@ -1010,7 +1030,8 @@ class LlamaCppModel:
             rendered += "<think>\n\n</think>\n\n"
         return rendered
 
-    def _prompt_protocol(self, request: LocalInferenceRequest, *, include_schema: bool = False) -> str:
+    @classmethod
+    def _prompt_protocol(cls, request: LocalInferenceRequest, *, include_schema: bool = False) -> str:
         if not request.tools:
             if request.structured_output_schema is None:
                 return ""
@@ -1021,7 +1042,7 @@ class LlamaCppModel:
             )
             if include_schema:
                 contract += "\nRequired JSON schema: " + _stable_json(
-                    self._normalized_structured_output_schema(request)
+                    cls._normalized_structured_output_schema(request)
                 )
             return contract
         allowed: list[dict[str, Any]] = []
@@ -1061,12 +1082,12 @@ class LlamaCppModel:
             contract += "\nRequired tool_id: " + str(request.specific_tool_id)
         if include_schema and request.structured_output_schema is not None:
             contract += "\nRequired final JSON schema: " + _stable_json(
-                self._normalized_structured_output_schema(request)
+                cls._normalized_structured_output_schema(request)
             )
         return contract
 
+    @staticmethod
     def _normalized_structured_output_schema(
-        self,
         request: LocalInferenceRequest,
     ) -> dict[str, Any] | None:
         if request.structured_output_schema is None:

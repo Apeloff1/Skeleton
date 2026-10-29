@@ -931,9 +931,9 @@ class ServerState:
                 else None
             ),
         )
-        # Freeze the selected application-owned verifier composition before
-        # constructing the provider graph. A missing composition leaves
-        # production local inference unavailable, never silently legacy.
+        # Freeze any application-owned verifier composition before building
+        # the provider graph. Without it, the compatibility default can still
+        # activate unguarded local inference unless the guard is required.
         guarded_local_components = self._engine_local_guard_components
         service = EngineExecutionService(
             repository,
@@ -948,7 +948,7 @@ class ServerState:
         try:
             # The actual durable service only exists here: assemble a task-scoped
             # canonical owner reader AFTER its construction and BEFORE model startup.
-            # A missing native guard remains unavailable, not an implicit downgrade.
+            # Explicit canonical source wiring requires an installed native guard.
             canonical_sources = getattr(self, "_engine_canonical_sources", None)
             mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
             if mongo_owners is not None:
@@ -1414,11 +1414,6 @@ def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
         body_limits=_gate_body_limits(),
     )
     install_gate(app, policy=gate_policy)
-    # #3622 follow-up (TD: create_app is the only HTTP entry): fold a registered
-    # agent_edge gateway in behind the same install_gate stack.
-    # Restored: dropped by the stale-base merge of #4139.
-    from skeleton.api.agent_edge_mount import install_registered_agent_edge
-    install_registered_agent_edge(app)
     from skeleton.api.agent_edge_mount import install_registered_agent_edge
     install_registered_agent_edge(app)
     # Wrap gate/lifecycle denials as well as successful route responses. CORS

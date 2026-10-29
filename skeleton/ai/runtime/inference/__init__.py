@@ -112,14 +112,10 @@ def __getattr__(name: str):
     module = _NATIVE_EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    # Literal-only dispatch keeps Cortex optional and prevents runtime-selected
-    # module imports. Unknown targets fail closed, even if the table changes.
-    if module == ".native_transformer":
-        owner = _inference_import_module(".native_transformer", __name__)
-    elif module == ".native_guard_binding":
-        owner = _inference_import_module(".native_guard_binding", __name__)
+    # Keep imports literal; neither configuration nor model text chooses a module.
+    if name in {"build_guarded_native_transformer_adapter", "native_transformer_guard_components"}:
+        value = getattr(_inference_import_module(".native_guard_binding", __name__), name)
     else:
-        raise AttributeError(f"module {__name__!r} has no audited owner for {name!r}")
-    value = getattr(owner, name)
+        value = getattr(_inference_import_module(".native_transformer", __name__), name)
     globals()[name] = value
     return value

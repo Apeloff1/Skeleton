@@ -1,11 +1,16 @@
 name: Local AI Boilerplate
 
-# The exact same test module is part of Merge Readiness's required Unit
-# job (its complete skeleton/testing suite), including local_ai changes.
-# Keep this focused lane manually dispatchable without a duplicate Actions
-# admission on each change; the mandatory gate remains fail-closed.
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'skeleton/local_ai/**'
+      - 'skeleton/testing/test_local_ai_boilerplate.py'
+  pull_request:
+    paths:
+      - 'skeleton/local_ai/**'
+      - 'skeleton/testing/test_local_ai_boilerplate.py'
 
 permissions:
   contents: read

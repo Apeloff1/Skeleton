@@ -12,36 +12,22 @@ WORKDIR /app
 COPY package.json yarn.lock* ./
 COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
+COPY scripts/verify-no-release-npm-security.js scripts/verify-deepmerge-security.cjs ./scripts/
 RUN --mount=type=secret,id=proxy_ca \
-    set -eu; \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    attempt=1; \
-    while :; do \
-      if yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-timeout 120000 > /tmp/yarn-install.log 2>&1; then \
-        cat /tmp/yarn-install.log; \
-        break; \
-      fi; \
-      cat /tmp/yarn-install.log; \
-      if [ "$attempt" -ge 3 ] || ! grep -Eq 'Request failed.*(429|50[0-9]|51[0-9]|52[0-9]|53[0-9])|ETIMEDOUT|ECONNRESET|EAI_AGAIN|socket hang up' /tmp/yarn-install.log; then \
-        rm -f /tmp/yarn-install.log; \
-        exit 1; \
-      fi; \
-      sleep "$((attempt * 5))"; \
-      attempt="$((attempt + 1))"; \
-    done; \
-    rm -f /tmp/yarn-install.log; \
-    node ./scripts/patch-node-modules.js
+    yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-concurrency 4 --network-timeout 120000 \
+    && node ./scripts/patch-node-modules.js \
+    && node ./scripts/verify-no-release-npm-security.js \
+    && yarn cache clean
 
 # Stage 2: Development
 FROM deps AS development
-WORKDIR /app
 COPY . .
 EXPOSE 3000 8081 19000 19001 19002
 CMD ["npx", "expo", "start", "--web", "--port", "3000"]
 
 # Stage 3: Web Build
 FROM deps AS builder
-WORKDIR /app
 # Expo inlines public endpoints into the exported browser bundle. These are
 # public URLs only; model credentials remain confined to the engine.
 ARG EXPO_PUBLIC_BACKEND_URL=http://localhost:8001

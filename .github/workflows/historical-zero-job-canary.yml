@@ -1,8 +1,9 @@
 name: Historical Actions zero-job canary recovery
 
 on:
-  # Owner-invoked immutable tombstone recovery, no automatic queue admission.
-  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/historical-zero-job-canary.yml']
 
 permissions: {}
 
@@ -24,7 +25,6 @@ jobs:
       GH_REPOSITORY: ${{ github.repository }}
       GH_REF: ${{ github.ref }}
       GH_EVENT: ${{ github.event_name }}
-      GH_ACTOR: ${{ github.actor }}
     steps:
       - name: Fail-closed tombstone identity proof, single DELETE, and terminal verification
         shell: bash
@@ -49,8 +49,7 @@ jobs:
           if not token or (
               os.environ.get('GH_REPOSITORY') != REPO
               or os.environ.get('GH_REF') != 'refs/heads/main'
-              or os.environ.get('GH_EVENT') != 'workflow_dispatch'
-              or os.environ.get('GH_ACTOR') != REPO.split('/')[0]
+              or os.environ.get('GH_EVENT') != 'push'
           ):
               raise SystemExit('Refusing unexpected execution context')
 

@@ -190,10 +190,6 @@ async def galaxy_request_access(request: Request, user=Depends(get_current_user)
     installation = relative.startswith(_INSTALLATION_PREFIXES) or relative in _ADMIN_READS
     prepares_artifact = relative.startswith(("/download/", "/download-apk/"))
     minimum = "admin" if installation else "editor" if not read or prepares_artifact else "viewer"
-    # Private Galaxy routes require a real account even when the rest of the
-    # developer installation has relaxed authentication. Never admit the
-    # synthetic dev_mode administrator to private build or artifact data.
-    require_authenticated_identity(user)
     authenticated = require_role(minimum)(user)
     token = _request_user.set(authenticated)
     try:

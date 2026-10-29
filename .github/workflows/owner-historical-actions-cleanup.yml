@@ -1,22 +1,35 @@
 name: Owner-ordered historical Actions cleanup
 
 on:
-  # Manual owner operation prevents admission from unrelated issue comments.
+  issue_comment:
+    types: [created]
   workflow_dispatch:
 
-# Explicit owner dispatch retains immutable canary-first recovery.
-# No push/PR/comment admission; current-head CI and security remain unchanged.
+# Admin-triggered issue comment provides a distinct GitHub event admission path.
+# macOS uses a separate hosted-runner pool from stalled Linux cleanup runs.
+# No push/PR fanout; the one owner-authored issue command is strictly validated.
+# Current-head CI and security protections remain independent and unchanged.
 permissions: {}
 
-# Each owner dispatch has an isolated admission slot; job-level locking serializes writes.
+# Every trigger gets an independent workflow-wide slot. In particular, unrelated
+# issue comments must NEVER queue behind/cancel an owner-approved cleanup.
+# The only shared lock stays on the authorized job after its strict event gate.
 concurrency:
   group: owner-historical-actions-cleanup-trigger-${{ github.run_id }}
   cancel-in-progress: false
 
-# Apply shared job-level concurrency only after the explicit owner gate.
+# Apply shared concurrency at JOB scope, after the exact owner-command if gate.
+# Otherwise any unrelated issue_comment can cancel pending owner work before
+# it ever reaches a runner, even when that comment's job would be skipped.
 jobs:
   owner-cleanup:
-    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch'
+    if: >-
+      github.actor == github.repository_owner &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.number == 3902 &&
+        github.event.issue.pull_request == null &&
+        github.event.comment.body == '/owner-historical-cleanup-30-arm-v5'))
     concurrency:
       # A queued macOS v4 job must not occupy the ARM runner's recovery slot.
       group: owner-historical-actions-cleanup-v5-arm-${{ github.repository }}

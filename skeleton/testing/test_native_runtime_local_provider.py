@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 import asyncio
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -16,7 +18,6 @@ from skeleton.ai.runtime.inference import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
     LocalInferenceRequest,
-    LocalModelAdapter,
     LocalModelArtifactError,
     NativeRuntimeBackendError,
     NativeRuntimeLocalModel,
@@ -41,7 +42,7 @@ from skeleton.contracts.operation import OperationEnvelope
 from skeleton.cortex.transformer import TinyTransformer
 from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
-from skeleton.provider_runtime import ProviderRegistry, ProviderRequest, ProviderResponse
+from skeleton.provider_runtime import ProviderAdapter, ProviderRegistry, ProviderRequest, ProviderResponse
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
@@ -159,7 +160,8 @@ async def test_provider_registry_activates_native_runtime_artifact_offline(
     adapter = registry.require_active()
     status = registry.statuses()
 
-    assert isinstance(adapter, LocalModelAdapter)
+    assert isinstance(adapter, ProviderAdapter)
+    assert isinstance(adapter.engine.model, NativeRuntimeLocalModel)
     assert adapter.provider_id == "local"
     assert adapter.model == expected.model_id
     assert adapter.runtime_digest == expected.runtime_digest
@@ -438,12 +440,17 @@ def _verified(_request, candidate: str, context_digest: str):
 
 
 async def _wait_result(service, execution_id: str):
-    for _ in range(300):
-        result = service.repository.result(execution_id)
-        if result is not None:
-            return result
-        await asyncio.sleep(0)
-    raise AssertionError("native local engine execution did not complete")
+    # Native preparation and generation use real worker threads. A fixed
+    # number of event-loop turns does not give those workers a time budget.
+    try:
+        async with asyncio.timeout(10):
+            while True:
+                result = service.repository.result(execution_id)
+                if result is not None:
+                    return result
+                await asyncio.sleep(0.01)
+    except TimeoutError as exc:
+        raise AssertionError("native local engine execution did not complete") from exc
 
 
 @pytest.mark.asyncio

@@ -162,7 +162,7 @@ class OfflineAISession:
         return len(restored) // 2
 
     def save_history_backup(self, path: str | Path) -> str:
-        """Export the original standalone model-bound backup, not a durable chat."""
+        """Retain the standalone shell's original model-bound backup format."""
         if isinstance(self, DurableOfflineAISession):
             raise OfflineAIError("use durable conversation export for this session")
         if isinstance(self.backend, NativeRuntimeLocalModel):
@@ -174,7 +174,7 @@ class OfflineAISession:
         return backup_history(path, self.model_digest, self.history)
 
     def restore_history_backup(self, path: str | Path) -> int:
-        """Load only a verified backup for the same model into a fresh chat."""
+        """Restore verified shell context without replacing durable authority."""
         if isinstance(self, DurableOfflineAISession):
             raise OfflineAIError("use durable conversation import for this session")
         if self.history:

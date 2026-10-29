@@ -2,6 +2,10 @@
 from copy import deepcopy
 from types import SimpleNamespace
 import asyncio
+import json
+from pathlib import Path
+import shutil
+import subprocess
 
 import pytest
 
@@ -127,6 +131,57 @@ def test_fresh_private_creation_is_usable_and_isolated(project_boundary):
         assert client.get("/api/playable/list", headers=foreign).json()["playables"] == []
         raw = client.get(f"/api/playable/{pid}/raw", headers=foreign)
         assert raw.status_code == 404 and "PRIVATE-NEW-PLAYABLE-CANARY" not in raw.text
+
+
+def test_raw_game_response_is_sandboxed_even_on_direct_navigation(project_boundary):
+    client, headers, _, database = project_boundary
+    database.playables.rows.append({
+        "playable_id": "raw-csp-game", "owner_id": "alice@example.test", "tenant_id": "tenant-a",
+        "html": "<!doctype html><html><head></head><body><script>window.gameBooted=true</script></body></html>",
+    })
+    path = "/api/playable/raw-csp-game/raw"
+    response = client.get(path, headers=headers["alice"])
+    assert response.status_code == 200
+    policy = response.headers["content-security-policy"]
+    assert "sandbox allow-scripts allow-pointer-lock" in policy
+    assert "allow-same-origin" not in policy and "allow-top-navigation" not in policy
+    for directive in ("default-src 'none'", "connect-src 'none'", "frame-src 'none'", "form-action 'none'", "frame-ancestors 'none'"):
+        assert directive in policy
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert "window.gameBooted=true" in response.text
+    assert client.get(path, headers=headers["bob"]).status_code == 404
+    assert client.get(path).status_code == 401
+
+
+def test_direct_raw_response_is_opaque_and_offline_in_real_chromium(project_boundary):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node and a local Playwright/Chromium installation are required")
+    client, headers, _, database = project_boundary
+    html = """<!doctype html><html><head></head><body><script>
+    (async function () {
+      const result = {scriptRan:true, cookieDenied:false, storageDenied:false, fetchDenied:false};
+      try { void document.cookie; } catch (_) { result.cookieDenied=true; }
+      try { localStorage.getItem('private_app_canary'); } catch (_) { result.storageDenied=true; }
+      try { await fetch('/exfil'); } catch (_) { result.fetchDenied=true; }
+      document.body.dataset.result=JSON.stringify(result); document.body.dataset.done='yes';
+    })();</script></body></html>"""
+    database.playables.rows.append({
+        "playable_id": "browser-csp-game", "owner_id": "alice@example.test", "tenant_id": "tenant-a", "html": html,
+    })
+    response = client.get("/api/playable/browser-csp-game/raw", headers=headers["alice"])
+    assert response.status_code == 200
+    body = json.dumps({"headers": {key: response.headers[key] for key in (
+        "content-type", "content-security-policy", "cache-control", "x-content-type-options", "referrer-policy",
+    )}, "html": response.text})
+    canary = Path(__file__).with_name("playable_raw_browser_canary.cjs")
+    result = subprocess.run([node, str(canary)], input=body, capture_output=True, text=True, timeout=40)
+    if result.returncode == 77:
+        pytest.skip("Playwright with a Chromium executable is unavailable")
+    assert result.returncode == 0, result.stderr
+    assert "opaque, network-isolated sandbox" in result.stdout
 
 
 @pytest.mark.parametrize("path,payload,status", [

@@ -83,18 +83,6 @@ jobs:
             echo "::add-mask::${value}"
             echo "${name}=${value}" >> "$GITHUB_ENV"
           done
-          # Provision a unique, ephemeral installation admin for authorized
-          # creation. A freshly registered account remains a viewer; the E2E
-          # must prove its write denial rather than weakening route RBAC.
-          admin_pw="$(gen)"
-          admin_email="qa-e2e-admin-${GITHUB_RUN_ID}@example.com"
-          echo "::add-mask::${admin_pw}"
-          {
-            echo "GAMEFORGE_SEED_ADMIN_EMAIL=${admin_email}"
-            echo "GAMEFORGE_SEED_ADMIN_PASSWORD=${admin_pw}"
-            echo "SKELETON_E2E_ADMIN_EMAIL=${admin_email}"
-            echo "SKELETON_E2E_ADMIN_PASSWORD=${admin_pw}"
-          } >> "$GITHUB_ENV"
           echo "::add-mask::${mongo_pw}"
           # The password is generated above for this run only; nothing is committed.
           # Userinfo is assembled at runtime so the URI never appears as a literal.

@@ -139,6 +139,53 @@ def test_old_namespace_without_profile_keeps_chat_default(tmp_path, artifacts):
     assert json.loads((request.output / "deployment.json").read_text())["model_id"] == provisioner.MODEL_IDS["chat"]
 
 
+@pytest.mark.parametrize("prepare_for_container", [False, True], ids=["default", "explicit-container"])
+@pytest.mark.parametrize("existing_empty", [False, True], ids=["new", "existing-empty"])
+def test_native_windows_acquisition_is_refused_before_claim_or_transfer(
+    tmp_path, monkeypatch, artifacts, existing_empty, prepare_for_container,
+):
+    target = tmp_path / "windows-deployment"
+    if existing_empty:
+        target.mkdir()
+    request = args(target, artifacts, "coding")
+    request.prepare_for_container = prepare_for_container
+    monkeypatch.setattr(provisioner.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(provisioner, "_acquire", lambda *a, **kw: pytest.fail("no transfer may start"))
+    with pytest.raises(ValueError, match="WSL2 Linux filesystem"):
+        provisioner.provision(request)
+    assert target.exists() is existing_empty
+    if existing_empty:
+        assert list(target.iterdir()) == []
+
+
+def test_native_windows_can_verify_a_previously_complete_pinned_deployment(tmp_path, monkeypatch, artifacts):
+    target = tmp_path / "complete-deployment"
+    request = args(target, artifacts, "coding")
+    created = provisioner.provision(request)
+    before = {path.relative_to(target).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in target.rglob("*") if path.is_file()}
+    monkeypatch.setattr(provisioner.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(provisioner, "_acquire", lambda *a, **kw: pytest.fail("no transfer may start"))
+    request.prepare_for_container = True
+    result = provisioner.provision(request)
+    assert result["status"] == "verified_existing"
+    assert result["receipt_digest"] == created["receipt_digest"]
+    assert before == {path.relative_to(target).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                      for path in target.rglob("*") if path.is_file()}
+
+
+def test_other_non_native_host_keeps_explicit_container_preparation(monkeypatch):
+    monkeypatch.setattr(provisioner.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(provisioner.platform, "machine", lambda: "arm64")
+    monkeypatch.setattr(provisioner.platform, "libc_ver", lambda: ("", ""))
+    request = argparse.Namespace(target=provisioner.TARGET, prepare_for_container=True)
+    result = provisioner._platform_diagnostic(request)
+    assert result["preparation_mode"] == "container" and result["host_native_compatible"] is False
+    request.prepare_for_container = False
+    with pytest.raises(ValueError, match="explicit container preparation"):
+        provisioner._platform_diagnostic(request)
+
+
 def test_existing_coding_directory_cannot_be_retargeted_or_reconfigured(tmp_path, artifacts):
     target = tmp_path / "coding-deployment"
     request = args(target, artifacts, "coding")

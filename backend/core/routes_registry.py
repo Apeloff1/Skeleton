@@ -31,7 +31,7 @@ import sys
 import time
 from typing import List, Tuple, Union
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 #  A route entry is either ``(module_path, attribute_name)`` or
 #  ``(module_path, attribute_name, url_prefix)``.
@@ -116,23 +116,19 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             if router is None:
                 skipped_names.append(f"{module_path} (attr {attr!r} missing)")
                 continue
-            prior_routes = len(app.routes)
-            # Independently mounted Galaxy sub-routers must use the same
-            # principal, role and source-identity guard as the main router.
-            # Relying on the main router's dependencies does not protect
-            # separate app.include_router() calls. Public catalog exceptions
-            # remain explicitly defined by galaxy_request_access.
-            mounted_prefix = (prefix or "") + (getattr(router, "prefix", "") or "")
-            if mounted_prefix.startswith("/api/galaxy-studio/"):
-                from fastapi import Depends
+            admission = {}
+            router_prefix = str(getattr(router, "prefix", "")).rstrip("/")
+            if router_prefix == "/api/galaxy-studio" or router_prefix.startswith("/api/galaxy-studio/"):
+                # Galaxy's extracted sibling routers share the same private
+                # build/artifact owner even when mounted independently.
                 from routes.galaxy_studio_access import galaxy_request_access
 
-                admission = [Depends(galaxy_request_access)]
-                app.include_router(router, prefix=prefix or "", dependencies=admission)
-            elif prefix:
-                app.include_router(router, prefix=prefix)
+                admission["dependencies"] = [Depends(galaxy_request_access)]
+            prior_routes = len(app.routes)
+            if prefix:
+                app.include_router(router, prefix=prefix, **admission)
             else:
-                app.include_router(router)
+                app.include_router(router, **admission)
             newly_mounted = app.routes[prior_routes:]
             # A caller or integration shim might append an unrelated direct
             # route while discarding the requested router. A changed route

@@ -68,8 +68,7 @@ async def list_resumable_builds():
         docs = await cursor.to_list(length=50)
         out: list[dict] = []
         for d in docs:
-            # Recheck even when a database adapter ignores its query.
-            if not isinstance(d, dict) or not record_visible(d):
+            if not record_visible(d):
                 continue
             d.pop("_id",        None)
             d.pop("files",      None)
@@ -117,8 +116,7 @@ async def list_my_builds(limit: int = 50, status: str = ""):
         docs = await cursor.to_list(length=min(limit, 200))
         out: list[dict] = []
         for d in docs:
-            # Do not inspect vaults or expose metadata for unowned builds.
-            if not isinstance(d, dict) or not record_visible(d):
+            if not record_visible(d):
                 continue
             bid = d.get("build_id", "")
             vault_present = False

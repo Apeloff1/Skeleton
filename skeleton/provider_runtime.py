@@ -3450,13 +3450,33 @@ class ProviderRegistry:
         require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
-        if guarded_components is not None:
+        raw_guard = os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower()
+        if raw_guard not in {"", "0", "false", "1", "true"}:
+            raise ProviderUnavailableError("invalid AI_LOCAL_GUARD_REQUIRED policy")
+        if require_guarded_local is not None and type(require_guarded_local) is not bool:
+            raise ProviderUnavailableError("local guard policy must be a boolean")
+        development_legacy = (
+            active == "local" and raw_guard in {"0", "false"}
+            and require_guarded_local is False and guarded_components is None
+            and os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() == "development"
+            and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
+        )
+        if active == "local" and (raw_guard in {"0", "false"} or require_guarded_local is False) and not development_legacy:
+            raise ProviderUnavailableError("unguarded local model requires explicit development-only authorization")
+        guarded_required = (
+            (active == "local" and not development_legacy)
+            or raw_guard in {"1", "true"}
+            or require_guarded_local is True
+            or guarded_components is not None
+        )
+        if guarded_required and active != "local":
+            raise ProviderUnavailableError("guarded local dependencies require AI_PROVIDER=local")
+        if guarded_required:
             from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
-
-            if active != "local":
-                raise ProviderPolicyError("protected local components require a trusted local provider")
             if not isinstance(guarded_components, ProtectedLocalComponents):
-                raise ProviderUnavailableError("local guarded inference requires trusted dependencies")
+                raise ProviderUnavailableError("guard-required local startup lacks trusted dependencies")
+            if raw_guard in {"0", "false"} or require_guarded_local is False:
+                raise ProviderUnavailableError("guarded local startup cannot disable its enforcement")
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         secondary_values = {
@@ -3473,22 +3493,6 @@ class ProviderRegistry:
             raise ProviderUnavailableError("local model catalogs require AI_PROVIDER=local")
 
         if active == "local":
-            # Environment variables alone cannot authorize disabling guarded inference.
-            guard_policy = os.getenv("AI_LOCAL_GUARD_REQUIRED", "1").strip().lower()
-            if guard_policy not in {"0", "1", "false", "true"}:
-                raise ProviderUnavailableError("invalid AI_LOCAL_GUARD_REQUIRED policy")
-            opt_out_requested = guard_policy in {"0", "false"}
-            if opt_out_requested:
-                if (
-                    require_guarded_local is not False
-                    or os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() != "development"
-                    or os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "").strip() != "unsafe-local-dev-only"
-                ):
-                    raise ProviderUnavailableError(
-                        "development-only local guard opt-out requires trusted caller authorization"
-                    )
-            elif guarded_components is None:
-                raise ProviderUnavailableError("local guarded inference requires trusted dependencies")
             if any(secondary_values.values()):
                 raise ProviderUnavailableError(
                     "local provider mode forbids secondary external provider configuration"
@@ -3506,7 +3510,6 @@ class ProviderRegistry:
                 default_cache_size=0 if catalog_path or deployment_path else 128
             )
             local_admission = admission_runtime or AdmissionRuntime()
-            require_guarded_inference = not opt_out_requested or guarded_components is not None
 
             def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
                 return _GovernedLocalAdapter(
@@ -3521,11 +3524,11 @@ class ProviderRegistry:
                         catalog_path,
                         cache_size=cache_size,
                         default_seed=default_seed,
-                        require_guarded_inference=require_guarded_inference,
+                        require_guarded_inference=guarded_required,
                         guarded_components=guarded_components,
                         **capacity,
                     )
-                except (LocalModelCatalogError, OSError, TypeError, ValueError) as exc:
+                except (LocalModelCatalogError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider catalog failed activation") from exc
                 configured = {id(adapter): guarded(adapter) for adapter in activation.adapters}
                 return cls(
@@ -3549,11 +3552,11 @@ class ProviderRegistry:
                         cache_size=cache_size,
                         default_seed=default_seed,
                         rehash_artifacts_each_run=True,
-                        require_guarded_inference=require_guarded_inference,
+                        require_guarded_inference=guarded_required,
                         guarded_components=guarded_components,
                         **capacity,
                     )
-                except (LocalModelDeploymentError, OSError, TypeError, ValueError) as exc:
+                except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
                 return cls([guarded(adapter)], active="local")
             try:
@@ -3566,27 +3569,22 @@ class ProviderRegistry:
 
                 loaded = load_local_model_artifact(model_path)
                 engine = LocalInferenceEngine(
-                    loaded.model,
-                    cache_size=cache_size,
-                    require_guarded_context=require_guarded_inference,
-                    **capacity,
+                        loaded.model,
+                        cache_size=cache_size,
+                        require_guarded_context=guarded_required,
+                        **capacity,
                 )
-                if require_guarded_inference:
+                if guarded_required:
                     from skeleton.ai.runtime.inference.guarded_composition import compose_protected_local_adapter
-
                     local_adapter = compose_protected_local_adapter(
-                        engine,
-                        components=guarded_components,
-                        default_seed=default_seed,
-                        artifact_status=loaded.receipt.as_dict(),
+                        engine, components=guarded_components,
+                        default_seed=default_seed, artifact_status=loaded.receipt.as_dict(),
                     )
                 else:
                     local_adapter = LocalModelAdapter(
-                        engine,
-                        default_seed=default_seed,
-                        artifact_status=loaded.receipt.as_dict(),
+                        engine, default_seed=default_seed, artifact_status=loaded.receipt.as_dict(),
                     )
-            except (LocalModelArtifactError, TypeError, ValueError) as exc:
+            except (LocalModelArtifactError, ProviderPolicyError, TypeError, ValueError) as exc:
                 raise ProviderUnavailableError("local provider model artifact failed activation") from exc
             return cls(
                 [guarded(local_adapter)],

@@ -10,10 +10,10 @@ never blocked, even when LLM enrichment is requested.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from routes.galaxy_studio_access import private_build_access
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core import churn_2_service as churn
+from routes.galaxy_studio_access import private_build_access
 
 router = APIRouter(prefix="/api/churn", tags=["churn"], dependencies=[Depends(private_build_access)])
 
@@ -67,15 +67,14 @@ def run_async(build_id: str, req: RunReq | None = None):
     return {"job_id": jid, "status": "running"}
 
 
-@router.post("/job/{job_id}/cancel")
-def cancel_job(job_id: str):
-    """Cancel only an authenticated, owned churn job."""
-    return churn.cancel_job(job_id)
-
-
 @router.get("/job/{job_id}")
 def job(job_id: str):
     return churn.get_job(job_id)
+
+
+@router.post("/job/{job_id}/cancel")
+def cancel_job(job_id: str):
+    return churn.cancel_job(job_id)
 
 
 # ── runs history ─────────────────────────────────────────────────────────────
@@ -99,7 +98,7 @@ def apply(build_id: str, gid: str, req: ApplyReq):
 class DaemonReq(BaseModel):
     enabled: bool
     interval_s: int | None = None
-    build_ids: list[str] | None = None
+    build_ids: list[str] | None = Field(default=None, max_length=25)
 
 
 @router.post("/daemon/toggle")

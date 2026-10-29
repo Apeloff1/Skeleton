@@ -4,23 +4,25 @@ Read the full event stream and rolling context summary for any build, list all
 builds, or log an explicit build event.
 """
 from __future__ import annotations
+import asyncio
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from core import build_ledger as bl
-from routes.galaxy_studio_access import visible_build_rows
 
 router = APIRouter(prefix="/api/galaxy-studio/builds", tags=["build-ledger"])
 
 
 @router.get("")
 async def list_builds(limit: int = 200):
-    result = bl.list_builds(limit=limit)
-    if not isinstance(result, dict) or not isinstance(result.get("builds"), list):
-        raise HTTPException(503, "Build inventory unavailable")
-    filtered = await visible_build_rows(result["builds"])
-    return {**result, "builds": filtered, "count": len(filtered)}
+    from routes.galaxy_studio_access import visible_build_rows
+
+    result = await asyncio.to_thread(bl.list_builds, limit=min(max(limit, 1), 200))
+    # The ledger is a derived projection; canonical Galaxy metadata decides
+    # which build identities this account can inspect.
+    visible = await visible_build_rows(result.get("builds", []))
+    return {"count": len(visible), "builds": visible}
 
 
 @router.get("/{build_id}/ledger")

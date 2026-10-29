@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from skeleton.app.assembly import (
+    CHROMA_FULL_PROFILE_BLOCKED,
     checks_ok,
     compose_command,
     find_repo_root,
@@ -242,6 +243,9 @@ def _run_compose(
     env = os.environ.copy()
     if env_overrides:
         env.update(env_overrides)
+    # An inherited Compose setting must not remove an older Chroma container
+    # that is now an orphan and may own the only copy of writable /data.
+    env["COMPOSE_REMOVE_ORPHANS"] = "0"
     completed = subprocess.run(list(command), cwd=root, check=False, env=env)
     return int(completed.returncode)
 
@@ -273,8 +277,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "local-ai":
         from skeleton.app.offline_cli import _parser as offline_parser, main as offline_main
 
-        # Keep simple model inference under the app CLI; standalone workspace,
-        # library, backup and qualification options retain their original owner.
+        # The standalone shell owns workspace, backup, local-library and
+        # qualification modes. Delegate their complete parsing/validation;
+        # native training/benchmarking and ordinary inference keep this CLI.
         shared = {"--model", "--prompt", "--max-output-tokens", "--json", "--help", "-h"}
         shell_options = {
             option for action in offline_parser()._actions
@@ -798,6 +803,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     manifest = load_manifest()
 
     if command == "up":
+        if bool(args.full):
+            print(CHROMA_FULL_PROFILE_BLOCKED)
+            return 1
         if bool(args.production) and bool(args.hot):
             print("--production and --hot are mutually exclusive")
             return 2
@@ -822,14 +830,19 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             return 1
         manifest = runtime_manifest(manifest, root=root)
         mode = "production" if bool(args.production) else "development"
-        exit_code = _run_compose(
-            compose_command(
+        try:
+            startup_command = compose_command(
                 "up",
                 manifest=manifest,
                 full=bool(args.full),
                 build=not bool(args.no_build),
                 hot=bool(args.hot),
-            ),
+            )
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        exit_code = _run_compose(
+            startup_command,
             root,
             env_overrides=manifest.mode_env(mode),
         )

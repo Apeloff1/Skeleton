@@ -111,12 +111,15 @@ def package_async(req: BuildReq) -> dict:
 
 
 @router.get("/job/{job_id}")
-def job_status(job_id: str) -> dict:
+async def job_status(job_id: str) -> dict:
+    from routes.galaxy_studio_state import load_build
+
     with _JOBS_LOCK:
         j = _JOBS.get(job_id)
-        if not j:
-            raise HTTPException(404, "unknown job")
-        return dict(j)
+        snapshot = dict(j) if j else None
+    if not snapshot or await load_build(snapshot.get("build_id", "")) is None:
+        raise HTTPException(404, "unknown job")
+    return snapshot
 
 
 @router.get("/{build_id}")

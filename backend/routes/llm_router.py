@@ -15,6 +15,7 @@ import math
 from uuid import uuid4
 from collections import OrderedDict
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -372,12 +373,12 @@ async def route_complete(
     *,
     tenant_id: str = "default",
     actor_id: str = "llm-router",
-    data_class: str = "internal",
     provider_id: str | None = None,
     model_id: str | None = None,
     idempotency_key: str | None = None,
     max_output_tokens: int | None = None,
     cooperation: dict | None = None,
+    data_class: Literal["public", "internal", "confidential", "restricted"] = "internal",
 ) -> dict:
     """Complete exact scoped work without a second model or transcript owner.
 
@@ -395,9 +396,6 @@ async def route_complete(
         "task": task,
     }
     scope = {"tenant_id": tenant_id, "actor_id": actor_id}
-    # Classification is an exact authorization/cache partition, not a hint.
-    if not isinstance(data_class, str) or data_class not in {"public", "internal", "confidential", "restricted"}:
-        return {**public, "error": "Invalid data classification.", "error_code": "request_invalid"}
     # Legacy planning names cannot be authorization, including on a cache hit.
     if model:
         _STATS["errors"] += 1
@@ -420,6 +418,8 @@ async def route_complete(
         or not isinstance(session_id, str)
         or len(session_id) > 512
         or len(task) > 64
+        or not isinstance(data_class, str)
+        or data_class not in {"public", "internal", "confidential", "restricted"}
     ):
         return {**public, "error": "The completion request is invalid.", "error_code": "request_invalid"}
     key_for_turn = idempotency_key if idempotency_key is not None else "llm-router:" + str(uuid4())
@@ -453,13 +453,13 @@ async def route_complete(
             prompt,
             **scope,
             session_id=session_id,
-            data_class=data_class,
             provider_id=provider_id,
             model_id=model_id,
             max_output_tokens=max_output_tokens,
             cooperation=policy,
             catalog_digest=catalog_identity,
             idempotency_key=idempotency_key,
+            data_class=data_class,
         )
         chat = (
             EngineChat(
@@ -495,7 +495,8 @@ async def route_complete(
 
     if use_cache:
         cached = _CACHE.get(key)
-        if cached is not None and cached.get("_scope") == [tenant_id, actor_id]:
+        if (cached is not None and cached.get("_scope") == [tenant_id, actor_id]
+                and cached.get("_data_class") == data_class):
             _STATS["cache_hits"] += 1
             hit = json.loads(json.dumps(cached["result"], allow_nan=False))
             await _log_call(
@@ -564,7 +565,7 @@ async def route_complete(
         "verification": response.verification,
     }
     if use_cache:
-        _CACHE.set(key, {"_scope": [tenant_id, actor_id], "result": result})
+        _CACHE.set(key, {"_scope": [tenant_id, actor_id], "_data_class": data_class, "result": result})
     await _log_call({**result, **scope, "provider_receipt_count": len(response.provider_receipts)})
     return result
 

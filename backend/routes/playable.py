@@ -933,6 +933,23 @@ async def validate_playable(pid: str):
     }
 
 
+_RAW_PLAYABLE_HEADERS = {
+    # The generated document is untrusted even when the owner is authorized to
+    # fetch it. A direct navigation must not inherit the application's origin or
+    # network authority; the in-app preview applies its own opaque sandbox.
+    "Content-Security-Policy": (
+        "sandbox allow-scripts allow-pointer-lock; default-src 'none'; "
+        "script-src 'unsafe-inline' 'unsafe-eval' data: blob:; "
+        "style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; "
+        "font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; "
+        "worker-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    ),
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+}
+
+
 @router.get("/{pid}/raw", response_class=HTMLResponse)
 async def get_playable_raw(pid: str):
     """Serve the game HTML directly so a WebView can load it by URI.
@@ -944,9 +961,9 @@ async def get_playable_raw(pid: str):
             "<!DOCTYPE html><html><body style='background:#0a0a14;color:#fca5a5;"
             "font-family:sans-serif;display:flex;align-items:center;justify-content:center;"
             "height:100vh;margin:0'><div>Game not found.</div></body></html>",
-            status_code=404,
+            status_code=404, headers=_RAW_PLAYABLE_HEADERS,
         )
-    return HTMLResponse(_inject_error_reporter(doc["html"]))
+    return HTMLResponse(_inject_error_reporter(doc["html"]), headers=_RAW_PLAYABLE_HEADERS)
 
 
 _ERROR_REPORTER = (

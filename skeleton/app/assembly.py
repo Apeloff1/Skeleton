@@ -618,6 +618,14 @@ def checks_ok(checks: Iterable[AssemblyCheck]) -> bool:
     return all(check.ok or not check.required for check in checks)
 
 
+CHROMA_FULL_PROFILE_BLOCKED = (
+    "Full-profile startup is unavailable: the pinned Chroma image writes /data "
+    "outside the configured volume. Preserve any existing Chroma container and "
+    "its /data alongside the legacy chroma_data volume. See "
+    "docs/APP_ASSEMBLY.md#application-surfaces for recovery guidance."
+)
+
+
 def compose_command(
     action: str,
     *,
@@ -640,6 +648,8 @@ def compose_command(
         from skeleton.app.plan import build_plan
 
         plan = build_plan(manifest=manifest, full=full)
+        if "chroma" in plan.services:
+            raise ValueError(CHROMA_FULL_PROFILE_BLOCKED)
         profiles: list[str] = []
         for service_name in plan.services:
             profile = manifest.service(service_name).profile
@@ -653,7 +663,13 @@ def compose_command(
         command.extend(plan.services)
         return tuple(command)
     if action == "down":
-        return (*base, "down", "--remove-orphans")
+        # A normal Compose down removes container writable layers. The current
+        # optional Chroma image stores /data there, so stop all declared
+        # profiles instead and preserve every container and its writable layer.
+        profiles = tuple(dict.fromkeys(service.profile for service in manifest.services if service.profile))
+        for profile in profiles:
+            base.extend(["--profile", profile])
+        return (*base, "stop")
     if action == "ps":
         return (*base, "ps")
     if action == "logs":

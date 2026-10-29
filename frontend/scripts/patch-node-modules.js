@@ -196,12 +196,6 @@ function patchHttpCacheSemanticsMaxStale() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version === '4.3.0') {
-    // 4.3.0 is the reviewed patched line resolved by the frozen lockfile.
-    // Do not rewrite patched upstream code; keep future version drift fail-closed.
-    skipped++;
-    return;
-  }
   // 4.3.0 includes the upstream Vary wildcard/prototype hardening, but the
   // max-stale branch still has the same reviewed shape as 4.2.0. Keep this
   // allow-list exact so future package drift still fails closed before patching.
@@ -221,19 +215,91 @@ function patchHttpCacheSemanticsMaxStale() {
   );
 }
 
+function patchDeepmergePrototypePoisoning() {
+  const pkgPath = path.join(ROOT, 'node_modules/deepmerge/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  for (const dir of [path.dirname(pkgPath), path.join(path.dirname(pkgPath), 'dist')]) {
+    if (!fs.lstatSync(dir).isDirectory()) {
+      throw new Error('[patch-node-modules] deepmerge package directory is unsafe');
+    }
+  }
+  const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
+  if (version !== '4.3.1') {
+    throw new Error(`[patch-node-modules] deepmerge ${version} requires security patch review`);
+  }
+  const expoMetadata = path.join(ROOT, 'node_modules/@expo/config/package.json');
+  if (fs.existsSync(expoMetadata)) {
+    const expoDeepmerge = require.resolve('deepmerge/package.json', { paths: [path.dirname(expoMetadata)] });
+    if (fs.realpathSync(expoDeepmerge) !== fs.realpathSync(pkgPath)) {
+      throw new Error('[patch-node-modules] Expo resolves an unreviewed deepmerge copy');
+    }
+  }
+
+  // GHSA-gcqx-w48m-w2h4: copying an own __proto__ key into the ordinary
+  // destination object invokes its prototype setter. Guard both the target
+  // copy and source merge in each published distribution. Validate every file
+  // before writing so an unfamiliar or partially modified package fails closed.
+  const rels = ['node_modules/deepmerge/index.js', 'node_modules/deepmerge/dist/cjs.js',
+    'node_modules/deepmerge/dist/umd.js'];
+  const plan = rels.map(rel => {
+    const abs = path.join(ROOT, rel);
+    if (!fs.existsSync(abs) || !fs.lstatSync(abs).isFile()) {
+      throw new Error(`[patch-node-modules] security target missing or unsafe: ${rel}`);
+    }
+    const source = fs.readFileSync(abs, 'utf8');
+    const target = /^([ \t]*)getKeys\(target\)\.forEach\(function\(key\) \{\r?\n/gm;
+    const input = /^([ \t]*)getKeys\(source\)\.forEach\(function\(key\) \{\r?\n/gm;
+    const guard = "if (key === '__proto__') throw new Error('[deepmerge] unsafe __proto__ key'); // skeleton GHSA-gcqx-w48m-w2h4";
+    const guardCount = source.split(guard).length - 1;
+    const targetMatches = [...source.matchAll(target)];
+    const inputMatches = [...source.matchAll(input)];
+    const writes = [...source.matchAll(/\bdestination\[key\]\s*=/g)];
+    if (targetMatches.length !== 1 || inputMatches.length !== 1 || writes.length !== 3) {
+      throw new Error(`[patch-node-modules] deepmerge target changed shape; review required: ${rel}`);
+    }
+    const follows = match => source.slice(match.index + match[0].length).startsWith(match[1] + '\t' + guard);
+    const targetGuarded = follows(targetMatches[0]);
+    const inputGuarded = follows(inputMatches[0]);
+    if (guardCount !== (targetGuarded ? 1 : 0) + (inputGuarded ? 1 : 0) || targetGuarded !== inputGuarded) {
+      throw new Error(`[patch-node-modules] deepmerge mixed prototype-guard state: ${rel}`);
+    }
+    if (targetGuarded) return { abs, rel, source, output: source };
+    const addGuard = (match, indent) => match + indent + '\t' + guard + '\n';
+    return { abs, rel, source, output: source.replace(target, addGuard).replace(input, addGuard) };
+  });
+  for (const item of plan) {
+    if (item.source === item.output) { skipped++; continue; }
+    fs.writeFileSync(item.abs, item.output, 'utf8');
+    patched++;
+    console.log(`[patch-node-modules] ✓ security ${item.rel}`);
+  }
+}
+
 function patchNodeForgeNestedDigestAlgorithm() {
   const pkgPath = path.join(ROOT, 'node_modules/node-forge/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '1.4.0') {
+  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
+  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
+  // Never silently trust a version bump as proof of this security fix.
+  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 
-  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: node-forge 1.4.0 checks the
-  // outer DigestInfo element count but not the nested DigestAlgorithm count.
-  // This is the upstream #1152 fix shape, applied fail-closed until a patched
-  // npm release exists.
+  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
+  // nested-count patch for both vulnerable upstream parser shapes.
+  // patchSecurityFile rejects unrecognized source before any security bypass.
+  // Reject ambiguous mixed sources: a stray hardened marker must not hide
+  // another original vulnerable conditional behind the idempotence shortcut.
+  const rsaSource = fs.readFileSync(
+    path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
+  const unpatchedDigestInfo = /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/;
+  const nestedArityCheck = /obj\.value\[0\]\.value\.length !==/;
+  if (unpatchedDigestInfo.test(rsaSource) && nestedArityCheck.test(rsaSource)) {
+    throw new Error('[patch-node-modules] node-forge mixed DigestInfo patch states');
+  }
+
   patchSecurityFile(
     'node_modules/node-forge/lib/rsa.js',
     /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/,
@@ -449,6 +515,7 @@ function patchExpoStaticIndexPath() {
 patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
+patchDeepmergePrototypePoisoning();
 patchNodeForgeNestedDigestAlgorithm();
 patchSprintfFormatBounds();
 patchWorkletsStaticRendering();

@@ -103,10 +103,7 @@ async def vault_list() -> dict:
     the operator.
     """
     await get_all_vault_entries()
-    entries = sorted(
-        (entry for entry in _vault_entries.values() if record_visible(entry)),
-        key=lambda e: e["created_at"], reverse=True,
-    )
+    entries = sorted((entry for entry in _vault_entries.values() if record_visible(entry)), key=lambda e: e["created_at"], reverse=True)
     zips = [e for e in entries if e["type"] == "zip"]
     apks = [e for e in entries if e["type"] == "apk"]
     return {

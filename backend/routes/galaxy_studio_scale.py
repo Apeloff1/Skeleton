@@ -20,6 +20,17 @@ def _parse_scale(scale_text: str, target_files: int = 0, target_size_gb: float =
     """
     text = scale_text.lower().replace(",", "").replace("_", "") if scale_text else ""
 
+    # An explicit file count is an execution ceiling. Natural-language scale,
+    # size hints, fusion and legacy delivery floors must not enlarge it.
+    if isinstance(target_files, int) and not isinstance(target_files, bool) and target_files > 0:
+        return {
+            "target_files": target_files,
+            "explicit_target_files": target_files,
+            "target_size_gb": target_size_gb,
+            "multiplier": max(1, (target_files + 499) // 500),
+            "scale_label": _scale_label(target_files, target_size_gb),
+        }
+
     parsed_files = target_files
     parsed_size = target_size_gb
 
@@ -88,11 +99,15 @@ def _parse_scale(scale_text: str, target_files: int = 0, target_size_gb: float =
         size_implied_files = int(parsed_size * 20_000)  # 20K files per GB
         effective_files = max(effective_files, size_implied_files)
 
-    # Scale estimates are targets, not mandatory minimum output counts.
+    # ─── HARD FLOOR: every build delivers ≥ 48 000 files (user requirement) ───
+    # No matter what the user typed (or didn't type) we never ship a build
+    # below 48 000 generated files. This guarantees the "JUGGERNAUT-tier"
+    # baseline shipping experience and matches the user's explicit minimum.
+    MIN_FILES_FLOOR = 48_000
+    effective_files = max(effective_files, MIN_FILES_FLOOR)
 
     return {
-        "explicit_target_files": target_files if isinstance(target_files, int) and not isinstance(target_files, bool) and target_files > 0 else None,
-        "target_files": target_files if isinstance(target_files, int) and not isinstance(target_files, bool) and target_files > 0 else effective_files,
+        "target_files": effective_files,
         "target_size_gb": parsed_size,
         "multiplier": multiplier,
         "scale_label": _scale_label(effective_files, parsed_size),

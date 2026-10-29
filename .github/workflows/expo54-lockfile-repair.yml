@@ -1,7 +1,6 @@
 name: Expo 54 lockfile repair artifact
 
 on:
-  # Owner-invoked artifact repair; not an automatic CI admission.
   workflow_dispatch:
 
 permissions:
