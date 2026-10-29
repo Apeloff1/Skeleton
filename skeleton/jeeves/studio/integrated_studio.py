@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, faction, weather, slots, crafting, companion, map, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
+Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, faction, weather, slots, crafting, companion, map, reputation, traps, ending, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v14"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v15"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -42,8 +42,10 @@ class IntegratedStudio:
         crafting_available = ["speed_tonic", "optical_flare"]
         companion = {"mode": "scout", "health": 40.0}
         map_fog = {"revealed": [0,1,2,3,4,5,6,7], "percent": 0.67}
+        reputation = {"score": 22, "tier": "known"}
+        traps_active = 3
+        ending = {"id": "extract_rich", "title": "Rich extract", "acts": 4}
         narrative_branch = "high_optical" if optical > 0.9 else "standard"
-        ending = "extract_rich" if salvage > 40 and optical > 0.9 else "extract"
         boss = {"phase": 4, "weak_point": "core", "defeated": True}
         curriculum_steps = 185
         godot_files = ["project.godot", "world.tscn", "world.gd", "boss.gd"]
@@ -51,7 +53,7 @@ class IntegratedStudio:
         sounds = ["pack_clear", "boss_phase", "extract"]
         state_digest = "a1b2c3d4e5f67890"
         validation_ok = True
-        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "craft", "companion", "reveal-map", "ingest-card"]
+        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "record-reputation", "place-trap", "sequence-ending", "ingest-card"]
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -77,8 +79,10 @@ class IntegratedStudio:
             "crafting_available": crafting_available,
             "companion": companion,
             "map_fog": map_fog,
-            "narrative_branch": narrative_branch,
+            "reputation": reputation,
+            "traps_active": traps_active,
             "ending": ending,
+            "narrative_branch": narrative_branch,
             "boss": boss,
             "curriculum_steps": curriculum_steps,
             "godot_files": godot_files,
@@ -95,7 +99,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels craft layer")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels ending layer")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Craft, companion, map."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Reputation, traps, ending."), indent=2))
