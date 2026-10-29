@@ -19,6 +19,7 @@ def test_research_lineage_roots_are_historical_not_runtime_support() -> None:
     zones = {zone["name"]: zone for zone in taxonomy["zone"]}
     research = zones["research-lineage"]
     specialized = zones["specialized-runtime"]
+    foundation = zones["foundation-extensions"]
 
     assert research["lifecycle"] == "historical"
     assert research["owner"] == "ai-runtime"
@@ -32,13 +33,13 @@ def test_research_lineage_roots_are_historical_not_runtime_support() -> None:
     }
     assert set(specialized["prefixes"]) == {
         "skeleton/cue/",
-        "skeleton/dna/",
         "skeleton/genos/",
-        "skeleton/organs/",
         "skeleton/parse/",
         "skeleton/turn/",
     }
+    assert {"skeleton/dna/", "skeleton/organs/"} <= set(foundation["prefixes"])
     assert set(research["prefixes"]).isdisjoint(specialized["prefixes"])
+    assert set(specialized["prefixes"]).isdisjoint(foundation["prefixes"])
 
 
 def test_tree031_records_taxonomy_only_classification() -> None:
