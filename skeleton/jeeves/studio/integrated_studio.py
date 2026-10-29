@@ -1,9 +1,8 @@
-"""IntegratedStudio: fully operational completionist conductor.
-Uses fine-tuned local AI cycle.
+"""IntegratedStudio: operational conductor with large AI cycle.
 """
 from __future__ import annotations
 from typing import Dict, Any
-from .local_ai_operational_fine import fine_tune_cycle
+from .local_ai_large_cycle import large_cycle
 
 class IntegratedStudio:
     def __init__(self) -> None:
@@ -40,7 +39,7 @@ class IntegratedStudio:
             return {"ok": False, "reason": "floors_failed", "sealed": False}
 
         era_status = self.set_era(self.era)
-        ai_result = fine_tune_cycle(brief, self.optical, self.fidelity)
+        ai_result = large_cycle(brief, self.optical, self.fidelity)
         if not ai_result.get("ok"):
             return {"ok": False, "reason": ai_result.get("reason", "ai_failed"), "sealed": False}
 
@@ -142,7 +141,7 @@ class IntegratedStudio:
             "optical": self.optical,
             "fidelity": self.fidelity,
             "ai_ok": self.ai_ok,
-            "peak_ok": self.peak_ok,
             "ready": self.optical >= 0.9 and self.fidelity >= 0.92,
             "operational": True,
+            "cycle": "large",
         }
