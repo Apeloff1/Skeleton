@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 
 import pytest
 
@@ -420,28 +421,29 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
     operation = "op-replay-journal-conflict"
     request = _request(operation)
     first = _governor(path)
-    first.reserve(request, now_wall=10.0)
+    initial = first.reserve(request, now_wall=10.0)
 
     restarted = _governor(path)
     assert restarted._journal is not None
+    original_load = restarted._journal.load
 
-    def reject_replay(**_kwargs):
-        raise CostGovernorConflict("simulated journal replay conflict")
+    def conflicting_record(operation_id):
+        record = original_load(operation_id)
+        assert record is not None
+        return replace(record, requested_request_digest="0" * 64)
 
-    monkeypatch.setattr(
-        restarted._journal,
-        "record_active",
-        reject_replay,
-    )
+    # Restart reattaches an existing durable reservation; it does not call
+    # record_active again. Corrupt the loaded journal identity instead.
+    with monkeypatch.context() as patch:
+        patch.setattr(restarted._journal, "load", conflicting_record)
+        with pytest.raises(
+            CostGovernorConflict,
+            match="durable operation replayed with different requested inputs",
+        ):
+            restarted.reserve(request, now_wall=20.0)
 
-    with pytest.raises(
-        CostGovernorConflict,
-        match="simulated journal replay conflict",
-    ):
-        restarted.reserve(request, now_wall=20.0)
-
-    # The reservation predated this restart attempt, so a metadata disagreement
-    # must not refund/delete it.
+    # A journal disagreement must never refund/delete the original authority.
     snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
     assert snapshot["active_reservations"] == 1
     assert snapshot["reserved"]["cost_usd"] == pytest.approx(2.0)
+    assert restarted.reserve(request, now_wall=21.0) == initial
