@@ -270,7 +270,7 @@ def test_memory_and_run_commands_reject_coerced_objects() -> None:
         assert result.ok is False
         assert result.to_payload()["error"]["code"] == "invalid_argument"
 
-    answers = service.execute("run", {"answers": {"seed": 1}})
+    answers = service.execute("run", {"answers": {"seed": 1}, "target": "json"})
     assert answers.ok is True
     for payload in ({"answers": []}, {"answers": "nope"}):
         result = service.execute("run", payload)
