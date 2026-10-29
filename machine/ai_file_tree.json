@@ -889,7 +889,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "f181efb63d9c47b4fdb01555274312ee6f5c7127",
+      "source_git_object_sha": "112ad1c2ec8e90414966c36be7ad71533fc16f51",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
