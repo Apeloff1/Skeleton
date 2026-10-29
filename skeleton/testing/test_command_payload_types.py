@@ -103,16 +103,17 @@ def test_memory_command_rejects_coerced_top_k() -> None:
 
 def test_run_command_rejects_coerced_repair_flag() -> None:
     service = build_runtime_command_service(_State())
-    ok = service.execute("run", {"answers": {}, "repair": True})
+    # JSON-spec assertions must select JSON explicitly; omitted target runs Godot.
+    ok = service.execute("run", {"answers": {}, "target": "json", "repair": True})
     assert ok.ok is True
     assert ok.data["game"]["repair"] is True
 
-    defaulted = service.execute("run", {"answers": {}})
+    defaulted = service.execute("run", {"answers": {}, "target": "json"})
     assert defaulted.ok is True
     assert defaulted.data["game"]["repair"] is False
 
     for repair in (1, "false", "true", None):
-        result = service.execute("run", {"answers": {}, "repair": repair})
+        result = service.execute("run", {"answers": {}, "target": "json", "repair": repair})
         assert result.ok is False
         assert result.to_payload()["error"]["code"] == "invalid_argument"
 
