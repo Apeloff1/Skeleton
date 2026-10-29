@@ -92,7 +92,7 @@ class DrivingSimulator:
         self.state.x += math.cos(self.state.heading) * self.state.speed * _DT
         self.state.y += math.sin(self.state.heading) * self.state.speed * _DT
         self.state.collision = abs(self.state.x) > 1200 or abs(self.state.y) > 1200
-        self.state.telemetry = {"speed": self.state.speed, "rpm": self.state.rpm, "downforce": self.state.downforce, "engine_temp": self.state.thermal.engine_temp, "tire_temp": self.state.thermal.tire_temp, "aero_balance": self.state.aero_balance}
+        self.state.telemetry = {"speed": self.state.speed, "rpm": self.state.rpm, "downforce": self.state.downforce, "engine_temp": self.state.thermal.engine_temp, "tire_temp": self.state.thermal.tire_temp, "aero_balance": self.state.aero_balance, "steps": self.state.steps}
         payload = f"{self.state.x:.1f}:{self.state.y:.1f}:{self.state.speed:.1f}:{self.state.thermal.engine_temp:.1f}"
         self.state.digest = hashlib.sha256(payload.encode()).hexdigest()
         emit_receipt(kind="driving_step_30x", target=self.state.digest, engine_temp=self.state.thermal.engine_temp, stored_prose=0)
