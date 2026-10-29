@@ -107,6 +107,7 @@ def test_active_reservation_replays_across_process_restart(tmp_path) -> None:
 
 def test_completed_decision_recovers_after_crash_between_reconcile_and_qualification(
     tmp_path,
+    monkeypatch,
 ) -> None:
     path = tmp_path / "quota.sqlite3"
     operation = "op-completion-crash"
@@ -128,14 +129,23 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
         now_wall=10.5,
     )
 
-    # Crash injection: the spend ledger commits terminal accounting, but the
-    # governor never reaches qualification/journal terminalization.
-    completion = first.runtime.complete(
-        operation,
-        actual,
-        now_wall=11.0,
-    )
-    assert completion.quota_completion is not None
+    # Crash after the governor durably records the operation budget and
+    # evidence intent and settles spend, but before journal terminalization.
+    # A direct runtime.complete() bypasses that intent and must fail closed.
+    assert first._journal is not None
+
+    def crash_before_terminal(*_args, **_kwargs):
+        raise SystemExit("simulated process loss after quota completion")
+
+    monkeypatch.setattr(first._journal, "record_terminal", crash_before_terminal)
+    with pytest.raises(SystemExit):
+        first.complete(
+            operation,
+            actual,
+            evidence_refs=_refs("completion"),
+            now_wall=11.0,
+        )
+    assert first.runtime.quota_ledger.snapshot("tenant-a")["completions"] == 1
 
     restarted = _governor(path)
     recovered = restarted.recover_completed(
@@ -160,6 +170,38 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
     assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
         "completions"
     ] == 1
+
+
+def test_completed_recovery_without_durable_intent_fails_closed(tmp_path) -> None:
+    path = tmp_path / "quota.sqlite3"
+    operation = "op-no-completion-intent"
+    first = _governor(path)
+    first.reserve(_request(operation), now_wall=10.0)
+    actual = UsageEstimate(cost_usd=0.5)
+    first.charge(
+        operation,
+        "provider-1",
+        "provider",
+        actual,
+        now_wall=10.5,
+    )
+
+    # A runtime-only completion cannot prove the original operation budget.
+    # Recovery must not promote it, even if tenant-wide quotas are healthy.
+    first.runtime.complete(operation, actual, now_wall=11.0)
+    restarted = _governor(path)
+    denied = restarted.recover_completed(
+        operation,
+        evidence_refs=_refs("no-intent"),
+    )
+    assert denied.state == "completed"
+    assert denied.accepted is False
+    assert denied.reasons == ("operation-budget-recovery-intent-missing",)
+    assert denied.promotion_authority is False
+    assert restarted.recover_completed(
+        operation,
+        evidence_refs=_refs("no-intent"),
+    ) == denied
 
 
 def test_completed_recovery_rejects_different_evidence_replay(tmp_path) -> None:
@@ -365,7 +407,9 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
         evidence_refs=_refs("completion-wins"),
     )
     assert completed.state == "completed"
-    assert completed.accepted is True
+    assert completed.accepted is False
+    assert completed.reasons == ("operation-budget-recovery-intent-missing",)
+    assert completed.promotion_authority is False
 
 
 def test_restart_journal_conflict_never_releases_preexisting_reservation(
