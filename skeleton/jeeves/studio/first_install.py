@@ -1,17 +1,20 @@
 """First install readiness.
-Checks local AI, peak gates, and end-user surface for clean first run.
+Fail-closed: refuses ready unless AI, peak, fidelity, and optical all pass.
 """
 from typing import Any, Dict
 
 class FirstInstall:
     def check(self, ai_ok: bool, peak: bool, fidelity: float, optical: float) -> Dict[str, Any]:
-        ready = ai_ok and peak and fidelity >= 0.92 and optical >= 0.9
+        if not isinstance(fidelity, (int, float)) or not isinstance(optical, (int, float)):
+            return {"ready": False, "reason": "bad_types", "schema": "skeleton.first_install.v2"}
+        ready = bool(ai_ok) and bool(peak) and fidelity >= 0.92 and optical >= 0.9
         return {
             "ready": ready,
-            "ai_ok": ai_ok,
-            "peak": peak,
+            "ai_ok": bool(ai_ok),
+            "peak": bool(peak),
             "fidelity": fidelity,
             "optical": optical,
             "first_run": True,
-            "schema": "skeleton.first_install.v1",
+            "reason": "ok" if ready else "gates_failed",
+            "schema": "skeleton.first_install.v2",
         }
