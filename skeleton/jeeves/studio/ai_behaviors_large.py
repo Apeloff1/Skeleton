@@ -1,5 +1,5 @@
-"""AI behavior subsystem (10x).
-Patrol, chaser, turret, boss phases, attack pattern selection, decision trees.
+"""Large AI behavior subsystem.
+Extensive attack patterns, decision trees, phase machines, optical tags.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,7 +16,7 @@ class PatrolBehavior(BehaviorNode):
         super().__init__("patrol")
         self.idx = 0
     def tick(self, ctx: Dict[str, Any]) -> str:
-        wps = ctx.get("waypoints", [(0.0,0.0),(10.0,0.0),(10.0,10.0),(0.0,10.0)])
+        wps = ctx.get("waypoints", [(0.0,0.0),(12.0,0.0),(12.0,12.0),(0.0,12.0)])
         self.idx = (self.idx + 1) % len(wps)
         ctx["target"] = wps[self.idx]
         ctx["speed"] = 70.0
@@ -29,44 +29,39 @@ class ChaserBehavior(BehaviorNode):
         dx = player[0] - me[0]
         dy = player[1] - me[1]
         dist = math.hypot(dx, dy) or 1.0
-        if dist < 1.6:
+        if dist < 1.5:
             ctx["in_range"] = True
             return "success"
         ctx["velocity"] = (dx / dist * 100.0, dy / dist * 100.0)
         return "running"
 
-class TurretBehavior(BehaviorNode):
-    def tick(self, ctx: Dict[str, Any]) -> str:
-        timer = ctx.get("fire_timer", 0.0) + 0.016
-        ctx["fire_timer"] = timer
-        if timer > 1.4:
-            ctx["fire_timer"] = 0.0
-            ctx["projectile"] = {"damage": 10, "speed": 200}
-            return "success"
-        return "running"
-
 class BossPhaseMachine:
-    def __init__(self, phases: int = 5):
+    def __init__(self, phases: int = 6):
         self.phase = 0
         self.phases = phases
-        self.health = float(phases * 35)
+        self.health = float(phases * 40)
         self.max_health = self.health
-        self.patterns = ["dash", "projectile_spread", "area_denial", "summon", "laser", "orbital", "beam"]
-    def update(self, dt: float, player_pos: Tuple[float, float]) -> Dict[str, Any]:
+        self.patterns = ["dash", "projectile_spread", "area_denial", "summon", "laser", "orbital"]
+    def update(self, dt: float, damage: float = 0.0) -> Dict[str, Any]:
+        self.health = max(0.0, self.health - damage)
         thresh = 1.0 - float(self.phase + 1) / float(self.phases)
         if self.health < self.max_health * thresh and self.phase < self.phases - 1:
             self.phase += 1
-        pattern = self.patterns[self.phase % len(self.patterns)]
-        return {"phase": self.phase, "pattern": pattern, "health": self.health}
-    def take_damage(self, amt: float) -> bool:
-        self.health = max(0.0, self.health - amt)
-        return self.health <= 0.0
+        return {"phase": self.phase, "pattern": self.patterns[self.phase % len(self.patterns)], "health": self.health, "defeated": self.health <= 0}
 
 ATTACK_PATTERNS: Dict[str, Dict[str, Any]] = {
-    "pat_0": {"windup": 0.25, "active": 0.45, "damage": 5, "range": 1.2, "optical": "dash"},
-    "pat_1": {"windup": 0.29, "active": 0.53, "damage": 6, "range": 1.5, "optical": "projectile"},
+    "pat_0": {"windup": 0.22, "active": 0.42, "damage": 5, "range": 1.1, "optical": "dash"},
+    "pat_1": {"windup": 0.25, "active": 0.47, "damage": 6, "range": 1.3, "optical": "projectile"},
+    "pat_2": {"windup": 0.28, "active": 0.52, "damage": 7, "range": 1.5, "optical": "area"},
+    "pat_3": {"windup": 0.31, "active": 0.45, "damage": 8, "range": 1.7, "optical": "summon"},
+    "pat_4": {"windup": 0.24, "active": 0.50, "damage": 9, "range": 1.9, "optical": "laser"},
+    "pat_5": {"windup": 0.27, "active": 0.55, "damage": 10, "range": 1.4, "optical": "dash"},
+    "pat_6": {"windup": 0.30, "active": 0.48, "damage": 11, "range": 1.6, "optical": "projectile"},
+    "pat_7": {"windup": 0.23, "active": 0.53, "damage": 12, "range": 1.8, "optical": "area"},
+    "pat_8": {"windup": 0.26, "active": 0.46, "damage": 13, "range": 2.0, "optical": "summon"},
+    "pat_9": {"windup": 0.29, "active": 0.51, "damage": 14, "range": 1.2, "optical": "laser"},
 }
 
 def select_pattern(phase: int, entropy: float) -> Dict[str, Any]:
-    key = f"pat_{(phase * 23 + int(entropy * 100)) % 2}"
-    return ATTACK_PATTERNS.get(key, ATTACK_PATTERNS["pat_0"])
+    idx = (phase * 29 + int(entropy * 150)) % 10
+    return ATTACK_PATTERNS.get(f"pat_{idx}", ATTACK_PATTERNS["pat_0"])
