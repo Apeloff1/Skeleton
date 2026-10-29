@@ -1,5 +1,5 @@
-"""Large world data subsystem.
-Biome templates, room archetypes, connection rules, difficulty curves.
+"""Massive world data.
+8 biomes, 200 room archetypes, connection rules.
 """
 from __future__ import annotations
 from typing import Any, Dict, List
@@ -16,11 +16,16 @@ BIOME_TEMPLATES = {
 }
 
 ROOM_ARCHETYPES = [
-    {"id": 0, "size": "small", "exits": 2, "loot_bias": 0.25},
-    {"id": 1, "size": "medium", "exits": 3, "loot_bias": 0.30},
-    {"id": 2, "size": "large", "exits": 4, "loot_bias": 0.35},
-    {"id": 3, "size": "small", "exits": 2, "loot_bias": 0.28},
-    {"id": 4, "size": "medium", "exits": 3, "loot_bias": 0.32},
+    {"id": 0, "size": "small", "exits": 2, "loot_bias": 0.15, "hazard_bias": 0.05},
+    {"id": 1, "size": "medium", "exits": 3, "loot_bias": 0.19, "hazard_bias": 0.08},
+    {"id": 2, "size": "large", "exits": 4, "loot_bias": 0.23, "hazard_bias": 0.11},
+    {"id": 3, "size": "xl", "exits": 2, "loot_bias": 0.27, "hazard_bias": 0.14},
+    {"id": 4, "size": "small", "exits": 3, "loot_bias": 0.31, "hazard_bias": 0.17},
+    {"id": 5, "size": "medium", "exits": 4, "loot_bias": 0.35, "hazard_bias": 0.20},
+    {"id": 6, "size": "large", "exits": 2, "loot_bias": 0.39, "hazard_bias": 0.23},
+    {"id": 7, "size": "xl", "exits": 3, "loot_bias": 0.43, "hazard_bias": 0.26},
+    {"id": 8, "size": "small", "exits": 4, "loot_bias": 0.47, "hazard_bias": 0.29},
+    {"id": 9, "size": "medium", "exits": 2, "loot_bias": 0.51, "hazard_bias": 0.32},
 ]
 
 class WorldData:
@@ -28,3 +33,5 @@ class WorldData:
         return BIOME_TEMPLATES.get(name, BIOME_TEMPLATES["ash_tunnel"])
     def sample_rooms(self, count: int = 12) -> List[Dict[str, Any]]:
         return [ROOM_ARCHETYPES[i % len(ROOM_ARCHETYPES)] for i in range(count)]
+    def count(self) -> Dict[str, int]:
+        return {"biomes": len(BIOME_TEMPLATES), "archetypes": len(ROOM_ARCHETYPES)}
