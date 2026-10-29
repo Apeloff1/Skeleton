@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including economy simulator, loot roller, progress aggregator, boss sequencer, narrative branch engine, fidelity ratchet, multi-tier validator, advanced optical feedback, export orchestrator, advanced multi-tier local AI, visual editor, asset pipeline, local AI, AI driven development, remaining context, expanded graphics editor, advanced algorithms, graphics modes, era engine, decomp, distill, weights, forge, optical, boss, loot, narrative, economy, and AI.
+Chains the full studio surface including dialogue selector, achievement tracker, event generator, economy simulator, loot roller, progress aggregator, boss sequencer, narrative branch engine, fidelity ratchet, multi-tier validator, advanced optical feedback, export orchestrator, advanced multi-tier local AI, visual editor, asset pipeline, local AI, AI driven development, remaining context, expanded graphics editor, advanced algorithms, graphics modes, era engine, decomp, distill, weights, forge, optical, boss, loot, narrative, economy, and AI.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v39"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v40"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -36,6 +36,9 @@ class IntegratedStudio:
         economy = {"salvage": 42, "prices": {"speed": 20, "armor": 25, "range": 18}}
         loot = {"source": "elite", "value": 22, "rarity": "rare", "effect": "armor"}
         progress = {"rooms": 7, "packs": 14, "boss_phase": 4, "boss_defeated": True, "percent": 0.89}
+        dialogue = ["intro", "high_opt", "rich", "boss_near", "extract"]
+        achievements = ["first_pack", "optical_master", "boss_down"]
+        events = [{"type": "optical_rift", "reward_mult": 1.5}, {"type": "salvage_cache", "value": 12}]
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -62,6 +65,9 @@ class IntegratedStudio:
             "fidelity_ratchet": ratchet,
             "economy_simulator": economy,
             "loot_roller": loot,
+            "dialogue": dialogue,
+            "achievements": achievements,
+            "events": events,
             "godot_files": ["project.godot", "world.tscn", "world.gd", "boss.gd"],
             "distill_pack": {"ingest_ready": True, "fidelity": 0.94},
             "jeeves_ready": True,
@@ -71,7 +77,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels economy loot progress")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels dialogue achievements events")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Economy, loot, progress."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Dialogue, achievements, events."), indent=2))
