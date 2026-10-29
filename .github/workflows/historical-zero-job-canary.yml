@@ -1,9 +1,10 @@
 name: Historical Actions zero-job canary recovery
 
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/historical-zero-job-canary.yml']
+  # Historical tombstone recovery is explicitly operator-dispatched.
+  # The one-shot installation push has already occurred; do not consume
+  # an independent automatic Actions admission on every policy audit.
+  workflow_dispatch:
 
 permissions: {}
 
