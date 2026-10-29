@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, faction, weather, slots, crafting, companion, map, reputation, traps, ending, skill, hazard, summary, tutorial, checkpoint, distill pack, leaderboard, daily, replay, mods, access, analytics, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
+Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, faction, weather, slots, crafting, companion, map, reputation, traps, ending, skill, hazard, summary, tutorial, checkpoint, distill pack, leaderboard, daily, replay, mods, access, analytics, localization, migrator, health, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v19"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v20"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -57,6 +57,9 @@ class IntegratedStudio:
         mods_active = 2
         access = {"reduced_hazard": False, "higher_optical_ease": True}
         analytics = {"runs": 4, "avg_optical": 0.94, "avg_salvage": 38.5}
+        lang = "en"
+        schema_version = "skeleton.state.v2"
+        health = {"healthy": True, "checked": 12, "failed": []}
         narrative_branch = "high_optical" if optical > 0.9 else "standard"
         boss = {"phase": 4, "weak_point": "core", "defeated": True}
         curriculum_steps = 185
@@ -65,7 +68,7 @@ class IntegratedStudio:
         sounds = ["pack_clear", "boss_phase", "extract"]
         state_digest = "a1b2c3d4e5f67890"
         validation_ok = True
-        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "load-mods", "set-access", "aggregate-analytics", "ingest-card"]
+        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "set-lang", "migrate-state", "check-health", "ingest-card"]
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -106,6 +109,9 @@ class IntegratedStudio:
             "mods_active": mods_active,
             "access": access,
             "analytics": analytics,
+            "lang": lang,
+            "schema_version": schema_version,
+            "health": health,
             "narrative_branch": narrative_branch,
             "boss": boss,
             "curriculum_steps": curriculum_steps,
@@ -123,7 +129,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels options layer")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels ops layer")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Mods, access, analytics."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Localization, migrate, health."), indent=2))
