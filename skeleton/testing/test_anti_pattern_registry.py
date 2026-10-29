@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pytest
 from skeleton.eval.antipatterns import *
-def pattern():return AntiPattern("ANTIPATTERN.BROAD_EXCEPT","historically swallowed durable failures",r"except\\s+Exception\\s*:", "catch typed exceptions and preserve failure evidence")
+def pattern():return AntiPattern("ANTIPATTERN.BROAD_EXCEPT","historically swallowed durable failures",r"except\s+Exception\s*:", "catch typed exceptions and preserve failure evidence")
 def test_detector_emits_deterministic_location():
  r=AntiPatternRegistry((pattern(),));f=r.scan("a.py","x=1\nexcept Exception:\n pass");assert f[0].line==2 and f[0].pattern_id=="ANTIPATTERN.BROAD_EXCEPT"
 def test_unexcepted_finding_remains_blocking():
