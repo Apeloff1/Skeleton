@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
+Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v11"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v12"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -33,6 +33,9 @@ class IntegratedStudio:
         combat = {"enemy_health": 85.0, "player_damage_taken": 3.2, "defeated": False, "weak_hit": True}
         loot = {"source": "elite", "value": 22, "rarity": "rare", "effect": "armor"}
         progress = {"rooms": 7, "packs": 14, "boss_phase": 4, "boss_defeated": True, "percent": 0.89}
+        status_mods = {"speed": 1.15, "armor": 8.0, "damage": 1.1}
+        room_graph = {"count": 12, "optical_bias": optical}
+        telemetry = {"count": 48, "by_kind": {"combat": 12, "loot": 9, "progress": 7}}
         narrative_branch = "high_optical" if optical > 0.9 else "standard"
         ending = "extract_rich" if salvage > 40 and optical > 0.9 else "extract"
         boss = {"phase": 4, "weak_point": "core", "defeated": True}
@@ -42,7 +45,7 @@ class IntegratedStudio:
         sounds = ["pack_clear", "boss_phase", "extract"]
         state_digest = "a1b2c3d4e5f67890"
         validation_ok = True
-        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "resolve-combat", "roll-loot", "track-progress", "ingest-card"]
+        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "apply-status", "connect-rooms", "log-telemetry", "ingest-card"]
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -59,6 +62,9 @@ class IntegratedStudio:
             "combat": combat,
             "loot": loot,
             "progress": progress,
+            "status_mods": status_mods,
+            "room_graph": room_graph,
+            "telemetry": telemetry,
             "narrative_branch": narrative_branch,
             "ending": ending,
             "boss": boss,
@@ -77,7 +83,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels combat layer")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels status layer")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Combat, loot, progress."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Status, rooms, telemetry."), indent=2))
