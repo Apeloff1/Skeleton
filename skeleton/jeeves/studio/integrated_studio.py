@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including ending sequencer, skill tree, environmental hazard, map reveal, reputation system, trap placer, save slot manager, crafting system, companion AI, telemetry logger, faction system, weather modifier, combat resolver, status effects, room connector, dialogue selector, achievement tracker, event generator, economy simulator, loot roller, progress aggregator, boss sequencer, narrative branch engine, fidelity ratchet, multi-tier validator, advanced optical feedback, export orchestrator, advanced multi-tier local AI, visual editor, asset pipeline, local AI, AI driven development, remaining context, expanded graphics editor, advanced algorithms, graphics modes, era engine, decomp, distill, weights, forge, optical, boss, loot, narrative, economy, and AI.
+Chains the full studio surface including run summary, tutorial system, checkpoint manager, ending sequencer, skill tree, environmental hazard, map reveal, reputation system, trap placer, save slot manager, crafting system, companion AI, telemetry logger, faction system, weather modifier, combat resolver, status effects, room connector, dialogue selector, achievement tracker, event generator, economy simulator, loot roller, progress aggregator, boss sequencer, narrative branch engine, fidelity ratchet, multi-tier validator, advanced optical feedback, export orchestrator, advanced multi-tier local AI, visual editor, asset pipeline, local AI, AI driven development, remaining context, expanded graphics editor, advanced algorithms, graphics modes, era engine, decomp, distill, weights, forge, optical, boss, loot, narrative, economy, and AI.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v45"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v46"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -54,6 +54,9 @@ class IntegratedStudio:
         ending = {"id": "extract_rich", "salvage": 42, "optical": optical}
         skills = ["swift", "keen"]
         hazard = {"damage": 3.6, "tags": ["ash"], "biome": "ash_tunnel"}
+        summary = {"grade": "A", "percent": 0.89, "rooms": 7, "packs": 14, "salvage": 42}
+        tutorial = {"complete": True, "done": ["move", "interact", "salvage", "optical", "extract"]}
+        checkpoint = {"has_checkpoint": True, "name": "mid_boss"}
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -97,6 +100,9 @@ class IntegratedStudio:
             "traps": traps,
             "skill_tree": skills,
             "hazard": hazard,
+            "run_summary": summary,
+            "tutorial": tutorial,
+            "checkpoint": checkpoint,
             "godot_files": ["project.godot", "world.tscn", "world.gd", "boss.gd"],
             "distill_pack": {"ingest_ready": True, "fidelity": 0.94},
             "jeeves_ready": True,
@@ -106,7 +112,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels ending skills hazard")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels summary tutorial checkpoint")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Ending, skills, hazard."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Summary, tutorial, checkpoint."), indent=2))
