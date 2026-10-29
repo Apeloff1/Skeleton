@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including save slot manager, crafting system, companion AI, telemetry logger, faction system, weather modifier, combat resolver, status effects, room connector, dialogue selector, achievement tracker, event generator, economy simulator, loot roller, progress aggregator, boss sequencer, narrative branch engine, fidelity ratchet, multi-tier validator, advanced optical feedback, export orchestrator, advanced multi-tier local AI, visual editor, asset pipeline, local AI, AI driven development, remaining context, expanded graphics editor, advanced algorithms, graphics modes, era engine, decomp, distill, weights, forge, optical, boss, loot, narrative, economy, and AI.
+Chains the full studio surface including map reveal, reputation system, trap placer, save slot manager, crafting system, companion AI, telemetry logger, faction system, weather modifier, combat resolver, status effects, room connector, dialogue selector, achievement tracker, event generator, economy simulator, loot roller, progress aggregator, boss sequencer, narrative branch engine, fidelity ratchet, multi-tier validator, advanced optical feedback, export orchestrator, advanced multi-tier local AI, visual editor, asset pipeline, local AI, AI driven development, remaining context, expanded graphics editor, advanced algorithms, graphics modes, era engine, decomp, distill, weights, forge, optical, boss, loot, narrative, economy, and AI.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v43"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v44"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -48,6 +48,9 @@ class IntegratedStudio:
         saves = ["slot_1", "autosave"]
         crafts = ["speed_tonic", "optical_flare"]
         companion = {"mode": "scout", "health": 40.0}
+        map_fog = {"explored": 7, "revealed": 5, "fog_of_war": True}
+        reputation = {"score": 18, "tier": "known", "actions": 6}
+        traps = {"total": 4, "armed": 2}
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -86,6 +89,9 @@ class IntegratedStudio:
             "save_slots": saves,
             "crafting": crafts,
             "companion": companion,
+            "map_reveal": map_fog,
+            "reputation": reputation,
+            "traps": traps,
             "godot_files": ["project.godot", "world.tscn", "world.gd", "boss.gd"],
             "distill_pack": {"ingest_ready": True, "fidelity": 0.94},
             "jeeves_ready": True,
@@ -95,7 +101,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels saves crafting companion")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels map reputation traps")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Saves, crafting, companion."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Map, reputation, traps."), indent=2))
