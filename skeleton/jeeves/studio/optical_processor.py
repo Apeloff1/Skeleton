@@ -1,5 +1,5 @@
-"""Optical observation processor.
-Tile classification, diversity scoring, feedback to level gen and distillation.
+"""Optical observation processor (4x).
+Tile classification, diversity scoring, feedback loops, multi-frame aggregation.
 """
 from __future__ import annotations
 from typing import Any, Dict, List
@@ -7,13 +7,24 @@ import math
 
 class OpticalProcessor:
     def classify(self, diversity: float, steps: int) -> Dict[str, float]:
-        return {
-            "tile_floor": 0.4 + diversity * 0.1,
-            "tile_wall": 0.2,
-            "tile_hazard": 0.1 + (1-diversity)*0.05,
-            "entity_pack": 0.15,
-            "entity_player": 0.1,
-            "entity_enemy": 0.05,
+        base = {
+            "tile_floor": 0.4 + diversity * 0.12,
+            "tile_wall": 0.18 + (1-diversity)*0.04,
+            "tile_hazard": 0.09 + (1-diversity)*0.06,
+            "entity_pack": 0.14 + diversity * 0.03,
+            "entity_player": 0.09,
+            "entity_enemy": 0.06 + diversity * 0.02,
+            "entity_boss": 0.04,
         }
+        total = sum(base.values())
+        return {k: v/total for k, v in base.items()}
+
     def score(self, classes: Dict[str, float]) -> float:
-        return sum(v * (0.5 + i*0.1) for i, v in enumerate(classes.values()))
+        weights = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]
+        return sum(v * weights[i % len(weights)] for i, v in enumerate(classes.values()))
+
+    def aggregate(self, frames: List[Dict[str, float]]) -> Dict[str, float]:
+        if not frames:
+            return {}
+        keys = frames[0].keys()
+        return {k: sum(f.get(k, 0) for f in frames)/len(frames) for k in keys}
