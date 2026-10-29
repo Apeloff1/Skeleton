@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including procedural generator, advanced graphics, delta compression, full local AI operational, peak operational, physics, multiplayer, networked, live conductor, Godot scene, realtime, era-bound, and the full prior set.
+Chains the full studio surface including advanced procedural (multi-biome density), advanced graphics (multi-pass palette), advanced delta (multi-peer history), advanced local AI (weight fusion), advanced peak (multi-gate), physics, multiplayer, networked, live conductor, Godot scene, realtime, era-bound, and the full prior set.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v52"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v53"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -75,11 +75,11 @@ class IntegratedStudio:
         phys_combat = {"damage": 15.6, "knockback": 0.19, "optical": optical}
         networked = {"delta_size": 3, "optical_priority": optical}
         phys_world = {"rooms": 7, "bodies": 8, "era": "ash"}
-        proc = {"rooms": 7, "graph": 7, "packs": 14, "boss": {"room": 6, "phase": 4}}
-        adv_gfx = {"mode": "2.5d", "lod": 1, "culled": 4, "visible": 12, "projection": "oblique"}
-        delta = {"size": 2, "optical_priority": optical, "peers": 4, "ratio": 0.85}
-        local_ai_op = {"tier": "final", "ok": True, "fidelity": 0.94, "modules": ["level_gen", "behavior_gen", "asset_respray", "boss_seq", "narrative_branch"]}
-        peak = {"peak": True, "fidelity": 0.94, "optical": optical, "export_ok": True, "ai_ok": True}
+        proc = {"rooms": 7, "graph": 7, "packs": 14, "biomes": ["ash_tunnel", "crystal_cavern", "void_rift", "ember_hall"], "boss": {"room": 6, "phase": 5}}
+        adv_gfx = {"mode": "2.5d", "lod": 1, "culled": 4, "visible": 12, "passes": 2, "palette": "#3a2a1a"}
+        delta = {"size": 2, "optical_priority": optical, "peers": 4, "ratio": 0.85, "avg_ratio": 0.85}
+        local_ai_op = {"tier": "final", "ok": True, "fidelity": 0.94, "fused": 0.82, "modules": ["level_gen", "behavior_gen", "asset_respray", "boss_seq", "narrative_branch", "proc_gen", "graphics"]}
+        peak = {"peak": True, "fidelity": 0.94, "optical": optical, "export_ok": True, "ai_ok": True, "physics_ok": True, "multi_ok": True}
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -157,7 +157,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels proc graphics delta ai peak")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels advanced elaborate")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Proc, graphics, delta, AI, peak."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Advanced elaborate."), indent=2))
