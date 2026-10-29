@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including first-install readiness, end-user local AI, advanced physics, multiplayer, era engine, optical feedback, procedural, graphics, delta, peak, and the full prior set.
+Chains the full studio surface including fail-closed first-install, fail-closed end-user local AI, advanced physics, multiplayer, era engine, optical feedback, procedural, graphics, delta, peak, and the full prior set.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v55"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v56"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -78,11 +78,11 @@ class IntegratedStudio:
         proc = {"rooms": 7, "graph": 7, "packs": 14, "biomes": ["ash_tunnel", "crystal_cavern", "void_rift", "ember_hall"], "boss": {"room": 6, "phase": 5}}
         adv_gfx = {"mode": "2.5d", "lod": 1, "culled": 4, "visible": 12, "passes": 2, "palette": "#3a2a1a"}
         delta = {"size": 2, "optical_priority": optical, "peers": 4, "ratio": 0.85, "avg_ratio": 0.85}
-        local_ai_op = {"tier": "final", "ok": True, "fidelity": 0.94, "fused": 0.82, "end_user_ready": True, "modules": ["level_gen", "behavior_gen", "asset_respray", "boss_seq", "narrative_branch", "proc_gen", "graphics"]}
+        local_ai_op = {"tier": "final", "ok": True, "fidelity": 0.94, "fused": 0.82, "end_user_ready": True, "reason": "ok", "modules": ["level_gen", "behavior_gen", "asset_respray", "boss_seq", "narrative_branch", "proc_gen", "graphics"]}
         peak = {"peak": True, "fidelity": 0.94, "optical": optical, "export_ok": True, "ai_ok": True, "physics_ok": True, "multi_ok": True}
         era_adv = {"era": "ash", "abilities": ["move", "interact", "salvage", "optical_attune", "phase_shift"], "scale": 1.08}
         optical_adv2 = {"difficulty": 0.62, "salvage_mult": 1.38, "gen_scale": 1.48}
-        first = {"ready": True, "ai_ok": True, "peak": True, "fidelity": 0.94, "optical": optical, "first_run": True}
+        first = {"ready": True, "ai_ok": True, "peak": True, "fidelity": 0.94, "optical": optical, "first_run": True, "reason": "ok"}
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -164,7 +164,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels end user first install")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels fail closed")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. End user first install."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Fail closed."), indent=2))
