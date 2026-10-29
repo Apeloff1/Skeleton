@@ -1,0 +1,14 @@
+"""NPC 0040.
+"""
+from __future__ import annotations
+
+NPC = "npc_0040"
+ROLE = ["vendor", "guard", "quest", "ambient"][40 % 4]
+
+def greet(player: str) -> dict:
+    if not player:
+        return {"ok": False, "reason": "no_player"}
+    return {"ok": True, "npc": NPC, "role": ROLE, "player": player, "line": f"{ROLE} greets {player}"}
+
+def can_trade() -> bool:
+    return ROLE == "vendor"
