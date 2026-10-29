@@ -1,16 +1,9 @@
 name: Local AI Boilerplate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'skeleton/local_ai/**'
-      - 'skeleton/testing/test_local_ai_boilerplate.py'
-  pull_request:
-    paths:
-      - 'skeleton/local_ai/**'
-      - 'skeleton/testing/test_local_ai_boilerplate.py'
+  # Merge Readiness / Unit already runs skeleton/testing, including this test.
+  # Keep targeted diagnostics available without a duplicate automatic run.
+  workflow_dispatch:
 
 permissions:
   contents: read
