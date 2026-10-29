@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
+Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, faction, weather, slots, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v12"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v13"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -36,6 +36,9 @@ class IntegratedStudio:
         status_mods = {"speed": 1.15, "armor": 8.0, "damage": 1.1}
         room_graph = {"count": 12, "optical_bias": optical}
         telemetry = {"count": 48, "by_kind": {"combat": 12, "loot": 9, "progress": 7}}
+        factions = {"ash_keepers": {"standing": 15, "tier": "friendly"}, "crystal_miners": {"standing": 0, "tier": "neutral"}}
+        weather = {"condition": "haze", "salvage_mult": 1.0, "hazard_mult": 1.0, "visibility": optical}
+        save_slots = ["slot_1", "autosave"]
         narrative_branch = "high_optical" if optical > 0.9 else "standard"
         ending = "extract_rich" if salvage > 40 and optical > 0.9 else "extract"
         boss = {"phase": 4, "weak_point": "core", "defeated": True}
@@ -45,7 +48,7 @@ class IntegratedStudio:
         sounds = ["pack_clear", "boss_phase", "extract"]
         state_digest = "a1b2c3d4e5f67890"
         validation_ok = True
-        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "apply-status", "connect-rooms", "log-telemetry", "ingest-card"]
+        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "adjust-faction", "check-weather", "save-slot", "ingest-card"]
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -65,6 +68,9 @@ class IntegratedStudio:
             "status_mods": status_mods,
             "room_graph": room_graph,
             "telemetry": telemetry,
+            "factions": factions,
+            "weather": weather,
+            "save_slots": save_slots,
             "narrative_branch": narrative_branch,
             "ending": ending,
             "boss": boss,
@@ -83,7 +89,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels status layer")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels faction layer")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Status, rooms, telemetry."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Faction, weather, slots."), indent=2))
