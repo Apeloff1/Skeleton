@@ -1,11 +1,9 @@
-"""IntegratedStudio: full completionist conductor.
-Wires every major game aspect: era, graphics, AI, physics, multiplayer, procedural,
-optical, narrative, loot, combat, economy, dialogue, achievement, event, status,
-telemetry, faction, weather, save, crafting, companion, map, reputation, trap,
-ending, skill, hazard, tutorial, checkpoint, advanced graphics, delta, and seals.
+"""IntegratedStudio: completionist conductor with full local AI.
+Wires every major game aspect plus completionist AI cycle.
 """
 from __future__ import annotations
 from typing import Dict, Any, List
+from .local_ai_completionist import run_completionist_ai
 
 class IntegratedStudio:
     def __init__(self) -> None:
@@ -42,18 +40,21 @@ class IntegratedStudio:
             return {"ok": False, "reason": "floors_failed", "sealed": False}
 
         era_status = self.set_era(self.era)
+        ai_result = run_completionist_ai(brief, self.optical, self.fidelity)
+        if not ai_result.get("ok"):
+            return {"ok": False, "reason": ai_result.get("reason", "ai_failed"), "sealed": False}
+
         rooms = max(4, int(self.rooms * self.optical))
         edges = [[i, i+1] for i in range(rooms - 1)]
         if self.optical > 0.92:
             edges.append([0, rooms-1])
-        tier = "final" if self.fidelity >= 0.94 else "refine"
+        tier = ai_result.get("tier", "final")
         phases = ["intro", "mid", "weak_point", "finale"]
         if self.optical > 0.93:
             phases.append("enrage")
         loot_rarity = "epic" if self.optical > 0.94 else "rare"
         narrative = "rich_extract" if self.optical > 0.93 else "high_optical"
 
-        # full aspect coverage
         economy = {"price_mod": 1.0 + self.optical * 0.2, "ok": True}
         dialogue = {"line": narrative, "ok": True}
         achievement = {"unlocked": ["optical_ace"] if self.optical > 0.9 else ["starter"], "ok": True}
@@ -82,7 +83,7 @@ class IntegratedStudio:
 
         godot = self.emit_godot_project(brief, rooms)
         sealed = (
-            era_status["ok"] and self.ai_ok and self.peak_ok
+            era_status["ok"] and ai_result["ok"] and self.ai_ok and self.peak_ok
             and self.godot_ok and self.export_ok and self.physics_ok
             and self.multiplayer_ok and godot["ok"]
             and economy["ok"] and dialogue["ok"] and achievement["ok"]
@@ -94,6 +95,7 @@ class IntegratedStudio:
             and tutorial["ok"] and checkpoint["ok"]
             and advanced_graphics["ok"] and delta_compression["ok"]
             and chunk_editor["ok"] and visual_palette["ok"] and asset_pipeline["ok"]
+            and ai_result.get("sealed", False)
         )
         return {
             "ok": sealed,
@@ -112,6 +114,7 @@ class IntegratedStudio:
             "narrative": narrative,
             "physics_ok": self.physics_ok,
             "multiplayer_ok": self.multiplayer_ok,
+            "local_ai": ai_result,
             "economy": economy,
             "dialogue": dialogue,
             "achievement": achievement,
