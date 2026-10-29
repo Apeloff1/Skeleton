@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, faction, weather, slots, crafting, companion, map, reputation, traps, ending, skill, hazard, summary, tutorial, checkpoint, distill pack, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
+Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, combat, loot, progress, status, rooms, telemetry, faction, weather, slots, crafting, companion, map, reputation, traps, ending, skill, hazard, summary, tutorial, checkpoint, distill pack, leaderboard, daily, replay, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v17"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v18"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -51,6 +51,9 @@ class IntegratedStudio:
         tutorial = {"current": 5, "completed": True}
         checkpoint = "boss_phase_4"
         distill_pack = {"digest": "c1d2e3f4a5b6", "fidelity": 0.94, "ingest_ready": True}
+        leaderboard_rank = 3
+        daily = {"kind": "high_optical", "target": 0.96, "reward_mult": 1.5}
+        replay_frames = 48
         narrative_branch = "high_optical" if optical > 0.9 else "standard"
         boss = {"phase": 4, "weak_point": "core", "defeated": True}
         curriculum_steps = 185
@@ -59,7 +62,7 @@ class IntegratedStudio:
         sounds = ["pack_clear", "boss_phase", "extract"]
         state_digest = "a1b2c3d4e5f67890"
         validation_ok = True
-        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "advance-tutorial", "save-checkpoint", "package-distill", "ingest-card"]
+        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "submit-leaderboard", "daily-challenge", "record-replay", "ingest-card"]
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -94,6 +97,9 @@ class IntegratedStudio:
             "tutorial": tutorial,
             "checkpoint": checkpoint,
             "distill_pack": distill_pack,
+            "leaderboard_rank": leaderboard_rank,
+            "daily": daily,
+            "replay_frames": replay_frames,
             "narrative_branch": narrative_branch,
             "boss": boss,
             "curriculum_steps": curriculum_steps,
@@ -111,7 +117,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels tutorial layer")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels meta layer")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Tutorial, checkpoint, distill pack."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Leaderboard, daily, replay."), indent=2))
