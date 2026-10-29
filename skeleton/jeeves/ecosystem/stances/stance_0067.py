@@ -1,0 +1,10 @@
+"""Stance 0067.
+"""
+from __future__ import annotations
+
+STANCE = "stance_0067"
+
+def enter(actor: str) -> dict:
+    if not actor:
+        return {"ok": False, "reason": "no_actor"}
+    return {"ok": True, "stance": STANCE, "actor": actor, "bonus": "atk" if 67 % 2 == 0 else "def"}
