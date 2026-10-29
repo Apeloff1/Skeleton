@@ -1,8 +1,8 @@
-"""IntegratedStudio: hyper extensive operational conductor.
+"""IntegratedStudio: advanced meticulous operational conductor.
 """
 from __future__ import annotations
 from typing import Dict, Any
-from .local_ai_hyper_extensive import hyper_cycle
+from .local_ai_advanced_meticulous import meticulous_cycle
 
 class IntegratedStudio:
     def __init__(self) -> None:
@@ -39,7 +39,7 @@ class IntegratedStudio:
             return {"ok": False, "reason": "floors_failed", "sealed": False}
 
         era_status = self.set_era(self.era)
-        ai_result = hyper_cycle(brief, self.era, self.optical, self.fidelity)
+        ai_result = meticulous_cycle(brief, self.era, self.optical, self.fidelity)
         if not ai_result.get("ok"):
             return {"ok": False, "reason": ai_result.get("reason", "ai_failed"), "sealed": False}
 
@@ -80,7 +80,7 @@ class IntegratedStudio:
             "multiplayer_ok": self.multiplayer_ok,
             "local_ai": ai_result,
             "godot_files": godot.get("files", []),
-            "status": "completionist_hyper" if sealed else "incomplete",
+            "status": "completionist_meticulous" if sealed else "incomplete",
         }
 
     def emit_godot_project(self, brief: str, rooms: int) -> Dict[str, Any]:
@@ -143,5 +143,5 @@ class IntegratedStudio:
             "ai_ok": self.ai_ok,
             "ready": self.optical >= 0.9 and self.fidelity >= 0.92,
             "operational": True,
-            "cycle": "hyper_extensive",
+            "cycle": "advanced_meticulous",
         }
