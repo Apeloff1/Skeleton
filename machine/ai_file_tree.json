@@ -1462,7 +1462,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "a356c796dc01bf226bb40e2f8cf5d166cc91afb5",
+      "source_git_object_sha": "aefa50feccd87c567b5abf3301ce50fbc49c00ca",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -2784,7 +2784,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "a0792dea0d865be8acc506ee647f866f760e5968",
+      "source_git_object_sha": "2e4c1cb55b377b99e276442ae4d48e7d2b9bdad8",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
