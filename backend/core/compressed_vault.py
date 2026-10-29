@@ -1,7 +1,7 @@
 """
-╔════════════════════════════════════════════════════════════════════════╗
+╔═══════════════════════════════════════════════════════════════════════╗
 ║  HYPERSCALE COMPRESSED VAULT                                           ║
-║  ────────────────────────────────────────────────────────────────────  ║
+║  ──────────────────────────────────────────────────────────────────────  ║
 ║  Stores massive knowledge databases as zstd-level-22 compressed        ║
 ║  JSONL archives on disk (typical 15-25× compression ratio).            ║
 ║  MongoDB only holds tiny manifest pointers, so the 9.8G volume         ║
@@ -13,7 +13,7 @@
 ║    • iter_shard(name)                 → streaming iterator             ║
 ║    • vault_stats()                    → on-disk + decompressed totals  ║
 ║    • list_shards()                    → all manifest entries           ║
-╚════════════════════════════════════════════════════════════════════════╝
+╚═════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
 import os
@@ -71,7 +71,7 @@ def _json_default(obj: Any):
         return None
 
 
-# ── Paths ───────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────
 def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
@@ -153,18 +153,27 @@ def _safe_name(name: str) -> str:
 
 
 def _shard_path(name: str, scratch: bool = False) -> Path:
+    """Return a path that is guaranteed to stay inside the vault/scratch root.
+    CodeQL path-injection mitigation: normalize, then verify containment.
+    """
     safe = _safe_name(name)
     _ensure_storage()
     root = (SCRATCH_ROOT if scratch else VAULT_ROOT).resolve()
+    # Build candidate, normalize, then prove it is under root.
     candidate = (root / f"{safe}.jsonl.zst").resolve()
     try:
         candidate.relative_to(root)
     except ValueError as exc:
         raise ValueError("invalid shard path") from exc
+    # Extra explicit prefix check for static analysis.
+    root_str = str(root)
+    cand_str = str(candidate)
+    if not cand_str.startswith(root_str):
+        raise ValueError("path escapes root")
     return candidate
 
 
-# ── Core write/read ─────────────────────────────────────────────────────
+# ── Core write/read ───────────────────────────────────────────────
 def write_shard(
     name: str,
     rows: Iterable[dict[str, Any]],
