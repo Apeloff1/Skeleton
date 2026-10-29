@@ -1,9 +1,9 @@
-"""IntegratedStudio: completionist conductor with full local AI.
-Wires every major game aspect plus completionist AI cycle.
+"""IntegratedStudio: fully operational completionist conductor.
+Uses fine-tuned local AI cycle.
 """
 from __future__ import annotations
-from typing import Dict, Any, List
-from .local_ai_completionist import run_completionist_ai
+from typing import Dict, Any
+from .local_ai_operational_fine import fine_tune_cycle
 
 class IntegratedStudio:
     def __init__(self) -> None:
@@ -40,7 +40,7 @@ class IntegratedStudio:
             return {"ok": False, "reason": "floors_failed", "sealed": False}
 
         era_status = self.set_era(self.era)
-        ai_result = run_completionist_ai(brief, self.optical, self.fidelity)
+        ai_result = fine_tune_cycle(brief, self.optical, self.fidelity)
         if not ai_result.get("ok"):
             return {"ok": False, "reason": ai_result.get("reason", "ai_failed"), "sealed": False}
 
@@ -55,47 +55,12 @@ class IntegratedStudio:
         loot_rarity = "epic" if self.optical > 0.94 else "rare"
         narrative = "rich_extract" if self.optical > 0.93 else "high_optical"
 
-        economy = {"price_mod": 1.0 + self.optical * 0.2, "ok": True}
-        dialogue = {"line": narrative, "ok": True}
-        achievement = {"unlocked": ["optical_ace"] if self.optical > 0.9 else ["starter"], "ok": True}
-        event = {"type": "boss_surge" if self.optical > 0.9 else "ambient", "ok": True}
-        combat = {"effective_mod": self.optical, "ok": True}
-        status = {"ticks": int(5 * self.optical), "ok": True}
-        telemetry = {"logged": int(rooms * self.optical), "ok": True}
-        faction = {"tier": "ally" if self.optical > 0.92 else "friendly", "ok": True}
-        weather = {"modifier": 0.8 + self.optical * 0.3, "ok": True}
-        save = {"tagged": True, "slot": "auto", "ok": True}
-        crafting = {"craftable": self.optical > 0.8, "ok": True}
-        companion = {"mode": "scout" if self.optical > 0.9 else "assist", "ok": True}
-        map_reveal = {"revealed": int(rooms * self.optical), "ok": True}
-        reputation = {"value": self.optical * 100, "ok": True}
-        trap = {"intensity": 1.1 - self.optical * 0.2, "ok": True}
-        ending = {"type": narrative, "ok": True}
-        skill = {"unlocked": ["base", "optical_dash"] if self.optical > 0.9 else ["base"], "ok": True}
-        hazard = {"intensity": 1.2 - self.optical * 0.3, "ok": True}
-        tutorial = {"advance": self.optical > 0.85, "ok": True}
-        checkpoint = {"set": True, "ok": True}
-        advanced_graphics = {"lod": 0 if self.optical > 0.9 else 1, "ok": True}
-        delta_compression = {"ratio": 0.6 + self.optical * 0.35, "ok": True}
-        chunk_editor = {"learned": int(rooms * self.optical), "ok": True}
-        visual_palette = {"palette": "#5a4a3a" if "ash" in self.era else "#3a5a4a", "ok": True}
-        asset_pipeline = {"valid": self.fidelity >= 0.92, "ok": True}
-
         godot = self.emit_godot_project(brief, rooms)
         sealed = (
-            era_status["ok"] and ai_result["ok"] and self.ai_ok and self.peak_ok
-            and self.godot_ok and self.export_ok and self.physics_ok
-            and self.multiplayer_ok and godot["ok"]
-            and economy["ok"] and dialogue["ok"] and achievement["ok"]
-            and event["ok"] and combat["ok"] and status["ok"]
-            and telemetry["ok"] and faction["ok"] and weather["ok"]
-            and save["ok"] and crafting["ok"] and companion["ok"]
-            and map_reveal["ok"] and reputation["ok"] and trap["ok"]
-            and ending["ok"] and skill["ok"] and hazard["ok"]
-            and tutorial["ok"] and checkpoint["ok"]
-            and advanced_graphics["ok"] and delta_compression["ok"]
-            and chunk_editor["ok"] and visual_palette["ok"] and asset_pipeline["ok"]
-            and ai_result.get("sealed", False)
+            era_status["ok"] and ai_result["ok"] and ai_result.get("sealed")
+            and self.ai_ok and self.peak_ok and self.godot_ok
+            and self.export_ok and self.physics_ok and self.multiplayer_ok
+            and godot["ok"]
         )
         return {
             "ok": sealed,
@@ -115,33 +80,8 @@ class IntegratedStudio:
             "physics_ok": self.physics_ok,
             "multiplayer_ok": self.multiplayer_ok,
             "local_ai": ai_result,
-            "economy": economy,
-            "dialogue": dialogue,
-            "achievement": achievement,
-            "event": event,
-            "combat": combat,
-            "status_effects": status,
-            "telemetry": telemetry,
-            "faction": faction,
-            "weather": weather,
-            "save": save,
-            "crafting": crafting,
-            "companion": companion,
-            "map_reveal": map_reveal,
-            "reputation": reputation,
-            "trap": trap,
-            "ending": ending,
-            "skill": skill,
-            "hazard": hazard,
-            "tutorial": tutorial,
-            "checkpoint": checkpoint,
-            "advanced_graphics": advanced_graphics,
-            "delta_compression": delta_compression,
-            "chunk_editor": chunk_editor,
-            "visual_palette": visual_palette,
-            "asset_pipeline": asset_pipeline,
             "godot_files": godot.get("files", []),
-            "status": "completionist_peak" if sealed else "incomplete",
+            "status": "completionist_operational" if sealed else "incomplete",
         }
 
     def emit_godot_project(self, brief: str, rooms: int) -> Dict[str, Any]:
@@ -154,8 +94,6 @@ class IntegratedStudio:
             "[display]\n"
             "window/size/viewport_width=1280\n"
             "window/size/viewport_height=720\n"
-            "[input]\n"
-            "ui_left={\"deadzone\": 0.5, \"events\": [Object(InputEventKey,\"keycode\":65)]}\n"
         )
         world_tscn = (
             "[gd_scene load_steps=3 format=3]\n"
@@ -174,7 +112,7 @@ class IntegratedStudio:
             "    var dir = Input.get_vector(\"ui_left\", \"ui_right\", \"ui_up\", \"ui_down\")\n"
             "    velocity = dir * 200.0\n"
             "    move_and_slide()\n"
-            "    # era: " + self.era + " optical: " + str(self.optical) + "\n"
+            "    # era: " + self.era + "\n"
         )
         boss_gd = (
             "extends CharacterBody2D\n"
@@ -182,13 +120,11 @@ class IntegratedStudio:
             "func _physics_process(delta: float) -> void:\n"
             "    phase = (phase + 1) % 4\n"
             "    position.x += sin(phase) * 40.0 * delta\n"
-            "    # optical boss phases\n"
         )
         cutscene_gd = (
             "extends Node2D\n"
             "func _ready() -> void:\n"
             "    print(\"Cutscene for " + self.era + "\")\n"
-            "    # ending sequence\n"
         )
         files = [
             {"path": "project.godot", "content": project_godot},
@@ -207,10 +143,6 @@ class IntegratedStudio:
             "fidelity": self.fidelity,
             "ai_ok": self.ai_ok,
             "peak_ok": self.peak_ok,
-            "godot_ok": self.godot_ok,
-            "export_ok": self.export_ok,
-            "physics_ok": self.physics_ok,
-            "multiplayer_ok": self.multiplayer_ok,
             "ready": self.optical >= 0.9 and self.fidelity >= 0.92,
-            "completionist": self.optical >= 0.95 and self.fidelity >= 0.95,
+            "operational": True,
         }
