@@ -402,6 +402,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     # ── Game factory / studio / armor ──────────────────────────────────
     ("routes.game_factory", "router"),
     ("routes.studio_api", "router"),
+    ("routes.ecosystem_api", "router"),
     ("routes.overheat_system", "router"),
     ("routes.performance_armor", "router"),
     # ── Godot engine (in-repo binary, headless scaffolding + export) ────
