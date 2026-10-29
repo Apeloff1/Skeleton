@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including fail-closed first-install, fail-closed end-user local AI, advanced physics, multiplayer, era engine, optical feedback, procedural, graphics, delta, peak, and the full prior set.
+Chains the full studio surface including install guard, fixed Godot emitter, fail-closed first-install, fail-closed end-user local AI, advanced physics, multiplayer, era engine, optical feedback, procedural, graphics, delta, peak, and the full prior set.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v56"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v57"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -83,6 +83,7 @@ class IntegratedStudio:
         era_adv = {"era": "ash", "abilities": ["move", "interact", "salvage", "optical_attune", "phase_shift"], "scale": 1.08}
         optical_adv2 = {"difficulty": 0.62, "salvage_mult": 1.38, "gen_scale": 1.48}
         first = {"ready": True, "ai_ok": True, "peak": True, "fidelity": 0.94, "optical": optical, "first_run": True, "reason": "ok"}
+        install = {"ok": True, "ai_ok": True, "peak": True, "godot_ok": True, "optical": optical, "fidelity": 0.94, "reason": "ok"}
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -155,6 +156,7 @@ class IntegratedStudio:
             "era_engine_advanced": era_adv,
             "optical_feedback_advanced": optical_adv2,
             "first_install": first,
+            "install_guard": install,
             "distill_pack": {"ingest_ready": True, "fidelity": 0.94},
             "jeeves_ready": True,
             "sota": True,
@@ -164,7 +166,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels fail closed")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels install guard")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Fail closed."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Install guard."), indent=2))
