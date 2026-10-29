@@ -1,16 +1,21 @@
-"""Local AI loop.
-Draft/refine/final with observe, generate, validate, and ratchet.
+"""Advanced local AI loop.
+Multi-tier thresholds, optical floors, and ratchet-aware advance.
 """
 from typing import Any, Dict
 
 class LocalAILoop:
-    def step(self, tier: str, optical: float, fidelity: float) -> Dict[str, Any]:
-        ok = fidelity >= (0.85 if tier == "draft" else 0.90 if tier == "refine" else 0.92) and optical >= 0.8
+    THRESH = {"draft": 0.85, "refine": 0.90, "final": 0.92}
+
+    def step(self, tier: str, optical: float, fidelity: float, ratchet: float = 0.0) -> Dict[str, Any]:
+        thresh = self.THRESH.get(tier, 0.92)
+        ok = fidelity >= thresh and optical >= 0.8 and fidelity >= ratchet
         return {
             "tier": tier,
             "ok": ok,
+            "threshold": thresh,
             "optical": optical,
             "fidelity": fidelity,
+            "ratchet": ratchet,
             "next": "advance" if ok else "retry",
-            "schema": "skeleton.local_ai.loop.v1",
+            "schema": "skeleton.local_ai.loop.v2",
         }
