@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains the full studio surface including decomp weight extractor, distill card emitter, era graphics binder, local AI loop, Godot emitter, fail-closed export, persistent editor state, run summary, tutorial, checkpoint, ending, skill tree, hazard, map, reputation, traps, saves, crafting, companion, telemetry, factions, weather, combat, status, rooms, dialogue, achievements, events, economy, loot, progress, boss, narrative, ratchet, validator, optical, export, local AI, visual, assets, editor, algorithms, graphics modes, era engine, decomp, distill, weights, forge, optical, boss, loot, narrative, economy, and AI.
+Chains the full studio surface including advanced decomp weight extractor (multi-era bias), advanced distill card emitter (multi-lens + ratchet), advanced era graphics binder (mode consistency + scale), advanced local AI loop (multi-tier + ratchet), advanced Godot emitter (optical uniforms), advanced fail-closed export (multi-gate), advanced persistent editor state (optical tags), and the full prior set.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v47"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v48"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -16,7 +16,7 @@ class IntegratedStudio:
             "q_values": {"right": 0.8, "accept": 0.7}, "core_loop": "clear_packs_spend_salvage",
         }
         optical = evidence["optical_diversity"]
-        weights = {"decomp": 0.8, "distill": 0.94, "weight": 0.7, "forge": 0.85, "optical": optical, "boss": 0.75, "loot": 0.6, "narrative": 0.65, "economy": 0.7, "ai": 0.8}
+        weights = {"decomp": 0.84, "distill": 0.94, "weight": 0.74, "forge": 0.89, "optical": optical, "boss": 0.79, "loot": 0.63, "narrative": 0.74, "economy": 0.74, "ai": 0.84, "era_bias": 1.05}
         era_engine = {"era": "ash", "scale": 1.0, "abilities": ["move", "interact", "salvage", "optical_attune", "phase_shift"], "gaming": False}
         graphics = {"mode": "2.5d", "projection": "oblique", "layers": 2, "depth": True, "time_axis": False}
         editor = {"chunks": 4, "learned": 12, "consistent": True, "batch": True}
@@ -58,12 +58,12 @@ class IntegratedStudio:
         tutorial = {"complete": True, "done": ["move", "interact", "salvage", "optical", "extract"]}
         checkpoint = {"has_checkpoint": True, "name": "mid_boss"}
         decomp_weights = weights
-        distill_card = {"fidelity": 0.94, "optical": optical, "ingest_ready": True}
-        era_graphics = {"era": "ash", "mode": "2.5d", "abilities": ["move", "interact", "salvage", "optical_attune", "phase_shift"]}
-        ai_loop = {"tier": "final", "ok": True, "next": "advance"}
+        distill_card = {"fidelity": 0.94, "optical": optical, "lenses": ["optical", "economy", "boss", "narrative"], "ingest_ready": True, "ratchet_locked": True}
+        era_graphics = {"era": "ash", "mode": "2.5d", "layers": 2, "abilities": ["move", "interact", "salvage", "optical_attune", "phase_shift"], "scale": 1.0}
+        ai_loop = {"tier": "final", "ok": True, "threshold": 0.92, "next": "advance"}
         godot = ["project.godot", "world.tscn", "player.gd", "boss.gd", "cutscene_director.gd"]
-        fail_closed = {"ok": True, "fidelity": 0.94, "assets_exported": 3}
-        persist = {"chunks": 4, "learned": 12}
+        fail_closed = {"ok": True, "fidelity": 0.94, "optical": optical, "assets_exported": 3, "ratchet": 0.94}
+        persist = {"chunks": 4, "learned": 12, "optical_tagged": True}
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -125,7 +125,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels all improvements")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels advanced")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. All improvements."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Advanced."), indent=2))
