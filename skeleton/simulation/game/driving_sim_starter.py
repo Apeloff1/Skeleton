@@ -82,7 +82,7 @@ class DrivingSimulator:
         self.state.thermal.tire_temp = min(120.0, self.state.thermal.tire_temp + abs(steer) * v * 0.02)
         self.state.thermal.brake_temp = min(800.0, self.state.thermal.brake_temp + brake * 15.0 - 2.0)
         torque = self.power * throttle * (1.0 - self.state.rpm / 9500.0) * (1.0 if self.state.thermal.engine_temp < 120 else 0.7)
-        accel = (torque / self.mass) - (drag_force / self.mass) - brake * 18.0
+        # Crankshaft torque must be geared into wheel force before opposing braking.\n        # First gear (3.5:1) and a 0.35 m tire radius give 10 N per N·m.\n        wheel_force = torque * (3.5 / 0.35)\n        accel = (wheel_force - drag_force) / self.mass - brake * 18.0
         self.state.speed = max(0.0, min(_MAX_SPEED, self.state.speed + accel * _DT))
         self.state.rpm = 800.0 + self.state.speed * 32.0
         self.state.heading += steer * min(v * 0.011, 1.3) * (1.0 if self.state.thermal.tire_temp < 110 else 0.8)
