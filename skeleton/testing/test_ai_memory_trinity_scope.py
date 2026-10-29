@@ -134,10 +134,10 @@ def test_scoped_trinity_rehearsal_changes_score_not_authority() -> None:
 
     # MAG intentionally increases recall score after each access. Provenance
     # order may change, but neither the memory identities nor scope may drift.
-    identity=lambda result: {
-        ref.split("(score=",1)[0] for ref in result.provenance_chain
-    }
-    assert identity(first)==identity(second)
+    def identities(provenance: list[str]) -> set[str]:
+        return {ref.split("(score=",1)[0] for ref in provenance}
+
+    assert identities(first.provenance_chain)==identities(second.provenance_chain)
     assert [item.chunk.id for item in first.facts]==["fact-allowed"]
     assert [item.chunk.id for item in second.facts]==["fact-allowed"]
     assert first.personal_history[0].chunk.id==second.personal_history[0].chunk.id
