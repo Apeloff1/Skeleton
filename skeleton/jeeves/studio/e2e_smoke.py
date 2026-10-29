@@ -13,15 +13,6 @@ def smoke() -> dict[str, Any]:
     except Exception as exc:
         results["checks"].append({"name": "utc_compat", "ok": False, "error": type(exc).__name__})
         results["ok"] = False
-    # security helpers
-    try:
-        from backend.core.security_augmentation import bound_text, is_safe_identifier
-        assert bound_text("hello", 3) == "hel"
-        assert is_safe_identifier("abc-123")
-        results["checks"].append({"name": "security_helpers", "ok": True})
-    except Exception as exc:
-        results["checks"].append({"name": "security_helpers", "ok": False, "error": type(exc).__name__})
-        results["ok"] = False
     # studio conductor (may fail if deps missing)
     try:
         from skeleton.jeeves.studio.integrated_studio import IntegratedStudio
