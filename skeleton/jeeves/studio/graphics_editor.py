@@ -19,6 +19,13 @@ class GraphicsEditor:
         self.learned.append({"chunk": cid, "key": key, "value": value})
         return {"ok": True, "chunk": cid, "edit": {key: value}}
 
+    def batch_edit(self, edits: List[Dict[str, Any]], optical: float) -> Dict[str, Any]:
+        results = []
+        for e in edits:
+            results.append(self.edit(e["x"], e["y"], e["key"], e["value"]))
+        self.learn_from(optical)
+        return {"applied": len(results), "optical": optical}
+
     def learn_from(self, optical: float) -> Dict[str, Any]:
         if optical > 0.9 and self.learned:
             pattern = self.learned[-1]
