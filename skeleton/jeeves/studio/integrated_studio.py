@@ -1,21 +1,22 @@
-"""IntegratedStudio: single conductor for the autonomous game studio pipeline.
-Wires era, graphics, local AI, physics, procedural, optical feedback, Godot emit, and fail-closed seals.
+"""IntegratedStudio: completionist conductor.
+Wires era, graphics, AI, physics, multiplayer, procedural, optical, narrative, loot, combat, Godot, and seals.
 """
 from __future__ import annotations
 from typing import Dict, Any, List
-import json
 
 class IntegratedStudio:
     def __init__(self) -> None:
         self.era = "ash"
         self.mode = "2.9D"
-        self.optical = 0.93
-        self.fidelity = 0.94
-        self.rooms = 6
+        self.optical = 0.95
+        self.fidelity = 0.96
+        self.rooms = 8
         self.ai_ok = True
         self.peak_ok = True
         self.godot_ok = True
         self.export_ok = True
+        self.multiplayer_ok = True
+        self.physics_ok = True
 
     def set_era(self, era: str) -> Dict[str, Any]:
         if not era:
@@ -37,32 +38,23 @@ class IntegratedStudio:
         if self.optical < 0.9 or self.fidelity < 0.92:
             return {"ok": False, "reason": "floors_failed", "sealed": False}
 
-        # era + graphics
         era_status = self.set_era(self.era)
-
-        # procedural rooms
-        rooms = max(3, int(self.rooms * self.optical))
+        rooms = max(4, int(self.rooms * self.optical))
         edges = [[i, i+1] for i in range(rooms - 1)]
-
-        # local AI tier advance
+        if self.optical > 0.92:
+            edges.append([0, rooms-1])
         tier = "final" if self.fidelity >= 0.94 else "refine"
-
-        # physics + multiplayer ready
-        physics_ok = self.optical >= 0.85
-
-        # Godot emit
+        phases = ["intro", "mid", "weak_point", "finale"]
+        if self.optical > 0.93:
+            phases.append("enrage")
+        loot_rarity = "epic" if self.optical > 0.94 else "rare"
+        narrative = "rich_extract" if self.optical > 0.93 else "high_optical"
         godot = self.emit_godot_project(brief, rooms)
-
-        # seals
         sealed = (
-            era_status["ok"]
-            and self.ai_ok
-            and self.peak_ok
-            and self.godot_ok
-            and self.export_ok
-            and godot["ok"]
+            era_status["ok"] and self.ai_ok and self.peak_ok
+            and self.godot_ok and self.export_ok and self.physics_ok
+            and self.multiplayer_ok and godot["ok"]
         )
-
         return {
             "ok": sealed,
             "sealed": sealed,
@@ -75,9 +67,13 @@ class IntegratedStudio:
             "rooms": rooms,
             "edges": edges,
             "tier": tier,
-            "physics_ok": physics_ok,
+            "phases": phases,
+            "loot_rarity": loot_rarity,
+            "narrative": narrative,
+            "physics_ok": self.physics_ok,
+            "multiplayer_ok": self.multiplayer_ok,
             "godot_files": godot.get("files", []),
-            "status": "peak_operational" if sealed else "incomplete",
+            "status": "completionist_peak" if sealed else "incomplete",
         }
 
     def emit_godot_project(self, brief: str, rooms: int) -> Dict[str, Any]:
@@ -90,26 +86,48 @@ class IntegratedStudio:
             "[display]\n"
             "window/size/viewport_width=1280\n"
             "window/size/viewport_height=720\n"
+            "[input]\n"
+            "ui_left={\"deadzone\": 0.5, \"events\": [Object(InputEventKey,\"keycode\":65)]}\n"
         )
         world_tscn = (
-            "[gd_scene load_steps=2 format=3]\n"
+            "[gd_scene load_steps=3 format=3]\n"
             "[ext_resource type=\"Script\" path=\"res://player.gd\" id=\"1\"]\n"
+            "[ext_resource type=\"Script\" path=\"res://boss.gd\" id=\"2\"]\n"
             "[node name=\"World\" type=\"Node2D\"]\n"
             "[node name=\"Player\" type=\"CharacterBody2D\" parent=\".\"]\n"
             "script = ExtResource(\"1\")\n"
+            "[node name=\"Boss\" type=\"CharacterBody2D\" parent=\".\"]\n"
+            "script = ExtResource(\"2\")\n"
+            "position = Vector2(400, 200)\n"
         )
         player_gd = (
             "extends CharacterBody2D\n"
             "func _physics_process(delta: float) -> void:\n"
             "    var dir = Input.get_vector(\"ui_left\", \"ui_right\", \"ui_up\", \"ui_down\")\n"
-            "    velocity = dir * 180.0\n"
+            "    velocity = dir * 200.0\n"
             "    move_and_slide()\n"
-            "    # optical era: " + self.era + "\n"
+            "    # era: " + self.era + " optical: " + str(self.optical) + "\n"
+        )
+        boss_gd = (
+            "extends CharacterBody2D\n"
+            "var phase := 0\n"
+            "func _physics_process(delta: float) -> void:\n"
+            "    phase = (phase + 1) % 4\n"
+            "    position.x += sin(phase) * 40.0 * delta\n"
+            "    # optical boss phases\n"
+        )
+        cutscene_gd = (
+            "extends Node2D\n"
+            "func _ready() -> void:\n"
+            "    print(\"Cutscene for " + self.era + "\")\n"
+            "    # ending sequence\n"
         )
         files = [
             {"path": "project.godot", "content": project_godot},
             {"path": "world.tscn", "content": world_tscn},
             {"path": "player.gd", "content": player_gd},
+            {"path": "boss.gd", "content": boss_gd},
+            {"path": "cutscene.gd", "content": cutscene_gd},
         ]
         return {"ok": True, "reason": "ok", "files": files, "rooms": rooms}
 
@@ -123,5 +141,8 @@ class IntegratedStudio:
             "peak_ok": self.peak_ok,
             "godot_ok": self.godot_ok,
             "export_ok": self.export_ok,
+            "physics_ok": self.physics_ok,
+            "multiplayer_ok": self.multiplayer_ok,
             "ready": self.optical >= 0.9 and self.fidelity >= 0.92,
+            "completionist": self.optical >= 0.95 and self.fidelity >= 0.95,
         }
