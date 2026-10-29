@@ -111,6 +111,7 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing --tb=short
           --ignore=skeleton/testing/test_engine_handoff_recovery.py
+          --maxfail=1
 
   integration_smoke:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')

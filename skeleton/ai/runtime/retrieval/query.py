@@ -19,8 +19,8 @@ from types import MappingProxyType
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from skeleton.kernel.errors import KernelError
-from skeleton.retrieval.fusion import Fuser, FusionStrategy, ScoredResult
-from skeleton.retrieval.ranking import Ranker
+from .fusion import Fuser, FusionStrategy, ScoredResult
+from .ranking import Ranker
 
 
 class RetrievalError(KernelError):

@@ -318,7 +318,7 @@
       "source": "skeleton/retrieval",
       "destination": "skeleton/ai/runtime/retrieval",
       "kind": "tree",
-      "source_git_object_sha": "98c1c3a9af8d78de483ca74defa3b65f74243747",
+      "source_git_object_sha": "c6dbd785a224715478dd3616637996fc8c270b20",
       "role": "retrieval and grounding",
       "work_package_refs": [
         "WP-W08",
@@ -1462,7 +1462,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "a356c796dc01bf226bb40e2f8cf5d166cc91afb5",
+      "source_git_object_sha": "1a88ed1b27f0b58f7cb2c0dff43b8beb3210ceaf",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -2784,7 +2784,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "a0792dea0d865be8acc506ee647f866f760e5968",
+      "source_git_object_sha": "e596af608d440cdeca01242ee1696dfb61ce28b2",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
