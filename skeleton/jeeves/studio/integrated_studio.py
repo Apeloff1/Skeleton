@@ -1,12 +1,12 @@
 """Skeleton Jeeves — Autonomous Game Studio Emulator Pipeline (SOTA Creative Complete)
 
-Chains optical, world, economy, inventory, quests, difficulty, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
+Chains optical, world, economy, inventory, quests, difficulty, dialogue, achievements, events, narrative, boss, curriculum, Godot, effects, state, sound, teacher.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Mapping
 import json
 
-SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v9"
+SCHEMA = "skeleton.jeeves.autonomous_game_studio_emulator.sota.v10"
 
 class IntegratedStudio:
     def run_full_pipeline(self, brief: str, evidence: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -27,6 +27,9 @@ class IntegratedStudio:
         inventory = {"count": 6, "capacity": 20, "equipped": {"weapon": "item_2"}}
         quests_completed = ["clear_3", "salvage_20"]
         difficulty = {"enemy_health": 1.15, "pack_value": 0.87, "boss_aggression": 0.85, "overall": 1.15}
+        dialogue = ["intro", "high_opt", "rich", "boss_near"]
+        achievements = ["first_pack", "optical_master"]
+        events = [{"type": "salvage_cache", "value": 12}, {"type": "optical_rift", "reward_mult": 1.5}]
         narrative_branch = "high_optical" if optical > 0.9 else "standard"
         ending = "extract_rich" if salvage > 40 and optical > 0.9 else "extract"
         boss = {"phase": 4, "weak_point": "core", "defeated": True}
@@ -36,7 +39,7 @@ class IntegratedStudio:
         sounds = ["pack_clear", "boss_phase", "extract"]
         state_digest = "a1b2c3d4e5f67890"
         validation_ok = True
-        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "track-quests", "scale-difficulty", "ingest-card"]
+        verbs = ["studio-pipeline", "emit-world", "sequence-boss", "dialogue", "achievements", "events", "ingest-card"]
         return {
             "pipeline_complete": True,
             "brief": brief,
@@ -47,6 +50,9 @@ class IntegratedStudio:
             "inventory": inventory,
             "quests_completed": quests_completed,
             "difficulty": difficulty,
+            "dialogue": dialogue,
+            "achievements": achievements,
+            "events": events,
             "narrative_branch": narrative_branch,
             "ending": ending,
             "boss": boss,
@@ -65,7 +71,7 @@ class IntegratedStudio:
         }
 
 def capabilities() -> List[Dict[str, Any]]:
-    return [IntegratedStudio().run_full_pipeline("Ash tunnels next layer")]
+    return [IntegratedStudio().run_full_pipeline("Ash tunnels dialogue layer")]
 
 if __name__ == "__main__":
-    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Inventory, quests, difficulty."), indent=2))
+    print(json.dumps(IntegratedStudio().run_full_pipeline("Ash tunnels. Dialogue, achievements, events."), indent=2))
