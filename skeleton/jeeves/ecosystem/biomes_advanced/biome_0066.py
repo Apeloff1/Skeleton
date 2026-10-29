@@ -1,0 +1,16 @@
+"""Advanced biome 0066.
+"""
+from __future__ import annotations
+
+BIOME = "adv_biome_0066"
+
+def climate() -> dict:
+    return {"temp": round((66 % 20) / 20, 2), "moisture": round(((66*7) % 20) / 20, 2), "wind": round((66 % 10) / 10, 2)}
+
+def resources() -> list[str]:
+    base = ["wood", "stone"]
+    if 66 % 3 == 0:
+        base.append("ore")
+    if 66 % 5 == 0:
+        base.append("crystal")
+    return base
