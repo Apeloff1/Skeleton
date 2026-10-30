@@ -120,3 +120,13 @@ def test_paused_admission_persists_across_restarts(tmp_path):
     next_j.set_paused(False,operator="supervisor",authorized=True)
     next_j.claim("source-canon",worker="w",token="t",authorized=True)
     assert next_j.verify_events()["events"]==3
+
+def test_event_replay_rejects_task_row_forgery_even_when_chain_is_intact(tmp_path):
+    root,graph=_owner(tmp_path)
+    j=WorkJournal(root,graph,authorized=True)
+    j.claim("source-canon",worker="worker",token="token",authorized=True)
+    assert j.verify_state()["local_lifecycle_replay_valid"]
+    with sqlite3.connect(root/"studio_work.sqlite3") as db:
+        db.execute("UPDATE tasks SET status='reviewed_claim' WHERE id='source-canon'")
+    with pytest.raises(StudioQuestError):
+        WorkJournal(root,graph,authorized=True)
