@@ -29,6 +29,7 @@ def explore_quest_routes(documents: Mapping[str, Any], *, authorized: bool,
     endings: set[str] = set()
     visits = 0
     sample = None
+    frontier_truncated = False
     while queue and len(terminal_digests) < max_terminal_routes and visits < max_state_visits:
         session = queue.popleft()
         visits += 1
@@ -44,9 +45,14 @@ def explore_quest_routes(documents: Mapping[str, Any], *, authorized: bool,
         # independent-stage permutations as distinct story routes.
         stage = program.stages[len(session.completed)]
         for alternative in stage.alternatives:
+            if len(queue) >= max_state_visits:
+                frontier_truncated = True
+                break
             queue.append(step_quest(session, documents, stage=stage.key,
                                     alternative=alternative, authorized=True))
-    complete = not queue
+        if frontier_truncated:
+            break
+    complete = not queue and not frontier_truncated
     # Explicitly identify when a budget truncates the search frontier.
     return {
         "schema": "skeleton.game_builder.studio_quest_route_coverage.v1",
