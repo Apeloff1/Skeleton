@@ -538,6 +538,9 @@ class OfflineHTTPApplication:
                 "local_only": True, "ready": True,
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
+                "adaptive_metal_launch": getattr(
+                    self.backend, "adaptive_metal_receipt", None,
+                ),
                 "model_digest": self.model_digest,
                 "tokenizer_digest": self.tokenizer_digest,
                 "session_list_limit": 100,
