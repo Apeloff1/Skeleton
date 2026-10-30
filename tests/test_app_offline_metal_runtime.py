@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 import threading
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, PropertyMock
 import unittest
 
 from skeleton.ai.runtime.inference.llama_cpp import (
@@ -184,6 +184,54 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
                             threading.Event())
         self.assertEqual(model._resource_preflight_checks, 1)
         self.assertTrue(model._inference_admitted)
+
+    def test_second_metal_preflight_fences_spawn_after_model_preparation(self):
+        """A late GPU-pressure change blocks Popen and releases spawn admission."""
+        backend = object.__new__(LlamaCppModel)
+        backend.config = configuration(gpu_layers=8)
+        backend._process_lock = threading.Lock()
+        backend._processes_started = 0
+        backend._spawning_processes = 0
+        backend._inference_admitted = False
+        backend._resource_preflight_checks = 0
+        calls = []
+        def guard():
+            calls.append("checked")
+            if len(calls) == 2:
+                raise LocalResourcePressure("late Metal pressure")
+        backend._resource_preflight = guard
+        with patch.object(
+            LlamaCppModel, "_assert_artifacts_stable",
+        ), patch.object(
+            LlamaCppModel, "execution_profile_digest",
+            new_callable=PropertyMock, return_value="a" * 64,
+        ), patch.object(
+            LlamaCppModel, "_render_prompt", return_value="hello",
+        ), patch.object(
+            LlamaCppModel, "generation_limits",
+            return_value={
+                "max_output_utf8_bytes": 4096,
+                "max_output_tokens": 100,
+                "max_total_tokens": 4096,
+            },
+        ), patch.object(
+            LlamaCppModel, "_generation_schema", return_value=None,
+        ), patch.object(
+            LlamaCppModel, "_command", return_value=["/pinned/llama-cli"],
+        ), patch(
+            "skeleton.ai.runtime.inference.llama_cpp.subprocess.Popen",
+            side_effect=AssertionError("native process must not launch"),
+        ):
+            with self.assertRaisesRegex(
+                LocalResourcePressure, "late Metal pressure"
+            ):
+                backend.infer(
+                    LocalInferenceRequest(prompt="private local question"),
+                    threading.Event(),
+                )
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(backend._resource_preflight_checks, 2)
+        self.assertEqual(backend._spawning_processes, 0)
 
     def test_native_kv_observation_is_owned_by_exact_execution_receipt(self):
         model = object.__new__(LlamaCppModel)
