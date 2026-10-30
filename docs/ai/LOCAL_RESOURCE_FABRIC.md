@@ -137,3 +137,31 @@ References:
 - https://developer.apple.com/documentation/metal/mtldevice/currentallocatedsize
 - https://developer.apple.com/documentation/metal/mtlstoragemode/shared
 - https://support.apple.com/guide/activity-monitor/view-memory-usage-actmntr1004/mac
+
+## Advanced runtime admission and long-form Merkle paging
+
+The locally activated GGUF runtime now registers one immutable Apple-Silicon
+resource preflight if Metal GPU offload was selected. Immediately before
+rendering a prompt or starting the llama.cpp subprocess, the manager re-probes
+physical RAM pressure and the available Metal recommended working set. If the
+**existing, sealed** offload profile no longer fits, it refuses the request
+without changing model identity or pretending that a live CUDA/Metal tensor can
+be migrated into a swapfile. Users can retry after pressure clears or reload
+their pinned deployment with fewer GPU layers. The preflight is admission
+defense, not a guarantee against concurrent pressure or a GPU-residency proof.
+
+New long-form archives atomically build a SHA-256 binary Merkle tree of
+individual compressed-page **original byte** digests and page indices. A
+selected page is verified by its O(log N) siblings against the manifest root.
+This makes repeated chapter/page retrieval scale with the *selected* page
+count, not total archive bytes. Explicit `verify` still checks the complete
+original SHA-256, ordered hash chain and all saved FTS content; legacy
+archives with no Merkle root continue to use full verification. The search
+API explicitly states `search_completeness_proven: false`: a valid matching
+page proves that page's contents, not that no other matches exist.
+
+The trusted local SQLite archive manifest is not externally signed. An
+attacker with authority to rewrite the entire archive *and its root* could
+forge local evidence; for external attestations, bind the archive's source
+SHA-256 and Merkle root to an independent trusted signed receipt. The current
+implementation does not claim this external custody.

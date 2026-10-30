@@ -7,17 +7,17 @@ capability is invented when a driver provides no trustworthy telemetry.
 """
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+import ctypes
 import hashlib
 import json
-import ctypes
-import platform
-import sys
 import mmap
 import os
 from pathlib import Path
+import platform
 import stat
+import sys
 import threading
 import time
 from typing import Any, Iterable

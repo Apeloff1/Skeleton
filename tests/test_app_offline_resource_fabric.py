@@ -6,7 +6,6 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-import os
 import unittest
 
 from skeleton.app.offline_resources import LocalResourcePressure, LocalResourceSnapshot
