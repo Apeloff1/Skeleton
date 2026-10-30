@@ -109,3 +109,14 @@ def test_rejected_submission_clears_stale_hash_and_requeues(tmp_path):
     assert row["submitted_sha"] is None
     s.claim("source-canon",worker="maker",token="fresh",authorized=True)
     assert s.snapshot()["tasks"]["source-canon"]["attempt"]==2
+
+def test_paused_admission_persists_across_restarts(tmp_path):
+    root,graph=_owner(tmp_path)
+    j=WorkJournal(root,graph,authorized=True)
+    j.set_paused(True,operator="supervisor",authorized=True)
+    next_j=WorkJournal(root,graph,authorized=True)
+    with pytest.raises(StudioQuestError):
+        next_j.claim("source-canon",worker="w",token="t",authorized=True)
+    next_j.set_paused(False,operator="supervisor",authorized=True)
+    next_j.claim("source-canon",worker="w",token="t",authorized=True)
+    assert next_j.verify_events()["events"]==3

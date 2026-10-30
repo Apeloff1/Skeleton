@@ -207,6 +207,18 @@ class WorkJournal:
                     "tasks":rows,"completion_evidence_verified":False,
                     "release_certified":False}
 
+    def set_paused(self, paused: bool, *, operator: str, authorized: bool) -> None:
+        """Pause only fresh task admissions; in-flight evidence can still submit."""
+        if not authorized:
+            raise PermissionError("pause requires operator authorization")
+        if type(paused) is not bool or not isinstance(operator,str) or not TOKEN.fullmatch(operator):
+            raise StudioQuestError("invalid pause command")
+        with self._tx() as db:
+            db.execute("""INSERT INTO meta(key,value) VALUES('paused',?)
+                          ON CONFLICT(key) DO UPDATE SET value=excluded.value""",
+                       ("1" if paused else "0",))
+            self._event(db,"pause" if paused else "resume","producer-admission",operator)
+
     def claim(self, task_id: str, *, worker: str, token: str, authorized: bool) -> None:
         if not authorized:
             raise PermissionError("claim requires operator authorization")
@@ -217,6 +229,9 @@ class WorkJournal:
             raise StudioQuestError("unregistered producer task")
         with self._tx() as db:
             states = dict(db.execute("SELECT id,status FROM tasks"))
+            paused=db.execute("SELECT value FROM meta WHERE key='paused'").fetchone()
+            if paused is not None and paused[0]=="1":
+                raise StudioQuestError("producer admission paused by operator")
             if states[task_id] != "pending":
                 raise StudioQuestError("already claimed or not pending")
             if any(states[dep] != "reviewed_claim" for dep in definitions[task_id]["depends_on"]):
