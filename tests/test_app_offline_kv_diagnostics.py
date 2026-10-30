@@ -77,6 +77,23 @@ class NativeKVObservationTests(unittest.TestCase):
         self.assertFalse(unknown["backend_reported"])
         self.assertFalse(unknown["actual_gpu_coherency_proven"])
 
+    def test_actual_metal_layer_offload_requires_matching_native_reports(self) -> None:
+        records = observe_native_kv_placement(
+            b"llama_model_load: offloaded 12/32 layers to GPU\n"
+            b"llama_model_load: Metal0 model buffer size = 512.00 MiB\n"
+            b"llama_kv_cache: CPU KV buffer size = 64.00 MiB\n"
+        )
+        self.assertEqual(records["backend_reported_gpu_layers"], 12)
+        self.assertEqual(
+            records["backend_reported_metal_model_bytes"], 512 * 1024**2,
+        )
+        self.assertEqual(records["reported_device_kv_bytes"], 0)
+        unconfirmed = observe_native_kv_placement(
+            b"llama_kv_cache: CPU KV buffer size = 64.00 MiB\n"
+        )
+        self.assertEqual(unconfirmed["backend_reported_gpu_layers"], 0)
+        self.assertEqual(unconfirmed["backend_reported_metal_model_bytes"], 0)
+
     def test_unrecognized_native_gpu_kv_is_not_zero_gpu_evidence(self) -> None:
         receipt = observe_native_kv_placement(
             b"llama_kv_cache: CPU KV buffer size = 64.00 MiB\n"

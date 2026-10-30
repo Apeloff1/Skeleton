@@ -21,6 +21,18 @@ _KV_LINE = re.compile(
     re.IGNORECASE,
 )
 _MULTIPLIERS = {"kib": 1024, "mib": 1024**2, "gib": 1024**3}
+_GPU_LAYER_SUMMARY = re.compile(
+    r"^\s*llama_model_load\s*:\s*offloaded\s+"
+    r"(?P<actual>[0-9]{1,4})/(?P<total>[0-9]{1,4})"
+    r"\s+layers\s+to\s+GPU\s*$",
+    re.IGNORECASE,
+)
+_METAL_MODEL_BUFFER = re.compile(
+    r"^\s*llama_model_load\s*:\s*Metal[0-9]*\s+model buffer size\s*=\s*"
+    r"(?P<size>[0-9]{1,10}(?:\.[0-9]{1,3})?)"
+    r"\s*(?P<unit>KiB|MiB|GiB)\s*$",
+    re.IGNORECASE,
+)
 
 
 def observe_native_kv_placement(stderr: bytes) -> dict[str, Any]:
@@ -34,11 +46,29 @@ def observe_native_kv_placement(stderr: bytes) -> dict[str, Any]:
     host = 0
     gpu = 0
     rows = 0
+    offloaded_gpu_layers = 0
+    metal_model_bytes = 0
     unknown_allocation_lines = 0
     seen: set[tuple[str, str, str]] = set()
     for line in stderr.decode("utf-8", errors="replace").splitlines():
         if len(line) > 512:
             continue
+        offloaded = _GPU_LAYER_SUMMARY.fullmatch(line)
+        if offloaded is not None:
+            actual = int(offloaded["actual"])
+            total = int(offloaded["total"])
+            if 0 < actual <= total:
+                offloaded_gpu_layers = max(offloaded_gpu_layers, actual)
+        metal_model = _METAL_MODEL_BUFFER.fullmatch(line)
+        if metal_model is not None:
+            units = metal_model["unit"].lower()
+            number = metal_model["size"].split(".")
+            scaled = int(number[0]) * 1000
+            if len(number) > 1:
+                scaled += int(number[1].ljust(3, "0"))
+            byte_count = scaled * _MULTIPLIERS[units] // 1000
+            if 0 < byte_count <= 1 << 50:
+                metal_model_bytes = max(metal_model_bytes, byte_count)
         match = _KV_LINE.fullmatch(line)
         if match is None:
             # A native KV allocation line with an unsupported device,
@@ -79,6 +109,8 @@ def observe_native_kv_placement(stderr: bytes) -> dict[str, Any]:
         "native_stderr_sha256": sha256(stderr).hexdigest(),
         "reported_host_kv_bytes": host,
         "reported_device_kv_bytes": gpu,
+        "backend_reported_metal_model_bytes": metal_model_bytes,
+        "backend_reported_gpu_layers": offloaded_gpu_layers,
         "matched_allocation_lines": rows,
         "unrecognized_allocation_lines": unknown_allocation_lines,
         "backend_reported": bool(rows),
