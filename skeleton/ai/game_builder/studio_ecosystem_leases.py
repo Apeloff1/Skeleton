@@ -4,7 +4,7 @@ Leases are local coordination proposals, not distributed, durable, or real
 job-completion proof. Source identity is immutable for the lease lifetime.
 """
 from __future__ import annotations
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from hashlib import sha256
 import json
 from typing import Any, Mapping
