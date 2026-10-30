@@ -51,3 +51,18 @@ def test_explicit_parallel_cli_makes_source_verified_2d_games(tmp_path,capsys):
                  "--estimated-output-bytes","1024"])==0
     assert (out/"studio_arena_fighting_glacial_fjord"/"walkable.html").is_file()
     assert json.loads(capsys.readouterr().out)["all_projects_completed"]
+
+def test_operator_resume_rechecks_source_and_exact_game_mode(tmp_path,capsys):
+    root=tmp_path/"private";root.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    options=["--private-root",str(root),"--output-root",str(out),
+             "--project","studio_arena_fighting_glacial_fjord",
+             "--walkable-story","--working-set-bytes","1024",
+             "--estimated-output-bytes","1024"]
+    assert main(options)==0
+    capsys.readouterr()
+    assert main(options+["--resume"])==0
+    result=json.loads(capsys.readouterr().out)
+    assert result["recovery"]["reused_verified"]==["studio_arena_fighting_glacial_fjord"]
+    assert result["recovery"]["built_now"]==[]
+    assert not result["consumer_release_certified"]
