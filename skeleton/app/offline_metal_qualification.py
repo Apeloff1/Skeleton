@@ -8,7 +8,9 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
+import subprocess
 import threading
 from typing import Any
 
@@ -120,6 +122,76 @@ def qualify_pinned_apple_host_kv(manifest: str | Path) -> dict[str, Any]:
     )
 
 
+def _validated_shared_fence_receipt(data: object) -> dict[str, Any]:
+    """Only a complete bounded, schema-checked Metal test is accepted."""
+    if not isinstance(data, dict) or set(data) != {
+        "schema", "passed", "shared_metal_buffers",
+        "synchronized_command_buffers", "verified_values", "output_sha256",
+        "model_tensor_fence_verified", "llama_kv_cache_fence_verified",
+    }:
+        raise RuntimeError("unexpected native Metal fence receipt")
+    if (
+        data["schema"] != "skeleton.apple.metal-shared-fence.v1"
+        or data["passed"] is not True
+        or type(data["shared_metal_buffers"]) is not int
+        or data["shared_metal_buffers"] != 2
+        or type(data["synchronized_command_buffers"]) is not int
+        or data["synchronized_command_buffers"] != 2
+        or type(data["verified_values"]) is not int
+        or data["verified_values"] != 128
+        or type(data["output_sha256"]) is not str
+        or len(data["output_sha256"]) != 64
+        or any(ch not in "0123456789abcdef" for ch in data["output_sha256"])
+        or data["model_tensor_fence_verified"] is not False
+        or data["llama_kv_cache_fence_verified"] is not False
+    ):
+        raise RuntimeError("invalid native shared-buffer fence evidence")
+    return dict(data)
+
+
+def qualify_apple_shared_buffer_fence() -> dict[str, Any]:
+    """Opt-in real Metal shared buffer test using the installed Apple compiler.
+
+    It is independent of llama.cpp: never use this result to claim model GPU
+    allocation, model tensor migration, or model KV synchronization.
+    """
+    if not _apple_silicon():
+        raise RuntimeError("shared Metal fence needs an Apple Silicon Mac")
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "scripts" / "qualify_metal_shared.swift"
+    )
+    if source.is_symlink() or not source.is_file():
+        raise RuntimeError("trusted Metal qualification source unavailable")
+    original = source.read_bytes()
+    if not original or len(original) > 32_768:
+        raise RuntimeError("unbounded native qualification source")
+    source_sha = sha256(original).hexdigest()
+    if not os.access("/usr/bin/xcrun", os.X_OK):
+        raise RuntimeError("Apple xcrun developer tooling unavailable")
+    try:
+        invocation = subprocess.run(
+            ["/usr/bin/xcrun", "swift", str(source)],
+            check=False, capture_output=True,
+            timeout=180, cwd=str(source.parent),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("native Metal fence invocation failed") from exc
+    if sha256(source.read_bytes()).hexdigest() != source_sha:
+        raise RuntimeError("Metal qualification source changed while running")
+    if invocation.returncode != 0 or len(invocation.stdout) > 8192:
+        raise RuntimeError("Metal shared-buffer qualification failed")
+    try:
+        output = json.loads(invocation.stdout.decode("utf-8", errors="strict"))
+    except (UnicodeError, ValueError) as exc:
+        raise RuntimeError("invalid native Metal fence output") from exc
+    result = _validated_shared_fence_receipt(output)
+    result["qualification_source_sha256"] = source_sha
+    result["model_tensor_fence_verified"] = False
+    result["llama_kv_cache_fence_verified"] = False
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Qualify pinned native Apple Metal/host-KV behavior locally"
@@ -128,9 +200,28 @@ def main() -> int:
         "--manifest", required=True,
         help="Path to an existing identity-checked private GGUF deployment",
     )
+    parser.add_argument(
+        "--shared-buffer-fence", action="store_true",
+        help="also exercise independent real Metal shared-buffer synchronization",
+    )
     args = parser.parse_args()
     try:
         report = qualify_pinned_apple_host_kv(args.manifest)
+        if args.shared_buffer_fence:
+            shared = qualify_apple_shared_buffer_fence()
+            report["shared_buffer_fence"] = shared
+            report["standalone_shared_metal_fence_verified"] = True
+            # This qualifies only the standalone shared-buffer experiment.
+            # Never infer that llama.cpp KV buffers were synchronized.
+            report["driver_coherency_verified"] = False
+            report["metal_event_fence_verified"] = False
+            report["qualification_receipt_sha256"] = sha256(
+                json.dumps(
+                    {k: v for k, v in report.items()
+                     if k != "qualification_receipt_sha256"},
+                    sort_keys=True, separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
     except (OSError, RuntimeError, ValueError) as exc:
         print(json.dumps({
             "schema": "skeleton.local.metal-kv-device-qualification.v1",
