@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 448,
+  "project_count": 456,
   "sections": [
     "intent",
     "narrative",
@@ -2700,10 +2700,58 @@
       "genre": "celestial_navigation",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_elastic_physics_copper_mesa",
+      "genre": "elastic_physics",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_elastic_physics_glacial_fjord",
+      "genre": "elastic_physics",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_elastic_physics_ashen_archipelago",
+      "genre": "elastic_physics",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_elastic_physics_luminous_marsh",
+      "genre": "elastic_physics",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_elastic_physics_cloud_canopy",
+      "genre": "elastic_physics",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_elastic_physics_ion_wastes",
+      "genre": "elastic_physics",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_elastic_physics_frosted_crater",
+      "genre": "elastic_physics",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_elastic_physics_salt_dunes",
+      "genre": "elastic_physics",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 3584,
+    "source_files": 3648,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,

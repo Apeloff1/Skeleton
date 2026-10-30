@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_glacial_fjord",
+  "title": "Glacial Fjord: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010316026,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 4
+}
