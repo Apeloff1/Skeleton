@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_orbital_gardens",
+  "title": "Orbital Gardens: The Maker Commons",
+  "subtitle": "Original the maker commons design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010312959,
+  "width": 21,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 3
+}

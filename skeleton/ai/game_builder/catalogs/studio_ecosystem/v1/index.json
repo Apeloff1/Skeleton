@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 336,
+  "project_count": 352,
   "sections": [
     "intent",
     "narrative",
@@ -2028,10 +2028,106 @@
       "genre": "circuit_racing",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_factory_automation_copper_mesa",
+      "genre": "factory_automation",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_factory_automation_glacial_fjord",
+      "genre": "factory_automation",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_factory_automation_ashen_archipelago",
+      "genre": "factory_automation",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_factory_automation_luminous_marsh",
+      "genre": "factory_automation",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_cloud_canopy",
+      "genre": "factory_automation",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_ion_wastes",
+      "genre": "factory_automation",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_factory_automation_frosted_crater",
+      "genre": "factory_automation",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_factory_automation_salt_dunes",
+      "genre": "factory_automation",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_factory_automation_sunken_metro",
+      "genre": "factory_automation",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_factory_automation_verdant_caldera",
+      "genre": "factory_automation",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_glass_steppe",
+      "genre": "factory_automation",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_factory_automation_orbital_gardens",
+      "genre": "factory_automation",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_factory_automation_misty_breakwater",
+      "genre": "factory_automation",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_factory_automation_neon_undercity",
+      "genre": "factory_automation",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_factory_automation_amber_highlands",
+      "genre": "factory_automation",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_echo_caverns",
+      "genre": "factory_automation",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 2688,
+    "source_files": 2816,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
