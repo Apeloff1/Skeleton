@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_orbital_gardens",
+  "title": "Orbital Gardens: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010314923,
+  "width": 21,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 10,
+  "theme": "space",
+  "starting_health": 3
+}
