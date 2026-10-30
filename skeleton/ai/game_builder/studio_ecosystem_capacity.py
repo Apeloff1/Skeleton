@@ -27,11 +27,17 @@ def observe_producer_capacity(root: Path) -> ProducerCapacity:
     try:
         free_disk=shutil.disk_usage(root).free
         cores=os.cpu_count() or 1
-        if hasattr(os,"sysconf"):
-            free_ram=int(os.sysconf("SC_AVPHYS_PAGES"))*int(os.sysconf("SC_PAGE_SIZE"))
-        else:
+        try:
             import psutil
-            free_ram=int(psutil.virtual_memory().available)
+        except ImportError:
+            psutil = None
+        if psutil is not None:
+            free_ram = int(psutil.virtual_memory().available)
+        elif hasattr(os, "sysconf"):
+            # POSIX fallback; unsupported/unknown sysconf keys fail closed.
+            free_ram = int(os.sysconf("SC_AVPHYS_PAGES")) * int(os.sysconf("SC_PAGE_SIZE"))
+        else:
+            raise StudioQuestError("no supported physical memory telemetry")
     except (OSError,ValueError,ImportError,KeyError) as exc:
         raise StudioQuestError("host memory/disk availability not observable") from exc
     if not free_disk or not free_ram:

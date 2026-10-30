@@ -33,7 +33,7 @@ def resource_label(documents: Mapping[str, Any]) -> str:
     name = source.get(field) if isinstance(source, dict) else None
     if not isinstance(name, str) or not name or len(name) > 256:
         raise StudioQuestError("invalid authored resource identity")
-    if key == "resource_constraints" and source.get("max_mint_without_source") != 0:
+    if key == "resource_constraints" and (type(source.get("max_mint_without_source")) is not int or source.get("max_mint_without_source") != 0):
         raise StudioQuestError("source permits unearned resource mint")
     if key == "resource_economy" and source.get("no_mint_without_supply") is not True:
         raise StudioQuestError("source fails closed on resource minting")
