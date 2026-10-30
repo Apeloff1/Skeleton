@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_glacial_fjord",
+  "title": "Glacial Fjord: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010317008,
+  "width": 21,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 6
+}
