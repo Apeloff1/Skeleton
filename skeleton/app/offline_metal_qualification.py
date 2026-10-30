@@ -143,46 +143,65 @@ def qualify_pinned_apple_host_kv(manifest: str | Path) -> dict[str, Any]:
     )
 
 
+def _expected_multisync_digest() -> str:
+    """Independent CPU calculation of all four fixed Swift GPU workloads."""
+    digest = sha256()
+    phases = (
+        (range(4), 1),
+        (range(100, 104), 2),
+        (range(200, 203), 1),
+        (range(300, 302), 1),
+    )
+    for seeds, transformations in phases:
+        for seed in seeds:
+            for index in range(64):
+                value = seed * 100_003 + index * 97
+                for _ in range(transformations):
+                    value = ((value ^ 0x5a17b3e2) + index) & 0xffffffff
+                digest.update(value.to_bytes(4, "little"))
+    return digest.hexdigest()
+
+
 def _validated_shared_fence_receipt(data: object) -> dict[str, Any]:
-    """Only a complete bounded, schema-checked Metal test is accepted."""
+    """Accept only the complete four-mode native Metal synchronization probe.
+
+    Evidence is strictly for the allocated probe buffers. A standalone
+    shared-event completion cannot certify llama.cpp's memory allocator.
+    """
     if not isinstance(data, dict) or set(data) != {
         "schema", "passed", "shared_metal_buffers",
-        "synchronized_command_buffers", "verified_values", "output_sha256",
-        "model_tensor_fence_verified", "llama_kv_cache_fence_verified",
+        "synchronized_command_buffers", "verified_values",
+        "serial_cpu_gpu_cpu_round_trips", "cross_queue_event_handoffs",
+        "parallel_independent_lanes", "shared_event_cpu_observations",
+        "output_sha256", "model_tensor_fence_verified",
+        "llama_kv_cache_fence_verified",
     }:
-        raise RuntimeError("unexpected native Metal fence receipt")
-    # Independent CPU-side expected digest for two rounds of the fixed 64
-    # uint32 Metal compute kernel. Reject a false "passed" report even when
-    # a local tool prints a schema-compatible JSON envelope.
-    expected_bytes = bytearray()
-    for iteration in range(2):
-        for index in range(64):
-            source = iteration * 100_003 + index * 97
-            computed = ((source ^ 0x5a17b3e2) + index) & 0xffffffff
-            expected_bytes.extend(computed.to_bytes(4, "little"))
-    expected_sha = sha256(expected_bytes).hexdigest()
+        raise RuntimeError("unexpected native multi-sync Metal receipt")
+    expected_counts = {
+        "shared_metal_buffers": 13,
+        "synchronized_command_buffers": 17,
+        "verified_values": 832,
+        "serial_cpu_gpu_cpu_round_trips": 4,
+        "cross_queue_event_handoffs": 4,
+        "parallel_independent_lanes": 3,
+        "shared_event_cpu_observations": 2,
+    }
     if (
-        data["schema"] != "skeleton.apple.metal-shared-fence.v1"
+        data["schema"] != "skeleton.apple.metal-multisync.v2"
         or data["passed"] is not True
-        or type(data["shared_metal_buffers"]) is not int
-        or data["shared_metal_buffers"] != 2
-        or type(data["synchronized_command_buffers"]) is not int
-        or data["synchronized_command_buffers"] != 2
-        or type(data["verified_values"]) is not int
-        or data["verified_values"] != 128
+        or any(type(data[key]) is not int or data[key] != expected
+               for key, expected in expected_counts.items())
         or type(data["output_sha256"]) is not str
-        or len(data["output_sha256"]) != 64
-        or any(ch not in "0123456789abcdef" for ch in data["output_sha256"])
-        or data["output_sha256"] != expected_sha
+        or data["output_sha256"] != _expected_multisync_digest()
         or data["model_tensor_fence_verified"] is not False
         or data["llama_kv_cache_fence_verified"] is not False
     ):
-        raise RuntimeError("invalid native shared-buffer fence evidence")
+        raise RuntimeError("invalid native multi-sync Metal evidence")
     return dict(data)
 
 
 def qualify_apple_shared_buffer_fence() -> dict[str, Any]:
-    """Opt-in real Metal shared buffer test using the installed Apple compiler.
+    """Opt-in four-mode real Metal synchronization test on Apple hardware.
 
     It is independent of llama.cpp: never use this result to claim model GPU
     allocation, model tensor migration, or model KV synchronization.
