@@ -25,8 +25,8 @@ def resume_catalog_preview_batch(portfolio: StudioPortfolio, output_root: Path, 
     _private_directory(root)
     registered={record["id"] for record in list_blueprints()}
     if (not isinstance(project_ids,(tuple,list)) or not project_ids or
-            len(set(project_ids))!=len(project_ids) or
-            any(not isinstance(pid,str) or pid not in registered for pid in project_ids)):
+            any(not isinstance(pid,str) or pid not in registered for pid in project_ids) or
+            len(set(project_ids))!=len(project_ids)):
         raise StudioEcosystemError("unknown or duplicate resume source")
     reused=[]
     built=[]

@@ -1,6 +1,5 @@
 import pytest
 from skeleton.ai.game_builder.studio_ecosystem_portfolio import StudioPortfolio
-from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 from skeleton.ai.game_builder.studio_ecosystem_catalog import StudioEcosystemError
 
 def test_project_journals_are_namespaced_not_shared(tmp_path):

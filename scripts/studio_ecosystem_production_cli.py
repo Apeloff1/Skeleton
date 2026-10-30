@@ -7,7 +7,6 @@ from pathlib import Path
 
 from skeleton.ai.game_builder.studio_ecosystem_portfolio import StudioPortfolio
 from skeleton.ai.game_builder.studio_ecosystem_preview_batch import build_catalog_preview_batch
-from skeleton.ai.game_builder.studio_ecosystem_catalog import list_blueprints
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,7 +31,6 @@ def main(argv: list[str] | None = None) -> int:
     from skeleton.ai.game_builder.studio_ecosystem_catalog import StudioEcosystemError
     try:
         owner=StudioPortfolio(args.private_root,authorized=True)
-        entries=list_blueprints(genre=args.genre,biome=args.biome)
         selection=None if args.all else args.project
         report=build_catalog_preview_batch(
             owner,args.output_root,project_ids=selection,
