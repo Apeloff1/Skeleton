@@ -49,3 +49,16 @@ def test_dialogue_cast_binding_and_fake_qa_passing_are_rejected():
     invalid["verification"]["release_certified"] = True
     with pytest.raises(StudioQuestError):
         inspect_continuity(invalid)
+
+
+def test_original_wave1_scene_contract_binds_to_authored_quest():
+    docs = read_blueprint("studio_aerial_traversal_amber_highlands")
+    report = inspect_continuity(docs)
+    assert report["source_consistent"], report["errors"]
+    changed = deepcopy(docs)
+    changed["scene"]["episode_plan"][1]["quest"] = "fabricated_stage"
+    report = inspect_continuity(changed)
+    assert "scene_references_unknown_quest_stage" in report["errors"]
+    changed = deepcopy(docs)
+    changed["scene"]["episode_plan"][1]["objects"] = []
+    assert "scene_without_interactions" in inspect_continuity(changed)["errors"]

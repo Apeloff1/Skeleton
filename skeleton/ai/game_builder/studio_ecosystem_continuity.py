@@ -51,7 +51,16 @@ def inspect_continuity(documents: Mapping[str, Any]) -> dict[str, object]:
         if not isinstance(episode, dict):
             raise StudioQuestError("invalid scene")
         key = episode.get("id")
-        stage = episode.get("quest_stage")
+        if "quest_stage" in episode and "quest" not in episode:
+            stage = episode["quest_stage"]
+            objects = episode.get("interactive_objects")
+        elif "quest" in episode and "quest_stage" not in episode:
+            # Original wave-1 scene documents use quest + objects.
+            stage = episode["quest"]
+            objects = episode.get("objects")
+        else:
+            stage = None
+            objects = None
         if not isinstance(key, str) or not key or key in seen_scene_keys:
             errors.append("duplicate_or_missing_scene_id")
         else:
@@ -59,7 +68,6 @@ def inspect_continuity(documents: Mapping[str, Any]) -> dict[str, object]:
         if not isinstance(stage, str) or stage not in program.stage_ids:
             errors.append("scene_references_unknown_quest_stage")
         scenes.append(stage)
-        objects = episode.get("interactive_objects")
         if not isinstance(objects, list) or len(objects) < 1 or any(
             not isinstance(item, str) or not item for item in objects
         ):
