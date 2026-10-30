@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 264,
+  "project_count": 272,
   "sections": [
     "intent",
     "narrative",
@@ -1596,10 +1596,58 @@
       "genre": "orchestral_rhythm",
       "biome": "salt_dunes",
       "theme": "desert"
+    },
+    {
+      "id": "studio_orchestral_rhythm_sunken_metro",
+      "genre": "orchestral_rhythm",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_orchestral_rhythm_verdant_caldera",
+      "genre": "orchestral_rhythm",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_glass_steppe",
+      "genre": "orchestral_rhythm",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_orchestral_rhythm_orbital_gardens",
+      "genre": "orchestral_rhythm",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_orchestral_rhythm_misty_breakwater",
+      "genre": "orchestral_rhythm",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_orchestral_rhythm_neon_undercity",
+      "genre": "orchestral_rhythm",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_orchestral_rhythm_amber_highlands",
+      "genre": "orchestral_rhythm",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_echo_caverns",
+      "genre": "orchestral_rhythm",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 2112,
+    "source_files": 2176,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,

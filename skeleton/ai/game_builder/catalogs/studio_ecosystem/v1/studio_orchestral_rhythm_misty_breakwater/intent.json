@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_misty_breakwater",
+  "title": "Misty Breakwater: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010310541,
+  "width": 23,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 3
+}
