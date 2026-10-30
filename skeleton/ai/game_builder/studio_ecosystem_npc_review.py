@@ -41,7 +41,12 @@ def review_npc_dialogue_log(documents: Mapping[str, Any], raw: bytes, *,
             or not isinstance(payload["contacts"],list)):
         raise StudioQuestError("invalid NPC log contract")
     session=replay_walk(documents,payload["events"],authorized=True)
-    replay_hazard_health(documents,session.events,authorized=True)
+    encounter=replay_hazard_health(documents,session.events,authorized=True)
+    defeated_at=None
+    if encounter["character_defeated"]:
+        if not encounter["hazard_contacts"]:
+            raise StudioQuestError("impossible zero-health encounter proof")
+        defeated_at=encounter["hazard_contacts"][-1]["event"]+1
     actors=cast_patrols(documents)
     if (payload["project_id"]!=session.project_id
             or payload["source_digest"]!=session.source_digest):
@@ -53,7 +58,8 @@ def review_npc_dialogue_log(documents: Mapping[str, Any], raw: bytes, *,
     moves=0
     cursor=0
     observed=[]
-    previous=(-1,"")
+    seen_at_cursor=set()
+    previous_cursor=-1
     for item in contacts:
         if (not isinstance(item,dict) or set(item)!={"id","event_cursor"}
                 or not isinstance(item["id"],str)
@@ -63,9 +69,15 @@ def review_npc_dialogue_log(documents: Mapping[str, Any], raw: bytes, *,
         target=item["event_cursor"]
         if target<cursor:
             raise StudioQuestError("NPC contacts are not event-ordered")
+        if defeated_at is not None and target>=defeated_at:
+            raise StudioQuestError("NPC contact cannot occur after player defeat")
+        if target!=previous_cursor:
+            seen_at_cursor.clear()
+            previous_cursor=target
         actor=lookup.get(item["id"])
-        if actor is None or (target,item["id"])==previous:
+        if actor is None or item["id"] in seen_at_cursor:
             raise StudioQuestError("unknown or duplicated NPC encounter")
+        seen_at_cursor.add(item["id"])
         for kind,value in session.events[cursor:target]:
             if kind=="move":
                 dx,dy=DIRECTIONS[value]
@@ -83,7 +95,6 @@ def review_npc_dialogue_log(documents: Mapping[str, Any], raw: bytes, *,
         observed.append({"npc_id":actor["id"],"scene_index":scene,
                          "at_event":cursor,"position":npc,
                          "authored_knowledge":actor["knows"]})
-        previous=(target,item["id"])
     digest=sha256(json.dumps(observed,sort_keys=True,ensure_ascii=True,
                              separators=(",",":")).encode("ascii")).hexdigest()
     return {"schema":"skeleton.game_builder.authoritative_npc_review.v1",
