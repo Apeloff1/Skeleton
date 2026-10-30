@@ -198,6 +198,7 @@ class WorkJournal:
 
     def snapshot(self) -> dict[str, object]:
         with self._tx() as db:
+            self._verify_chain(db)
             rows = {r[0]: {"status":r[1],"worker":r[2],"attempt":r[3],
                            "submitted_sha":r[4],"reviewer":r[5]}
                     for r in db.execute("SELECT id,status,worker,attempt,submitted_sha,reviewer FROM tasks")}
@@ -225,6 +226,26 @@ class WorkJournal:
                        (worker,token,task_id))
             self._event(db,"claim",task_id,worker)
 
+    def recover_claim(self, task_id: str, *, former_worker: str,
+                      expected_attempt: int, operator: str,
+                      authorized: bool) -> None:
+        """Explicit operator recovery, never a timer-based silent takeover."""
+        if not authorized:
+            raise PermissionError("recovery needs operator authorization")
+        if (not isinstance(former_worker,str) or not TOKEN.fullmatch(former_worker)
+                or not isinstance(operator,str) or not TOKEN.fullmatch(operator)
+                or type(expected_attempt) is not int or expected_attempt < 1
+                or operator == former_worker):
+            raise StudioQuestError("invalid independent recovery authority")
+        with self._tx() as db:
+            row=db.execute("SELECT status,worker,attempt FROM tasks WHERE id=?",
+                           (task_id,)).fetchone()
+            if row != ("leased",former_worker,expected_attempt):
+                raise StudioQuestError("stale recovery or changed lease owner")
+            db.execute("""UPDATE tasks SET status='pending',worker=NULL,token=NULL
+                          WHERE id=?""",(task_id,))
+            self._event(db,"operator_recovery",task_id,operator)
+
     def submit(self, task_id: str, *, worker: str, token: str,
                artifact_sha256: str, authorized: bool) -> None:
         if not authorized:
@@ -233,7 +254,9 @@ class WorkJournal:
             raise StudioQuestError("invalid submitted evidence fingerprint")
         with self._tx() as db:
             row=db.execute("SELECT status,worker,token FROM tasks WHERE id=?",(task_id,)).fetchone()
-            if row != ("leased",worker,token):
+            if (not isinstance(worker,str) or not TOKEN.fullmatch(worker)
+                    or not isinstance(token,str) or not TOKEN.fullmatch(token)
+                    or row != ("leased",worker,token)):
                 raise StudioQuestError("stale or mismatched worker token")
             db.execute("""UPDATE tasks SET status='submitted',submitted_sha=?,token=NULL
                           WHERE id=?""",(artifact_sha256,task_id))
@@ -249,8 +272,14 @@ class WorkJournal:
             row=db.execute("SELECT status,worker FROM tasks WHERE id=?",(task_id,)).fetchone()
             if row is None or row[0] != "submitted" or reviewer == row[1]:
                 raise StudioQuestError("missing submission or non-independent review")
-            db.execute("""UPDATE tasks SET status=?,reviewer=? WHERE id=?""",
-                       ("reviewed_claim" if accepted else "pending",reviewer,task_id))
+            if accepted:
+                db.execute("""UPDATE tasks SET status='reviewed_claim',reviewer=?
+                              WHERE id=?""",(reviewer,task_id))
+            else:
+                # A rejected unverified hash cannot survive into a new attempt.
+                db.execute("""UPDATE tasks SET status='pending',reviewer=?,
+                              worker=NULL,token=NULL,submitted_sha=NULL WHERE id=?""",
+                           (reviewer,task_id))
             self._event(db,"review_accept" if accepted else "review_reject",task_id,reviewer)
 
     @staticmethod
