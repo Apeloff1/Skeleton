@@ -28,3 +28,18 @@ def test_verify_complete_bundle_then_reject_corrupted_media(tmp_path):
     (target/"environment.svg").write_bytes(b"corrupted")
     with pytest.raises(StudioQuestError):
         verify_studio_bundle(target,authorized=True)
+
+def test_verified_v2_story_package_rejects_tampered_quest_page(tmp_path):
+    root=tmp_path/"private";root.mkdir(mode=0o700)
+    output=tmp_path/"export";output.mkdir(mode=0o700)
+    pid="studio_aerial_traversal_amber_highlands"
+    docs=read_blueprint(pid)
+    journal=WorkJournal(root,build_work_graph(docs),authorized=True)
+    pin_source_sections(journal,docs,authorized=True)
+    result=build_offline_studio_bundle(journal,ArtifactSpool(root,authorized=True),
+                                       output,interactive_story=True,authorized=True)
+    target=Path(result["output_dir"])
+    assert verify_studio_bundle(target,authorized=True)["files_verified"]==6
+    (target/"quest.html").write_bytes(b"forged")
+    with pytest.raises(StudioQuestError):
+        verify_studio_bundle(target,authorized=True)
