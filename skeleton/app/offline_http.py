@@ -485,7 +485,7 @@ class OfflineHTTPApplication:
             action = path[len("/v1/resources/longform/"):]
             try:
                 if action == "ingest":
-                    _fields(body, {"root", "relative_path", "approved"},
+                    _fields(body, {"root", "relative_path", "approved", "request_id"},
                             {"root", "relative_path", "approved"})
                     if body["approved"] is not True:
                         raise OfflineHTTPError(
@@ -495,9 +495,14 @@ class OfflineHTTPApplication:
                         body["relative_path"], str
                     ):
                         raise OfflineHTTPError(400, "invalid selected longform path")
-                    return 201, self.longform.ingest(
+                    outcome = self.longform.ingest(
                         body["root"], body["relative_path"],
+                        request_id=body.get("request_id"),
                     )
+                    return (200 if outcome["replayed"] else 201), outcome
+                if action == "source-status":
+                    _fields(body, {"source_id"}, {"source_id"})
+                    return 200, self.longform.inspect_source(body["source_id"])
                 if action == "work-start":
                     _fields(body, {"source_id", "approved"},
                             {"source_id", "approved"})
