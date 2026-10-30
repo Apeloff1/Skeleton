@@ -1,0 +1,94 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.scene.v1",
+  "project_id": "studio_merchant_caravan_ion_wastes",
+  "genre": "merchant_caravan",
+  "biome": "ion_wastes",
+  "release_certified": false,
+  "episode_plan": [
+    {
+      "id": "origin",
+      "site": "outer charged dunes",
+      "weather_state": "electromagnetic storms",
+      "quest_stage": "investigate",
+      "assets": [
+        "weather_ion_wastes",
+        "navigator_merchant_caravan"
+      ],
+      "interactive_objects": [
+        "survey_beacon",
+        "witness_board",
+        "route_chart"
+      ],
+      "camera_target": "regional_overview",
+      "dialogue_hook": "witness"
+    },
+    {
+      "id": "contest",
+      "site": "drifting relay station",
+      "weather_state": "escalating electromagnetic storms",
+      "quest_stage": "intervene",
+      "assets": [
+        "structure_ion_wastes",
+        "tool_merchant_caravan"
+      ],
+      "interactive_objects": [
+        "maintenance_console",
+        "faction_emissary",
+        "evidence_station"
+      ],
+      "camera_target": "close_third_person",
+      "dialogue_hook": "rival"
+    },
+    {
+      "id": "settlement",
+      "site": "shared access node near drifting relay station",
+      "weather_state": "measured induced currents",
+      "quest_stage": "ratify",
+      "assets": [
+        "commons_board",
+        "resource_ion_wastes"
+      ],
+      "interactive_objects": [
+        "audit_terminal",
+        "branch_choice",
+        "repair_monitor"
+      ],
+      "camera_target": "cinematic_pullback",
+      "dialogue_hook": "technician"
+    }
+  ],
+  "continuity": {
+    "authority": "canonical_game_project_workspace",
+    "state_keys": [
+      "hazard_measurement",
+      "witness_consented",
+      "repair_evidence",
+      "faction_alignment"
+    ],
+    "canonical_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ],
+    "replay_obligation": "exact_input_world_digest_and_branch_receipts"
+  },
+  "genre_mechanics": {
+    "genre": "merchant_caravan",
+    "primary": "convoy routing, demand elasticity and risk pricing",
+    "systemic_safety": "solvency",
+    "environment_feedback": "induced currents"
+  },
+  "navigation": {
+    "routes": [
+      "direct",
+      "safe_detour",
+      "public_transport_when_available"
+    ],
+    "unreachable_gates": "explicitly_marked"
+  },
+  "runtime_binding": {
+    "preview": "existing_deterministic_2D_grid_HTML5",
+    "requested_runtime": "native_merchant_caravan",
+    "implemented": false
+  }
+}

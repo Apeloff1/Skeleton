@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_amber_highlands",
+  "title": "Amber Highlands: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010315034,
+  "width": 27,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 6
+}

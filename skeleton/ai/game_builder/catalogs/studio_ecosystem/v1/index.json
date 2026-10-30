@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 400,
+  "project_count": 416,
   "sections": [
     "intent",
     "narrative",
@@ -2412,10 +2412,106 @@
       "genre": "investigative_journalism",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_merchant_caravan_copper_mesa",
+      "genre": "merchant_caravan",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_merchant_caravan_glacial_fjord",
+      "genre": "merchant_caravan",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_merchant_caravan_ashen_archipelago",
+      "genre": "merchant_caravan",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_merchant_caravan_luminous_marsh",
+      "genre": "merchant_caravan",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_cloud_canopy",
+      "genre": "merchant_caravan",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_ion_wastes",
+      "genre": "merchant_caravan",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_merchant_caravan_frosted_crater",
+      "genre": "merchant_caravan",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_merchant_caravan_salt_dunes",
+      "genre": "merchant_caravan",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_merchant_caravan_sunken_metro",
+      "genre": "merchant_caravan",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_merchant_caravan_verdant_caldera",
+      "genre": "merchant_caravan",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_glass_steppe",
+      "genre": "merchant_caravan",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_merchant_caravan_orbital_gardens",
+      "genre": "merchant_caravan",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_merchant_caravan_misty_breakwater",
+      "genre": "merchant_caravan",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_merchant_caravan_neon_undercity",
+      "genre": "merchant_caravan",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_merchant_caravan_amber_highlands",
+      "genre": "merchant_caravan",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_echo_caverns",
+      "genre": "merchant_caravan",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 3200,
+    "source_files": 3328,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
