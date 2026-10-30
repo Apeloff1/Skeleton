@@ -138,6 +138,9 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
             )
         self.assertEqual(model.config.gpu_layers, 4)
         self.assertEqual(model.config.batch_size, 64)
+        self.assertTrue(model._resource_profile_bound)
+        with self.assertRaisesRegex(LlamaCppRuntimeError, "already bound"):
+            model.activate_prelaunch_resource_profile(model.config)
         with self.assertRaises(LlamaCppRuntimeError):
             model.activate_prelaunch_resource_profile(
                 replace(model.config, gpu_layers=9),
