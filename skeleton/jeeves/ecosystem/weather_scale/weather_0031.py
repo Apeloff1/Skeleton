@@ -1,0 +1,13 @@
+"""Weather scale 0031.
+"""
+from __future__ import annotations
+
+ID = "weather_scale_0031"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "weather", "index": 31, "tier": 31 % 5}
+
+def apply(context: str = "") -> dict:
+    if not context and 31 % 11 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:140], "active": True}

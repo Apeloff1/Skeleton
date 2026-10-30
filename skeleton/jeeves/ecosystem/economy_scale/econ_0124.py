@@ -1,0 +1,13 @@
+"""Econ scale 0124.
+"""
+from __future__ import annotations
+
+ID = "econ_scale_0124"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "econ", "value": 10 + 124}
+
+def grant(player: str) -> dict:
+    if not player:
+        return {"ok": False, "reason": "no_player"}
+    return {"ok": True, "id": ID, "player": player, "granted": True}
