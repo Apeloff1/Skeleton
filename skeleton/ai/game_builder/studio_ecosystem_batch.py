@@ -28,7 +28,7 @@ def materialize_previews(
     destination: str | Path, *, authorized: bool,
     genre: str | None = None, biome: str | None = None,
     project_ids: tuple[str, ...] | None = None,
-    max_artifact_bytes: int = 128 * 1024 * 1024,
+    max_artifact_bytes: int | None = None,
 ) -> dict[str, object]:
     """Export selected deterministic prototypes with a transactional receipt.
 
@@ -38,14 +38,27 @@ def materialize_previews(
     """
     if not authorized:
         raise PermissionError("studio batch requires explicit operator authorization")
-    if type(max_artifact_bytes) is not int or max_artifact_bytes <= 0:
-        raise StudioEcosystemError("positive artifact budget required")
+    if max_artifact_bytes is not None and (
+        type(max_artifact_bytes) is not int or max_artifact_bytes <= 0
+    ):
+        raise StudioEcosystemError("positive explicit artifact budget required")
     root = Path(destination)
     if root.is_symlink() or not root.is_dir():
         raise StudioEcosystemError("existing non-symlink output directory required")
+    try:
+        initial_free = shutil.disk_usage(root).free
+    except OSError as exc:
+        raise StudioEcosystemError("unable to measure output disk capacity") from exc
+    reserve = max(4 * 1024 * 1024, initial_free // 20)
+    if initial_free <= reserve:
+        raise StudioEcosystemError("insufficient disk space for protected reserve")
+    effective_budget = min(
+        max_artifact_bytes if max_artifact_bytes is not None else initial_free,
+        initial_free - reserve,
+    )
     available = {entry["id"] for entry in list_blueprints(genre=genre, biome=biome)}
     requested = sorted(available) if project_ids is None else list(project_ids)
-    if not requested or len(requested) > 256 or len(set(requested)) != len(requested):
+    if not requested or len(set(requested)) != len(requested):
         raise StudioEcosystemError("nonempty unique bounded project selection required")
     if any(pid not in available for pid in requested):
         raise StudioEcosystemError("unknown or out-of-scope project")
@@ -73,8 +86,14 @@ def materialize_previews(
             raise StudioEcosystemError("preview did not achieve a winning replay")
         receipt_bytes = _canonical(receipt)
         projected = total_bytes + len(html_bytes) + len(receipt_bytes)
-        if projected > max_artifact_bytes:
+        if projected > effective_budget:
             raise StudioEcosystemError("artifact budget exceeded before export")
+        try:
+            current_free = shutil.disk_usage(root).free
+        except OSError as exc:
+            raise StudioEcosystemError("unable to remeasure output capacity") from exc
+        if len(html_bytes) + len(receipt_bytes) > current_free - reserve:
+            raise StudioEcosystemError("output disk reserve would be exhausted")
         # Atomic directory allocation: mkdir will fail on races and cannot
         # replace a pre-existing path. Receipt is committed last.
         target = root / pid
@@ -96,6 +115,9 @@ def materialize_previews(
         "status": "preview_only",
         "project_count": len(results),
         "artifact_bytes": total_bytes,
+        "effective_artifact_budget_bytes": effective_budget,
+        "initial_disk_free_bytes": initial_free,
+        "protected_disk_reserve_bytes": reserve,
         "receipts": results,
         "release_certified": False,
     }

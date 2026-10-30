@@ -104,7 +104,19 @@ def compile_quest_program(documents: Mapping[str, Any]) -> QuestProgram:
         if key in seen:
             raise StudioQuestError("repeated stage ID")
         if primary:
-            deps = item.get("prerequisites")
+            if "prerequisites" in item:
+                if "entry" in item:
+                    raise StudioQuestError("mixed entry and prerequisite contracts")
+                deps = item["prerequisites"]
+            elif "entry" in item:
+                # The original wave-1 corpus spells the sequential dependency
+                # as new_game / <previous_stage>_complete, not prerequisites.
+                expected = "new_game" if position == 0 else stages[-1].key + "_complete"
+                if item["entry"] != expected:
+                    raise StudioQuestError("authored entry does not match causal order")
+                deps = [] if position == 0 else [stages[-1].key]
+            else:
+                raise StudioQuestError("missing authored stage dependency contract")
         else:
             deps = [stages[-1].key] if stages else []
         if (not isinstance(deps, list) or len(deps) > 64

@@ -104,3 +104,22 @@ def test_real_catalog_both_stage_schemas_execute_local_choices(project):
     verify_quest_session(session, documents)
     assert quest_progress(session, documents)["stage_completed"] == 3
     assert session.receipt()["release_certified"] is False
+
+
+def test_original_wave1_entry_contract_replays_and_refuses_corrupt_links():
+    from copy import deepcopy
+    from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
+    docs = read_blueprint("studio_aerial_traversal_amber_highlands")
+    program = compile_quest_program(docs)
+    assert program.stage_ids == ("arrival", "dispute", "repair")
+    assert program.stages[1].prerequisites == ("arrival",)
+    session = replay_quest(docs, [(s.key, s.alternatives[0]) for s in program.stages], authorized=True)
+    assert len(session.completed) == 3
+    bad = deepcopy(docs)
+    bad["quest"]["stage_graph"][1]["entry"] = "invented_complete"
+    with pytest.raises(StudioQuestError):
+        compile_quest_program(bad)
+    bad = deepcopy(docs)
+    bad["quest"]["stage_graph"][0]["prerequisites"] = []
+    with pytest.raises(StudioQuestError):
+        compile_quest_program(bad)
