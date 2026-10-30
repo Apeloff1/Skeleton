@@ -1663,6 +1663,11 @@ class LlamaCppModel:
                             pump_errors.append(exc)
 
                 stop_output_end: int | None = None
+                # An M-chip may lose unified-memory headroom *during*
+                # long-running decoding. Probe at a bounded cadence while
+                # the child is live; the existing finally block reliably
+                # terminates/drains it if pressure admission fails.
+                next_resource_sample = time.monotonic() + 1.0
                 stop_markers = tuple(marker.encode("utf-8") for marker in request.stop)
                 stop_tail = b""
                 stop_scanned = 0
@@ -1683,7 +1688,15 @@ class LlamaCppModel:
                     while process.poll() is None:
                         if cancel.is_set():
                             raise LocalInferenceCancelled("local generation cancelled")
-                        if time.monotonic() - started > float(self.config.timeout_seconds):
+                        now = time.monotonic()
+                        if resource_guard is not None and now >= next_resource_sample:
+                            with self._process_lock:
+                                self._resource_preflight_checks += 1
+                            # Explicitly deny rather than silently altering
+                            # the launched model's tensor/KV residence.
+                            resource_guard()
+                            next_resource_sample = time.monotonic() + 1.0
+                        if now - started > float(self.config.timeout_seconds):
                             timed_out = True
                             break
                         if stdout_overflow_event.is_set():
