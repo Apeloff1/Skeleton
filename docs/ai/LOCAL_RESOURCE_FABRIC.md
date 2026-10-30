@@ -355,3 +355,20 @@ between validation and execution. Both the private source SHA-256 and the
 bounded output receipt are checked. The four-mode Metal test and the native
 GGUF host-KV qualifier still require **real Apple Silicon hardware** to be
 accepted as device evidence.
+
+## Native telemetry ownership and bounded qualifier source
+
+The Apple Metal resource monitor releases each `MTLCreateSystemDefaultDevice`
+retained Objective-C device when a sample ends, including early returns and
+driver/selector failures. It also drains an autorelease pool per sample.
+This matters because a long-running local generation now samples pressure
+periodically; retained Metal objects would otherwise accumulate. Regression
+tests mock both the native success and failure paths and require balanced
+device/pool cleanup.
+
+The optional device-qualification Swift source is read at a strict bounded
+size and executed as a **private frozen copy** rather than directly from a
+mutable checkout. The diagnostic process output is bounded and the result
+checked against a fixed independent CPU digest. An unsigned or modified
+source, a missing Apple toolchain, a non-Apple Silicon host, or unverified
+model-specific synchronization cannot satisfy final release qualification.

@@ -219,7 +219,8 @@ def qualify_apple_shared_buffer_fence() -> dict[str, Any]:
     )
     if source.is_symlink() or not source.is_file():
         raise RuntimeError("trusted Metal qualification source unavailable")
-    original = source.read_bytes()
+    with source.open("rb") as stream:
+        original = stream.read(32_769)
     if not original or len(original) > 32_768:
         raise RuntimeError("unbounded native qualification source")
     source_sha = sha256(original).hexdigest()
