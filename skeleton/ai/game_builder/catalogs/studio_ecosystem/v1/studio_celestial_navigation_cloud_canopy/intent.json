@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_cloud_canopy",
+  "title": "Cloud Canopy: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010315646,
+  "width": 27,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 10,
+  "theme": "forest",
+  "starting_health": 6
+}

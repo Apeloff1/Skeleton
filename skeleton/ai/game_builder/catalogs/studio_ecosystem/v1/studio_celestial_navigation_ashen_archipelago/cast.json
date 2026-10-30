@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_celestial_navigation_ashen_archipelago",
+  "genre": "celestial_navigation",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Orla Wynn",
+    "role": "navigator",
+    "public_goal": "locate a missing relay before a transit corridor fails",
+    "private_burden": "An earlier volcanic ash report ignored by peers",
+    "abilities": [
+      "orbital windows, instrument calibration and coordinate inference",
+      "calculate"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Neri Vale",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of cliffside signal tower",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Miro Morrow",
+      "role": "Maintainer of freshwater cisterns",
+      "knows": "Repair topology under ash deposition",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Iva Nara",
+      "role": "contested operations director",
+      "organization": "a misleading navigation syndicate",
+      "goal": "Exclusive access to freshwater cisterns",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of fuel and measurement variance",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over freshwater cisterns",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}
