@@ -85,6 +85,33 @@ function draw(){
  historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
  document.getElementById("walk-history").textContent=JSON.stringify(walkReceipt(),null,2);
 }
+function hint(){
+ const stage=current();
+ const output=document.getElementById("navigation-hint");
+ if(!stage){output.textContent="All authored scenes completed";return;}
+ const queue=[[player.x,player.y,[]]];
+ const visited=new Set([player.x+","+player.y]);
+ const moves=[["up",0,-1],["right",1,0],["down",0,1],["left",-1,0]];
+ const rows=world.maps[stageIndex];
+ for(let i=0;i<queue.length;i++){
+   const [x,y,path]=queue[i];
+   if(Math.abs(x-world.target[0])+Math.abs(y-world.target[1])<=1){
+     output.textContent=path.length?
+       "Shortest reachable route: "+path.length+" moves. Next: "+path[0]:
+       "Marker is already within interaction distance";
+     return;
+   }
+   for(const [name,dx,dy] of moves){
+     const nx=x+dx,ny=y+dy;
+     const key=nx+","+ny;
+     if(nx>=0&&nx<world.width&&ny>=0&&ny<world.height&&
+        rows[ny][nx]!=="#"&&!visited.has(key)){
+       visited.add(key);queue.push([nx,ny,path.concat(name)]);
+     }
+   }
+ }
+ output.textContent="No navigable marker route from current position";
+}
 function move(dx,dy){
  if(!current())return;
  const x=player.x+dx,y=player.y+dy;
@@ -93,6 +120,7 @@ function move(dx,dy){
  const direction=dx===1?"right":dx===-1?"left":dy===1?"down":"up";
  physicsEvents.push(["move",direction]);
  player.x=x;player.y=y;steps++;draw();
+ document.getElementById("navigation-hint").textContent="";
 }
 function choose(choice){
  const stage=current();
@@ -100,6 +128,7 @@ function choose(choice){
  choices.push([stage.id,choice]);
  physicsEvents.push(["choose",choice]);
  stageIndex++;player={x:1,y:1};draw();
+ document.getElementById("navigation-hint").textContent="";
 }
 const keys={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],
  ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
@@ -112,6 +141,7 @@ document.querySelectorAll("[data-dx]").forEach(button=>{
  button.addEventListener("click",()=>move(Number(button.dataset.dx),
                                           Number(button.dataset.dy)));
 });
+document.getElementById("hint").addEventListener("click",hint);
 document.getElementById("restart").addEventListener("click",()=>{
  stageIndex=0;player={x:1,y:1};steps=0;choices.length=0;physicsEvents.length=0;draw();
 });
@@ -197,6 +227,8 @@ def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
       "<button type='button' data-dx='0' data-dy='1'>Down</button>"
       "<button type='button' data-dx='1' data-dy='0'>Right</button></div>"
       "<section id='choices' aria-live='polite'></section>"
+      "<button id='hint' type='button'>Show shortest route hint</button>"
+      "<p id='navigation-hint' role='status' aria-live='polite'></p>"
       "<button id='restart' type='button'>Restart</button>"
       "<h2>Sandbox decisions</h2><pre id='history'></pre>"
       "<h2>Collision-verified replay input</h2><pre id='walk-history'></pre>"
