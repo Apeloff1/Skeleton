@@ -138,7 +138,8 @@ def search_chunks(
     db: sqlite3.Connection, expression: str, limit: int
 ) -> list[tuple[str, str, str, str, float, int]]:
     return db.execute(
-        "SELECT d.root, d.relative_path, d.sha256, c.body, "
+        "SELECT d.root, d.relative_path, d.sha256, "
+        "offline_document_chunk_fts.body, "
         "bm25(offline_document_chunk_fts) AS rank, d.id "
         "FROM offline_document_chunk_fts "
         "JOIN offline_document_chunks AS c "
