@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_ashen_archipelago",
+  "title": "Ashen Archipelago: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010316063,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 5
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_salt_dunes",
+  "title": "Salt Dunes: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010317721,
+  "width": 23,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "desert",
+  "starting_health": 5
+}

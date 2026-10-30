@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 256,
+  "project_count": 512,
   "sections": [
     "intent",
     "narrative",
@@ -1548,10 +1548,1546 @@
       "genre": "cooperative_rescue",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_orchestral_rhythm_copper_mesa",
+      "genre": "orchestral_rhythm",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_orchestral_rhythm_glacial_fjord",
+      "genre": "orchestral_rhythm",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_orchestral_rhythm_ashen_archipelago",
+      "genre": "orchestral_rhythm",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_orchestral_rhythm_luminous_marsh",
+      "genre": "orchestral_rhythm",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_cloud_canopy",
+      "genre": "orchestral_rhythm",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_ion_wastes",
+      "genre": "orchestral_rhythm",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_orchestral_rhythm_frosted_crater",
+      "genre": "orchestral_rhythm",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_orchestral_rhythm_salt_dunes",
+      "genre": "orchestral_rhythm",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_orchestral_rhythm_sunken_metro",
+      "genre": "orchestral_rhythm",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_orchestral_rhythm_verdant_caldera",
+      "genre": "orchestral_rhythm",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_glass_steppe",
+      "genre": "orchestral_rhythm",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_orchestral_rhythm_orbital_gardens",
+      "genre": "orchestral_rhythm",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_orchestral_rhythm_misty_breakwater",
+      "genre": "orchestral_rhythm",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_orchestral_rhythm_neon_undercity",
+      "genre": "orchestral_rhythm",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_orchestral_rhythm_amber_highlands",
+      "genre": "orchestral_rhythm",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_echo_caverns",
+      "genre": "orchestral_rhythm",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_arena_fighting_copper_mesa",
+      "genre": "arena_fighting",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_arena_fighting_glacial_fjord",
+      "genre": "arena_fighting",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_arena_fighting_ashen_archipelago",
+      "genre": "arena_fighting",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_arena_fighting_luminous_marsh",
+      "genre": "arena_fighting",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_arena_fighting_cloud_canopy",
+      "genre": "arena_fighting",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_arena_fighting_ion_wastes",
+      "genre": "arena_fighting",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_arena_fighting_frosted_crater",
+      "genre": "arena_fighting",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_arena_fighting_salt_dunes",
+      "genre": "arena_fighting",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_arena_fighting_sunken_metro",
+      "genre": "arena_fighting",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_arena_fighting_verdant_caldera",
+      "genre": "arena_fighting",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_arena_fighting_glass_steppe",
+      "genre": "arena_fighting",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_arena_fighting_orbital_gardens",
+      "genre": "arena_fighting",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_arena_fighting_misty_breakwater",
+      "genre": "arena_fighting",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_arena_fighting_neon_undercity",
+      "genre": "arena_fighting",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_arena_fighting_amber_highlands",
+      "genre": "arena_fighting",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_arena_fighting_echo_caverns",
+      "genre": "arena_fighting",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_stellar_colony_copper_mesa",
+      "genre": "stellar_colony",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_stellar_colony_glacial_fjord",
+      "genre": "stellar_colony",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_stellar_colony_ashen_archipelago",
+      "genre": "stellar_colony",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_stellar_colony_luminous_marsh",
+      "genre": "stellar_colony",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_stellar_colony_cloud_canopy",
+      "genre": "stellar_colony",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_stellar_colony_ion_wastes",
+      "genre": "stellar_colony",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_stellar_colony_frosted_crater",
+      "genre": "stellar_colony",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_stellar_colony_salt_dunes",
+      "genre": "stellar_colony",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_stellar_colony_sunken_metro",
+      "genre": "stellar_colony",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_stellar_colony_verdant_caldera",
+      "genre": "stellar_colony",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_stellar_colony_glass_steppe",
+      "genre": "stellar_colony",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_stellar_colony_orbital_gardens",
+      "genre": "stellar_colony",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_stellar_colony_misty_breakwater",
+      "genre": "stellar_colony",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_stellar_colony_neon_undercity",
+      "genre": "stellar_colony",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_stellar_colony_amber_highlands",
+      "genre": "stellar_colony",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_stellar_colony_echo_caverns",
+      "genre": "stellar_colony",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_underwater_archaeology_copper_mesa",
+      "genre": "underwater_archaeology",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_underwater_archaeology_glacial_fjord",
+      "genre": "underwater_archaeology",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_underwater_archaeology_ashen_archipelago",
+      "genre": "underwater_archaeology",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_underwater_archaeology_luminous_marsh",
+      "genre": "underwater_archaeology",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_cloud_canopy",
+      "genre": "underwater_archaeology",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_ion_wastes",
+      "genre": "underwater_archaeology",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_underwater_archaeology_frosted_crater",
+      "genre": "underwater_archaeology",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_underwater_archaeology_salt_dunes",
+      "genre": "underwater_archaeology",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_underwater_archaeology_sunken_metro",
+      "genre": "underwater_archaeology",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_underwater_archaeology_verdant_caldera",
+      "genre": "underwater_archaeology",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_glass_steppe",
+      "genre": "underwater_archaeology",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_underwater_archaeology_orbital_gardens",
+      "genre": "underwater_archaeology",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_underwater_archaeology_misty_breakwater",
+      "genre": "underwater_archaeology",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_underwater_archaeology_neon_undercity",
+      "genre": "underwater_archaeology",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_underwater_archaeology_amber_highlands",
+      "genre": "underwater_archaeology",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_echo_caverns",
+      "genre": "underwater_archaeology",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_circuit_racing_copper_mesa",
+      "genre": "circuit_racing",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_circuit_racing_glacial_fjord",
+      "genre": "circuit_racing",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_circuit_racing_ashen_archipelago",
+      "genre": "circuit_racing",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_circuit_racing_luminous_marsh",
+      "genre": "circuit_racing",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_cloud_canopy",
+      "genre": "circuit_racing",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_ion_wastes",
+      "genre": "circuit_racing",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_circuit_racing_frosted_crater",
+      "genre": "circuit_racing",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_circuit_racing_salt_dunes",
+      "genre": "circuit_racing",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_circuit_racing_sunken_metro",
+      "genre": "circuit_racing",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_circuit_racing_verdant_caldera",
+      "genre": "circuit_racing",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_glass_steppe",
+      "genre": "circuit_racing",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_circuit_racing_orbital_gardens",
+      "genre": "circuit_racing",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_circuit_racing_misty_breakwater",
+      "genre": "circuit_racing",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_circuit_racing_neon_undercity",
+      "genre": "circuit_racing",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_circuit_racing_amber_highlands",
+      "genre": "circuit_racing",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_echo_caverns",
+      "genre": "circuit_racing",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_factory_automation_copper_mesa",
+      "genre": "factory_automation",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_factory_automation_glacial_fjord",
+      "genre": "factory_automation",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_factory_automation_ashen_archipelago",
+      "genre": "factory_automation",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_factory_automation_luminous_marsh",
+      "genre": "factory_automation",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_cloud_canopy",
+      "genre": "factory_automation",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_ion_wastes",
+      "genre": "factory_automation",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_factory_automation_frosted_crater",
+      "genre": "factory_automation",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_factory_automation_salt_dunes",
+      "genre": "factory_automation",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_factory_automation_sunken_metro",
+      "genre": "factory_automation",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_factory_automation_verdant_caldera",
+      "genre": "factory_automation",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_glass_steppe",
+      "genre": "factory_automation",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_factory_automation_orbital_gardens",
+      "genre": "factory_automation",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_factory_automation_misty_breakwater",
+      "genre": "factory_automation",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_factory_automation_neon_undercity",
+      "genre": "factory_automation",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_factory_automation_amber_highlands",
+      "genre": "factory_automation",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_factory_automation_echo_caverns",
+      "genre": "factory_automation",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_tactical_command_copper_mesa",
+      "genre": "tactical_command",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_tactical_command_glacial_fjord",
+      "genre": "tactical_command",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_tactical_command_ashen_archipelago",
+      "genre": "tactical_command",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_tactical_command_luminous_marsh",
+      "genre": "tactical_command",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_cloud_canopy",
+      "genre": "tactical_command",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_ion_wastes",
+      "genre": "tactical_command",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_tactical_command_frosted_crater",
+      "genre": "tactical_command",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_tactical_command_salt_dunes",
+      "genre": "tactical_command",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_tactical_command_sunken_metro",
+      "genre": "tactical_command",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_tactical_command_verdant_caldera",
+      "genre": "tactical_command",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_glass_steppe",
+      "genre": "tactical_command",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_tactical_command_orbital_gardens",
+      "genre": "tactical_command",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_tactical_command_misty_breakwater",
+      "genre": "tactical_command",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_tactical_command_neon_undercity",
+      "genre": "tactical_command",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_tactical_command_amber_highlands",
+      "genre": "tactical_command",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_echo_caverns",
+      "genre": "tactical_command",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_creature_sanctuary_copper_mesa",
+      "genre": "creature_sanctuary",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_creature_sanctuary_glacial_fjord",
+      "genre": "creature_sanctuary",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_creature_sanctuary_ashen_archipelago",
+      "genre": "creature_sanctuary",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_creature_sanctuary_luminous_marsh",
+      "genre": "creature_sanctuary",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_creature_sanctuary_cloud_canopy",
+      "genre": "creature_sanctuary",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_creature_sanctuary_ion_wastes",
+      "genre": "creature_sanctuary",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_creature_sanctuary_frosted_crater",
+      "genre": "creature_sanctuary",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_creature_sanctuary_salt_dunes",
+      "genre": "creature_sanctuary",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_creature_sanctuary_sunken_metro",
+      "genre": "creature_sanctuary",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_creature_sanctuary_verdant_caldera",
+      "genre": "creature_sanctuary",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_creature_sanctuary_glass_steppe",
+      "genre": "creature_sanctuary",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_creature_sanctuary_orbital_gardens",
+      "genre": "creature_sanctuary",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_creature_sanctuary_misty_breakwater",
+      "genre": "creature_sanctuary",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_creature_sanctuary_neon_undercity",
+      "genre": "creature_sanctuary",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_creature_sanctuary_amber_highlands",
+      "genre": "creature_sanctuary",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_creature_sanctuary_echo_caverns",
+      "genre": "creature_sanctuary",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_investigative_journalism_copper_mesa",
+      "genre": "investigative_journalism",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_investigative_journalism_glacial_fjord",
+      "genre": "investigative_journalism",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_investigative_journalism_ashen_archipelago",
+      "genre": "investigative_journalism",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_investigative_journalism_luminous_marsh",
+      "genre": "investigative_journalism",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_cloud_canopy",
+      "genre": "investigative_journalism",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_ion_wastes",
+      "genre": "investigative_journalism",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_investigative_journalism_frosted_crater",
+      "genre": "investigative_journalism",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_investigative_journalism_salt_dunes",
+      "genre": "investigative_journalism",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_investigative_journalism_sunken_metro",
+      "genre": "investigative_journalism",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_investigative_journalism_verdant_caldera",
+      "genre": "investigative_journalism",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_glass_steppe",
+      "genre": "investigative_journalism",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_investigative_journalism_orbital_gardens",
+      "genre": "investigative_journalism",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_investigative_journalism_misty_breakwater",
+      "genre": "investigative_journalism",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_investigative_journalism_neon_undercity",
+      "genre": "investigative_journalism",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_investigative_journalism_amber_highlands",
+      "genre": "investigative_journalism",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_echo_caverns",
+      "genre": "investigative_journalism",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_merchant_caravan_copper_mesa",
+      "genre": "merchant_caravan",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_merchant_caravan_glacial_fjord",
+      "genre": "merchant_caravan",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_merchant_caravan_ashen_archipelago",
+      "genre": "merchant_caravan",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_merchant_caravan_luminous_marsh",
+      "genre": "merchant_caravan",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_cloud_canopy",
+      "genre": "merchant_caravan",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_ion_wastes",
+      "genre": "merchant_caravan",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_merchant_caravan_frosted_crater",
+      "genre": "merchant_caravan",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_merchant_caravan_salt_dunes",
+      "genre": "merchant_caravan",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_merchant_caravan_sunken_metro",
+      "genre": "merchant_caravan",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_merchant_caravan_verdant_caldera",
+      "genre": "merchant_caravan",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_glass_steppe",
+      "genre": "merchant_caravan",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_merchant_caravan_orbital_gardens",
+      "genre": "merchant_caravan",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_merchant_caravan_misty_breakwater",
+      "genre": "merchant_caravan",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_merchant_caravan_neon_undercity",
+      "genre": "merchant_caravan",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_merchant_caravan_amber_highlands",
+      "genre": "merchant_caravan",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_merchant_caravan_echo_caverns",
+      "genre": "merchant_caravan",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_seasonal_farming_copper_mesa",
+      "genre": "seasonal_farming",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_seasonal_farming_glacial_fjord",
+      "genre": "seasonal_farming",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_seasonal_farming_ashen_archipelago",
+      "genre": "seasonal_farming",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_seasonal_farming_luminous_marsh",
+      "genre": "seasonal_farming",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_seasonal_farming_cloud_canopy",
+      "genre": "seasonal_farming",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_seasonal_farming_ion_wastes",
+      "genre": "seasonal_farming",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_seasonal_farming_frosted_crater",
+      "genre": "seasonal_farming",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_seasonal_farming_salt_dunes",
+      "genre": "seasonal_farming",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_seasonal_farming_sunken_metro",
+      "genre": "seasonal_farming",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_seasonal_farming_verdant_caldera",
+      "genre": "seasonal_farming",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_seasonal_farming_glass_steppe",
+      "genre": "seasonal_farming",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_seasonal_farming_orbital_gardens",
+      "genre": "seasonal_farming",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_seasonal_farming_misty_breakwater",
+      "genre": "seasonal_farming",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_seasonal_farming_neon_undercity",
+      "genre": "seasonal_farming",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_seasonal_farming_amber_highlands",
+      "genre": "seasonal_farming",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_seasonal_farming_echo_caverns",
+      "genre": "seasonal_farming",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_celestial_navigation_copper_mesa",
+      "genre": "celestial_navigation",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_celestial_navigation_glacial_fjord",
+      "genre": "celestial_navigation",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_celestial_navigation_ashen_archipelago",
+      "genre": "celestial_navigation",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_celestial_navigation_luminous_marsh",
+      "genre": "celestial_navigation",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_celestial_navigation_cloud_canopy",
+      "genre": "celestial_navigation",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_celestial_navigation_ion_wastes",
+      "genre": "celestial_navigation",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_celestial_navigation_frosted_crater",
+      "genre": "celestial_navigation",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_celestial_navigation_salt_dunes",
+      "genre": "celestial_navigation",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_celestial_navigation_sunken_metro",
+      "genre": "celestial_navigation",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_celestial_navigation_verdant_caldera",
+      "genre": "celestial_navigation",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_celestial_navigation_glass_steppe",
+      "genre": "celestial_navigation",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_celestial_navigation_orbital_gardens",
+      "genre": "celestial_navigation",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_celestial_navigation_misty_breakwater",
+      "genre": "celestial_navigation",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_celestial_navigation_neon_undercity",
+      "genre": "celestial_navigation",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_celestial_navigation_amber_highlands",
+      "genre": "celestial_navigation",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_celestial_navigation_echo_caverns",
+      "genre": "celestial_navigation",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_elastic_physics_copper_mesa",
+      "genre": "elastic_physics",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_elastic_physics_glacial_fjord",
+      "genre": "elastic_physics",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_elastic_physics_ashen_archipelago",
+      "genre": "elastic_physics",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_elastic_physics_luminous_marsh",
+      "genre": "elastic_physics",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_elastic_physics_cloud_canopy",
+      "genre": "elastic_physics",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_elastic_physics_ion_wastes",
+      "genre": "elastic_physics",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_elastic_physics_frosted_crater",
+      "genre": "elastic_physics",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_elastic_physics_salt_dunes",
+      "genre": "elastic_physics",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_elastic_physics_sunken_metro",
+      "genre": "elastic_physics",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_elastic_physics_verdant_caldera",
+      "genre": "elastic_physics",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_elastic_physics_glass_steppe",
+      "genre": "elastic_physics",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_elastic_physics_orbital_gardens",
+      "genre": "elastic_physics",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_elastic_physics_misty_breakwater",
+      "genre": "elastic_physics",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_elastic_physics_neon_undercity",
+      "genre": "elastic_physics",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_elastic_physics_amber_highlands",
+      "genre": "elastic_physics",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_elastic_physics_echo_caverns",
+      "genre": "elastic_physics",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_weather_survival_copper_mesa",
+      "genre": "weather_survival",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_weather_survival_glacial_fjord",
+      "genre": "weather_survival",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_weather_survival_ashen_archipelago",
+      "genre": "weather_survival",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_weather_survival_luminous_marsh",
+      "genre": "weather_survival",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_weather_survival_cloud_canopy",
+      "genre": "weather_survival",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_weather_survival_ion_wastes",
+      "genre": "weather_survival",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_weather_survival_frosted_crater",
+      "genre": "weather_survival",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_weather_survival_salt_dunes",
+      "genre": "weather_survival",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_weather_survival_sunken_metro",
+      "genre": "weather_survival",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_weather_survival_verdant_caldera",
+      "genre": "weather_survival",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_weather_survival_glass_steppe",
+      "genre": "weather_survival",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_weather_survival_orbital_gardens",
+      "genre": "weather_survival",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_weather_survival_misty_breakwater",
+      "genre": "weather_survival",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_weather_survival_neon_undercity",
+      "genre": "weather_survival",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_weather_survival_amber_highlands",
+      "genre": "weather_survival",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_weather_survival_echo_caverns",
+      "genre": "weather_survival",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_historical_citybuilder_copper_mesa",
+      "genre": "historical_citybuilder",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_historical_citybuilder_glacial_fjord",
+      "genre": "historical_citybuilder",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_historical_citybuilder_ashen_archipelago",
+      "genre": "historical_citybuilder",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_historical_citybuilder_luminous_marsh",
+      "genre": "historical_citybuilder",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_historical_citybuilder_cloud_canopy",
+      "genre": "historical_citybuilder",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_historical_citybuilder_ion_wastes",
+      "genre": "historical_citybuilder",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_historical_citybuilder_frosted_crater",
+      "genre": "historical_citybuilder",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_historical_citybuilder_salt_dunes",
+      "genre": "historical_citybuilder",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_historical_citybuilder_sunken_metro",
+      "genre": "historical_citybuilder",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_historical_citybuilder_verdant_caldera",
+      "genre": "historical_citybuilder",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_historical_citybuilder_glass_steppe",
+      "genre": "historical_citybuilder",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_historical_citybuilder_orbital_gardens",
+      "genre": "historical_citybuilder",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_historical_citybuilder_misty_breakwater",
+      "genre": "historical_citybuilder",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_historical_citybuilder_neon_undercity",
+      "genre": "historical_citybuilder",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_historical_citybuilder_amber_highlands",
+      "genre": "historical_citybuilder",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_historical_citybuilder_echo_caverns",
+      "genre": "historical_citybuilder",
+      "biome": "echo_caverns",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_collaborative_robotics_copper_mesa",
+      "genre": "collaborative_robotics",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_collaborative_robotics_glacial_fjord",
+      "genre": "collaborative_robotics",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_collaborative_robotics_ashen_archipelago",
+      "genre": "collaborative_robotics",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_collaborative_robotics_luminous_marsh",
+      "genre": "collaborative_robotics",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_cloud_canopy",
+      "genre": "collaborative_robotics",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_ion_wastes",
+      "genre": "collaborative_robotics",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_collaborative_robotics_frosted_crater",
+      "genre": "collaborative_robotics",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_collaborative_robotics_salt_dunes",
+      "genre": "collaborative_robotics",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_collaborative_robotics_sunken_metro",
+      "genre": "collaborative_robotics",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_collaborative_robotics_verdant_caldera",
+      "genre": "collaborative_robotics",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_glass_steppe",
+      "genre": "collaborative_robotics",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_collaborative_robotics_orbital_gardens",
+      "genre": "collaborative_robotics",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_collaborative_robotics_misty_breakwater",
+      "genre": "collaborative_robotics",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_collaborative_robotics_neon_undercity",
+      "genre": "collaborative_robotics",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_collaborative_robotics_amber_highlands",
+      "genre": "collaborative_robotics",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_echo_caverns",
+      "genre": "collaborative_robotics",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 2048,
+    "source_files": 4096,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,

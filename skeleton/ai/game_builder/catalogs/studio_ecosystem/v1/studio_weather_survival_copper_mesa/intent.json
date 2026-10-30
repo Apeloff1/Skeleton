@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_copper_mesa",
+  "title": "Copper Mesa: Stormline",
+  "subtitle": "Original stormline design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010316480,
+  "width": 19,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "desert",
+  "starting_health": 4
+}

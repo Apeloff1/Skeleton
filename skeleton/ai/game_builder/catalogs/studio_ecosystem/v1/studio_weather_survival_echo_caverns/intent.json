@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_echo_caverns",
+  "title": "Echo Caverns: Stormline",
+  "subtitle": "Original stormline design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010317035,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 10,
+  "theme": "arcade",
+  "starting_health": 3
+}

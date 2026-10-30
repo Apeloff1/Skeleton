@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_amber_highlands",
+  "title": "Amber Highlands: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010316507,
+  "width": 27,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 5
+}
