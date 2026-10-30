@@ -841,6 +841,9 @@ class LlamaCppModel:
         self._processes_started = 0
         self._inference_admitted = False
         self._resource_profile_bound = False
+        self._resource_preflight: Callable[[], None] | None = None
+        self._resource_preflight_bound = False
+        self._resource_preflight_checks = 0
         self._processes_exited = 0
         self._termination_requests = 0
         if not _stat_matches(self._model):
@@ -906,6 +909,24 @@ class LlamaCppModel:
             self._assert_artifacts_stable()
             self.config = profile
             self._resource_profile_bound = True
+
+    def install_prelaunch_resource_guard(self, guard: Callable[[], None]) -> None:
+        """Install one trusted resource-preflight callback before inference.
+
+        The callback may only reject a request: it does not change model,
+        execution flags, backend identity or GPU allocations.
+        """
+        if not callable(guard):
+            raise TypeError("prelaunch resource guard must be callable")
+        with self._process_lock:
+            if (getattr(self, "_resource_preflight_bound", False)
+                    or getattr(self, "_inference_admitted", False)
+                    or self._processes_started or self._spawning_processes):
+                raise LlamaCppRuntimeError(
+                    "resource guard cannot be installed after admission"
+                )
+            self._resource_preflight = guard
+            self._resource_preflight_bound = True
 
     @property
     def model_digest(self) -> str:
@@ -987,6 +1008,8 @@ class LlamaCppModel:
                     self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound
                 ),
                 "memory_estimate_source": self.memory_estimate_source,
+                "resource_preflight_bound": self._resource_preflight_bound,
+                "resource_preflight_checks": self._resource_preflight_checks,
             }
 
     @property
@@ -1453,6 +1476,12 @@ class LlamaCppModel:
             # Freeze profile before prompt hashing or artifact checks begin.
             # This prevents a digest/config race with late resource retuning.
             self._inference_admitted = True
+            resource_guard = self._resource_preflight
+            if resource_guard is not None:
+                self._resource_preflight_checks += 1
+        if resource_guard is not None:
+            # No prompt or child process is constructed before this check.
+            resource_guard()
         started = time.monotonic()
 
         def interrupt() -> None:

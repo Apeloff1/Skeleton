@@ -140,4 +140,39 @@ def plan_metal_llama_launch(
     )
 
 
-__all__ = ["MetalLaunchReceipt", "plan_metal_llama_launch"]
+def require_live_metal_headroom(
+    model: LlamaCppModel,
+    *, hardware: LocalResourceSnapshot | None = None,
+    devices: tuple[GPUResource, ...] | None = None,
+) -> MetalLaunchReceipt:
+    """Fail closed *before* launching an Apple GPU subprocess under pressure.
+
+    A deployed llama.cpp process owns Metal allocations. An already sealed
+    launch profile cannot safely be retuned mid-request. When the available
+    host/Metal working set shrinks, reject this request instead of claiming
+    a GPU-to-swap migration, changing model identity or launching into OOM.
+    """
+    if not _apple_silicon() or not model.config.gpu_layers:
+        return MetalLaunchReceipt(
+            False, "gpu_offload_not_active", model.config.gpu_layers,
+            model.config.gpu_layers, model.config.threads,
+            model.config.batch_size, None, None,
+        )
+    from .offline_resources import LocalResourcePressure
+
+    planned, receipt = plan_metal_llama_launch(
+        model, hardware=hardware, devices=devices,
+    )
+    if planned.gpu_layers is None or planned.gpu_layers < model.config.gpu_layers:
+        raise LocalResourcePressure(
+            "Apple unified-memory headroom no longer supports the sealed "
+            "Metal offload profile; retry after pressure clears or reload "
+            "with fewer GPU layers. No model state was changed."
+        )
+    return receipt
+
+
+__all__ = [
+    "MetalLaunchReceipt", "plan_metal_llama_launch",
+    "require_live_metal_headroom",
+]

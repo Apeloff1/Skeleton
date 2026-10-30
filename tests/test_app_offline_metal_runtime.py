@@ -10,7 +10,10 @@ import unittest
 from skeleton.ai.runtime.inference.llama_cpp import (
     LlamaCppConfig, LlamaCppModel, LlamaCppRuntimeError,
 )
-from skeleton.app.offline_metal_runtime import plan_metal_llama_launch
+from skeleton.app.offline_metal_runtime import (
+    plan_metal_llama_launch, require_live_metal_headroom,
+)
+from skeleton.app.offline_resources import LocalResourcePressure
 from skeleton.app.offline_resource_fabric import GPUResource
 from skeleton.app.offline_resources import LocalResourceSnapshot
 
@@ -120,6 +123,42 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
             profile, receipt = plan_metal_llama_launch(fake_model(original))
         self.assertIs(profile, original)
         self.assertFalse(receipt.supported)
+
+    def test_runtime_preflight_blocks_new_gpu_inference_when_uma_shrinks(self):
+        candidate = fake_model(configuration(gpu_layers=8))
+        with patch("skeleton.app.offline_metal_runtime._apple_silicon",
+                   return_value=True):
+            supported = require_live_metal_headroom(
+                candidate, hardware=local_hardware(),
+                devices=(apple_device(),),
+            )
+            self.assertTrue(supported.supported)
+            with self.assertRaisesRegex(LocalResourcePressure, "headroom"):
+                require_live_metal_headroom(
+                    candidate,
+                    hardware=local_hardware(free=60_000_000, pressure=0.9),
+                    devices=(apple_device(working=3_000_000_000,
+                                          allocated=2_999_000_000),),
+                )
+        self.assertEqual(candidate.config.gpu_layers, 8)
+
+    def test_resource_guard_must_be_registered_once_before_inference(self):
+        model = object.__new__(LlamaCppModel)
+        model._process_lock = threading.Lock()
+        model._processes_started = 0
+        model._spawning_processes = 0
+        model._inference_admitted = False
+        model._resource_preflight_bound = False
+        model._resource_preflight = None
+        calls = []
+        model.install_prelaunch_resource_guard(lambda: calls.append("checked"))
+        self.assertTrue(model._resource_preflight_bound)
+        with self.assertRaisesRegex(LlamaCppRuntimeError, "after admission"):
+            model.install_prelaunch_resource_guard(lambda: None)
+        self.assertEqual(calls, [])
+        model._inference_admitted = True
+        with self.assertRaisesRegex(LlamaCppRuntimeError, "after admission"):
+            model.install_prelaunch_resource_guard(lambda: None)
 
     def test_backend_reconfiguration_is_prelaunch_and_identity_bound(self):
         baseline = configuration()

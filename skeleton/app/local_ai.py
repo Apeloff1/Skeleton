@@ -57,11 +57,15 @@ def load_gguf_deployment(source: str | Path) -> LlamaCppModel:
         rehash_artifacts_each_run=True,
     ))
     from skeleton.app.offline_metal_runtime import (
-        _apple_silicon, plan_metal_llama_launch,
+        _apple_silicon, plan_metal_llama_launch, require_live_metal_headroom,
     )
     if _apple_silicon():
         profile, receipt = plan_metal_llama_launch(model)
         model.activate_prelaunch_resource_profile(profile)
+        if profile.gpu_layers:
+            model.install_prelaunch_resource_guard(
+                lambda: require_live_metal_headroom(model)
+            )
         model.adaptive_metal_receipt = receipt.as_dict()
     return model
 
