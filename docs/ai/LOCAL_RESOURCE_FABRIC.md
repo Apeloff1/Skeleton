@@ -208,3 +208,33 @@ Metal memory budget, CPU-KV requests, buffer-report omissions, quantized
 cache quality and exact-head rollout checks. Driver-level live KV migration,
 Metal synchronization event receipts and memory-compression control remain
 unimplemented, and kernel swap/SIP settings are not changed.
+
+## On-device qualification procedure (macOS M-series)
+
+With a user-owned, immutable GGUF and pinned llama.cpp executable already
+recorded in a deployment manifest, set the manifest's `config` to include
+`"gpu_layers": N` for an actual supported positive N and
+`"kv_cache_location": "host"`. A model's default KV dtype remains unchanged
+unless the operator explicitly selects a supported K/V type.
+
+On the Apple Silicon device, from the project root:
+
+```bash
+python -m skeleton.app.offline_metal_qualification --manifest /path/to/private-local-model-deployment.json
+```
+
+The device qualification uses the normal offline `load_gguf_deployment` path,
+executes one small bounded request, and captures the pinned model SHA,
+pinned runtime SHA, execution digest and the limited backend-reported native
+CPU/device KV buffer totals. It returns a nonzero status when any required
+proof is missing, contradicted, not running on M-series hardware, or actual
+Metal GPU layer admission is zero. It does not print source bytes, prompts,
+raw stderr or secrets. The receipt is a local deterministic audit artifact,
+not independent driver attestation.
+
+`qualified_host_kv_diagnostic` means only **the pinned native backend
+reported a CPU KV buffer while the chosen Apple Metal offload mode was active,
+and no GPU KV buffer was reported**. It does not certify DMA, Metal event
+fences, runtime tensor migration, numerical equivalence across K/V cache
+types, or macOS swap modification. Test each chosen cache precision,
+memory-pressure condition, interruption and process/device failure separately.
