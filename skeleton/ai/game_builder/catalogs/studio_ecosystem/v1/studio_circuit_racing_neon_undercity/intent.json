@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_neon_undercity",
+  "title": "Neon Undercity: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010312542,
+  "width": 25,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "arcade",
+  "starting_health": 4
+}
