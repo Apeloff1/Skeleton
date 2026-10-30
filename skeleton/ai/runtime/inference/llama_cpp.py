@@ -870,6 +870,7 @@ class LlamaCppModel:
         self._resource_preflight_bound = False
         self._resource_preflight_checks = 0
         self._last_kv_observation: dict[str, Any] | None = None
+        self._kv_by_execution_receipt: dict[str, dict[str, Any]] = {}
         self._processes_exited = 0
         self._termination_requests = 0
         if not _stat_matches(self._model):
@@ -941,6 +942,23 @@ class LlamaCppModel:
             self._assert_artifacts_stable()
             self.config = profile
             self._resource_profile_bound = True
+
+    def kv_observation_for_receipt(
+        self, receipt_digest: str,
+    ) -> dict[str, Any] | None:
+        """Return only the exact invocation's native KV observation.
+
+        A bounded in-memory cache avoids racing another concurrent inference.
+        The digest is part of the original typed LocalInferenceResult, not
+        an observer's guess at the last process to finish.
+        """
+        if not isinstance(receipt_digest, str) or not _HEX64.fullmatch(
+            receipt_digest
+        ):
+            raise LlamaCppRuntimeError("invalid native execution receipt identity")
+        with self._process_lock:
+            observation = self._kv_by_execution_receipt.get(receipt_digest)
+            return None if observation is None else dict(observation)
 
     def install_prelaunch_resource_guard(self, guard: Callable[[], None]) -> None:
         """Install one trusted resource-preflight callback before inference.
@@ -1779,9 +1797,7 @@ class LlamaCppModel:
             response_id = (
                 "local:llama:" + self.runtime_digest + ":" + self.model_digest + ":" + response_digest
             )
-            with self._process_lock:
-                self._last_kv_observation = dict(kv_observation)
-            return LocalInferenceResult(
+            result = LocalInferenceResult(
                 text=text,
                 model_id=self.model_id,
                 model_digest=self.model_digest,
@@ -1819,6 +1835,18 @@ class LlamaCppModel:
                 structured_output=structured,
                 latency_ms=(time.monotonic() - started) * 1000.0,
             )
+            if result.execution_receipt_digest is None:
+                raise LlamaCppRuntimeError("native result lacks execution receipt")
+            with self._process_lock:
+                self._last_kv_observation = dict(kv_observation)
+                self._kv_by_execution_receipt[
+                    result.execution_receipt_digest
+                ] = dict(kv_observation)
+                while len(self._kv_by_execution_receipt) > 64:
+                    self._kv_by_execution_receipt.pop(
+                        next(iter(self._kv_by_execution_receipt))
+                    )
+            return result
 
 
 def build_llama_cpp_adapter(

@@ -114,7 +114,9 @@ def qualify_pinned_apple_host_kv(manifest: str | Path) -> dict[str, Any]:
         execution_receipt=native.execution_receipt_digest,
         requested_kv_location=model.config.kv_cache_location,
         selected_gpu_layers=model.config.gpu_layers,
-        observed=model._last_kv_observation,
+        observed=model.kv_observation_for_receipt(
+            native.execution_receipt_digest
+        ),
         metal_present=any(
             device.vendor == "apple" and device.shared_with_system_ram
             for device in probe_gpu_resources()
