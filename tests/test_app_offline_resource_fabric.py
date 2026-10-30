@@ -5,12 +5,14 @@ from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import unittest
+from types import SimpleNamespace
 
 from skeleton.app.offline_resources import LocalResourcePressure, LocalResourceSnapshot
 from skeleton.app.offline_resource_fabric import (
-    AdaptiveResourceFabric, GPUResource, ResourceFabricError, probe_gpu_resources,
+    AdaptiveResourceFabric, GPUResource, ResourceFabricError,
+    _probe_apple_metal, probe_gpu_resources,
 )
 
 
@@ -29,6 +31,50 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def test_metal_repeated_probe_releases_created_device_on_all_paths(self):
+        metal = SimpleNamespace(
+            MTLCreateSystemDefaultDevice=Mock(return_value=0xFEED),
+        )
+        objc = SimpleNamespace(
+            sel_registerName=Mock(side_effect=lambda selector: selector),
+            objc_autoreleasePoolPush=Mock(return_value=0xCAFE),
+            objc_autoreleasePoolPop=Mock(),
+        )
+        observations = {
+            b"hasUnifiedMemory": 1,
+            b"recommendedMaxWorkingSetSize": 8_000_000_000,
+            b"currentAllocatedSize": 300_000_000,
+            b"release": 0,
+        }
+        objc.objc_msgSend = Mock(
+            side_effect=lambda device, selector: observations[selector],
+        )
+        with patch(
+            "skeleton.app.offline_resource_fabric.sys.platform", "darwin",
+        ), patch(
+            "skeleton.app.offline_resource_fabric.platform.machine",
+            return_value="arm64",
+        ), patch(
+            "skeleton.app.offline_resource_fabric.ctypes.CDLL",
+            side_effect=lambda path: metal if path.endswith("/Metal") else objc,
+        ):
+            for _ in range(3):
+                probe = _probe_apple_metal()
+                self.assertEqual(probe[0].vendor, "apple")
+                self.assertEqual(probe[0].dedicated_total_bytes, 0)
+            observations[b"hasUnifiedMemory"] = 0
+            self.assertEqual(_probe_apple_metal(), ())
+            observations[b"hasUnifiedMemory"] = 1
+            del observations[b"recommendedMaxWorkingSetSize"]
+            self.assertEqual(_probe_apple_metal(), ())
+        self.assertEqual(
+            objc.objc_autoreleasePoolPop.call_count, 5,
+        )
+        self.assertEqual(
+            [call.args[1] for call in objc.objc_msgSend.call_args_list]
+            .count(b"release"), 5,
+        )
+
     def test_gpu_shared_host_budget_is_not_additive_or_fabricated(self):
         with TemporaryDirectory() as d:
             fabric = AdaptiveResourceFabric(d)
