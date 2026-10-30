@@ -56,3 +56,12 @@ def test_walkable_csp_hashes_rendered_program_and_source_without_unsafe_inline()
     assert b"'unsafe-inline'" not in html
     assert html.count(b"'sha256-")>=3
     assert b"form-action 'none'" in html
+
+def test_canvas_renders_original_actor_patrol_and_safe_dialogue():
+    docs=read_blueprint("studio_aerial_traversal_amber_highlands")
+    html=render_playable_world_html(docs)
+    assert b'"actors":' in html
+    assert b"Talk to " in html
+    assert b"actor.knows" in html
+    assert b"npc-dialogue" in html
+    assert b"Rika Morrow" in html
