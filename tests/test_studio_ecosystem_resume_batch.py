@@ -23,3 +23,15 @@ def test_second_pass_reuses_only_full_verified_source_bound_packages(tmp_path):
     with pytest.raises(StudioQuestError):
         resume_catalog_preview_batch(owner,out,project_ids=[a],
             working_set_bytes=1024,estimated_output_bytes=1024,authorized=True)
+
+def test_resume_refuses_to_relabel_old_v1_package_as_walkable_v3(tmp_path):
+    work=tmp_path/"work";work.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    owner=StudioPortfolio(work,authorized=True)
+    pid="studio_aerial_traversal_amber_highlands"
+    resume_catalog_preview_batch(owner,out,project_ids=[pid],
+        working_set_bytes=1024,estimated_output_bytes=1024,authorized=True)
+    with pytest.raises(StudioQuestError):
+        resume_catalog_preview_batch(owner,out,project_ids=[pid],
+            working_set_bytes=1024,estimated_output_bytes=1024,
+            walkable_story=True,authorized=True)
