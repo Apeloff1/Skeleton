@@ -869,6 +869,8 @@ class LlamaCppModel:
         self._resource_preflight: Callable[[], None] | None = None
         self._resource_preflight_bound = False
         self._resource_preflight_checks = 0
+        self._resource_lease_factory: Callable[[], Callable[[], None]] | None = None
+        self._resource_lease_bound = False
         self._last_kv_observation: dict[str, Any] | None = None
         self._kv_by_execution_receipt: dict[str, dict[str, Any]] = {}
         self._processes_exited = 0
@@ -977,6 +979,26 @@ class LlamaCppModel:
                 )
             self._resource_preflight = guard
             self._resource_preflight_bound = True
+
+    def install_resource_lease_factory(
+        self, factory: Callable[[], Callable[[], None]],
+    ) -> None:
+        """Reserve unified RAM for the entire native process lifetime.
+
+        A factory returns a single idempotent release callback. It cannot
+        alter pinned execution flags and cannot be installed after admission.
+        """
+        if not callable(factory):
+            raise TypeError("unified-memory lease factory must be callable")
+        with self._process_lock:
+            if (self._resource_lease_bound
+                    or getattr(self, "_inference_admitted", False)
+                    or self._processes_started or self._spawning_processes):
+                raise LlamaCppRuntimeError(
+                    "unified-memory lease factory cannot change after admission"
+                )
+            self._resource_lease_factory = factory
+            self._resource_lease_bound = True
 
     @property
     def model_digest(self) -> str:
@@ -1536,6 +1558,7 @@ class LlamaCppModel:
             # This prevents a digest/config race with late resource retuning.
             self._inference_admitted = True
             resource_guard = self._resource_preflight
+            lease_factory = getattr(self, "_resource_lease_factory", None)
             if resource_guard is not None:
                 self._resource_preflight_checks += 1
         if resource_guard is not None:
@@ -1596,6 +1619,7 @@ class LlamaCppModel:
                 raise LocalInferenceCancelled("local generation cancelled before launch")
 
             with stdout_file.open("wb") as stdout_handle, stderr_file.open("wb") as stderr_handle:
+                release_lease: Callable[[], None] | None = None
                 with self._process_lock:
                     self._spawning_processes += 1
                 try:
@@ -1608,6 +1632,12 @@ class LlamaCppModel:
                         with self._process_lock:
                             self._resource_preflight_checks += 1
                         resource_guard()
+                    if lease_factory is not None:
+                        release_lease = lease_factory()
+                        if not callable(release_lease):
+                            raise LlamaCppRuntimeError(
+                                "Metal lease did not provide release callback"
+                            )
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
@@ -1621,8 +1651,12 @@ class LlamaCppModel:
                         creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
                     )
                 except BaseException:
-                    with self._process_lock:
-                        self._spawning_processes -= 1
+                    try:
+                        if release_lease is not None:
+                            release_lease()
+                    finally:
+                        with self._process_lock:
+                            self._spawning_processes -= 1
                     raise
                 with self._process_lock:
                     self._spawning_processes -= 1
@@ -1729,18 +1763,22 @@ class LlamaCppModel:
                             self._draining_processes.add(process.pid)
                             if process.poll() is None:
                                 self._termination_requests += 1
-                    self._terminate(process)
-                    for pump in pumps:
-                        while pump.is_alive():
-                            pump.join(timeout=0.25)
-                    if process.stdout is not None:
-                        process.stdout.close()
-                    if process.stderr is not None:
-                        process.stderr.close()
-                    with self._process_lock:
-                        self._active_processes.discard(process.pid)
-                        self._draining_processes.discard(process.pid)
-                        self._processes_exited += 1
+                    try:
+                        self._terminate(process)
+                        for pump in pumps:
+                            while pump.is_alive():
+                                pump.join(timeout=0.25)
+                        if process.stdout is not None:
+                            process.stdout.close()
+                        if process.stderr is not None:
+                            process.stderr.close()
+                    finally:
+                        with self._process_lock:
+                            self._active_processes.discard(process.pid)
+                            self._draining_processes.discard(process.pid)
+                            self._processes_exited += 1
+                        if release_lease is not None:
+                            release_lease()
                 return_code = process.poll()
                 if return_code is None:
                     raise LlamaCppRuntimeError("local runtime could not be terminated")
