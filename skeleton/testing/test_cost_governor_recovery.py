@@ -107,6 +107,7 @@ def test_active_reservation_replays_across_process_restart(tmp_path) -> None:
 
 def test_completed_decision_recovers_after_crash_between_reconcile_and_qualification(
     tmp_path,
+    monkeypatch,
 ) -> None:
     path = tmp_path / "quota.sqlite3"
     operation = "op-completion-crash"
@@ -128,14 +129,23 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
         now_wall=10.5,
     )
 
-    # Crash injection: the spend ledger commits terminal accounting, but the
-    # governor never reaches qualification/journal terminalization.
-    completion = first.runtime.complete(
-        operation,
-        actual,
-        now_wall=11.0,
-    )
-    assert completion.quota_completion is not None
+    # Crash injection through the public governor path: completion intent is
+    # durably journaled before quota accounting, but terminalization is lost.
+    # Recovery can only accept a completion with its budget/evidence intent.
+    assert first._journal is not None
+
+    def crash_before_terminal(*_args, **_kwargs):
+        raise SystemExit("simulated crash after durable quota completion")
+
+    monkeypatch.setattr(first._journal, "record_terminal", crash_before_terminal)
+    with pytest.raises(SystemExit, match="simulated crash"):
+        first.complete(
+            operation,
+            actual,
+            evidence_refs=_refs("completion"),
+            now_wall=11.0,
+        )
+    assert first.runtime.quota_ledger.snapshot("tenant-a")["completions"] == 1
 
     restarted = _governor(path)
     recovered = restarted.recover_completed(
@@ -365,7 +375,10 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
         evidence_refs=_refs("completion-wins"),
     )
     assert completed.state == "completed"
-    assert completed.accepted is True
+    # This impossible race has no persisted completion intent. Its accounting
+    # is recoverable, but operation-budget qualification must fail closed.
+    assert completed.accepted is False
+    assert completed.reasons == ("operation-budget-recovery-intent-missing",)
 
 
 def test_restart_journal_conflict_never_releases_preexisting_reservation(
