@@ -24,3 +24,10 @@ def test_fake_movement_is_never_accepted_as_hazard_proof():
     docs=read_blueprint("studio_arena_fighting_glacial_fjord")
     with pytest.raises(StudioQuestError):
         replay_hazard_health(docs,[("move","left")],authorized=True)
+
+def test_hazard_replay_never_indexes_an_illegal_post_completion_stage():
+    docs=read_blueprint("studio_arena_fighting_glacial_fjord")
+    passed=simulate_complete_walk(docs,authorized=True)
+    with pytest.raises(StudioQuestError):
+        replay_hazard_health(docs,passed["actions"]+[["move","right"]],
+                             authorized=True)

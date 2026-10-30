@@ -57,6 +57,7 @@ def replay_hazard_health(documents: Mapping[str, Any],
     if not authorized:
         raise PermissionError("hazard replay requires operator authorization")
     from .studio_ecosystem_walk_replay import replay_walk
+    session=replay_walk(documents,events,authorized=True)
     world=playable_world_source(documents)
     hazards=authored_hazards(documents)
     health=hazards["starting_health"]
@@ -78,9 +79,6 @@ def replay_hazard_health(documents: Mapping[str, Any],
         elif kind=="choose":
             scene+=1
             x,y=world["spawn"]
-    # The authoritative grid replay rejects all illegal moves/choices,
-    # including any unreachable/forged hazard contact assertions.
-    session=replay_walk(documents,events,authorized=True)
     return {"schema":"skeleton.game_builder.offline_hazard_replay.v1",
             "project_id":session.project_id,"walk_session_sha256":session.digest,
             "remaining_health":health,"hazard_contacts":hit_events,
