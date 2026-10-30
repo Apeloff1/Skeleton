@@ -202,7 +202,7 @@ class WorkJournal:
         self._verify_chain(db)
         state = {
             task["id"]: {"status":"pending", "worker":None, "attempt":0,
-                         "sha":None, "reviewer":None}
+                         "sha":None, "reviewer":None, "token":None}
             for task in self.tasks
         }
         deps = {task["id"]:task["depends_on"] for task in self.tasks}
@@ -223,22 +223,30 @@ class WorkJournal:
                     state[d]["status"] != "reviewed_claim" for d in deps[task]
                 ):
                     raise StudioQuestError("invalid historical producer admission")
-                row.update(status="leased",worker=actor,attempt=row["attempt"]+1)
+                # Lease tokens are private capability strings: persist and
+                # audit only their hashes, bound to the specific owner.
+                if not isinstance(actor,str) or actor.count("|") != 1:
+                    raise StudioQuestError("unsealed historical lease token")
+                owner, token_sha = actor.split("|",1)
+                if not TOKEN.fullmatch(owner) or not HEX.fullmatch(token_sha):
+                    raise StudioQuestError("malformed historical lease authority")
+                row.update(status="leased",worker=owner,token=token_sha,
+                           attempt=row["attempt"]+1)
             elif kind == "submit":
                 if row["status"]!="leased" or not isinstance(actor,str) or not HEX.fullmatch(actor):
                     raise StudioQuestError("invalid historical producer submission")
-                row.update(status="submitted",sha=actor)
+                row.update(status="submitted",sha=actor,token=None)
             elif kind in ("review_accept","review_reject"):
                 if row["status"]!="submitted" or actor==row["worker"]:
                     raise StudioQuestError("invalid historical reviewer transition")
                 if kind=="review_accept":
                     row.update(status="reviewed_claim",reviewer=actor)
                 else:
-                    row.update(status="pending",worker=None,sha=None,reviewer=actor)
+                    row.update(status="pending",worker=None,sha=None,reviewer=actor,token=None)
             elif kind == "operator_recovery":
                 if row["status"]!="leased" or actor==row["worker"]:
                     raise StudioQuestError("invalid historical operator recovery")
-                row.update(status="pending",worker=None)
+                row.update(status="pending",worker=None,token=None)
             else:
                 raise StudioQuestError("unrecognized producer event kind")
         stored = {
@@ -310,10 +318,11 @@ class WorkJournal:
                 raise StudioQuestError("already claimed or not pending")
             if any(states[dep] != "reviewed_claim" for dep in definitions[task_id]["depends_on"]):
                 raise StudioQuestError("source producer prerequisites not reviewed")
+            token_sha=sha256(token.encode("ascii")).hexdigest()
             db.execute("""UPDATE tasks SET status='leased',worker=?,token=?,
                         attempt=attempt+1 WHERE id=? AND status='pending'""",
-                       (worker,token,task_id))
-            self._event(db,"claim",task_id,worker)
+                       (worker,token_sha,task_id))
+            self._event(db,"claim",task_id,worker+"|"+token_sha)
 
     def recover_claim(self, task_id: str, *, former_worker: str,
                       expected_attempt: int, operator: str,
@@ -345,7 +354,7 @@ class WorkJournal:
             row=db.execute("SELECT status,worker,token FROM tasks WHERE id=?",(task_id,)).fetchone()
             if (not isinstance(worker,str) or not TOKEN.fullmatch(worker)
                     or not isinstance(token,str) or not TOKEN.fullmatch(token)
-                    or row != ("leased",worker,token)):
+                    or row != ("leased",worker,sha256(token.encode("ascii")).hexdigest())):
                 raise StudioQuestError("stale or mismatched worker token")
             db.execute("""UPDATE tasks SET status='submitted',submitted_sha=?,token=NULL
                           WHERE id=?""",(artifact_sha256,task_id))
