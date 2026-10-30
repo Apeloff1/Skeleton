@@ -224,7 +224,16 @@ class LongformVirtualMemory:
             "storage": "sqlite_wal_adaptive_zlib_pages", "verified": True,
         }
 
-    def _read_verified(self, source_id: str) -> tuple[dict[str, object], list[str]]:
+    def _read_verified(
+        self, source_id: str, *, selected: set[int] | None = None,
+        max_selected_bytes: int = 0,
+    ) -> tuple[dict[str, object], dict[int, str]]:
+        """Stream-verifies the *entire* archive using bounded memory.
+
+        Decoded pages are retained only if explicitly selected. The full
+        document hash, ordered chain and searchable projection are checked
+        before returning any selected text to a model or API caller.
+        """
         if type(source_id) is not str or len(source_id) != 48 or (
             any(ch not in "0123456789abcdef" for ch in source_id)
         ):
@@ -239,22 +248,29 @@ class LongformVirtualMemory:
         digest = sha256()
         chain = ROOT_CHAIN
         actual_bytes = 0
-        pages: list[str] = []
+        count = 0
+        captured: dict[int, str] = {}
+        captured_bytes = 0
         cursor = self._db.execute(
             "SELECT ordinal,encoded,plain_bytes,digest,chain,encoding "
             "FROM longform_pages WHERE source_id=? ORDER BY ordinal",
             (source_id,),
         )
         for index, encoded, length, expected_digest, expected_chain, encoding in cursor:
-            if index != len(pages) or encoding not in ("raw", "zlib"):
+            if index != count or encoding not in ("raw", "zlib"):
                 raise LongformMemoryError("longform page ordering or encoding corrupted")
+            # Page length must be reasonable relative to *current* RAM.
+            # A malicious SQLite row must not force unlimited decompression.
+            if type(length) is not int or length < 0 or length > max(
+                1024, probe_local_resources(self.path).resident_document_budget // 2
+            ):
+                raise LongformMemoryError("invalid longform page allocation")
             try:
-                # zlib.decompress may expand malicious modified content;
-                # enforce original chunk length using an exact-size streaming cap.
                 if encoding == "zlib":
-                    z = zlib.decompressobj()
-                    raw = z.decompress(encoded, length + 1)
-                    if len(raw) > length or not z.eof or z.unconsumed_tail:
+                    decoder = zlib.decompressobj()
+                    raw = decoder.decompress(encoded, length + 1)
+                    if (len(raw) > length or not decoder.eof
+                            or decoder.unconsumed_tail or decoder.unused_data):
                         raise ValueError("invalid compressed longform page")
                 else:
                     raw = encoded
@@ -274,8 +290,20 @@ class LongformVirtualMemory:
                 raise LongformMemoryError("longform search projection corrupted")
             digest.update(raw)
             actual_bytes += length
-            pages.append(text)
-        if (len(pages) != expected_pages or actual_bytes != expected_bytes
+            if selected is not None and index in selected:
+                captured_bytes += length
+                if captured_bytes > max_selected_bytes:
+                    raise LongformMemoryError(
+                        "page window exceeds current RAM headroom"
+                    )
+                captured[index] = text
+            count += 1
+        actual_fts_count = self._db.execute(
+            "SELECT COUNT(*) FROM longform_fts WHERE source_id=?",
+            (source_id,),
+        ).fetchone()[0]
+        if (count != expected_pages or actual_bytes != expected_bytes
+                or actual_fts_count != expected_pages
                 or digest.hexdigest() != expected_sha
                 or chain.hex() != terminal_chain):
             raise LongformMemoryError("longform snapshot integrity mismatch")
@@ -283,7 +311,7 @@ class LongformVirtualMemory:
             "source_id": source_id, "source_sha256": expected_sha,
             "source_bytes": expected_bytes, "page_count": expected_pages,
             "terminal_chain": terminal_chain, "verified": True,
-        }, pages
+        }, captured
 
     def read_window(
         self, source_id: str, *, start_page: int = 0, pages: int = 1
@@ -291,26 +319,61 @@ class LongformVirtualMemory:
         if (type(start_page) is not int or start_page < 0
                 or type(pages) is not int or pages < 1):
             raise LongformMemoryError("invalid page window")
-        # Hard RAM/transport guard on this single read, never on corpus size.
         safe = probe_local_resources(self.path).resident_document_budget // 4
         if safe < 2048:
             raise LongformMemoryError("insufficient memory for longform page reading")
         with self._lock:
-            manifest, text_pages = self._read_verified(source_id)
-            selected = text_pages[start_page:start_page + pages]
-            total = sum(len(text.encode("utf-8")) for text in selected)
-            if total > safe:
-                raise LongformMemoryError("page window exceeds current RAM headroom")
+            manifest, captured = self._read_verified(
+                source_id, selected=set(range(start_page, start_page + pages)),
+                max_selected_bytes=safe,
+            )
             return {
                 **manifest, "start_page": start_page,
-                "returned_pages": len(selected),
-                "text": "".join(selected),
+                "returned_pages": len(captured),
+                "text": "".join(captured[i] for i in sorted(captured)),
                 "model_context_applied": False,
             }
 
     def verify(self, source_id: str) -> dict[str, object]:
         with self._lock:
             return self._read_verified(source_id)[0]
+
+    def search(
+        self, source_id: str, query: str, *, limit: int = 5
+    ) -> dict[str, object]:
+        """Retrieve a small provenance-verified subset, not entire corpus."""
+        import re
+        if type(query) is not str or not query.strip() or len(query) > 512:
+            raise LongformMemoryError("invalid longform search query")
+        if type(limit) is not int or not 1 <= limit <= 20:
+            raise LongformMemoryError("invalid longform search return count")
+        terms = tuple(dict.fromkeys(re.findall(
+            r"(?u)\\w{2,32}", query.casefold(),
+        )))[:12]
+        if not terms:
+            raise LongformMemoryError("longform search needs text terms")
+        expression = " OR ".join('"' + term + '"' for term in terms)
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT ordinal FROM longform_fts "
+                "WHERE longform_fts MATCH ? AND source_id=? "
+                "ORDER BY bm25(longform_fts), ordinal LIMIT ?",
+                (expression, source_id, limit),
+            ).fetchall()
+            positions = [int(row[0]) for row in rows]
+            safe = probe_local_resources(self.path).resident_document_budget // 4
+            manifest, captured = self._read_verified(
+                source_id, selected=set(positions), max_selected_bytes=safe,
+            )
+        return {
+            **manifest,
+            "hits": [
+                {"page": position, "text": captured[position],
+                 "source_sha256": manifest["source_sha256"]}
+                for position in positions
+            ],
+            "model_context_applied": False,
+        }
 
 
 __all__ = ["LongformVirtualMemory", "LongformMemoryError"]
