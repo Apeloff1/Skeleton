@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_frosted_crater",
+  "title": "Frosted Crater: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010313756,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 10,
+  "theme": "space",
+  "starting_health": 4
+}

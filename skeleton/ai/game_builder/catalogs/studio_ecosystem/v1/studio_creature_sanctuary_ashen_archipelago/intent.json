@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_ashen_archipelago",
+  "title": "Ashen Archipelago: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010313608,
+  "width": 23,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 14,
+  "theme": "ocean",
+  "starting_health": 4
+}
