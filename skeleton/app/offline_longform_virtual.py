@@ -19,6 +19,10 @@ import time
 import zlib
 
 from .offline_resource_fabric import _open_source_at
+from .offline_longform_merkle import (
+    EMPTY_ROOT, MerkleIntegrityError, install_merkle_schema,
+    build_merkle_tree, verify_merkle_page,
+)
 from .offline_resources import (
     LocalResourcePressure, admit_disk_document, probe_local_resources,
 )
@@ -109,6 +113,7 @@ class LongformVirtualMemory:
             self._db.execute("""CREATE VIRTUAL TABLE IF NOT EXISTS longform_fts
                 USING fts5(source_id UNINDEXED, ordinal UNINDEXED, text,
                            tokenize='unicode61')""")
+            install_merkle_schema(self._db)
             self._db.execute("""CREATE TABLE IF NOT EXISTS longform_work (
                 work_id TEXT PRIMARY KEY,
                 source_id TEXT NOT NULL,
@@ -255,10 +260,17 @@ class LongformVirtualMemory:
                             not (base / rel).resolve(strict=True).is_relative_to(base)
                         ):
                             raise LongformMemoryError("source changed during ingestion")
+                        root = build_merkle_tree(
+                            self._db, source_id, ordinal,
+                        )
                         self._db.execute(
-                            "INSERT INTO longform_sources VALUES (?,?,?,?,?,?,?,?)",
+                            "INSERT INTO longform_sources "
+                            "(source_id,source_label,source_sha256,bytes,pages,"
+                            "terminal_chain,stored_bytes,created_ns,merkle_root) "
+                            "VALUES (?,?,?,?,?,?,?,?,?)",
                             (source_id, rel.as_posix(), hasher.hexdigest(),
-                             count, ordinal, previous.hex(), stored, time.time_ns()),
+                             count, ordinal, previous.hex(), stored,
+                             time.time_ns(), root),
                         )
                         self._db.execute("COMMIT")
                     except BaseException:
@@ -391,6 +403,101 @@ class LongformVirtualMemory:
             "terminal_chain": terminal_chain, "verified": True,
         }, captured
 
+    def _read_selected_merkle(
+        self, source_id: str, selection: set[int],
+        *, max_selected_bytes: int,
+    ) -> tuple[dict[str, object], dict[int, str]] | None:
+        """Verify selected immutable page membership without full archive scan.
+
+        Legacy archives with no Merkle root continue to use the existing
+        complete file/hash-chain verification path. A modern root MUST be
+        supported by a valid path for each page before returning any text.
+        """
+        row = self._db.execute(
+            "SELECT source_sha256,bytes,pages,terminal_chain,merkle_root "
+            "FROM longform_sources WHERE source_id=?", (source_id,),
+        ).fetchone()
+        if row is None:
+            raise LongformMemoryError("unknown longform source")
+        digest, source_bytes, total, terminal, root = row
+        if root is None:
+            return None
+        if (type(total) is not int or total < 0
+                or type(source_bytes) is not int or source_bytes < 0
+                or type(root) is not str or len(root) != 64):
+            raise LongformMemoryError("invalid Merkle source manifest")
+        manifest: dict[str, object] = {
+            "source_id": source_id, "source_sha256": digest,
+            "source_bytes": source_bytes, "page_count": total,
+            "terminal_chain": terminal, "merkle_root": root,
+            "verified": True, "verification_scope": "selected_merkle_pages",
+        }
+        if total == 0:
+            if (root != EMPTY_ROOT or source_bytes != 0
+                    or digest != sha256(b"").hexdigest()
+                    or terminal != ROOT_CHAIN.hex()):
+                raise LongformMemoryError("empty Merkle manifest corrupted")
+            if selection:
+                raise LongformMemoryError("selected page outside empty archive")
+            return manifest, {}
+        if selection and (min(selection) < 0 or max(selection) >= total):
+            raise LongformMemoryError("selected longform page out of bounds")
+        captured: dict[int, str] = {}
+        used = 0
+        resources = probe_local_resources(self.path)
+        page_limit = max(
+            1024, min(
+                resources.read_chunk_bytes * 4,
+                resources.resident_document_budget // 2,
+            ),
+        )
+        for index in sorted(selection):
+            record = self._db.execute(
+                "SELECT encoded,plain_bytes,digest,encoding "
+                "FROM longform_pages WHERE source_id=? AND ordinal=?",
+                (source_id, index),
+            ).fetchone()
+            if record is None:
+                raise LongformMemoryError("selected longform page is missing")
+            encoded, length, page_digest, encoding = record
+            if (type(length) is not int or not 0 <= length <= page_limit
+                    or type(encoded) is not bytes
+                    or encoding not in ("zlib", "raw")):
+                raise LongformMemoryError("invalid selected page allocation")
+            if used + length > max_selected_bytes:
+                raise LongformMemoryError("selected pages exceed live RAM headroom")
+            try:
+                if encoding == "zlib":
+                    decoder = zlib.decompressobj()
+                    raw = decoder.decompress(encoded, length + 1)
+                    if (len(raw) != length or not decoder.eof
+                            or decoder.unused_data or decoder.unconsumed_tail):
+                        raise ValueError("invalid selected compressed page")
+                else:
+                    raw = encoded
+                page = raw.decode("utf-8", errors="strict")
+            except (ValueError, UnicodeError, zlib.error) as exc:
+                raise LongformMemoryError("corrupted selected longform page") from exc
+            if len(raw) != length or sha256(raw).hexdigest() != page_digest:
+                raise LongformMemoryError("selected longform page digest mismatch")
+            try:
+                verify_merkle_page(
+                    self._db, source_id, ordinal=index, page_count=total,
+                    byte_length=length, page_digest=page_digest, root=root,
+                )
+            except MerkleIntegrityError as exc:
+                raise LongformMemoryError("selected Merkle page proof failed") from exc
+            projections = self._db.execute(
+                "SELECT text FROM longform_fts "
+                "WHERE source_id=? AND ordinal=? LIMIT 2",
+                (source_id, index),
+            ).fetchall()
+            if projections != [(page,)]:
+                raise LongformMemoryError("selected source search text changed")
+            captured[index] = page
+            used += length
+        return manifest, captured
+
     def read_window(
         self, source_id: str, *, start_page: int = 0, pages: int = 1
     ) -> dict[str, object]:
@@ -408,10 +515,17 @@ class LongformVirtualMemory:
         if pages > max(1, safe // 1024):
             raise LongformMemoryError("requested window exceeds live page budget")
         with self._lock:
-            manifest, captured = self._read_verified(
-                source_id, selected=set(range(start_page, start_page + pages)),
-                max_selected_bytes=safe,
+            selection = set(range(start_page, start_page + pages))
+            merkle = self._read_selected_merkle(
+                source_id, selection, max_selected_bytes=safe,
             )
+            if merkle is None:
+                manifest, captured = self._read_verified(
+                    source_id, selected=selection,
+                    max_selected_bytes=safe,
+                )
+            else:
+                manifest, captured = merkle
             return {
                 **manifest, "start_page": start_page,
                 "returned_pages": len(captured),
@@ -450,9 +564,16 @@ class LongformVirtualMemory:
                 8 * 1024 * 1024,
                 probe_local_resources(self.path).resident_document_budget // 4,
             )
-            manifest, captured = self._read_verified(
-                source_id, selected=set(positions), max_selected_bytes=safe,
+            merkle = self._read_selected_merkle(
+                source_id, set(positions), max_selected_bytes=safe,
             )
+            if merkle is None:
+                manifest, captured = self._read_verified(
+                    source_id, selected=set(positions),
+                    max_selected_bytes=safe,
+                )
+            else:
+                manifest, captured = merkle
         return {
             **manifest,
             "hits": [
@@ -461,6 +582,7 @@ class LongformVirtualMemory:
                 for position in positions
             ],
             "model_context_applied": False,
+            "search_completeness_proven": False,
         }
 
 
