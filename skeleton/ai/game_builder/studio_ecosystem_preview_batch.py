@@ -20,6 +20,7 @@ def build_catalog_preview_batch(portfolio: StudioPortfolio, output_root: Path, *
                                 genre: str | None = None, biome: str | None = None,
                                 working_set_bytes: int,
                                 estimated_output_bytes: int,
+                                interactive_story: bool = False,
                                 authorized: bool) -> dict[str, object]:
     if not authorized:
         raise PermissionError("multi-game preview output requires operator authorization")
@@ -48,12 +49,15 @@ def build_catalog_preview_batch(portfolio: StudioPortfolio, output_root: Path, *
         disk_before=capacity.free_disk_bytes
         supervisor=portfolio.open(pid,authorized=True)
         receipt=build_offline_studio_bundle(supervisor.journal,supervisor.spool,
-                                             output_root,authorized=True)
+                                             output_root,interactive_story=interactive_story,
+                                             authorized=True)
         verification=verify_studio_bundle(Path(receipt["output_dir"]),authorized=True)
         if not verification["local_bundle_integrity_verified"]:
             raise StudioEcosystemError("post-write package integrity failed")
         elapsed=max(1,time.monotonic_ns()-started)
         disk_after=observe_producer_capacity(output_root).free_disk_bytes
+        if verification["files_verified"]!=(6 if interactive_story else 5):
+            raise StudioEcosystemError("unexpected interactive story package contract")
         successes.append({"project_id":pid,"manifest_sha256":receipt["manifest_sha256"],
                           "local_bundle_integrity_verified":True,
                           "elapsed_monotonic_ns":elapsed,
