@@ -1,0 +1,1 @@
+"""quests_mega"""
