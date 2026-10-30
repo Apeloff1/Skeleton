@@ -1449,6 +1449,40 @@ def _idempotency_wrapper_verified(tree: ast.Module) -> bool:
     return False
 
 
+def _queued_build_idempotency_verified(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Recognize the durable build queue only with its scoped replay key and digest."""
+    extracts_key = any(
+        isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Attribute)
+        and isinstance(child.func.value, ast.Name)
+        and child.func.value.id == "_idempotency"
+        and child.func.attr == "_extract_key"
+        for child in ast.walk(fn)
+    )
+    enqueue_calls = (
+        child for child in ast.walk(fn)
+        if isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Name)
+        and child.func.id == "enqueue_game_build"
+    )
+    return extracts_key and any(
+        any(
+            keyword.arg == "idempotency_key"
+            and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "header_key"
+            for keyword in call.keywords
+        )
+        and any(
+            keyword.arg == "request_digest"
+            and isinstance(keyword.value, ast.Call)
+            and isinstance(keyword.value.func, ast.Name)
+            and keyword.value.func.id == "request_hash"
+            for keyword in call.keywords
+        )
+        for call in enqueue_calls
+    )
+
+
 def idempotency_handler_rows() -> list[dict[str, object]]:
     modules = (
         ("skeleton.api.routes", "/api/v1"),
@@ -1464,6 +1498,8 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             replay, remember = _idempotency_attrs(node)
+            if module == "skeleton.api.routes" and node.name == "game_build" and _queued_build_idempotency_verified(node):
+                replay, remember = True, True
             if guarded_wrapper and any(
                 isinstance(decorator, ast.Name) and decorator.id == "_forge_idempotent"
                 for decorator in node.decorator_list
