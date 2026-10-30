@@ -67,6 +67,12 @@ class ArtifactSpool:
             except FileExistsError:
                 self.verify(fingerprint)
             temp.unlink()
+            if os.name=="posix":
+                fd_dir=os.open(self.path,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+                try:
+                    os.fsync(fd_dir)
+                finally:
+                    os.close(fd_dir)
             return {"schema":"skeleton.game_builder.studio_local_spool.v1",
                     "sha256":fingerprint,"bytes":total,
                     "local_digest_verified":True,
