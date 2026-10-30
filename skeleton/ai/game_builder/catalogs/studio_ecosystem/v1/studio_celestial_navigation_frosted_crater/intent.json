@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_frosted_crater",
+  "title": "Frosted Crater: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010315720,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 14,
+  "theme": "space",
+  "starting_health": 4
+}

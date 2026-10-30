@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_creature_sanctuary_ashen_archipelago",
+  "genre": "creature_sanctuary",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Ashen Archipelago",
+    "landmark": "cliffside signal tower",
+    "era": "post-transit reconstruction",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control freshwater cisterns while volcanic ash destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "forensic"
+  },
+  "premise": "Tavi Wynn, a caretaker with expertise in habitat preference, population feedback and ethical stewardship, must protect vulnerable species during a rapid environmental shift before volcanic ash reaches the cliffside signal tower.",
+  "stakes": [
+    "Residents lose access to freshwater cisterns",
+    "an illegal collector consortium gains authority without independent evidence",
+    "The cliffside signal tower becomes inaccessible beyond basalt islands"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured volcanic ash closes the main approach",
+      "goal": "Acquire an independent account of freshwater cisterns",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "an illegal collector consortium challenges Tavi Wynn's mandate",
+      "goal": "Apply habitat preference, population feedback and ethical stewardship in basalt islands",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of cliffside signal tower",
+      "goal": "protect vulnerable species during a rapid environmental shift",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains cliffside signal tower with auditable access to freshwater cisterns"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain food, shelter and water without an illegal collector consortium"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over freshwater cisterns persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "cliffside signal tower",
+      "basalt islands",
+      "ash deposition"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

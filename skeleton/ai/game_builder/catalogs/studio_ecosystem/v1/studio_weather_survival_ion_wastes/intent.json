@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_ion_wastes",
+  "title": "Ion Wastes: Stormline",
+  "subtitle": "Original stormline design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010316665,
+  "width": 19,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 14,
+  "theme": "space",
+  "starting_health": 5
+}

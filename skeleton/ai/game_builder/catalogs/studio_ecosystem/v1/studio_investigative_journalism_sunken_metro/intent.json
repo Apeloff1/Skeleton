@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_sunken_metro",
+  "title": "Sunken Metro: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010314321,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 3
+}

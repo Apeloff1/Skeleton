@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_orbital_gardens",
+  "title": "Orbital Gardens: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010311977,
+  "width": 21,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 5
+}

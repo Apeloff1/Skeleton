@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_underwater_archaeology_salt_dunes",
+  "genre": "underwater_archaeology",
+  "biome": "salt_dunes",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Sela Nara",
+    "role": "diver",
+    "public_goal": "recover archival evidence without damaging a protected ruin",
+    "private_burden": "An earlier salt storms report ignored by peers",
+    "abilities": [
+      "buoyancy, decompression and noninvasive survey",
+      "survey"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Rina Juno",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of buried aqueduct",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Enzo Kest",
+      "role": "Maintainer of brine reservoirs",
+      "knows": "Repair topology under salt corrosion",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Dava Hale",
+      "role": "contested operations director",
+      "organization": "an illegal salvage contractor",
+      "goal": "Exclusive access to brine reservoirs",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of air and research grants",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over brine reservoirs",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}

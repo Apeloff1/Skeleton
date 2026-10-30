@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_luminous_marsh",
+  "title": "Luminous Marsh: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010315609,
+  "width": 25,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 5
+}

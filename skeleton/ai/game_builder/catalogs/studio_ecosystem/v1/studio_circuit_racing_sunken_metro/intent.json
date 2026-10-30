@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_sunken_metro",
+  "title": "Sunken Metro: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010312357,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 11,
+  "theme": "arcade",
+  "starting_health": 3
+}
