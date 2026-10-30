@@ -29,3 +29,14 @@ def test_cli_explicit_interactive_story_option(tmp_path,capsys):
                  "--estimated-output-bytes","1024"])==0
     assert (output/"studio_arena_fighting_glacial_fjord"/"quest.html").is_file()
     assert json.loads(capsys.readouterr().out)["all_projects_completed"]
+
+def test_cli_walkable_source_game_is_explicit_opt_in(tmp_path,capsys):
+    root=tmp_path/"root";root.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    assert main(["--private-root",str(root),"--output-root",str(out),
+                 "--project","studio_aerial_traversal_amber_highlands",
+                 "--walkable-story","--working-set-bytes","1024",
+                 "--estimated-output-bytes","1024"])==0
+    result=json.loads(capsys.readouterr().out)
+    assert result["all_projects_completed"]
+    assert (out/"studio_aerial_traversal_amber_highlands"/"walkable.html").is_file()

@@ -20,8 +20,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="One registered original project ID; repeat for multiple games")
     choice.add_argument("--all",action="store_true",
                         help="Explicitly select all registered matching projects")
-    parser.add_argument("--interactive-story",action="store_true",
-                        help="Package a source-authored interactive quest alongside the grid game")
+    mode=parser.add_mutually_exclusive_group()
+    mode.add_argument("--interactive-story",action="store_true",
+                      help="Package authored interactive stage choices (V2)")
+    mode.add_argument("--walkable-story",action="store_true",
+                      help="Produce full offline walkable scene quest prototype (V3)")
     parser.add_argument("--genre",help="Optional registered source taxonomy filter")
     parser.add_argument("--biome",help="Optional registered source taxonomy filter")
     parser.add_argument("--working-set-bytes",type=int,default=64*1024*1024,
@@ -40,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             working_set_bytes=args.working_set_bytes,
             estimated_output_bytes=args.estimated_output_bytes,
             interactive_story=args.interactive_story,
+            walkable_story=args.walkable_story,
             authorized=True)
     except (StudioQuestError,StudioEcosystemError,OSError,ValueError) as exc:
         parser.error(str(exc))
