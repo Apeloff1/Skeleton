@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_cloud_canopy",
+  "title": "Cloud Canopy: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010314173,
+  "width": 27,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 3
+}

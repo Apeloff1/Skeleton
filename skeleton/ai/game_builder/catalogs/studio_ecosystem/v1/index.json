@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 384,
+  "project_count": 400,
   "sections": [
     "intent",
     "narrative",
@@ -2316,10 +2316,106 @@
       "genre": "creature_sanctuary",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_investigative_journalism_copper_mesa",
+      "genre": "investigative_journalism",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_investigative_journalism_glacial_fjord",
+      "genre": "investigative_journalism",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_investigative_journalism_ashen_archipelago",
+      "genre": "investigative_journalism",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_investigative_journalism_luminous_marsh",
+      "genre": "investigative_journalism",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_cloud_canopy",
+      "genre": "investigative_journalism",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_ion_wastes",
+      "genre": "investigative_journalism",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_investigative_journalism_frosted_crater",
+      "genre": "investigative_journalism",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_investigative_journalism_salt_dunes",
+      "genre": "investigative_journalism",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_investigative_journalism_sunken_metro",
+      "genre": "investigative_journalism",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_investigative_journalism_verdant_caldera",
+      "genre": "investigative_journalism",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_glass_steppe",
+      "genre": "investigative_journalism",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_investigative_journalism_orbital_gardens",
+      "genre": "investigative_journalism",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_investigative_journalism_misty_breakwater",
+      "genre": "investigative_journalism",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_investigative_journalism_neon_undercity",
+      "genre": "investigative_journalism",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_investigative_journalism_amber_highlands",
+      "genre": "investigative_journalism",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_investigative_journalism_echo_caverns",
+      "genre": "investigative_journalism",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 3072,
+    "source_files": 3200,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
