@@ -186,15 +186,23 @@ def _linux_swap() -> tuple[int, int]:
 
 
 def _linux_memory_pressure() -> float:
-    try:
-        with open("/proc/pressure/memory", encoding="ascii") as handle:
-            first = handle.readline()
-        if first.startswith("some "):
-            for field in first.split():
-                if field.startswith("avg10="):
-                    return min(1.0, max(0.0, float(field.split("=", 1)[1]) / 100))
-    except (OSError, ValueError):
-        pass
+    # Prefer pressure local to this container. Fall back to the host PSI;
+    # the avg10 "some" indicator measures time tasks were RAM-stalled.
+    for path in (
+        "/sys/fs/cgroup/memory.pressure",
+        "/proc/pressure/memory",
+    ):
+        try:
+            with open(path, encoding="ascii") as handle:
+                first = handle.readline()
+            if first.startswith("some "):
+                for field in first.split():
+                    if field.startswith("avg10="):
+                        return min(1.0, max(
+                            0.0, float(field.split("=", 1)[1]) / 100
+                        ))
+        except (OSError, ValueError):
+            continue
     return 0.0
 
 
