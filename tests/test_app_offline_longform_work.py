@@ -90,6 +90,33 @@ class LongformWorkCursorTests(unittest.TestCase):
                 self.assertEqual(state["next_page"], 0)
                 self.assertFalse(store._db.in_transaction)
 
+    def test_exact_import_request_recovers_without_duplicate_archive(self):
+        with TemporaryDirectory() as root:
+            folder = Path(root)
+            (folder / "a.txt").write_text("stable original bytes " * 8000)
+            (folder / "b.txt").write_text("a distinct source")
+            key = secrets.token_hex(24)
+            with LongformVirtualMemory(folder / "store.sqlite") as store:
+                original = store.ingest(folder, "a.txt", request_id=key)
+                self.assertEqual(original["source_id"], key)
+                self.assertFalse(original["replayed"])
+                resumed = store.ingest(folder, "a.txt", request_id=key)
+                self.assertTrue(resumed["replayed"])
+                self.assertEqual(resumed["source_sha256"],
+                                 original["source_sha256"])
+                self.assertEqual(store._db.execute(
+                    "SELECT COUNT(*) FROM longform_sources"
+                ).fetchone()[0], 1)
+                with self.assertRaisesRegex(LongformMemoryError, "belongs"):
+                    store.ingest(folder, "b.txt", request_id=key)
+                metadata = store.inspect_source(key)
+                self.assertEqual(metadata["source_sha256"],
+                                 original["source_sha256"])
+                self.assertEqual(metadata["source_bytes"], original["source_bytes"])
+            with LongformVirtualMemory(folder / "store.sqlite") as reopened:
+                self.assertEqual(reopened.inspect_source(key)["source_sha256"],
+                                 original["source_sha256"])
+
     def test_work_must_not_advance_after_last_page(self):
         with TemporaryDirectory() as root:
             folder = Path(root)
