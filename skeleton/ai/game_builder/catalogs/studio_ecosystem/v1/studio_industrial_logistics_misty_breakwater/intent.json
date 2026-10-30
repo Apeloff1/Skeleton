@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_misty_breakwater",
+  "title": "Misty Breakwater: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610302509,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 4
+}

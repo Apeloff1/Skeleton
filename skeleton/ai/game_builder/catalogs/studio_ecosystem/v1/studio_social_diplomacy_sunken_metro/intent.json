@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_sunken_metro",
+  "title": "Sunken Metro: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610302185,
+  "width": 19,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 3
+}

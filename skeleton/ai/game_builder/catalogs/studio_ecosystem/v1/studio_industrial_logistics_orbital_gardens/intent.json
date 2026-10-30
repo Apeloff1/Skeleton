@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_orbital_gardens",
+  "title": "Orbital Gardens: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610302492,
+  "width": 25,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "space",
+  "starting_health": 3
+}

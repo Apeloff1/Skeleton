@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_neon_undercity",
+  "title": "Neon Undercity: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610302270,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 4
+}

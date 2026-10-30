@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_frosted_crater",
+  "title": "Frosted Crater: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610302663,
+  "width": 23,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "space",
+  "starting_health": 3
+}

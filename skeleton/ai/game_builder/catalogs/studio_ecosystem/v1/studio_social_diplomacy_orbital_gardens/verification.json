@@ -1,0 +1,64 @@
+{
+  "project_id": "studio_social_diplomacy_orbital_gardens",
+  "genre": "social_diplomacy",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.verification.v1",
+  "stage": "design_intake",
+  "preview_expectation": {
+    "compiler": "compile_original_game",
+    "proves": "solvable_existing_maze_adapter",
+    "genre_implementation_verified": false
+  },
+  "quality_gates": [
+    {
+      "id": "world",
+      "criterion": "Simulated life-support imbalance cannot sever all viable paths",
+      "status": "not_tested"
+    },
+    {
+      "id": "quest",
+      "criterion": "At least two audited consequences for each negotiation",
+      "status": "not_tested"
+    },
+    {
+      "id": "simulation",
+      "criterion": "No artificial generation of hydroponic nutrients without supply",
+      "status": "not_tested"
+    },
+    {
+      "id": "rights",
+      "criterion": "All models, sounds and textures are independently created or licensed",
+      "status": "not_tested"
+    },
+    {
+      "id": "memory",
+      "criterion": "Physical and virtual memory resource guard tolerates pressure",
+      "status": "not_tested"
+    },
+    {
+      "id": "replay",
+      "criterion": "Save, restore and event ordering remain deterministic",
+      "status": "not_tested"
+    },
+    {
+      "id": "accessibility",
+      "criterion": "Control remap, captions and contrast verified",
+      "status": "not_tested"
+    },
+    {
+      "id": "release",
+      "criterion": "Certified runtime, platform, malware and CI checks",
+      "status": "not_tested"
+    }
+  ],
+  "release_blockers": [
+    "author_and_build_real_assets",
+    "implement_requested_genre",
+    "review_originality_and_rights",
+    "native_qualification",
+    "exact_head_ci",
+    "playtesting_and_mirror"
+  ],
+  "readiness": "unqualified_authoring_blueprint"
+}

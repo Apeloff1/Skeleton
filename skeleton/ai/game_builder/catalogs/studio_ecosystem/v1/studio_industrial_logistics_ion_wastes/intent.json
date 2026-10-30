@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_ion_wastes",
+  "title": "Ion Wastes: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610302390,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "space",
+  "starting_health": 5
+}

@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_roguelite_extraction_salt_dunes",
+  "genre": "roguelite_extraction",
+  "biome": "salt_dunes",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Salt Dunes: Roguelite Extraction",
+  "foundation": {
+    "setting": "Salt Dunes",
+    "era": "post-isolation",
+    "environment": "white salt flats",
+    "history": "A forgotten buried aqueduct once protected brine reservoirs, until recurring salt storms forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Amea Yun, a delver, must retrieve the endangered survey archive, relying on risk and retreat despite salt storms.",
+  "central_conflict": "a hostile salvage crew threatens the buried aqueduct by restricting brine reservoirs.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "salt storms destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a hostile salvage crew contests access to brine reservoirs",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The buried aqueduct becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers brine reservoirs"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "buried aqueduct",
+    "critical_resource": "brine reservoirs",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

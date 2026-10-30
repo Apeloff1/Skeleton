@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_ashen_archipelago",
+  "title": "Ashen Archipelago: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610302083,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 5
+}

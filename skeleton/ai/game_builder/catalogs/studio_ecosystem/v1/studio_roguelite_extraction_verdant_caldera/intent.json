@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_verdant_caldera",
+  "title": "Verdant Caldera: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Verdant Caldera; prototype maps are not full genre implementations.",
+  "seed": 202610302970,
+  "width": 21,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 3
+}
