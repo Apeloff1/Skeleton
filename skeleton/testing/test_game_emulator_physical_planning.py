@@ -61,7 +61,8 @@ def fake_host():
         "width": 2, "height": 2, "format": "rgb24",
         "pixel_sha256": hashlib.sha256(host._pixels).hexdigest(),
         "rotation": 0, "video_callbacks": 1, "runs": 2,
-        "audio_frames": 4, "sample_rate": 44100.0, "fps": 60.0,
+        "audio_frames": 4, "audio_sha256": hashlib.sha256(host._audio).hexdigest(),
+        "sample_rate": 44100.0, "fps": 60.0,
         "audio_available": True, "shutdown": False,
     }
     values = [1, 2] * 4
@@ -170,7 +171,13 @@ class AudioSavestateRegression(unittest.TestCase):
             self.assertEqual(host._audio, bytes([1, 0, 2, 0] * 4))
             self.assertEqual(host._steps, 2)
             self.assertEqual(returned, snapshot["observation"])
-            self.assertEqual(snapshot["snapshot_digest"], host.snapshot()["snapshot_digest"])
+            replay = host.snapshot()
+            self.assertEqual(snapshot["state_sha256"], replay["state_sha256"])
+            self.assertEqual(snapshot["audio_sha256"], replay["audio_sha256"])
+            self.assertEqual(snapshot["observation"], replay["observation"])
+            # Restore rehydrates prior PCM history but does not replay the
+            # native audio callback; the current frame has an empty callback.
+            self.assertEqual(replay["frame"]["audio_frames"], 0)
             self.assertIn("restore", commands)
         finally:
             host.close()
