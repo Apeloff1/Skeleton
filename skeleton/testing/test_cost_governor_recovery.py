@@ -401,3 +401,35 @@ def test_restart_reattach_conflict_never_releases_preexisting_reservation(
     snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
     assert snapshot["active_reservations"] == 1
     assert snapshot["reserved"]["cost_usd"] == pytest.approx(2.0)
+
+
+def test_completed_recovery_without_durable_intent_fails_closed(tmp_path) -> None:
+    path = tmp_path / "quota.sqlite3"
+    operation = "op-no-completion-intent"
+    first = _governor(path)
+    first.reserve(_request(operation), now_wall=10.0)
+    actual = UsageEstimate(cost_usd=0.5)
+    first.charge(
+        operation,
+        "provider-1",
+        "provider",
+        actual,
+        now_wall=10.5,
+    )
+
+    # A runtime-only completion cannot prove the original operation budget.
+    # Recovery must not promote it, even if tenant-wide quotas are healthy.
+    first.runtime.complete(operation, actual, now_wall=11.0)
+    restarted = _governor(path)
+    denied = restarted.recover_completed(
+        operation,
+        evidence_refs=_refs("no-intent"),
+    )
+    assert denied.state == "completed"
+    assert denied.accepted is False
+    assert denied.reasons == ("operation-budget-recovery-intent-missing",)
+    assert denied.promotion_authority is False
+    assert restarted.recover_completed(
+        operation,
+        evidence_refs=_refs("no-intent"),
+    ) == denied
