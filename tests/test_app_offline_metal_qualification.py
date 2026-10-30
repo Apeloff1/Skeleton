@@ -166,6 +166,7 @@ class AppleKVQualificationTests(unittest.TestCase):
         argv = called.call_args.args[0]
         self.assertEqual(argv[:2], ["/usr/bin/xcrun", "swift"])
         self.assertTrue(argv[2].endswith("qualify_metal_shared.swift"))
+        self.assertIn("skeleton-private-metal-", argv[2])
         self.assertFalse(called.call_args.kwargs["check"] is True)
 
     def test_metal_probe_rejects_oversized_native_output(self):

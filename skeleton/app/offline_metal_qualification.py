@@ -226,19 +226,29 @@ def qualify_apple_shared_buffer_fence() -> dict[str, Any]:
     if not os.access("/usr/bin/xcrun", os.X_OK):
         raise RuntimeError("Apple xcrun developer tooling unavailable")
     try:
-        with tempfile.TemporaryFile(mode="w+b") as output_file:
-            invocation = subprocess.run(
-                ["/usr/bin/xcrun", "swift", str(source)],
-                check=False, stdout=output_file,
-                stderr=subprocess.DEVNULL,
-                timeout=180, cwd=str(source.parent),
-            )
-            output_file.seek(0)
-            bounded_stdout = output_file.read(8193)
+        with tempfile.TemporaryDirectory(
+            prefix="skeleton-private-metal-",
+        ) as private_dir:
+            # Execute only the exact audited bytes. The repository source
+            # may change after this read; it cannot affect the private copy.
+            frozen_source = Path(private_dir) / "qualify_metal_shared.swift"
+            frozen_source.write_bytes(original)
+            os.chmod(frozen_source, 0o600)
+            if sha256(frozen_source.read_bytes()).hexdigest() != source_sha:
+                raise RuntimeError("private Metal source copy changed")
+            with tempfile.TemporaryFile(mode="w+b") as output_file:
+                invocation = subprocess.run(
+                    ["/usr/bin/xcrun", "swift", str(frozen_source)],
+                    check=False, stdout=output_file,
+                    stderr=subprocess.DEVNULL,
+                    timeout=180, cwd=private_dir,
+                )
+                output_file.seek(0)
+                bounded_stdout = output_file.read(8193)
+            if sha256(frozen_source.read_bytes()).hexdigest() != source_sha:
+                raise RuntimeError("private Metal source changed during execution")
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError("native Metal fence invocation failed") from exc
-    if sha256(source.read_bytes()).hexdigest() != source_sha:
-        raise RuntimeError("Metal qualification source changed while running")
     if invocation.returncode != 0 or len(bounded_stdout) > 8192:
         raise RuntimeError("Metal shared-buffer qualification failed")
     try:
