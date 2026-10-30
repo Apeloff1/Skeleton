@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 256,
+  "project_count": 264,
   "sections": [
     "intent",
     "narrative",
@@ -1548,10 +1548,58 @@
       "genre": "cooperative_rescue",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_orchestral_rhythm_copper_mesa",
+      "genre": "orchestral_rhythm",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_orchestral_rhythm_glacial_fjord",
+      "genre": "orchestral_rhythm",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_orchestral_rhythm_ashen_archipelago",
+      "genre": "orchestral_rhythm",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_orchestral_rhythm_luminous_marsh",
+      "genre": "orchestral_rhythm",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_cloud_canopy",
+      "genre": "orchestral_rhythm",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_orchestral_rhythm_ion_wastes",
+      "genre": "orchestral_rhythm",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_orchestral_rhythm_frosted_crater",
+      "genre": "orchestral_rhythm",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_orchestral_rhythm_salt_dunes",
+      "genre": "orchestral_rhythm",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 2048,
+    "source_files": 2112,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
