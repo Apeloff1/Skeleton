@@ -9,10 +9,10 @@ from skeleton.ai.game_builder.studio_ecosystem_catalog import ROOT, catalog_inde
 def test_full_source_audit_has_no_padding_or_unearned_claim():
     receipt = audit()
     assert receipt["status"] == "source_valid", receipt["errors"][:3]
-    assert receipt["projects"] == 256
-    assert receipt["documents"] == 2048
-    assert receipt["unique_source_digests"] == 2048
-    assert receipt["genres"] == 16
+    assert receipt["projects"] == 512
+    assert receipt["documents"] == 4096
+    assert receipt["unique_source_digests"] == 4096
+    assert receipt["genres"] == 32
     assert receipt["release_certified"] is False
 
 
