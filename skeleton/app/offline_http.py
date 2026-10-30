@@ -38,6 +38,10 @@ from skeleton.app.local_ai import (
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
 from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
+from skeleton.app.offline_longform_virtual import (
+    LongformVirtualMemory, LongformMemoryError,
+)
+from skeleton.app.offline_resources import LocalResourcePressure
 from skeleton.app.offline_background_job import LocalJobRejected, LocalReferenceJob
 from skeleton.app.offline_reference_read import (
     LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
@@ -145,7 +149,11 @@ class OfflineHTTPApplication:
         self._active_session: str | None = None
         self._closing = False
         self._store = OfflineChatStore(database)
+        self.longform = None
         try:
+            self.longform = LongformVirtualMemory(
+                self.database.with_name(self.database.name + ".longform.sqlite3")
+            )
             self.knowledge = OfflineKnowledgeLibrary(
                 self._store, self.model_digest, self.tokenizer_digest
             )
@@ -153,6 +161,8 @@ class OfflineHTTPApplication:
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
         except BaseException:
+            if self.longform is not None:
+                self.longform.close()
             self._store.close()
             raise
 
@@ -169,6 +179,8 @@ class OfflineHTTPApplication:
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
+        if self.longform is not None:
+            self.longform.close()
         self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -467,6 +479,48 @@ class OfflineHTTPApplication:
                              "gpu_transfer_executed": False}
             except (OSError, ValueError, RuntimeError) as exc:
                 raise OfflineHTTPError(422, "local read-only staging rejected") from exc
+        if path.startswith("/v1/resources/longform/"):
+            if method != "POST" or self.longform is None:
+                raise OfflineHTTPError(405, "unsupported local longform operation")
+            action = path[len("/v1/resources/longform/"):]
+            try:
+                if action == "ingest":
+                    _fields(body, {"root", "relative_path", "approved"},
+                            {"root", "relative_path", "approved"})
+                    if body["approved"] is not True:
+                        raise OfflineHTTPError(
+                            403, "longform disk ingestion requires explicit operator approval"
+                        )
+                    if not isinstance(body["root"], str) or not isinstance(
+                        body["relative_path"], str
+                    ):
+                        raise OfflineHTTPError(400, "invalid selected longform path")
+                    return 201, self.longform.ingest(
+                        body["root"], body["relative_path"],
+                    )
+                if action == "window":
+                    _fields(body, {"source_id", "start_page", "pages"},
+                            {"source_id"})
+                    return 200, self.longform.read_window(
+                        body["source_id"], start_page=body.get("start_page", 0),
+                        pages=body.get("pages", 1),
+                    )
+                if action == "search":
+                    _fields(body, {"source_id", "query", "limit"},
+                            {"source_id", "query"})
+                    return 200, self.longform.search(
+                        body["source_id"], body["query"],
+                        limit=body.get("limit", 5),
+                    )
+                if action == "verify":
+                    _fields(body, {"source_id"}, {"source_id"})
+                    return 200, self.longform.verify(body["source_id"])
+                raise OfflineHTTPError(404, "unknown longform operation")
+            except (LongformMemoryError, LocalResourcePressure,
+                    sqlite3.Error, OSError, ValueError, UnicodeError) as exc:
+                raise OfflineHTTPError(
+                    422, "longform virtual-memory operation rejected"
+                ) from exc
         if path == "/v1/status" and method == "GET":
             with self._turn_lock:
                 active = next((t for t in self._turns.values()
