@@ -34,11 +34,18 @@ let steps=0;
 let playerHealth=world.starting_health;
 const choices=[];
 const physicsEvents=[];
+const npcTalks=[];
 function text(tag,value){const el=document.createElement(tag);el.textContent=value;return el;}
 function current(){return world.stages[stageIndex];}
 function nearMarker(){
  return !!current() && Math.abs(player.x-world.target[0])+
                            Math.abs(player.y-world.target[1])<=1;
+}
+function npcReceipt(){
+ return {schema:"skeleton.game_builder.offline_npc_contacts.v1",
+   project_id:world.project_id,source_digest:world.source_digest,
+   events:physicsEvents.map(pair=>pair.slice()),
+   contacts:npcTalks.map(talk=>({...talk})),release_certified:false};
 }
 function walkReceipt(){
  return {schema:"skeleton.game_builder.offline_walk_events.v1",
@@ -60,6 +67,7 @@ function draw(){
    hud.textContent="All source-authored stages completed (sandbox only).";
    choicesEl.replaceChildren();historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
  document.getElementById("walk-history").textContent=JSON.stringify(walkReceipt(),null,2);
+ document.getElementById("npc-history").textContent=JSON.stringify(npcReceipt(),null,2);
    return;
  }
  const cells=world.maps[stageIndex];
@@ -89,6 +97,7 @@ function draw(){
    choicesEl.replaceChildren();
    historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
    document.getElementById("walk-history").textContent=JSON.stringify(walkReceipt(),null,2);
+ document.getElementById("npc-history").textContent=JSON.stringify(npcReceipt(),null,2);
    return;
  }
  choicesEl.replaceChildren();
@@ -98,8 +107,11 @@ function draw(){
      const talk=text("button","Talk to "+actor.name);
      talk.type="button";
      talk.addEventListener("click",()=>{
+       npcTalks.push({id:actor.id,event_cursor:physicsEvents.length});
        document.getElementById("npc-dialogue").textContent=actor.name+
          " knows: "+actor.knows;
+       document.getElementById("npc-history").textContent=
+         JSON.stringify(npcReceipt(),null,2);
      });
      choicesEl.append(talk);
    }
@@ -113,6 +125,7 @@ function draw(){
  }
  historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
  document.getElementById("walk-history").textContent=JSON.stringify(walkReceipt(),null,2);
+ document.getElementById("npc-history").textContent=JSON.stringify(npcReceipt(),null,2);
 }
 function hint(){
  const stage=current();
@@ -180,7 +193,7 @@ document.querySelectorAll("[data-dx]").forEach(button=>{
 document.getElementById("hint").addEventListener("click",hint);
 document.getElementById("restart").addEventListener("click",()=>{
  stageIndex=0;player={x:1,y:1};steps=0;playerHealth=world.starting_health;
- choices.length=0;physicsEvents.length=0;draw();
+ choices.length=0;physicsEvents.length=0;npcTalks.length=0;draw();
 });
 draw();
 """
@@ -282,6 +295,7 @@ def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
       "<button id='restart' type='button'>Restart</button>"
       "<h2>Sandbox decisions</h2><pre id='history'></pre>"
       "<h2>Collision-verified replay input</h2><pre id='walk-history'></pre>"
+      "<h2>Verifiable local NPC dialogue contacts</h2><pre id='npc-history'></pre>"
       "<script type='application/json' id='world-source'>"+payload+"</script>"
       "<script>"+_SCRIPT+"</script></body></html>"
     )
