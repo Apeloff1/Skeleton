@@ -42,3 +42,12 @@ def test_replay_rejects_forged_release_or_repeated_json_keys():
     with pytest.raises(StudioQuestError):
         review_walk_events(b'{"project_id":"a","project_id":"b"}',
                            docs, authorized=True)
+
+def test_safe_replayed_walk_reports_valid_starting_health():
+    from skeleton.ai.game_builder.studio_ecosystem_encounters import authored_hazards
+    pid="studio_arena_fighting_glacial_fjord"
+    docs=read_blueprint(pid)
+    result=review_walk_events(json.dumps(_payload(pid,[["move","right"]],docs)).encode(),
+                              docs,authorized=True)
+    assert result["remaining_health"]==authored_hazards(docs)["starting_health"]
+    assert result["character_defeated"] is False

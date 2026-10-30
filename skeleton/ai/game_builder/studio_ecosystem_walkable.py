@@ -80,7 +80,10 @@ function draw(){
    "; marker object: "+stage.objects[0];
  if(playerHealth<=0){
    hud.textContent="Character defeated by hazard contact. Restart to try again.";
-   choicesEl.replaceChildren();return;
+   choicesEl.replaceChildren();
+   historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
+   document.getElementById("walk-history").textContent=JSON.stringify(walkReceipt(),null,2);
+   return;
  }
  choicesEl.replaceChildren();
  if(nearMarker()){
