@@ -498,6 +498,29 @@ class OfflineHTTPApplication:
                     return 201, self.longform.ingest(
                         body["root"], body["relative_path"],
                     )
+                if action == "work-start":
+                    _fields(body, {"source_id", "approved"},
+                            {"source_id", "approved"})
+                    if body["approved"] is not True:
+                        raise OfflineHTTPError(
+                            403, "longform work cursor requires operator approval"
+                        )
+                    return 201, self.longform.start_work(body["source_id"])
+                if action == "work-status":
+                    _fields(body, {"work_id"}, {"work_id"})
+                    return 200, self.longform.inspect_work(body["work_id"])
+                if action == "work-next":
+                    _fields(
+                        body, {"work_id", "expected_revision",
+                               "request_id", "pages"},
+                        {"work_id", "expected_revision", "request_id"},
+                    )
+                    return 200, self.longform.advance_work(
+                        body["work_id"],
+                        expected_revision=body["expected_revision"],
+                        request_id=body["request_id"],
+                        pages=body.get("pages", 1),
+                    )
                 if action == "window":
                     _fields(body, {"source_id", "start_page", "pages"},
                             {"source_id"})
