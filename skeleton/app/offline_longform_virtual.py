@@ -322,6 +322,8 @@ class LongformVirtualMemory:
         safe = probe_local_resources(self.path).resident_document_budget // 4
         if safe < 2048:
             raise LongformMemoryError("insufficient memory for longform page reading")
+        if pages > max(1, safe // 1024):
+            raise LongformMemoryError("requested window exceeds live page budget")
         with self._lock:
             manifest, captured = self._read_verified(
                 source_id, selected=set(range(start_page, start_page + pages)),
@@ -348,7 +350,7 @@ class LongformVirtualMemory:
         if type(limit) is not int or not 1 <= limit <= 20:
             raise LongformMemoryError("invalid longform search return count")
         terms = tuple(dict.fromkeys(re.findall(
-            r"(?u)\\w{2,32}", query.casefold(),
+            r"(?u)\w{2,32}", query.casefold(),
         )))[:12]
         if not terms:
             raise LongformMemoryError("longform search needs text terms")
