@@ -317,10 +317,16 @@ class AdaptiveResourceFabric:
         # an explicit driver API this is NOT a GPU-coherent allocation.
         staging = residency == "disk_chunks" or source_bytes > hw.read_chunk_bytes
         headroom = max(1, hw.suggested_index_jobs - running)
-        penalty = max(1, int(1 + ema * hw.cpu_count))
+        # Capacity follows measured headroom; ordinary 50%-used RAM must
+        # not collapse a many-core machine to a single stream. Throttle
+        # aggressively only as predictive pressure approaches saturation.
+        pressure_factor = max(0.05, 1 - max(0.0, ema - 0.35) / 0.65)
+        ram_factor = min(
+            1.0, hw.available_ram_bytes / (hw.total_ram_bytes * 0.35),
+        )
+        capacity = max(1, int(hw.cpu_count * pressure_factor * ram_factor))
         streams = max(1, min(
-            desired_streams, headroom,
-            max(1, hw.cpu_count // penalty),
+            desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
         ))
         gpu = None
