@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 320,
+  "project_count": 336,
   "sections": [
     "intent",
     "narrative",
@@ -1932,10 +1932,106 @@
       "genre": "underwater_archaeology",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_circuit_racing_copper_mesa",
+      "genre": "circuit_racing",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_circuit_racing_glacial_fjord",
+      "genre": "circuit_racing",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_circuit_racing_ashen_archipelago",
+      "genre": "circuit_racing",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_circuit_racing_luminous_marsh",
+      "genre": "circuit_racing",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_cloud_canopy",
+      "genre": "circuit_racing",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_ion_wastes",
+      "genre": "circuit_racing",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_circuit_racing_frosted_crater",
+      "genre": "circuit_racing",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_circuit_racing_salt_dunes",
+      "genre": "circuit_racing",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_circuit_racing_sunken_metro",
+      "genre": "circuit_racing",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_circuit_racing_verdant_caldera",
+      "genre": "circuit_racing",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_glass_steppe",
+      "genre": "circuit_racing",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_circuit_racing_orbital_gardens",
+      "genre": "circuit_racing",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_circuit_racing_misty_breakwater",
+      "genre": "circuit_racing",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_circuit_racing_neon_undercity",
+      "genre": "circuit_racing",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_circuit_racing_amber_highlands",
+      "genre": "circuit_racing",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_circuit_racing_echo_caverns",
+      "genre": "circuit_racing",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 2560,
+    "source_files": 2688,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
