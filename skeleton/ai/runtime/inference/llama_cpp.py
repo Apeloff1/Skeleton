@@ -854,6 +854,51 @@ class LlamaCppModel:
         )
         self._admitted_model_id = self.model_id
 
+    def activate_prelaunch_resource_profile(
+        self, profile: LlamaCppConfig,
+    ) -> None:
+        """Bind measured CPU/Metal flags before any inference has started.
+
+        Device memory allocation, actual KV residency and synchronization
+        remain owned by llama.cpp. This cannot escalate source, network,
+        model identity, security or output authority, and may not retune
+        an executing or previously activated process.
+        """
+        if not isinstance(profile, LlamaCppConfig):
+            raise TypeError("verified LlamaCppConfig required")
+        immutable_fields = (
+            "executable", "model_path", "model_id", "timeout_seconds",
+            "max_output_bytes", "max_stderr_bytes", "context_size",
+            "temperature", "extra_args", "environment",
+            "reject_model_symlink", "rehash_artifacts_each_run",
+            "output_framing", "runtime_scratch_bytes",
+            "kv_bytes_per_token",
+        )
+        if any(getattr(profile, field) != getattr(self.config, field)
+               for field in immutable_fields):
+            raise LlamaCppRuntimeError(
+                "resource retuning cannot change model, safety or context identity"
+            )
+        for field in ("gpu_layers", "threads", "batch_size"):
+            original = getattr(self.config, field)
+            proposed = getattr(profile, field)
+            if original is not None and proposed is not None and proposed > original:
+                raise LlamaCppRuntimeError(
+                    "adaptive profile may not exceed operator request"
+                )
+            if field == "gpu_layers" and original is None and proposed not in (None, 0):
+                raise LlamaCppRuntimeError(
+                    "adaptive profile cannot silently activate GPU offload"
+                )
+        with self._process_lock:
+            if (self._processes_started or self._active_processes
+                    or self._draining_processes or self._spawning_processes):
+                raise LlamaCppRuntimeError(
+                    "runtime profile cannot change after first execution"
+                )
+            self._assert_artifacts_stable()
+            self.config = profile
+
     @property
     def model_digest(self) -> str:
         return self._model.sha256
