@@ -144,6 +144,27 @@ def test_large_pr_merge_does_not_drop_scoped_checks_on_broken_pipe(tmp_path: Pat
     }
 
 
+def test_git_filename_with_embedded_newline_is_scoped_exactly(tmp_path: Path) -> None:
+    """NUL delimiting must preserve paths git normally quotes on text output."""
+    repo = tmp_path / "repo"
+    _init(repo)
+    _git(repo, "checkout", "-b", "feature")
+    frontend = repo / "frontend"
+    frontend.mkdir()
+    changed = frontend / "new\\nline.tsx"
+    changed.write_text("export const ready = true;\\n", encoding="utf-8")
+    _git(repo, "add", "--all")
+    _git(repo, "commit", "-m", "unusual name")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature", "-m", "merge unusual name")
+    assert _scope(repo, "pull_request") == {
+        "frontend": "true",
+        "backend": "false",
+        "python": "false",
+        "docker": "false",
+    }
+
+
 def test_empty_merge_diff_fails_closed_to_every_lane(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init(repo)

@@ -29,26 +29,40 @@ if [ "${EVENT_NAME:-}" != "pull_request" ] || ! git rev-parse --verify -q HEAD^2
   exit 0
 fi
 
-changed="$(git diff --name-only HEAD^1 HEAD)"
-# An empty or unexpectedly nonmatching merge diff must never suppress gates.
-if [ -z "$changed" ]; then
-  all
-  exit 0
-fi
-if grep -Eq '^(\.github/workflows/(ci|merge-readiness)\.yml|\.github/ci/|pyproject\.toml|requirements[^/]*\.txt)' <<< "$changed"; then
-  all
-  exit 0
-fi
+# Consume the entire NUL-delimited Git diff. This is bounded in memory,
+# handles arbitrary legal filenames, and propagates producer errors via pipefail.
+# Never exit a grep early: that would SIGPIPE the diff producer on large PRs.
+git diff --name-only -z HEAD^1 HEAD | {
+  seen=false
+  force_all=false
+  frontend=false
+  backend=false
+  python=false
+  docker=false
 
-has() {
-  if grep -Eq "$1" <<< "$changed"; then
-    echo true
+  while IFS= read -r -d '' path; do
+    seen=true
+    case "$path" in
+      .github/workflows/ci.yml|.github/workflows/merge-readiness.yml|.github/ci/*|pyproject.toml|requirements*.txt)
+        force_all=true
+        ;;
+    esac
+    case "$path" in frontend/*) frontend=true ;; esac
+    case "$path" in backend/*) backend=true ;; esac
+    case "$path" in skeleton/*|tests/*|scripts/*|java-accelerators/*) python=true ;; esac
+    case "$path" in
+      Dockerfile*|*/Dockerfile*|.dockerignore|compose*.yml|compose*.yaml|frontend/nginx.conf|frontend/scripts/test-nginx-runtime-dns.mjs)
+        docker=true
+        ;;
+    esac
+  done
+
+  if [ "$seen" = false ] || [ "$force_all" = true ]; then
+    all
   else
-    echo false
+    out "frontend=$frontend"
+    out "backend=$backend"
+    out "python=$python"
+    out "docker=$docker"
   fi
 }
-
-out "frontend=$(has '^frontend/')"
-out "backend=$(has '^backend/')"
-out "python=$(has '^(skeleton/|tests/|scripts/|java-accelerators/)')"
-out "docker=$(has '(^|/)Dockerfile|^\.dockerignore|compose[^/]*\.ya?ml$|^frontend/(nginx\.conf|scripts/test-nginx-runtime-dns\.mjs)$')"
