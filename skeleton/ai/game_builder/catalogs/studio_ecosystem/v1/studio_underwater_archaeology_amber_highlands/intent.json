@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_amber_highlands",
+  "title": "Amber Highlands: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010312088,
+  "width": 27,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 10,
+  "theme": "forest",
+  "starting_health": 4
+}

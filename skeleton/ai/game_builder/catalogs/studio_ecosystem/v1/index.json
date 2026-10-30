@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 312,
+  "project_count": 320,
   "sections": [
     "intent",
     "narrative",
@@ -1884,10 +1884,58 @@
       "genre": "underwater_archaeology",
       "biome": "salt_dunes",
       "theme": "desert"
+    },
+    {
+      "id": "studio_underwater_archaeology_sunken_metro",
+      "genre": "underwater_archaeology",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_underwater_archaeology_verdant_caldera",
+      "genre": "underwater_archaeology",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_glass_steppe",
+      "genre": "underwater_archaeology",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_underwater_archaeology_orbital_gardens",
+      "genre": "underwater_archaeology",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_underwater_archaeology_misty_breakwater",
+      "genre": "underwater_archaeology",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_underwater_archaeology_neon_undercity",
+      "genre": "underwater_archaeology",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_underwater_archaeology_amber_highlands",
+      "genre": "underwater_archaeology",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_echo_caverns",
+      "genre": "underwater_archaeology",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 2496,
+    "source_files": 2560,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
