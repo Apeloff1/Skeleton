@@ -35,3 +35,15 @@ def test_successful_batch_receipts_have_measured_not_estimated_metrics(tmp_path)
     assert first["elapsed_monotonic_ns"]>0
     assert isinstance(first["measured_disk_change_bytes"],int)
     assert first["target_genre_qualified"] is False
+
+def test_two_interactive_browser_games_batch_with_real_six_file_manifests(tmp_path):
+    private=tmp_path/"private";private.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    result=build_catalog_preview_batch(
+        StudioPortfolio(private,authorized=True),out,
+        project_ids=["studio_aerial_traversal_amber_highlands",
+                     "studio_arena_fighting_glacial_fjord"],
+        working_set_bytes=1024,estimated_output_bytes=1024,
+        interactive_story=True,authorized=True)
+    assert result["all_projects_completed"]
+    assert len(list(out.glob("*/quest.html")))==2
