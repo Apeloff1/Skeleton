@@ -387,6 +387,14 @@ class OfflineIndexQueue:
             raise OfflineQueueError("offline drain limit must be positive")
         completed: list[IndexJob] = []
         for _ in range(limit):
+            # Recheck between jobs; load or swap saturation may have
+            # worsened since the caller started this drain operation.
+            try:
+                allowed = probe_local_resources(self.path).suggested_index_jobs
+            except LocalResourcePressure as exc:
+                raise OfflineQueueError(str(exc)) from exc
+            if len(completed) >= allowed:
+                break
             job = self.run_one()
             if job is None:
                 break
