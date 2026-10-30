@@ -165,3 +165,46 @@ attacker with authority to rewrite the entire archive *and its root* could
 forge local evidence; for external attestations, bind the archive's source
 SHA-256 and Merkle root to an independent trusted signed receipt. The current
 implementation does not claim this external custody.
+
+## Native KV-cache residency and precision (M-chip runtime)
+
+The pinned local llama.cpp deployment supports an **explicit** `kv_cache_location`
+value of `backend` (the unmodified native default) or `host`. A host value
+emits the actual native `--no-kv-offload` flag; it does not copy live GPU
+buffers into virtual RAM, and it does not claim the native KV buffer has a
+driver-certified CPU residency or a completed Metal synchronization fence.
+
+Operators may independently choose `kv_cache_type_k` and
+`kv_cache_type_v` from `f16`, `q8_0`, or `q4_0`. These map to
+llama.cpp `--cache-type-k` and `--cache-type-v`. They are omitted by default
+to preserve pinned prior behavior. Changing type can affect output fidelity:
+it must be a deliberate deployment decision with real regression testing,
+not a hidden automatic response to memory pressure. Both flags and the host
+placement directive are guarded as **managed flags**, so untrusted arbitrary
+`extra_args` cannot override the machine-authorized model profile.
+
+The Apple Silicon planner reserves physical CPU/host memory for any explicitly
+host-resident KV budget **before** computing the available Metal working set.
+This is one physical unified RAM pool. Under memory pressure the native
+launch preflight may reject a request; it never simulates in-process GPU/CPU
+migration. The config, resulting command flags and report are bound into the
+local execution-profile digest and the per-run receipt.
+
+Actual native stderr is captured with the existing bounded pipe. Recognized
+`llama_kv_cache` and `llama_kv_cache_unified` CPU/device allocation log
+lines are parsed into small **backend-reported** KV-byte measurements. Raw
+log text is never included in durable telemetry; only its SHA-256 and the
+limited parsed counters enter the inference receipt. If a host-only directive
+is explicitly requested and that backend reports GPU KV buffers, the result
+is rejected. Missing log lines imply unknown placement; the system **never**
+converts silence into evidence of CPU residency. Even correctly parsed logs
+are not driver-level attestation or independent cache-coherency proof.
+
+A selected native runtime version must support the explicit flags. An old or
+mismatched pinned executable can fail closed on unsupported arguments. The
+deployment's executable checksum is the authority; Skeleton does not fetch or
+substitute an unapproved runtime. Mac device testing must cover loss of
+Metal memory budget, CPU-KV requests, buffer-report omissions, quantized
+cache quality and exact-head rollout checks. Driver-level live KV migration,
+Metal synchronization event receipts and memory-compression control remain
+unimplemented, and kernel swap/SIP settings are not changed.
