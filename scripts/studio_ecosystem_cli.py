@@ -18,8 +18,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--compile-preview", action="store_true", help="Compile verified HTML5 maze preview")
     ap.add_argument("--materialize-batch", action="store_true",
                     help="Compile matching catalog projects into an existing output directory")
-    ap.add_argument("--max-artifact-bytes", type=int, default=128 * 1024 * 1024,
-                    help="Fail-closed maximum output bytes for batch exports")
+    ap.add_argument("--max-artifact-bytes", type=int, default=None,
+                    help="Optional explicit export cap; default adapts to measured free disk capacity")
     ap.add_argument("--output", type=Path, help="New directory for compiled HTML")
     ap.add_argument("--search", help="Search registered original production briefs")
     ap.add_argument("--deep-search", action="store_true",
