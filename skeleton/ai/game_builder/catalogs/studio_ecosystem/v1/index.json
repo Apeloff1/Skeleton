@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 360,
+  "project_count": 368,
   "sections": [
     "intent",
     "narrative",
@@ -2172,10 +2172,58 @@
       "genre": "tactical_command",
       "biome": "salt_dunes",
       "theme": "desert"
+    },
+    {
+      "id": "studio_tactical_command_sunken_metro",
+      "genre": "tactical_command",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_tactical_command_verdant_caldera",
+      "genre": "tactical_command",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_glass_steppe",
+      "genre": "tactical_command",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_tactical_command_orbital_gardens",
+      "genre": "tactical_command",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_tactical_command_misty_breakwater",
+      "genre": "tactical_command",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_tactical_command_neon_undercity",
+      "genre": "tactical_command",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_tactical_command_amber_highlands",
+      "genre": "tactical_command",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_echo_caverns",
+      "genre": "tactical_command",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 2880,
+    "source_files": 2944,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
