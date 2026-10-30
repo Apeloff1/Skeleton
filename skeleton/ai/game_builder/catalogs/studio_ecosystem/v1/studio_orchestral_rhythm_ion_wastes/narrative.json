@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_orchestral_rhythm_ion_wastes",
+  "genre": "orchestral_rhythm",
+  "biome": "ion_wastes",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Ion Wastes",
+    "landmark": "drifting relay station",
+    "era": "post-transit reconstruction",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control shielded relay coils while electromagnetic storms destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "high-stakes"
+  },
+  "premise": "Ari Ashe, a conductor with expertise in meter shifts and synchronized phrase entries, must reconnect the five lost civic ensembles before electromagnetic storms reaches the drifting relay station.",
+  "stakes": [
+    "Residents lose access to shielded relay coils",
+    "a score-forging rival gains authority without independent evidence",
+    "The drifting relay station becomes inaccessible beyond charged dunes"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured electromagnetic storms closes the main approach",
+      "goal": "Acquire an independent account of shielded relay coils",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a score-forging rival challenges Ari Ashe's mandate",
+      "goal": "Apply meter shifts and synchronized phrase entries in charged dunes",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of drifting relay station",
+      "goal": "reconnect the five lost civic ensembles",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains drifting relay station with auditable access to shielded relay coils"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain ensemble credits without a score-forging rival"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over shielded relay coils persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "drifting relay station",
+      "charged dunes",
+      "induced currents"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

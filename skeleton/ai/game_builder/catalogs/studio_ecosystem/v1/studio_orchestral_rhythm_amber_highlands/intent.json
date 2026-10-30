@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_amber_highlands",
+  "title": "Amber Highlands: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010310615,
+  "width": 27,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 5
+}
