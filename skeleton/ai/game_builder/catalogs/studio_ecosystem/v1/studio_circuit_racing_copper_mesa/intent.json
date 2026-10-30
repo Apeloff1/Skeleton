@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_copper_mesa",
+  "title": "Copper Mesa: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010312061,
+  "width": 19,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 3
+}

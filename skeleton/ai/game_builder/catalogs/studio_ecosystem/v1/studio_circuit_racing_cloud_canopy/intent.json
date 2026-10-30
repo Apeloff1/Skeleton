@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_cloud_canopy",
+  "title": "Cloud Canopy: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010312209,
+  "width": 27,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 3
+}
