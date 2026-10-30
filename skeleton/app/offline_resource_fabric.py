@@ -405,9 +405,25 @@ class AdaptiveResourceFabric:
                     raise ResourceFabricError("source changed before mmap admission")
                 digest = hashlib.sha256()
                 if before.st_size:
-                    with mmap.mmap(fd, 0, access=mmap.ACCESS_READ) as view:
-                        for offset in range(0, before.st_size, plan.transfer_chunk_bytes):
-                            digest.update(view[offset:offset + plan.transfer_chunk_bytes])
+                    # Windowed read-only mappings: avoid reserving a whole
+                    # multi-gigabyte virtual address range on 32-bit/low-end
+                    # machines. Offsets respect Windows/POSIX page granularity.
+                    granularity = mmap.ALLOCATIONGRANULARITY
+                    for offset in range(
+                        0, before.st_size, plan.transfer_chunk_bytes,
+                    ):
+                        aligned = offset // granularity * granularity
+                        displacement = offset - aligned
+                        length = min(
+                            before.st_size - aligned,
+                            displacement + plan.transfer_chunk_bytes,
+                        )
+                        with mmap.mmap(
+                            fd, length, access=mmap.ACCESS_READ, offset=aligned,
+                        ) as view:
+                            digest.update(view[displacement:displacement + min(
+                                plan.transfer_chunk_bytes, before.st_size - offset,
+                            )])
                 after = os.fstat(fd)
                 current = path.lstat()
                 if (
