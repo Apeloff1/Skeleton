@@ -119,6 +119,26 @@ def read_blueprint(project_id: str, *, root: Path = ROOT) -> dict[str, dict[str,
             raise StudioEcosystemError("broken cross-document ownership or schema")
         if part.get("release_certified") is not False:
             raise StudioEcosystemError("unearned release certification")
+    mandatory = {
+        "narrative": ("foundation", "premise", "plot_beats", "endings"),
+        "cast": ("protagonist", "support", "factions"),
+        "quest": ("objective",),
+        "scene": ("episode_plan",),
+        "visual": ("art_direction",),
+        "audio": ("audio_accessibility",),
+        "verification": ("quality_gates", "release_blockers"),
+    }
+    for section, fields in mandatory.items():
+        if any(not parts[section].get(field) for field in fields):
+            raise StudioEcosystemError("incomplete substantive studio section")
+    if not (parts["quest"].get("stages") or parts["quest"].get("stage_graph")):
+        raise StudioEcosystemError("missing quest graph")
+    if not (parts["visual"].get("jobs") or parts["visual"].get("asset_recipes")):
+        raise StudioEcosystemError("missing visual production plan")
+    if not (parts["audio"].get("cue_sheet") or parts["audio"].get("sound_layers")):
+        raise StudioEcosystemError("missing audio cue graph")
+    if len(parts["scene"]["episode_plan"]) < 3 or len(parts["verification"]["quality_gates"]) < 4:
+        raise StudioEcosystemError("insufficient scene or QA coverage")
     return parts
 
 
