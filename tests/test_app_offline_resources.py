@@ -74,7 +74,7 @@ class LocalResourceBudgetTests(unittest.TestCase):
             self.assertEqual(snap.cpu_count, 2)
 
     def test_swap_is_a_pressure_signal_not_extra_free_ram(self):
-        plenty = self.snapshot(memory=2_000_000_000, disk=10_000_000_000)
+        plenty = self.snapshot(memory=2_000_000_000, disk=300_000_000_000)
         committed = LocalResourceSnapshot(
             total_ram_bytes=plenty.total_ram_bytes,
             available_ram_bytes=plenty.available_ram_bytes,
