@@ -118,6 +118,10 @@ class AppleKVQualificationTests(unittest.TestCase):
             "model_tensor_fence_verified": False,
             "llama_kv_cache_fence_verified": False,
         }
+        def mocked_run(_args, **kwargs):
+            kwargs["stdout"].write(json.dumps(proof).encode("utf-8"))
+            return SimpleNamespace(returncode=0)
+
         with patch(
             "skeleton.app.offline_metal_qualification._apple_silicon",
             return_value=True,
@@ -126,9 +130,7 @@ class AppleKVQualificationTests(unittest.TestCase):
             return_value=True,
         ), patch(
             "skeleton.app.offline_metal_qualification.subprocess.run",
-            return_value=SimpleNamespace(
-                returncode=0, stdout=json.dumps(proof).encode("utf-8"),
-            ),
+            side_effect=mocked_run,
         ) as called:
             receipt = qualify_apple_shared_buffer_fence()
         self.assertTrue(receipt["passed"])
@@ -138,6 +140,24 @@ class AppleKVQualificationTests(unittest.TestCase):
         self.assertEqual(argv[:2], ["/usr/bin/xcrun", "swift"])
         self.assertTrue(argv[2].endswith("qualify_metal_shared.swift"))
         self.assertFalse(called.call_args.kwargs["check"] is True)
+
+    def test_metal_probe_rejects_oversized_native_output(self):
+        def oversized_run(_args, **kwargs):
+            kwargs["stdout"].write(b"x" * 8300)
+            return SimpleNamespace(returncode=0)
+
+        with patch(
+            "skeleton.app.offline_metal_qualification._apple_silicon",
+            return_value=True,
+        ), patch(
+            "skeleton.app.offline_metal_qualification.os.access",
+            return_value=True,
+        ), patch(
+            "skeleton.app.offline_metal_qualification.subprocess.run",
+            side_effect=oversized_run,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "qualification failed"):
+                qualify_apple_shared_buffer_fence()
 
     def test_metal_probe_fails_closed_without_apple_machine(self):
         with patch(

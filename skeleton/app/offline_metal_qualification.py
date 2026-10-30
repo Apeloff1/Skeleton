@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 import threading
 from typing import Any
 
@@ -190,19 +191,23 @@ def qualify_apple_shared_buffer_fence() -> dict[str, Any]:
     if not os.access("/usr/bin/xcrun", os.X_OK):
         raise RuntimeError("Apple xcrun developer tooling unavailable")
     try:
-        invocation = subprocess.run(
-            ["/usr/bin/xcrun", "swift", str(source)],
-            check=False, capture_output=True,
-            timeout=180, cwd=str(source.parent),
-        )
+        with tempfile.TemporaryFile(mode="w+b") as output_file:
+            invocation = subprocess.run(
+                ["/usr/bin/xcrun", "swift", str(source)],
+                check=False, stdout=output_file,
+                stderr=subprocess.DEVNULL,
+                timeout=180, cwd=str(source.parent),
+            )
+            output_file.seek(0)
+            bounded_stdout = output_file.read(8193)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError("native Metal fence invocation failed") from exc
     if sha256(source.read_bytes()).hexdigest() != source_sha:
         raise RuntimeError("Metal qualification source changed while running")
-    if invocation.returncode != 0 or len(invocation.stdout) > 8192:
+    if invocation.returncode != 0 or len(bounded_stdout) > 8192:
         raise RuntimeError("Metal shared-buffer qualification failed")
     try:
-        output = json.loads(invocation.stdout.decode("utf-8", errors="strict"))
+        output = json.loads(bounded_stdout.decode("utf-8", errors="strict"))
     except (UnicodeError, ValueError) as exc:
         raise RuntimeError("invalid native Metal fence output") from exc
     result = _validated_shared_fence_receipt(output)
