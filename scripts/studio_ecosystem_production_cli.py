@@ -45,6 +45,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         owner=StudioPortfolio(args.private_root,authorized=True)
         selection=None if args.all else args.project
+        allowed={p["id"] for p in list_blueprints(genre=args.genre,biome=args.biome)}
+        if selection is not None and any(pid not in allowed for pid in selection):
+            raise StudioEcosystemError("project outside requested genre or biome")
         if args.resume:
             selected=(sorted(p["id"] for p in list_blueprints(
                 genre=args.genre,biome=args.biome)) if args.all else selection)

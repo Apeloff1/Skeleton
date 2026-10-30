@@ -37,12 +37,18 @@ function nearMarker(){
  return !!current() && Math.abs(player.x-world.target[0])+
                            Math.abs(player.y-world.target[1])<=1;
 }
+function transcriptReceipt(){
+ return {schema:"skeleton.game_builder.offline_story_choices.v1",
+   project_id:world.project_id,source_digest:world.source_digest,
+   choices:choices.map(pair=>pair.slice()),external_evidence_verified:false,
+   native_genre_runtime_verified:false,release_certified:false};
+}
 function draw(){
  ctx.fillStyle="#101b29";ctx.fillRect(0,0,canvas.width,canvas.height);
  const stage=current();
  if(!stage){
    hud.textContent="All source-authored stages completed (sandbox only).";
-   choicesEl.replaceChildren();historyEl.textContent=JSON.stringify(choices);
+   choicesEl.replaceChildren();historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
    return;
  }
  const cells=world.maps[stageIndex];
@@ -67,7 +73,7 @@ function draw(){
      button.addEventListener("click",()=>choose(choice));choicesEl.append(button);
    }
  }
- historyEl.textContent=JSON.stringify(choices);
+ historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
 }
 function move(dx,dy){
  if(!current())return;
