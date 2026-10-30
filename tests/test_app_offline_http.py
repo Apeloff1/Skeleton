@@ -128,6 +128,67 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(status, 422)
 
+    def test_longform_work_cursor_http_cas_replay_and_resume(self) -> None:
+        import secrets
+        source = self.folder / "work"
+        source.mkdir()
+        (source / "book.txt").write_text(
+            "verified chapter and longform continuity " * 8000,
+            encoding="utf-8",
+        )
+        status, result, _ = self._request(
+            "POST", "/v1/resources/longform/ingest",
+            {"root": str(source), "relative_path": "book.txt",
+             "approved": True},
+        )
+        self.assertEqual(status, 201)
+        sid = result["source_id"]
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-start",
+            {"source_id": sid, "approved": False},
+        )
+        self.assertEqual(status, 403)
+        status, started, _ = self._request(
+            "POST", "/v1/resources/longform/work-start",
+            {"source_id": sid, "approved": True},
+        )
+        self.assertEqual(status, 201)
+        self.assertGreater(started["total_pages"], 1)
+        work = started["work_id"]
+        request_id = secrets.token_hex(24)
+        payload = {
+            "work_id": work, "expected_revision": 0,
+            "request_id": request_id, "pages": 1,
+        }
+        status, one, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(one["next_page"], 1)
+        self.assertTrue(one["progress_committed"])
+        status, replay, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(replay["receipt_digest"], one["receipt_digest"])
+        self.assertEqual(replay["text"], one["text"])
+        status, resumed, _ = self._request(
+            "POST", "/v1/resources/longform/work-status", {"work_id": work},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(resumed["revision"], 1)
+        payload["request_id"] = secrets.token_hex(24)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 422)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-status", {"work_id": work},
+            authorized=False,
+        )
+        self.assertEqual(status, 401)
+
     def test_resource_fabric_auth_and_readonly_multisource_staging(self) -> None:
         status, _, _ = self._request(
             "GET", "/v1/resources", authorized=False,
