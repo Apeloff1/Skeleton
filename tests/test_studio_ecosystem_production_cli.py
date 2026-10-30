@@ -66,3 +66,12 @@ def test_operator_resume_rechecks_source_and_exact_game_mode(tmp_path,capsys):
     assert result["recovery"]["reused_verified"]==["studio_arena_fighting_glacial_fjord"]
     assert result["recovery"]["built_now"]==[]
     assert not result["consumer_release_certified"]
+
+def test_parallel_cli_rejects_explicit_project_outside_requested_genre(tmp_path):
+    root=tmp_path/"private";root.mkdir(mode=0o700)
+    out=tmp_path/"output";out.mkdir(mode=0o700)
+    with pytest.raises(SystemExit) as exc:
+        main(["--private-root",str(root),"--output-root",str(out),
+              "--project","studio_arena_fighting_glacial_fjord",
+              "--genre","aerial_traversal","--parallel"])
+    assert exc.value.code==2
