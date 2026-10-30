@@ -42,3 +42,10 @@ def test_walkable_browser_has_actual_bfs_hint_without_teleportation():
     assert b"Shortest reachable route" in html
     assert b'id=\'navigation-hint\'' in html
     assert b"player.x=x;player.y=y;steps++;draw();" in html
+
+def test_walkable_browser_renders_real_hazards_and_source_health():
+    docs=read_blueprint("studio_arena_fighting_glacial_fjord")
+    data=render_playable_world_html(docs)
+    assert b"hazards_by_stage" in data
+    assert b"playerHealth--" in data
+    assert b"Character defeated by hazard contact" in data

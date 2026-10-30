@@ -30,6 +30,7 @@ const stepsEl=document.getElementById("steps");
 let stageIndex=0;
 let player={x:1,y:1};
 let steps=0;
+let playerHealth=world.starting_health;
 const choices=[];
 const physicsEvents=[];
 function text(tag,value){const el=document.createElement(tag);el.textContent=value;return el;}
@@ -61,9 +62,11 @@ function draw(){
    return;
  }
  const cells=world.maps[stageIndex];
+ const hazardCells=new Set(world.hazards_by_stage[stageIndex].map(c=>c.join(",")));
  for(let y=0;y<world.height;y++){
    for(let x=0;x<world.width;x++){
-     ctx.fillStyle=cells[y][x]==="#"?"#34495a":(x+y)%2?"#1e3949":"#244454";
+     ctx.fillStyle=cells[y][x]==="#"?"#34495a":hazardCells.has(x+","+y)?
+       "#ad4448":(x+y)%2?"#1e3949":"#244454";
      ctx.fillRect(x*40+1,y*40+1,38,38);
    }
  }
@@ -73,7 +76,12 @@ function draw(){
  ctx.beginPath();ctx.arc(player.x*40+20,player.y*40+20,13,0,Math.PI*2);ctx.fill();
  hud.textContent="Scene "+(stageIndex+1)+"/"+world.stages.length+
    ": "+stage.scene_id+". Objective: reach marker, choose an authored action.";
- stepsEl.textContent="Moves: "+steps+"; marker object: "+stage.objects[0];
+ stepsEl.textContent="Moves: "+steps+"; health: "+playerHealth+
+   "; marker object: "+stage.objects[0];
+ if(playerHealth<=0){
+   hud.textContent="Character defeated by hazard contact. Restart to try again.";
+   choicesEl.replaceChildren();return;
+ }
  choicesEl.replaceChildren();
  if(nearMarker()){
    choicesEl.append(text("h2","Nearby object: "+stage.objects[0]));
@@ -113,18 +121,23 @@ function hint(){
  output.textContent="No navigable marker route from current position";
 }
 function move(dx,dy){
- if(!current())return;
+ if(!current()||playerHealth<=0)return;
+ if(Math.abs(dx)+Math.abs(dy)!==1)return;
  const x=player.x+dx,y=player.y+dy;
  if(x<0||x>=world.width||y<0||y>=world.height)return;
  if(world.maps[stageIndex][y][x]==="#")return;
  const direction=dx===1?"right":dx===-1?"left":dy===1?"down":"up";
  physicsEvents.push(["move",direction]);
- player.x=x;player.y=y;steps++;draw();
+ player.x=x;player.y=y;steps++;
+ if(world.hazards_by_stage[stageIndex].some(c=>c[0]===x&&c[1]===y)){
+   playerHealth--;
+ }
+ draw();
  document.getElementById("navigation-hint").textContent="";
 }
 function choose(choice){
  const stage=current();
- if(!stage||!nearMarker()||!stage.alternatives.includes(choice))return;
+ if(!stage||playerHealth<=0||!nearMarker()||!stage.alternatives.includes(choice))return;
  choices.push([stage.id,choice]);
  physicsEvents.push(["choose",choice]);
  stageIndex++;player={x:1,y:1};draw();
@@ -143,7 +156,8 @@ document.querySelectorAll("[data-dx]").forEach(button=>{
 });
 document.getElementById("hint").addEventListener("click",hint);
 document.getElementById("restart").addEventListener("click",()=>{
- stageIndex=0;player={x:1,y:1};steps=0;choices.length=0;physicsEvents.length=0;draw();
+ stageIndex=0;player={x:1,y:1};steps=0;playerHealth=world.starting_health;
+ choices.length=0;physicsEvents.length=0;draw();
 });
 draw();
 """
@@ -206,7 +220,11 @@ def playable_world_source(documents: Mapping[str, Any]) -> dict[str, object]:
 
 
 def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
+    from .studio_ecosystem_encounters import authored_hazards
     source=playable_world_source(documents)
+    encounter=authored_hazards(documents)
+    source["starting_health"]=encounter["starting_health"]
+    source["hazards_by_stage"]=encounter["hazards_by_stage"]
     payload=json.dumps(source,sort_keys=True,separators=(",",":"),
                        ensure_ascii=True,allow_nan=False)
     payload=payload.replace("<",r"\u003c").replace(">",r"\u003e").replace("&",r"\u0026")
