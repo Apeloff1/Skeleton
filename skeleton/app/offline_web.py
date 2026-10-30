@@ -63,6 +63,14 @@ HTML = r"""<!doctype html>
       <button id="reference-rollback" class="secondary">Roll back last write</button>
       <div id="knowledge-hits" class="knowledge-hits" aria-live="polite"></div>
     </section>
+    <section class="knowledge-section" aria-label="Local hardware resource monitor">
+      <div class="heading"><span>Hardware &amp; memory fabric</span>
+        <button id="resource-refresh" class="small" type="button" disabled>Refresh</button>
+      </div>
+      <p class="hint">Private device telemetry. GPU and shared memory remain
+      backend-owned; unknown hardware capacity is never assumed available.</p>
+      <pre id="resource-monitor" aria-live="polite">Connect to inspect your device.</pre>
+    </section>
     <div class="sidebar-footer">
       <button id="fork" class="secondary">Fork conversation</button>
       <button id="export" class="secondary">Export backup</button>
@@ -145,8 +153,32 @@ JAVASCRIPT = r"""'use strict';
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
-    network: new AbortController(),
+    network: new AbortController(), resourceTimer: null,
   };
+  async function refreshResources() {
+    if (!state.connected || !state.token) return;
+    try {
+      const view = await api('GET', '/v1/resources');
+      const h = view.hardware || {};
+      const gib = value => typeof value === 'number' ? (value / 1073741824).toFixed(2) + ' GiB' : 'unknown';
+      const vram = view.gpus && view.gpus.length ? view.gpus.map(d =>
+        d.device + ': ' + gib(d.dedicated_free_bytes) + ' VRAM free' +
+        (d.shared_free_bytes === null ? ' · shared unknown' :
+          ' · ' + gib(d.shared_free_bytes) + ' host-shared (not additive)')
+      ).join('\n') : 'GPU telemetry unavailable — no VRAM allocation assumed';
+      const c = view.controller || {};
+      get('resource-monitor').textContent =
+        'RAM ' + gib(h.available_ram_bytes) + ' / ' + gib(h.total_ram_bytes) +
+        '\nSwap/pagefile ' + gib(h.free_swap_bytes) + ' / ' + gib(h.total_swap_bytes) +
+        '\nLocal disk ' + gib(h.free_disk_bytes) + ' / ' + gib(h.total_disk_bytes) +
+        '\nCPU load ' + (h.cpu_load_ratio ?? 'unknown') +
+        ' · worker budget ' + (c.adaptive_stream_budget ?? '?') +
+        '\nMemory pressure ' + ((c.predictive_pressure ?? 0) * 100).toFixed(1) + '%' +
+        '\n' + vram + '\nStaging: read-only host mmap / SQLite spill';
+    } catch (error) {
+      if (state.connected) get('resource-monitor').textContent = 'Resource telemetry unavailable.';
+    }
+  }
   const terminal = turn => !!turn && ['complete', 'failed', 'cancelled'].includes(turn.state);
   const unresolved = () => !!state.turn && !terminal(state.turn);
   const status = value => { get('status').textContent = value; };
@@ -177,6 +209,7 @@ JAVASCRIPT = r"""'use strict';
     get('send').disabled = locked || working || !state.session;
     get('connect').disabled = state.busy || state.connected;
     get('disconnect').disabled = !state.connected && !state.token;
+    get('resource-refresh').disabled = locked;
     const progress = !!state.turn;
     get('turn-progress').hidden = !progress;
     get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
@@ -203,6 +236,9 @@ JAVASCRIPT = r"""'use strict';
     state.timer = null;
   }
   function lock() {
+    if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
+    state.resourceTimer = null;
+    get('resource-monitor').textContent = 'Connect to inspect your device.';
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
@@ -535,6 +571,9 @@ JAVASCRIPT = r"""'use strict';
     get('budget').value = String(state.health.default_output_tokens);
     get('budget').max = String(state.health.max_output_tokens);
     await loadSessions(); await loadDocuments();
+    await refreshResources();
+    if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
+    state.resourceTimer = setInterval(refreshResources, 10000);
     if (state.health.active_turn) {
       const activeTurn = state.health.active_turn;
       await selectSession(activeTurn.session_id);
@@ -543,6 +582,7 @@ JAVASCRIPT = r"""'use strict';
     } else status('Connected locally. Choose a conversation or create a new one.');
   }));
   get('disconnect').addEventListener('click', lock);
+  get('resource-refresh').addEventListener('click', refreshResources);
   get('new').addEventListener('click', () => run(async () => {
     const system = get('system-prompt').value.trim();
     if (bytes(system) > 4096) throw new Error('Instructions exceed 4096 UTF-8 bytes.');
