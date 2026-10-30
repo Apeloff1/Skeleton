@@ -38,7 +38,7 @@ class MediaFingerprint:
     def __post_init__(self) -> None:
         if not isinstance(self.media_id, str) or not 1 <= len(self.media_id) <= 128:
             raise MediaScreenError("bounded media identifier required")
-        if any(ord(c) < 32 or ord(c) == 127 for c in self.media_id):
+        if any(ord(c) < 32 or ord(c) == 127 or c == "\\" for c in self.media_id):
             raise MediaScreenError("media identifier contains controls")
         if (not isinstance(self.content_sha256, str)
                 or len(self.content_sha256) != 64
@@ -78,7 +78,7 @@ class MediaMatchEvidence:
         if self.category not in {"artwork", "music_audio"}:
             raise MediaScreenError("unsupported media review category")
         if any(not isinstance(x, str) or not 1 <= len(x) <= 128
-               or any(ord(c) < 32 for c in x)
+               or any(ord(c) < 32 or ord(c) == 127 or c == "\\" for c in x)
                for x in (self.submitted_id, self.reference_id)):
             raise MediaScreenError("media review identities must be bounded text")
         if any(not isinstance(x, str) or len(x) != 64
