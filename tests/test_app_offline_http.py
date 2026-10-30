@@ -78,6 +78,45 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             conn.close()
         return status, json.loads(raw_response), headers_received
 
+    def test_resource_fabric_auth_and_readonly_multisource_staging(self) -> None:
+        status, _, _ = self._request(
+            "GET", "/v1/resources", authorized=False,
+        )
+        self.assertEqual(status, 401)
+        status, monitor, _ = self._request("GET", "/v1/resources")
+        self.assertEqual(status, 200)
+        self.assertEqual(monitor["schema"], "skeleton.offline.resource-fabric.v1")
+        self.assertFalse(monitor["shared_memory_is_additive"])
+        self.assertEqual(monitor["gpu_backend_binding"], "advisory_only")
+        status, planned, _ = self._request("POST", "/v1/resources/plan", {
+            "source_bytes": 5000, "desired_streams": 2,
+        })
+        self.assertEqual(status, 200)
+        self.assertFalse(planned["backend_gpu_transfer_executed"])
+        self.assertTrue(planned["evidence_digest"])
+        source = self.folder / "selected"
+        source.mkdir()
+        (source / "first.txt").write_text("immutable selected file")
+        (source / "second.txt").write_text("another verified local file")
+        request = {
+            "root": str(source), "paths": ["first.txt", "second.txt"],
+            "desired_streams": 2, "approved": False,
+        }
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 403)
+        request["approved"] = True
+        status, output, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 200)
+        self.assertTrue(output["verified"])
+        self.assertFalse(output["gpu_transfer_executed"])
+        self.assertEqual(len(output["sources"]), 2)
+        self.assertTrue(all(item["readonly"] for item in output["sources"]))
+        self.assertEqual((source / "first.txt").read_text(),
+                         "immutable selected file")
+        request["paths"] = ["../http.sqlite3"]
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 422)
+
     def test_native_local_http_roundtrip_and_exactly_once_retry(self) -> None:
         status, health, _ = self._request("GET", "/v1/status")
         self.assertEqual(status, 200)
