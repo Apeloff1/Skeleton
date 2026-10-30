@@ -82,7 +82,6 @@ def _read_document(
     Return body=None when the current RAM/swap pressure calls for disk
     offload. An offload callback persists decoded chunks into SQLite without
     assembling a full Python string.
-    """
 
     On POSIX the root is opened first, then each relative directory is
     traversed with O_DIRECTORY | O_NOFOLLOW via dir_fd. The final document
