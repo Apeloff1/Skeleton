@@ -109,6 +109,20 @@ class LongformVirtualMemory:
             self._db.execute("""CREATE VIRTUAL TABLE IF NOT EXISTS longform_fts
                 USING fts5(source_id UNINDEXED, ordinal UNINDEXED, text,
                            tokenize='unicode61')""")
+            self._db.execute("""CREATE TABLE IF NOT EXISTS longform_work (
+                work_id TEXT PRIMARY KEY,
+                source_id TEXT NOT NULL,
+                source_sha256 TEXT NOT NULL,
+                source_terminal_chain TEXT NOT NULL,
+                next_page INTEGER NOT NULL,
+                revision INTEGER NOT NULL,
+                last_request_id TEXT,
+                last_start_page INTEGER,
+                last_page_count INTEGER,
+                last_receipt_digest TEXT,
+                receipt_chain TEXT NOT NULL,
+                updated_ns INTEGER NOT NULL
+            )""")
         except BaseException:
             self._db.close()
             raise
@@ -389,6 +403,174 @@ class LongformVirtualMemory:
             ],
             "model_context_applied": False,
         }
+
+
+    @staticmethod
+    def _identity(value: str, label: str) -> str:
+        if type(value) is not str or len(value) != 48 or any(
+            ch not in "0123456789abcdef" for ch in value
+        ):
+            raise LongformMemoryError("invalid " + label)
+        return value
+
+    def start_work(self, source_id: str) -> dict[str, object]:
+        """Create a durable chapter/page cursor only after archive verification."""
+        source_id = self._identity(source_id, "source identity")
+        with self._lock:
+            manifest = self._read_verified(source_id)[0]
+            work_id = secrets.token_hex(24)
+            root = sha256(
+                b"skeleton.longform.work.v1:" +
+                bytes.fromhex(work_id) +
+                bytes.fromhex(manifest["source_sha256"])
+            ).hexdigest()
+            self._db.execute(
+                "INSERT INTO longform_work VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    work_id, source_id, manifest["source_sha256"],
+                    manifest["terminal_chain"], 0, 0,
+                    None, None, None, None, root, time.time_ns(),
+                ),
+            )
+            return {
+                "work_id": work_id, "source_id": source_id,
+                "source_sha256": manifest["source_sha256"],
+                "next_page": 0, "revision": 0,
+                "total_pages": manifest["page_count"],
+                "receipt_chain": root,
+                "progress_committed": True,
+            }
+
+    def inspect_work(self, work_id: str) -> dict[str, object]:
+        work_id = self._identity(work_id, "work identity")
+        with self._lock:
+            record = self._db.execute(
+                "SELECT w.source_id, w.source_sha256, w.next_page, "
+                "w.revision, w.receipt_chain, s.pages, "
+                "w.source_terminal_chain, s.terminal_chain, s.source_sha256 "
+                "FROM longform_work AS w JOIN longform_sources AS s "
+                "ON s.source_id=w.source_id WHERE w.work_id=?",
+                (work_id,),
+            ).fetchone()
+            if record is None:
+                raise LongformMemoryError("unknown longform work cursor")
+            source, digest, page, revision, chain, total, pinned, current, current_digest = record
+            if current != pinned or current_digest != digest:
+                raise LongformMemoryError("longform cursor source changed")
+            return {
+                "work_id": work_id, "source_id": source,
+                "source_sha256": digest, "next_page": page,
+                "revision": revision, "total_pages": total,
+                "receipt_chain": chain,
+                "complete": page >= total,
+            }
+
+    def advance_work(
+        self, work_id: str, *, expected_revision: int,
+        request_id: str, pages: int = 1,
+    ) -> dict[str, object]:
+        """Exactly-once cursor movement with replayable completed page receipts.
+
+        The client must reuse request_id on transport retries. The same
+        request has its previous verified page content reconstructed, while
+        a conflicting revision or changed source fails closed.
+        """
+        work_id = self._identity(work_id, "work identity")
+        self._identity(request_id, "work request identity")
+        if type(expected_revision) is not int or expected_revision < 0:
+            raise LongformMemoryError("invalid expected work revision")
+        if type(pages) is not int or pages < 1:
+            raise LongformMemoryError("invalid requested page batch")
+        with self._lock:
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                state = self._db.execute(
+                    "SELECT source_id, source_sha256, source_terminal_chain, "
+                    "next_page, revision, last_request_id, last_start_page, "
+                    "last_page_count, last_receipt_digest, receipt_chain "
+                    "FROM longform_work WHERE work_id=?",
+                    (work_id,),
+                ).fetchone()
+                if state is None:
+                    raise LongformMemoryError("unknown longform work cursor")
+                (
+                    source_id, source_sha, terminal, next_page, revision,
+                    last_request, last_start, last_pages, last_digest,
+                    receipt_chain,
+                ) = state
+                replay = (
+                    last_request == request_id
+                    and expected_revision == revision - 1
+                    and pages == last_pages
+                )
+                if not replay and expected_revision != revision:
+                    raise LongformMemoryError("stale longform revision")
+                if not replay and last_request == request_id:
+                    raise LongformMemoryError("work request identity already consumed")
+                if replay:
+                    start = last_start
+                    target = last_pages
+                else:
+                    start = next_page
+                    target = pages
+                # read_window fully verifies the source and retains only the
+                # selected small window. Never advance an unverified source.
+                window = self.read_window(
+                    source_id, start_page=start, pages=target,
+                )
+                if window["terminal_chain"] != terminal or (
+                    window["source_sha256"] != source_sha
+                ):
+                    raise LongformMemoryError("work cursor lost source identity")
+                count = window["returned_pages"]
+                if not replay and count == 0:
+                    raise LongformMemoryError("longform work already at end")
+                payload = window["text"]
+                digest = sha256(
+                    b"skeleton.longform.delivery.v1:" + payload.encode("utf-8")
+                    + str(start).encode("ascii")
+                    + str(count).encode("ascii")
+                    + bytes.fromhex(source_sha)
+                ).hexdigest()
+                if replay:
+                    if digest != last_digest:
+                        raise LongformMemoryError("replayed work receipt changed")
+                    return {
+                        **window, "work_id": work_id, "request_id": request_id,
+                        "revision": revision, "next_page": next_page,
+                        "receipt_digest": digest,
+                        "receipt_chain": receipt_chain,
+                        "replayed": True, "progress_committed": True,
+                    }
+                new_chain = sha256(
+                    bytes.fromhex(receipt_chain) +
+                    bytes.fromhex(request_id) +
+                    bytes.fromhex(digest)
+                ).hexdigest()
+                updated = self._db.execute(
+                    "UPDATE longform_work SET next_page=?, revision=?, "
+                    "last_request_id=?, last_start_page=?, last_page_count=?, "
+                    "last_receipt_digest=?, receipt_chain=?, updated_ns=? "
+                    "WHERE work_id=? AND revision=? AND receipt_chain=?",
+                    (
+                        start + count, revision + 1, request_id, start, pages,
+                        digest, new_chain, time.time_ns(), work_id, revision,
+                        receipt_chain,
+                    ),
+                )
+                if updated.rowcount != 1:
+                    raise LongformMemoryError("work cursor CAS failed")
+                self._db.execute("COMMIT")
+                return {
+                    **window, "work_id": work_id, "request_id": request_id,
+                    "revision": revision + 1, "next_page": start + count,
+                    "receipt_digest": digest, "receipt_chain": new_chain,
+                    "replayed": False, "progress_committed": True,
+                }
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
 
 
 __all__ = ["LongformVirtualMemory", "LongformMemoryError"]
