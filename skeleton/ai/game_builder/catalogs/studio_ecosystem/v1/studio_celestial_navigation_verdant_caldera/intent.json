@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_verdant_caldera",
+  "title": "Verdant Caldera: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010315831,
+  "width": 27,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 3
+}

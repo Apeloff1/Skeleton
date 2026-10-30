@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_investigative_journalism_ion_wastes",
+  "genre": "investigative_journalism",
+  "biome": "ion_wastes",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Kira Ashe",
+    "role": "reporter",
+    "public_goal": "publish a defensible account of a hidden institutional disaster",
+    "private_burden": "An earlier electromagnetic storms report ignored by peers",
+    "abilities": [
+      "source triangulation, chronology and consent",
+      "verify"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Orla Rowan",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of drifting relay station",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Neri Nara",
+      "role": "Maintainer of shielded relay coils",
+      "knows": "Repair topology under induced currents",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Miro Lark",
+      "role": "contested operations director",
+      "organization": "a records-suppression firm",
+      "goal": "Exclusive access to shielded relay coils",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of source confidence and publishing budget",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over shielded relay coils",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_glass_steppe",
+  "title": "Glass Steppe: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010315868,
+  "width": 19,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 10,
+  "theme": "desert",
+  "starting_health": 4
+}

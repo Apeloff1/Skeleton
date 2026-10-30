@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_copper_mesa",
+  "title": "Copper Mesa: The Four Harvests",
+  "subtitle": "Original the four harvests design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010315007,
+  "width": 19,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 13,
+  "theme": "desert",
+  "starting_health": 5
+}
