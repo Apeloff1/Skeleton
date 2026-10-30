@@ -7,7 +7,7 @@ native 2D/3D world or commercially-qualified art pipeline.
 from __future__ import annotations
 
 from hashlib import sha256
-from math import cos, pi, sin
+from math import pi, sin
 import re
 import xml.etree.ElementTree as ET
 from typing import Any, Mapping

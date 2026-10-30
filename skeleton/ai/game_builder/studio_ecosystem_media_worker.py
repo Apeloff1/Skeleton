@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import Any
-
 from .studio_ecosystem_catalog import read_blueprint
 from .studio_ecosystem_fence import assert_source_fence
 from .studio_ecosystem_journal import WorkJournal
