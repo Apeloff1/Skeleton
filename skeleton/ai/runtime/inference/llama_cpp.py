@@ -33,6 +33,7 @@ from skeleton.skills.tool_contract import (
     validate_json_value,
 )
 
+from .kv_placement import observe_native_kv_placement
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -853,6 +854,7 @@ class LlamaCppModel:
         self._resource_preflight: Callable[[], None] | None = None
         self._resource_preflight_bound = False
         self._resource_preflight_checks = 0
+        self._last_kv_observation: dict[str, Any] | None = None
         self._processes_exited = 0
         self._termination_requests = 0
         if not _stat_matches(self._model):
@@ -1711,6 +1713,13 @@ class LlamaCppModel:
             if return_code != 0 and stop_output_end is None:
                 diagnostic = stderr_bytes.decode("utf-8", errors="replace").strip()[-4096:]
                 raise LlamaCppRuntimeError(f"local runtime exited with code {return_code}: {diagnostic}")
+            kv_observation = observe_native_kv_placement(stderr_bytes)
+            if (self.config.kv_cache_location == "host"
+                    and kv_observation["reported_device_kv_bytes"] > 0):
+                raise LlamaCppRuntimeError(
+                    "native llama.cpp reported GPU KV buffers despite the "
+                    "pinned host-only KV placement request"
+                )
 
             self._assert_artifacts_stable(interrupt=interrupt)
             if self.execution_profile_digest != execution_profile:
@@ -1749,6 +1758,8 @@ class LlamaCppModel:
             response_id = (
                 "local:llama:" + self.runtime_digest + ":" + self.model_digest + ":" + response_digest
             )
+            with self._process_lock:
+                self._last_kv_observation = dict(kv_observation)
             return LocalInferenceResult(
                 text=text,
                 model_id=self.model_id,
@@ -1762,6 +1773,8 @@ class LlamaCppModel:
                         "schema": "skeleton.llama-cpp.execution-receipt.v1",
                         "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
                         "output_framing": self.config.output_framing,
+                        "kv_cache_location_requested": self.config.kv_cache_location,
+                        "native_kv_observation": kv_observation,
                         "request": request.digest,
                         "execution_profile": execution_profile,
                         "response_id": response_id,
