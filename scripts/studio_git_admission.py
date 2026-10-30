@@ -98,8 +98,10 @@ def evaluate(
         path = change.path
         parts = PurePosixPath(path).parts if isinstance(path, str) else ()
         if (not parts or path.startswith("/") or "\\" in path
-                or path.endswith("/") or any(ord(ch) < 32 for ch in path)
-                or any(part in (".", "..") for part in parts) or path in seen):
+                or path.endswith("/") or path != str(PurePosixPath(path))
+                or any(ord(ch) < 32 for ch in path)
+                or any(part in (".", "..", ".git") for part in parts)
+                or path in seen):
             failures.append("unsafe_or_duplicate_path")
         if len(parts) > MAX_PATH_DEPTH:
             failures.append("path_depth")

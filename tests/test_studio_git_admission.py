@@ -44,6 +44,8 @@ def test_unsafe_paths_symlinks_binary_and_oversize_are_rejected():
     assert "unsafe_or_duplicate_path" in ev(Change("../escape.py",1,0,10))["violations"]
     assert "unsafe_or_duplicate_path" in ev(Change("a/a.py",1,0,1),Change("a/a.py",1,0,1))["violations"]
     assert ev(Change(".github/workflows/ci.yml",1,0,100))["admitted"]
+    assert "unsafe_or_duplicate_path" in ev(Change(".git/hooks/post-commit",1,0,10))["violations"]
+    assert "unsafe_or_duplicate_path" in ev(Change("safe/./file.py",1,0,10))["violations"]
 
 def test_unmeasured_capacity_fails_closed():
     try:
