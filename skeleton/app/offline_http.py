@@ -37,6 +37,7 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
+from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
 from skeleton.app.offline_background_job import LocalJobRejected, LocalReferenceJob
 from skeleton.app.offline_reference_read import (
     LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
@@ -134,6 +135,7 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         self.backend = backend
         self.database = Path(database)
+        self.resource_fabric = AdaptiveResourceFabric(self.database)
         self.token = token
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
@@ -426,6 +428,23 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/resources" and method == "GET":
+            try:
+                return 200, self.resource_fabric.monitor()
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise OfflineHTTPError(503, "local resource telemetry unavailable") from exc
+        if path == "/v1/resources/plan" and method == "POST":
+            _fields(body, {"source_bytes", "desired_streams", "requested_gpu_bytes",
+                           "allow_gpu"}, {"source_bytes"})
+            try:
+                return 200, self.resource_fabric.plan(
+                    body["source_bytes"],
+                    desired_streams=body.get("desired_streams", 1),
+                    requested_gpu_bytes=body.get("requested_gpu_bytes", 0),
+                    allow_gpu=body.get("allow_gpu", False),
+                ).as_dict()
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise OfflineHTTPError(422, "resource plan rejected by live hardware policy") from exc
         if path == "/v1/status" and method == "GET":
             with self._turn_lock:
                 active = next((t for t in self._turns.values()
