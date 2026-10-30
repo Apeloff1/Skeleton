@@ -29,6 +29,6 @@ python -m pytest -q tests/test_studio_ecosystem_journal.py tests/test_studio_eco
 python -m compileall -q skeleton/ai/game_builder scripts
 ```
 
-These drafts remain **uncertified** until their exact-head required CI, frontend/backend/security policies, source rights and target-device integration evidence complete. Historical success, skipped draft checks, queued/cancelled runs and authoring simulations never count as completed release certification. Do not squash the stacked chain out of order; each small draft's base depends on the preceding one. Keep GitHub size limits and security gates intact. 
+These drafts remain **uncertified** until their exact-head required CI, frontend/backend/security policies, source rights and target-device integration evidence complete. Historical success, skipped draft checks, queued/cancelled runs and authoring simulations never count as completed release certification. Do not squash the stacked chain out of order; each small draft's base depends on the preceding one. Keep GitHub size limits and security gates intact.
 
 Known limitations: local Python/SQLite single-host coordination rather than distributed workers, no automatic OS process manager, no persistent materialized native 3D assets, no cross-owner signed provenance, no true producer GPU KV ownership or driver sync, no released full genre gameplay. Next layers require real engine adapters, media pipelines, device-qualified benchmarking, and independent evidence attestation.
