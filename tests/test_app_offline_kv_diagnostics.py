@@ -2,17 +2,56 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from skeleton.ai.runtime.inference.kv_placement import observe_native_kv_placement
+from skeleton.ai.runtime.inference.llama_cpp import LlamaCppConfig
 from skeleton.app.offline_metal_runtime import plan_metal_llama_launch
 from skeleton.app.offline_resource_fabric import GPUResource
 from skeleton.app.offline_resources import LocalResourceSnapshot
 
-from test_app_offline_metal_runtime import (
-    apple_device, configuration, fake_model, local_hardware,
-)
+
+def configuration(*, gpu_layers: int = 30, batch_size: int = 512) -> LlamaCppConfig:
+    return LlamaCppConfig(
+        executable="/offline/llama-cli", model_path="/offline/model.gguf",
+        gpu_layers=gpu_layers, batch_size=batch_size,
+        context_size=4096, kv_bytes_per_token=2048,
+        runtime_scratch_bytes=256_000_000,
+    )
+
+
+def local_hardware(*, free: int = 6_000_000_000) -> LocalResourceSnapshot:
+    return LocalResourceSnapshot(
+        total_ram_bytes=16_000_000_000, available_ram_bytes=free,
+        total_disk_bytes=1_000_000_000_000,
+        free_disk_bytes=500_000_000_000,
+        cpu_count=12, cpu_load_ratio=0.2,
+    )
+
+
+def apple_device(*, working: int = 8_000_000_000,
+                 allocated: int = 1_000_000_000) -> GPUResource:
+    return GPUResource(
+        "Apple Silicon Metal", "apple", 0, 0,
+        shared_with_system_ram=True,
+        recommended_working_set_bytes=working,
+        current_allocated_bytes=allocated,
+        measurement="metal_unified_working_set",
+    )
+
+
+def fake_model(config: LlamaCppConfig) -> SimpleNamespace:
+    return SimpleNamespace(
+        config=config,
+        model_artifact=SimpleNamespace(
+            size_bytes=2_000_000_000, path="/offline/model.gguf",
+        ),
+        serving_metadata=SimpleNamespace(
+            block_count=40, kv_bytes_per_token_upper_bound=2048,
+        ),
+    )
 
 
 class NativeKVObservationTests(unittest.TestCase):
