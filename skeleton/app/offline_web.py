@@ -91,6 +91,13 @@ HTML = r"""<!doctype html>
         <input id="longform-search" type="search" autocomplete="off">
         <button id="longform-query" class="secondary" disabled>Retrieve verified passages</button>
         <pre id="longform-status" aria-live="polite">No staged source.</pre>
+        <div class="heading"><span>Resumable long-form work</span></div>
+        <label for="longform-work-id">Work ID (copy to resume after restart)</label>
+        <input id="longform-work-id" type="text" autocomplete="off" spellcheck="false">
+        <button id="longform-work-start" class="secondary" disabled>Begin durable work</button>
+        <button id="longform-work-resume" class="secondary" disabled>Restore cursor</button>
+        <button id="longform-work-next" class="secondary" disabled>Read and commit next page</button>
+        <pre id="longform-work-status" aria-live="polite">No active work cursor.</pre>
       </details>
     </section>
     <div class="sidebar-footer">
@@ -176,6 +183,7 @@ JAVASCRIPT = r"""'use strict';
     writePending: null, writeRequest: '',
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
+    longformWork: null, longformPendingRequest: null,
   };
   async function refreshResources() {
     if (!state.connected || !state.token) return;
@@ -241,6 +249,9 @@ JAVASCRIPT = r"""'use strict';
     get('resource-plan').disabled = locked;
     get('longform-ingest').disabled = locked || state.busy;
     get('longform-query').disabled = locked || state.busy || !state.longformSourceId;
+    get('longform-work-start').disabled = locked || state.busy || !state.longformSourceId;
+    get('longform-work-resume').disabled = locked || state.busy;
+    get('longform-work-next').disabled = locked || state.busy || !state.longformWork;
     const progress = !!state.turn;
     get('turn-progress').hidden = !progress;
     get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
@@ -272,7 +283,11 @@ JAVASCRIPT = r"""'use strict';
     get('resource-monitor').textContent = 'Connect to inspect your device.';
     get('resource-plan-result').textContent = 'No workload planned.';
     get('longform-status').textContent = 'No staged source.';
+    get('longform-work-status').textContent = 'No active work cursor.';
+    get('longform-work-id').value = '';
     state.longformSourceId = null;
+    state.longformWork = null;
+    state.longformPendingRequest = null;
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
@@ -659,6 +674,53 @@ JAVASCRIPT = r"""'use strict';
       '…\n' + evidence.hits.map(h =>
         'Page ' + h.page + ': ' + h.text.slice(0, 400)
       ).join('\n\n');
+  }));
+  function displayLongformWork(work) {
+    const progress = work.next_page + ' / ' + work.total_pages + ' pages';
+    get('longform-work-id').value = work.work_id;
+    get('longform-work-status').textContent =
+      'Saved progress: ' + progress + '\nRevision: ' + work.revision +
+      (work.complete ? '\nComplete.' : '\nReady for next page.');
+    state.longformWork = work;
+    updateControls();
+  }
+  get('longform-work-start').addEventListener('click', () => run(async () => {
+    if (!state.longformSourceId) throw new Error('Stage a source first.');
+    const work = await api('POST', '/v1/resources/longform/work-start',
+      {source_id: state.longformSourceId, approved: true});
+    state.longformPendingRequest = null;
+    displayLongformWork(work);
+  }));
+  get('longform-work-resume').addEventListener('click', () => run(async () => {
+    const work_id = get('longform-work-id').value.trim();
+    if (!/^[0-9a-f]{48}$/.test(work_id)) throw new Error('Enter the exact work ID.');
+    const work = await api('POST', '/v1/resources/longform/work-status', {work_id});
+    state.longformPendingRequest = null;
+    state.longformSourceId = work.source_id;
+    displayLongformWork(work);
+  }));
+  get('longform-work-next').addEventListener('click', () => run(async () => {
+    const work = state.longformWork;
+    if (!work) throw new Error('Restore or begin a work cursor.');
+    // Preserve request identity on uncertain delivery. Reusing the same
+    // work/revision/pages replays the already committed delivery exactly.
+    const request = state.longformPendingRequest || {
+      work_id: work.work_id, expected_revision: work.revision,
+      request_id: Array.from(crypto.getRandomValues(new Uint8Array(24)),
+        n => n.toString(16).padStart(2, '0')).join(''), pages: 1,
+    };
+    state.longformPendingRequest = request;
+    const result = await api('POST', '/v1/resources/longform/work-next', request);
+    state.longformPendingRequest = null;
+    displayLongformWork({
+      ...work, next_page: result.next_page, revision: result.revision,
+      complete: result.next_page >= work.total_pages,
+      receipt_chain: result.receipt_chain,
+    });
+    get('longform-work-status').textContent +=
+      '\nReceipt: ' + result.receipt_digest.slice(0, 20) + '…' +
+      (result.replayed ? '\nOriginal delivery recovered.' : '\nPage committed.') +
+      '\nPage: ' + result.text.slice(0, 2000);
   }));
   get('new').addEventListener('click', () => run(async () => {
     const system = get('system-prompt').value.trim();
