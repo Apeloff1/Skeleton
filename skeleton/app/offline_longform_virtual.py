@@ -515,7 +515,18 @@ class LongformVirtualMemory:
         if pages > max(1, safe // 1024):
             raise LongformMemoryError("requested window exceeds live page budget")
         with self._lock:
-            selection = set(range(start_page, start_page + pages))
+            count_row = self._db.execute(
+                "SELECT pages FROM longform_sources WHERE source_id=?",
+                (source_id,),
+            ).fetchone()
+            if count_row is None:
+                raise LongformMemoryError("unknown longform source")
+            if type(count_row[0]) is not int or count_row[0] < 0:
+                raise LongformMemoryError("invalid longform page count")
+            selection = set(range(
+                min(start_page, count_row[0]),
+                min(start_page + pages, count_row[0]),
+            ))
             merkle = self._read_selected_merkle(
                 source_id, selection, max_selected_bytes=safe,
             )
