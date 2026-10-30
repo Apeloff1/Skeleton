@@ -364,7 +364,9 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
     first._journal.mark_release_pending(operation, active.receipt)
 
     # Simulate an impossible-but-defensive race where accounting completes
-    # while the governor journal says release is pending.
+    # while the governor journal says release is pending. A direct runtime
+    # completion cannot create the governor's durable completion intent, so
+    # the completed accounting MUST be recovered fail-closed.
     first.runtime.complete(operation, actual, now_wall=11.0)
 
     restarted = _governor(path)
@@ -379,7 +381,12 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
         evidence_refs=_refs("completion-wins"),
     )
     assert completed.state == "completed"
-    assert completed.accepted is True
+    assert completed.accepted is False
+    assert completed.reasons == ("operation-budget-recovery-intent-missing",)
+    assert completed.promotion_authority is False
+    assert restarted.recover_completed(
+        operation, evidence_refs=_refs("completion-wins"),
+    ) == completed
 
 
 def test_restart_reattach_conflict_never_releases_preexisting_reservation(
