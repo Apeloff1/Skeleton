@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import os
 import re
 from typing import Any
 
@@ -18,7 +19,30 @@ ROOT = Path(__file__).resolve().parent / "catalogs" / "studio_ecosystem" / "v1"
 SECTIONS = ("intent", "narrative", "cast", "quest", "scene", "visual", "audio", "verification")
 IDENT = re.compile(r"^[a-z][a-z0-9_-]{2,75}$")
 MAX_FILE_BYTES = 32768
-MAX_INDEX_BYTES = 256 * 1024
+MAX_INDEX_BYTES = 256 * 1024  # legacy minimum, not a fixed corpus ceiling
+
+
+def _available_index_memory_bytes() -> int:
+    """Best-effort live physical RAM headroom; refuse speculative unlimited JSON."""
+    try:
+        import psutil
+        return max(0, int(psutil.virtual_memory().available))
+    except (ImportError, OSError, ValueError, AttributeError):
+        pass
+    if hasattr(os, "sysconf"):
+        try:
+            pages = int(os.sysconf("SC_AVPHYS_PAGES"))
+            size = int(os.sysconf("SC_PAGE_SIZE"))
+            if pages > 0 and size > 0:
+                return pages * size
+        except (OSError, ValueError, KeyError):
+            pass
+    return 0
+
+
+def _adaptive_index_bytes() -> int:
+    """Admit an expanding catalog using measured RAM instead of file count."""
+    return max(MAX_INDEX_BYTES, _available_index_memory_bytes() // 32)
 
 
 class StudioEcosystemError(ValueError):
@@ -56,7 +80,7 @@ def _read_json(path: Path, *, maximum: int = MAX_FILE_BYTES) -> dict[str, Any]:
 
 
 def catalog_index(*, root: Path = ROOT) -> tuple[dict[str, str], ...]:
-    index = _read_json(root / "index.json", maximum=MAX_INDEX_BYTES)
+    index = _read_json(root / "index.json", maximum=_adaptive_index_bytes())
     if index.get("schema") != SCHEMA or index.get("sections") != list(SECTIONS):
         raise StudioEcosystemError("wrong studio ecosystem index contract")
     records = index.get("projects")

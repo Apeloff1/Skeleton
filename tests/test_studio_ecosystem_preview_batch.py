@@ -1,4 +1,3 @@
-from pathlib import Path
 import pytest
 from skeleton.ai.game_builder.studio_ecosystem_portfolio import StudioPortfolio
 from skeleton.ai.game_builder.studio_ecosystem_preview_batch import build_catalog_preview_batch
