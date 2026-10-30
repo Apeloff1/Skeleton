@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-import shutil
+import time
 from typing import Sequence
 
 from .studio_ecosystem_catalog import list_blueprints, StudioEcosystemError
@@ -44,14 +44,20 @@ def build_catalog_preview_batch(portfolio: StudioPortfolio, output_root: Path, *
                     "status":"paused_by_measured_resource_capacity",
                     "all_projects_completed":False,
                     "consumer_release_certified":False}
+        started=time.monotonic_ns()
+        disk_before=capacity.free_disk_bytes
         supervisor=portfolio.open(pid,authorized=True)
         receipt=build_offline_studio_bundle(supervisor.journal,supervisor.spool,
                                              output_root,authorized=True)
         verification=verify_studio_bundle(Path(receipt["output_dir"]),authorized=True)
         if not verification["local_bundle_integrity_verified"]:
             raise StudioEcosystemError("post-write package integrity failed")
+        elapsed=max(1,time.monotonic_ns()-started)
+        disk_after=observe_producer_capacity(output_root).free_disk_bytes
         successes.append({"project_id":pid,"manifest_sha256":receipt["manifest_sha256"],
                           "local_bundle_integrity_verified":True,
+                          "elapsed_monotonic_ns":elapsed,
+                          "measured_disk_change_bytes":disk_before-disk_after,
                           "target_genre_qualified":False})
     return {"schema":"skeleton.game_builder.studio_batch_preview.v1",
             "selected_projects":len(wanted),"completed_projects":len(successes),
