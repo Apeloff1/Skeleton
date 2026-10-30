@@ -2,11 +2,11 @@
 
 Owner: `skeleton/ai/game_builder`, extending the existing original studio and playable compiler.
 
-The catalog contains 256 *linked source-production briefs*: eight purpose-specific
-JSON documents per project (2,048 original documents). Each includes playable
+The catalog contains 512 *linked source-production briefs*: eight purpose-specific
+JSON documents per project (4,096 original documents). Each includes playable
 offline-grid preview intent, narrative/canon, character relationships, branching
 quests, scene direction, visual recipes, audio direction, and explicit verification
-obligations. Genre x biome combinations give differentiated starting points,
+obligations. Thirty-two original genre concepts across sixteen environments give differentiated starting points,
 not consumer-ready games. No copied engine source, model checkpoints, third-party
 training sets, executable source downloads, or copyrighted game assets are embedded.
 
