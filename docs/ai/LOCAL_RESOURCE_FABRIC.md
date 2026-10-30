@@ -239,49 +239,67 @@ fences, runtime tensor migration, numerical equivalence across K/V cache
 types, or macOS swap modification. Test each chosen cache precision,
 memory-pressure condition, interruption and process/device failure separately.
 
-## Real Metal shared-buffer fence qualification
+## Four-mode Metal synchronization and multi-stream qualification
 
-A **separate, opt-in** Swift/Metal qualifier performs genuine Apple
-Silicon CPU↔GPU shared-memory command execution. It constructs a 64-element
-read/write pair of `MTLBuffer` allocations using `storageModeShared`,
-runs a deterministic GPU compute kernel, waits for each Metal command buffer
-to complete, and verifies the CPU-visible output after *two* independent
-CPU modifications. The native Swift source is at
-`scripts/qualify_metal_shared.swift`.
+The opt-in Swift/Metal qualifier runs **real device-local GPU work** on
+Apple Silicon. It exercises four distinct memory synchronization contracts
+with a fixed kernel and SHA-256 proof, not mock GPU results:
 
-Run on an Apple M-series Mac with the Apple developer toolchain installed:
+1. **Serial CPU→GPU→CPU**: four rounds of CPU writes followed by a Metal
+   command-buffer completion, then CPU readback; no host reads or writes
+   overlap an in-flight GPU operation.
+2. **Two Metal command queues**: four producer/consumer pairs with explicit
+   `MTLEvent` signal/wait dependencies. GPU writes to a staging buffer on
+   queue A, signals a monotonically increasing event value; queue B waits
+   before reading that buffer, runs its own kernel and completes a readback.
+3. **Three concurrent independent lanes**: three separate input/output
+   buffer pairs are submitted before any CPU waits; buffers are never
+   aliased across lanes, and results are checked after every completion.
+4. **CPU-visible shared event**: two more rounds use `MTLSharedEvent`
+   GPU signals and CPU observation of the monotonically increasing
+   `signaledValue` after command completion.
+
+The proof uses **13 real shared-memory Metal buffers, 17 completed
+command buffers, 4 interqueue event handoffs, 3 independent parallel lanes,
+2 shared-event CPU observations and 832 verified output values**.
+All four modes must pass. The Python verifier independently calculates the
+complete expected output digest and rejects missing, substituted, stale
+v1, undercounted or unrecognized fields. A standalone v2 receipt can
+never mark llama.cpp model/KV tensor synchronization as verified.
+
+Run on an Apple M-series Mac with the Apple developer toolchain:
 
 ```bash
-# Standalone low-level shared-buffer probe; no model files needed
+# Standalone multi-mode GPU test; does not require model weights
 /usr/bin/xcrun swift scripts/qualify_metal_shared.swift
 
-# Or combine with the existing pinned llama.cpp host-KV qualification
+# Combine with the normal pinned GGUF host-KV backend qualification
 python -m skeleton.app.offline_metal_qualification \
     --manifest /path/to/private-local-model-deployment.json \
     --shared-buffer-fence
 ```
 
-The Python validator requires an exact declared schema, two completed
-command buffers, 128 individually verified values, and the **independently
-computed SHA-256** expected from the fixed Metal kernel. The probe file is
-hashed before and after the subprocess call and the result parser requires a
-bounded JSON response. Any compiler, platform, synchronization, digest, or
-backend failure returns **unqualified**; none of these paths change macOS
-swap, SIP, GPU firmware, or installed model weights.
+The native source is `scripts/qualify_metal_shared.swift`; the Python
+validation is `_validated_shared_fence_receipt` in
+`skeleton/app/offline_metal_qualification.py`. The Swift process runs
+without shell interpolation, with its stdout held in a private temporary
+file and read at a fixed 8193-byte limit. A 180-second process timeout,
+strict schema, checked output digest and source hash before/after execution
+provide bounded failure behavior. macOS swap, SIP, GPU firmware and weights
+are not altered.
 
-**Scope separation:** Successfully running this standalone probe demonstrates
-that the *probe's* shared Metal buffers were coherent after the observed
-command completions. It is not evidence that the separate pinned llama.cpp
-process synchronized, migrated or paged any actual model tensor or KV-cache
-allocation. The local GGUF qualification keeps
+**Scope separation:** This qualifies only the *probe's* real GPU buffer
+handoffs, event signaling and command completions. It does not attach an
+event, a buffer or a fence to the separate llama.cpp inference process.
+Its model-scoped receipt fields remain
 `driver_coherency_verified: false`,
-`metal_event_fence_verified: false`, and
-`device_tensor_migration_verified: false`. The standalone proof is saved
-under a separate `shared_buffer_fence` field and must not override those
-model-scoped qualification claims.
+`metal_event_fence_verified: false`,
+`device_tensor_migration_verified: false`.
+The independent probe evidence is nested under `shared_buffer_fence` and
+must not be interpreted as model-specific KV synchronization. Actual M-series
+hardware runs, native inference integration and process-failure recovery
+are still required for release qualification.
 
-Native KV diagnostic observations are now additionally associated with
-the exact `execution_receipt_digest` from the completed model inference,
-rather than relying on a mutable "last request" diagnostic. The bounded
-in-memory receipt map avoids confusing two overlapping local generations.
-Missing or evicted evidence fails closed.
+Native KV diagnostic observations are bound by exact
+`execution_receipt_digest` to avoid mixing the evidence from concurrent
+local requests. Missing or evicted evidence fails closed.
