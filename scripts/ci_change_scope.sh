@@ -30,13 +30,18 @@ if [ "${EVENT_NAME:-}" != "pull_request" ] || ! git rev-parse --verify -q HEAD^2
 fi
 
 changed="$(git diff --name-only HEAD^1 HEAD)"
-if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/(ci|merge-readiness)\.yml|\.github/ci/|pyproject\.toml|requirements[^/]*\.txt)'; then
+# An empty or unexpectedly nonmatching merge diff must never suppress gates.
+if [ -z "$changed" ]; then
+  all
+  exit 0
+fi
+if grep -Eq '^(\.github/workflows/(ci|merge-readiness)\.yml|\.github/ci/|pyproject\.toml|requirements[^/]*\.txt)' <<< "$changed"; then
   all
   exit 0
 fi
 
 has() {
-  if printf '%s\n' "$changed" | grep -Eq "$1"; then
+  if grep -Eq "$1" <<< "$changed"; then
     echo true
   else
     echo false

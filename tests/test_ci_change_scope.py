@@ -115,6 +115,47 @@ def test_frontend_ingress_changes_run_docker_regression(tmp_path: Path, changed_
     }
 
 
+def test_large_pr_merge_does_not_drop_scoped_checks_on_broken_pipe(tmp_path: Path) -> None:
+    """Over 4,000 changed paths must not turn true gates into false skips."""
+    repo = tmp_path / "repo"
+    _init(repo)
+    _git(repo, "checkout", "-b", "feature")
+    frontend = repo / "frontend" / "generated"
+    frontend.mkdir(parents=True)
+    for index in range(4_096):
+        (frontend / f"long_generated_source_file_{index:05d}.tsx").write_text(
+            "export const ready = true;\\n", encoding="utf-8"
+        )
+    backend = repo / "backend"
+    backend.mkdir()
+    (backend / "contract.py").write_text("READY = True\\n", encoding="utf-8")
+    skeleton = repo / "skeleton"
+    skeleton.mkdir()
+    (skeleton / "contract.py").write_text("READY = True\\n", encoding="utf-8")
+    _git(repo, "add", "--all")
+    _git(repo, "commit", "-m", "large multi-plane change")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature", "-m", "merge large change")
+    assert _scope(repo, "pull_request") == {
+        "frontend": "true",
+        "backend": "true",
+        "python": "true",
+        "docker": "false",
+    }
+
+
+def test_empty_merge_diff_fails_closed_to_every_lane(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init(repo)
+    _git(repo, "checkout", "-b", "feature")
+    (repo / "README.md").write_text("new intent\\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-m", "feature")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "-s", "ours", "feature", "-m", "empty-result merge")
+    assert set(_scope(repo, "pull_request").values()) == {"true"}
+
+
 def test_reusable_ci_calls_the_shared_scope_script_once() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "bash scripts/ci_change_scope.sh" in ci
