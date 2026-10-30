@@ -49,3 +49,10 @@ def test_walkable_browser_renders_real_hazards_and_source_health():
     assert b"hazards_by_stage" in data
     assert b"playerHealth--" in data
     assert b"Character defeated by hazard contact" in data
+
+def test_walkable_csp_hashes_rendered_program_and_source_without_unsafe_inline():
+    docs=read_blueprint("studio_arena_fighting_glacial_fjord")
+    html=render_playable_world_html(docs)
+    assert b"'unsafe-inline'" not in html
+    assert html.count(b"'sha256-")>=3
+    assert b"form-action 'none'" in html
