@@ -30,7 +30,7 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(missing, [], "masterplan references missing workflows")
 
     def test_auxiliary_admissions_are_manual_only(self):
-        """Keep the 20-trigger cap without dropping required security gates."""
+        """Keep owner-only recovery without an arbitrary CI lane ceiling."""
         for name in ("historical-zero-job-canary.yml", "local-ai-boilerplate.yml"):
             source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
             self.assertEqual(events(source), {"workflow_dispatch"}, name)
@@ -96,9 +96,8 @@ class WorkflowTierTests(unittest.TestCase):
                     "    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
                     encoding="utf-8",
                 )
-            self.assertTrue(
-                any("unexpected active workflow count" in item for item in audit(root))
-            )
+            # Valid additional workflows no longer fail on a numeric cap.
+            self.assertEqual(audit(root), [])
             for index in range(10):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
             name = registry["specialized_manual_only"][0]

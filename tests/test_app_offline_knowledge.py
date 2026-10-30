@@ -12,7 +12,7 @@ import unittest
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
 from skeleton.app.offline_knowledge import (
-    MAX_DOCUMENT_BYTES, OfflineKnowledgeLibrary,
+    OfflineKnowledgeLibrary, read_reference_file,
 )
 
 
@@ -81,7 +81,6 @@ class OfflineKnowledgeLibraryTests(unittest.TestCase):
             ("nul\x00file", "Good searchable text"),
             ("title", "data\x00bad"),
             ("x" * 201, "Valid searchable text"),
-            ("title", "z" * (MAX_DOCUMENT_BYTES + 1)),
             ("title", "   "),
             ("title", "A!" * 50),
         ]:
@@ -206,17 +205,22 @@ class OfflineKnowledgeLibraryTests(unittest.TestCase):
         self.assertEqual(doc["sha256"], same["sha256"])
         self.assertEqual(doc["document_id"], same["document_id"])
 
-    def test_library_cap_enforced_before_transaction_writes(self):
-        # Use the real bounded admission logic against an artificially
-        # lowered configured cap; no large fixture generation required.
+    def test_local_library_has_no_legacy_document_quota(self):
         from unittest.mock import patch
         self.library.add_text("One", "CPU vector instruction scheduling.")
         with patch("skeleton.app.offline_knowledge.MAX_DOCUMENTS_PER_MODEL", 1):
-            with self.assertRaisesRegex(RuntimeContractError, "at capacity"):
-                self.library.add_text(
-                    "Two", "GPU asynchronous compute dispatches."
-                )
-        self.assertEqual(len(self.library.list_documents()), 1)
+            self.library.add_text("Two", "GPU asynchronous compute dispatches.")
+        self.assertEqual(len(self.library.list_documents()), 2)
+
+    def test_large_local_reference_file_can_be_indexed(self):
+        source = Path(self.temp.name) / "reference.txt"
+        content = ("Hardware rasterizer pixel traversal. " * 2600) + " rarefinalmarker."
+        source.write_text(content, encoding="utf-8")
+        self.assertGreater(source.stat().st_size, 65_536)
+        self.assertEqual(read_reference_file(source), content)
+        added = self.library.add_text("Large local source", read_reference_file(source))
+        self.assertGreater(added["chunk_count"], 160)
+        self.assertTrue(self.library.search("rarefinalmarker"))
 
     def test_chunking_preserves_source_offsets_and_document_sha(self):
         content = (

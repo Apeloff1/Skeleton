@@ -3,11 +3,12 @@
 This implements *searchable evidence retrieval*, not a claim that arbitrary
 generated model text is grounded. It deliberately never downloads, crawls,
 executes, follows stored file paths or interprets stored text as instructions.
-Explicit operator-selected files use bounded regular-file admission.
+Explicit operator-selected files use safe, no-follow regular-file admission.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+import codecs
 from hashlib import sha256
 import math
 import os
@@ -21,15 +22,16 @@ from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
 
 
-MAX_DOCUMENT_BYTES = 65_536
+# Legacy symbolic names remain importable. None means no public-service quota.
+MAX_DOCUMENT_BYTES = None
 MAX_TITLE_BYTES = 200
-MAX_DOCUMENTS_PER_MODEL = 256
-MAX_CHUNKS_PER_MODEL = 4_096
+MAX_DOCUMENTS_PER_MODEL = None
+MAX_CHUNKS_PER_MODEL = None
 MAX_SEARCH_TOKENS = 24
 MAX_QUERY_BYTES = 1_024
 _CHUNK_CHARS = 600
 _CHUNK_OVERLAP = 80
-_MAX_DOC_CHUNKS = 160
+_MAX_DOC_CHUNKS = None
 _TERMS = re.compile(r"[^\W_]{2,}", re.UNICODE)
 _STOP = frozenset({
     "the", "and", "are", "for", "that", "this", "with", "from", "into",
@@ -41,7 +43,7 @@ _STOP = frozenset({
 
 
 def read_reference_file(path: Path) -> str:
-    """Read one bounded local UTF-8 file through a stable regular-file handle.
+    """Read UTF-8 through a stable regular-file handle without a size cap.
 
     Inspect the path both before and after opening, bind the opened file to
     that identity, and reject any replacement or in-place change during read.
@@ -67,9 +69,20 @@ def read_reference_file(path: Path) -> str:
                     or (opened.st_dev, opened.st_ino) !=
                     (before.st_dev, before.st_ino)):
                 raise RuntimeContractError("reference changed during file admission")
-            if not 1 <= opened.st_size <= MAX_DOCUMENT_BYTES:
-                raise RuntimeContractError("reference file exceeds the 64 KiB limit")
-            payload = source.read(MAX_DOCUMENT_BYTES + 1)
+            if opened.st_size < 1:
+                raise RuntimeContractError("reference file is empty")
+            decoder = codecs.getincrementaldecoder("utf-8")("strict")
+            parts: list[str] = []
+            byte_count = 0
+            try:
+                while data := source.read(256 * 1024):
+                    if b"\x00" in data:
+                        raise RuntimeContractError("binary reference content is prohibited")
+                    byte_count += len(data)
+                    parts.append(decoder.decode(data))
+                parts.append(decoder.decode(b"", final=True))
+            except UnicodeError as exc:
+                raise RuntimeContractError("reference must be UTF-8 text") from exc
             after = os.fstat(source.fileno())
             current = path.lstat()
             if (not stat.S_ISREG(current.st_mode)
@@ -82,15 +95,9 @@ def read_reference_file(path: Path) -> str:
         if isinstance(exc, RuntimeContractError):
             raise
         raise RuntimeContractError("reference path is not a readable regular file") from exc
-    if not 1 <= len(payload) <= MAX_DOCUMENT_BYTES or len(payload) != opened.st_size:
-        raise RuntimeContractError("reference changed or exceeded size budget")
-    try:
-        text = payload.decode("utf-8", errors="strict")
-    except UnicodeError as exc:
-        raise RuntimeContractError("reference must be UTF-8 text") from exc
-    if "\x00" in text:
-        raise RuntimeContractError("binary reference content is prohibited")
-    return text
+    if byte_count != opened.st_size:
+        raise RuntimeContractError("reference changed during file admission")
+    return "".join(parts)
 
 def _identity(value: str, label: str) -> str:
     if (not isinstance(value, str) or len(value) != 64
@@ -132,7 +139,7 @@ class LocalKnowledgeHit:
 
 
 class OfflineKnowledgeLibrary:
-    """Bounded model-scoped documents stored in the existing local SQLite DB."""
+    """Model-scoped documents stored in the existing local SQLite DB."""
 
     def __init__(self, store: OfflineChatStore, model_digest: str,
                  tokenizer_digest: str) -> None:
@@ -174,8 +181,6 @@ class OfflineKnowledgeLibrary:
         if not isinstance(content, str) or not content.strip() or "\x00" in content:
             raise RuntimeContractError("reference document must be nonempty text")
         payload = content.encode("utf-8")
-        if len(payload) > MAX_DOCUMENT_BYTES:
-            raise RuntimeContractError("reference document exceeds 64 KiB")
         return payload
 
     @staticmethod
@@ -191,8 +196,6 @@ class OfflineKnowledgeLibrary:
             if end <= start:
                 raise RuntimeContractError("invalid reference chunk boundary")
             rows.append((start, end, content[start:end]))
-            if len(rows) > _MAX_DOC_CHUNKS:
-                raise RuntimeContractError("reference document chunk budget exceeded")
             if end == len(content):
                 break
             start = max(start + 1, end - _CHUNK_OVERLAP)
@@ -222,16 +225,8 @@ class OfflineKnowledgeLibrary:
                     "document_id": row[0], "title": row[1], "sha256": digest,
                     "chunk_count": len(pieces), "reused": True,
                 }
-            doc_count, chunk_count = self.store._db.execute(
-                "SELECT COUNT(*), COALESCE(SUM(("
-                "SELECT COUNT(*) FROM offline_document_chunks c "
-                "WHERE c.document_id=d.document_id)), 0) "
-                "FROM offline_documents d WHERE model_digest=? AND tokenizer_digest=?",
-                (self.model_digest, self.tokenizer_digest),
-            ).fetchone()
-            if (doc_count >= MAX_DOCUMENTS_PER_MODEL
-                    or chunk_count + len(pieces) > MAX_CHUNKS_PER_MODEL):
-                raise RuntimeContractError("local reference library is at capacity")
+            # Local document and chunk counts follow available storage, not
+            # hardcoded public-hosting quotas. Database errors roll back.
             doc_id = secrets.token_urlsafe(18)
             self.store._db.execute(
                 "INSERT INTO offline_documents VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -278,9 +273,6 @@ class OfflineKnowledgeLibrary:
             finally:
                 if own_snapshot:
                     self.store._db.execute("ROLLBACK")
-        if (len(documents) > MAX_DOCUMENTS_PER_MODEL
-                or len(chunks) > MAX_CHUNKS_PER_MODEL):
-            raise RuntimeContractError("local reference index is beyond its budget")
         by_document: dict[str, list[tuple[Any, ...]]] = {}
         for chunk in chunks:
             by_document.setdefault(chunk[0], []).append(chunk)

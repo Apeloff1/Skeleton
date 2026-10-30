@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the small active CI set against archived specialized qualifications.
+"""Validate required CI gates against archived specialized qualifications.
 
 Archive files deliberately do not run on GitHub Actions; restoring an archived
 workflow to .github/workflows is a separate reviewed operation.
@@ -70,9 +70,8 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # Signed evidence workflows may sit beside the compact PR set when they
-    # cannot run automatically. Only non-manual triggers consume the cap.
-    automatic = 0
+    # Parse every active workflow, but impose no fixed admission count.
+    # Required PR/security gates and archived specializations remain checked.
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -81,10 +80,6 @@ def audit(root: Path = ROOT) -> list[str]:
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
-        if independently_triggered(found):
-            automatic += 1
-    if automatic > 20:
-        failures.append(f"unexpected active workflow count: {automatic}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():

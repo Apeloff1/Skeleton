@@ -8,25 +8,27 @@ parses active formats, or asks a model to classify indexed text.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import codecs
 import hashlib
+import io
 import os
 from pathlib import Path
 import re
 import sqlite3
 import stat
 import threading
-from typing import Callable
+from typing import Callable, Iterator
 
 from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
 SCHEMA = "skeleton.app.offline_library.v1"
-MAX_FILES = 2000
-MAX_DOCUMENT_BYTES = 128 * 1024
-MAX_TOTAL_BYTES = 32 * 1024 * 1024
-# Aggregate storage bounds also apply across separately imported directories.
-MAX_LIBRARY_FILES = 10000
-MAX_LIBRARY_BYTES = 128 * 1024 * 1024
+# Retired compatibility names: local capacity follows hardware and disk space.
+MAX_FILES = None
+MAX_DOCUMENT_BYTES = None
+MAX_TOTAL_BYTES = None
+MAX_LIBRARY_FILES = None
+MAX_LIBRARY_BYTES = None
 EXTENSIONS = frozenset({".txt", ".md", ".markdown", ".rst", ".py", ".json", ".jsonl", ".csv", ".toml", ".yaml", ".yml"})
 SKIP_DIRS = frozenset({".git", ".svn", ".hg", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cache", ".pytest_cache"})
 
@@ -66,7 +68,7 @@ def _read_document(
     *,
     root: Path | None = None,
 ) -> tuple[str, str, int]:
-    """Read bounded bytes without following a swapped parent-directory link.
+    """Stream UTF-8 without a fixed size cap or swapped parent-directory link.
 
     On POSIX the root is opened first, then each relative directory is
     traversed with O_DIRECTORY | O_NOFOLLOW via dir_fd. The final document
@@ -107,26 +109,38 @@ def _read_document(
         with os.fdopen(fd, "rb") as handle:
             fd = None
             info = os.fstat(handle.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_DOCUMENT_BYTES:
-                raise OfflineLibraryError("document is not a bounded regular file")
-            raw = handle.read(MAX_DOCUMENT_BYTES + 1)
+            if not stat.S_ISREG(info.st_mode):
+                raise OfflineLibraryError("document is not a regular file")
+            digest = hashlib.sha256()
+            decoder = codecs.getincrementaldecoder("utf-8")("strict")
+            text = io.StringIO()
+            byte_count = 0
+            try:
+                while chunk := handle.read(256 * 1024):
+                    if b"\x00" in chunk:
+                        raise OfflineLibraryError("binary local document is unsupported")
+                    digest.update(chunk)
+                    byte_count += len(chunk)
+                    text.write(decoder.decode(chunk))
+                text.write(decoder.decode(b"", final=True))
+            except UnicodeError as exc:
+                raise OfflineLibraryError("selected document is not UTF-8 text") from exc
+            after = os.fstat(handle.fileno())
+            if (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) != (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+            ) or byte_count != info.st_size:
+                raise OfflineLibraryError("local document changed during indexing")
+            body = text.getvalue()
     except OSError as exc:
         raise OfflineLibraryError("cannot read selected local document safely") from exc
     finally:
         if fd is not None:
             os.close(fd)
-    if len(raw) > MAX_DOCUMENT_BYTES or b"\x00" in raw:
-        raise OfflineLibraryError("unsupported binary or oversized local document")
-    try:
-        body = raw.decode("utf-8", "strict")
-    except UnicodeError as exc:
-        raise OfflineLibraryError("selected document is not UTF-8 text") from exc
-    return body, hashlib.sha256(raw).hexdigest(), len(raw)
+    return body, digest.hexdigest(), byte_count
 
 
-def _files(directory: Path) -> list[tuple[str, str, str, int]]:
-    staged: list[tuple[str, str, str, int]] = []
-    budget = 0
+def _files(directory: Path) -> Iterator[tuple[str, str, str, int]]:
+    """Yield one safely opened document at a time; no corpus-wide staging."""
     for parent, dirs, names in os.walk(directory, followlinks=False):
         dirs[:] = sorted(
             name for name in dirs if name not in SKIP_DIRS and not name.startswith(".")
@@ -146,11 +160,7 @@ def _files(directory: Path) -> list[tuple[str, str, str, int]]:
             if len(relative) > 500:
                 raise OfflineLibraryError("document relative path exceeds safety budget")
             body, digest, byte_count = _read_document(path, root=directory)
-            budget += byte_count
-            if budget > MAX_TOTAL_BYTES or len(staged) >= MAX_FILES:
-                raise OfflineLibraryError("indexed corpus exceeds offline budget")
-            staged.append((relative, digest, body, byte_count))
-    return staged
+            yield (relative, digest, body, byte_count)
 
 
 def _terms(query: str) -> tuple[str, ...]:
@@ -241,8 +251,10 @@ class OfflineDocumentLibrary:
         worker with an expired/reclaimed lease from publishing stale results.
         """
         root = str(_root(directory))
-        staged = _files(Path(root))  # Finish validation before mutating SQLite.
-        seen = {item[0] for item in staged}
+        # Scanning inside BEGIN IMMEDIATE preserves all-or-nothing publication.
+        seen: set[str] = set()
+        indexed_files = 0
+        indexed_bytes = 0
         changed = 0
         removed = 0
         with self._lock:
@@ -253,7 +265,10 @@ class OfflineDocumentLibrary:
                     (root,),
                 ).fetchall()
                 previous = {relative: (docid, digest) for docid, relative, digest in records}
-                for relative, digest, body, size in staged:
+                for relative, digest, body, size in _files(Path(root)):
+                    seen.add(relative)
+                    indexed_files += 1
+                    indexed_bytes += size
                     old = previous.get(relative)
                     if old is not None and old[1] == digest:
                         # A digest match alone is insufficient after a
@@ -314,17 +329,8 @@ class OfflineDocumentLibrary:
                         "DELETE FROM offline_document_fts WHERE rowid=?",
                         (orphan_id,),
                     )
-                total = self._db.execute(
-                    "SELECT COUNT(*), COALESCE(SUM(size_bytes),0) "
-                    "FROM offline_documents"
-                ).fetchone()
-                if (
-                    total[0] > MAX_LIBRARY_FILES
-                    or total[1] > MAX_LIBRARY_BYTES
-                ):
-                    raise OfflineLibraryError(
-                        "aggregate local knowledge library exceeds admitted size limits"
-                    )
+                # Actual SQLite/filesystem exhaustion still aborts atomically.
+                # No artificial per-directory or aggregate corpus quota.
                 if before_commit is not None:
                     before_commit()
                 self._db.execute("COMMIT")
@@ -333,11 +339,11 @@ class OfflineDocumentLibrary:
                 raise
         return {
             "schema_version": SCHEMA,
-            "indexed_files": len(staged),
+            "indexed_files": indexed_files,
             "updated_files": changed,
             "removed_files": removed,
             "repaired_orphan_fts_rows": len(orphans),
-            "indexed_bytes": sum(item[3] for item in staged),
+            "indexed_bytes": indexed_bytes,
         }
 
     def search(self, query: str, *, limit: int = 5) -> tuple[LibraryHit, ...]:
