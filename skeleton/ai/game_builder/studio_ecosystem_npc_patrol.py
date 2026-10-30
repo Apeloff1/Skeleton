@@ -25,44 +25,44 @@ def cast_patrols(documents: Mapping[str, Any]) -> dict[str,object]:
         raise StudioQuestError("missing original NPC cast")
     unique=set()
     actors=[]
-    rows=world["maps"][0]
-    reachable={tuple(world["spawn"])}
-    queue=deque(reachable)
-    while queue:
-        x,y=queue.popleft()
-        for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1)):
-            if (0<=nx<world["width"] and 0<=ny<world["height"] and
-                    rows[ny][nx]=="." and (nx,ny) not in reachable):
-                reachable.add((nx,ny));queue.append((nx,ny))
     tx,ty=world["target"]
     spawn=tuple(world["spawn"])
-    candidates=sorted((x,y) for x,y in reachable
-                      if (x,y)!=spawn and abs(x-tx)+abs(y-ty)>1)
-    if len(candidates)<2:
-        raise StudioQuestError("insufficient reachable NPC patrol surface")
     for actor in support:
         if not isinstance(actor,dict):
             raise StudioQuestError("invalid NPC cast entry")
-        aid=actor.get("id")
-        name=actor.get("name")
-        knows=actor.get("knows")
+        aid,name,knows=actor.get("id"),actor.get("name"),actor.get("knows")
         if (not isinstance(aid,str) or not aid or aid in unique
                 or not isinstance(name,str) or not name
                 or not isinstance(knows,str) or not knows
                 or max(len(aid),len(name),len(knows))>1024):
-            raise StudioQuestError("unqualified original NPC identity or knowledge")
+            raise StudioQuestError("invalid original NPC identity or knowledge")
         unique.add(aid)
-        seed=sha256((world["source_digest"]+aid).encode("utf-8")).digest()
-        start=candidates[int.from_bytes(seed[:4],"big")%len(candidates)]
-        adjacent=sorted((nx,ny) for nx,ny in (
-            (start[0]+1,start[1]),(start[0]-1,start[1]),
-            (start[0],start[1]+1),(start[0],start[1]-1)
-        ) if (nx,ny) in reachable)
-        if not adjacent:
-            raise StudioQuestError("NPC patrol cannot move between legal cells")
-        end=adjacent[int.from_bytes(seed[4:8],"big")%len(adjacent)]
+        patrols=[]
+        for scene_index,rows in enumerate(world["maps"]):
+            reachable={spawn}
+            queue=deque([spawn])
+            while queue:
+                x,y=queue.popleft()
+                for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1)):
+                    if (0<=nx<world["width"] and 0<=ny<world["height"]
+                            and rows[ny][nx]=="." and (nx,ny) not in reachable):
+                        reachable.add((nx,ny));queue.append((nx,ny))
+            candidates=sorted((x,y) for x,y in reachable
+                              if (x,y)!=spawn and abs(x-tx)+abs(y-ty)>1)
+            if len(candidates)<2:
+                raise StudioQuestError("insufficient reachable NPC patrol surface")
+            seed=sha256((world["source_digest"]+aid+str(scene_index)).encode("utf-8")).digest()
+            start=candidates[int.from_bytes(seed[:4],"big")%len(candidates)]
+            adjacent=sorted((nx,ny) for nx,ny in (
+                (start[0]+1,start[1]),(start[0]-1,start[1]),
+                (start[0],start[1]+1),(start[0],start[1]-1)
+            ) if (nx,ny) in reachable)
+            if not adjacent:
+                raise StudioQuestError("NPC patrol cannot reach adjacent cells")
+            end=adjacent[int.from_bytes(seed[4:8],"big")%len(adjacent)]
+            patrols.append([list(start),list(end)])
         actors.append({"id":aid,"name":name,"knows":knows,
-                       "patrol":[list(start),list(end)]})
+                       "patrol":patrols[0],"patrol_by_stage":patrols})
     return {"schema":"skeleton.game_builder.source_npc_patrol.v1",
             "project_id":world["project_id"],
             "source_digest":world["source_digest"],
@@ -73,7 +73,8 @@ def cast_patrols(documents: Mapping[str, Any]) -> dict[str,object]:
 
 def inspect_npc_contact(documents: Mapping[str, Any], *,
                         npc_id: str, player_position: tuple[int,int],
-                        accepted_moves: int, authorized: bool) -> dict[str,object]:
+                        accepted_moves: int, scene_index: int = 0,
+                        authorized: bool) -> dict[str,object]:
     if not authorized:
         raise PermissionError("NPC contact requires operator authorization")
     if (not isinstance(player_position,tuple) or len(player_position)!=2
@@ -84,7 +85,9 @@ def inspect_npc_contact(documents: Mapping[str, Any], *,
     actor=next((x for x in actors["actors"] if x["id"]==npc_id),None)
     if actor is None:
         raise StudioQuestError("unregistered NPC")
-    position=actor["patrol"][accepted_moves%2]
+    if type(scene_index) is not int or not 0<=scene_index<len(actor["patrol_by_stage"]):
+        raise StudioQuestError("invalid authored NPC scene")
+    position=actor["patrol_by_stage"][scene_index][accepted_moves%2]
     if (abs(player_position[0]-position[0])+
             abs(player_position[1]-position[1])>1):
         raise StudioQuestError("NPC is not within conversation proximity")

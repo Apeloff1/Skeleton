@@ -72,7 +72,7 @@ function draw(){
    }
  }
  for(const actor of world.actors){
-   const [ax,ay]=actor.patrol[steps%2];
+   const [ax,ay]=actor.patrol_by_stage[stageIndex][steps%2];
    ctx.fillStyle="#9b8ee1";
    ctx.beginPath();ctx.arc(ax*40+20,ay*40+20,10,0,Math.PI*2);ctx.fill();
  }
@@ -93,7 +93,7 @@ function draw(){
  }
  choicesEl.replaceChildren();
  for(const actor of world.actors){
-   const [ax,ay]=actor.patrol[steps%2];
+   const [ax,ay]=actor.patrol_by_stage[stageIndex][steps%2];
    if(Math.abs(ax-player.x)+Math.abs(ay-player.y)<=1){
      const talk=text("button","Talk to "+actor.name);
      talk.type="button";

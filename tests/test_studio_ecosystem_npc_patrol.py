@@ -30,3 +30,19 @@ def test_real_original_cast_patrols_are_reachable_and_repeatable(pid):
     with pytest.raises(StudioQuestError):
         inspect_npc_contact(docs,npc_id="no-one",
                             player_position=(1,1),accepted_moves=0,authorized=True)
+
+def test_npcs_remain_on_reachable_terrain_in_every_authored_scene():
+    docs=read_blueprint("studio_arena_fighting_glacial_fjord")
+    world=playable_world_source(docs)
+    cast=cast_patrols(docs)
+    for actor in cast["actors"]:
+        assert len(actor["patrol_by_stage"])==len(world["maps"])
+        for index,patrol in enumerate(actor["patrol_by_stage"]):
+            for x,y in patrol:
+                assert world["maps"][index][y][x]=="."
+    actor=cast["actors"][0]
+    loc=tuple(actor["patrol_by_stage"][2][0])
+    receipt=inspect_npc_contact(docs,npc_id=actor["id"],
+                                player_position=loc,accepted_moves=0,
+                                scene_index=2,authorized=True)
+    assert receipt["local_contact_available"]
