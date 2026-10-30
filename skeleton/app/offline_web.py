@@ -87,6 +87,9 @@ HTML = r"""<!doctype html>
         <label for="longform-grant"><input id="longform-grant" type="checkbox">
           I approve this exact private disk-backed import</label>
         <button id="longform-ingest" class="secondary" disabled>Stage long-form source</button>
+        <label for="longform-import-id">Import receipt ID (copy to recover after disconnect)</label>
+        <input id="longform-import-id" type="text" autocomplete="off" spellcheck="false">
+        <button id="longform-import-restore" class="secondary" disabled>Recover committed import</button>
         <label for="longform-search">Search staged long-form pages</label>
         <input id="longform-search" type="search" autocomplete="off">
         <button id="longform-query" class="secondary" disabled>Retrieve verified passages</button>
@@ -184,6 +187,7 @@ JAVASCRIPT = r"""'use strict';
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
+    longformImportPending: null,
   };
   async function refreshResources() {
     if (!state.connected || !state.token) return;
@@ -248,6 +252,7 @@ JAVASCRIPT = r"""'use strict';
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
     get('longform-ingest').disabled = locked || state.busy;
+    get('longform-import-restore').disabled = locked || state.busy;
     get('longform-query').disabled = locked || state.busy || !state.longformSourceId;
     get('longform-work-start').disabled = locked || state.busy || !state.longformSourceId;
     get('longform-work-resume').disabled = locked || state.busy;
@@ -288,6 +293,8 @@ JAVASCRIPT = r"""'use strict';
     state.longformSourceId = null;
     state.longformWork = null;
     state.longformPendingRequest = null;
+    state.longformImportPending = null;
+    get('longform-import-id').value = '';
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
@@ -323,7 +330,10 @@ JAVASCRIPT = r"""'use strict';
     const timeout = new AbortController();
     const cancel = () => timeout.abort();
     network.signal.addEventListener('abort', cancel, {once: true});
-    const timer = setTimeout(cancel, 15000);
+    // Long file ingestion may stream for hours. Abort only on an explicit
+    // workspace lock; the durable import ID allows post-disconnect recovery.
+    const timer = path === '/v1/resources/longform/ingest' ? null :
+      setTimeout(cancel, 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -342,7 +352,7 @@ JAVASCRIPT = r"""'use strict';
       if (error.name === 'AbortError') throw new Error('The connection timed out. The server may still be working.');
       throw error;
     } finally {
-      clearTimeout(timer);
+      if (timer !== null) clearTimeout(timer);
       network.signal.removeEventListener('abort', cancel);
     }
   }
@@ -652,8 +662,21 @@ JAVASCRIPT = r"""'use strict';
     const root = get('longform-root').value.trim();
     const relative_path = get('longform-relative').value.trim();
     if (!root || !relative_path) throw new Error('Choose the selected root and filename.');
+    let pending = state.longformImportPending;
+    if (pending && (pending.root !== root || pending.relative_path !== relative_path)) {
+      throw new Error('Recover the previous import ID before selecting a different source.');
+    }
+    if (!pending) {
+      const request_id = Array.from(crypto.getRandomValues(new Uint8Array(24)),
+        n => n.toString(16).padStart(2, '0')).join('');
+      pending = {root, relative_path, request_id};
+      state.longformImportPending = pending;
+    }
+    get('longform-import-id').value = pending.request_id;
+    get('longform-status').textContent = 'Private import running or awaiting recovery…';
     const receipt = await api('POST', '/v1/resources/longform/ingest',
-      {root, relative_path, approved: true});
+      {...pending, approved: true});
+    state.longformImportPending = null;
     state.longformSourceId = receipt.source_id;
     get('longform-grant').checked = false;
     get('longform-status').textContent =
@@ -661,6 +684,17 @@ JAVASCRIPT = r"""'use strict';
       '…\nBytes: ' + receipt.source_bytes +
       '\nPages: ' + receipt.page_count +
       '\nDisk payload: ' + receipt.stored_payload_bytes;
+    updateControls();
+  }));
+  get('longform-import-restore').addEventListener('click', () => run(async () => {
+    const source_id = get('longform-import-id').value.trim();
+    if (!/^[0-9a-f]{48}$/.test(source_id)) throw new Error('Enter an exact import ID.');
+    const receipt = await api('POST', '/v1/resources/longform/source-status', {source_id});
+    state.longformSourceId = receipt.source_id;
+    state.longformImportPending = null;
+    get('longform-status').textContent =
+      'Committed source recovered: ' + receipt.source_sha256.slice(0, 20) +
+      '…\nBytes: ' + receipt.source_bytes + '\nPages: ' + receipt.page_count;
     updateControls();
   }));
   get('longform-query').addEventListener('click', () => run(async () => {
