@@ -96,3 +96,16 @@ def test_crash_recovery_fences_old_worker_token_and_attempt(tmp_path):
     restarted.submit("source-canon",worker="workerB",token="fresh",
                      artifact_sha256="b"*64,authorized=True)
     assert restarted.verify_events()["events"]==4
+
+def test_rejected_submission_clears_stale_hash_and_requeues(tmp_path):
+    root,graph=_owner(tmp_path)
+    s=WorkJournal(root,graph,authorized=True)
+    s.claim("source-canon",worker="maker",token="old",authorized=True)
+    s.submit("source-canon",worker="maker",token="old",
+             artifact_sha256="b"*64,authorized=True)
+    s.review("source-canon",reviewer="reviewer",accepted=False,authorized=True)
+    row=s.snapshot()["tasks"]["source-canon"]
+    assert row["status"]=="pending"
+    assert row["submitted_sha"] is None
+    s.claim("source-canon",worker="maker",token="fresh",authorized=True)
+    assert s.snapshot()["tasks"]["source-canon"]["attempt"]==2
