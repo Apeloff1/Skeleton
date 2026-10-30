@@ -1,5 +1,4 @@
 from copy import deepcopy
-from hashlib import sha256
 import json
 import re
 import pytest

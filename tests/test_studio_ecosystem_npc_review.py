@@ -31,3 +31,39 @@ def test_npc_dialogue_log_does_not_claim_release():
     assert npc["knows"] and source.source_digest
     with pytest.raises(PermissionError):
         review_npc_dialogue_log(docs,_body(docs,[]),authorized=False)
+
+
+def test_actual_reachable_original_npc_contact_is_independently_verified():
+    from collections import deque
+    from skeleton.ai.game_builder.studio_ecosystem_walkable import playable_world_source
+    from skeleton.ai.game_builder.studio_ecosystem_walk_replay import DIRECTIONS
+    docs=read_blueprint("studio_arena_fighting_glacial_fjord")
+    actor=cast_patrols(docs)["actors"][0]
+    world=playable_world_source(docs)
+    rows=world["maps"][0]
+    start=(1,1,0)
+    queue=deque([start])
+    seen={start:[]}
+    found=None
+    while queue:
+        x,y,phase=queue.popleft()
+        nx,ny=actor["patrol_by_stage"][0][phase]
+        if abs(x-nx)+abs(y-ny)<=1:
+            found=seen[(x,y,phase)]
+            break
+        for direction,(dx,dy) in DIRECTIONS.items():
+            px,py=x+dx,y+dy
+            state=(px,py,1-phase)
+            if (0<=px<world["width"] and 0<=py<world["height"]
+                    and rows[py][px]=="." and state not in seen):
+                seen[state]=seen[(x,y,phase)]+[["move",direction]]
+                queue.append(state)
+    assert found is not None
+    body=_body(docs,[{"id":actor["id"],"event_cursor":len(found)}],found)
+    reviewed=review_npc_dialogue_log(docs,body,authorized=True)
+    assert reviewed["local_contacts_verified"]==1
+    assert reviewed["contacts"][0]["authored_knowledge"]==actor["knows"]
+    duplicate=json.loads(body)
+    duplicate["contacts"].append(duplicate["contacts"][0])
+    with pytest.raises(StudioQuestError):
+        review_npc_dialogue_log(docs,json.dumps(duplicate).encode(),authorized=True)
