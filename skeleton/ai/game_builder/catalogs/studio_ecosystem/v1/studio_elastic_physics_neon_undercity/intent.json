@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_neon_undercity",
+  "title": "Neon Undercity: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010316470,
+  "width": 25,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 4
+}
