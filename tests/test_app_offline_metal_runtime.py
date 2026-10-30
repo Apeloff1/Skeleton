@@ -14,6 +14,7 @@ from skeleton.app.offline_metal_runtime import (
     plan_metal_llama_launch, require_live_metal_headroom,
 )
 from skeleton.app.offline_resources import LocalResourcePressure
+from skeleton.ai.runtime.inference.local import LocalInferenceRequest
 from skeleton.app.offline_resource_fabric import GPUResource
 from skeleton.app.offline_resources import LocalResourceSnapshot
 
@@ -159,6 +160,30 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
         model._inference_admitted = True
         with self.assertRaisesRegex(LlamaCppRuntimeError, "after admission"):
             model.install_prelaunch_resource_guard(lambda: None)
+
+    def test_inference_preflight_refusal_precedes_model_or_prompt_access(self):
+        """No subprocess, prompt renderer or artifact check runs after a deny."""
+        model = object.__new__(LlamaCppModel)
+        model._process_lock = threading.Lock()
+        model._inference_admitted = False
+        model._resource_preflight_checks = 0
+        def deny():
+            raise LocalResourcePressure("GPU headroom exhausted")
+        model._resource_preflight = deny
+        with patch.object(
+            LlamaCppModel, "_assert_artifacts_stable",
+            side_effect=AssertionError("preflight must run first"),
+        ), patch.object(
+            LlamaCppModel, "_render_prompt",
+            side_effect=AssertionError("prompt must not be rendered"),
+        ):
+            with self.assertRaisesRegex(
+                LocalResourcePressure, "headroom exhausted"
+            ):
+                model.infer(LocalInferenceRequest(prompt="hello"),
+                            threading.Event())
+        self.assertEqual(model._resource_preflight_checks, 1)
+        self.assertTrue(model._inference_admitted)
 
     def test_backend_reconfiguration_is_prelaunch_and_identity_bound(self):
         baseline = configuration()
