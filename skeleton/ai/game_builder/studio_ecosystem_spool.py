@@ -9,6 +9,7 @@ from hashlib import sha256
 import os
 from pathlib import Path
 import shutil
+import stat
 import tempfile
 from typing import Iterable
 
@@ -74,22 +75,39 @@ class ArtifactSpool:
         finally:
             temp.unlink(missing_ok=True)
 
-    def verify(self, fingerprint: str) -> int:
+    def _read_verified(self, fingerprint: str, *, offset: int,
+                       length: int | None) -> tuple[int, bytes]:
+        """Hash and read one open descriptor, rejecting pathname races."""
         target=self._target(fingerprint)
-        if target.is_symlink() or not target.is_file():
-            raise StudioQuestError("missing or linked spool object")
-        flags=os.O_RDONLY
-        if hasattr(os,"O_NOFOLLOW"):
-            flags|=os.O_NOFOLLOW
+        flags=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)
         h=sha256()
         total=0
+        selected=bytearray()
         with os.fdopen(os.open(target,flags),"rb") as stream:
-            while block:=stream.read(1024*1024):
-                h.update(block)
-                total+=len(block)
-        if h.hexdigest()!=fingerprint:
-            raise StudioQuestError("spool content changed or hash mismatch")
-        return total
+            before=os.fstat(stream.fileno())
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink!=1 or
+                    (os.name=="posix" and before.st_mode & 0o077)):
+                raise StudioQuestError("unsafe object type or sharing")
+            while chunk:=stream.read(1024*1024):
+                h.update(chunk)
+                if length is not None:
+                    begin=max(0,offset-total)
+                    end=min(len(chunk),offset+length-total)
+                    if end>begin:
+                        selected.extend(chunk[begin:end])
+                total+=len(chunk)
+            after=os.fstat(stream.fileno())
+        if (before.st_dev!=after.st_dev or before.st_ino!=after.st_ino or
+                before.st_size!=after.st_size or before.st_mtime_ns!=after.st_mtime_ns
+                or h.hexdigest()!=fingerprint):
+            raise StudioQuestError("object changed during read or digest mismatch")
+        if length is not None and (offset>total or length>total-offset
+                                   or len(selected)!=length):
+            raise StudioQuestError("verified window outside object")
+        return total,bytes(selected)
+
+    def verify(self, fingerprint: str) -> int:
+        return self._read_verified(fingerprint,offset=0,length=None)[0]
 
     def read_window(self, fingerprint: str, *, offset: int, length: int,
                     memory_budget_bytes: int, authorized: bool) -> bytes:
@@ -99,19 +117,4 @@ class ArtifactSpool:
             offset<0 or length<0 or memory_budget_bytes<=0 or length>memory_budget_bytes
         ):
             raise StudioQuestError("window exceeds operator memory budget")
-        total=self.verify(fingerprint)
-        if offset>total or length>total-offset:
-            raise StudioQuestError("window outside verified artifact")
-        target=self._target(fingerprint)
-        flags=os.O_RDONLY
-        if hasattr(os,"O_NOFOLLOW"):
-            flags|=os.O_NOFOLLOW
-        with os.fdopen(os.open(target,flags),"rb") as stream:
-            before=os.fstat(stream.fileno())
-            stream.seek(offset)
-            out=stream.read(length)
-            after=os.fstat(stream.fileno())
-        if (before.st_ino!=after.st_ino or before.st_size!=after.st_size or
-                before.st_mtime_ns!=after.st_mtime_ns or len(out)!=length):
-            raise StudioQuestError("artifact changed during read")
-        return out
+        return self._read_verified(fingerprint,offset=offset,length=length)[1]

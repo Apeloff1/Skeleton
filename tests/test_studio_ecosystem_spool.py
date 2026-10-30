@@ -35,3 +35,21 @@ def test_spool_fails_closed_on_tampering_and_budget(tmp_path):
                           memory_budget_bytes=0,authorized=True)
     with pytest.raises(PermissionError):
         spool.ingest([b"data"],authorized=False)
+
+def test_read_window_refuses_hardlinked_and_world_readable_objects(tmp_path):
+    import os
+    root=tmp_path/"secure"
+    root.mkdir(mode=0o700)
+    store=ArtifactSpool(root,authorized=True)
+    receipt=store.ingest([b"123456789"],authorized=True)
+    target=store.path/receipt["sha256"]
+    alias=root/"linked"
+    os.link(target,alias)
+    with pytest.raises(StudioQuestError):
+        store.read_window(receipt["sha256"],offset=0,length=4,
+                          memory_budget_bytes=4,authorized=True)
+    alias.unlink()
+    if os.name=="posix":
+        target.chmod(0o644)
+        with pytest.raises(StudioQuestError):
+            store.verify(receipt["sha256"])
