@@ -29,6 +29,8 @@ class MetalLaunchReceipt:
     metal_headroom_bytes: int | None
     gpu_transfer_verified: bool = False
     actual_backend_allocation: bool = False
+    kv_cache_location: str = "backend"
+    host_kv_reserve_bytes: int = 0
 
     def as_dict(self) -> dict[str, int | str | bool | None]:
         return {
@@ -42,6 +44,8 @@ class MetalLaunchReceipt:
             "metal_headroom_bytes": self.metal_headroom_bytes,
             "gpu_transfer_verified": self.gpu_transfer_verified,
             "actual_backend_allocation": self.actual_backend_allocation,
+            "kv_cache_location": self.kv_cache_location,
+            "host_kv_reserve_bytes": self.host_kv_reserve_bytes,
         }
 
 
@@ -96,13 +100,27 @@ def plan_metal_llama_launch(
     cores = hardware.cpu_count
     # Avoid overcommitting GPU and CPU working sets on the same physical RAM.
     # Weight estimate uses whole GGUF file as a conservative upper envelope.
-    available = max(0, min(int(headroom * 0.55),
-                           int(ram * (0.40 - 0.25 * pressure))))
     blocks = model.serving_metadata.block_count
     known_kv = config.kv_bytes_per_token or (
         model.serving_metadata.kv_bytes_per_token_upper_bound
     )
     ctx = config.context_size
+    host_kv_reserve = (
+        ctx * known_kv if config.kv_cache_location == "host" and ctx and known_kv
+        else 0
+    )
+    if config.kv_cache_location == "host" and not host_kv_reserve:
+        # Cannot safely account for CPU KV residency without tensor geometry.
+        available_host = 0
+    else:
+        # Reserve *physical* RAM for CPU KV; it is not a free second tier on UMA.
+        available_host = max(
+            0, ram - host_kv_reserve - config.runtime_scratch_bytes,
+        )
+    available = max(0, min(
+        int(headroom * 0.55),
+        int(available_host * (0.40 - 0.25 * pressure)),
+    ))
     requested = config.gpu_layers
     selected = 0
     reason = "gpu_explicitly_disabled"
@@ -114,7 +132,10 @@ def plan_metal_llama_launch(
             1, (model.model_artifact.size_bytes * 2 + blocks - 1) // blocks,
         )
         cache = ctx * known_kv
-        gpu_kv_reserve = min(available, (cache + 1) // 2)
+        gpu_kv_reserve = (
+            0 if config.kv_cache_location == "host"
+            else min(available, (cache + 1) // 2)
+        )
         scratch = min(available, config.runtime_scratch_bytes // 2)
         budget = max(0, available - gpu_kv_reserve - scratch)
         selected = min(requested, blocks, budget // per_layer)
@@ -137,6 +158,8 @@ def plan_metal_llama_launch(
     )
     return updated, MetalLaunchReceipt(
         True, reason, requested, selected, threads, batch, ram, headroom,
+        kv_cache_location=updated.kv_cache_location,
+        host_kv_reserve_bytes=host_kv_reserve,
     )
 
 
