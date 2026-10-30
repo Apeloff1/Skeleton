@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_neon_undercity",
+  "title": "Neon Undercity: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010314506,
+  "width": 25,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 13,
+  "theme": "arcade",
+  "starting_health": 4
+}
