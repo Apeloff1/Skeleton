@@ -4,6 +4,7 @@ import json
 from typing import Any, Mapping
 from .studio_ecosystem_quest import StudioQuestError
 from .studio_ecosystem_walk_replay import replay_walk
+from .studio_ecosystem_encounters import replay_hazard_health
 
 FIELDS = {"schema", "project_id", "source_digest", "events",
           "external_evidence_verified", "native_genre_runtime_verified",
@@ -37,6 +38,7 @@ def review_walk_events(raw: bytes, documents: Mapping[str, Any], *,
                 "release_certified"))):
         raise StudioQuestError("invalid or certified browser claims")
     session = replay_walk(documents, payload["events"], authorized=True)
+    encounter = replay_hazard_health(documents, session.events, authorized=True)
     if (payload["project_id"] != session.project_id
             or payload["source_digest"] != session.source_digest):
         raise StudioQuestError("stale or foreign authored source")
@@ -47,6 +49,9 @@ def review_walk_events(raw: bytes, documents: Mapping[str, Any], *,
             "position": list(session.position),
             "authored_decisions": [list(e) for e in session.chosen],
             "accepted_moves": session.accepted_moves,
+            "remaining_health": encounter["remaining_health"],
+            "hazard_contacts": encounter["hazard_contacts"],
+            "character_defeated": encounter["character_defeated"],
             "local_physics_replay_verified": True,
             "external_input_authenticity_verified": False,
             "native_genre_runtime_verified": False,

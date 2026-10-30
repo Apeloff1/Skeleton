@@ -31,3 +31,20 @@ def test_hazard_replay_never_indexes_an_illegal_post_completion_stage():
     with pytest.raises(StudioQuestError):
         replay_hazard_health(docs,passed["actions"]+[["move","right"]],
                              authorized=True)
+
+def test_source_generated_hazards_are_reachable_from_player_spawn():
+    from collections import deque
+    from skeleton.ai.game_builder.studio_ecosystem_walkable import playable_world_source
+    docs=read_blueprint("studio_arena_fighting_glacial_fjord")
+    world=playable_world_source(docs)
+    traps=authored_hazards(docs)["hazards_by_stage"]
+    for stage,rows in enumerate(world["maps"]):
+        seen={(1,1)}
+        queue=deque([(1,1)])
+        while queue:
+            x,y=queue.popleft()
+            for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1)):
+                if 0<=nx<world["width"] and 0<=ny<world["height"] and (
+                    nx,ny) not in seen and rows[ny][nx]==".":
+                    seen.add((nx,ny));queue.append((nx,ny))
+        assert all(tuple(x) in seen for x in traps[stage])

@@ -6,6 +6,7 @@ pretending to implement every original game's combat or physics systems.
 """
 from __future__ import annotations
 
+from collections import deque
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
 
@@ -34,10 +35,19 @@ def authored_hazards(documents: Mapping[str, Any]) -> dict[str, object]:
         for command in route["directions"]:
             dx,dy=DIRECTIONS[command]
             x+=dx;y+=dy;safe.add((x,y))
+        reachable={tuple(world["spawn"])}
+        queue=deque(reachable)
+        while queue:
+            px,py=queue.popleft()
+            for nx,ny in ((px+1,py),(px-1,py),(px,py+1),(px,py-1)):
+                if (0<=nx<world["width"] and 0<=ny<world["height"] and
+                        rows[ny][nx]=="." and (nx,ny) not in reachable):
+                    reachable.add((nx,ny))
+                    queue.append((nx,ny))
         choices=[]
         for y,row in enumerate(rows):
             for x,value in enumerate(row):
-                if value=="." and (x,y) not in safe:
+                if value=="." and (x,y) in reachable and (x,y) not in safe:
                     token=sha256((world["source_digest"]+":"+str(scene)+
                                   ":"+str(x)+":"+str(y)).encode("ascii")).digest()
                     choices.append((token,x,y))
@@ -65,6 +75,8 @@ def replay_hazard_health(documents: Mapping[str, Any],
     scene=0
     hit_events=[]
     for index,event in enumerate(events):
+        if health<=0:
+            raise StudioQuestError("player cannot act after defeat")
         if len(event)!=2:
             raise StudioQuestError("invalid encounter event")
         kind,value=event
@@ -74,13 +86,13 @@ def replay_hazard_health(documents: Mapping[str, Any],
             if [x,y] in hazards["hazards_by_stage"][scene]:
                 health-=hazards["hazard_damage"]
                 hit_events.append({"event":index,"scene_index":scene,"position":[x,y]})
-                if health<=0:
-                    raise StudioQuestError("player health exhausted before game completion")
+                health=max(0,health)
         elif kind=="choose":
             scene+=1
             x,y=world["spawn"]
     return {"schema":"skeleton.game_builder.offline_hazard_replay.v1",
             "project_id":session.project_id,"walk_session_sha256":session.digest,
             "remaining_health":health,"hazard_contacts":hit_events,
+            "character_defeated":health==0,
             "local_physics_checked":True,"native_combat_qualified":False,
             "release_certified":False}
