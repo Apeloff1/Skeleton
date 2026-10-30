@@ -71,6 +71,11 @@ function draw(){
      ctx.fillRect(x*40+1,y*40+1,38,38);
    }
  }
+ for(const actor of world.actors){
+   const [ax,ay]=actor.patrol[steps%2];
+   ctx.fillStyle="#9b8ee1";
+   ctx.beginPath();ctx.arc(ax*40+20,ay*40+20,10,0,Math.PI*2);ctx.fill();
+ }
  ctx.fillStyle="#ebc66f";
  ctx.fillRect(world.target[0]*40+9,world.target[1]*40+9,22,22);
  ctx.fillStyle="#62d7c1";
@@ -87,6 +92,18 @@ function draw(){
    return;
  }
  choicesEl.replaceChildren();
+ for(const actor of world.actors){
+   const [ax,ay]=actor.patrol[steps%2];
+   if(Math.abs(ax-player.x)+Math.abs(ay-player.y)<=1){
+     const talk=text("button","Talk to "+actor.name);
+     talk.type="button";
+     talk.addEventListener("click",()=>{
+       document.getElementById("npc-dialogue").textContent=actor.name+
+         " knows: "+actor.knows;
+     });
+     choicesEl.append(talk);
+   }
+ }
  if(nearMarker()){
    choicesEl.append(text("h2","Nearby object: "+stage.objects[0]));
    for(const choice of stage.alternatives){
@@ -138,6 +155,7 @@ function move(dx,dy){
  }
  draw();
  document.getElementById("navigation-hint").textContent="";
+ document.getElementById("npc-dialogue").textContent="";
 }
 function choose(choice){
  const stage=current();
@@ -146,6 +164,7 @@ function choose(choice){
  physicsEvents.push(["choose",choice]);
  stageIndex++;player={x:1,y:1};draw();
  document.getElementById("navigation-hint").textContent="";
+ document.getElementById("npc-dialogue").textContent="";
 }
 const keys={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],
  ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
@@ -229,10 +248,12 @@ def _csp_hash(source: str) -> str:
 
 def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
     from .studio_ecosystem_encounters import authored_hazards
+    from .studio_ecosystem_npc_patrol import cast_patrols
     source=playable_world_source(documents)
     encounter=authored_hazards(documents)
     source["starting_health"]=encounter["starting_health"]
     source["hazards_by_stage"]=encounter["hazards_by_stage"]
+    source["actors"]=cast_patrols(documents)["actors"]
     payload=json.dumps(source,sort_keys=True,separators=(",",":"),
                        ensure_ascii=True,allow_nan=False)
     payload=payload.replace("<",r"\u003c").replace(">",r"\u003e").replace("&",r"\u0026")
@@ -255,6 +276,7 @@ def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
       "<button type='button' data-dx='0' data-dy='1'>Down</button>"
       "<button type='button' data-dx='1' data-dy='0'>Right</button></div>"
       "<section id='choices' aria-live='polite'></section>"
+      "<p id='npc-dialogue' role='status' aria-live='polite'></p>"
       "<button id='hint' type='button'>Show shortest route hint</button>"
       "<p id='navigation-hint' role='status' aria-live='polite'></p>"
       "<button id='restart' type='button'>Restart</button>"
