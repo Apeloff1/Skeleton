@@ -172,6 +172,7 @@ class LongformVirtualMemory:
                 ordinal = 0
                 pending = ""
                 previous = ROOT_CHAIN
+                last_disk_probe = time.monotonic()
                 with self._lock:
                     previous_import = self._db.execute(
                         "SELECT source_label, source_sha256, bytes, pages, "
@@ -197,7 +198,7 @@ class LongformVirtualMemory:
                     self._db.execute("BEGIN IMMEDIATE")
                     try:
                         def publish(page: str) -> None:
-                            nonlocal previous, ordinal, stored
+                            nonlocal previous, ordinal, stored, last_disk_probe
                             raw = page.encode("utf-8")
                             digest = sha256(raw).hexdigest()
                             compressed = (
@@ -207,14 +208,19 @@ class LongformVirtualMemory:
                             use_zlib = len(compressed) < len(raw) * 0.92
                             encoded = compressed if use_zlib else raw
                             previous = _chain(previous, ordinal, raw)
-                            # Disk headroom can change during long imports.
-                            try:
-                                admit_disk_document(
-                                    probe_local_resources(self.path),
-                                    len(encoded) * 3,
-                                )
-                            except LocalResourcePressure as exc:
-                                raise LongformMemoryError(str(exc)) from exc
+                            # Re-sample live disk pressure periodically, not
+                            # once per 1-KiB page. SQLITE_FULL and the write
+                            # transaction still fail closed between probes.
+                            now = time.monotonic()
+                            if ordinal % 128 == 0 or now - last_disk_probe >= 1.0:
+                                try:
+                                    admit_disk_document(
+                                        probe_local_resources(self.path),
+                                        max(len(encoded) * 3, 4096),
+                                    )
+                                except LocalResourcePressure as exc:
+                                    raise LongformMemoryError(str(exc)) from exc
+                                last_disk_probe = now
                             self._db.execute(
                                 "INSERT INTO longform_pages VALUES (?,?,?,?,?,?,?)",
                                 (source_id, ordinal, encoded, len(raw), digest,
@@ -318,12 +324,17 @@ class LongformVirtualMemory:
             "FROM longform_pages WHERE source_id=? ORDER BY ordinal",
             (source_id,),
         )
+        resources = probe_local_resources(self.path)
+        sampled_at = time.monotonic()
         for index, encoded, length, expected_digest, expected_chain, encoding in cursor:
             if index != count or encoding not in ("raw", "zlib"):
                 raise LongformMemoryError("longform page ordering or encoding corrupted")
             # Page length must be reasonable relative to *current* RAM.
             # A malicious SQLite row must not force unlimited decompression.
-            resources = probe_local_resources(self.path)
+            now = time.monotonic()
+            if count % 128 == 0 or now - sampled_at >= 1.0:
+                resources = probe_local_resources(self.path)
+                sampled_at = now
             page_limit = max(
                 1024, min(
                     resources.read_chunk_bytes * 4,
