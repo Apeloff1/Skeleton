@@ -45,7 +45,7 @@ def materialize_previews(
         raise StudioEcosystemError("existing non-symlink output directory required")
     available = {entry["id"] for entry in list_blueprints(genre=genre, biome=biome)}
     requested = sorted(available) if project_ids is None else list(project_ids)
-    if not requested or len(requested) > 256 or len(set(requested)) != len(requested):
+    if not requested or len(requested) > len(available) or len(set(requested)) != len(requested):
         raise StudioEcosystemError("nonempty unique bounded project selection required")
     if any(pid not in available for pid in requested):
         raise StudioEcosystemError("unknown or out-of-scope project")
