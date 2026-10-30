@@ -1,5 +1,6 @@
 """Source-bound, actually interactive browser quest director. No external IO."""
 from __future__ import annotations
+from base64 import b64encode
 from hashlib import sha256
 from html import escape
 import json
@@ -88,6 +89,11 @@ def story_source(documents: Mapping[str, Any]) -> dict[str, object]:
             "external_evidence_verified":False,"release_certified":False}
 
 
+def _csp_hash(source: str) -> str:
+    digest=b64encode(sha256(source.encode("utf-8")).digest()).decode("ascii")
+    return "'sha256-"+digest+"'"
+
+
 def render_story_html(documents: Mapping[str, Any]) -> bytes:
     source=story_source(documents)
     payload=json.dumps(source,sort_keys=True,ensure_ascii=True,allow_nan=False,
@@ -95,12 +101,13 @@ def render_story_html(documents: Mapping[str, Any]) -> bytes:
     payload=(payload.replace("<",r"\u003c").replace(">",r"\u003e")
                     .replace("&",r"\u0026"))
     project=escape(source["project_id"],quote=True)
+    policy=("default-src 'none'; script-src "+_csp_hash(payload)+" "+
+            _csp_hash(_JS)+"; style-src "+_csp_hash(_CSS)+
+            "; base-uri 'none'; form-action 'none'; object-src 'none'")
     page=(
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none';"
-        " script-src 'unsafe-inline'; style-src 'unsafe-inline';"
-        " base-uri 'none'; form-action 'none'\">"
+        "<meta http-equiv='Content-Security-Policy' content=\""+policy+"\">"
         "<title>Original interactive quest — "+project+"</title>"
         "<style>"+_CSS+"</style></head><body>"
         "<header><h1>Original interactive quest</h1><p>Project: "+project+"</p>"
