@@ -1599,6 +1599,15 @@ class LlamaCppModel:
                 with self._process_lock:
                     self._spawning_processes += 1
                 try:
+                    # GGUF identity rehash and prompt preparation may take
+                    # substantial time for large local models. Recheck live
+                    # unified-memory pressure at the native spawn boundary,
+                    # not only before artifact/prompt processing. A failed
+                    # admission decrements the reserved spawning slot below.
+                    if resource_guard is not None:
+                        with self._process_lock:
+                            self._resource_preflight_checks += 1
+                        resource_guard()
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
