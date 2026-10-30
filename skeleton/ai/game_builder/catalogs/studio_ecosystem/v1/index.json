@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 304,
+  "project_count": 312,
   "sections": [
     "intent",
     "narrative",
@@ -1836,10 +1836,58 @@
       "genre": "stellar_colony",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_underwater_archaeology_copper_mesa",
+      "genre": "underwater_archaeology",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_underwater_archaeology_glacial_fjord",
+      "genre": "underwater_archaeology",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_underwater_archaeology_ashen_archipelago",
+      "genre": "underwater_archaeology",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_underwater_archaeology_luminous_marsh",
+      "genre": "underwater_archaeology",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_cloud_canopy",
+      "genre": "underwater_archaeology",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_underwater_archaeology_ion_wastes",
+      "genre": "underwater_archaeology",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_underwater_archaeology_frosted_crater",
+      "genre": "underwater_archaeology",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_underwater_archaeology_salt_dunes",
+      "genre": "underwater_archaeology",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 2432,
+    "source_files": 2496,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
