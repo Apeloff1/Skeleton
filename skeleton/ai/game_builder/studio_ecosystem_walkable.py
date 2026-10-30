@@ -31,11 +31,19 @@ let stageIndex=0;
 let player={x:1,y:1};
 let steps=0;
 const choices=[];
+const physicsEvents=[];
 function text(tag,value){const el=document.createElement(tag);el.textContent=value;return el;}
 function current(){return world.stages[stageIndex];}
 function nearMarker(){
  return !!current() && Math.abs(player.x-world.target[0])+
                            Math.abs(player.y-world.target[1])<=1;
+}
+function walkReceipt(){
+ return {schema:"skeleton.game_builder.offline_walk_events.v1",
+   project_id:world.project_id,source_digest:world.source_digest,
+   events:physicsEvents.map(pair=>pair.slice()),
+   external_evidence_verified:false,
+   native_genre_runtime_verified:false,release_certified:false};
 }
 function transcriptReceipt(){
  return {schema:"skeleton.game_builder.offline_story_choices.v1",
@@ -49,6 +57,7 @@ function draw(){
  if(!stage){
    hud.textContent="All source-authored stages completed (sandbox only).";
    choicesEl.replaceChildren();historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
+ document.getElementById("walk-history").textContent=JSON.stringify(walkReceipt(),null,2);
    return;
  }
  const cells=world.maps[stageIndex];
@@ -74,18 +83,22 @@ function draw(){
    }
  }
  historyEl.textContent=JSON.stringify(transcriptReceipt(),null,2);
+ document.getElementById("walk-history").textContent=JSON.stringify(walkReceipt(),null,2);
 }
 function move(dx,dy){
  if(!current())return;
  const x=player.x+dx,y=player.y+dy;
  if(x<0||x>=world.width||y<0||y>=world.height)return;
  if(world.maps[stageIndex][y][x]==="#")return;
+ const direction=dx===1?"right":dx===-1?"left":dy===1?"down":"up";
+ physicsEvents.push(["move",direction]);
  player.x=x;player.y=y;steps++;draw();
 }
 function choose(choice){
  const stage=current();
  if(!stage||!nearMarker()||!stage.alternatives.includes(choice))return;
  choices.push([stage.id,choice]);
+ physicsEvents.push(["choose",choice]);
  stageIndex++;player={x:1,y:1};draw();
 }
 const keys={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],
@@ -100,7 +113,7 @@ document.querySelectorAll("[data-dx]").forEach(button=>{
                                           Number(button.dataset.dy)));
 });
 document.getElementById("restart").addEventListener("click",()=>{
- stageIndex=0;player={x:1,y:1};steps=0;choices.length=0;draw();
+ stageIndex=0;player={x:1,y:1};steps=0;choices.length=0;physicsEvents.length=0;draw();
 });
 draw();
 """
@@ -186,6 +199,7 @@ def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
       "<section id='choices' aria-live='polite'></section>"
       "<button id='restart' type='button'>Restart</button>"
       "<h2>Sandbox decisions</h2><pre id='history'></pre>"
+      "<h2>Collision-verified replay input</h2><pre id='walk-history'></pre>"
       "<script type='application/json' id='world-source'>"+payload+"</script>"
       "<script>"+_SCRIPT+"</script></body></html>"
     )
