@@ -1,0 +1,60 @@
+{
+  "project_id": "studio_settlement_survival_amber_highlands",
+  "genre": "settlement_survival",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "art_direction": {
+    "architecture": "mountain hospice",
+    "biome_palette": [
+      "#173528",
+      "#497957",
+      "#B8D6A0",
+      "#F1F8DF"
+    ],
+    "materials": [
+      "terraced ridgepaths",
+      "resin lamps"
+    ],
+    "style": "original_high_readability_modular",
+    "reference_rights": "no_external_asset_ingestion"
+  },
+  "jobs": [
+    {
+      "id": "hero_silhouette",
+      "kind": "character",
+      "recipe": "Original builder silhouette, visible gear for needs and crafting",
+      "lodding": "mobile_desktop_adaptive_requirement"
+    },
+    {
+      "id": "world_tiles",
+      "kind": "environment",
+      "recipe": "Modular terraced ridgepaths surfaces with landslides state overlays",
+      "lodding": "streamed_chunks_requirement"
+    },
+    {
+      "id": "landmark_kit",
+      "kind": "architecture",
+      "recipe": "Reusable trim, portals and silhouette of mountain hospice",
+      "lodding": "impostor_fallback_requirement"
+    },
+    {
+      "id": "interface",
+      "kind": "ui",
+      "recipe": "Readable resin lamps and reputation status with colour-independent cues",
+      "lodding": "device_scale_requirement"
+    },
+    {
+      "id": "effect",
+      "kind": "vfx",
+      "recipe": "Authorable volumetric response to landslides",
+      "lodding": "particle_budget_requirement"
+    }
+  ],
+  "deliverables": "recipes_only_no_meshes_or_textures_yet",
+  "accessibility": {
+    "contrast": "WCAG_target_not_tested",
+    "photosensitive": "exclude_unbounded_flash"
+  },
+  "engine_ownership": "existing_studio_asset_pipeline"
+}

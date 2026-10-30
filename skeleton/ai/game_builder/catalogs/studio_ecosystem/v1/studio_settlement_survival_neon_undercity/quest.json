@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_settlement_survival_neon_undercity",
+  "genre": "settlement_survival",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_settlement_survival_neon_undercity:restore",
+  "objective": "establish a resilient shelter network",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "elevated night markets",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near hidden radio library",
+        "Seek a witness of grid brownouts"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "hidden radio library",
+      "entry": "survey_complete",
+      "actions": [
+        "construct",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to community capacitors",
+        "Establish an independent path around an approaching storm"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "hidden radio library",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of hidden radio library",
+        "Construct a low-resource alternative using community capacitors"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden grid brownouts interrupts transfer",
+    "The an approaching storm suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "community capacitors",
+    "unlimited_rewards": false
+  }
+}

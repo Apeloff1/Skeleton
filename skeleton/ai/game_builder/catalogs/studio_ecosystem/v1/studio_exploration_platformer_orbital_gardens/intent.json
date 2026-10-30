@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_orbital_gardens",
+  "title": "Orbital Gardens: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610301212,
+  "width": 25,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 6
+}

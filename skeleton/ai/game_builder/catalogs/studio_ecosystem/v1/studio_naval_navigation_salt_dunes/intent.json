@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_salt_dunes",
+  "title": "Salt Dunes: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610301912,
+  "width": 25,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "desert",
+  "starting_health": 5
+}

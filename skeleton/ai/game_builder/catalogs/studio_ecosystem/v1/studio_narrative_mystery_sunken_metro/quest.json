@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_narrative_mystery_sunken_metro",
+  "genre": "narrative_mystery",
+  "biome": "sunken_metro",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_narrative_mystery_sunken_metro:restore",
+  "objective": "reconstruct an erased civic record",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "submerged tunnels",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near underwater tram hub",
+        "Seek a witness of rising flood gates"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "underwater tram hub",
+      "entry": "survey_complete",
+      "actions": [
+        "investigate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to recycled batteries",
+        "Establish an independent path around a record-forging council"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "underwater tram hub",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of underwater tram hub",
+        "Construct a low-resource alternative using recycled batteries"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden rising flood gates interrupts transfer",
+    "The a record-forging council suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "recycled batteries",
+    "unlimited_rewards": false
+  }
+}

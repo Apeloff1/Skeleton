@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_narrative_mystery_ion_wastes",
+  "title": "Ion Wastes: Narrative Mystery",
+  "subtitle": "An original narrative mystery brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610301366,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 5
+}

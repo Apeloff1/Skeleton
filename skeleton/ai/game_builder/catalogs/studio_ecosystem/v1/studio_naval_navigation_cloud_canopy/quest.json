@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_naval_navigation_cloud_canopy",
+  "genre": "naval_navigation",
+  "biome": "cloud_canopy",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_naval_navigation_cloud_canopy:restore",
+  "objective": "reconnect isolated trading ports",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "multi-tier boughs",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near suspended library",
+        "Seek a witness of severe canopy winds"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "suspended library",
+      "entry": "survey_complete",
+      "actions": [
+        "navigate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to aerial roots",
+        "Establish an independent path around a blockade fleet"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "suspended library",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of suspended library",
+        "Construct a low-resource alternative using aerial roots"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden severe canopy winds interrupts transfer",
+    "The a blockade fleet suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "aerial roots",
+    "unlimited_rewards": false
+  }
+}

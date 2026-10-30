@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_narrative_mystery_glass_steppe",
+  "title": "Glass Steppe: Narrative Mystery",
+  "subtitle": "An original narrative mystery brief in Glass Steppe; prototype maps are not full genre implementations.",
+  "seed": 202610301451,
+  "width": 23,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "desert",
+  "starting_health": 6
+}
