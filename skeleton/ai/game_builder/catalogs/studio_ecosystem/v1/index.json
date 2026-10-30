@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 288,
+  "project_count": 296,
   "sections": [
     "intent",
     "narrative",
@@ -1740,10 +1740,58 @@
       "genre": "arena_fighting",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_stellar_colony_copper_mesa",
+      "genre": "stellar_colony",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_stellar_colony_glacial_fjord",
+      "genre": "stellar_colony",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_stellar_colony_ashen_archipelago",
+      "genre": "stellar_colony",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_stellar_colony_luminous_marsh",
+      "genre": "stellar_colony",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_stellar_colony_cloud_canopy",
+      "genre": "stellar_colony",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_stellar_colony_ion_wastes",
+      "genre": "stellar_colony",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_stellar_colony_frosted_crater",
+      "genre": "stellar_colony",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_stellar_colony_salt_dunes",
+      "genre": "stellar_colony",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 2304,
+    "source_files": 2368,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
