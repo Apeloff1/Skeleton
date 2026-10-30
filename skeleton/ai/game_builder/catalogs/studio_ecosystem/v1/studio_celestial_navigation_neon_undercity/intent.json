@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_neon_undercity",
+  "title": "Neon Undercity: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010315979,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 4,
+  "theme": "arcade",
+  "starting_health": 3
+}
