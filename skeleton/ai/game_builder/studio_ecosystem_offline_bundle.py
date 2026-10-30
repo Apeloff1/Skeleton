@@ -20,6 +20,7 @@ from .studio_ecosystem_fence import assert_source_fence
 from .studio_ecosystem_catalog import read_blueprint
 from .studio_ecosystem_quest import StudioQuestError
 from .studio_ecosystem_story_html import render_story_html
+from .studio_ecosystem_walkable import render_playable_world_html
 
 
 def _canonical(payload: object) -> bytes:
@@ -38,6 +39,7 @@ def _write_exclusive(path: Path, data: bytes) -> None:
 def build_offline_studio_bundle(journal: WorkJournal, spool: ArtifactSpool,
                                 output_root: Path, *, cue_id: str | None = None,
                                 interactive_story: bool = False,
+                                walkable_story: bool = False,
                                 authorized: bool) -> dict[str, object]:
     if not authorized:
         raise PermissionError("offline package needs operator authorization")
@@ -50,13 +52,17 @@ def build_offline_studio_bundle(journal: WorkJournal, spool: ArtifactSpool,
     preview=compile_and_spool_preview(journal,spool,authorized=True)
     media=render_media_packet(journal,spool,cue_id=cue_id,authorized=True)
     assert_source_fence(journal,read_blueprint(journal.project),authorized=True)
-    if type(interactive_story) is not bool:
-        raise StudioQuestError("interactive story mode must be an explicit boolean")
+    if type(interactive_story) is not bool or type(walkable_story) is not bool:
+        raise StudioQuestError("interactive game modes must be explicit booleans")
     story_digest=None
-    if interactive_story:
+    if interactive_story or walkable_story:
         story_bytes=render_story_html(read_blueprint(journal.project))
         story_receipt=spool.ingest([story_bytes],authorized=True)
         story_digest=story_receipt["sha256"]
+    walkable_digest=None
+    if walkable_story:
+        walkable_bytes=render_playable_world_html(read_blueprint(journal.project))
+        walkable_digest=spool.ingest([walkable_bytes],authorized=True)["sha256"]
     assert_source_fence(journal,read_blueprint(journal.project),authorized=True)
     target.mkdir(mode=0o700,exist_ok=False)
     # A package is complete only when manifest.json is the last new file.
@@ -69,6 +75,8 @@ def build_offline_studio_bundle(journal: WorkJournal, spool: ArtifactSpool,
         spool.export_verified(digest,target/name,authorized=True)
     if story_digest is not None:
         spool.export_verified(story_digest,target/"quest.html",authorized=True)
+    if walkable_digest is not None:
+        spool.export_verified(walkable_digest,target/"walkable.html",authorized=True)
     body = ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             "<meta http-equiv='Content-Security-Policy' "
@@ -85,7 +93,9 @@ def build_offline_studio_bundle(journal: WorkJournal, spool: ArtifactSpool,
             "<iframe sandbox='allow-scripts' title='Offline playable grid preview' "
             "src='index.html'></iframe>"
             +("<p><a href='quest.html'>Play authored quest choices</a></p>"
-              if interactive_story else "")+
+              if story_digest is not None else "")+
+            ("<p><a href='walkable.html'>Play walkable scene prototype</a></p>"
+              if walkable_story else "")+
             "<h2>Original environment concept</h2>"
             "<img alt='Original generated environment illustration' "
             "src='environment.svg'>"
@@ -95,8 +105,11 @@ def build_offline_studio_bundle(journal: WorkJournal, spool: ArtifactSpool,
             "</body></html>").encode("utf-8")
     _write_exclusive(target/"studio.html",body)
     receipt={
-        "schema":("skeleton.game_builder.studio_offline_package.v2"
-                  if interactive_story else "skeleton.game_builder.studio_offline_package.v1"),
+        "schema":("skeleton.game_builder.studio_offline_package.v3"
+                  if walkable_story else
+                  "skeleton.game_builder.studio_offline_package.v2"
+                  if interactive_story else
+                  "skeleton.game_builder.studio_offline_package.v1"),
         "project_id":journal.project,"source_chain_sha256":before["section_chain_sha256"],
         "index_html_sha256":preview["html_sha256"],
         "environment_svg_sha256":media["svg_sha256"],
@@ -110,6 +123,8 @@ def build_offline_studio_bundle(journal: WorkJournal, spool: ArtifactSpool,
     }
     if story_digest is not None:
         receipt["story_html_sha256"]=story_digest
+    if walkable_digest is not None:
+        receipt["walkable_html_sha256"]=walkable_digest
     _write_exclusive(target/"manifest.json",_canonical(receipt))
     if os.name=="posix":
         fd=os.open(target,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
@@ -120,6 +135,9 @@ def build_offline_studio_bundle(journal: WorkJournal, spool: ArtifactSpool,
     return {"project_id":journal.project,"output_dir":str(target),
             "manifest_sha256":sha256(_canonical(receipt)).hexdigest(),
             "assets":(("index.html","environment.svg","soundscape.wav",
+                       "quest.html","walkable.html","studio.html","manifest.json")
+                      if walkable_story else
+                      ("index.html","environment.svg","soundscape.wav",
                        "quest.html","studio.html","manifest.json")
                       if interactive_story else
                       ("index.html","environment.svg","soundscape.wav",
