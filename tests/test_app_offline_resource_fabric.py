@@ -46,9 +46,11 @@ class FabricTests(unittest.TestCase):
             b"currentAllocatedSize": 300_000_000,
             b"release": 0,
         }
-        objc.objc_msgSend = Mock(
-            side_effect=lambda device, selector: observations[selector],
-        )
+        def message(_device, selector):
+            if selector not in observations:
+                raise OSError("simulated Metal selector failure")
+            return observations[selector]
+        objc.objc_msgSend = Mock(side_effect=message)
         with patch(
             "skeleton.app.offline_resource_fabric.sys.platform", "darwin",
         ), patch(
