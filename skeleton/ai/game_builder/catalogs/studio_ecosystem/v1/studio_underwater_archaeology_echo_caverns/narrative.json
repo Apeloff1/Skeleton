@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_underwater_archaeology_echo_caverns",
+  "genre": "underwater_archaeology",
+  "biome": "echo_caverns",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Echo Caverns",
+    "landmark": "underground listening post",
+    "era": "the forgotten century",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control acoustic reflectors while unstable resonance destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "hopeful"
+  },
+  "premise": "Sela Quill, a diver with expertise in buoyancy, decompression and noninvasive survey, must recover archival evidence without damaging a protected ruin before unstable resonance reaches the underground listening post.",
+  "stakes": [
+    "Residents lose access to acoustic reflectors",
+    "an illegal salvage contractor gains authority without independent evidence",
+    "The underground listening post becomes inaccessible beyond ringing stone halls"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured unstable resonance closes the main approach",
+      "goal": "Acquire an independent account of acoustic reflectors",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "an illegal salvage contractor challenges Sela Quill's mandate",
+      "goal": "Apply buoyancy, decompression and noninvasive survey in ringing stone halls",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of underground listening post",
+      "goal": "recover archival evidence without damaging a protected ruin",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains underground listening post with auditable access to acoustic reflectors"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain air and research grants without an illegal salvage contractor"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over acoustic reflectors persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "underground listening post",
+      "ringing stone halls",
+      "vibration amplification"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}
