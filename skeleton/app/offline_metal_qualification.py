@@ -132,6 +132,16 @@ def _validated_shared_fence_receipt(data: object) -> dict[str, Any]:
         "model_tensor_fence_verified", "llama_kv_cache_fence_verified",
     }:
         raise RuntimeError("unexpected native Metal fence receipt")
+    # Independent CPU-side expected digest for two rounds of the fixed 64
+    # uint32 Metal compute kernel. Reject a false "passed" report even when
+    # a local tool prints a schema-compatible JSON envelope.
+    expected_bytes = bytearray()
+    for iteration in range(2):
+        for index in range(64):
+            source = iteration * 100_003 + index * 97
+            computed = ((source ^ 0x5a17b3e2) + index) & 0xffffffff
+            expected_bytes.extend(computed.to_bytes(4, "little"))
+    expected_sha = sha256(expected_bytes).hexdigest()
     if (
         data["schema"] != "skeleton.apple.metal-shared-fence.v1"
         or data["passed"] is not True
@@ -144,6 +154,7 @@ def _validated_shared_fence_receipt(data: object) -> dict[str, Any]:
         or type(data["output_sha256"]) is not str
         or len(data["output_sha256"]) != 64
         or any(ch not in "0123456789abcdef" for ch in data["output_sha256"])
+        or data["output_sha256"] != expected_sha
         or data["model_tensor_fence_verified"] is not False
         or data["llama_kv_cache_fence_verified"] is not False
     ):
