@@ -129,14 +129,27 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
         now_wall=10.5,
     )
 
-    # Crash injection: the spend ledger commits terminal accounting, but the
-    # governor never reaches qualification/journal terminalization.
-    completion = first.runtime.complete(
-        operation,
-        actual,
-        now_wall=11.0,
-    )
-    assert completion.quota_completion is not None
+    # Inject the crash through the governor's real completion path, after
+    # durable completion intent and quota accounting but before qualification
+    # and terminal journal commit. Calling runtime.complete() directly skips
+    # the intent and must instead fail closed (tested separately below).
+    def crash_before_qualification(*_args, **_kwargs):
+        raise SystemExit("simulated process loss before qualification")
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            first, "_completed_decision", crash_before_qualification
+        )
+        with pytest.raises(
+            SystemExit, match="simulated process loss before qualification"
+        ):
+            first.complete(
+                operation,
+                actual,
+                evidence_refs=_refs("completion"),
+                now_wall=11.0,
+            )
+    assert first.runtime.quota_ledger.snapshot("tenant-a")["completions"] == 1
 
     restarted = _governor(path)
     recovered = restarted.recover_completed(
