@@ -43,3 +43,19 @@ def test_verified_v2_story_package_rejects_tampered_quest_page(tmp_path):
     (target/"quest.html").write_bytes(b"forged")
     with pytest.raises(StudioQuestError):
         verify_studio_bundle(target,authorized=True)
+
+def test_v3_walkable_bundle_checks_all_seven_file_digests(tmp_path):
+    root=tmp_path/"private";root.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    pid="studio_arena_fighting_glacial_fjord"
+    docs=read_blueprint(pid)
+    j=WorkJournal(root,build_work_graph(docs),authorized=True)
+    pin_source_sections(j,docs,authorized=True)
+    built=build_offline_studio_bundle(
+        j,ArtifactSpool(root,authorized=True),out,walkable_story=True,
+        authorized=True)
+    target=Path(built["output_dir"])
+    assert verify_studio_bundle(target,authorized=True)["files_verified"]==7
+    (target/"walkable.html").write_bytes(b"tampered")
+    with pytest.raises(StudioQuestError):
+        verify_studio_bundle(target,authorized=True)

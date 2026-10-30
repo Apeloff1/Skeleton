@@ -43,11 +43,17 @@ def _read_receipt(path: Path) -> dict[str, Any]:
         raise StudioQuestError("malformed offline manifest") from exc
     if not isinstance(data,dict):
         raise StudioQuestError("invalid offline release receipt")
-    v2=data.get("schema")=="skeleton.game_builder.studio_offline_package.v2"
-    if (data.get("schema") not in (
+    mode=data.get("schema")
+    v2=mode=="skeleton.game_builder.studio_offline_package.v2"
+    v3=mode=="skeleton.game_builder.studio_offline_package.v3"
+    fields=KEYS | ({"story_html_sha256"} if v2 or v3 else set()) | (
+        {"walkable_html_sha256"} if v3 else set()
+    )
+    if (mode not in (
             "skeleton.game_builder.studio_offline_package.v1",
-            "skeleton.game_builder.studio_offline_package.v2"
-        ) or set(data)!=(KEYS | ({"story_html_sha256"} if v2 else set())) or
+            "skeleton.game_builder.studio_offline_package.v2",
+            "skeleton.game_builder.studio_offline_package.v3"
+        ) or set(data)!=fields or
             data["target_genre_implemented"] is not False or
             data["rights_independently_qualified"] is not False or
             data["release_certified"] is not False or
@@ -58,7 +64,9 @@ def _read_receipt(path: Path) -> dict[str, Any]:
             not HEX.fullmatch(data["source_chain_sha256"]) or
             raw!=_canonical(data)):
         raise StudioQuestError("invalid or noncanonical offline release receipt")
-    all_hash_keys=list(FILES.values())+(["story_html_sha256"] if v2 else [])
+    all_hash_keys=list(FILES.values())+(
+        ["story_html_sha256"] if v2 or v3 else []
+    )+(["walkable_html_sha256"] if v3 else [])
     if any(not isinstance(data[k],str) or not HEX.fullmatch(data[k])
            for k in all_hash_keys):
         raise StudioQuestError("malformed bundled content identity")
@@ -91,8 +99,11 @@ def verify_studio_bundle(path: Path, *, authorized: bool) -> dict[str, object]:
     path=Path(path)
     _private_directory(path)
     receipt=_read_receipt(path/"manifest.json")
-    is_v2=receipt["schema"].endswith(".v2")
-    files={**FILES,**({"quest.html":"story_html_sha256"} if is_v2 else {})}
+    mode=receipt["schema"]
+    has_story=mode.endswith(".v2") or mode.endswith(".v3")
+    has_walk=mode.endswith(".v3")
+    files={**FILES,**({"quest.html":"story_html_sha256"} if has_story else {}),
+           **({"walkable.html":"walkable_html_sha256"} if has_walk else {})}
     found={entry.name for entry in path.iterdir()}
     if found!=set(files)|{"manifest.json"}:
         raise StudioQuestError("incomplete or altered offline bundle inventory")
@@ -106,6 +117,7 @@ def verify_studio_bundle(path: Path, *, authorized: bool) -> dict[str, object]:
         sizes[name]=count
     return {"schema":"skeleton.game_builder.studio_offline_verify.v1",
             "project_id":receipt["project_id"],
+            "package_format":receipt["schema"],
             "source_chain_sha256":receipt["source_chain_sha256"],
             "files_verified":len(files)+1,
             "verified_file_bytes":sizes,
