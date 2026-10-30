@@ -35,3 +35,11 @@ def test_authored_text_cannot_escape_inert_json_script():
     assert "</script>" not in captured
     assert json.loads(captured)["stages"][0]["alternatives"][0]=="</script><script>alert(1)</script>"
     assert "alert(1)" not in html.replace(captured,"")
+
+def test_story_csp_uses_content_hashes_not_permissive_inline_scripts():
+    docs=read_blueprint("studio_aerial_traversal_amber_highlands")
+    html=render_story_html(docs)
+    assert b"'unsafe-inline'" not in html
+    assert html.count(b"'sha256-")>=3
+    assert b"object-src 'none'" in html
+    assert b"addEventListener" in html
