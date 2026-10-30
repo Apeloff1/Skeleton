@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import threading
+import sys
 from types import SimpleNamespace
 from unittest.mock import patch, PropertyMock
 import unittest
@@ -232,6 +233,70 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertEqual(backend._resource_preflight_checks, 2)
         self.assertEqual(backend._spawning_processes, 0)
+
+    def test_late_live_pressure_terminates_running_local_process(self):
+        """The 1 Hz monitor fails closed and drains the native child process.
+
+        A host Python sleep subprocess stands in for llama.cpp; no weights,
+        Metal GPU or runtime binary are required to verify lifecycle cleanup.
+        """
+        model = object.__new__(LlamaCppModel)
+        model.config = configuration(gpu_layers=8)
+        model._process_lock = threading.Lock()
+        model._processes_started = 0
+        model._processes_exited = 0
+        model._spawning_processes = 0
+        model._active_processes = set()
+        model._draining_processes = set()
+        model._termination_requests = 0
+        model._resource_preflight_checks = 0
+        model._inference_admitted = False
+        samples = []
+        def guard():
+            samples.append(True)
+            if len(samples) == 3:
+                raise LocalResourcePressure("sustained Metal memory pressure")
+        model._resource_preflight = guard
+        with patch.object(
+            LlamaCppModel, "_assert_artifacts_stable",
+        ), patch.object(
+            LlamaCppModel, "execution_profile_digest",
+            new_callable=PropertyMock, return_value="a" * 64,
+        ), patch.object(
+            LlamaCppModel, "_render_prompt", return_value="hello",
+        ), patch.object(
+            LlamaCppModel, "generation_limits",
+            return_value={
+                "max_output_utf8_bytes": 4096,
+                "max_output_tokens": 64,
+                "max_total_tokens": 4096,
+            },
+        ), patch.object(
+            LlamaCppModel, "_generation_schema", return_value=None,
+        ), patch.object(
+            LlamaCppModel, "_command",
+            return_value=[
+                sys.executable, "-c",
+                "import time; time.sleep(20)",
+            ],
+        ), patch.object(
+            LlamaCppModel, "_child_environment", return_value={},
+        ):
+            with self.assertRaisesRegex(
+                LocalResourcePressure, "sustained Metal memory pressure",
+            ):
+                model.infer(
+                    LocalInferenceRequest(prompt="local pressure probe"),
+                    threading.Event(),
+                )
+        self.assertGreaterEqual(len(samples), 3)
+        self.assertEqual(model._resource_preflight_checks, len(samples))
+        self.assertEqual(model._processes_started, 1)
+        self.assertEqual(model._processes_exited, 1)
+        self.assertFalse(model._active_processes)
+        self.assertFalse(model._draining_processes)
+        self.assertEqual(model._spawning_processes, 0)
+        self.assertGreaterEqual(model._termination_requests, 1)
 
     def test_native_kv_observation_is_owned_by_exact_execution_receipt(self):
         model = object.__new__(LlamaCppModel)
