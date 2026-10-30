@@ -261,9 +261,14 @@ class LongformVirtualMemory:
                 raise LongformMemoryError("longform page ordering or encoding corrupted")
             # Page length must be reasonable relative to *current* RAM.
             # A malicious SQLite row must not force unlimited decompression.
-            if type(length) is not int or length < 0 or length > max(
-                1024, probe_local_resources(self.path).resident_document_budget // 2
-            ):
+            resources = probe_local_resources(self.path)
+            page_limit = max(
+                1024, min(
+                    resources.read_chunk_bytes * 4,
+                    resources.resident_document_budget // 2,
+                ),
+            )
+            if type(length) is not int or length < 0 or length > page_limit:
                 raise LongformMemoryError("invalid longform page allocation")
             try:
                 if encoding == "zlib":
@@ -319,7 +324,12 @@ class LongformVirtualMemory:
         if (type(start_page) is not int or start_page < 0
                 or type(pages) is not int or pages < 1):
             raise LongformMemoryError("invalid page window")
-        safe = probe_local_resources(self.path).resident_document_budget // 4
+        # This caps one HTTP-sized materialization, not file size or archive.
+        # The model's verified context window remains a separate constraint.
+        safe = min(
+            8 * 1024 * 1024,
+            probe_local_resources(self.path).resident_document_budget // 4,
+        )
         if safe < 2048:
             raise LongformMemoryError("insufficient memory for longform page reading")
         if pages > max(1, safe // 1024):
@@ -363,7 +373,10 @@ class LongformVirtualMemory:
                 (expression, source_id, limit),
             ).fetchall()
             positions = [int(row[0]) for row in rows]
-            safe = probe_local_resources(self.path).resident_document_budget // 4
+            safe = min(
+                8 * 1024 * 1024,
+                probe_local_resources(self.path).resident_document_budget // 4,
+            )
             manifest, captured = self._read_verified(
                 source_id, selected=set(positions), max_selected_bytes=safe,
             )

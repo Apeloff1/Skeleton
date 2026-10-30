@@ -96,3 +96,44 @@ tests under host/WSL2/cgroups, GPU device-loss scenarios, partial disk I/O
 and power/thermal changes, profiling with real model weights, and replay-
 verified error/recovery handling. No release hold should be weakened merely
 because this controller returns a favorable plan.
+
+## Apple Silicon M-series virtual-memory extension
+
+`offline_resources.py` reads public macOS `hw.memsize`, `host_statistics64`
+free/inactive-page observations, and `vm.swapusage` **without changing kernel
+swap settings**. These are approximate observations: compression and wired
+pages are not extra free RAM. When macOS telemetry cannot be read, the manager
+uses its optional platform-appropriate fallback or refuses unsafe admission.
+
+`offline_resource_fabric.py` queries Metal's `hasUnifiedMemory`,
+`recommendedMaxWorkingSetSize` and `currentAllocatedSize` for an Apple Silicon
+default device. A Metal budget is capped by **both** current physical memory
+and the recommended GPU working-set remainder. Metal does not report a
+separate GPU RAM pool on M-series chips; the computed budget is advisory,
+not verified global free memory. No OS private memory cap is bypassed.
+
+`offline_longform_virtual.py` implements real application-managed virtual
+longform storage alongside, rather than inside, the macOS swapfile:
+- Selected local UTF-8 inputs streamed with descriptor-based source admission.
+- Private SQLite/WAL `FULL` durability, pagewise optional zlib compression,
+  SHA-256 source identity, ordered per-page digest and rolling hash chain.
+- Full archive/projection verification with **O(one page plus requested window)**
+  decoder memory, including fail-closed corruption and unexpected page checks.
+- Authenticated `POST /v1/resources/longform/ingest` (explicit approval),
+  `/verify`, `/window`, and `/search`. Per-read return payloads are
+  bounded by **live RAM headroom**; the archived source size is not capped.
+- User-facing offline workspace to stage a selected manuscript and search
+  its saved pages. Returned pages are **untrusted source evidence**, not
+  silently installed as model instructions or new model context.
+
+Metal `shared` buffers can be accessed by CPU and GPU but require proper
+command completion/synchronization. A read-only host mmap file is **not**
+an automatically Metal-coherent allocation. Native Metal/llama.cpp tensor
+paging, KV-cache migration and verified synchronization events remain a
+device-qualified backend follow-up, not a claim made by this extension.
+
+References:
+- https://developer.apple.com/documentation/metal/mtldevice/recommendedmaxworkingsetsize
+- https://developer.apple.com/documentation/metal/mtldevice/currentallocatedsize
+- https://developer.apple.com/documentation/metal/mtlstoragemode/shared
+- https://support.apple.com/guide/activity-monitor/view-memory-usage-actmntr1004/mac
