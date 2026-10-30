@@ -76,6 +76,22 @@ HTML = r"""<!doctype html>
       <input id="resource-streams" type="number" min="1" step="1" value="4">
       <button id="resource-plan" class="secondary" disabled>Calculate adaptive plan</button>
       <pre id="resource-plan-result">No workload planned.</pre>
+      <details><summary>Long-form virtual memory (Mac M-series / local)</summary>
+        <p class="hint">Spool selected, trusted local text files as compressed,
+        verified disk pages without loading the whole file into RAM.
+        This does not enlarge the model's trained context window.</p>
+        <label for="longform-root">Selected local directory (absolute path)</label>
+        <input id="longform-root" type="text" autocomplete="off" spellcheck="false">
+        <label for="longform-relative">Filename relative to selected directory</label>
+        <input id="longform-relative" type="text" autocomplete="off" spellcheck="false">
+        <label for="longform-grant"><input id="longform-grant" type="checkbox">
+          I approve this exact private disk-backed import</label>
+        <button id="longform-ingest" class="secondary" disabled>Stage long-form source</button>
+        <label for="longform-search">Search staged long-form pages</label>
+        <input id="longform-search" type="search" autocomplete="off">
+        <button id="longform-query" class="secondary" disabled>Retrieve verified passages</button>
+        <pre id="longform-status" aria-live="polite">No staged source.</pre>
+      </details>
     </section>
     <div class="sidebar-footer">
       <button id="fork" class="secondary">Fork conversation</button>
@@ -159,7 +175,7 @@ JAVASCRIPT = r"""'use strict';
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
-    network: new AbortController(), resourceTimer: null,
+    network: new AbortController(), resourceTimer: null, longformSourceId: null,
   };
   async function refreshResources() {
     if (!state.connected || !state.token) return;
@@ -168,9 +184,12 @@ JAVASCRIPT = r"""'use strict';
       const h = view.hardware || {};
       const gib = value => typeof value === 'number' ? (value / 1073741824).toFixed(2) + ' GiB' : 'unknown';
       const vram = view.gpus && view.gpus.length ? view.gpus.map(d =>
-        d.device + ': ' + gib(d.dedicated_free_bytes) + ' VRAM free' +
-        (d.shared_free_bytes === null ? ' · shared unknown' :
-          ' · ' + gib(d.shared_free_bytes) + ' host-shared (not additive)')
+        d.device + ': ' + (d.vendor === 'apple'
+          ? 'Metal unified · recommended set ' + gib(d.recommended_working_set_bytes)
+            + ' · currently allocated ' + gib(d.current_allocated_bytes)
+          : gib(d.dedicated_free_bytes) + ' VRAM free' +
+            (d.shared_free_bytes === null ? ' · shared unknown' :
+              ' · ' + gib(d.shared_free_bytes) + ' host-shared (not additive)'))
       ).join('\n') : 'GPU telemetry unavailable — no VRAM allocation assumed';
       const c = view.controller || {};
       const throughput = typeof c.smoothed_read_bytes_per_second === 'number' ?
@@ -220,6 +239,8 @@ JAVASCRIPT = r"""'use strict';
     get('disconnect').disabled = !state.connected && !state.token;
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
+    get('longform-ingest').disabled = locked || state.busy;
+    get('longform-query').disabled = locked || state.busy || !state.longformSourceId;
     const progress = !!state.turn;
     get('turn-progress').hidden = !progress;
     get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
@@ -250,6 +271,8 @@ JAVASCRIPT = r"""'use strict';
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
     get('resource-plan-result').textContent = 'No workload planned.';
+    get('longform-status').textContent = 'No staged source.';
+    state.longformSourceId = null;
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
@@ -608,6 +631,34 @@ JAVASCRIPT = r"""'use strict';
       '\nChunk bytes ' + plan.transfer_chunk_bytes +
       '\nRead-only staging ' + (plan.readonly_staging ? 'recommended' : 'optional') +
       '\nGPU transfer: backend qualification required';
+  }));
+  get('longform-ingest').addEventListener('click', () => run(async () => {
+    if (!get('longform-grant').checked) throw new Error('Approve this source first.');
+    const root = get('longform-root').value.trim();
+    const relative_path = get('longform-relative').value.trim();
+    if (!root || !relative_path) throw new Error('Choose the selected root and filename.');
+    const receipt = await api('POST', '/v1/resources/longform/ingest',
+      {root, relative_path, approved: true});
+    state.longformSourceId = receipt.source_id;
+    get('longform-grant').checked = false;
+    get('longform-status').textContent =
+      'Private archive verified: ' + receipt.source_sha256.slice(0, 20) +
+      '…\nBytes: ' + receipt.source_bytes +
+      '\nPages: ' + receipt.page_count +
+      '\nDisk payload: ' + receipt.stored_payload_bytes;
+    updateControls();
+  }));
+  get('longform-query').addEventListener('click', () => run(async () => {
+    if (!state.longformSourceId) throw new Error('Stage a source before searching.');
+    const query = get('longform-search').value.trim();
+    if (!query) throw new Error('Enter a query.');
+    const evidence = await api('POST', '/v1/resources/longform/search',
+      {source_id: state.longformSourceId, query, limit: 3});
+    get('longform-status').textContent =
+      'Verified ' + evidence.source_sha256.slice(0, 20) +
+      '…\n' + evidence.hits.map(h =>
+        'Page ' + h.page + ': ' + h.text.slice(0, 400)
+      ).join('\n\n');
   }));
   get('new').addEventListener('click', () => run(async () => {
     const system = get('system-prompt').value.trim();
