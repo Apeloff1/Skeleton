@@ -252,6 +252,10 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
         model._resource_preflight_checks = 0
         model._inference_admitted = False
         samples = []
+        releases = []
+        model._resource_lease_factory = (
+            lambda: lambda: releases.append("released")
+        )
         def guard():
             samples.append(True)
             if len(samples) == 3:
@@ -299,6 +303,7 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
         self.assertFalse(model._draining_processes)
         self.assertEqual(model._spawning_processes, 0)
         self.assertGreaterEqual(model._termination_requests, 1)
+        self.assertEqual(releases, ["released"])
 
     def test_native_kv_observation_is_owned_by_exact_execution_receipt(self):
         model = object.__new__(LlamaCppModel)

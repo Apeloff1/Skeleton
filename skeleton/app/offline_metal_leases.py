@@ -68,7 +68,9 @@ def reserve_apple_llama_runtime(model: object) -> Callable[[], None]:
     if not layers:
         return lambda: None
     geometry = model.serving_metadata
-    if not geometry.block_count or not geometry.kv_bytes_per_token_upper_bound:
+    if (not geometry.block_count
+            or not (config.kv_bytes_per_token
+                    or geometry.kv_bytes_per_token_upper_bound)):
         raise LocalResourcePressure("unverified native KV/layer geometry")
     snapshot = probe_local_resources(model.model_artifact.path)
     apple = next((

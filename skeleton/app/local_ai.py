@@ -63,8 +63,12 @@ def load_gguf_deployment(source: str | Path) -> LlamaCppModel:
         profile, receipt = plan_metal_llama_launch(model)
         model.activate_prelaunch_resource_profile(profile)
         if profile.gpu_layers:
+            from skeleton.app.offline_metal_leases import reserve_apple_llama_runtime
             model.install_prelaunch_resource_guard(
                 lambda: require_live_metal_headroom(model)
+            )
+            model.install_resource_lease_factory(
+                lambda: reserve_apple_llama_runtime(model)
             )
         model.adaptive_metal_receipt = receipt.as_dict()
     return model
