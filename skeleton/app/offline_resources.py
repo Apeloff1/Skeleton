@@ -292,6 +292,21 @@ def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapsh
     )
 
 
+def admit_disk_document(snapshot: LocalResourceSnapshot, size_bytes: int) -> None:
+    """Reserve realistic SQLite/FTS/WAL space for streaming disk offload.
+
+    This is a measured free-volume reservation, not a per-file quota. A
+    full disk never causes truncation or premature deletion of existing data.
+    """
+    if type(size_bytes) is not int or size_bytes < 0:
+        raise ValueError("invalid source size")
+    if size_bytes > snapshot.disk_document_budget:
+        raise LocalResourcePressure(
+            "Insufficient disk/WAL headroom for adaptive source offloading; "
+            "free disk space or select another local storage volume."
+        )
+
+
 def admit_resident_document(
     snapshot: LocalResourceSnapshot, size_bytes: int, *, write: bool = False
 ) -> None:
@@ -315,4 +330,5 @@ def admit_resident_document(
 __all__ = [
     "LocalResourcePressure", "LocalResourceSnapshot",
     "probe_local_resources", "admit_resident_document",
+    "admit_disk_document",
 ]
