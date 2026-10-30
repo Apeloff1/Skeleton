@@ -58,3 +58,10 @@ def test_review_does_not_claim_external_proof(tmp_path):
     assert store.snapshot()["tasks"]["source-canon"]["status"]=="reviewed_claim"
     assert store.snapshot()["completion_evidence_verified"] is False
     store.claim("quest-integration",worker="second",token="next",authorized=True)
+
+def test_created_journal_file_is_private(tmp_path):
+    import os
+    root,graph=_owner(tmp_path)
+    WorkJournal(root,graph,authorized=True)
+    if os.name=="posix":
+        assert (root/"studio_work.sqlite3").stat().st_mode & 0o077 == 0

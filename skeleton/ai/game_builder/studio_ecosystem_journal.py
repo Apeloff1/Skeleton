@@ -85,6 +85,27 @@ def _safe_database(path: Path) -> None:
             raise StudioQuestError("journal file must be owned and private")
 
 
+def _create_private_database(path: Path) -> None:
+    """Prevent SQLite's default umask from creating a world-readable DB."""
+    _safe_database(path)
+    if path.exists():
+        return
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(path, flags, 0o600)
+    except FileExistsError:
+        _safe_database(path)
+        return
+    try:
+        if os.name == "posix":
+            os.fchmod(fd, 0o600)
+    finally:
+        os.close(fd)
+    _safe_database(path)
+
+
 class WorkJournal:
     """Atomic work claims, unverified submissions, and explicit review decisions."""
 
@@ -95,7 +116,7 @@ class WorkJournal:
         _private_directory(self.root)
         self.path = self.root / "studio_work.sqlite3"
         self.project, self.source, self.graph_digest, self.tasks = checked_graph(graph)
-        _safe_database(self.path)
+        _create_private_database(self.path)
         with self._tx() as db:
             db.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             db.execute("""CREATE TABLE IF NOT EXISTS tasks (
