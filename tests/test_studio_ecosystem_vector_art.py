@@ -29,3 +29,9 @@ def test_invalid_colour_refused_before_asset_generation():
     docs["visual"]["art_direction"]["palette"][0]="url(javascript:alert(1))"
     with pytest.raises(StudioQuestError):
         render_environment_svg(docs)
+
+def test_wave1_original_biome_palette_produces_real_svg():
+    docs=read_blueprint("studio_puzzle_expedition_copper_mesa")
+    image=render_environment_svg(docs)
+    assert ET.fromstring(image).tag.endswith("svg")
+    assert vector_art_receipt(docs)["svg_bytes"]==len(image)
