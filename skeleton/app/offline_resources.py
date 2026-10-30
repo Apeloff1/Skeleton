@@ -238,6 +238,44 @@ def _windows_memory() -> tuple[int, int] | None:
     return status[:2] if status else None
 
 
+def _windows_cpu_load() -> float | None:
+    """Measure actual CPU utilization with two native GetSystemTimes samples."""
+    if os.name != "nt":
+        return None
+    import time
+
+    class FileTime(ctypes.Structure):
+        _fields_ = [
+            ("low", ctypes.c_uint32), ("high", ctypes.c_uint32),
+        ]
+
+    def read() -> tuple[int, int, int] | None:
+        idle, kernel, user = FileTime(), FileTime(), FileTime()
+        try:
+            ok = ctypes.windll.kernel32.GetSystemTimes(
+                ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user),
+            )
+        except (AttributeError, OSError):
+            return None
+        if not ok:
+            return None
+        values = []
+        for item in (idle, kernel, user):
+            values.append((item.high << 32) | item.low)
+        return values[0], values[1], values[2]
+
+    before = read()
+    if before is None:
+        return None
+    time.sleep(0.05)
+    after = read()
+    if after is None:
+        return None
+    idle = max(0, after[0] - before[0])
+    total = max(0, after[1] - before[1]) + max(0, after[2] - before[2])
+    return min(1.0, max(0.0, 1 - idle / total)) if total else None
+
+
 def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapshot:
     """Sample resource headroom for the target storage volume *now*."""
     windows = _windows_memory_status() if os.name == "nt" else None
@@ -280,13 +318,17 @@ def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapsh
     try:
         load = os.getloadavg()[0] / cores
     except (AttributeError, OSError):
-        # Windows does not expose Unix load averages. Prefer actual CPU usage
-        # when psutil is available; no invented pressure measurement.
-        try:
-            import psutil  # type: ignore[import-not-found]
-            load = psutil.cpu_percent(interval=None) / 100.0
-        except (ImportError, OSError, AttributeError):
-            load = 0.0
+        # Native Windows system times avoid depending on optional psutil.
+        measured = _windows_cpu_load()
+        if measured is not None:
+            load = measured
+        else:
+            try:
+                import psutil  # type: ignore[import-not-found]
+                load = psutil.cpu_percent(interval=0.05) / 100.0
+            except (ImportError, OSError, AttributeError):
+                # Unknown CPU state is not an assertion of idle capacity.
+                load = 1.0
     return LocalResourceSnapshot(
         total_ram_bytes=int(memory[0]),
         available_ram_bytes=int(memory[1]),
