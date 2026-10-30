@@ -7,6 +7,8 @@ from pathlib import Path
 
 from skeleton.ai.game_builder.studio_ecosystem_portfolio import StudioPortfolio
 from skeleton.ai.game_builder.studio_ecosystem_preview_batch import build_catalog_preview_batch
+from skeleton.ai.game_builder.studio_ecosystem_parallel import produce_parallel_games
+from skeleton.ai.game_builder.studio_ecosystem_catalog import list_blueprints
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -25,6 +27,8 @@ def main(argv: list[str] | None = None) -> int:
                       help="Package authored interactive stage choices (V2)")
     mode.add_argument("--walkable-story",action="store_true",
                       help="Produce full offline walkable scene quest prototype (V3)")
+    parser.add_argument("--parallel",action="store_true",
+                        help="Use resource-admitted concurrent game producers")
     parser.add_argument("--genre",help="Optional registered source taxonomy filter")
     parser.add_argument("--biome",help="Optional registered source taxonomy filter")
     parser.add_argument("--working-set-bytes",type=int,default=64*1024*1024,
@@ -37,14 +41,23 @@ def main(argv: list[str] | None = None) -> int:
     try:
         owner=StudioPortfolio(args.private_root,authorized=True)
         selection=None if args.all else args.project
-        report=build_catalog_preview_batch(
-            owner,args.output_root,project_ids=selection,
-            genre=args.genre,biome=args.biome,
-            working_set_bytes=args.working_set_bytes,
-            estimated_output_bytes=args.estimated_output_bytes,
-            interactive_story=args.interactive_story,
-            walkable_story=args.walkable_story,
-            authorized=True)
+        if args.parallel:
+            selected=(sorted(p["id"] for p in list_blueprints(
+                genre=args.genre,biome=args.biome)) if args.all else selection)
+            report=produce_parallel_games(
+                owner,args.output_root,project_ids=selected,
+                working_set_bytes=args.working_set_bytes,
+                estimated_output_bytes=args.estimated_output_bytes,
+                interactive_story=args.interactive_story,
+                walkable_story=args.walkable_story,authorized=True)
+        else:
+            report=build_catalog_preview_batch(
+                owner,args.output_root,project_ids=selection,
+                genre=args.genre,biome=args.biome,
+                working_set_bytes=args.working_set_bytes,
+                estimated_output_bytes=args.estimated_output_bytes,
+                interactive_story=args.interactive_story,
+                walkable_story=args.walkable_story,authorized=True)
     except (StudioQuestError,StudioEcosystemError,OSError,ValueError) as exc:
         parser.error(str(exc))
     print(json.dumps(report,sort_keys=True,ensure_ascii=True,allow_nan=False))
