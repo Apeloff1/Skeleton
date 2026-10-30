@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 496,
+  "project_count": 512,
   "sections": [
     "intent",
     "narrative",
@@ -2988,10 +2988,106 @@
       "genre": "historical_citybuilder",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_collaborative_robotics_copper_mesa",
+      "genre": "collaborative_robotics",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_collaborative_robotics_glacial_fjord",
+      "genre": "collaborative_robotics",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_collaborative_robotics_ashen_archipelago",
+      "genre": "collaborative_robotics",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_collaborative_robotics_luminous_marsh",
+      "genre": "collaborative_robotics",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_cloud_canopy",
+      "genre": "collaborative_robotics",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_ion_wastes",
+      "genre": "collaborative_robotics",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_collaborative_robotics_frosted_crater",
+      "genre": "collaborative_robotics",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_collaborative_robotics_salt_dunes",
+      "genre": "collaborative_robotics",
+      "biome": "salt_dunes",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_collaborative_robotics_sunken_metro",
+      "genre": "collaborative_robotics",
+      "biome": "sunken_metro",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_collaborative_robotics_verdant_caldera",
+      "genre": "collaborative_robotics",
+      "biome": "verdant_caldera",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_glass_steppe",
+      "genre": "collaborative_robotics",
+      "biome": "glass_steppe",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_collaborative_robotics_orbital_gardens",
+      "genre": "collaborative_robotics",
+      "biome": "orbital_gardens",
+      "theme": "space"
+    },
+    {
+      "id": "studio_collaborative_robotics_misty_breakwater",
+      "genre": "collaborative_robotics",
+      "biome": "misty_breakwater",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_collaborative_robotics_neon_undercity",
+      "genre": "collaborative_robotics",
+      "biome": "neon_undercity",
+      "theme": "arcade"
+    },
+    {
+      "id": "studio_collaborative_robotics_amber_highlands",
+      "genre": "collaborative_robotics",
+      "biome": "amber_highlands",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_collaborative_robotics_echo_caverns",
+      "genre": "collaborative_robotics",
+      "biome": "echo_caverns",
+      "theme": "arcade"
     }
   ],
   "claims": {
-    "source_files": 3968,
+    "source_files": 4096,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
