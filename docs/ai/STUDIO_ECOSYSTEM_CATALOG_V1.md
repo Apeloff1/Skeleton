@@ -14,7 +14,16 @@ Use `python scripts/studio_ecosystem_cli.py --genre puzzle_expedition` to search
 the catalog; `--project <id>` reads a complete plan. To build a solvable,
 deterministic HTML5 grid *preview* through the existing engine, run
 `python scripts/studio_ecosystem_cli.py --project <id> --compile-preview --output ./new_output_dir`.
-The result includes a real simulated winning replay receipt. The production
+The result includes a real simulated winning replay receipt.
+
+To compile multiple source briefs into playable offline grid previews, create an
+output folder and run `python scripts/studio_ecosystem_cli.py --genre
+puzzle_expedition --materialize-batch --output ./preview_outputs`.
+This uses source-validated project IDs, a total output byte budget, per-project
+exclusive directory creation, real replay verification and content-addressed
+receipts; it does **not** silently overwrite prior outputs, import arbitrary
+scripts, or activate any other runtime. The operator should set the output
+root to its own scratch/artifact storage rather than commit generated HTML to Git. The production
 genres, 3D models, animations, music, dialogue, native builds, and multiplayer
 systems are **not** implemented by these content briefs. None is certified for
 publication without independent completion and review.
