@@ -130,3 +130,15 @@ def test_event_replay_rejects_task_row_forgery_even_when_chain_is_intact(tmp_pat
         db.execute("UPDATE tasks SET status='reviewed_claim' WHERE id='source-canon'")
     with pytest.raises(StudioQuestError):
         WorkJournal(root,graph,authorized=True)
+
+def test_lease_token_is_hashed_and_bound_to_replayed_claim(tmp_path):
+    root,graph=_owner(tmp_path)
+    j=WorkJournal(root,graph,authorized=True)
+    j.claim("source-canon",worker="a",token="high-entropy-secret",authorized=True)
+    with sqlite3.connect(root/"studio_work.sqlite3") as db:
+        value=db.execute("SELECT token FROM tasks WHERE id='source-canon'").fetchone()[0]
+        assert value!="high-entropy-secret"
+        assert len(value)==64
+        db.execute("UPDATE tasks SET token=? WHERE id='source-canon'",("b"*64,))
+    with pytest.raises(StudioQuestError):
+        j.verify_state()
