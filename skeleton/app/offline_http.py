@@ -445,6 +445,28 @@ class OfflineHTTPApplication:
                 ).as_dict()
             except (OSError, ValueError, RuntimeError) as exc:
                 raise OfflineHTTPError(422, "resource plan rejected by live hardware policy") from exc
+        if path == "/v1/resources/stage" and method == "POST":
+            # An explicit authenticated local operator may stage selected
+            # regular files for read-only, digest-verified concurrent I/O.
+            # No file contents or credential-bearing paths are returned.
+            _fields(body, {"root", "paths", "desired_streams", "approved"},
+                    {"root", "paths", "approved"})
+            if body["approved"] is not True:
+                raise OfflineHTTPError(403, "read-only file staging requires operator approval")
+            if (not isinstance(body["root"], str) or
+                    not isinstance(body["paths"], list) or
+                    not all(isinstance(item, str) for item in body["paths"])):
+                raise OfflineHTTPError(400, "invalid selected local sources")
+            try:
+                records = self.resource_fabric.stream_readonly(
+                    body["root"], body["paths"],
+                    desired_streams=body.get("desired_streams", 4),
+                )
+                return 200, {"schema": "skeleton.offline.readonly-staging.v1",
+                             "sources": list(records), "verified": True,
+                             "gpu_transfer_executed": False}
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise OfflineHTTPError(422, "local read-only staging rejected") from exc
         if path == "/v1/status" and method == "GET":
             with self._turn_lock:
                 active = next((t for t in self._turns.values()
