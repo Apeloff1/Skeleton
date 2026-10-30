@@ -60,6 +60,18 @@ class LocalResourceBudgetTests(unittest.TestCase):
              patch.object(offline_resources, "_read_counter", side_effect=counter):
             self.assertEqual(_linux_memory(), (2_000_000_000, 500_000_000))
 
+    def test_cpu_quota_is_respected(self):
+        from unittest.mock import mock_open
+        from skeleton.app import offline_resources
+        with TemporaryDirectory() as temp:
+            with patch.object(offline_resources, "_linux_memory",
+                              return_value=(8_000_000_000, 4_000_000_000)), \
+                 patch.object(offline_resources.os, "cpu_count", return_value=12), \
+                 patch.object(offline_resources.Path, "read_text",
+                              return_value="150000 100000"):
+                snap = probe_local_resources(temp)
+            self.assertEqual(snap.cpu_count, 2)
+
     def test_probe_reports_host_disk_and_recomputes(self):
         with TemporaryDirectory() as temp:
             with patch("skeleton.app.offline_resources._linux_memory",

@@ -21,13 +21,17 @@ from typing import Any
 
 from .offline_library import OfflineDocumentLibrary, _root
 from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
+from .offline_resources import (
+    LocalResourcePressure, probe_local_resources, admit_resident_document,
+)
 
 
 SCHEMA = "skeleton.app.offline_index_queue.v1"
 MAX_ATTEMPTS = 3
 LEASE_SECONDS = 900
 MAX_RUN_BATCH = 20
-MAX_STORED_JOBS = 5000
+# Legacy name retained for callers; local queues have no fixed row quota.
+MAX_STORED_JOBS = None
 
 
 class OfflineQueueError(RuntimeError):
@@ -200,13 +204,15 @@ class OfflineIndexQueue:
                 if row is not None:
                     self._db.execute("COMMIT")
                     return _as_job(row)
-                total = self._db.execute(
-                    "SELECT COUNT(*) FROM offline_index_jobs"
-                ).fetchone()[0]
-                if total >= MAX_STORED_JOBS:
-                    raise OfflineQueueError(
-                        "local indexing queue storage quota is exhausted"
+                # Admission is governed by actual SQLite volume headroom.
+                try:
+                    storage = probe_local_resources(self.path)
+                    admit_resident_document(
+                        storage, len(source.encode()) + len(target.encode()) + 2048,
+                        write=True,
                     )
+                except LocalResourcePressure as exc:
+                    raise OfflineQueueError(str(exc)) from exc
                 job_id = secrets.token_hex(16)
                 self._db.execute(
                     "INSERT INTO offline_index_jobs "
@@ -369,9 +375,16 @@ class OfflineIndexQueue:
         except Exception as exc:
             return self._finish(job, token, error=exc)
 
-    def drain(self, *, limit: int = MAX_RUN_BATCH) -> tuple[IndexJob, ...]:
-        if type(limit) is not int or not 1 <= limit <= MAX_RUN_BATCH:
-            raise OfflineQueueError("offline drain batch must contain 1-20 jobs")
+    def drain(self, *, limit: int | None = None) -> tuple[IndexJob, ...]:
+        # Default job batch follows available CPU and RAM at invocation.
+        # An explicit operator-selected limit remains an upper bound.
+        if limit is None:
+            try:
+                limit = probe_local_resources(self.path).suggested_index_jobs
+            except LocalResourcePressure as exc:
+                raise OfflineQueueError(str(exc)) from exc
+        if type(limit) is not int or limit < 1:
+            raise OfflineQueueError("offline drain limit must be positive")
         completed: list[IndexJob] = []
         for _ in range(limit):
             job = self.run_one()

@@ -77,7 +77,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--queue-status", action="store_true", help="show durable local index jobs")
     parser.add_argument("--cancel-queue-job", help="cancel a queued indexing job by id")
     parser.add_argument("--retry-queue-job", help="retry a terminal failed indexing job by id")
-    parser.add_argument("--drain-limit", type=int, default=5, help="maximum queued indexing jobs per invocation")
+    parser.add_argument("--drain-limit", type=int, default=None,
+                        help="operator maximum; omitted selects current CPU/RAM budget")
     parser.add_argument("--snapshot-to", help="publish portable SQLite recovery folder")
     parser.add_argument("--restore-from", help="restore verified SQLite recovery folder")
     parser.add_argument("--verify-snapshot", help="verify portable local recovery folder")
@@ -476,8 +477,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             or (args.cancel_queue_job and args.retry_queue_job)
             or (args.cancel_queue_job and (args.enqueue_dir or args.run_queue))
             or (args.retry_queue_job and (args.enqueue_dir or args.run_queue))
-            or type(args.drain_limit) is not int
-            or not 1 <= args.drain_limit <= 20
+            or (args.drain_limit is not None and
+                (type(args.drain_limit) is not int or args.drain_limit < 1))
         ):
             print("invalid offline queue arguments; select explicit local queue and index paths", file=sys.stderr)
             return 2

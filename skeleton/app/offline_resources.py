@@ -169,10 +169,26 @@ def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapsh
     except OSError as exc:
         raise LocalResourcePressure("Cannot measure local storage headroom") from exc
     cores = max(1, os.cpu_count() or 1)
+    # cgroup CPU quotas can be smaller than the visible host core count.
+    try:
+        quota_file = Path("/sys/fs/cgroup/cpu.max")
+        parts = quota_file.read_text(encoding="ascii").split()
+        if len(parts) == 2 and parts[0].isdecimal() and parts[1].isdecimal():
+            quota, period = int(parts[0]), int(parts[1])
+            if period > 0:
+                cores = min(cores, max(1, math.ceil(quota / period)))
+    except (OSError, UnicodeError, ValueError):
+        pass
     try:
         load = os.getloadavg()[0] / cores
     except (AttributeError, OSError):
-        load = 0.0
+        # Windows does not expose Unix load averages. Prefer actual CPU usage
+        # when psutil is available; no invented pressure measurement.
+        try:
+            import psutil  # type: ignore[import-not-found]
+            load = psutil.cpu_percent(interval=None) / 100.0
+        except (ImportError, OSError, AttributeError):
+            load = 0.0
     return LocalResourceSnapshot(
         total_ram_bytes=int(memory[0]),
         available_ram_bytes=int(memory[1]),

@@ -25,10 +25,12 @@ from .offline_resources import (
 )
 
 
-def _require_local_headroom(size_bytes: int, *, write: bool = False) -> None:
+def _require_local_headroom(
+    size_bytes: int, *, write: bool = False, storage_path: str | Path = "."
+) -> None:
     try:
         admit_resident_document(
-            probe_local_resources(), size_bytes, write=write
+            probe_local_resources(storage_path), size_bytes, write=write
         )
     except LocalResourcePressure as exc:
         raise RuntimeContractError(str(exc)) from exc
@@ -163,6 +165,10 @@ class OfflineKnowledgeLibrary:
         if not isinstance(store, OfflineChatStore):
             raise RuntimeContractError("a canonical local SQLite store is required")
         self.store = store
+        # PRAGMA exposes the actual SQLite volume (including WAL placement).
+        # In-memory stores intentionally use the current local working volume.
+        database = store._db.execute("PRAGMA database_list").fetchone()
+        self._storage_path = database[2] if database and database[2] else "."
         self.model_digest = _identity(model_digest, "model digest")
         self.tokenizer_digest = _identity(tokenizer_digest, "tokenizer digest")
         with store._lock:
@@ -224,9 +230,13 @@ class OfflineKnowledgeLibrary:
 
         # The current model-scoped index materializes complete sources/chunks.
         # Admission therefore follows live RAM and free disk, not file count.
-        _require_local_headroom(len(content), write=True)
+        _require_local_headroom(
+            len(content), write=True, storage_path=self._storage_path
+        )
         payload = self._validate(title, content)
-        _require_local_headroom(len(payload), write=True)
+        _require_local_headroom(
+            len(payload), write=True, storage_path=self._storage_path
+        )
         digest = sha256(payload).hexdigest()
         pieces = self._chunks(content)
         if not any(_terms(piece[2]) for piece in pieces):
@@ -283,7 +293,9 @@ class OfflineKnowledgeLibrary:
                     "WHERE model_digest=? AND tokenizer_digest=?",
                     (self.model_digest, self.tokenizer_digest),
                 ).fetchone()[0]
-                _require_local_headroom(int(source_bytes) * 2)
+                _require_local_headroom(
+                    int(source_bytes) * 2, storage_path=self._storage_path
+                )
                 documents = self.store._db.execute(
                     "SELECT document_id, title, content_digest, content_text, "
                     "created_ns FROM offline_documents "
