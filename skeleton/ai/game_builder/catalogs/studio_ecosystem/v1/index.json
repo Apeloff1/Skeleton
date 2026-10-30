@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 368,
+  "project_count": 376,
   "sections": [
     "intent",
     "narrative",
@@ -2220,10 +2220,58 @@
       "genre": "tactical_command",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_creature_sanctuary_copper_mesa",
+      "genre": "creature_sanctuary",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_creature_sanctuary_glacial_fjord",
+      "genre": "creature_sanctuary",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_creature_sanctuary_ashen_archipelago",
+      "genre": "creature_sanctuary",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_creature_sanctuary_luminous_marsh",
+      "genre": "creature_sanctuary",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_creature_sanctuary_cloud_canopy",
+      "genre": "creature_sanctuary",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_creature_sanctuary_ion_wastes",
+      "genre": "creature_sanctuary",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_creature_sanctuary_frosted_crater",
+      "genre": "creature_sanctuary",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_creature_sanctuary_salt_dunes",
+      "genre": "creature_sanctuary",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 2944,
+    "source_files": 3008,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
