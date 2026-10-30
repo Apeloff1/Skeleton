@@ -180,7 +180,7 @@ jobs:
     # Scope native qualification to the active hardware PR; normal app E2E
     # remains unchanged for other branches and main. This is an existing
     # workflow, not an additional automatically admitted workflow file.
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 4369 && !github.event.pull_request.draft }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.number == 4369 && !github.event.pull_request.draft) }}
     runs-on: macos-15
     timeout-minutes: 15
     permissions:
