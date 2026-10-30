@@ -18,19 +18,20 @@ ROOT = Path(__file__).resolve().parent / "catalogs" / "studio_ecosystem" / "v1"
 SECTIONS = ("intent", "narrative", "cast", "quest", "scene", "visual", "audio", "verification")
 IDENT = re.compile(r"^[a-z][a-z0-9_-]{2,75}$")
 MAX_FILE_BYTES = 32768
+MAX_INDEX_BYTES = 256 * 1024
 
 
 class StudioEcosystemError(ValueError):
     """Untrusted or incomplete studio production blueprint."""
 
 
-def _read_json(path: Path) -> dict[str, Any]:
+def _read_json(path: Path, *, maximum: int = MAX_FILE_BYTES) -> dict[str, Any]:
     if path.is_symlink() or not path.is_file():
         raise StudioEcosystemError("missing or linked blueprint file")
-    if path.stat().st_size > MAX_FILE_BYTES:
+    if path.stat().st_size > maximum:
         raise StudioEcosystemError("oversize blueprint file")
     data = path.read_bytes()
-    if len(data) > MAX_FILE_BYTES:
+    if len(data) > maximum:
         raise StudioEcosystemError("blueprint file changed during read")
     try:
         def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -55,7 +56,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def catalog_index(*, root: Path = ROOT) -> tuple[dict[str, str], ...]:
-    index = _read_json(root / "index.json")
+    index = _read_json(root / "index.json", maximum=MAX_INDEX_BYTES)
     if index.get("schema") != SCHEMA or index.get("sections") != list(SECTIONS):
         raise StudioEcosystemError("wrong studio ecosystem index contract")
     records = index.get("projects")
