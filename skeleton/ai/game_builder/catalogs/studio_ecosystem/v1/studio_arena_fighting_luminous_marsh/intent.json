@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_luminous_marsh",
+  "title": "Luminous Marsh: The Open Tournament",
+  "subtitle": "Original the open tournament design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010310699,
+  "width": 25,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 10,
+  "theme": "forest",
+  "starting_health": 3
+}
