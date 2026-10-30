@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_orbital_gardens",
+  "title": "Orbital Gardens: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010314432,
+  "width": 21,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 9,
+  "theme": "space",
+  "starting_health": 6
+}

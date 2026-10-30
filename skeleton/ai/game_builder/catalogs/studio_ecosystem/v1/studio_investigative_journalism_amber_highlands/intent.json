@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_amber_highlands",
+  "title": "Amber Highlands: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010314543,
+  "width": 27,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 5
+}
