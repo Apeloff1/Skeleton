@@ -128,6 +128,7 @@ class WorkJournal:
                 seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL,
                 previous_sha TEXT NOT NULL, event_sha TEXT NOT NULL
             )""")
+            self._verify_chain(db)
             rows = dict(db.execute("SELECT key, value FROM meta"))
             expected = {"schema": SCHEMA, "project": self.project,
                         "source": self.source, "graph": self.graph_digest}
@@ -163,6 +164,37 @@ class WorkJournal:
             raise
         finally:
             db.close()
+
+    @staticmethod
+    def _verify_chain(db: sqlite3.Connection) -> str:
+        """Replay every durable event before trusting any stored task status."""
+        prior = "0"*64
+        for encoded, parent, fingerprint in db.execute(
+            "SELECT event_json,previous_sha,event_sha FROM events ORDER BY seq"
+        ):
+            if not isinstance(encoded, str) or parent != prior:
+                raise StudioQuestError("journal event predecessor mismatch")
+            if sha256(encoded.encode("utf-8")).hexdigest() != fingerprint:
+                raise StudioQuestError("journal event digest mismatch")
+            try:
+                event = json.loads(encoded)
+            except (TypeError, ValueError) as exc:
+                raise StudioQuestError("invalid durable event") from exc
+            if (not isinstance(event, dict) or
+                    set(event) != {"kind","task","actor","previous"} or
+                    event["previous"] != prior or canonical(event) != encoded):
+                raise StudioQuestError("noncanonical durable event chain")
+            prior = fingerprint
+        return prior
+
+    def verify_events(self) -> dict[str, object]:
+        with self._tx() as db:
+            last = self._verify_chain(db)
+            count = db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+            return {"schema":"skeleton.game_builder.studio_work_journal_audit.v1",
+                    "project_id":self.project,"events":count,
+                    "final_sha256":last,"external_attestation_verified":False,
+                    "release_certified":False}
 
     def snapshot(self) -> dict[str, object]:
         with self._tx() as db:
