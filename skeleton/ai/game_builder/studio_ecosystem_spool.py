@@ -112,6 +112,52 @@ class ArtifactSpool:
             raise StudioQuestError("verified window outside object")
         return total,bytes(selected)
 
+    def export_verified(self, fingerprint: str, destination: Path, *,
+                        authorized: bool) -> dict[str, object]:
+        """Stream a verified private spool object to a new owner-only output.
+
+        A failed integrity check removes only this newly created file. Never
+        overwrites or mutates an existing operator document.
+        """
+        if not authorized:
+            raise PermissionError("verified export requires operator authorization")
+        destination=Path(destination)
+        _private_directory(destination.parent)
+        if destination.exists() or destination.is_symlink():
+            raise StudioQuestError("artifact export cannot overwrite a path")
+        source=self._target(fingerprint)
+        flags=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)
+        output_flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0)
+        bytes_written=0
+        h=sha256()
+        created=False
+        try:
+            with os.fdopen(os.open(source,flags),"rb") as reader:
+                original=os.fstat(reader.fileno())
+                if (not stat.S_ISREG(original.st_mode) or original.st_nlink!=1 or
+                        (os.name=="posix" and original.st_mode & 0o077)):
+                    raise StudioQuestError("unsafe object source")
+                with os.fdopen(os.open(destination,output_flags,0o600),"wb") as writer:
+                    created=True
+                    while block:=reader.read(1024*1024):
+                        h.update(block)
+                        writer.write(block)
+                        bytes_written+=len(block)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                after=os.fstat(reader.fileno())
+            if (original.st_dev!=after.st_dev or original.st_ino!=after.st_ino or
+                    original.st_size!=after.st_size or
+                    original.st_mtime_ns!=after.st_mtime_ns or
+                    h.hexdigest()!=fingerprint):
+                raise StudioQuestError("exported source failed full verification")
+            return {"sha256":fingerprint,"bytes":bytes_written,
+                    "content_verified":True,"external_rights_verified":False}
+        except BaseException:
+            if created:
+                destination.unlink(missing_ok=True)
+            raise
+
     def verify(self, fingerprint: str) -> int:
         return self._read_verified(fingerprint,offset=0,length=None)[0]
 
