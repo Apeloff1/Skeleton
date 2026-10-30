@@ -5,7 +5,6 @@ count limit; only verbose error details are bounded for caller memory.
 """
 from __future__ import annotations
 
-from hashlib import sha256
 import os
 
 from .studio_ecosystem_journal import HEX, _private_directory

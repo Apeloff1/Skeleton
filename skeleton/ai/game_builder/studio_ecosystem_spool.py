@@ -103,11 +103,15 @@ class ArtifactSpool:
         if offset>total or length>total-offset:
             raise StudioQuestError("window outside verified artifact")
         target=self._target(fingerprint)
-        before=target.stat()
-        with target.open("rb") as stream:
+        flags=os.O_RDONLY
+        if hasattr(os,"O_NOFOLLOW"):
+            flags|=os.O_NOFOLLOW
+        with os.fdopen(os.open(target,flags),"rb") as stream:
+            before=os.fstat(stream.fileno())
             stream.seek(offset)
             out=stream.read(length)
-        after=target.stat()
-        if before.st_ino!=after.st_ino or before.st_mtime_ns!=after.st_mtime_ns or len(out)!=length:
+            after=os.fstat(stream.fileno())
+        if (before.st_ino!=after.st_ino or before.st_size!=after.st_size or
+                before.st_mtime_ns!=after.st_mtime_ns or len(out)!=length):
             raise StudioQuestError("artifact changed during read")
         return out
