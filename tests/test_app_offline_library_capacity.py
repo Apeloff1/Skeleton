@@ -7,6 +7,7 @@ from unittest.mock import patch
 import unittest
 
 from skeleton.app import offline_library
+from skeleton.app.offline_resources import LocalResourceSnapshot
 from skeleton.app.offline_library import OfflineDocumentLibrary, OfflineLibraryError
 
 
@@ -31,6 +32,60 @@ class LocalCapacityTests(unittest.TestCase):
                     self.assertEqual(library.count(), 2)
                     self.assertTrue(library.search("fidelity"))
                     self.assertEqual(library.index_directory(source)["updated_files"], 0)
+
+    def test_current_memory_pressure_blocks_only_unsafe_resident_work(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            source.mkdir()
+            (source / "large.txt").write_text("Local memory admission " * 2000)
+            plentiful = LocalResourceSnapshot(
+                total_ram_bytes=2_000_000_000, available_ram_bytes=1_000_000_000,
+                total_disk_bytes=100_000_000_000, free_disk_bytes=50_000_000_000,
+                cpu_count=8, cpu_load_ratio=0.1,
+            )
+            tight = LocalResourceSnapshot(
+                total_ram_bytes=2_000_000_000, available_ram_bytes=100_000,
+                total_disk_bytes=100_000_000_000, free_disk_bytes=50_000_000_000,
+                cpu_count=8, cpu_load_ratio=0.9,
+            )
+            with OfflineDocumentLibrary(root / "index.sqlite") as library:
+                with patch.object(offline_library, "probe_local_resources",
+                                  return_value=tight):
+                    with self.assertRaisesRegex(OfflineLibraryError, "RAM"):
+                        library.index_directory(source)
+                self.assertEqual(library.count(), 0)
+                with patch.object(offline_library, "probe_local_resources",
+                                  return_value=plentiful):
+                    self.assertEqual(library.index_directory(source)["indexed_files"], 1)
+
+    def test_current_disk_pressure_rolls_back_updates(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            source.mkdir()
+            (source / "large.txt").write_text("Disk pressure must not commit." * 300)
+            abundant = LocalResourceSnapshot(
+                total_ram_bytes=2_000_000_000, available_ram_bytes=1_000_000_000,
+                total_disk_bytes=1_000_000_000, free_disk_bytes=800_000_000,
+                cpu_count=4, cpu_load_ratio=0,
+            )
+            full = LocalResourceSnapshot(
+                total_ram_bytes=2_000_000_000, available_ram_bytes=1_000_000_000,
+                total_disk_bytes=1_000_000_000, free_disk_bytes=1_000_000,
+                cpu_count=4, cpu_load_ratio=0,
+            )
+            with OfflineDocumentLibrary(root / "index.sqlite") as library:
+                with patch.object(offline_library, "probe_local_resources",
+                                  return_value=abundant):
+                    library.index_directory(source)
+                (source / "large.txt").write_text("Changed content." * 300)
+                with patch.object(offline_library, "probe_local_resources",
+                                  return_value=full):
+                    with self.assertRaisesRegex(OfflineLibraryError, "disk"):
+                        library.index_directory(source)
+                self.assertTrue(library.search("Disk"))
+                self.assertFalse(library.search("Changed"))
 
     def test_invalid_source_rolls_back_entire_snapshot(self):
         with TemporaryDirectory() as temp:

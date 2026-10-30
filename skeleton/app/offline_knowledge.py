@@ -20,6 +20,18 @@ from typing import Any
 
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+from .offline_resources import (
+    LocalResourcePressure, probe_local_resources, admit_resident_document,
+)
+
+
+def _require_local_headroom(size_bytes: int, *, write: bool = False) -> None:
+    try:
+        admit_resident_document(
+            probe_local_resources(), size_bytes, write=write
+        )
+    except LocalResourcePressure as exc:
+        raise RuntimeContractError(str(exc)) from exc
 
 
 # Legacy symbolic names remain importable. None means no public-service quota.
@@ -71,11 +83,16 @@ def read_reference_file(path: Path) -> str:
                 raise RuntimeContractError("reference changed during file admission")
             if opened.st_size < 1:
                 raise RuntimeContractError("reference file is empty")
+            try:
+                resources = probe_local_resources(path)
+                admit_resident_document(resources, opened.st_size)
+            except LocalResourcePressure as exc:
+                raise RuntimeContractError(str(exc)) from exc
             decoder = codecs.getincrementaldecoder("utf-8")("strict")
             parts: list[str] = []
             byte_count = 0
             try:
-                while data := source.read(256 * 1024):
+                while data := source.read(resources.read_chunk_bytes):
                     if b"\x00" in data:
                         raise RuntimeContractError("binary reference content is prohibited")
                     byte_count += len(data)
@@ -205,7 +222,11 @@ class OfflineKnowledgeLibrary:
         import secrets
         import time
 
+        # The current model-scoped index materializes complete sources/chunks.
+        # Admission therefore follows live RAM and free disk, not file count.
+        _require_local_headroom(len(content), write=True)
         payload = self._validate(title, content)
+        _require_local_headroom(len(payload), write=True)
         digest = sha256(payload).hexdigest()
         pieces = self._chunks(content)
         if not any(_terms(piece[2]) for piece in pieces):
@@ -254,6 +275,15 @@ class OfflineKnowledgeLibrary:
             if own_snapshot:
                 self.store._db.execute("BEGIN")
             try:
+                # This legacy verifier materializes the whole model corpus.
+                # Check measured headroom before fetching a large snapshot.
+                source_bytes = self.store._db.execute(
+                    "SELECT COALESCE(SUM(LENGTH(CAST(content_text AS BLOB))),0) "
+                    "FROM offline_documents "
+                    "WHERE model_digest=? AND tokenizer_digest=?",
+                    (self.model_digest, self.tokenizer_digest),
+                ).fetchone()[0]
+                _require_local_headroom(int(source_bytes) * 2)
                 documents = self.store._db.execute(
                     "SELECT document_id, title, content_digest, content_text, "
                     "created_ns FROM offline_documents "

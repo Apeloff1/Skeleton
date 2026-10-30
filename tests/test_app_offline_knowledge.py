@@ -212,6 +212,22 @@ class OfflineKnowledgeLibraryTests(unittest.TestCase):
             self.library.add_text("Two", "GPU asynchronous compute dispatches.")
         self.assertEqual(len(self.library.list_documents()), 2)
 
+    def test_local_reference_admission_responds_to_usage(self):
+        from unittest.mock import patch
+        from skeleton.app.offline_resources import (
+            LocalResourceSnapshot, LocalResourcePressure,
+        )
+        pressure = LocalResourceSnapshot(
+            total_ram_bytes=1_000_000_000, available_ram_bytes=1_000,
+            total_disk_bytes=1_000_000_000, free_disk_bytes=500_000_000,
+            cpu_count=4, cpu_load_ratio=0.9,
+        )
+        with patch("skeleton.app.offline_knowledge.probe_local_resources",
+                   return_value=pressure):
+            with self.assertRaisesRegex(RuntimeContractError, "RAM"):
+                self.library.add_text("Under pressure", "Large source " * 1000)
+        self.assertEqual(self.library.list_documents(), [])
+
     def test_large_local_reference_file_can_be_indexed(self):
         source = Path(self.temp.name) / "reference.txt"
         content = ("Hardware rasterizer pixel traversal. " * 2600) + " rarefinalmarker."

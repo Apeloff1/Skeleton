@@ -20,6 +20,9 @@ import threading
 from typing import Callable, Iterator
 
 from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
+from .offline_resources import (
+    LocalResourcePressure, probe_local_resources, admit_resident_document,
+)
 
 
 SCHEMA = "skeleton.app.offline_library.v1"
@@ -111,12 +114,17 @@ def _read_document(
             info = os.fstat(handle.fileno())
             if not stat.S_ISREG(info.st_mode):
                 raise OfflineLibraryError("document is not a regular file")
+            try:
+                resource = probe_local_resources(path)
+                admit_resident_document(resource, info.st_size)
+            except LocalResourcePressure as exc:
+                raise OfflineLibraryError(str(exc)) from exc
             digest = hashlib.sha256()
             decoder = codecs.getincrementaldecoder("utf-8")("strict")
             text = io.StringIO()
             byte_count = 0
             try:
-                while chunk := handle.read(256 * 1024):
+                while chunk := handle.read(resource.read_chunk_bytes):
                     if b"\x00" in chunk:
                         raise OfflineLibraryError("binary local document is unsupported")
                     digest.update(chunk)
@@ -288,6 +296,14 @@ class OfflineDocumentLibrary:
                             and projection == (body,)
                         ):
                             continue
+                    # Recheck current disk/RAM pressure for actual writes,
+                    # after unchanged sources have already been skipped.
+                    try:
+                        admit_resident_document(
+                            probe_local_resources(self.path), size, write=True
+                        )
+                    except LocalResourcePressure as exc:
+                        raise OfflineLibraryError(str(exc)) from exc
                     if old is None:
                         docid = self._db.execute(
                             "INSERT INTO offline_documents "
