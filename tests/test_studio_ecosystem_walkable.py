@@ -34,3 +34,11 @@ def test_malicious_choice_cannot_escape_inert_json_into_html():
     assert data is not None
     assert "</script>" not in data.group(1)
     assert json.loads(data.group(1))["stages"][0]["alternatives"][0]=="</script><script>evil()</script>"
+
+def test_walkable_browser_has_actual_bfs_hint_without_teleportation():
+    docs=read_blueprint("studio_aerial_traversal_amber_highlands")
+    html=render_playable_world_html(docs)
+    assert b"function hint()" in html
+    assert b"Shortest reachable route" in html
+    assert b'id=\'navigation-hint\'' in html
+    assert b"player.x=x;player.y=y;steps++;draw();" in html
