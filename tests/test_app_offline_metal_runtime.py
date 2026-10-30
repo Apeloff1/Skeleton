@@ -185,6 +185,32 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
         self.assertEqual(model._resource_preflight_checks, 1)
         self.assertTrue(model._inference_admitted)
 
+    def test_native_kv_observation_is_owned_by_exact_execution_receipt(self):
+        model = object.__new__(LlamaCppModel)
+        model._process_lock = threading.Lock()
+        first = "a" * 64
+        second = "b" * 64
+        model._kv_by_execution_receipt = {
+            first: {"reported_host_kv_bytes": 4096,
+                    "reported_device_kv_bytes": 0},
+            second: {"reported_host_kv_bytes": 0,
+                     "reported_device_kv_bytes": 8192},
+        }
+        observation = model.kv_observation_for_receipt(first)
+        self.assertEqual(observation["reported_host_kv_bytes"], 4096)
+        self.assertEqual(
+            model.kv_observation_for_receipt(second)["reported_device_kv_bytes"],
+            8192,
+        )
+        observation["reported_host_kv_bytes"] = -1
+        self.assertEqual(
+            model.kv_observation_for_receipt(first)["reported_host_kv_bytes"],
+            4096,
+        )
+        self.assertIsNone(model.kv_observation_for_receipt("c" * 64))
+        with self.assertRaises(LlamaCppRuntimeError):
+            model.kv_observation_for_receipt("untrusted")
+
     def test_backend_reconfiguration_is_prelaunch_and_identity_bound(self):
         baseline = configuration()
         # Testing an already created backend's policy gate without requiring
