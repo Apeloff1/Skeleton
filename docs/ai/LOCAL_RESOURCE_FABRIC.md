@@ -238,3 +238,50 @@ and no GPU KV buffer was reported**. It does not certify DMA, Metal event
 fences, runtime tensor migration, numerical equivalence across K/V cache
 types, or macOS swap modification. Test each chosen cache precision,
 memory-pressure condition, interruption and process/device failure separately.
+
+## Real Metal shared-buffer fence qualification
+
+A **separate, opt-in** Swift/Metal qualifier performs genuine Apple
+Silicon CPU↔GPU shared-memory command execution. It constructs a 64-element
+read/write pair of `MTLBuffer` allocations using `storageModeShared`,
+runs a deterministic GPU compute kernel, waits for each Metal command buffer
+to complete, and verifies the CPU-visible output after *two* independent
+CPU modifications. The native Swift source is at
+`scripts/qualify_metal_shared.swift`.
+
+Run on an Apple M-series Mac with the Apple developer toolchain installed:
+
+```bash
+# Standalone low-level shared-buffer probe; no model files needed
+/usr/bin/xcrun swift scripts/qualify_metal_shared.swift
+
+# Or combine with the existing pinned llama.cpp host-KV qualification
+python -m skeleton.app.offline_metal_qualification \
+    --manifest /path/to/private-local-model-deployment.json \
+    --shared-buffer-fence
+```
+
+The Python validator requires an exact declared schema, two completed
+command buffers, 128 individually verified values, and the **independently
+computed SHA-256** expected from the fixed Metal kernel. The probe file is
+hashed before and after the subprocess call and the result parser requires a
+bounded JSON response. Any compiler, platform, synchronization, digest, or
+backend failure returns **unqualified**; none of these paths change macOS
+swap, SIP, GPU firmware, or installed model weights.
+
+**Scope separation:** Successfully running this standalone probe demonstrates
+that the *probe's* shared Metal buffers were coherent after the observed
+command completions. It is not evidence that the separate pinned llama.cpp
+process synchronized, migrated or paged any actual model tensor or KV-cache
+allocation. The local GGUF qualification keeps
+`driver_coherency_verified: false`,
+`metal_event_fence_verified: false`, and
+`device_tensor_migration_verified: false`. The standalone proof is saved
+under a separate `shared_buffer_fence` field and must not override those
+model-scoped qualification claims.
+
+Native KV diagnostic observations are now additionally associated with
+the exact `execution_receipt_digest` from the completed model inference,
+rather than relying on a mutable "last request" diagnostic. The bounded
+in-memory receipt map avoids confusing two overlapping local generations.
+Missing or evicted evidence fails closed.
