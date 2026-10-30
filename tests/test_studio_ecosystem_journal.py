@@ -58,3 +58,23 @@ def test_review_does_not_claim_external_proof(tmp_path):
     assert store.snapshot()["tasks"]["source-canon"]["status"]=="reviewed_claim"
     assert store.snapshot()["completion_evidence_verified"] is False
     store.claim("quest-integration",worker="second",token="next",authorized=True)
+
+def test_created_journal_file_is_private(tmp_path):
+    import os
+    root,graph=_owner(tmp_path)
+    WorkJournal(root,graph,authorized=True)
+    if os.name=="posix":
+        assert (root/"studio_work.sqlite3").stat().st_mode & 0o077 == 0
+
+def test_event_integrity_detects_modified_durable_history(tmp_path):
+    root,graph=_owner(tmp_path)
+    journal=WorkJournal(root,graph,authorized=True)
+    journal.claim("source-canon",worker="maker",token="one",authorized=True)
+    proof=journal.verify_events()
+    assert proof["events"]==1
+    assert len(proof["final_sha256"])==64
+    assert proof["external_attestation_verified"] is False
+    with sqlite3.connect(root/"studio_work.sqlite3") as db:
+        db.execute("UPDATE events SET event_json='{}' WHERE seq=1")
+    with pytest.raises(StudioQuestError):
+        WorkJournal(root,graph,authorized=True)

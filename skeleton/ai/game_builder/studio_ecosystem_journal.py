@@ -85,6 +85,27 @@ def _safe_database(path: Path) -> None:
             raise StudioQuestError("journal file must be owned and private")
 
 
+def _create_private_database(path: Path) -> None:
+    """Prevent SQLite's default umask from creating a world-readable DB."""
+    _safe_database(path)
+    if path.exists():
+        return
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(path, flags, 0o600)
+    except FileExistsError:
+        _safe_database(path)
+        return
+    try:
+        if os.name == "posix":
+            os.fchmod(fd, 0o600)
+    finally:
+        os.close(fd)
+    _safe_database(path)
+
+
 class WorkJournal:
     """Atomic work claims, unverified submissions, and explicit review decisions."""
 
@@ -95,7 +116,7 @@ class WorkJournal:
         _private_directory(self.root)
         self.path = self.root / "studio_work.sqlite3"
         self.project, self.source, self.graph_digest, self.tasks = checked_graph(graph)
-        _safe_database(self.path)
+        _create_private_database(self.path)
         with self._tx() as db:
             db.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             db.execute("""CREATE TABLE IF NOT EXISTS tasks (
@@ -107,6 +128,7 @@ class WorkJournal:
                 seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL,
                 previous_sha TEXT NOT NULL, event_sha TEXT NOT NULL
             )""")
+            self._verify_chain(db)
             rows = dict(db.execute("SELECT key, value FROM meta"))
             expected = {"schema": SCHEMA, "project": self.project,
                         "source": self.source, "graph": self.graph_digest}
@@ -142,6 +164,37 @@ class WorkJournal:
             raise
         finally:
             db.close()
+
+    @staticmethod
+    def _verify_chain(db: sqlite3.Connection) -> str:
+        """Replay every durable event before trusting any stored task status."""
+        prior = "0"*64
+        for encoded, parent, fingerprint in db.execute(
+            "SELECT event_json,previous_sha,event_sha FROM events ORDER BY seq"
+        ):
+            if not isinstance(encoded, str) or parent != prior:
+                raise StudioQuestError("journal event predecessor mismatch")
+            if sha256(encoded.encode("utf-8")).hexdigest() != fingerprint:
+                raise StudioQuestError("journal event digest mismatch")
+            try:
+                event = json.loads(encoded)
+            except (TypeError, ValueError) as exc:
+                raise StudioQuestError("invalid durable event") from exc
+            if (not isinstance(event, dict) or
+                    set(event) != {"kind","task","actor","previous"} or
+                    event["previous"] != prior or canonical(event) != encoded):
+                raise StudioQuestError("noncanonical durable event chain")
+            prior = fingerprint
+        return prior
+
+    def verify_events(self) -> dict[str, object]:
+        with self._tx() as db:
+            last = self._verify_chain(db)
+            count = db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+            return {"schema":"skeleton.game_builder.studio_work_journal_audit.v1",
+                    "project_id":self.project,"events":count,
+                    "final_sha256":last,"external_attestation_verified":False,
+                    "release_certified":False}
 
     def snapshot(self) -> dict[str, object]:
         with self._tx() as db:
