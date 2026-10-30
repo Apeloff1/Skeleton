@@ -7,8 +7,8 @@ import json
 import unittest
 
 from skeleton.app.offline_metal_qualification import (
-    _validated_shared_fence_receipt, evaluate_host_kv_qualification,
-    qualify_apple_shared_buffer_fence,
+    _expected_multisync_digest, _validated_shared_fence_receipt,
+    evaluate_host_kv_qualification, qualify_apple_shared_buffer_fence,
 )
 
 
@@ -31,6 +31,24 @@ def inputs(**overrides):
     }
     value.update(overrides)
     return value
+
+
+def multisync_proof():
+    return {
+        "schema": "skeleton.apple.metal-multisync.v2",
+        "passed": True,
+        "shared_metal_buffers": 13,
+        "synchronized_command_buffers": 17,
+        "verified_values": 832,
+        "serial_cpu_gpu_cpu_round_trips": 4,
+        "cross_queue_event_handoffs": 4,
+        "parallel_independent_lanes": 3,
+        "shared_event_cpu_observations": 2,
+        "output_sha256":
+            "7765e4607be2b2849b33bdbd6cff387365600703d14fd49ba17ed0b7b4654a6f",
+        "model_tensor_fence_verified": False,
+        "llama_kv_cache_fence_verified": False,
+    }
 
 
 class AppleKVQualificationTests(unittest.TestCase):
@@ -89,23 +107,25 @@ class AppleKVQualificationTests(unittest.TestCase):
                 **inputs()
             )["qualification_accepted"])
 
+    def test_multisync_independent_expected_digest(self):
+        self.assertEqual(
+            _expected_multisync_digest(),
+            "7765e4607be2b2849b33bdbd6cff387365600703d14fd49ba17ed0b7b4654a6f",
+        )
+
     def test_real_metal_shared_buffer_proof_requires_exact_known_digest(self):
-        proof = {
-            "schema": "skeleton.apple.metal-shared-fence.v1",
-            "passed": True,
-            "shared_metal_buffers": 2,
-            "synchronized_command_buffers": 2,
-            "verified_values": 128,
-            "output_sha256":
-                "a6d248f975ab3b8adf09ce0beef4493c7cda5827b19f277728fa28c38708b286",
-            "model_tensor_fence_verified": False,
-            "llama_kv_cache_fence_verified": False,
-        }
+        proof = multisync_proof()
         self.assertTrue(_validated_shared_fence_receipt(proof)["passed"])
         for changed in (
             {"output_sha256": "0" * 64},
             {"synchronized_command_buffers": 1},
             {"verified_values": 0},
+            {"serial_cpu_gpu_cpu_round_trips": 2},
+            {"cross_queue_event_handoffs": 0},
+            {"parallel_independent_lanes": 0},
+            {"shared_event_cpu_observations": 0},
+            {"shared_metal_buffers": 12},
+            {"schema": "skeleton.apple.metal-shared-fence.v1"},
             {"model_tensor_fence_verified": True},
             {"llama_kv_cache_fence_verified": True},
         ):
@@ -116,17 +136,7 @@ class AppleKVQualificationTests(unittest.TestCase):
             _validated_shared_fence_receipt({**proof, "extra": True})
 
     def test_opt_in_native_metal_probe_process_receipt_is_bounded(self):
-        proof = {
-            "schema": "skeleton.apple.metal-shared-fence.v1",
-            "passed": True,
-            "shared_metal_buffers": 2,
-            "synchronized_command_buffers": 2,
-            "verified_values": 128,
-            "output_sha256":
-                "a6d248f975ab3b8adf09ce0beef4493c7cda5827b19f277728fa28c38708b286",
-            "model_tensor_fence_verified": False,
-            "llama_kv_cache_fence_verified": False,
-        }
+        proof = multisync_proof()
         def mocked_run(_args, **kwargs):
             kwargs["stdout"].write(json.dumps(proof).encode("utf-8"))
             return SimpleNamespace(returncode=0)
