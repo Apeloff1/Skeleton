@@ -33,3 +33,16 @@ def test_playable_offline_bundle_has_real_media_and_no_release_claim(tmp_path,pr
         assert stream.getnchannels()==1
     with pytest.raises(StudioQuestError):
         build_offline_studio_bundle(j,spool,output,authorized=True)
+
+def test_interactive_story_package_contains_six_owned_files(tmp_path):
+    workspace=tmp_path/"source";workspace.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    docs=read_blueprint("studio_aerial_traversal_amber_highlands")
+    journal=WorkJournal(workspace,build_work_graph(docs),authorized=True)
+    pin_source_sections(journal,docs,authorized=True)
+    result=build_offline_studio_bundle(journal,ArtifactSpool(workspace,authorized=True),
+                                       out,interactive_story=True,authorized=True)
+    target=Path(result["output_dir"])
+    assert len(result["assets"])==6
+    assert (target/"quest.html").is_file()
+    assert json.loads((target/"manifest.json").read_text())["schema"].endswith(".v2")
