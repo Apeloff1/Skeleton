@@ -151,7 +151,7 @@ def test_git_filename_with_embedded_newline_is_scoped_exactly(tmp_path: Path) ->
     _git(repo, "checkout", "-b", "feature")
     frontend = repo / "frontend"
     frontend.mkdir()
-    changed = frontend / "new\\nline.tsx"
+    changed = frontend / "new\nline.tsx"
     changed.write_text("export const ready = true;\\n", encoding="utf-8")
     _git(repo, "add", "--all")
     _git(repo, "commit", "-m", "unusual name")
