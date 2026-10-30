@@ -100,12 +100,12 @@ def _read_positive(path: Path) -> int | None:
 
 
 def _probe_apple_metal() -> tuple[GPUResource, ...]:
-    """Public Metal device working-set telemetry, not fabricated free VRAM.
+    """Sample advisory Apple Metal working-set data without retaining devices.
 
-    Apple Silicon CPU/GPU use the same physical unified RAM. Metal's
-    recommendedMaxWorkingSetSize is an *approximate per-device performance
-    budget*, not another pool of free RAM. currentAllocatedSize counts GPU
-    resources allocated by this Metal device context, not all processes.
+    Apple Silicon CPU/GPU share one physical RAM pool. The recommended Metal
+    working set is only advisory; querying a newly created MTLDevice does not
+    discover allocations owned by other processes or the separate llama.cpp
+    executable.
     """
     if sys.platform != "darwin" or platform.machine().lower() not in {
         "arm64", "aarch64",
@@ -114,36 +114,48 @@ def _probe_apple_metal() -> tuple[GPUResource, ...]:
     try:
         metal = ctypes.CDLL("/System/Library/Frameworks/Metal.framework/Metal")
         objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
-        metal.MTLCreateSystemDefaultDevice.argtypes = []
-        metal.MTLCreateSystemDefaultDevice.restype = ctypes.c_void_p
-        device = metal.MTLCreateSystemDefaultDevice()
-        if not device:
-            return ()
         objc.sel_registerName.argtypes = [ctypes.c_char_p]
         objc.sel_registerName.restype = ctypes.c_void_p
         message = objc.objc_msgSend
-        # Set prototype per return type; one invocation at a time, while
-        # this Python thread owns the selector call. Do not pass pointers
-        # to Metal buffers or issue GPU commands from telemetry.
         message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
         message.restype = ctypes.c_uint64
-        def number(selector: bytes) -> int:
-            return int(message(device, objc.sel_registerName(selector)))
-        unified = bool(number(b"hasUnifiedMemory"))
-        if not unified:
+        objc.objc_autoreleasePoolPush.argtypes = []
+        objc.objc_autoreleasePoolPush.restype = ctypes.c_void_p
+        objc.objc_autoreleasePoolPop.argtypes = [ctypes.c_void_p]
+        objc.objc_autoreleasePoolPop.restype = None
+        metal.MTLCreateSystemDefaultDevice.argtypes = []
+        metal.MTLCreateSystemDefaultDevice.restype = ctypes.c_void_p
+        pool = objc.objc_autoreleasePoolPush()
+        if not pool:
             return ()
-        budget = number(b"recommendedMaxWorkingSetSize")
-        allocated = number(b"currentAllocatedSize")
-        if budget <= 0:
-            return ()
-        # Neither size is free VRAM; dedicated capacity is *zero* on UMA.
-        return (GPUResource(
-            device="Apple Silicon Metal", vendor="apple",
-            dedicated_total_bytes=0, dedicated_free_bytes=0,
-            shared_with_system_ram=True, measurement="metal_unified_working_set",
-            recommended_working_set_bytes=budget,
-            current_allocated_bytes=allocated,
-        ),)
+        try:
+            device = metal.MTLCreateSystemDefaultDevice()
+            if not device:
+                return ()
+            try:
+                def number(selector: bytes) -> int:
+                    return int(message(device, objc.sel_registerName(selector)))
+                if not bool(number(b"hasUnifiedMemory")):
+                    return ()
+                budget = number(b"recommendedMaxWorkingSetSize")
+                allocated = number(b"currentAllocatedSize")
+                if budget <= 0 or allocated < 0:
+                    return ()
+                return (GPUResource(
+                    device="Apple Silicon Metal", vendor="apple",
+                    dedicated_total_bytes=0, dedicated_free_bytes=0,
+                    shared_with_system_ram=True,
+                    measurement="metal_unified_working_set",
+                    recommended_working_set_bytes=budget,
+                    current_allocated_bytes=allocated,
+                ),)
+            finally:
+                # MTLCreateSystemDefaultDevice follows the Create Rule (+1).
+                # Telemetry repeats during live inference, so every probe
+                # must release its own retained device, even on early return.
+                message(device, objc.sel_registerName(b"release"))
+        finally:
+            objc.objc_autoreleasePoolPop(pool)
     except (OSError, AttributeError, ValueError, TypeError):
         return ()
 
