@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_ashen_archipelago",
+  "title": "Ashen Archipelago: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010311644,
+  "width": 23,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 10,
+  "theme": "ocean",
+  "starting_health": 4
+}

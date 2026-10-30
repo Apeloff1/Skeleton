@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_sunken_metro",
+  "title": "Sunken Metro: The Maker Commons",
+  "subtitle": "Original the maker commons design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010312848,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 12,
+  "theme": "arcade",
+  "starting_health": 4
+}

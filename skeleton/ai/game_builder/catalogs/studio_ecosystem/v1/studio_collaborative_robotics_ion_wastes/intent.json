@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_ion_wastes",
+  "title": "Ion Wastes: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010317647,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 3
+}

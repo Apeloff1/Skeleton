@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_elastic_physics_misty_breakwater",
+  "genre": "elastic_physics",
+  "biome": "misty_breakwater",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Misty Breakwater",
+    "landmark": "historic sea wall",
+    "era": "the second settlement",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control fog horns while low-visibility tides destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "pensive"
+  },
+  "premise": "Dava Hale, a inventor with expertise in rigid-body interactions, elasticity and momentum transfer, must repair a chain of motion-controlled civic mechanisms before low-visibility tides reaches the historic sea wall.",
+  "stakes": [
+    "Residents lose access to fog horns",
+    "a sabotaging patent guild gains authority without independent evidence",
+    "The historic sea wall becomes inaccessible beyond mist-channel locks"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured low-visibility tides closes the main approach",
+      "goal": "Acquire an independent account of fog horns",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a sabotaging patent guild challenges Dava Hale's mandate",
+      "goal": "Apply rigid-body interactions, elasticity and momentum transfer in mist-channel locks",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of historic sea wall",
+      "goal": "repair a chain of motion-controlled civic mechanisms",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains historic sea wall with auditable access to fog horns"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain mechanical energy and stability without a sabotaging patent guild"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over fog horns persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "historic sea wall",
+      "mist-channel locks",
+      "tidal drift"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

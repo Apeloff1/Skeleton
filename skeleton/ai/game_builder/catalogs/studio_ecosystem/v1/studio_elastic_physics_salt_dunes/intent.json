@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_salt_dunes",
+  "title": "Salt Dunes: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010316248,
+  "width": 23,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 6
+}

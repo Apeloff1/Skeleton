@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_merchant_caravan_ion_wastes",
+  "genre": "merchant_caravan",
+  "biome": "ion_wastes",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Ion Wastes",
+    "landmark": "drifting relay station",
+    "era": "the forgotten century",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control shielded relay coils while electromagnetic storms destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "forensic"
+  },
+  "premise": "Enzo Ashe, a trader with expertise in convoy routing, demand elasticity and risk pricing, must reopen commerce without bankrupting roadside communities before electromagnetic storms reaches the drifting relay station.",
+  "stakes": [
+    "Residents lose access to shielded relay coils",
+    "an exclusionary merchant league gains authority without independent evidence",
+    "The drifting relay station becomes inaccessible beyond charged dunes"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured electromagnetic storms closes the main approach",
+      "goal": "Acquire an independent account of shielded relay coils",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "an exclusionary merchant league challenges Enzo Ashe's mandate",
+      "goal": "Apply convoy routing, demand elasticity and risk pricing in charged dunes",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of drifting relay station",
+      "goal": "reopen commerce without bankrupting roadside communities",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains drifting relay station with auditable access to shielded relay coils"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain cargo capacity and provisions without an exclusionary merchant league"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over shielded relay coils persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "drifting relay station",
+      "charged dunes",
+      "induced currents"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

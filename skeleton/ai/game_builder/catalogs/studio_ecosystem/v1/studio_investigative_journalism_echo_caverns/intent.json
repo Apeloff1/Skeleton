@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_echo_caverns",
+  "title": "Echo Caverns: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010314580,
+  "width": 19,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 6
+}

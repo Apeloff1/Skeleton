@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_cloud_canopy",
+  "title": "Cloud Canopy: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010311718,
+  "width": 27,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 14,
+  "theme": "forest",
+  "starting_health": 6
+}

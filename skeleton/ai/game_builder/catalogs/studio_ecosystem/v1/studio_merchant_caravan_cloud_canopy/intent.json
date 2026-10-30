@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_cloud_canopy",
+  "title": "Cloud Canopy: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010314664,
+  "width": 27,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 4
+}

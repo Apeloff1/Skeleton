@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_glass_steppe",
+  "title": "Glass Steppe: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010313904,
+  "width": 19,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "desert",
+  "starting_health": 4
+}

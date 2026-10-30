@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_copper_mesa",
+  "title": "Copper Mesa: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010314516,
+  "width": 19,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 12,
+  "theme": "desert",
+  "starting_health": 4
+}

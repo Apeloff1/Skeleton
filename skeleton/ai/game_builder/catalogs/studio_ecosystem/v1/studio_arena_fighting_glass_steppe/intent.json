@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_glass_steppe",
+  "title": "Glass Steppe: The Open Tournament",
+  "subtitle": "Original the open tournament design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010310958,
+  "width": 19,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 12,
+  "theme": "desert",
+  "starting_health": 6
+}

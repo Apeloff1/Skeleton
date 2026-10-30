@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_glacial_fjord",
+  "title": "Glacial Fjord: The Maker Commons",
+  "subtitle": "Original the maker commons design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010312589,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 10,
+  "theme": "ocean",
+  "starting_health": 5
+}

@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "project_id": "studio_investigative_journalism_amber_highlands",
+  "genre": "investigative_journalism",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "sound_design": {
+    "acoustics": "wind through amber pines",
+    "genre": "investigative_journalism",
+    "tempo_bpm": 124,
+    "meter": "6/8",
+    "tonality": "bright",
+    "rendered": false
+  },
+  "sound_layers": [
+    {
+      "id": "ambient",
+      "trigger": "outdoor_amber_highlands",
+      "source": "Original environmental Foley emphasizing wind through amber pines",
+      "spatial": "outdoor_binaural",
+      "ducking": "below_dialogue"
+    },
+    {
+      "id": "mechanic",
+      "trigger": "verify",
+      "source": "Percussive feedback to source triangulation, chronology and consent",
+      "spatial": "diegetic_close",
+      "ducking": "below_warning"
+    },
+    {
+      "id": "risk",
+      "trigger": "landslides",
+      "source": "Nonverbal hazard escalation for unstable inclines",
+      "spatial": "wide_dynamic",
+      "ducking": "priority_warning"
+    },
+    {
+      "id": "resolution",
+      "trigger": "verified_branch",
+      "source": "Original acoustic theme varying with source confidence and publishing budget stewardship",
+      "spatial": "narrative_bus",
+      "ducking": "dialogue_priority"
+    }
+  ],
+  "dialogue_voice": {
+    "casts": [
+      "protagonist",
+      "witness",
+      "technician",
+      "rival"
+    ],
+    "performance_requirement": "new_original_voice_material",
+    "localized_content": "not_recorded"
+  },
+  "audio_accessibility": [
+    "complete_captions",
+    "no_audio_only_navigation",
+    "adjustable_mixer",
+    "dynamic_range_modes"
+  ],
+  "audio_processing": {
+    "cpu_budget": "runtime_measured",
+    "compression": "hardware_profile_adaptive",
+    "sample_quality": "audited_per_target"
+  }
+}

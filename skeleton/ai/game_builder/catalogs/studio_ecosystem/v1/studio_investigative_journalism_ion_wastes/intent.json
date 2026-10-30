@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_ion_wastes",
+  "title": "Ion Wastes: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010314210,
+  "width": 19,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "space",
+  "starting_health": 4
+}

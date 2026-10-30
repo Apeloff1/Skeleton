@@ -14,7 +14,7 @@ from skeleton.ai.game_builder.studio_ecosystem_catalog import (
 
 def test_catalog_has_linked_original_vertical_slices():
     records = catalog_index()
-    assert len(records) == len(records)
+    assert len(records) >= 512  # Baseline corpus cannot silently contract
     assert len({(item["genre"], item["biome"]) for item in records}) == len(records)
     assert len({item["id"] for item in records}) == len(records)
     assert len(SECTIONS) == 8

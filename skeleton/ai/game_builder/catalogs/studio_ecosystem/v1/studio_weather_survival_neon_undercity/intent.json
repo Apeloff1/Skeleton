@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_neon_undercity",
+  "title": "Neon Undercity: Stormline",
+  "subtitle": "Original stormline design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010316961,
+  "width": 25,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 5
+}
