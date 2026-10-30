@@ -40,7 +40,11 @@ def render_environment_svg(documents: Mapping[str, Any]) -> bytes:
             or visual.get("release_certified") is not False):
         raise StudioQuestError("unqualified or mismatched original art documents")
     direction = visual.get("art_direction")
-    palette = direction.get("palette") if isinstance(direction, dict) else None
+    if not isinstance(direction, dict):
+        raise StudioQuestError("authored vector art direction missing")
+    if "palette" in direction and "biome_palette" in direction:
+        raise StudioQuestError("ambiguous original art palette contract")
+    palette = direction.get("palette", direction.get("biome_palette"))
     if (not isinstance(palette, list) or len(palette) < 3
             or len(palette) > 8 or any(
                 not isinstance(c, str) or not COLOUR.fullmatch(c) for c in palette

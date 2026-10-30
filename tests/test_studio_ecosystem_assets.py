@@ -21,3 +21,9 @@ def test_unearned_asset_complete_state_is_rejected():
     docs["visual"]["asset_recipes"][0]["status"]="complete"
     with pytest.raises(StudioQuestError):
         planned_assets(docs)
+
+def test_original_wave1_jobs_preserve_kind_and_recipe_provenance():
+    report=planned_assets(read_blueprint("studio_puzzle_expedition_copper_mesa"))
+    assert report["jobs"][0]["asset_id"]=="hero_silhouette"
+    assert report["jobs"][0]["asset_type"]=="character"
+    assert report["jobs"][0]["asset_delivered"] is False
