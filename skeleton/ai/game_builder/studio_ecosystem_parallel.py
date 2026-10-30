@@ -22,6 +22,7 @@ def produce_parallel_games(portfolio: StudioPortfolio, output_root: Path, *,
                            working_set_bytes: int,
                            estimated_output_bytes: int,
                            walkable_story: bool = False,
+                           interactive_story: bool = False,
                            authorized: bool) -> dict[str,object]:
     if not authorized:
         raise PermissionError("parallel production requires operator authorization")
@@ -31,7 +32,8 @@ def produce_parallel_games(portfolio: StudioPortfolio, output_root: Path, *,
     if (not isinstance(project_ids,(tuple,list)) or not project_ids
             or any(not isinstance(pid,str) or pid not in known for pid in project_ids)
             or len(set(project_ids))!=len(project_ids)
-            or type(walkable_story) is not bool):
+            or type(walkable_story) is not bool
+            or type(interactive_story) is not bool):
         raise StudioEcosystemError("invalid registered parallel producer selection")
     if any((root/pid).exists() or (root/pid).is_symlink() for pid in project_ids):
         raise StudioQuestError("parallel output already exists; never overwrite")
@@ -39,9 +41,10 @@ def produce_parallel_games(portfolio: StudioPortfolio, output_root: Path, *,
         supervisor=portfolio.open(pid,authorized=True)
         package=build_offline_studio_bundle(
             supervisor.journal,supervisor.spool,root,
-            walkable_story=walkable_story,authorized=True)
+            walkable_story=walkable_story,
+            interactive_story=interactive_story,authorized=True)
         verified=verify_studio_bundle(Path(package["output_dir"]),authorized=True)
-        expected=7 if walkable_story else 5
+        expected=7 if walkable_story else 6 if interactive_story else 5
         if verified["files_verified"]!=expected:
             raise StudioQuestError("parallel worker produced wrong package schema")
         return {"project_id":pid,"bundle_sha256":package["manifest_sha256"],

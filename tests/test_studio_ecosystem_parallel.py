@@ -26,3 +26,13 @@ def test_parallel_requires_unique_registered_projects(tmp_path):
         produce_parallel_games(StudioPortfolio(work,authorized=True),out,
             project_ids=[pid,pid],working_set_bytes=1024,
             estimated_output_bytes=1024,authorized=True)
+
+def test_parallel_v2_stories_remain_distinct_from_v3_walkable(tmp_path):
+    private=tmp_path/"private";private.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    report=produce_parallel_games(StudioPortfolio(private,authorized=True),out,
+        project_ids=["studio_arena_fighting_glacial_fjord"],
+        working_set_bytes=1024,estimated_output_bytes=1024,
+        interactive_story=True,authorized=True)
+    assert report["completed_projects"][0]["files_verified"]==6
+    assert not list(out.glob("*/walkable.html"))
