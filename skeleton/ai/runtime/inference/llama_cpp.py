@@ -839,6 +839,8 @@ class LlamaCppModel:
         self._draining_processes: set[int] = set()
         self._spawning_processes = 0
         self._processes_started = 0
+        self._inference_admitted = False
+        self._resource_profile_bound = False
         self._processes_exited = 0
         self._termination_requests = 0
         if not _stat_matches(self._model):
@@ -891,13 +893,19 @@ class LlamaCppModel:
                     "adaptive profile cannot silently activate GPU offload"
                 )
         with self._process_lock:
-            if (self._processes_started or self._active_processes
+            if getattr(self, "_resource_profile_bound", False):
+                raise LlamaCppRuntimeError(
+                    "adaptive runtime profile was already bound"
+                )
+            if (getattr(self, "_inference_admitted", False)
+                    or self._processes_started or self._active_processes
                     or self._draining_processes or self._spawning_processes):
                 raise LlamaCppRuntimeError(
-                    "runtime profile cannot change after first execution"
+                    "runtime profile cannot change after inference admission"
                 )
             self._assert_artifacts_stable()
             self.config = profile
+            self._resource_profile_bound = True
 
     @property
     def model_digest(self) -> str:
@@ -1441,6 +1449,10 @@ class LlamaCppModel:
             raise TypeError("cancel must be threading.Event")
         if cancel.is_set():
             raise LocalInferenceCancelled("local generation cancelled before launch")
+        with self._process_lock:
+            # Freeze profile before prompt hashing or artifact checks begin.
+            # This prevents a digest/config race with late resource retuning.
+            self._inference_admitted = True
         started = time.monotonic()
 
         def interrupt() -> None:
