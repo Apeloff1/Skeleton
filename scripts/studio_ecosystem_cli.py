@@ -13,6 +13,9 @@ from skeleton.ai.game_builder.studio_ecosystem_catalog import (
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Browse original production briefs and build offline proof")
     ap.add_argument("--genre", help="Filter available production briefs")
+    ap.add_argument("--search", help="Search indexed genres, environments and original source briefs")
+    ap.add_argument("--deep-search", action="store_true",
+                    help="Inspect canonical authored source content, not only index metadata")
     ap.add_argument("--biome", help="Filter original environments")
     ap.add_argument("--project", help="Inspect or compile one registered project")
     ap.add_argument("--compile-preview", action="store_true", help="Compile verified HTML5 maze preview")
@@ -22,7 +25,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="Fail-closed maximum output bytes for batch exports")
     ap.add_argument("--output", type=Path, help="New directory for compiled HTML")
     args = ap.parse_args(argv)
-    if args.materialize_batch:
+    if args.search:
+        if args.compile_preview or args.materialize_batch or args.project or args.output:
+            ap.error("--search is incompatible with preview and project export")
+        from skeleton.ai.game_builder.studio_ecosystem_search import search_blueprints
+        print(json.dumps({"matches": search_blueprints(args.search, genre=args.genre,
+                            biome=args.biome, deep=args.deep_search)}, sort_keys=True))
+    elif args.materialize_batch:
         if args.compile_preview or not args.output:
             ap.error("--materialize-batch requires --output and excludes --compile-preview")
         from skeleton.ai.game_builder.studio_ecosystem_batch import materialize_previews
