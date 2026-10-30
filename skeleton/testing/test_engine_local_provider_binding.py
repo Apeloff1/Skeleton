@@ -315,12 +315,14 @@ async def test_pristine_created_legacy_checkpoint_can_acquire_the_exact_pin(tmp_
 @pytest.mark.parametrize(
     "field,value",
     [
-        ("model_digest", "bad"),
-        ("runtime_digest", "bad"),
-        ("execution_profile_digest", "bad"),
+        ("model_digest", "bad", "local reference content changed behind its claimed digest"),
+        ("runtime_digest", "bad", "local activation runtime digest is invalid"),
+        ("execution_profile_digest", "bad", "local activation runtime digest is invalid"),
     ],
 )
-def test_descriptor_rejects_invalid_loaded_artifact_receipt(local_artifact, monkeypatch, field, value):
+def test_descriptor_rejects_invalid_loaded_artifact_receipt(
+    local_artifact, monkeypatch, field, value, expected_error
+):
     adapter = ProviderRegistry.from_env(require_guarded_local=False).require_active()
     original_status = adapter.status
 
@@ -330,7 +332,7 @@ def test_descriptor_rejects_invalid_loaded_artifact_receipt(local_artifact, monk
         return status
 
     monkeypatch.setattr(adapter, "status", corrupted_status)
-    with pytest.raises(ProviderPolicyError, match="local .* digest is invalid"):
+    with pytest.raises(ProviderPolicyError, match=expected_error):
         provider_execution_identity(adapter)
 
 
