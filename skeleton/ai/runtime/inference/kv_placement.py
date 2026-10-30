@@ -13,11 +13,11 @@ from typing import Any
 
 # Only native llama.cpp KV allocation lines, never free-form model output.
 _KV_LINE = re.compile(
-    r"^\\s*llama_kv_cache(?:_unified)?\\s*:\\s*"
+    r"^\s*llama_kv_cache(?:_unified)?\s*:\s*"
     r"(?P<device>CPU|Metal[0-9]*|CUDA[0-9]*|ROCm[0-9]*|Vulkan[0-9]*)"
-    r"\\s+KV buffer size\\s*=\\s*"
-    r"(?P<size>[0-9]{1,10}(?:\\.[0-9]{1,3})?)"
-    r"\\s*(?P<unit>KiB|MiB|GiB)\\s*$",
+    r"\s+KV buffer size\s*=\s*"
+    r"(?P<size>[0-9]{1,10}(?:\.[0-9]{1,3})?)"
+    r"\s*(?P<unit>KiB|MiB|GiB)\s*$",
     re.IGNORECASE,
 )
 _MULTIPLIERS = {"kib": 1024, "mib": 1024**2, "gib": 1024**3}
