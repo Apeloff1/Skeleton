@@ -455,7 +455,6 @@ def create_local_model_deployment(
             "context_size": validated.context_size,
             "threads": validated.threads,
             "gpu_layers": validated.gpu_layers,
-            "kv_cache_location": validated.kv_cache_location,
             "timeout_seconds": validated.timeout_seconds,
             "temperature": 0.0,
             "extra_args": list(validated.extra_args),
@@ -464,6 +463,9 @@ def create_local_model_deployment(
             "kv_bytes_per_token": validated.kv_bytes_per_token,
         },
     }
+    if validated.kv_cache_location != "backend":
+        # Preserve exact manifests for previously installed default profiles.
+        payload["config"]["kv_cache_location"] = validated.kv_cache_location
     if completion_profile:
         payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None
