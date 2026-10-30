@@ -70,6 +70,12 @@ HTML = r"""<!doctype html>
       <p class="hint">Private device telemetry. GPU and shared memory remain
       backend-owned; unknown hardware capacity is never assumed available.</p>
       <pre id="resource-monitor" aria-live="polite">Connect to inspect your device.</pre>
+      <label for="resource-bytes" class="hint">Estimated source bytes</label>
+      <input id="resource-bytes" type="number" min="0" step="1" value="10000000">
+      <label for="resource-streams" class="hint">Requested concurrent read streams</label>
+      <input id="resource-streams" type="number" min="1" step="1" value="4">
+      <button id="resource-plan" class="secondary" disabled>Calculate adaptive plan</button>
+      <pre id="resource-plan-result">No workload planned.</pre>
     </section>
     <div class="sidebar-footer">
       <button id="fork" class="secondary">Fork conversation</button>
@@ -167,6 +173,8 @@ JAVASCRIPT = r"""'use strict';
           ' · ' + gib(d.shared_free_bytes) + ' host-shared (not additive)')
       ).join('\n') : 'GPU telemetry unavailable — no VRAM allocation assumed';
       const c = view.controller || {};
+      const throughput = typeof c.smoothed_read_bytes_per_second === 'number' ?
+        (c.smoothed_read_bytes_per_second / 1048576).toFixed(2) + ' MiB/s' : 'not calibrated';
       get('resource-monitor').textContent =
         'RAM ' + gib(h.available_ram_bytes) + ' / ' + gib(h.total_ram_bytes) +
         '\nSwap/pagefile ' + gib(h.free_swap_bytes) + ' / ' + gib(h.total_swap_bytes) +
@@ -174,7 +182,8 @@ JAVASCRIPT = r"""'use strict';
         '\nCPU load ' + (h.cpu_load_ratio ?? 'unknown') +
         ' · worker budget ' + (c.adaptive_stream_budget ?? '?') +
         '\nMemory pressure ' + ((c.predictive_pressure ?? 0) * 100).toFixed(1) + '%' +
-        '\n' + vram + '\nStaging: read-only host mmap / SQLite spill';
+        '\n' + vram + '\nRead throughput: ' + throughput +
+        '\nStaging: read-only host mmap / SQLite spill';
     } catch (error) {
       if (state.connected) get('resource-monitor').textContent = 'Resource telemetry unavailable.';
     }
@@ -210,6 +219,7 @@ JAVASCRIPT = r"""'use strict';
     get('connect').disabled = state.busy || state.connected;
     get('disconnect').disabled = !state.connected && !state.token;
     get('resource-refresh').disabled = locked;
+    get('resource-plan').disabled = locked;
     const progress = !!state.turn;
     get('turn-progress').hidden = !progress;
     get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
@@ -239,6 +249,7 @@ JAVASCRIPT = r"""'use strict';
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
+    get('resource-plan-result').textContent = 'No workload planned.';
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
@@ -583,6 +594,21 @@ JAVASCRIPT = r"""'use strict';
   }));
   get('disconnect').addEventListener('click', lock);
   get('resource-refresh').addEventListener('click', refreshResources);
+  get('resource-plan').addEventListener('click', () => run(async () => {
+    const source_bytes = Number(get('resource-bytes').value);
+    const desired_streams = Number(get('resource-streams').value);
+    if (!Number.isSafeInteger(source_bytes) || source_bytes < 0 ||
+        !Number.isSafeInteger(desired_streams) || desired_streams < 1) {
+      throw new Error('Select nonnegative source bytes and positive read streams.');
+    }
+    const plan = await api('POST', '/v1/resources/plan',
+                           {source_bytes, desired_streams});
+    get('resource-plan-result').textContent =
+      'Placement ' + plan.residency + '\nStreams ' + plan.stream_count +
+      '\nChunk bytes ' + plan.transfer_chunk_bytes +
+      '\nRead-only staging ' + (plan.readonly_staging ? 'recommended' : 'optional') +
+      '\nGPU transfer: backend qualification required';
+  }));
   get('new').addEventListener('click', () => run(async () => {
     const system = get('system-prompt').value.trim();
     if (bytes(system) > 4096) throw new Error('Instructions exceed 4096 UTF-8 bytes.');
