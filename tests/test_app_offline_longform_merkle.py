@@ -136,6 +136,56 @@ class MerklePageProofTests(unittest.TestCase):
                 self.assertTrue(result["verified"])
                 self.assertGreater(scan.call_count, 0)
 
+    def test_selected_text_uses_pinned_fts_rowid_and_rejects_projection_drift(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "book.txt").write_text("safe trusted chapter " * 10000)
+            with LongformVirtualMemory(root / "private.sqlite") as store:
+                source = store.ingest(root, "book.txt")["source_id"]
+                rowid = store._db.execute(
+                    "SELECT fts_rowid FROM longform_pages "
+                    "WHERE source_id=? AND ordinal=0", (source,),
+                ).fetchone()[0]
+                self.assertGreater(rowid, 0)
+                self.assertEqual(
+                    store._db.execute(
+                        "SELECT source_id,ordinal FROM longform_fts "
+                        "WHERE rowid=?", (rowid,),
+                    ).fetchone(), (source, 0),
+                )
+                with patch.object(
+                    store, "_read_verified",
+                    side_effect=AssertionError("indexable pages must not full-scan"),
+                ):
+                    self.assertTrue(
+                        store.read_window(source, pages=1)["text"].startswith(
+                            "safe trusted chapter"
+                        )
+                    )
+                store._db.execute(
+                    "UPDATE longform_pages SET fts_rowid=? "
+                    "WHERE source_id=? AND ordinal=0",
+                    (rowid + 1, source),
+                )
+                with self.assertRaises(LongformMemoryError):
+                    store.read_window(source, pages=1)
+
+    def test_pre_rowid_migration_uses_full_hash_proof(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "old.txt").write_text("older stored source " * 5000)
+            with LongformVirtualMemory(root / "private.sqlite") as store:
+                source = store.ingest(root, "old.txt")["source_id"]
+                store._db.execute(
+                    "UPDATE longform_pages SET fts_rowid=NULL "
+                    "WHERE source_id=? AND ordinal=0", (source,),
+                )
+                with patch.object(store, "_read_verified",
+                                  wraps=store._read_verified) as scan:
+                    window = store.read_window(source, pages=1)
+                self.assertGreater(scan.call_count, 0)
+                self.assertTrue(window["verified"])
+
     def test_end_of_work_is_not_a_missing_merkle_page(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
