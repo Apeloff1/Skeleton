@@ -26,26 +26,40 @@ class LocalResourceSnapshot:
     free_disk_bytes: int
     cpu_count: int
     cpu_load_ratio: float
+    total_swap_bytes: int = 0
+    free_swap_bytes: int = 0
+    memory_pressure_ratio: float = 0.0
 
     def __post_init__(self) -> None:
         for name in ("total_ram_bytes", "available_ram_bytes",
-                     "total_disk_bytes", "free_disk_bytes", "cpu_count"):
+                     "total_disk_bytes", "free_disk_bytes", "cpu_count",
+                     "total_swap_bytes", "free_swap_bytes"):
             value = getattr(self, name)
             if type(value) is not int or value < 0:
                 raise ValueError(f"invalid hardware reading: {name}")
         if (self.total_ram_bytes < self.available_ram_bytes
                 or self.total_disk_bytes < self.free_disk_bytes
+                or self.total_swap_bytes < self.free_swap_bytes
                 or self.cpu_count < 1 or self.total_ram_bytes == 0
                 or self.total_disk_bytes == 0
                 or not math.isfinite(self.cpu_load_ratio)
-                or self.cpu_load_ratio < 0):
+                or self.cpu_load_ratio < 0
+                or not math.isfinite(self.memory_pressure_ratio)
+                or not 0 <= self.memory_pressure_ratio <= 1):
             raise ValueError("inconsistent hardware measurements")
 
     @property
     def resident_document_budget(self) -> int:
         # Six copies cover decoder, Python text, chunks and SQLite/FTS work.
         # Recomputed at admission, not a fixed product/user file ceiling.
-        return int(self.available_ram_bytes * 0.45) // 6
+        # Swap/pagefile is not interchangeable with physical RAM. If it is
+        # heavily committed, spill earlier rather than forcing OS paging.
+        swap_used = (
+            1 - self.free_swap_bytes / self.total_swap_bytes
+            if self.total_swap_bytes else 0.0
+        )
+        pressure = max(self.memory_pressure_ratio, max(0.0, swap_used - 0.5))
+        return int(self.available_ram_bytes * 0.45 * (1 - pressure * 0.8)) // 6
 
     @property
     def disk_document_budget(self) -> int:
@@ -56,11 +70,21 @@ class LocalResourceSnapshot:
         return max(0, self.free_disk_bytes - reserve) // 4
 
     @property
+    def should_spill_early(self) -> bool:
+        # In physical-memory contention, pagefile availability is monitored
+        # but never used as a reason to force whole documents into RAM.
+        swap_filled = (
+            1 - self.free_swap_bytes / self.total_swap_bytes
+            if self.total_swap_bytes else 0.0
+        )
+        return self.memory_pressure_ratio >= 0.20 or swap_filled >= 0.85
+
+    @property
     def read_chunk_bytes(self) -> int:
         # A transfer buffer, NOT a maximum file length.
         chunk = min(1024 * 1024, max(8 * 1024,
                     self.available_ram_bytes // 1024))
-        if self.cpu_load_ratio >= 0.85:
+        if self.cpu_load_ratio >= 0.85 or self.should_spill_early:
             chunk = max(8 * 1024, chunk // 4)
         elif self.cpu_load_ratio >= 0.65:
             chunk = max(8 * 1024, chunk // 2)
@@ -72,7 +96,11 @@ class LocalResourceSnapshot:
         # invocation*, not the number of stored jobs or documents.
         memory_share = self.available_ram_bytes / self.total_ram_bytes
         cpu_share = max(0.0, 1.0 - min(1.0, self.cpu_load_ratio))
-        return max(1, int(self.cpu_count * memory_share * cpu_share))
+        pressure_share = 1.0 - self.memory_pressure_ratio
+        if self.should_spill_early:
+            pressure_share *= 0.5
+        return max(1, int(self.cpu_count * memory_share * cpu_share
+                          * pressure_share))
 
     def as_dict(self) -> dict[str, int | float]:
         return {
@@ -82,6 +110,10 @@ class LocalResourceSnapshot:
             "free_disk_bytes": self.free_disk_bytes,
             "cpu_count": self.cpu_count,
             "cpu_load_ratio": self.cpu_load_ratio,
+            "total_swap_bytes": self.total_swap_bytes,
+            "free_swap_bytes": self.free_swap_bytes,
+            "memory_pressure_ratio": self.memory_pressure_ratio,
+            "should_spill_early": self.should_spill_early,
             "resident_document_budget": self.resident_document_budget,
             "disk_document_budget": self.disk_document_budget,
             "read_chunk_bytes": self.read_chunk_bytes,
@@ -125,7 +157,49 @@ def _linux_memory() -> tuple[int, int] | None:
     return total, min(total, available)
 
 
-def _windows_memory() -> tuple[int, int] | None:
+def _linux_swap() -> tuple[int, int]:
+    """Swap under the effective cgroup ceiling; unknown reports zero."""
+    values: dict[str, int] = {}
+    try:
+        with open("/proc/meminfo", encoding="ascii") as handle:
+            for line in handle:
+                key, _, raw = line.partition(":")
+                if key in {"SwapTotal", "SwapFree"}:
+                    values[key] = int(raw.strip().split()[0]) * 1024
+    except (OSError, ValueError, IndexError):
+        return 0, 0
+    total = max(0, values.get("SwapTotal", 0))
+    free = min(total, max(0, values.get("SwapFree", 0)))
+    for ceiling_path, usage_path in (
+        ("/sys/fs/cgroup/memory.swap.max",
+         "/sys/fs/cgroup/memory.swap.current"),
+        ("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes",
+         "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes"),
+    ):
+        ceiling = _read_counter(Path(ceiling_path))
+        used = _read_counter(Path(usage_path))
+        if ceiling is not None and used is not None and ceiling < total:
+            total = max(0, ceiling)
+            free = min(free, max(0, ceiling - used))
+            break
+    return total, free
+
+
+def _linux_memory_pressure() -> float:
+    try:
+        with open("/proc/pressure/memory", encoding="ascii") as handle:
+            first = handle.readline()
+        if first.startswith("some "):
+            for field in first.split():
+                if field.startswith("avg10="):
+                    return min(1.0, max(0.0, float(field.split("=", 1)[1]) / 100))
+    except (OSError, ValueError):
+        pass
+    return 0.0
+
+
+def _windows_memory_status() -> tuple[int, int, int, int] | None:
+    """GlobalMemoryStatusEx pagefile values are *commit* capacity estimates."""
     if os.name != "nt":
         return None
     class MemoryStatus(ctypes.Structure):
@@ -143,21 +217,37 @@ def _windows_memory() -> tuple[int, int] | None:
     status.length = ctypes.sizeof(status)
     try:
         if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
-            return status.total_phys, status.avail_phys
+            total_swap = max(0, status.total_page - status.total_phys)
+            free_swap = min(total_swap, max(0, status.avail_page - status.avail_phys))
+            return status.total_phys, status.avail_phys, total_swap, free_swap
     except (AttributeError, OSError):
         return None
     return None
 
 
+def _windows_memory() -> tuple[int, int] | None:
+    status = _windows_memory_status()
+    return status[:2] if status else None
+
+
 def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapshot:
     """Sample resource headroom for the target storage volume *now*."""
-    memory = _linux_memory() or _windows_memory()
+    windows = _windows_memory_status() if os.name == "nt" else None
+    memory = _linux_memory() if os.name != "nt" else (
+        (windows[0], windows[1]) if windows else None
+    )
+    swap = _linux_swap() if os.name != "nt" else (
+        (windows[2], windows[3]) if windows else (0, 0)
+    )
+    pressure = _linux_memory_pressure() if os.name != "nt" else 0.0
     if memory is None:
         # Optional dependency improves support on macOS and other platforms.
         try:
             import psutil  # type: ignore[import-not-found]
             mem = psutil.virtual_memory()
             memory = int(mem.total), int(mem.available)
+            sw = psutil.swap_memory()
+            swap = int(sw.total), int(sw.free)
         except (ImportError, OSError, AttributeError):
             raise LocalResourcePressure(
                 "Cannot measure available RAM; refusing unbounded in-memory indexing"
@@ -196,6 +286,9 @@ def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapsh
         free_disk_bytes=int(disk.free),
         cpu_count=cores,
         cpu_load_ratio=max(0.0, load),
+        total_swap_bytes=swap[0],
+        free_swap_bytes=swap[1],
+        memory_pressure_ratio=pressure,
     )
 
 
@@ -205,7 +298,9 @@ def admit_resident_document(
     """Admit a full-text RAM operation only if present hardware can sustain it."""
     if type(size_bytes) is not int or size_bytes < 0:
         raise ValueError("invalid source size")
-    if size_bytes > snapshot.resident_document_budget:
+    if size_bytes > snapshot.resident_document_budget or (
+        snapshot.should_spill_early and size_bytes > snapshot.read_chunk_bytes
+    ):
         raise LocalResourcePressure(
             "Available RAM is under pressure for this source; free memory "
             "or use chunk-indexed storage. No data was truncated."
