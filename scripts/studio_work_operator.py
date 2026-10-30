@@ -33,8 +33,8 @@ def _bytes(path: Path):
 
 def _token(parser: argparse.ArgumentParser) -> str:
     token=os.environ.get("SKELETON_STUDIO_WORK_TOKEN","")
-    if not token:
-        parser.error("SKELETON_STUDIO_WORK_TOKEN must be configured privately")
+    if len(token)<24:
+        parser.error("SKELETON_STUDIO_WORK_TOKEN must be a private high-entropy capability")
     return token
 
 

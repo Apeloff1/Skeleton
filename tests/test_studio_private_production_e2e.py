@@ -8,7 +8,6 @@ from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_work import build_work_graph
 from skeleton.ai.game_builder.studio_ecosystem_journal import WorkJournal
 from skeleton.ai.game_builder.studio_ecosystem_supervisor import StudioSupervisor
-from skeleton.ai.game_builder.studio_ecosystem_spool import ArtifactSpool
 from skeleton.ai.game_builder.studio_ecosystem_fence import (
     assert_source_fence, pin_source_sections,
 )

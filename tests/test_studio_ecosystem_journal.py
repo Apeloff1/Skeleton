@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
 from skeleton.ai.game_builder.studio_ecosystem_work import build_work_graph
-from skeleton.ai.game_builder.studio_ecosystem_journal import WorkJournal, checked_graph
+from skeleton.ai.game_builder.studio_ecosystem_journal import WorkJournal
 from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
 
 def _owner(tmp_path: Path):

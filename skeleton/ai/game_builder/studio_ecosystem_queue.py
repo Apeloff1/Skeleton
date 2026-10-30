@@ -4,7 +4,6 @@ from typing import Any, Mapping, Sequence
 
 from .studio_ecosystem_capacity import ProducerCapacity,plan_producer_admission
 from .studio_ecosystem_work import ready_work
-from .studio_ecosystem_quest import StudioQuestError
 
 
 def plan_work_batch(graph: Mapping[str, Any], completed: Sequence[str],

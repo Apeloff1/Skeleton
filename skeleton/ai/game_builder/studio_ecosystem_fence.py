@@ -1,8 +1,6 @@
 """Verify canonical source and work-graph identity before producer operations."""
 from __future__ import annotations
 
-from hashlib import sha256
-import json
 from typing import Any, Mapping
 
 from .studio_ecosystem_catalog import read_blueprint
