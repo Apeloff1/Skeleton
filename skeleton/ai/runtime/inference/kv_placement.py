@@ -34,12 +34,19 @@ def observe_native_kv_placement(stderr: bytes) -> dict[str, Any]:
     host = 0
     gpu = 0
     rows = 0
+    unknown_allocation_lines = 0
     seen: set[tuple[str, str, str]] = set()
     for line in stderr.decode("utf-8", errors="replace").splitlines():
         if len(line) > 512:
             continue
         match = _KV_LINE.fullmatch(line)
         if match is None:
+            # A native KV allocation line with an unsupported device,
+            # precision or size cannot be treated as proof of zero GPU KV.
+            if ("KV buffer size" in line and
+                    ("llama_kv_cache:" in line
+                     or "llama_kv_cache_unified:" in line)):
+                unknown_allocation_lines += 1
             continue
         groups = match.groupdict()
         identity = (
@@ -57,6 +64,7 @@ def observe_native_kv_placement(stderr: bytes) -> dict[str, Any]:
             numerator * _MULTIPLIERS[groups["unit"].lower()] // 1000
         )
         if not 0 < amount <= 1 << 50:
+            unknown_allocation_lines += 1
             continue
         if groups["device"].casefold() == "cpu":
             host += amount
@@ -72,6 +80,7 @@ def observe_native_kv_placement(stderr: bytes) -> dict[str, Any]:
         "reported_host_kv_bytes": host,
         "reported_device_kv_bytes": gpu,
         "matched_allocation_lines": rows,
+        "unrecognized_allocation_lines": unknown_allocation_lines,
         "backend_reported": bool(rows),
         "actual_gpu_coherency_proven": False,
         "native_sync_fence_proven": False,

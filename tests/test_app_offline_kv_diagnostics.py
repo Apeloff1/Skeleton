@@ -77,6 +77,21 @@ class NativeKVObservationTests(unittest.TestCase):
         self.assertFalse(unknown["backend_reported"])
         self.assertFalse(unknown["actual_gpu_coherency_proven"])
 
+    def test_unrecognized_native_gpu_kv_is_not_zero_gpu_evidence(self) -> None:
+        receipt = observe_native_kv_placement(
+            b"llama_kv_cache: CPU KV buffer size = 64.00 MiB\n"
+            b"llama_kv_cache: SYCL0 KV buffer size = 22.00 MiB\n"
+        )
+        self.assertTrue(receipt["backend_reported"])
+        self.assertGreater(receipt["reported_host_kv_bytes"], 0)
+        self.assertEqual(receipt["reported_device_kv_bytes"], 0)
+        self.assertEqual(receipt["unrecognized_allocation_lines"], 1)
+        overflow = observe_native_kv_placement(
+            b"llama_kv_cache: CPU KV buffer size = 9999999999.00 GiB\n"
+        )
+        self.assertEqual(overflow["matched_allocation_lines"], 0)
+        self.assertEqual(overflow["unrecognized_allocation_lines"], 1)
+
     def test_rejects_unbounded_untrusted_or_false_positive_logs(self) -> None:
         with self.assertRaises(ValueError):
             observe_native_kv_placement(b"x" * (16 * 1024 * 1024 + 1))

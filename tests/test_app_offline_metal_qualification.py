@@ -57,6 +57,10 @@ class AppleKVQualificationTests(unittest.TestCase):
             {"requested_kv_location": "backend"},
             {"selected_gpu_layers": 0},
             {"metal_present": False},
+            {"observed": {"backend_reported": True,
+                          "reported_host_kv_bytes": 1024,
+                          "reported_device_kv_bytes": 0,
+                          "unrecognized_allocation_lines": 1}},
         )
         with patch(
             "skeleton.app.offline_metal_qualification._apple_silicon",

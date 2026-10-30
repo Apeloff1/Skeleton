@@ -52,12 +52,18 @@ def evaluate_host_kv_qualification(
         observed.get("reported_device_kv_bytes", 0)
         if isinstance(observed, dict) else 0
     )
-    if any(type(item) is not int or item < 0 for item in (host_bytes, device_bytes)):
+    unknown = (
+        observed.get("unrecognized_allocation_lines", 0)
+        if isinstance(observed, dict) else 0
+    )
+    if any(type(item) is not int or item < 0
+           for item in (host_bytes, device_bytes, unknown)):
         raise ValueError("invalid native memory observations")
     accepted = bool(
         _apple_silicon() and metal_present and requested_kv_location == "host"
         and type(selected_gpu_layers) is int and selected_gpu_layers > 0
         and reported and host_bytes > 0 and device_bytes == 0
+        and unknown == 0
     )
     result = {
         "schema": "skeleton.local.metal-kv-device-qualification.v1",
@@ -71,6 +77,7 @@ def evaluate_host_kv_qualification(
         "requested_kv_location": requested_kv_location,
         "backend_reported_host_kv_bytes": host_bytes,
         "backend_reported_device_kv_bytes": device_bytes,
+        "unrecognized_native_kv_lines": unknown,
         "backend_report_present": reported,
         "metal_telemetry_present": metal_present,
         "driver_coherency_verified": False,
