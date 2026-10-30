@@ -141,6 +141,7 @@ def _read_document(
             decoder = codecs.getincrementaldecoder("utf-8")("strict")
             text = io.StringIO() if resident else None
             byte_count = 0
+            next_probe = max(8 * 1024 * 1024, resource.read_chunk_bytes * 8)
             try:
                 while chunk := handle.read(resource.read_chunk_bytes):
                     if b"\x00" in chunk:
@@ -152,6 +153,22 @@ def _read_document(
                         text.write(decoded)
                     elif offload is not None and decoded:
                         offload(decoded)
+                    # Usage can change during a long read. On renewed
+                    # pressure discard the first-pass resident buffer and
+                    # re-run this source through the disk writer transaction.
+                    if byte_count >= next_probe:
+                        try:
+                            resource = probe_local_resources(path)
+                        except LocalResourcePressure as exc:
+                            raise OfflineLibraryError(str(exc)) from exc
+                        if text is not None and (
+                            info.st_size > resource.resident_document_budget
+                            or resource.should_spill_early
+                        ):
+                            text = None
+                        next_probe = byte_count + max(
+                            8 * 1024 * 1024, resource.read_chunk_bytes * 8,
+                        )
                 trailing = decoder.decode(b"", final=True)
                 if text is not None:
                     text.write(trailing)
