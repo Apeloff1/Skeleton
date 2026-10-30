@@ -296,6 +296,7 @@ class WorkJournal:
         if type(paused) is not bool or not isinstance(operator,str) or not TOKEN.fullmatch(operator):
             raise StudioQuestError("invalid pause command")
         with self._tx() as db:
+            self._verify_state(db)
             db.execute("""INSERT INTO meta(key,value) VALUES('paused',?)
                           ON CONFLICT(key) DO UPDATE SET value=excluded.value""",
                        ("1" if paused else "0",))
@@ -310,6 +311,7 @@ class WorkJournal:
         if task_id not in definitions:
             raise StudioQuestError("unregistered producer task")
         with self._tx() as db:
+            self._verify_state(db)
             states = dict(db.execute("SELECT id,status FROM tasks"))
             paused=db.execute("SELECT value FROM meta WHERE key='paused'").fetchone()
             if paused is not None and paused[0]=="1":
@@ -336,6 +338,7 @@ class WorkJournal:
                 or operator == former_worker):
             raise StudioQuestError("invalid independent recovery authority")
         with self._tx() as db:
+            self._verify_state(db)
             row=db.execute("SELECT status,worker,attempt FROM tasks WHERE id=?",
                            (task_id,)).fetchone()
             if row != ("leased",former_worker,expected_attempt):
@@ -351,6 +354,7 @@ class WorkJournal:
         if not isinstance(artifact_sha256,str) or not HEX.fullmatch(artifact_sha256):
             raise StudioQuestError("invalid submitted evidence fingerprint")
         with self._tx() as db:
+            self._verify_state(db)
             row=db.execute("SELECT status,worker,token FROM tasks WHERE id=?",(task_id,)).fetchone()
             if (not isinstance(worker,str) or not TOKEN.fullmatch(worker)
                     or not isinstance(token,str) or not TOKEN.fullmatch(token)
@@ -367,6 +371,7 @@ class WorkJournal:
         if not isinstance(reviewer,str) or not TOKEN.fullmatch(reviewer) or type(accepted) is not bool:
             raise StudioQuestError("invalid reviewer decision")
         with self._tx() as db:
+            self._verify_state(db)
             row=db.execute("SELECT status,worker FROM tasks WHERE id=?",(task_id,)).fetchone()
             if row is None or row[0] != "submitted" or reviewer == row[1]:
                 raise StudioQuestError("missing submission or non-independent review")

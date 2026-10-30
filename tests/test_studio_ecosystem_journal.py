@@ -142,3 +142,13 @@ def test_lease_token_is_hashed_and_bound_to_replayed_claim(tmp_path):
         db.execute("UPDATE tasks SET token=? WHERE id='source-canon'",("b"*64,))
     with pytest.raises(StudioQuestError):
         j.verify_state()
+
+def test_mutations_fail_before_touching_tampered_state(tmp_path):
+    root,graph=_owner(tmp_path)
+    j=WorkJournal(root,graph,authorized=True)
+    with sqlite3.connect(root/"studio_work.sqlite3") as db:
+        db.execute("UPDATE tasks SET attempt=20 WHERE id='source-canon'")
+    with pytest.raises(StudioQuestError):
+        j.claim("source-canon",worker="w",token="t",authorized=True)
+    with pytest.raises(StudioQuestError):
+        j.set_paused(True,operator="owner",authorized=True)
