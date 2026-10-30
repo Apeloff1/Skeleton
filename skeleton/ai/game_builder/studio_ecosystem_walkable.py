@@ -5,6 +5,7 @@ from native target-genre mechanics. No network, provider or external assets.
 """
 from __future__ import annotations
 
+from base64 import b64encode
 from collections import deque
 from hashlib import sha256
 import json
@@ -222,6 +223,10 @@ def playable_world_source(documents: Mapping[str, Any]) -> dict[str, object]:
             "target_genre_runtime_implemented":False,"release_certified":False}
 
 
+def _csp_hash(source: str) -> str:
+    return "'sha256-"+b64encode(sha256(source.encode("utf-8")).digest()).decode("ascii")+"'"
+
+
 def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
     from .studio_ecosystem_encounters import authored_hazards
     source=playable_world_source(documents)
@@ -231,12 +236,14 @@ def render_playable_world_html(documents: Mapping[str, Any]) -> bytes:
     payload=json.dumps(source,sort_keys=True,separators=(",",":"),
                        ensure_ascii=True,allow_nan=False)
     payload=payload.replace("<",r"\u003c").replace(">",r"\u003e").replace("&",r"\u0026")
+    policy=("default-src 'none'; script-src "+_csp_hash(payload)+" "+
+            _csp_hash(_SCRIPT)+"; style-src "+_csp_hash(_CSS)+
+            "; base-uri 'none'; form-action 'none'; object-src 'none'")
     html=(
       "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
       "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-      "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none';"
-      " script-src 'unsafe-inline'; style-src 'unsafe-inline';"
-      " base-uri 'none'; form-action 'none'\"><title>Original walkable studio</title>"
+      "<meta http-equiv='Content-Security-Policy' content=\""+policy+
+      "\"><title>Original walkable studio</title>"
       "<style>"+_CSS+"</style></head><body><h1>Walkable original studio prototype</h1>"
       "<p>Arrow keys/WASD or controls move. Reach gold object to select an action.</p>"
       "<p id='hud' role='status' aria-live='polite'></p>"
