@@ -220,6 +220,13 @@ class AdaptiveResourceFabric:
         self._pressure_ema: float | None = None
         self._active_streams = 0
         self._observations = 0
+        self._stream_batches = 0
+        self._stream_failures = 0
+        self._stream_bytes = 0
+        self._stream_throughput_ema_bps: float | None = None
+        self._last_stream_ns = 0
+        self._learned_parallelism = 1.0
+        self._previous_batch_throughput: float | None = None
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
@@ -258,6 +265,7 @@ class AdaptiveResourceFabric:
         with self._lock:
             ema = self._pressure_ema if self._pressure_ema is not None else 1.0
             running = self._active_streams
+            learned_parallelism = self._learned_parallelism
         if source_bytes > hw.disk_document_budget and source_bytes > hw.resident_document_budget:
             raise LocalResourcePressure("not enough RAM or disk headroom to stage requested source")
         residency = "disk_chunks" if (
@@ -270,7 +278,11 @@ class AdaptiveResourceFabric:
         staging = residency == "disk_chunks" or source_bytes > hw.read_chunk_bytes
         headroom = max(1, hw.suggested_index_jobs - running)
         penalty = max(1, int(1 + ema * hw.cpu_count))
-        streams = max(1, min(desired_streams, headroom, max(1, hw.cpu_count // penalty)))
+        streams = max(1, min(
+            desired_streams, headroom,
+            max(1, hw.cpu_count // penalty),
+            max(1, int(hw.cpu_count * learned_parallelism)),
+        ))
         gpu = None
         budget = 0
         # Never count shared GPU RAM as additional system or dedicated VRAM.
@@ -316,6 +328,12 @@ class AdaptiveResourceFabric:
         with self._lock:
             pressure = self._pressure_ema
             observations = self._observations
+            io_samples = self._stream_batches
+            io_failures = self._stream_failures
+            io_bytes = self._stream_bytes
+            io_rate = self._stream_throughput_ema_bps
+            last_io = self._last_stream_ns
+            learned = self._learned_parallelism
         result = snapshot.as_dict()
         result["controller"] = {
             "predictive_pressure": round(pressure or 0, 6),
@@ -324,6 +342,12 @@ class AdaptiveResourceFabric:
             "mode": "adaptive_deterministic_with_predictive_smoothing",
             "gpu_allocation_authority": "inference_backend_only",
             "onboard_readonly_staging": "host_mmap_page_cache",
+            "completed_stream_batches": io_samples,
+            "failed_stream_batches": io_failures,
+            "verified_read_bytes": io_bytes,
+            "smoothed_read_bytes_per_second": None if io_rate is None else int(io_rate),
+            "last_verified_read_ns": last_io or None,
+            "learned_parallelism_fraction": round(learned, 4),
         }
         return result
 
@@ -401,14 +425,46 @@ class AdaptiveResourceFabric:
                 }
             finally:
                 os.close(fd)
+        started = time.monotonic_ns()
+        succeeded = False
         try:
             with ThreadPoolExecutor(max_workers=plan.stream_count) as pool:
                 futures = [pool.submit(worker, item) for item in entries]
                 records = [future.result() for future in futures]
+            succeeded = True
             return tuple(records)
         finally:
+            elapsed = max(1, time.monotonic_ns() - started)
+            rate = total * 1_000_000_000.0 / elapsed
             with self._lock:
                 self._active_streams -= plan.stream_count
+                if succeeded:
+                    self._stream_batches += 1
+                    self._stream_bytes += total
+                    self._last_stream_ns = time.time_ns()
+                    old_rate = self._stream_throughput_ema_bps
+                    self._stream_throughput_ema_bps = (
+                        rate if old_rate is None else old_rate * 0.75 + rate * 0.25
+                    )
+                    # AIMD-inspired autotuning; performance feedback is
+                    # advisory and always subordinate to measured hard limits.
+                    if self._previous_batch_throughput is not None:
+                        if rate < self._previous_batch_throughput * 0.8:
+                            self._learned_parallelism = max(
+                                1 / max(1, plan.stream_count),
+                                self._learned_parallelism * 0.75,
+                            )
+                        elif rate > self._previous_batch_throughput * 1.1:
+                            self._learned_parallelism = min(
+                                1.0, self._learned_parallelism + 0.10,
+                            )
+                    self._previous_batch_throughput = rate
+                else:
+                    self._stream_failures += 1
+                    self._learned_parallelism = max(
+                        1 / max(1, plan.stream_count),
+                        self._learned_parallelism * 0.5,
+                    )
 
 
 __all__ = [
