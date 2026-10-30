@@ -49,6 +49,11 @@ def fake_host():
     host._chain = "e" * 64
     host._audio_total = 4
     host._audio_generation = 1
+    # Mirror the native-host fields initialized by the real constructor.
+    # This synthetic host intentionally has no authored RAM descriptor.
+    host._native_descriptor = None
+    host._native_values = None
+    host._native_memory_digest = None
     host._controls = [copy.deepcopy(_EMPTY)]
     host._pixels = bytes([20, 40, 60] * 4)
     host._audio = bytes([1, 0, 2, 0] * 4)
@@ -77,10 +82,17 @@ def fake_host():
         reward_components=("visual_change",), max_episode_steps=8,
     )
     host._observation = features
+    host._policy_signal_channels = tuple(sorted(features))
     commands = []
 
     def exchange(command, payload, blocks=None):
         commands.append(command)
+        if command == "disc_status":
+            # The synthetic core has no registered disk-control interface.
+            return {
+                "supported": False, "interface_version": None,
+                "image_count": 0, "image_index": None, "ejected": None,
+            }, {}
         if command == "state_info":
             return {"state_size": 4}, {}
         if command == "snapshot":
