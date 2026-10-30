@@ -11,6 +11,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 import hashlib
 import json
+import ctypes
+import platform
+import sys
 import mmap
 import os
 from pathlib import Path
@@ -40,6 +43,8 @@ class GPUResource:
     measurement: str = "unknown"
     utilization_ratio: float | None = None
     temperature_c: float | None = None
+    recommended_working_set_bytes: int | None = None
+    current_allocated_bytes: int | None = None
 
     def __post_init__(self) -> None:
         if not self.device or not self.vendor:
@@ -59,6 +64,10 @@ class GPUResource:
             raise ValueError("invalid GPU utilization")
         if self.temperature_c is not None and not -50 <= self.temperature_c <= 200:
             raise ValueError("invalid GPU temperature")
+        for key in ("recommended_working_set_bytes", "current_allocated_bytes"):
+            value = getattr(self, key)
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError("invalid Metal working-set telemetry")
         if self.shared_total_bytes is not None and (
             type(self.shared_total_bytes) is not int
             or type(self.shared_free_bytes) is not int
@@ -77,6 +86,8 @@ class GPUResource:
             "measurement": self.measurement,
             "utilization_ratio": self.utilization_ratio,
             "temperature_c": self.temperature_c,
+            "recommended_working_set_bytes": self.recommended_working_set_bytes,
+            "current_allocated_bytes": self.current_allocated_bytes,
         }
 
 
@@ -88,12 +99,64 @@ def _read_positive(path: Path) -> int | None:
         return None
 
 
+def _probe_apple_metal() -> tuple[GPUResource, ...]:
+    """Public Metal device working-set telemetry, not fabricated free VRAM.
+
+    Apple Silicon CPU/GPU use the same physical unified RAM. Metal's
+    recommendedMaxWorkingSetSize is an *approximate per-device performance
+    budget*, not another pool of free RAM. currentAllocatedSize counts GPU
+    resources allocated by this Metal device context, not all processes.
+    """
+    if sys.platform != "darwin" or platform.machine().lower() not in {
+        "arm64", "aarch64",
+    }:
+        return ()
+    try:
+        metal = ctypes.CDLL("/System/Library/Frameworks/Metal.framework/Metal")
+        objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+        metal.MTLCreateSystemDefaultDevice.argtypes = []
+        metal.MTLCreateSystemDefaultDevice.restype = ctypes.c_void_p
+        device = metal.MTLCreateSystemDefaultDevice()
+        if not device:
+            return ()
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        message = objc.objc_msgSend
+        # Set prototype per return type; one invocation at a time, while
+        # this Python thread owns the selector call. Do not pass pointers
+        # to Metal buffers or issue GPU commands from telemetry.
+        message.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        message.restype = ctypes.c_uint64
+        def number(selector: bytes) -> int:
+            return int(message(device, objc.sel_registerName(selector)))
+        unified = bool(number(b"hasUnifiedMemory"))
+        if not unified:
+            return ()
+        budget = number(b"recommendedMaxWorkingSetSize")
+        allocated = number(b"currentAllocatedSize")
+        if budget <= 0:
+            return ()
+        # Neither size is free VRAM; dedicated capacity is *zero* on UMA.
+        return (GPUResource(
+            device="Apple Silicon Metal", vendor="apple",
+            dedicated_total_bytes=0, dedicated_free_bytes=0,
+            shared_with_system_ram=True, measurement="metal_unified_working_set",
+            recommended_working_set_bytes=budget,
+            current_allocated_bytes=allocated,
+        ),)
+    except (OSError, AttributeError, ValueError, TypeError):
+        return ()
+
+
 def probe_gpu_resources() -> tuple[GPUResource, ...]:
     """Optional NVML, then Linux DRM sysfs. Unknown is not free memory.
 
     NVML reports dedicated GPU memory only. GTT on AMD is host-backed and
     must never be counted as additive RAM or independent VRAM.
     """
+    apple = _probe_apple_metal()
+    if apple:
+        return apple
     devices: list[GPUResource] = []
     try:
         import pynvml  # type: ignore[import-not-found]
@@ -220,10 +283,12 @@ class FabricPlan:
             "gpu_device": self.gpu_device,
             "requested_gpu_bytes": self.requested_gpu_bytes,
             "dedicated_gpu_budget_bytes": self.dedicated_gpu_budget_bytes,
+            "gpu_budget_units": "host_shared_or_dedicated_not_additive",
             "memory_pressure": self.memory_pressure,
             "reason": self.reason,
             "evidence_digest": self.evidence_digest,
             "backend_gpu_transfer_executed": False,
+            "gpu_coherency_proven": False,
         }
 
 
@@ -333,7 +398,23 @@ class AdaptiveResourceFabric:
         budget = 0
         # Never count shared GPU RAM as additional system or dedicated VRAM.
         for device in snap.gpus:
-            free = int(device.dedicated_free_bytes * 0.70)
+            if (
+                device.shared_with_system_ram
+                and device.recommended_working_set_bytes is not None
+                and device.current_allocated_bytes is not None
+            ):
+                # UMA never increases physical RAM. Reserve additional host
+                # memory for the OS and other CPU/GPU consumers.
+                metal_headroom = max(
+                    0, device.recommended_working_set_bytes
+                    - device.current_allocated_bytes,
+                )
+                free = min(
+                    int(hw.available_ram_bytes * 0.35),
+                    int(metal_headroom * 0.70),
+                )
+            else:
+                free = int(device.dedicated_free_bytes * 0.70)
             if free > budget:
                 gpu, budget = device, free
         eligible = bool(
