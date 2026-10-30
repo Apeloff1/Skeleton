@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import ctypes
 import math
 import os
+import sys
 from pathlib import Path
 import shutil
 
@@ -206,6 +207,75 @@ def _linux_memory_pressure() -> float:
     return 0.0
 
 
+def _darwin_sysctl(name: str, capacity: int = 128) -> bytes | None:
+    """Read public macOS VM counters; never modify system swap or sysctls."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+        buffer = ctypes.create_string_buffer(capacity)
+        length = ctypes.c_size_t(capacity)
+        libc.sysctlbyname.argtypes = [
+            ctypes.c_char_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t),
+            ctypes.c_void_p, ctypes.c_size_t,
+        ]
+        libc.sysctlbyname.restype = ctypes.c_int
+        if libc.sysctlbyname(
+            name.encode("ascii"), buffer, ctypes.byref(length), None, 0,
+        ) != 0 or not 0 < length.value <= capacity:
+            return None
+        return buffer.raw[:length.value]
+    except (OSError, AttributeError, UnicodeError):
+        return None
+
+
+def _darwin_memory() -> tuple[int, int] | None:
+    """Host physically reclaimable pages, excluding compressed/wired pages.
+
+    Uses macOS host_statistics64 with VM_STATISTICS64 (flavor 4) and
+    hw.memsize. Cache-eligible inactive pages count as available. This is a
+    conservative approximation, not Apple's private memory-pressure rating.
+    """
+    data = _darwin_sysctl("hw.memsize")
+    if data is None or len(data) < 8:
+        return None
+    total = int.from_bytes(data[:8], "little")
+    if total <= 0:
+        return None
+    try:
+        libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+        host = libc.mach_host_self()
+        words = (ctypes.c_uint32 * 128)()
+        count = ctypes.c_uint32(128)
+        libc.host_statistics64.argtypes = [
+            ctypes.c_uint32, ctypes.c_int, ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint32),
+        ]
+        libc.host_statistics64.restype = ctypes.c_int
+        if libc.host_statistics64(
+            host, 4, words, ctypes.byref(count)
+        ) != 0 or count.value < 4:
+            return None
+        page = os.sysconf("SC_PAGE_SIZE")
+        available = (int(words[0]) + int(words[2])) * int(page)
+        return total, min(total, available)
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def _darwin_swap() -> tuple[int, int]:
+    """vm.swapusage is xsw_usage: total, avail, used, pagesize, encrypted."""
+    data = _darwin_sysctl("vm.swapusage")
+    if data is None or len(data) < 24:
+        return 0, 0
+    total = int.from_bytes(data[0:8], "little")
+    available = int.from_bytes(data[8:16], "little")
+    used = int.from_bytes(data[16:24], "little")
+    if total <= 0 or available > total or used > total:
+        return 0, 0
+    return total, min(available, max(0, total - used))
+
+
 def _windows_memory_status() -> tuple[int, int, int, int] | None:
     """GlobalMemoryStatusEx pagefile values are *commit* capacity estimates."""
     if os.name != "nt":
@@ -279,13 +349,18 @@ def _windows_cpu_load() -> float | None:
 def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapshot:
     """Sample resource headroom for the target storage volume *now*."""
     windows = _windows_memory_status() if os.name == "nt" else None
-    memory = _linux_memory() if os.name != "nt" else (
-        (windows[0], windows[1]) if windows else None
-    )
-    swap = _linux_swap() if os.name != "nt" else (
-        (windows[2], windows[3]) if windows else (0, 0)
-    )
-    pressure = _linux_memory_pressure() if os.name != "nt" else 0.0
+    if windows is not None:
+        memory = windows[0], windows[1]
+        swap = windows[2], windows[3]
+        pressure = 0.0
+    elif sys.platform == "darwin":
+        memory = _darwin_memory()
+        swap = _darwin_swap()
+        pressure = 0.0  # Darwin does not expose Linux PSI.
+    else:
+        memory = _linux_memory()
+        swap = _linux_swap()
+        pressure = _linux_memory_pressure()
     if memory is None:
         # Optional dependency improves support on macOS and other platforms.
         try:
