@@ -63,3 +63,7 @@ def test_actual_reachable_original_npc_contact_is_independently_verified():
     reviewed=review_npc_dialogue_log(docs,body,authorized=True)
     assert reviewed["local_contacts_verified"]==1
     assert reviewed["contacts"][0]["authored_knowledge"]==actor["knows"]
+    duplicate=json.loads(body)
+    duplicate["contacts"].append(duplicate["contacts"][0])
+    with pytest.raises(StudioQuestError):
+        review_npc_dialogue_log(docs,json.dumps(duplicate).encode(),authorized=True)

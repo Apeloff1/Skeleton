@@ -7,7 +7,7 @@ import json
 from typing import Any, Mapping
 
 from .studio_ecosystem_walkable import playable_world_source
-from .studio_ecosystem_walk_replay import DIRECTIONS, replay_walk
+from .studio_ecosystem_walk_replay import DIRECTIONS
 from .studio_ecosystem_quest import StudioQuestError
 
 _NEIGHBORS = tuple(DIRECTIONS.items())
