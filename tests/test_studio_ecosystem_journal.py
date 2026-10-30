@@ -78,3 +78,21 @@ def test_event_integrity_detects_modified_durable_history(tmp_path):
         db.execute("UPDATE events SET event_json='{}' WHERE seq=1")
     with pytest.raises(StudioQuestError):
         WorkJournal(root,graph,authorized=True)
+
+def test_crash_recovery_fences_old_worker_token_and_attempt(tmp_path):
+    root,graph=_owner(tmp_path)
+    journal=WorkJournal(root,graph,authorized=True)
+    journal.claim("source-canon",worker="workerA",token="old",authorized=True)
+    restarted=WorkJournal(root,graph,authorized=True)
+    restarted.recover_claim("source-canon",former_worker="workerA",
+                             expected_attempt=1,operator="supervisor",authorized=True)
+    restarted.claim("source-canon",worker="workerB",token="fresh",authorized=True)
+    with pytest.raises(StudioQuestError):
+        restarted.submit("source-canon",worker="workerA",token="old",
+                         artifact_sha256="a"*64,authorized=True)
+    with pytest.raises(StudioQuestError):
+        restarted.recover_claim("source-canon",former_worker="workerA",
+                                expected_attempt=1,operator="supervisor",authorized=True)
+    restarted.submit("source-canon",worker="workerB",token="fresh",
+                     artifact_sha256="b"*64,authorized=True)
+    assert restarted.verify_events()["events"]==4
