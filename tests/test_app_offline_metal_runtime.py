@@ -286,7 +286,9 @@ class AdaptiveMetalLaunchTests(unittest.TestCase):
                 LocalResourcePressure, "sustained Metal memory pressure",
             ):
                 model.infer(
-                    LocalInferenceRequest(prompt="local pressure probe"),
+                    LocalInferenceRequest(
+                        prompt="local pressure probe", max_output_tokens=8,
+                    ),
                     threading.Event(),
                 )
         self.assertGreaterEqual(len(samples), 3)
