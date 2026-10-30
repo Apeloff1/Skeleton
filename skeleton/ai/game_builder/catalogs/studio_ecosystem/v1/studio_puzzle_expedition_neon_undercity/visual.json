@@ -1,0 +1,60 @@
+{
+  "project_id": "studio_puzzle_expedition_neon_undercity",
+  "genre": "puzzle_expedition",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "art_direction": {
+    "architecture": "hidden radio library",
+    "biome_palette": [
+      "#211C38",
+      "#64418C",
+      "#DE6EC6",
+      "#FFF0EC"
+    ],
+    "materials": [
+      "elevated night markets",
+      "community capacitors"
+    ],
+    "style": "original_high_readability_modular",
+    "reference_rights": "no_external_asset_ingestion"
+  },
+  "jobs": [
+    {
+      "id": "hero_silhouette",
+      "kind": "character",
+      "recipe": "Original cartographer silhouette, visible gear for pattern decoding",
+      "lodding": "mobile_desktop_adaptive_requirement"
+    },
+    {
+      "id": "world_tiles",
+      "kind": "environment",
+      "recipe": "Modular elevated night markets surfaces with grid brownouts state overlays",
+      "lodding": "streamed_chunks_requirement"
+    },
+    {
+      "id": "landmark_kit",
+      "kind": "architecture",
+      "recipe": "Reusable trim, portals and silhouette of hidden radio library",
+      "lodding": "impostor_fallback_requirement"
+    },
+    {
+      "id": "interface",
+      "kind": "ui",
+      "recipe": "Readable community capacitors and reputation status with colour-independent cues",
+      "lodding": "device_scale_requirement"
+    },
+    {
+      "id": "effect",
+      "kind": "vfx",
+      "recipe": "Authorable volumetric response to grid brownouts",
+      "lodding": "particle_budget_requirement"
+    }
+  ],
+  "deliverables": "recipes_only_no_meshes_or_textures_yet",
+  "accessibility": {
+    "contrast": "WCAG_target_not_tested",
+    "photosensitive": "exclude_unbounded_flash"
+  },
+  "engine_ownership": "existing_studio_asset_pipeline"
+}

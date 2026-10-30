@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_ecological_restoration_sunken_metro",
+  "genre": "ecological_restoration",
+  "biome": "sunken_metro",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Sunken Metro: Ecological Restoration",
+  "foundation": {
+    "setting": "Sunken Metro",
+    "era": "near-future renewal",
+    "environment": "submerged tunnels",
+    "history": "The underwater tram hub was built to protect recycled batteries, but rising flood gates interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Noa Navin, a field ecologist, must rebuild the broken food web using resource stewardship while rising flood gates threatens the underwater tram hub.",
+  "central_conflict": "a resource consortium seeks control of recycled batteries; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "rising flood gates isolates the underwater tram hub",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a resource consortium offers privileged access to recycled batteries",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "underwater tram hub",
+    "critical_resource": "recycled batteries",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

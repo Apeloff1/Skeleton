@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_defense_ashen_archipelago",
+  "title": "Ashen Archipelago: Tactical Defense",
+  "subtitle": "An original tactical defense brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610300547,
+  "width": 23,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 3
+}

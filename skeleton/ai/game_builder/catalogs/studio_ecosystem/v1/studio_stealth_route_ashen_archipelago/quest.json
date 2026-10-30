@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_stealth_route_ashen_archipelago",
+  "genre": "stealth_route",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_stealth_route_ashen_archipelago:restore",
+  "objective": "deliver a sealed civic charter",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "basalt islands",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near cliffside signal tower",
+        "Seek a witness of volcanic ash"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "cliffside signal tower",
+      "entry": "survey_complete",
+      "actions": [
+        "infiltrate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to freshwater cisterns",
+        "Establish an independent path around a surveillance guild"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "cliffside signal tower",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of cliffside signal tower",
+        "Construct a low-resource alternative using freshwater cisterns"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden volcanic ash interrupts transfer",
+    "The a surveillance guild suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "freshwater cisterns",
+    "unlimited_rewards": false
+  }
+}

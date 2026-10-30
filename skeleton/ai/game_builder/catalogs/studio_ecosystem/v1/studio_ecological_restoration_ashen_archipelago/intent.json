@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_ashen_archipelago",
+  "title": "Ashen Archipelago: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610300803,
+  "width": 23,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 4
+}

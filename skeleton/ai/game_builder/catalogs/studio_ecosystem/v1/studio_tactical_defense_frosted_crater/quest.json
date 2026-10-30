@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_tactical_defense_frosted_crater",
+  "genre": "tactical_defense",
+  "biome": "frosted_crater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_tactical_defense_frosted_crater:restore",
+  "objective": "protect the last community hub",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "frozen crater rims",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near impact-hollow vault",
+        "Seek a witness of cryogenic pockets"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "impact-hollow vault",
+      "entry": "survey_complete",
+      "actions": [
+        "defend",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to basalt shelters",
+        "Establish an independent path around a rogue militia"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "impact-hollow vault",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of impact-hollow vault",
+        "Construct a low-resource alternative using basalt shelters"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden cryogenic pockets interrupts transfer",
+    "The a rogue militia suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "basalt shelters",
+    "unlimited_rewards": false
+  }
+}

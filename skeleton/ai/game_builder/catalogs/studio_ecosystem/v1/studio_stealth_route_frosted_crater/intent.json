@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_frosted_crater",
+  "title": "Frosted Crater: Stealth Route",
+  "subtitle": "An original stealth route brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610300359,
+  "width": 23,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "space",
+  "starting_health": 6
+}

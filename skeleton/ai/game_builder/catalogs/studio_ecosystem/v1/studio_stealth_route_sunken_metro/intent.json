@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_sunken_metro",
+  "title": "Sunken Metro: Stealth Route",
+  "subtitle": "An original stealth route brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610300393,
+  "width": 19,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 4
+}

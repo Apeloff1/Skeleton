@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_ion_wastes",
+  "title": "Ion Wastes: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610300086,
+  "width": 21,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 4
+}
