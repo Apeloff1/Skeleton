@@ -535,6 +535,7 @@ class LongformVirtualMemory:
                 if replay:
                     if digest != last_digest:
                         raise LongformMemoryError("replayed work receipt changed")
+                    self._db.execute("COMMIT")
                     return {
                         **window, "work_id": work_id, "request_id": request_id,
                         "revision": revision, "next_page": next_page,
