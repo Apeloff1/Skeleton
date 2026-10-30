@@ -1,0 +1,210 @@
+"""Durable, single-host SQLite studio work journal with transactional CAS.
+
+All states represent operator-reported *planning* progress, never independently
+verified assets or finished game releases. The only mutable state is a local
+private SQLite database; the source work graph remains immutable.
+"""
+from __future__ import annotations
+
+from contextlib import contextmanager
+from hashlib import sha256
+import json
+import os
+from pathlib import Path
+import re
+import sqlite3
+import stat
+from typing import Any, Iterator, Mapping
+
+from .studio_ecosystem_quest import StudioQuestError
+
+TOKEN = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+HEX = re.compile(r"^[0-9a-f]{64}$")
+SCHEMA = "skeleton.game_builder.studio_work_journal.v1"
+
+
+def canonical(value: object) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True,
+                          separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise StudioQuestError("noncanonical work journal input") from exc
+
+
+def digest(value: object) -> str:
+    return sha256(canonical(value).encode("ascii")).hexdigest()
+
+
+def checked_graph(graph: Mapping[str, Any]) -> tuple[str, str, str, tuple[dict[str, object], ...]]:
+    if not isinstance(graph, Mapping) or graph.get("schema") != "skeleton.game_builder.studio_work_graph.v1":
+        raise StudioQuestError("wrong producer graph schema")
+    project, source, fingerprint = (graph.get("project_id"), graph.get("source_digest"),
+                                    graph.get("work_graph_sha256"))
+    if not isinstance(project, str) or not TOKEN.fullmatch(project):
+        raise StudioQuestError("unsafe producer project ID")
+    if not isinstance(source, str) or not HEX.fullmatch(source):
+        raise StudioQuestError("invalid producer source digest")
+    tasks = graph.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        raise StudioQuestError("producer graph has no tasks")
+    observed: set[str] = set()
+    for task in tasks:
+        if not isinstance(task, dict):
+            raise StudioQuestError("invalid producer task")
+        name, deps, kind = task.get("id"), task.get("depends_on"), task.get("kind")
+        if (not isinstance(name, str) or not TOKEN.fullmatch(name)
+                or name in observed or not isinstance(kind, str) or not TOKEN.fullmatch(kind)
+                or not isinstance(deps, list) or any(
+                    not isinstance(dep, str) or dep not in observed for dep in deps
+                ) or len(deps) != len(set(deps))):
+            raise StudioQuestError("invalid or out-of-order task dependency")
+        observed.add(name)
+    expected = digest({"project": project, "source": source, "tasks": tasks})
+    if fingerprint != expected:
+        raise StudioQuestError("work graph digest or canonical owner mismatch")
+    return project, source, expected, tuple(tasks)
+
+
+def _private_directory(root: Path) -> None:
+    if root.is_symlink() or not root.is_dir():
+        raise StudioQuestError("existing non-symlink private workspace required")
+    st = root.stat()
+    if os.name == "posix":
+        if st.st_uid != os.getuid() or st.st_mode & 0o077:
+            raise StudioQuestError("work journal directory must be owned and private")
+
+
+def _safe_database(path: Path) -> None:
+    if path.is_symlink():
+        raise StudioQuestError("linked journal database refused")
+    if path.exists():
+        st = path.stat()
+        if not stat.S_ISREG(st.st_mode):
+            raise StudioQuestError("journal path must be a regular file")
+        if os.name == "posix" and (st.st_uid != os.getuid() or st.st_mode & 0o077):
+            raise StudioQuestError("journal file must be owned and private")
+
+
+class WorkJournal:
+    """Atomic work claims, unverified submissions, and explicit review decisions."""
+
+    def __init__(self, root: Path, graph: Mapping[str, Any], *, authorized: bool):
+        if not authorized:
+            raise PermissionError("private work journal requires operator authorization")
+        self.root = Path(root)
+        _private_directory(self.root)
+        self.path = self.root / "studio_work.sqlite3"
+        self.project, self.source, self.graph_digest, self.tasks = checked_graph(graph)
+        _safe_database(self.path)
+        with self._tx() as db:
+            db.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            db.execute("""CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY, status TEXT NOT NULL,
+                worker TEXT, token TEXT, attempt INTEGER NOT NULL DEFAULT 0,
+                submitted_sha TEXT, reviewer TEXT
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS events (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL,
+                previous_sha TEXT NOT NULL, event_sha TEXT NOT NULL
+            )""")
+            rows = dict(db.execute("SELECT key, value FROM meta"))
+            expected = {"schema": SCHEMA, "project": self.project,
+                        "source": self.source, "graph": self.graph_digest}
+            if rows:
+                if any(rows.get(k) != v for k, v in expected.items()):
+                    raise StudioQuestError("work journal changed source or graph identity")
+                existing = {r[0] for r in db.execute("SELECT id FROM tasks")}
+                if existing != {t["id"] for t in self.tasks}:
+                    raise StudioQuestError("journal task inventory differs from source")
+            else:
+                for key, value in expected.items():
+                    db.execute("INSERT INTO meta (key,value) VALUES (?,?)", (key,value))
+                for task in self.tasks:
+                    db.execute("INSERT INTO tasks (id,status) VALUES (?,'pending')", (task["id"],))
+        _safe_database(self.path)
+
+    @contextmanager
+    def _tx(self) -> Iterator[sqlite3.Connection]:
+        _private_directory(self.root)
+        _safe_database(self.path)
+        db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
+        try:
+            db.execute("PRAGMA busy_timeout=10000")
+            db.execute("PRAGMA foreign_keys=ON")
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA synchronous=FULL")
+            db.execute("BEGIN IMMEDIATE")
+            yield db
+            db.execute("COMMIT")
+        except BaseException:
+            if db.in_transaction:
+                db.execute("ROLLBACK")
+            raise
+        finally:
+            db.close()
+
+    def snapshot(self) -> dict[str, object]:
+        with self._tx() as db:
+            rows = {r[0]: {"status":r[1],"worker":r[2],"attempt":r[3],
+                           "submitted_sha":r[4],"reviewer":r[5]}
+                    for r in db.execute("SELECT id,status,worker,attempt,submitted_sha,reviewer FROM tasks")}
+            return {"schema": SCHEMA,"project_id":self.project,
+                    "source_digest":self.source,"graph_sha256":self.graph_digest,
+                    "tasks":rows,"completion_evidence_verified":False,
+                    "release_certified":False}
+
+    def claim(self, task_id: str, *, worker: str, token: str, authorized: bool) -> None:
+        if not authorized:
+            raise PermissionError("claim requires operator authorization")
+        if not all(isinstance(x,str) and TOKEN.fullmatch(x) for x in (task_id,worker,token)):
+            raise StudioQuestError("unsafe claim identity")
+        definitions = {t["id"]:t for t in self.tasks}
+        if task_id not in definitions:
+            raise StudioQuestError("unregistered producer task")
+        with self._tx() as db:
+            states = dict(db.execute("SELECT id,status FROM tasks"))
+            if states[task_id] != "pending":
+                raise StudioQuestError("already claimed or not pending")
+            if any(states[dep] != "reviewed_claim" for dep in definitions[task_id]["depends_on"]):
+                raise StudioQuestError("source producer prerequisites not reviewed")
+            db.execute("""UPDATE tasks SET status='leased',worker=?,token=?,
+                        attempt=attempt+1 WHERE id=? AND status='pending'""",
+                       (worker,token,task_id))
+            self._event(db,"claim",task_id,worker)
+
+    def submit(self, task_id: str, *, worker: str, token: str,
+               artifact_sha256: str, authorized: bool) -> None:
+        if not authorized:
+            raise PermissionError("submit requires operator authorization")
+        if not isinstance(artifact_sha256,str) or not HEX.fullmatch(artifact_sha256):
+            raise StudioQuestError("invalid submitted evidence fingerprint")
+        with self._tx() as db:
+            row=db.execute("SELECT status,worker,token FROM tasks WHERE id=?",(task_id,)).fetchone()
+            if row != ("leased",worker,token):
+                raise StudioQuestError("stale or mismatched worker token")
+            db.execute("""UPDATE tasks SET status='submitted',submitted_sha=?,token=NULL
+                          WHERE id=?""",(artifact_sha256,task_id))
+            self._event(db,"submit",task_id,artifact_sha256)
+
+    def review(self, task_id: str, *, reviewer: str, accepted: bool,
+               authorized: bool) -> None:
+        if not authorized:
+            raise PermissionError("review needs independent operator authorization")
+        if not isinstance(reviewer,str) or not TOKEN.fullmatch(reviewer) or type(accepted) is not bool:
+            raise StudioQuestError("invalid reviewer decision")
+        with self._tx() as db:
+            row=db.execute("SELECT status,worker FROM tasks WHERE id=?",(task_id,)).fetchone()
+            if row is None or row[0] != "submitted" or reviewer == row[1]:
+                raise StudioQuestError("missing submission or non-independent review")
+            db.execute("""UPDATE tasks SET status=?,reviewer=? WHERE id=?""",
+                       ("reviewed_claim" if accepted else "pending",reviewer,task_id))
+            self._event(db,"review_accept" if accepted else "review_reject",task_id,reviewer)
+
+    @staticmethod
+    def _event(db: sqlite3.Connection, kind: str, task_id: str, actor: str) -> None:
+        last = db.execute("SELECT event_sha FROM events ORDER BY seq DESC LIMIT 1").fetchone()
+        previous = last[0] if last else "0"*64
+        payload = {"kind":kind,"task":task_id,"actor":actor,"previous":previous}
+        encoded=canonical(payload)
+        db.execute("INSERT INTO events (event_json,previous_sha,event_sha) VALUES (?,?,?)",
+                   (encoded,previous,sha256(encoded.encode("ascii")).hexdigest()))
