@@ -106,6 +106,8 @@ _MANAGED_LONG_FLAGS = {
     "--threads",
     "--batch-size",
     "--gpu-layers",
+    "--kv-offload",
+    "--no-kv-offload",
     "--grammar",
     "--grammar-file",
     "--json-schema",
@@ -121,6 +123,8 @@ _MANAGED_SHORT_FLAGS = (
     "-b",
     "-bf",
     "-ngl",
+    "-kvo",
+    "-nkvo",
     "-j",
     "-jf",
     "-s",
@@ -250,6 +254,7 @@ class LlamaCppConfig:
     threads: int | None = None
     batch_size: int | None = None
     gpu_layers: int | None = None
+    kv_cache_location: str = "backend"
     temperature: float = 0.0
     extra_args: tuple[str, ...] = ()
     environment: Mapping[str, str] = field(default_factory=dict)
@@ -304,6 +309,10 @@ class LlamaCppConfig:
             "llama_completion_eog",
         }:
             raise ValueError("output_framing must be raw or llama_completion_eog")
+        if type(self.kv_cache_location) is not str or self.kv_cache_location not in {
+            "backend", "host",
+        }:
+            raise ValueError("kv_cache_location must be backend or host")
         normalized_args: list[str] = []
         for item in self.extra_args:
             if not isinstance(item, str) or not item:
@@ -884,6 +893,12 @@ class LlamaCppModel:
             raise LlamaCppRuntimeError(
                 "resource retuning cannot change model, safety or context identity"
             )
+        if profile.kv_cache_location != self.config.kv_cache_location:
+            if not (self.config.kv_cache_location == "backend"
+                    and profile.kv_cache_location == "host"):
+                raise LlamaCppRuntimeError(
+                    "resource adaptation cannot activate GPU KV offloading"
+                )
         for field in ("gpu_layers", "threads", "batch_size"):
             original = getattr(self.config, field)
             proposed = getattr(profile, field)
@@ -948,6 +963,7 @@ class LlamaCppModel:
             "threads": self.config.threads,
             "batch_size": self.config.batch_size,
             "gpu_layers": self.config.gpu_layers,
+            "kv_cache_location": self.config.kv_cache_location,
             "temperature": float(self.config.temperature),
             "extra_args": list(self.config.extra_args),
             "output_framing": self.config.output_framing,
@@ -1264,6 +1280,8 @@ class LlamaCppModel:
             command.extend(("-b", str(self.config.batch_size)))
         if self.config.gpu_layers is not None:
             command.extend(("-ngl", str(self.config.gpu_layers)))
+        if self.config.kv_cache_location == "host":
+            command.append("--no-kv-offload")
         if schema_file is not None:
             command.extend(("--json-schema-file", str(schema_file)))
         if self._native_chat_profile() is None:
