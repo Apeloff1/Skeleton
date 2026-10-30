@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_misty_breakwater",
+  "title": "Misty Breakwater: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010316433,
+  "width": 23,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 3
+}
