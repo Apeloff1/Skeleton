@@ -313,7 +313,7 @@ async def test_pristine_created_legacy_checkpoint_can_acquire_the_exact_pin(tmp_
 
 
 @pytest.mark.parametrize(
-    "field,value",
+    "field,value,expected_error",
     [
         ("model_digest", "bad", "local reference content changed behind its claimed digest"),
         ("runtime_digest", "bad", "local activation runtime digest is invalid"),
