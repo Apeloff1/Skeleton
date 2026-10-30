@@ -19,3 +19,13 @@ def test_cli_requires_explicit_selection(tmp_path):
     with pytest.raises(SystemExit) as exc:
         main(["--private-root",str(tmp_path),"--output-root",str(tmp_path)])
     assert exc.value.code==2
+
+def test_cli_explicit_interactive_story_option(tmp_path,capsys):
+    root=tmp_path/"private";root.mkdir(mode=0o700)
+    output=tmp_path/"exports";output.mkdir(mode=0o700)
+    assert main(["--private-root",str(root),"--output-root",str(output),
+                 "--project","studio_arena_fighting_glacial_fjord",
+                 "--interactive-story","--working-set-bytes","1024",
+                 "--estimated-output-bytes","1024"])==0
+    assert (output/"studio_arena_fighting_glacial_fjord"/"quest.html").is_file()
+    assert json.loads(capsys.readouterr().out)["all_projects_completed"]
