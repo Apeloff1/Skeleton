@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_time_loop_detective_cloud_canopy",
+  "title": "Cloud Canopy: Time Loop Detective",
+  "subtitle": "An original time loop detective brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610303141,
+  "width": 19,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "forest",
+  "starting_health": 3
+}

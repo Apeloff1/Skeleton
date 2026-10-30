@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_luminous_marsh",
+  "title": "Luminous Marsh: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610303892,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 5
+}

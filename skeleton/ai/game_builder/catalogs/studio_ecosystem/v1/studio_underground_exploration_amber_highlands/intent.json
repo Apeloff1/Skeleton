@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_amber_highlands",
+  "title": "Amber Highlands: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Amber Highlands; prototype maps are not full genre implementations.",
+  "seed": 202610303823,
+  "width": 23,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 3
+}

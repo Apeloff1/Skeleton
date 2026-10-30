@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_copper_mesa",
+  "title": "Copper Mesa: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Copper Mesa; prototype maps are not full genre implementations.",
+  "seed": 202610303585,
+  "width": 19,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "desert",
+  "starting_health": 5
+}

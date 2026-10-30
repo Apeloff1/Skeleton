@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_time_loop_detective_amber_highlands",
+  "genre": "time_loop_detective",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Amber Highlands: Time Loop Detective",
+  "foundation": {
+    "setting": "Amber Highlands",
+    "era": "post-isolation",
+    "environment": "terraced ridgepaths",
+    "history": "A forgotten mountain hospice once protected resin lamps, until recurring landslides forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Fen Talas, a chronologist, must prevent a repeat reactor incident, relying on event-order inference despite landslides.",
+  "central_conflict": "a self-reinforcing paradox threatens the mountain hospice by restricting resin lamps.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "landslides destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a self-reinforcing paradox contests access to resin lamps",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The mountain hospice becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers resin lamps"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "mountain hospice",
+    "critical_resource": "resin lamps",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

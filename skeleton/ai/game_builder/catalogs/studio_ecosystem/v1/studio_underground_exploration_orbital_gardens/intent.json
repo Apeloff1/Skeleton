@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_orbital_gardens",
+  "title": "Orbital Gardens: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610303772,
+  "width": 25,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "space",
+  "starting_health": 4
+}

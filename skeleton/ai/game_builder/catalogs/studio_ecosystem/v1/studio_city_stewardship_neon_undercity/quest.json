@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_city_stewardship_neon_undercity",
+  "genre": "city_stewardship",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_city_stewardship_neon_undercity:restore",
+  "objective": "repair shared urban infrastructure",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "elevated night markets",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before grid brownouts"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "hidden radio library",
+      "verb": "allocate",
+      "requirements": [
+        "Establish control of community capacitors"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "hidden radio library",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the hidden radio library"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "grid brownouts",
+    "an exclusionary syndicate"
+  ],
+  "resource_constraints": {
+    "resource": "community capacitors",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

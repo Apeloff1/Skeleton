@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_neon_undercity",
+  "title": "Neon Undercity: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610304062,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 3
+}

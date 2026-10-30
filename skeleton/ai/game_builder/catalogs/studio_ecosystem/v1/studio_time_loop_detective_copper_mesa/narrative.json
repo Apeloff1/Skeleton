@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_time_loop_detective_copper_mesa",
+  "genre": "time_loop_detective",
+  "biome": "copper_mesa",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Copper Mesa: Time Loop Detective",
+  "foundation": {
+    "setting": "Copper Mesa",
+    "era": "early reconstruction",
+    "environment": "dry ravines",
+    "history": "A forgotten abandoned observatory once protected solar mirrors, until recurring dust squalls forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Fen Vale, a chronologist, must prevent a repeat reactor incident, relying on event-order inference despite dust squalls.",
+  "central_conflict": "a self-reinforcing paradox threatens the abandoned observatory by restricting solar mirrors.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "dust squalls destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a self-reinforcing paradox contests access to solar mirrors",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The abandoned observatory becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers solar mirrors"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "abandoned observatory",
+    "critical_resource": "solar mirrors",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}
