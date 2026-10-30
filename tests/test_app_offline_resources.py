@@ -62,7 +62,6 @@ class LocalResourceBudgetTests(unittest.TestCase):
             self.assertEqual(_linux_memory(), (2_000_000_000, 500_000_000))
 
     def test_cpu_quota_is_respected(self):
-        from unittest.mock import mock_open
         from skeleton.app import offline_resources
         with TemporaryDirectory() as temp:
             with patch.object(offline_resources, "_linux_memory",
