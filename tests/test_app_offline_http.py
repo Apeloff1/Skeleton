@@ -78,6 +78,56 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             conn.close()
         return status, json.loads(raw_response), headers_received
 
+    def test_mac_longform_virtual_memory_requires_approval_and_verifies_pages(self) -> None:
+        root = self.folder / "longform-books"
+        root.mkdir()
+        text = "continuity and long context " * 10000
+        (root / "manuscript.txt").write_text(text, encoding="utf-8")
+        selected = {
+            "root": str(root), "relative_path": "manuscript.txt",
+            "approved": False,
+        }
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected, authorized=False,
+        )
+        self.assertEqual(status, 401)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected,
+        )
+        self.assertEqual(status, 403)
+        selected["approved"] = True
+        status, result, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(result["source_bytes"], len(text.encode("utf-8")))
+        self.assertGreater(result["page_count"], 1)
+        source_id = result["source_id"]
+        status, verified, _ = self._request(
+            "POST", "/v1/resources/longform/verify",
+            {"source_id": source_id},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(verified["verified"])
+        status, hit, _ = self._request(
+            "POST", "/v1/resources/longform/search",
+            {"source_id": source_id, "query": "continuity", "limit": 2},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(hit["hits"])
+        self.assertFalse(hit["model_context_applied"])
+        status, page, _ = self._request(
+            "POST", "/v1/resources/longform/window",
+            {"source_id": source_id, "start_page": 0, "pages": 1},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(text.startswith(page["text"]))
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/window",
+            {"source_id": "../escape"},
+        )
+        self.assertEqual(status, 422)
+
     def test_resource_fabric_auth_and_readonly_multisource_staging(self) -> None:
         status, _, _ = self._request(
             "GET", "/v1/resources", authorized=False,
