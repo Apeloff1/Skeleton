@@ -36,7 +36,7 @@ from skeleton.app.local_ai import (
     private_desktop_database,
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
-from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
+from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
 from skeleton.app.offline_background_job import LocalJobRejected, LocalReferenceJob
 from skeleton.app.offline_reference_read import (
     LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
@@ -757,7 +757,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
             raise OfflineHTTPError(411, "numeric request length required")
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
-            else MAX_DOCUMENT_BYTES * 6 + 8192 if path == "/v1/knowledge/documents"
+            else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
