@@ -1432,6 +1432,23 @@ def _idempotency_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool
     return replay, remember
 
 
+def _idempotency_wrapper_verified(tree: ast.Module) -> bool:
+    """Recognize the shared guard only when both replay and completion exist."""
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name != "_forge_idempotent":
+            continue
+        calls = {
+            child.func.attr
+            for child in ast.walk(node)
+            if isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and isinstance(child.func.value, ast.Name)
+            and child.func.value.id == "_idempotency"
+        }
+        return {"operation", "complete"}.issubset(calls)
+    return False
+
+
 def idempotency_handler_rows() -> list[dict[str, object]]:
     modules = (
         ("skeleton.api.routes", "/api/v1"),
@@ -1442,10 +1459,16 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
         tree = parse_module_tree(module)
         if tree is None or not isinstance(tree, ast.Module):
             continue
+        guarded_wrapper = _idempotency_wrapper_verified(tree)
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             replay, remember = _idempotency_attrs(node)
+            if guarded_wrapper and any(
+                isinstance(decorator, ast.Name) and decorator.id == "_forge_idempotent"
+                for decorator in node.decorator_list
+            ):
+                replay, remember = True, True
             if not replay and not remember:
                 continue
             for decorator in node.decorator_list:
