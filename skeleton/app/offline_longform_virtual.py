@@ -137,8 +137,17 @@ class LongformVirtualMemory:
         with self._lock:
             self._db.close()
 
-    def ingest(self, root: str | Path, relative: str) -> dict[str, object]:
-        """Atomically spool a selected UTF-8 source; no full-file text buffer."""
+    def ingest(
+        self, root: str | Path, relative: str,
+        *, request_id: str | None = None,
+    ) -> dict[str, object]:
+        """Atomically spool once; caller can recover by a stable request id.
+
+        A retried import never duplicates a previous committed archive and
+        never represents a new source version as the old source snapshot.
+        """
+        if request_id is not None:
+            self._identity(request_id, "import request identity")
         base, rel = _source(root, relative)
         try:
             fd = _open_source_at(base, rel)
@@ -157,14 +166,34 @@ class LongformVirtualMemory:
                 )
                 decoder = codecs.getincrementaldecoder("utf-8")("strict")
                 hasher = sha256()
-                source_id = secrets.token_hex(24)
+                source_id = request_id or secrets.token_hex(24)
                 count = 0
-                length = 0
                 stored = 0
                 ordinal = 0
                 pending = ""
                 previous = ROOT_CHAIN
                 with self._lock:
+                    previous_import = self._db.execute(
+                        "SELECT source_label, source_sha256, bytes, pages, "
+                        "terminal_chain, stored_bytes FROM longform_sources "
+                        "WHERE source_id=?", (source_id,),
+                    ).fetchone()
+                    if previous_import is not None:
+                        if previous_import[0] != rel.as_posix():
+                            raise LongformMemoryError(
+                                "import request identity already belongs to another source"
+                            )
+                        manifest = self._read_verified(source_id)[0]
+                        return {
+                            "source_id": source_id,
+                            "source_sha256": manifest["source_sha256"],
+                            "source_bytes": manifest["source_bytes"],
+                            "page_count": manifest["page_count"],
+                            "terminal_chain": manifest["terminal_chain"],
+                            "stored_payload_bytes": previous_import[5],
+                            "storage": "sqlite_wal_adaptive_zlib_pages",
+                            "verified": True, "replayed": True,
+                        }
                     self._db.execute("BEGIN IMMEDIATE")
                     try:
                         def publish(page: str) -> None:
@@ -236,7 +265,26 @@ class LongformVirtualMemory:
             "source_bytes": count, "page_count": ordinal,
             "stored_payload_bytes": stored, "terminal_chain": previous.hex(),
             "storage": "sqlite_wal_adaptive_zlib_pages", "verified": True,
+            "replayed": False,
         }
+
+    def inspect_source(self, source_id: str) -> dict[str, object]:
+        """Retrieve a previously committed source after a lost HTTP response."""
+        self._identity(source_id, "source identity")
+        with self._lock:
+            data = self._db.execute(
+                "SELECT source_label, stored_bytes FROM longform_sources "
+                "WHERE source_id=?", (source_id,),
+            ).fetchone()
+            if data is None:
+                raise LongformMemoryError("unknown committed longform source")
+            manifest = self._read_verified(source_id)[0]
+            return {
+                **manifest,
+                "source_label": data[0],
+                "stored_payload_bytes": data[1],
+                "storage": "sqlite_wal_adaptive_zlib_pages",
+            }
 
     def _read_verified(
         self, source_id: str, *, selected: set[int] | None = None,
