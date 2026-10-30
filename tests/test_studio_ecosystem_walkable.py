@@ -1,0 +1,36 @@
+from copy import deepcopy
+from hashlib import sha256
+import json
+import re
+import pytest
+from skeleton.ai.game_builder.studio_ecosystem_catalog import read_blueprint
+from skeleton.ai.game_builder.studio_ecosystem_walkable import (
+    _reachable,playable_world_source,render_playable_world_html,
+)
+
+@pytest.mark.parametrize("project",[
+ "studio_aerial_traversal_amber_highlands",
+ "studio_puzzle_expedition_copper_mesa",
+ "studio_arena_fighting_glacial_fjord",
+])
+def test_all_original_source_families_produce_real_walkable_scene_maps(project):
+    docs=read_blueprint(project)
+    source=playable_world_source(docs)
+    assert len(source["maps"])==len(source["stages"])==3
+    assert all(_reachable(rows) for rows in source["maps"])
+    assert all(rows[1][1]=="." for rows in source["maps"])
+    assert all(rows[8][14]=="." for rows in source["maps"])
+    html=render_playable_world_html(docs)
+    assert b"<canvas" in html and b"function move" in html and b"function choose" in html
+    assert b"fetch(" not in html and b"localStorage" not in html
+    assert html==render_playable_world_html(docs)
+    assert source["target_genre_runtime_implemented"] is False
+
+def test_malicious_choice_cannot_escape_inert_json_into_html():
+    docs=deepcopy(read_blueprint("studio_arena_fighting_glacial_fjord"))
+    docs["quest"]["stage_graph"][0]["alternatives"][0]="</script><script>evil()</script>"
+    html=render_playable_world_html(docs).decode("utf-8")
+    data=re.search(r"<script type='application/json' id='world-source'>(.*?)</script>",html,re.S)
+    assert data is not None
+    assert "</script>" not in data.group(1)
+    assert json.loads(data.group(1))["stages"][0]["alternatives"][0]=="</script><script>evil()</script>"

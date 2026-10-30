@@ -46,3 +46,18 @@ def test_interactive_story_package_contains_six_owned_files(tmp_path):
     assert len(result["assets"])==6
     assert (target/"quest.html").is_file()
     assert json.loads((target/"manifest.json").read_text())["schema"].endswith(".v2")
+
+def test_v3_package_has_real_walkable_canvas_as_seventh_file(tmp_path):
+    workspace=tmp_path/"private";workspace.mkdir(mode=0o700)
+    out=tmp_path/"out";out.mkdir(mode=0o700)
+    docs=read_blueprint("studio_arena_fighting_glacial_fjord")
+    j=WorkJournal(workspace,build_work_graph(docs),authorized=True)
+    pin_source_sections(j,docs,authorized=True)
+    bundle=build_offline_studio_bundle(
+        j,ArtifactSpool(workspace,authorized=True),out,
+        walkable_story=True,authorized=True)
+    target=Path(bundle["output_dir"])
+    assert len(bundle["assets"])==7
+    assert b"<canvas" in (target/"walkable.html").read_bytes()
+    manifest=json.loads((target/"manifest.json").read_bytes())
+    assert manifest["schema"]=="skeleton.game_builder.studio_offline_package.v3"
