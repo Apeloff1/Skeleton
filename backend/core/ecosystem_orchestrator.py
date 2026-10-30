@@ -69,12 +69,14 @@ class EcosystemOrchestrator:
         if not self._run_lock.acquire(blocking=False):
             return {"ok": False, "session_id": session_id, "reason": "studio_busy"}
         try:
+            if session.status != "created":
+                return {"ok": False, "session_id": session_id, "reason": "session_already_run"}
             session.status = "running"
             self.studio.set_era(session.era)
             result = self.studio.run_pipeline(session.brief)
             session.result = result
             session.godot_files = list(result.get("godot_files") or [])
-            session.status = "sealed" if result.get("sealed") else "incomplete"
+            session.status = "sealed" if result.get("ok") and result.get("sealed") else "incomplete"
             session.error = None if result.get("ok") else result.get("reason")
             self.audit.record(actor, "session.run", f"{session_id}:{session.status}")
             return {
