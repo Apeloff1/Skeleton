@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 464,
+  "project_count": 472,
   "sections": [
     "intent",
     "narrative",
@@ -2796,10 +2796,58 @@
       "genre": "elastic_physics",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_weather_survival_copper_mesa",
+      "genre": "weather_survival",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_weather_survival_glacial_fjord",
+      "genre": "weather_survival",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_weather_survival_ashen_archipelago",
+      "genre": "weather_survival",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_weather_survival_luminous_marsh",
+      "genre": "weather_survival",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_weather_survival_cloud_canopy",
+      "genre": "weather_survival",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_weather_survival_ion_wastes",
+      "genre": "weather_survival",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_weather_survival_frosted_crater",
+      "genre": "weather_survival",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_weather_survival_salt_dunes",
+      "genre": "weather_survival",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 3712,
+    "source_files": 3776,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
