@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_misty_breakwater",
+  "title": "Misty Breakwater: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010317415,
+  "width": 23,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 5
+}

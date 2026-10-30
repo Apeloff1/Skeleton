@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_glass_steppe",
+  "title": "Glass Steppe: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010317341,
+  "width": 19,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 13,
+  "theme": "desert",
+  "starting_health": 3
+}
