@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_copper_mesa",
+  "title": "Copper Mesa: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010317462,
+  "width": 19,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 6,
+  "theme": "desert",
+  "starting_health": 6
+}

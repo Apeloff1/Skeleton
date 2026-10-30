@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_glacial_fjord",
+  "title": "Glacial Fjord: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010317499,
+  "width": 21,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 3
+}
