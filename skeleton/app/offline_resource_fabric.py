@@ -38,6 +38,8 @@ class GPUResource:
     shared_free_bytes: int | None = None
     shared_with_system_ram: bool = False
     measurement: str = "unknown"
+    utilization_ratio: float | None = None
+    temperature_c: float | None = None
 
     def __post_init__(self) -> None:
         if not self.device or not self.vendor:
@@ -49,6 +51,14 @@ class GPUResource:
             raise ValueError("GPU free VRAM cannot exceed total VRAM")
         if (self.shared_total_bytes is None) != (self.shared_free_bytes is None):
             raise ValueError("shared GPU memory must have complete telemetry")
+        for value in (self.utilization_ratio, self.temperature_c):
+            if value is not None and (not isinstance(value, (int, float))
+                                      or isinstance(value, bool)):
+                raise ValueError("invalid GPU sensor value")
+        if self.utilization_ratio is not None and not 0 <= self.utilization_ratio <= 1:
+            raise ValueError("invalid GPU utilization")
+        if self.temperature_c is not None and not -50 <= self.temperature_c <= 200:
+            raise ValueError("invalid GPU temperature")
         if self.shared_total_bytes is not None and (
             type(self.shared_total_bytes) is not int
             or type(self.shared_free_bytes) is not int
@@ -65,6 +75,8 @@ class GPUResource:
             "shared_free_bytes": self.shared_free_bytes,
             "shared_with_system_ram": self.shared_with_system_ram,
             "measurement": self.measurement,
+            "utilization_ratio": self.utilization_ratio,
+            "temperature_c": self.temperature_c,
         }
 
 
@@ -93,15 +105,32 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
                 name = pynvml.nvmlDeviceGetName(handle)
                 if isinstance(name, bytes):
                     name = name.decode("utf-8", errors="replace")
+                utilization = None
+                temperature = None
+                try:
+                    utilization = (
+                        int(pynvml.nvmlDeviceGetUtilizationRates(handle).gpu) / 100
+                    )
+                except Exception:
+                    pass  # Optional sensor unsupported; do not fabricate it.
+                try:
+                    temperature = float(pynvml.nvmlDeviceGetTemperature(
+                        handle, pynvml.NVML_TEMPERATURE_GPU,
+                    ))
+                except Exception:
+                    pass
                 devices.append(GPUResource(
                     device=str(name), vendor="nvidia",
                     dedicated_total_bytes=int(memory.total),
                     dedicated_free_bytes=int(memory.free),
-                    measurement="nvml",
+                    measurement="nvml", utilization_ratio=utilization,
+                    temperature_c=temperature,
                 ))
         finally:
             pynvml.nvmlShutdown()
-    except (ImportError, OSError, RuntimeError, AttributeError, ValueError):
+    except Exception:
+        # NVML is optional; a missing driver or unsupported host cannot
+        # authorize GPU allocation. Fall back to DRM or unknown.
         pass
     # Avoid double counting Nvidia devices already covered by NVML.
     if devices:
@@ -121,6 +150,15 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
         valid_shared = (
             shared is not None and shared_used is not None and shared_used <= shared
         )
+        busy = _read_positive(physical / "gpu_busy_percent")
+        temperature = None
+        try:
+            temps = sorted(physical.glob("hwmon/hwmon*/temp1_input"))
+            if temps:
+                milli = _read_positive(temps[0])
+                temperature = milli / 1000 if milli is not None else None
+        except OSError:
+            pass
         devices.append(GPUResource(
             device=card.name, vendor="drm",
             dedicated_total_bytes=dedicated,
@@ -129,6 +167,8 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
             shared_free_bytes=shared - shared_used if valid_shared else None,
             shared_with_system_ram=valid_shared,
             measurement="linux_drm_sysfs",
+            utilization_ratio=min(1.0, busy / 100) if busy is not None else None,
+            temperature_c=temperature,
         ))
     return tuple(devices)
 
