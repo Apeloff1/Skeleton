@@ -125,7 +125,7 @@ def read_blueprint(project_id: str, *, root: Path = ROOT) -> dict[str, dict[str,
         "quest": ("objective",),
         "scene": ("episode_plan",),
         "visual": ("art_direction",),
-        "audio": ("audio_accessibility",),
+        "audio": (),
         "verification": ("quality_gates", "release_blockers"),
     }
     for section, fields in mandatory.items():
@@ -135,6 +135,8 @@ def read_blueprint(project_id: str, *, root: Path = ROOT) -> dict[str, dict[str,
         raise StudioEcosystemError("missing quest graph")
     if not (parts["visual"].get("jobs") or parts["visual"].get("asset_recipes")):
         raise StudioEcosystemError("missing visual production plan")
+    if not (parts["audio"].get("audio_accessibility") or parts["audio"].get("accessibility")):
+        raise StudioEcosystemError("missing audio accessibility requirements")
     if not (parts["audio"].get("cue_sheet") or parts["audio"].get("sound_layers")):
         raise StudioEcosystemError("missing audio cue graph")
     if len(parts["scene"]["episode_plan"]) < 3 or len(parts["verification"]["quality_gates"]) < 4:
