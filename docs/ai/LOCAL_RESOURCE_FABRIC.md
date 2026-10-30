@@ -307,3 +307,51 @@ are still required for release qualification.
 Native KV diagnostic observations are bound by exact
 `execution_receipt_digest` to avoid mixing the evidence from concurrent
 local requests. Missing or evicted evidence fails closed.
+
+## Concurrent local GGUF workers and continuous pressure recovery
+
+Pinned Apple Silicon GPU local models now share a cooperative, process-lifetime
+unified-memory lease ledger (`skeleton/app/offline_metal_leases.py`).
+A lease is reserved **after** the prelaunch hardware check but **before**
+`subprocess.Popen`, and released after the corresponding native child has
+terminated and its process pipes have drained. Failed subprocess admission,
+cancellation, a live resource-pressure refusal and normal completion all
+release the lease. The coordinator is protected by a Python lock, so two
+concurrent local workers cannot both consume the same reserved share of
+physical memory.
+
+Lease sizing conservatively combines estimated offloaded GGUF weights,
+native runtime scratch, **and** KV residency against one physical RAM pool.
+It compares the sum of active Skeleton-owned workers with the smaller of
+current RAM and Metal recommended working-set margins. A second local worker
+will be rejected when its projected allocation cannot fit, rather than
+pretending that offloaded model weights and host KV memory are additive
+free physical RAM. A worker can be retried when another process exits.
+Direct tests exercise four concurrent workers, a fifth denied admission,
+idempotent releases, recovered admission after completion and invalid claims.
+
+The runtime additionally rechecks the Apple physical/Metal pressure guard
+while generation is active (at most approximately 1 Hz), rather than
+checking only before loading a potentially large GGUF. If the sealed native
+profile is no longer admissible, inference is terminated and its child is
+reaped using the normal typed local runtime lifecycle; no live tensor/KV
+migration is asserted. A real local subprocess regression checks that the
+watchdog aborts, drains, and releases the lease rather than abandoning a
+running child. These safeguards do **not** increase the native model context
+window or disable existing prompt/output authorization.
+
+**Scope:** The lease ledger only coordinates **workers within the current
+Skeleton Python process**. A separate Skeleton instance, a third-party
+process, or another user's Metal workload is not governed by this ledger;
+OS-reported working-set/physical-RAM probes remain approximate. Actual
+device allocations, scheduling, Metal event signals, cache coherency and
+GPU-to-host tensor movement are still controlled by native Metal/llama.cpp.
+There is no system-level swap override, SIP change, external GPU memory
+attestation, or model-KV page migration in this layer.
+
+The optional Metal synchronization probe runs an immutable **private copy**
+of its audited Swift source; the original checkout cannot be swapped
+between validation and execution. Both the private source SHA-256 and the
+bounded output receipt are checked. The four-mode Metal test and the native
+GGUF host-KV qualifier still require **real Apple Silicon hardware** to be
+accepted as device evidence.
