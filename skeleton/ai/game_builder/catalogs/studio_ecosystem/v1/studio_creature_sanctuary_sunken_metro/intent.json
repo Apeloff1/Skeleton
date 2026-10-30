@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_sunken_metro",
+  "title": "Sunken Metro: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010313830,
+  "width": 25,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 14,
+  "theme": "arcade",
+  "starting_health": 6
+}
