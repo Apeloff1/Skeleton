@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_glass_steppe",
+  "title": "Glass Steppe: Stormline",
+  "subtitle": "Original stormline design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010316850,
+  "width": 19,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 12,
+  "theme": "desert",
+  "starting_health": 6
+}

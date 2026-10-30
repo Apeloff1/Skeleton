@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_verdant_caldera",
+  "title": "Verdant Caldera: Stormline",
+  "subtitle": "Original stormline design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010316813,
+  "width": 27,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 10,
+  "theme": "forest",
+  "starting_health": 5
+}
