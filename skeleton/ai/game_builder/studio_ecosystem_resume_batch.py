@@ -18,6 +18,8 @@ def resume_catalog_preview_batch(portfolio: StudioPortfolio, output_root: Path, 
                                  project_ids: Sequence[str],
                                  working_set_bytes: int,
                                  estimated_output_bytes: int,
+                                 interactive_story: bool = False,
+                                 walkable_story: bool = False,
                                  authorized: bool) -> dict[str, object]:
     if not authorized:
         raise PermissionError("portfolio resume requires operator authorization")
@@ -34,6 +36,11 @@ def resume_catalog_preview_batch(portfolio: StudioPortfolio, output_root: Path, 
         target=root/pid
         if target.exists() or target.is_symlink():
             report=verify_studio_bundle(target,authorized=True)
+            expected=("skeleton.game_builder.studio_offline_package.v3" if walkable_story
+                      else "skeleton.game_builder.studio_offline_package.v2"
+                      if interactive_story else "skeleton.game_builder.studio_offline_package.v1")
+            if report["package_format"]!=expected:
+                raise StudioQuestError("existing local package uses different game runtime")
             current=source_manifest(read_blueprint(pid))["source_chain_sha256"]
             if report["source_chain_sha256"]!=current:
                 raise StudioQuestError("existing package source differs from current canon")
@@ -52,7 +59,8 @@ def resume_catalog_preview_batch(portfolio: StudioPortfolio, output_root: Path, 
                     "release_certified":False}
         supervisor=portfolio.open(pid,authorized=True)
         package=build_offline_studio_bundle(supervisor.journal,supervisor.spool,
-                                             root,authorized=True)
+                                             root,interactive_story=interactive_story,
+                                             walkable_story=walkable_story,authorized=True)
         verified=verify_studio_bundle(Path(package["output_dir"]),authorized=True)
         if verified["source_chain_sha256"]!=source_manifest(read_blueprint(pid))["source_chain_sha256"]:
             raise StudioQuestError("source drift during resumed package")
