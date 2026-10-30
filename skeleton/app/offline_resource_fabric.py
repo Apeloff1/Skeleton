@@ -187,6 +187,26 @@ class FabricPlan:
         }
 
 
+def _open_source_at(root: Path, relative: Path) -> int:
+    """Open beneath a stable root without following POSIX parent symlinks."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    if os.name != "posix":
+        return os.open(root / relative, flags)
+    parent_flags = (
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    parent_fd = os.open(root, parent_flags)
+    try:
+        for component in relative.parts[:-1]:
+            child_fd = os.open(component, parent_flags, dir_fd=parent_fd)
+            os.close(parent_fd)
+            parent_fd = child_fd
+        return os.open(relative.parts[-1], flags, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
 class AdaptiveResourceFabric:
     """Locked controller with smoothing/hysteresis and measurable decisions.
 
@@ -354,8 +374,7 @@ class AdaptiveResourceFabric:
             self._active_streams += plan.stream_count
         def worker(entry: tuple[str, Path, int]) -> dict[str, Any]:
             name, path, expected_size = entry
-            flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-            fd = os.open(path, flags)
+            fd = _open_source_at(base, Path(name))
             try:
                 before = os.fstat(fd)
                 if not stat.S_ISREG(before.st_mode) or before.st_size != expected_size:
@@ -371,6 +390,7 @@ class AdaptiveResourceFabric:
                     (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
                     != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
                     or (after.st_dev, after.st_ino) != (current.st_dev, current.st_ino)
+                    or not path.resolve(strict=True).is_relative_to(base)
                 ):
                     raise ResourceFabricError("source changed during staged read")
                 return {
