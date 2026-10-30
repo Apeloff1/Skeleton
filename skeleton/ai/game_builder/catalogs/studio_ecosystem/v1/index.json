@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 352,
+  "project_count": 360,
   "sections": [
     "intent",
     "narrative",
@@ -2124,10 +2124,58 @@
       "genre": "factory_automation",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_tactical_command_copper_mesa",
+      "genre": "tactical_command",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_tactical_command_glacial_fjord",
+      "genre": "tactical_command",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_tactical_command_ashen_archipelago",
+      "genre": "tactical_command",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_tactical_command_luminous_marsh",
+      "genre": "tactical_command",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_cloud_canopy",
+      "genre": "tactical_command",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_tactical_command_ion_wastes",
+      "genre": "tactical_command",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_tactical_command_frosted_crater",
+      "genre": "tactical_command",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_tactical_command_salt_dunes",
+      "genre": "tactical_command",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 2816,
+    "source_files": 2880,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,
