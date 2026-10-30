@@ -1,0 +1,1 @@
+"""culling_scale"""

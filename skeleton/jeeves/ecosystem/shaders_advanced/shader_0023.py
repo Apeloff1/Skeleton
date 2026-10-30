@@ -1,11 +1,11 @@
-"""Advanced shader 0023.
+"""Shader scale2 0023.
 """
 from __future__ import annotations
 
-SHADER = "adv_shader_0023"
+ID = "shader_scale2_0023"
 
-def compile(era: str = "ash") -> dict:
-    if not era:
-        return {"ok": False, "reason": "empty_era"}
-    uniforms = ["u_time", "u_optical", "u_era"]
-    return {"ok": True, "shader": SHADER, "era": era, "uniforms": uniforms}
+def describe() -> dict:
+    return {"id": ID, "kind": "shader", "index": 23}
+
+def activate(context: str = "") -> dict:
+    return {"ok": True, "id": ID, "context": context[:100], "active": True}
