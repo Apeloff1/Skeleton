@@ -62,6 +62,11 @@ def install_merkle_schema(db: sqlite3.Connection) -> None:
     }
     if "merkle_root" not in columns:
         db.execute("ALTER TABLE longform_sources ADD COLUMN merkle_root TEXT")
+    page_columns = {
+        row[1] for row in db.execute("PRAGMA table_info(longform_pages)")
+    }
+    if "fts_rowid" not in page_columns:
+        db.execute("ALTER TABLE longform_pages ADD COLUMN fts_rowid INTEGER")
 
 
 def build_merkle_tree(

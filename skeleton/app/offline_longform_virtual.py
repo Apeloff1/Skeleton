@@ -202,8 +202,12 @@ class LongformVirtualMemory:
                         }
                     self._db.execute("BEGIN IMMEDIATE")
                     try:
+                        next_fts_rowid = int(self._db.execute(
+                            "SELECT COALESCE(MAX(rowid),0)+1 FROM longform_fts"
+                        ).fetchone()[0])
                         def publish(page: str) -> None:
                             nonlocal previous, ordinal, stored, last_disk_probe
+                            nonlocal next_fts_rowid
                             raw = page.encode("utf-8")
                             digest = sha256(raw).hexdigest()
                             compressed = (
@@ -227,14 +231,21 @@ class LongformVirtualMemory:
                                     raise LongformMemoryError(str(exc)) from exc
                                 last_disk_probe = now
                             self._db.execute(
-                                "INSERT INTO longform_pages VALUES (?,?,?,?,?,?,?)",
+                                "INSERT INTO longform_pages "
+                                "(source_id,ordinal,encoded,plain_bytes,"
+                                "digest,chain,encoding,fts_rowid) "
+                                "VALUES (?,?,?,?,?,?,?,?)",
                                 (source_id, ordinal, encoded, len(raw), digest,
-                                 previous.hex(), "zlib" if use_zlib else "raw"),
+                                 previous.hex(), "zlib" if use_zlib else "raw",
+                                 next_fts_rowid),
                             )
                             self._db.execute(
-                                "INSERT INTO longform_fts(source_id,ordinal,text) "
-                                "VALUES (?,?,?)", (source_id, ordinal, page),
+                                "INSERT INTO longform_fts"
+                                "(rowid,source_id,ordinal,text) "
+                                "VALUES (?,?,?,?)",
+                                (next_fts_rowid, source_id, ordinal, page),
                             )
+                            next_fts_rowid += 1
                             ordinal += 1
                             stored += len(encoded)
 
@@ -332,13 +343,13 @@ class LongformVirtualMemory:
         captured: dict[int, str] = {}
         captured_bytes = 0
         cursor = self._db.execute(
-            "SELECT ordinal,encoded,plain_bytes,digest,chain,encoding "
+            "SELECT ordinal,encoded,plain_bytes,digest,chain,encoding,fts_rowid "
             "FROM longform_pages WHERE source_id=? ORDER BY ordinal",
             (source_id,),
         )
         resources = probe_local_resources(self.path)
         sampled_at = time.monotonic()
-        for index, encoded, length, expected_digest, expected_chain, encoding in cursor:
+        for index, encoded, length, expected_digest, expected_chain, encoding, fts_rowid in cursor:
             if index != count or encoding not in ("raw", "zlib"):
                 raise LongformMemoryError("longform page ordering or encoding corrupted")
             # Page length must be reasonable relative to *current* RAM.
@@ -372,12 +383,20 @@ class LongformVirtualMemory:
             chain = _chain(chain, index, raw)
             if chain.hex() != expected_chain:
                 raise LongformMemoryError("longform page chain mismatch")
-            projection = self._db.execute(
-                "SELECT text FROM longform_fts WHERE source_id=? AND ordinal=?",
-                (source_id, index),
-            ).fetchone()
-            if projection != (text,):
-                raise LongformMemoryError("longform search projection corrupted")
+            if fts_rowid is not None:
+                projection = self._db.execute(
+                    "SELECT source_id, ordinal, text FROM longform_fts "
+                    "WHERE rowid=?", (fts_rowid,),
+                ).fetchone()
+                if projection != (source_id, index, text):
+                    raise LongformMemoryError("longform search projection corrupted")
+            else:
+                projection = self._db.execute(
+                    "SELECT text FROM longform_fts "
+                    "WHERE source_id=? AND ordinal=?", (source_id, index),
+                ).fetchone()
+                if projection != (text,):
+                    raise LongformMemoryError("longform search projection corrupted")
             digest.update(raw)
             actual_bytes += length
             if selected is not None and index in selected:
@@ -453,13 +472,19 @@ class LongformVirtualMemory:
         )
         for index in sorted(selection):
             record = self._db.execute(
-                "SELECT encoded,plain_bytes,digest,encoding "
+                "SELECT encoded,plain_bytes,digest,encoding,fts_rowid "
                 "FROM longform_pages WHERE source_id=? AND ordinal=?",
                 (source_id, index),
             ).fetchone()
             if record is None:
                 raise LongformMemoryError("selected longform page is missing")
-            encoded, length, page_digest, encoding = record
+            encoded, length, page_digest, encoding, fts_rowid = record
+            if fts_rowid is None:
+                # Old archive or partial migration: refuse a fast proof and
+                # use full-source/FTS verification instead.
+                return None
+            if type(fts_rowid) is not int or fts_rowid <= 0:
+                raise LongformMemoryError("invalid page FTS identity")
             if (type(length) is not int or not 0 <= length <= page_limit
                     or type(encoded) is not bytes
                     or encoding not in ("zlib", "raw")):
@@ -487,12 +512,11 @@ class LongformVirtualMemory:
                 )
             except MerkleIntegrityError as exc:
                 raise LongformMemoryError("selected Merkle page proof failed") from exc
-            projections = self._db.execute(
-                "SELECT text FROM longform_fts "
-                "WHERE source_id=? AND ordinal=? LIMIT 2",
-                (source_id, index),
-            ).fetchall()
-            if projections != [(page,)]:
+            projection = self._db.execute(
+                "SELECT source_id,ordinal,text FROM longform_fts "
+                "WHERE rowid=?", (fts_rowid,),
+            ).fetchone()
+            if projection != (source_id, index, page):
                 raise LongformMemoryError("selected source search text changed")
             captured[index] = page
             used += length
