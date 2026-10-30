@@ -97,14 +97,16 @@ class LocalResourceBudgetTests(unittest.TestCase):
     def test_cgroup_swap_ceiling_is_respected(self):
         from unittest.mock import mock_open
         from skeleton.app import offline_resources
-        meminfo = "SwapTotal: 4000000 kB\\nSwapFree: 3000000 kB\\n"
+        meminfo = "SwapTotal: 4000000 kB\nSwapFree: 3000000 kB\n"
         counters = {
             "/sys/fs/cgroup/memory.swap.max": 1_000_000_000,
             "/sys/fs/cgroup/memory.swap.current": 800_000_000,
         }
-        with patch("builtins.open", mock_open(read_data=meminfo)), \\
-             patch.object(offline_resources, "_read_counter",
-                          side_effect=lambda p: counters.get(str(p))):
+        with (
+            patch("builtins.open", mock_open(read_data=meminfo)),
+            patch.object(offline_resources, "_read_counter",
+                         side_effect=lambda p: counters.get(str(p))),
+        ):
             self.assertEqual(_linux_swap(), (1_000_000_000, 200_000_000))
 
     def test_probe_reports_host_disk_and_recomputes(self):
