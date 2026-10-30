@@ -1,0 +1,13 @@
+"""Raid scale 0043.
+"""
+from __future__ import annotations
+
+ID = "raid_scale_0043"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "raid", "index": 43}
+
+def activate(context: str = "") -> dict:
+    if not context and 43 % 7 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:120], "active": True}

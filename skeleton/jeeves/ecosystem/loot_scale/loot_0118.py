@@ -1,0 +1,13 @@
+"""Loot scale 0118.
+"""
+from __future__ import annotations
+
+ID = "loot_scale_0118"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "loot", "index": 118}
+
+def activate(context: str = "") -> dict:
+    if not context and 118 % 7 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:120], "active": True}
