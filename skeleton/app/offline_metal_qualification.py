@@ -72,7 +72,7 @@ def evaluate_host_kv_qualification(
         _apple_silicon() and metal_present and requested_kv_location == "host"
         and type(selected_gpu_layers) is int and selected_gpu_layers > 0
         and reported and host_bytes > 0 and device_bytes == 0
-        and metal_model > 0 and offloaded > 0
+        and metal_model > 0 and 0 < offloaded <= selected_gpu_layers + 1
         and unknown == 0
     )
     result = {
@@ -90,6 +90,10 @@ def evaluate_host_kv_qualification(
         "unrecognized_native_kv_lines": unknown,
         "backend_reported_metal_model_bytes": metal_model,
         "backend_reported_gpu_layers": offloaded,
+        "offload_count_consistent_with_request": (
+            type(selected_gpu_layers) is int
+            and 0 < offloaded <= selected_gpu_layers + 1
+        ),
         "backend_report_present": reported,
         "metal_telemetry_present": metal_present,
         "driver_coherency_verified": False,

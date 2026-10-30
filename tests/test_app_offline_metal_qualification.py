@@ -60,6 +60,7 @@ class AppleKVQualificationTests(unittest.TestCase):
         ):
             report = evaluate_host_kv_qualification(**inputs())
         self.assertTrue(report["qualification_accepted"])
+        self.assertTrue(report["offload_count_consistent_with_request"])
         self.assertEqual(report["status"], "qualified_host_kv_diagnostic")
         self.assertEqual(len(report["qualification_receipt_sha256"]), 64)
         self.assertFalse(report["driver_coherency_verified"])
@@ -85,6 +86,11 @@ class AppleKVQualificationTests(unittest.TestCase):
             {"requested_kv_location": "backend"},
             {"selected_gpu_layers": 0},
             {"metal_present": False},
+            {"observed": {"backend_reported": True,
+                          "reported_host_kv_bytes": 1024,
+                          "reported_device_kv_bytes": 0,
+                          "backend_reported_metal_model_bytes": 1024,
+                          "backend_reported_gpu_layers": 40}},
             {"observed": {"backend_reported": True,
                           "reported_host_kv_bytes": 1024,
                           "reported_device_kv_bytes": 0,
