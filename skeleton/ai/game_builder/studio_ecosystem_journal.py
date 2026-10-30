@@ -144,6 +144,7 @@ class WorkJournal:
                 for task in self.tasks:
                     db.execute("INSERT INTO tasks (id,status) VALUES (?,'pending')", (task["id"],))
         _safe_database(self.path)
+        self.verify_state()
 
     @contextmanager
     def _tx(self) -> Iterator[sqlite3.Connection]:
@@ -196,9 +197,82 @@ class WorkJournal:
                     "final_sha256":last,"external_attestation_verified":False,
                     "release_certified":False}
 
+    def _verify_state(self, db: sqlite3.Connection) -> None:
+        """Reconstruct task lifecycle from the event stream, not mutable rows."""
+        self._verify_chain(db)
+        state = {
+            task["id"]: {"status":"pending", "worker":None, "attempt":0,
+                         "sha":None, "reviewer":None}
+            for task in self.tasks
+        }
+        deps = {task["id"]:task["depends_on"] for task in self.tasks}
+        paused = False
+        for (encoded,) in db.execute("SELECT event_json FROM events ORDER BY seq"):
+            event = json.loads(encoded)
+            kind, task, actor = event["kind"], event["task"], event["actor"]
+            if kind in ("pause","resume"):
+                if task != "producer-admission" or not isinstance(actor,str):
+                    raise StudioQuestError("corrupt pause authority")
+                paused = kind == "pause"
+                continue
+            if task not in state:
+                raise StudioQuestError("durable event names an unregistered task")
+            row = state[task]
+            if kind == "claim":
+                if row["status"] != "pending" or paused or any(
+                    state[d]["status"] != "reviewed_claim" for d in deps[task]
+                ):
+                    raise StudioQuestError("invalid historical producer admission")
+                row.update(status="leased",worker=actor,attempt=row["attempt"]+1)
+            elif kind == "submit":
+                if row["status"]!="leased" or not isinstance(actor,str) or not HEX.fullmatch(actor):
+                    raise StudioQuestError("invalid historical producer submission")
+                row.update(status="submitted",sha=actor)
+            elif kind in ("review_accept","review_reject"):
+                if row["status"]!="submitted" or actor==row["worker"]:
+                    raise StudioQuestError("invalid historical reviewer transition")
+                if kind=="review_accept":
+                    row.update(status="reviewed_claim",reviewer=actor)
+                else:
+                    row.update(status="pending",worker=None,sha=None,reviewer=actor)
+            elif kind == "operator_recovery":
+                if row["status"]!="leased" or actor==row["worker"]:
+                    raise StudioQuestError("invalid historical operator recovery")
+                row.update(status="pending",worker=None)
+            else:
+                raise StudioQuestError("unrecognized producer event kind")
+        stored = {
+            name: {"status": status, "worker": worker, "attempt": attempt,
+                   "sha": sha, "reviewer": reviewer, "token": token}
+            for name,status,worker,attempt,sha,reviewer,token in db.execute(
+                "SELECT id,status,worker,attempt,submitted_sha,reviewer,token FROM tasks"
+            )
+        }
+        if set(stored) != set(state):
+            raise StudioQuestError("task table differs from source inventory")
+        for name, replay in state.items():
+            persisted = stored[name]
+            if any(persisted[key] != replay[key] for key in replay):
+                raise StudioQuestError("stored task status differs from event replay")
+            if (persisted["status"] == "leased") != (persisted["token"] is not None):
+                raise StudioQuestError("lease token presence disagrees with history")
+        setting=db.execute("SELECT value FROM meta WHERE key='paused'").fetchone()
+        if (setting is not None and setting[0] not in ("0","1")) or (
+            paused != (setting is not None and setting[0] == "1")
+        ):
+            raise StudioQuestError("pause state differs from event history")
+
+    def verify_state(self) -> dict[str, object]:
+        with self._tx() as db:
+            self._verify_state(db)
+            return {"schema":"skeleton.game_builder.studio_work_state_replay.v1",
+                    "project_id":self.project,
+                    "local_lifecycle_replay_valid":True,
+                    "external_proof_verified":False,"release_certified":False}
+
     def snapshot(self) -> dict[str, object]:
         with self._tx() as db:
-            self._verify_chain(db)
+            self._verify_state(db)
             rows = {r[0]: {"status":r[1],"worker":r[2],"attempt":r[3],
                            "submitted_sha":r[4],"reviewer":r[5]}
                     for r in db.execute("SELECT id,status,worker,attempt,submitted_sha,reviewer FROM tasks")}
