@@ -89,6 +89,47 @@ class PinnedKVPlacementTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     replace(config(), kv_cache_location=invalid)
 
+    def test_explicit_quantized_kv_dtype_is_an_operator_selection(self) -> None:
+        original = dummy_model(config("host"))
+        quantized = dummy_model(replace(
+            config("host"), kv_cache_type_k="q8_0",
+            kv_cache_type_v="q4_0",
+        ))
+        prompt = Path("/private/prompt.txt")
+        request = LocalInferenceRequest(prompt="owned local prompt")
+        command = quantized._command(prompt, request)
+        self.assertEqual(command.count("--cache-type-k"), 1)
+        self.assertEqual(command.count("--cache-type-v"), 1)
+        self.assertEqual(command[command.index("--cache-type-k") + 1], "q8_0")
+        self.assertEqual(command[command.index("--cache-type-v") + 1], "q4_0")
+        self.assertEqual(command.count("--no-kv-offload"), 1)
+        with patch.object(LlamaCppModel, "_effective_environment",
+                          return_value={}):
+            self.assertNotEqual(
+                original.execution_profile_digest,
+                quantized.execution_profile_digest,
+            )
+
+    def test_invalid_cache_dtype_and_flag_injections_are_rejected(self) -> None:
+        for name in ("kv_cache_type_k", "kv_cache_type_v"):
+            for value in ("f32", "auto", "invalid", "", 42, True):
+                with self.subTest(name=name, value=value):
+                    with self.assertRaises(ValueError):
+                        replace(config(), **{name: value})
+        for value in ("--cache-type-k", "--cache-type-v",
+                      "--cache-type-k=q8_0", "-ctk", "-ctv"):
+            with self.subTest(option=value):
+                with self.assertRaisesRegex(ValueError, "managed flag"):
+                    replace(config(), extra_args=(value,))
+
+    def test_runtime_cannot_change_kv_dtype_after_deployment(self) -> None:
+        model = dummy_model(config("host"))
+        with patch.object(LlamaCppModel, "_assert_artifacts_stable"):
+            with self.assertRaisesRegex(LlamaCppRuntimeError, "safety"):
+                model.activate_prelaunch_resource_profile(
+                    replace(model.config, kv_cache_type_k="q8_0"),
+                )
+
     def test_profile_can_move_kv_only_from_backend_to_host(self) -> None:
         model = dummy_model(config())
         with patch.object(LlamaCppModel, "_assert_artifacts_stable"):
