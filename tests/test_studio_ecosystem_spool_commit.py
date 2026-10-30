@@ -12,3 +12,17 @@ def test_spool_finalizes_private_single_link_object(tmp_path):
     assert not list(store.path.glob(".staging-*"))
     if os.name=="posix":
         assert obj.stat().st_mode & 0o077==0
+
+def test_verified_export_is_streamed_and_non_overwriting(tmp_path):
+    root=tmp_path/"owner"
+    root.mkdir(mode=0o700)
+    store=ArtifactSpool(root,authorized=True)
+    item=store.ingest([b"abc"*10000],authorized=True)
+    target=root/"generated.bin"
+    proof=store.export_verified(item["sha256"],target,authorized=True)
+    assert target.read_bytes()==b"abc"*10000
+    assert proof["bytes"]==30000
+    import pytest
+    from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+    with pytest.raises(StudioQuestError):
+        store.export_verified(item["sha256"],target,authorized=True)
