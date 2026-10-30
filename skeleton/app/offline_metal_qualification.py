@@ -173,7 +173,7 @@ def _validated_shared_fence_receipt(data: object) -> dict[str, Any]:
         "synchronized_command_buffers", "verified_values",
         "serial_cpu_gpu_cpu_round_trips", "cross_queue_event_handoffs",
         "parallel_independent_lanes", "shared_event_cpu_observations",
-        "output_sha256", "model_tensor_fence_verified",
+        "shared_event_cpu_acknowledgements", "output_sha256", "model_tensor_fence_verified",
         "llama_kv_cache_fence_verified",
     }:
         raise RuntimeError("unexpected native multi-sync Metal receipt")
@@ -185,6 +185,7 @@ def _validated_shared_fence_receipt(data: object) -> dict[str, Any]:
         "cross_queue_event_handoffs": 4,
         "parallel_independent_lanes": 3,
         "shared_event_cpu_observations": 2,
+        "shared_event_cpu_acknowledgements": 2,
     }
     if (
         data["schema"] != "skeleton.apple.metal-multisync.v2"

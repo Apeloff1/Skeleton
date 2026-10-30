@@ -44,6 +44,7 @@ def multisync_proof():
         "cross_queue_event_handoffs": 4,
         "parallel_independent_lanes": 3,
         "shared_event_cpu_observations": 2,
+        "shared_event_cpu_acknowledgements": 2,
         "output_sha256":
             "7765e4607be2b2849b33bdbd6cff387365600703d14fd49ba17ed0b7b4654a6f",
         "model_tensor_fence_verified": False,
@@ -124,6 +125,7 @@ class AppleKVQualificationTests(unittest.TestCase):
             {"cross_queue_event_handoffs": 0},
             {"parallel_independent_lanes": 0},
             {"shared_event_cpu_observations": 0},
+            {"shared_event_cpu_acknowledgements": 0},
             {"shared_metal_buffers": 12},
             {"schema": "skeleton.apple.metal-shared-fence.v1"},
             {"model_tensor_fence_verified": True},

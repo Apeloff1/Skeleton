@@ -255,13 +255,17 @@ with a fixed kernel and SHA-256 proof, not mock GPU results:
 3. **Three concurrent independent lanes**: three separate input/output
    buffer pairs are submitted before any CPU waits; buffers are never
    aliased across lanes, and results are checked after every completion.
-4. **CPU-visible shared event**: two more rounds use `MTLSharedEvent`
-   GPU signals and CPU observation of the monotonically increasing
-   `signaledValue` after command completion.
+4. **Two-way CPU/GPU shared-event handshake**: two more rounds use
+   `MTLSharedEvent` GPU signals at odd values. A CPU callback registered
+   through `MTLSharedEventListener` advances each event to the next even
+   value, which unblocks an explicit GPU command-buffer event wait.
+   The callback is bounded by a 15-second semaphore deadline. This is a
+   GPU→CPU notification plus CPU→GPU acknowledgement, not passive polling.
 
 The proof uses **13 real shared-memory Metal buffers, 17 completed
 command buffers, 4 interqueue event handoffs, 3 independent parallel lanes,
-2 shared-event CPU observations and 832 verified output values**.
+2 shared-event CPU callbacks and acknowledgements and 832 verified
+output values**.
 All four modes must pass. The Python verifier independently calculates the
 complete expected output digest and rejects missing, substituted, stale
 v1, undercounted or unrecognized fields. A standalone v2 receipt can

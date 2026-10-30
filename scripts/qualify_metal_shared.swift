@@ -177,20 +177,39 @@ for lane in 0..<lanes.count {
 guard let sharedEvent = device.makeSharedEvent() else {
     issue("cpu_visible_metal_shared_event_unavailable")
 }
+let callbackQueue = DispatchQueue(label: "skeleton.metal.multisync.cpu")
+let listener = MTLSharedEventListener(dispatchQueue: callbackQueue)
 let sharedIn = sharedBuffer()
 let sharedOut = sharedBuffer()
 var sharedObservations = 0
 for pass in 0..<2 {
     fill(sharedIn, seed: 300 + pass)
+    let requestedSignal = UInt64(pass * 2 + 1)
+    let cpuAcknowledgement = requestedSignal + 1
+    let callbackFinished = DispatchSemaphore(value: 0)
+    // CPU callback becomes the *only* actor authorized to advance from
+    // odd GPU signal to even CPU acknowledgement in this probe.
+    sharedEvent.notify(listener, atValue: requestedSignal) { event, value in
+        if value >= requestedSignal {
+            event.signaledValue = cpuAcknowledgement
+            callbackFinished.signal()
+        }
+    }
     guard let command = queueB.makeCommandBuffer() else {
         issue("shared_event_command_allocation_failed")
     }
     submit(command, sharedIn, sharedOut)
-    command.encodeSignalEvent(sharedEvent, value: UInt64(pass + 1))
+    command.encodeSignalEvent(sharedEvent, value: requestedSignal)
+    // GPU completion is gated on a CPU-side event callback. This is a
+    // genuine bidirectional handshake, not an after-the-fact observation.
+    command.encodeWaitForEvent(sharedEvent, value: cpuAcknowledgement)
     command.commit()
+    guard callbackFinished.wait(timeout: .now() + .seconds(15)) == .success else {
+        issue("metal_shared_event_cpu_callback_timeout")
+    }
     ensureCompleted(command)
-    guard sharedEvent.signaledValue >= UInt64(pass + 1) else {
-        issue("cpu_shared_event_value_not_observed")
+    guard sharedEvent.signaledValue >= cpuAcknowledgement else {
+        issue("cpu_shared_event_acknowledgement_missing")
     }
     completed += 1
     sharedObservations += 1
@@ -208,6 +227,7 @@ let receipt: [String: Any] = [
     "cross_queue_event_handoffs": eventHandoffs,
     "parallel_independent_lanes": lanes.count,
     "shared_event_cpu_observations": sharedObservations,
+    "shared_event_cpu_acknowledgements": sharedObservations,
     "output_sha256": outputSHA,
     "model_tensor_fence_verified": false,
     "llama_kv_cache_fence_verified": false,
