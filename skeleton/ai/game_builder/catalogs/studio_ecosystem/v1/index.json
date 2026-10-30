@@ -1,7 +1,7 @@
 {
   "schema": "skeleton.game_builder.studio_ecosystem.index.v1",
   "version": 1,
-  "project_count": 416,
+  "project_count": 424,
   "sections": [
     "intent",
     "narrative",
@@ -2508,10 +2508,58 @@
       "genre": "merchant_caravan",
       "biome": "echo_caverns",
       "theme": "arcade"
+    },
+    {
+      "id": "studio_seasonal_farming_copper_mesa",
+      "genre": "seasonal_farming",
+      "biome": "copper_mesa",
+      "theme": "desert"
+    },
+    {
+      "id": "studio_seasonal_farming_glacial_fjord",
+      "genre": "seasonal_farming",
+      "biome": "glacial_fjord",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_seasonal_farming_ashen_archipelago",
+      "genre": "seasonal_farming",
+      "biome": "ashen_archipelago",
+      "theme": "ocean"
+    },
+    {
+      "id": "studio_seasonal_farming_luminous_marsh",
+      "genre": "seasonal_farming",
+      "biome": "luminous_marsh",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_seasonal_farming_cloud_canopy",
+      "genre": "seasonal_farming",
+      "biome": "cloud_canopy",
+      "theme": "forest"
+    },
+    {
+      "id": "studio_seasonal_farming_ion_wastes",
+      "genre": "seasonal_farming",
+      "biome": "ion_wastes",
+      "theme": "space"
+    },
+    {
+      "id": "studio_seasonal_farming_frosted_crater",
+      "genre": "seasonal_farming",
+      "biome": "frosted_crater",
+      "theme": "space"
+    },
+    {
+      "id": "studio_seasonal_farming_salt_dunes",
+      "genre": "seasonal_farming",
+      "biome": "salt_dunes",
+      "theme": "desert"
     }
   ],
   "claims": {
-    "source_files": 3328,
+    "source_files": 3392,
     "source_kind": "original_design_briefs",
     "native_qualified": false,
     "genre_compiled": false,

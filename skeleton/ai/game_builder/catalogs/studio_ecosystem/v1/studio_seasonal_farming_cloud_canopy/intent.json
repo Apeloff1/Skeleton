@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_cloud_canopy",
+  "title": "Cloud Canopy: The Four Harvests",
+  "subtitle": "Original the four harvests design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010315155,
+  "width": 27,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 5
+}
