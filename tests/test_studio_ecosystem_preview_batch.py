@@ -47,3 +47,16 @@ def test_two_interactive_browser_games_batch_with_real_six_file_manifests(tmp_pa
         interactive_story=True,authorized=True)
     assert result["all_projects_completed"]
     assert len(list(out.glob("*/quest.html")))==2
+
+def test_multi_game_batch_admits_v3_walkable_variants(tmp_path):
+    root=tmp_path/"private";root.mkdir(mode=0o700)
+    output=tmp_path/"output";output.mkdir(mode=0o700)
+    ids=["studio_aerial_traversal_amber_highlands",
+         "studio_arena_fighting_glacial_fjord"]
+    result=build_catalog_preview_batch(
+        StudioPortfolio(root,authorized=True),output,project_ids=ids,
+        working_set_bytes=1024,estimated_output_bytes=1024,
+        walkable_story=True,authorized=True)
+    assert result["completed_projects"]==2
+    assert result["all_projects_completed"]
+    assert len(list(output.glob("*/walkable.html")))==2
