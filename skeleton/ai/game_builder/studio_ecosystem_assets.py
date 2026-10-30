@@ -22,7 +22,9 @@ def planned_assets(documents: Mapping[str, Any]) -> dict[str, object]:
         if not isinstance(recipe,dict):
             raise StudioQuestError("invalid asset recipe")
         ident=recipe.get("id")
-        kind=recipe.get("type")
+        if "type" in recipe and "kind" in recipe:
+            raise StudioQuestError("mixed original asset type vocabularies")
+        kind=recipe.get("type",recipe.get("kind"))
         if (not isinstance(ident,str) or not ident or ident in seen
                 or not isinstance(kind,str) or not kind):
             raise StudioQuestError("duplicate or invalid original asset identity")
