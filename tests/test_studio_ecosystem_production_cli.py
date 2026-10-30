@@ -40,3 +40,14 @@ def test_cli_walkable_source_game_is_explicit_opt_in(tmp_path,capsys):
     result=json.loads(capsys.readouterr().out)
     assert result["all_projects_completed"]
     assert (out/"studio_aerial_traversal_amber_highlands"/"walkable.html").is_file()
+
+def test_explicit_parallel_cli_makes_source_verified_2d_games(tmp_path,capsys):
+    root=tmp_path/"private";root.mkdir(mode=0o700)
+    out=tmp_path/"output";out.mkdir(mode=0o700)
+    assert main(["--private-root",str(root),"--output-root",str(out),
+                 "--project","studio_arena_fighting_glacial_fjord",
+                 "--parallel","--walkable-story",
+                 "--working-set-bytes","1024",
+                 "--estimated-output-bytes","1024"])==0
+    assert (out/"studio_arena_fighting_glacial_fjord"/"walkable.html").is_file()
+    assert json.loads(capsys.readouterr().out)["all_projects_completed"]
