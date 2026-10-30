@@ -15,6 +15,7 @@ from skeleton.intelligence.admission import (
     ResourceBudget,
     UsageEstimate,
 )
+from skeleton.intelligence.admission_runtime import AdmissionRuntimeConflict
 from skeleton.intelligence.quota import TenantQuota
 
 
@@ -368,7 +369,7 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
     assert completed.accepted is True
 
 
-def test_restart_journal_conflict_never_releases_preexisting_reservation(
+def test_restart_reattach_conflict_never_releases_preexisting_reservation(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -381,18 +382,17 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
     restarted = _governor(path)
     assert restarted._journal is not None
 
-    def reject_replay(**_kwargs):
-        raise CostGovernorConflict("simulated journal replay conflict")
+    # Active-journal replay reattaches the existing durable lease rather than
+    # rewriting the journal. Reject that real replay boundary to prove an
+    # unsuccessful reattach cannot release the preexisting reservation.
+    def reject_reattach(*_args, **_kwargs):
+        raise AdmissionRuntimeConflict("simulated lease reattach conflict")
 
-    monkeypatch.setattr(
-        restarted._journal,
-        "record_active",
-        reject_replay,
-    )
+    monkeypatch.setattr(restarted.runtime, "reattach", reject_reattach)
 
     with pytest.raises(
         CostGovernorConflict,
-        match="simulated journal replay conflict",
+        match="simulated lease reattach conflict",
     ):
         restarted.reserve(request, now_wall=20.0)
 
