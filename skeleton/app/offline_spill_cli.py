@@ -11,7 +11,7 @@ from typing import Sequence
 
 from skeleton.app.offline_encrypted_spill import (
     EncryptedSpillStore, SpillError, SpillIdentity, SpillPolicy,
-    NOFOLLOW, _read, _safe, _new, _directory_fd, _read_fd,
+    NOFOLLOW, NONBLOCK, _read, _safe, _new, _directory_fd, _read_fd,
 )
 
 
@@ -21,7 +21,7 @@ def _key(path: str) -> bytes:
     with _directory_fd(selected.parent) as parent:
         fd = os.open(
             selected.name if parent is not None else selected,
-            os.O_RDONLY | NOFOLLOW,
+            os.O_RDONLY | NOFOLLOW | NONBLOCK,
             **({"dir_fd": parent} if parent is not None else {}),
         )
         try:

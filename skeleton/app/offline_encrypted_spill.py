@@ -25,6 +25,7 @@ DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 CONTEXT = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
 TEMP = re.compile(r"\.tmp-[0-9a-f]{32}-[0-9a-f]{16}\Z")
 NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+NONBLOCK = getattr(os, "O_NONBLOCK", 0)
 
 
 @contextmanager
@@ -132,7 +133,7 @@ def _read(path: Path, limit: int) -> bytes:
     with _directory_fd(path.parent) as parent:
         fd = os.open(
             path.name if parent is not None else path,
-            os.O_RDONLY | NOFOLLOW,
+            os.O_RDONLY | NOFOLLOW | NONBLOCK,
             **({"dir_fd": parent} if parent is not None else {}),
         )
         try:
@@ -227,7 +228,7 @@ class EncryptedSpillStore:
                     lock = self.root / ".lock"
                     fd = os.open(
                         ".lock" if root_fd is not None else lock,
-                        os.O_RDWR | os.O_CREAT | NOFOLLOW, 0o600,
+                        os.O_RDWR | os.O_CREAT | NOFOLLOW | NONBLOCK, 0o600,
                         **({"dir_fd": root_fd} if root_fd is not None else {}),
                     )
                     try:
@@ -269,7 +270,7 @@ class EncryptedSpillStore:
     def _read_member(self, name: str, limit: int) -> bytes:
         if self._dir_fd is None:
             return _read(self.root / name, limit)
-        fd = os.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=self._dir_fd)
+        fd = os.open(name, os.O_RDONLY | NOFOLLOW | NONBLOCK, dir_fd=self._dir_fd)
         try:
             return _read_fd(fd, limit)
         finally:

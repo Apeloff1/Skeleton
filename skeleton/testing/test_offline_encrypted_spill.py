@@ -266,5 +266,48 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
         self.assertEqual(self.store.prune_orphans()["orphan_data_removed"], 1)
         self.assertEqual(self.store.verify()["verified"], 0)
 
+    def test_nonregular_fifo_paths_fail_closed_without_blocking(self):
+        if os.name != "posix" or not hasattr(os, "mkfifo"):
+            self.skipTest("POSIX named pipe safety")
+        import subprocess
+        import sys
+
+        keyfile = self.temp / "bounded-key"
+        keyfile.write_bytes(self.key)
+        keyfile.chmod(0o600)
+        fifo_key = self.temp / "fifo-key"
+        fifo_input = self.temp / "fifo-input"
+        fifo_lock = self.root / ".lock"
+        record_id = "f" * 32
+        fifo_manifest = self.root / (record_id + ".json")
+        base = [sys.executable, "-m", "skeleton.app.offline_spill_cli",
+                "--store", str(self.root), "--key-file", str(keyfile)]
+        identity = ["--model-sha256", MODEL, "--tokenizer-sha256", TOKENIZER,
+                    "--context-id", "test-context", "--chunk-index", "0"]
+        cases = (
+            ("key", fifo_key,
+             base[:6] + [str(fifo_key), "list"]),
+            ("input", fifo_input,
+             base + ["put", "--input", str(fifo_input)] + identity),
+            ("lock", fifo_lock, base + ["list"]),
+            ("manifest", fifo_manifest,
+             base + ["get", "--id", record_id,
+                     "--output", str(self.temp / "should-not-exist")] + identity),
+        )
+        for name, path, argv in cases:
+            with self.subTest(path=name):
+                if path.exists():
+                    path.unlink()
+                os.mkfifo(path, mode=0o600)
+                try:
+                    outcome = subprocess.run(
+                        argv, capture_output=True, text=True, timeout=4,
+                        check=False,
+                    )
+                    self.assertEqual(outcome.returncode, 1, outcome.stderr)
+                    self.assertIn("offline spill rejected:", outcome.stderr)
+                finally:
+                    path.unlink(missing_ok=True)
+
 if __name__ == "__main__":
     unittest.main()
