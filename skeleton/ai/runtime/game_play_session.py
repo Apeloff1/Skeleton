@@ -298,9 +298,60 @@ def render_play_comparison_frame(
     }
 
 
+def inspect_play_trace(
+    capsule: Mapping[str, Any], session: Any, start_frame: Any, end_frame: Any,
+) -> dict[str, Any]:
+    """Read a bounded window of actual simulation outcomes from a verified save.
+
+    The frame window is inclusive, one-based and limited to 64 frames. All
+    prior input history is replayed to recover the authoritative starting
+    state; the supplied saved avatar is never used as a starting point.
+    """
+    receipt = verify_play_session(capsule, session)
+    if (
+        type(start_frame) is not int or type(end_frame) is not int
+        or not 1 <= start_frame <= end_frame <= receipt["frame_count"]
+        or end_frame - start_frame + 1 > MAX_BATCH_FRAMES
+    ):
+        raise GamePlaySessionError("play trace window exceeds verified frame bounds")
+    controls = session["controls"]
+    prior = _replay(capsule, controls[:start_frame - 1])
+    avatar = prior["final_avatar"]
+    frames: list[dict[str, Any]] = []
+    for frame in range(start_frame, end_frame + 1):
+        control = controls[frame - 1]
+        outcome = platformer_step({
+            "tiles": capsule["tilemap"], "avatar": avatar, "control": control,
+        })
+        avatar = outcome["avatar"]
+        frames.append({
+            "frame": frame,
+            "control": control,
+            "avatar": avatar,
+            "grounded": outcome["grounded"],
+            "goal_reached": outcome["goal_reached"],
+            "vertical_cells_traversed": outcome["vertical_cells_traversed"],
+        })
+    return {
+        "schema_version": "skeleton.game.play_session.trace_window.v1",
+        "capsule_sha256": receipt["capsule_sha256"],
+        "session_sha256": receipt["session_sha256"],
+        "start_frame": start_frame,
+        "end_frame": end_frame,
+        "frame_count": len(frames),
+        "initial_avatar": prior["final_avatar"],
+        "final_avatar": avatar,
+        "frames": frames,
+        "window_sha256": _hash(frames),
+        "source_bound_replay_verified": True,
+        "native_renderer_used": False,
+    }
+
+
 __all__ = [
     "SCHEMA", "MAX_FRAMES", "MAX_BATCH_FRAMES", "GamePlaySessionError",
     "start_play_session", "resume_play_session", "verify_play_session",
     "render_play_session", "inspect_play_frame", "render_play_frame",
     "fork_play_session", "compare_play_sessions", "render_play_comparison_frame",
+    "inspect_play_trace",
 ]

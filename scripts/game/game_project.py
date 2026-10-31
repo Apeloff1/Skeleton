@@ -34,6 +34,7 @@ from skeleton.ai.runtime.game_play_session import (
     GamePlaySessionError, start_play_session, resume_play_session,
     verify_play_session, render_play_session, render_play_frame,
     fork_play_session, compare_play_sessions, render_play_comparison_frame,
+    inspect_play_trace,
 )
 from skeleton.ai.runtime.game_play_bundle import (
     GamePlayBundleError, pack_play_bundle, verify_play_bundle,
@@ -162,6 +163,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="compare two independently verified alternate game histories")
     operations.add_argument("--render-play-comparison", type=Path,
                             help="ASCII overlay of two verified histories at one shared frame")
+    operations.add_argument("--inspect-play-trace", type=Path,
+                            help="inspect bounded replay-verified simulation frames")
     operations.add_argument("--export-play-bundle", type=Path,
                             help="package a verified original capsule and save for offline transfer")
     operations.add_argument("--verify-play-bundle", type=Path,
@@ -184,6 +187,10 @@ def _parser() -> argparse.ArgumentParser:
                         help="strict local JSON keymap for accessible offline terminal controls")
     parser.add_argument("--terminal-max-frames", type=int,
                         help="terminal frames this invocation (1-64, default 32)")
+    parser.add_argument("--trace-start", type=int,
+                        help="inclusive one-based first frame of a verified trace window")
+    parser.add_argument("--trace-end", type=int,
+                        help="inclusive one-based final frame of a verified trace window")
     parser.add_argument("--at-frame", type=int,
                         help="zero-based replay seek/fork frame; zero is the original spawn")
     parser.add_argument("--controls-file", type=Path,
@@ -220,6 +227,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.verify_play_session, args.render_play_session,
         args.inspect_play_frame, args.fork_play_session,
         args.compare_play_sessions, args.render_play_comparison,
+        args.inspect_play_trace,
         args.terminal_play_capsule, args.terminal_resume_session,
     ))
     bundling = any(value is not None for value in (
@@ -233,6 +241,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     comparing = args.compare_play_sessions is not None or args.render_play_comparison is not None
     if (args.other_session is not None) != comparing:
         print("--other-session is required only for session comparison", file=sys.stderr)
+        return 2
+    tracing = args.inspect_play_trace is not None
+    if (args.trace_start is not None or args.trace_end is not None) != tracing:
+        print("--trace-start and --trace-end require trace inspection", file=sys.stderr)
+        return 2
+    if tracing and (args.trace_start is None or args.trace_end is None):
+        print("trace inspection requires both frame bounds", file=sys.stderr)
         return 2
     if (seeking != (args.at_frame is not None)):
         print("--at-frame is required only for timeline inspection or forks", file=sys.stderr)
@@ -348,6 +363,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "output_path": output_path,
                     "rendered_grid": render_play_session(capsule, session)["grid"],
                 }
+            elif args.inspect_play_trace is not None:
+                report = inspect_play_trace(
+                    capsule, _read_json(args.inspect_play_trace),
+                    args.trace_start, args.trace_end,
+                )
             elif args.render_play_comparison is not None:
                 report = render_play_comparison_frame(
                     capsule, _read_json(args.render_play_comparison),
