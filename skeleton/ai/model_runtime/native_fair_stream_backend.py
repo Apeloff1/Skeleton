@@ -15,8 +15,8 @@ from typing import Mapping
 
 from .fair_stream_result_vault import MAX_RESULT_BYTES
 from .fair_stream_session import DispatchPermit
-from .native_llm_runtime import NativeLLMRuntime
-from .runtime_contracts import GenerationConfig, GenerationResult
+from .native_llm_runtime import GenerationResult, NativeLLMRuntime
+from .runtime_contracts import GenerationConfig
 
 MAX_PROMPT_BYTES = 64 << 10
 MAX_STAGED_PROMPTS = 256
