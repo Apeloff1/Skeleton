@@ -1,0 +1,76 @@
+"""Canonical application seam for CPU-native encrypted fair-stream results.
+
+The caller provides the authenticated NativeLLMRuntime, independent private
+result/journal handles, external monotonic session anchor, and operator-owned
+keys. No default secrets, GPU qualification or automatic restart replay.
+"""
+from __future__ import annotations
+
+import os
+
+from skeleton.ai.model_runtime.fair_stream_execution_journal import (
+    FairStreamExecutionJournal, JournaledExecutionOwner,
+)
+from skeleton.ai.model_runtime.fair_stream_result_vault import (
+    SealedFairStreamResultVault,
+)
+from skeleton.ai.model_runtime.native_fair_stream_backend import (
+    NativeFairStreamBackend, NativePromptRegistry, pin_native_prompt,
+)
+from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle
+
+
+def bind_native_cpu_result_owner(
+    *, runtime: NativeLLMRuntime, registry: NativePromptRegistry,
+    result_handle: PrivateSQLiteHandle, journal: FairStreamExecutionJournal,
+    result_key: bytes,
+) -> tuple[JournaledExecutionOwner, SealedFairStreamResultVault]:
+    """Bind actual native CPU inference to signed journal + AES-GCM vault.
+
+    The journal and result store must be different physical SQLite files.
+    The app must also supply a durable high-watermark and an authenticated
+    dispatch service, and must keep all handles alive until quiescent.
+    """
+    if type(journal) is not FairStreamExecutionJournal:
+        raise ValueError("canonical signed execution journal required")
+    if type(result_handle) is not PrivateSQLiteHandle or result_handle._closed:
+        raise ValueError("canonical private result database required")
+    if journal._connection is result_handle.connection:
+        raise ValueError("result and execution journal must be separate connections")
+    db_rows = journal._connection.execute("PRAGMA database_list").fetchall()
+    if len(db_rows) != 1 or db_rows[0][1] != "main" or not db_rows[0][2]:
+        raise ValueError("file-backed private execution journal required")
+    journal_info = os.stat(db_rows[0][2], follow_symlinks=False)
+    result_info = os.fstat(result_handle._file_fd)
+    if (journal_info.st_dev, journal_info.st_ino) == (
+        result_info.st_dev, result_info.st_ino,
+    ):
+        raise ValueError("result and execution journal must use different inodes")
+    if registry.session_id != journal.session_id:
+        raise ValueError("native prompt and execution journal session mismatch")
+    backend = NativeFairStreamBackend(runtime, registry)
+    vault = SealedFairStreamResultVault(
+        result_handle, session_id=journal.session_id,
+        model_digest=backend.model_digest,
+        tokenizer_digest=backend.tokenizer_digest,
+        result_key=result_key, backend=backend,
+    )
+    return JournaledExecutionOwner(journal, vault), vault
+
+
+def stage_native_cpu_prompt(
+    *, runtime: NativeLLMRuntime, registry: NativePromptRegistry,
+    request_id: str, tenant_id: str, prompt: str, max_output_tokens: int,
+) -> None:
+    """Called only after the app authenticates tenant and request ownership.
+
+    Register before submitting the matching StreamRequest. A failed submit
+    must revoke this in-memory grant; never silently regenerate on restart.
+    """
+    pinned = pin_native_prompt(
+        runtime, session_id=registry.session_id, request_id=request_id,
+        tenant_id=tenant_id, prompt=prompt,
+        max_output_tokens=max_output_tokens,
+    )
+    registry.stage(pinned)
