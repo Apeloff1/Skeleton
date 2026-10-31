@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_ion_wastes",
+  "title": "Ion Wastes: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610302646,
+  "width": 21,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 6
+}

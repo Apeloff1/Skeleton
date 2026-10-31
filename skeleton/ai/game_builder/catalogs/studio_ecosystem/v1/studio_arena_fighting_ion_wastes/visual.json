@@ -1,0 +1,117 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "project_id": "studio_arena_fighting_ion_wastes",
+  "genre": "arena_fighting",
+  "biome": "ion_wastes",
+  "release_certified": false,
+  "art_direction": {
+    "original_design": true,
+    "location": "Ion Wastes",
+    "terrain": "charged dunes",
+    "theme": "space",
+    "light_model": "reactive_electromagnetic_storms",
+    "palette": [
+      "#17172F",
+      "#4E5E9F",
+      "#A7AFEE",
+      "#F5F4FF"
+    ],
+    "character_silhouette": "tools for frame-advantage reading and evasive counters"
+  },
+  "asset_recipes": [
+    {
+      "id": "primary_character",
+      "type": "rigged_character",
+      "description": "Readable competitor with equipment used in duel",
+      "inputs": [
+        "silhouette",
+        "joint_limit",
+        "outfit_palette"
+      ],
+      "deliverables": [
+        "body_mesh",
+        "rig",
+        "collision_volume",
+        "lod_chain"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "biome_kit",
+      "type": "procedural_geometry",
+      "description": "Reusable charged dunes modular kit showing induced currents damage",
+      "inputs": [
+        "terrain_profile",
+        "materials",
+        "collision_shape"
+      ],
+      "deliverables": [
+        "scene_prefabs",
+        "atlased_materials",
+        "lod_chain"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "landmark_interior",
+      "type": "architectural_environment",
+      "description": "Navigable original interior of drifting relay station",
+      "inputs": [
+        "functional_layout",
+        "interior_lighting",
+        "landmark_history"
+      ],
+      "deliverables": [
+        "modular_rooms",
+        "streaming_cells",
+        "occlusion_data"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "interactive_tool",
+      "type": "action_prop",
+      "description": "Original stamina and bout points tool for frame-advantage reading and evasive counters",
+      "inputs": [
+        "interaction_envelope",
+        "animation_state",
+        "accessibility_icon"
+      ],
+      "deliverables": [
+        "mesh",
+        "tool_state",
+        "interaction_sound"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "hazard_vfx",
+      "type": "climate_system",
+      "description": "Scoped electromagnetic storms field with measured induced currents response",
+      "inputs": [
+        "physical_state",
+        "resource_budget",
+        "fallback_mode"
+      ],
+      "deliverables": [
+        "effects_shaders",
+        "telemetry",
+        "low_end_fallback"
+      ],
+      "status": "not_created"
+    }
+  ],
+  "runtime_requirements": {
+    "physical_ram": "sample_live_capacity",
+    "gpu_memory": "adaptive_budget",
+    "virtual_ram": "spill_and_rehydrate_with_integrity",
+    "disk": "bounded_content_addressed_cache",
+    "streaming": "camera_and_scene_priority",
+    "quality": "dynamic_lod_with_fidelity_receipts"
+  },
+  "legal_review": {
+    "external_source": "none",
+    "license_evidence": "originality_review_pending"
+  },
+  "asset_owner": "existing_studio_asset_pipeline"
+}

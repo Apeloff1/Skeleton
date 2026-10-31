@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_aerial_traversal_frosted_crater",
+  "genre": "aerial_traversal",
+  "biome": "frosted_crater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Frosted Crater: Aerial Traversal",
+  "foundation": {
+    "setting": "Frosted Crater",
+    "era": "early reconstruction",
+    "environment": "frozen crater rims",
+    "history": "A forgotten impact-hollow vault once protected basalt shelters, until recurring cryogenic pockets forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Daro Halden, a pilot, must deliver emergency medicine, relying on wind-aware movement despite cryogenic pockets.",
+  "central_conflict": "a disrupted air network threatens the impact-hollow vault by restricting basalt shelters.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "cryogenic pockets destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a disrupted air network contests access to basalt shelters",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The impact-hollow vault becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers basalt shelters"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "impact-hollow vault",
+    "critical_resource": "basalt shelters",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

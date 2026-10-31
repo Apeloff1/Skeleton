@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_salt_dunes",
+  "title": "Salt Dunes: The Open Tournament",
+  "subtitle": "Original the open tournament design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010310847,
+  "width": 23,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 6,
+  "theme": "desert",
+  "starting_health": 3
+}
