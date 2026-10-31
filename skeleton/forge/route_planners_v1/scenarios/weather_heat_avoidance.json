@@ -1,0 +1,119 @@
+{
+  "schema": "skeleton.route_scenario.v1",
+  "id": "weather_heat_avoidance",
+  "domain": "weather",
+  "mode": "fly",
+  "nodes": [
+    "start",
+    "crossroads",
+    "safehouse",
+    "lookout",
+    "goal"
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "crossroads",
+      "distance": 6,
+      "danger": 2,
+      "energy": 8
+    },
+    {
+      "from": "crossroads",
+      "to": "goal",
+      "distance": 8,
+      "danger": 3,
+      "energy": 9
+    },
+    {
+      "from": "start",
+      "to": "safehouse",
+      "distance": 8,
+      "danger": 1,
+      "energy": 10
+    },
+    {
+      "from": "safehouse",
+      "to": "goal",
+      "distance": 9,
+      "danger": 1,
+      "energy": 8
+    },
+    {
+      "from": "crossroads",
+      "to": "lookout",
+      "distance": 5,
+      "danger": 5,
+      "energy": 9
+    },
+    {
+      "from": "lookout",
+      "to": "goal",
+      "distance": 6,
+      "danger": 5,
+      "energy": 8
+    },
+    {
+      "from": "safehouse",
+      "to": "crossroads",
+      "distance": 6,
+      "danger": 2,
+      "energy": 8
+    },
+    {
+      "from": "start",
+      "to": "goal",
+      "distance": 16,
+      "danger": 10,
+      "energy": 12
+    }
+  ],
+  "requests": [
+    {
+      "origin": "start",
+      "destination": "goal",
+      "danger_budget": 100,
+      "energy_budget": 100,
+      "distance_weight": 1,
+      "danger_weight": 2,
+      "energy_weight": 1,
+      "blocked": []
+    },
+    {
+      "origin": "start",
+      "destination": "goal",
+      "danger_budget": 10,
+      "energy_budget": 15,
+      "distance_weight": 1,
+      "danger_weight": 5,
+      "energy_weight": 1,
+      "blocked": [
+        "crossroads"
+      ]
+    },
+    {
+      "origin": "start",
+      "destination": "goal",
+      "danger_budget": 0,
+      "energy_budget": 0,
+      "distance_weight": 1,
+      "danger_weight": 1,
+      "energy_weight": 1,
+      "blocked": []
+    }
+  ],
+  "invariants": [
+    "deterministic-route-order",
+    "budget-respecting",
+    "no-cycles",
+    "actual-edge-validation",
+    "blocked-node-rejection",
+    "no-unknown-node"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "no_real_world_navigation": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
