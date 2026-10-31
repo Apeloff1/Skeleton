@@ -209,6 +209,36 @@ class DurableTailProfileStore:
                     "tail profile or independent anchor unverifiable"
                 ) from exc
 
+    def verified_snapshot(self) -> tuple[LocalTailProfiler, int, str]:
+        """Return a profile and the same independently verified CAS version.
+
+        Re-read the external anchor after profile authentication. If another
+        writer advanced it concurrently, never report a mixed-generation
+        status or claim that the earlier profile is current.
+        """
+        with self._lock:
+            profile = self.load()
+            try:
+                generation, digest = self._anchor.read()
+                row = self._row()
+                if (
+                    type(generation) is not int
+                    or not 0 <= generation <= MAX_GENERATION
+                    or type(digest) is not str
+                    or row is None
+                    or row[0] != generation
+                    or row[1] != _hex(digest, "anchor digest")
+                    or row[2] != _mac(self._key, generation, digest)
+                    or _digest(generation, row[3]) != digest
+                ):
+                    raise ValueError("tail profile changed during status read")
+                return profile, generation, digest
+            except BaseException as exc:
+                self._quarantined = True
+                raise TailCustodyQuarantined(
+                    "tail profile status cannot be independently verified"
+                ) from exc
+
     def persist(self, profile: LocalTailProfiler) -> tuple[int, str]:
         """Append observations, then advance external anchor; no silent eviction."""
         if not isinstance(profile, LocalTailProfiler):

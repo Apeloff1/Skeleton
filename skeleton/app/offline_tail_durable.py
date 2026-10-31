@@ -62,12 +62,11 @@ class OfflineDurableTailRecorder:
         if self._blocked or self._store.quarantined:
             raise TailCustodyQuarantined("tail recorder requires reconciliation")
         # Reverify independent anchor, not just an in-memory profile digest.
-        persisted = self._store.load()
+        persisted, generation, _ = self._store.verified_snapshot()
         checkpoint = persisted.checkpoint()
-        state = self._store._anchor.read()
         return DurableTailStatus(
             schema="skeleton.app.offline-durable-tail.v1",
-            generation=state[0],
+            generation=generation,
             profile_digest=checkpoint["digest"],
             requests=len(checkpoint["records"]),
             quarantined=False,
