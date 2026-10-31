@@ -9,6 +9,7 @@ Run from the repository root:
 
 ```sh
 python -m scripts.game.offline_grid_campaign inspect
+python -m scripts.game.offline_grid_campaign play
 python -m scripts.game.offline_grid_campaign run --commands commands.json > output.json
 python -m unittest skeleton.testing.test_offline_grid_campaign -v
 ```
@@ -37,3 +38,9 @@ source contract is versioned; unknown versions and malformed dependencies
 fail closed. CLI file reads reject symlinks at the final path on platforms
 supporting O_NOFOLLOW and cap input bytes; parent-directory race resistance
 and a production storage service are not claimed.
+
+The `play` command offers a real interactive text-grid loop on a local terminal.
+It renders the current map after each accepted action, rejects invalid commands
+without advancing the tick, and prints a replayable save as the final output
+line on victory, quit, or end-of-file. Keyboard text input is supported; touch,
+controller, screen-reader and native rendering qualification remain separate.

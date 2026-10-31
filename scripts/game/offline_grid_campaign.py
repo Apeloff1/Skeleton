@@ -39,7 +39,7 @@ def _read(path: Path) -> object:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("inspect", "run"))
+    parser.add_argument("operation", choices=("inspect", "run", "play"))
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--commands", type=Path)
     parser.add_argument("--resume", type=Path)
@@ -52,6 +52,31 @@ def main(argv: list[str] | None = None) -> int:
             session = Session.new(campaign)
             print(json.dumps({"source_digest": campaign.source_digest, "map": session.render(),
                               "title": campaign.spec["title"]}, sort_keys=True))
+            return 0
+        if args.operation == "play":
+            if args.commands is not None:
+                raise ValueError("play reads commands from the terminal")
+            session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
+            print("Offline grid campaign: move north/south/east/west, collect ID, talk ID, finish ID, wait, quit")
+            while session.ending is None and session.tick < 4096:
+                print(session.render())
+                try:
+                    line = input("> ").strip()
+                except EOFError:
+                    break
+                if line == "quit":
+                    break
+                parts = line.split()
+                if not parts or len(parts) > 2:
+                    print("Enter a command and optional target.", file=sys.stderr)
+                    continue
+                kind = parts[0]
+                target = parts[1] if len(parts) == 2 else ""
+                try:
+                    session = session.step(Command(f"terminal-{session.tick + 1}", kind, target))
+                except GameplayContractError as exc:
+                    print(f"Rejected: {exc}", file=sys.stderr)
+            print(json.dumps({"save": session.snapshot(), "map": session.render()}, sort_keys=True))
             return 0
         if args.commands is None:
             raise ValueError("run requires --commands")

@@ -126,6 +126,19 @@ class OfflineGridCampaignTests(unittest.TestCase):
         with self.assertRaises(GameplayContractError):
             Command("bad", "wait", "payload")
 
+    def test_interactive_terminal_playthrough(self):
+        inputs = "\\n".join(
+            (f"{kind} {target}".strip() for _, kind, target in COMMANDS)
+        ) + "\\n"
+        process = subprocess.run(
+            [sys.executable, "-m", "scripts.game.offline_grid_campaign", "play"],
+            input=inputs, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(process.returncode, 0, process.stderr)
+        result = json.loads(process.stdout.splitlines()[-1])
+        self.assertEqual(result["save"]["state"]["ending"], "homecoming")
+        self.assertEqual(Session.restore(self.campaign, result["save"]).tick, 10)
+
     def test_cli_offline_end_to_end(self):
         with tempfile.TemporaryDirectory() as tmp:
             commands = Path(tmp) / "commands.json"
