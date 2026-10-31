@@ -162,7 +162,7 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
 # satisfy the single-game replay contract, and has no provider or write path.
 CATALOG_REQUEST_SCHEMA = "skeleton.jeeves.studio_walk_catalog_request.v1"
 CATALOG_RESULT_SCHEMA = "skeleton.jeeves.studio_walk_catalog_result.v1"
-_CATALOG_FIELDS = frozenset({"schema", "offset", "limit", "genre", "biome"})
+_CATALOG_FIELDS = frozenset({"schema", "offset", "limit", "genre", "biome", "expected_catalog_digest"})
 
 
 def catalog_tool_schema() -> dict[str, object]:
@@ -178,6 +178,7 @@ def catalog_tool_schema() -> dict[str, object]:
                 "limit": {"type": "integer", "minimum": 1, "maximum": 4},
                 "genre": {"type": ["string", "null"], "maxLength": 96},
                 "biome": {"type": ["string", "null"], "maxLength": 96},
+                "expected_catalog_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             },
             "required": ["schema", "offset", "limit"],
         },
@@ -196,12 +197,19 @@ def execute_catalog_audit_tool(
         raise StudioQuestError("unsupported Jeeves catalog audit schema")
     offset, limit = request.get("offset"), request.get("limit")
     genre, biome = request.get("genre"), request.get("biome")
+    expected = request.get("expected_catalog_digest")
     if (type(offset) is not int or offset < 0
             or type(limit) is not int or not 1 <= limit <= 4
             or any(value is not None and
                    (type(value) is not str or not value or len(value) > 96)
                    for value in (genre, biome))):
         raise StudioQuestError("invalid Jeeves catalog audit bounds")
+    if (expected is not None and
+            (type(expected) is not str or len(expected) != 64 or
+             any(c not in "0123456789abcdef" for c in expected))):
+        raise StudioQuestError("invalid Jeeves catalog continuation digest")
+    if offset and expected is None:
+        raise StudioQuestError("Jeeves catalog continuation requires a digest")
     encoded = _canonical(request)
     if len(encoded) > 4096:
         raise StudioQuestError("Jeeves catalog audit request exceeds byte budget")
@@ -210,6 +218,7 @@ def execute_catalog_audit_tool(
     )
     detail = audit_catalog_walk_choices(
         authorized=True, genre=genre, biome=biome, offset=offset, limit=limit,
+        expected_catalog_digest=expected,
     )
     payload = {
         "schema": CATALOG_RESULT_SCHEMA,

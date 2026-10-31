@@ -20,6 +20,7 @@ MAX_CATALOG_AUDIT_REPLAY_EVENTS = 65_536
 def audit_catalog_walk_choices(
     *, authorized: bool, genre: str | None = None, biome: str | None = None,
     offset: int = 0, limit: int = 2,
+    expected_catalog_digest: str | None = None,
 ) -> dict[str, object]:
     """Audit a deterministic catalog page, with explicit incomplete results.
 
@@ -35,10 +36,20 @@ def audit_catalog_walk_choices(
                    (not isinstance(value, str) or not value or len(value) > 96)
                    for value in (genre, biome))):
         raise StudioQuestError("invalid catalog choice audit pagination or filter")
+    if expected_catalog_digest is not None and (
+        type(expected_catalog_digest) is not str
+        or len(expected_catalog_digest) != 64
+        or any(c not in "0123456789abcdef" for c in expected_catalog_digest)
+    ):
+        raise StudioQuestError("invalid expected catalog digest")
+    if offset and expected_catalog_digest is None:
+        raise StudioQuestError("continuation requires a catalog digest")
     records = list_blueprints(genre=genre, biome=biome)
     if offset > len(records):
         raise StudioQuestError("catalog choice audit offset exceeds filtered index")
     index_digest = _sha(records)
+    if expected_catalog_digest is not None and index_digest != expected_catalog_digest:
+        raise StudioQuestError("catalog changed between audit pages")
     selected = records[offset:offset + limit]
     projects: list[dict[str, Any]] = []
     replay_work = 0
@@ -90,6 +101,14 @@ def audit_catalog_walk_choices(
         "projects_examined": len(projects),
         "projects": projects,
         "next_offset": next_offset,
+        "continuation": ({
+            "schema": "skeleton.game_builder.studio_walk_catalog_cursor.v1",
+            "catalog_digest": index_digest,
+            "offset": next_offset,
+            "limit": limit,
+            "genre": genre,
+            "biome": biome,
+        } if next_offset is not None else None),
         "replay_work_events": replay_work,
         "complete_page_coverage": complete_page,
         "complete_catalog_coverage": bool(records) and offset == 0

@@ -36,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Zero-based offset for --walk-audit-catalog")
     ap.add_argument("--walk-audit-batch-size", type=int, default=2,
                     help="Projects per catalog audit page (1..4)")
+    ap.add_argument("--walk-audit-expected-digest",
+                    help="Required catalog SHA-256 from the preceding page for nonzero offset")
     ap.add_argument("--play-walk", action="store_true",
                     help="Replay authoritative walk movement and scene choices; print save receipt")
     ap.add_argument("--walk-events", metavar="JSON",
@@ -97,13 +99,15 @@ def main(argv: list[str] | None = None) -> int:
             result = audit_catalog_walk_choices(
                 authorized=True, genre=args.genre, biome=args.biome,
                 offset=args.walk_audit_offset, limit=args.walk_audit_batch_size,
+                expected_catalog_digest=args.walk_audit_expected_digest,
             )
         except (StudioQuestError, ValueError, OSError) as exc:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    if args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2:
-        ap.error("--walk-audit-offset and --walk-audit-batch-size require --walk-audit-catalog")
+    if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
+            or args.walk_audit_expected_digest is not None):
+        ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
     if args.play_walk:
         if (not args.project or args.play_quest or args.quest_actions is not None
                 or args.search is not None or args.materialize_batch

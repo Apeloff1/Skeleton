@@ -307,3 +307,27 @@ rejects unknown fields, invalid numbers, forged authority and oversized
 requests before reading the canonical index. It delegates to the same source
 assurance engine as `--walk-audit-catalog`, returns index/source/coverage
 receipts and never claims a completed original game or release approval.
+
+## Source-bound catalog audit continuation
+
+The paginated `--walk-audit-catalog` operator audit now binds each continuation
+page to the exact SHA-256 of the filtered catalog index. The first page
+returns `catalog_digest` and a `continuation` object containing the next
+offset, page limit and filter values. Supply that digest for every nonzero
+`--walk-audit-offset`; do not mix pages from different catalog snapshots.
+
+```sh
+python scripts/studio_ecosystem_cli.py --walk-audit-catalog \
+  --walk-audit-offset 2 --walk-audit-batch-size 2 \
+  --walk-audit-expected-digest <first-page-catalog-digest>
+```
+
+Jeeves' typed `studio_authoritative_walk_catalog` request accepts the same
+optional `expected_catalog_digest` (64 lowercase hexadecimal characters).
+It is mandatory when `offset > 0`. Invalid, absent or stale continuation
+identity fails before project source compilation. The catalog is also checked
+again after the page audit, so a concurrent catalog change fails closed.
+The digest is a source identity, not a secret, authorization credential,
+cryptographic signature or release approval. For complete coverage, continue
+until `next_offset` is null; each individual page remains bounded to four
+projects, and a page receipt never claims native genre certification.
