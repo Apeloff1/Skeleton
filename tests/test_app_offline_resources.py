@@ -108,6 +108,41 @@ class LocalResourceBudgetTests(unittest.TestCase):
         ):
             self.assertEqual(_linux_swap(), (1_000_000_000, 200_000_000))
 
+    def test_cgroup_v1_memsw_subtracts_physical_memory(self):
+        from unittest.mock import mock_open
+        from skeleton.app import offline_resources
+        meminfo = "SwapTotal: 4000000 kB\nSwapFree: 3000000 kB\n"
+        counters = {
+            "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes": 2_500_000_000,
+            "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes": 2_200_000_000,
+            "/sys/fs/cgroup/memory/memory.limit_in_bytes": 2_000_000_000,
+            "/sys/fs/cgroup/memory/memory.usage_in_bytes": 1_800_000_000,
+        }
+        with patch("builtins.open", mock_open(read_data=meminfo)), patch.object(
+            offline_resources, "_read_counter",
+            side_effect=lambda path: counters.get(str(path)),
+        ):
+            self.assertEqual(_linux_swap(), (500_000_000, 100_000_000))
+            del counters["/sys/fs/cgroup/memory/memory.usage_in_bytes"]
+            self.assertEqual(_linux_swap(), (0, 0))
+
+    def test_cgroup_v1_inconsistent_memsw_never_invents_capacity(self):
+        from unittest.mock import mock_open
+        from skeleton.app import offline_resources
+        counters = {
+            "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes": 1_000,
+            "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes": 500,
+            "/sys/fs/cgroup/memory/memory.limit_in_bytes": 2_000,
+            "/sys/fs/cgroup/memory/memory.usage_in_bytes": 700,
+        }
+        with patch("builtins.open", mock_open(
+            read_data="SwapTotal: 4000000 kB\nSwapFree: 3000000 kB\n",
+        )), patch.object(
+            offline_resources, "_read_counter",
+            side_effect=lambda path: counters.get(str(path)),
+        ):
+            self.assertEqual(_linux_swap(), (0, 0))
+
     def test_probe_reports_host_disk_and_recomputes(self):
         with TemporaryDirectory() as temp:
             with patch("skeleton.app.offline_resources._linux_memory",

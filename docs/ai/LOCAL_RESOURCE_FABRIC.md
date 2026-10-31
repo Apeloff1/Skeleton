@@ -372,3 +372,14 @@ mutable checkout. The diagnostic process output is bounded and the result
 checked against a fixed independent CPU digest. An unsigned or modified
 source, a missing Apple toolchain, a non-Apple Silicon host, or unverified
 model-specific synchronization cannot satisfy final release qualification.
+
+## cgroup v1/v2 swap accounting
+
+Linux cgroup v2 `memory.swap.max` measures swap-only bytes. The older cgroup
+v1 `memory.memsw.limit_in_bytes` includes both physical memory and swap;
+subtract the v1 physical memory limit to avoid double-counting host RAM as
+available swap. Derive swap use from memsw usage minus memory usage. Missing
+or contradictory v1 counters fail closed to unknown/zero swap capacity rather
+than fabricating available virtual memory. The unlimited kernel sentinel is
+not treated as a real quota. This is admission telemetry, not a swapfile or
+kernel memory-configuration modification.

@@ -171,18 +171,38 @@ def _linux_swap() -> tuple[int, int]:
         return 0, 0
     total = max(0, values.get("SwapTotal", 0))
     free = min(total, max(0, values.get("SwapFree", 0)))
-    for ceiling_path, usage_path in (
-        ("/sys/fs/cgroup/memory.swap.max",
-         "/sys/fs/cgroup/memory.swap.current"),
-        ("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes",
-         "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes"),
-    ):
-        ceiling = _read_counter(Path(ceiling_path))
-        used = _read_counter(Path(usage_path))
-        if ceiling is not None and used is not None and ceiling < total:
-            total = max(0, ceiling)
-            free = min(free, max(0, ceiling - used))
-            break
+    # cgroup v2 swap.max is swap-only, unlike v1 memory.memsw.* which
+    # includes both physical memory and swap. Never interpret v1 memsw
+    # capacity as additional virtual memory: subtract the physical limit.
+    v2_ceiling = _read_counter(Path("/sys/fs/cgroup/memory.swap.max"))
+    v2_used = _read_counter(Path("/sys/fs/cgroup/memory.swap.current"))
+    if v2_ceiling is not None and v2_used is not None:
+        if v2_ceiling < total:
+            total = v2_ceiling
+            free = min(free, max(0, total - v2_used))
+        return total, free
+    v1_ceiling = _read_counter(
+        Path("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes")
+    )
+    v1_used = _read_counter(
+        Path("/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes")
+    )
+    if v1_ceiling is not None and v1_used is not None:
+        memory_ceiling = _read_counter(
+            Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+        )
+        memory_used = _read_counter(
+            Path("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+        )
+        if (memory_ceiling is None or memory_used is None
+                or v1_ceiling < memory_ceiling or v1_used < memory_used):
+            return 0, 0  # Incomplete/inconsistent telemetry is not free swap.
+        if v1_ceiling >= (1 << 60):
+            return total, free  # Linux unlimited sentinel, not a real quota.
+        swap_ceiling = v1_ceiling - memory_ceiling
+        swap_used = v1_used - memory_used
+        total = min(total, swap_ceiling)
+        free = min(free, max(0, total - swap_used))
     return total, free
 
 
