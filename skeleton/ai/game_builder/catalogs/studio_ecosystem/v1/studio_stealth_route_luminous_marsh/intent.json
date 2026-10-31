@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_luminous_marsh",
+  "title": "Luminous Marsh: Stealth Route",
+  "subtitle": "An original stealth route brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610300308,
+  "width": 25,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 3
+}

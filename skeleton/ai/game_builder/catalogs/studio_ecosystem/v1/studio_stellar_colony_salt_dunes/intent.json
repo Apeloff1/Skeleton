@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_salt_dunes",
+  "title": "Salt Dunes: Outer Settlement",
+  "subtitle": "Original outer settlement design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010311338,
+  "width": 23,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 4
+}

@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_stealth_route_verdant_caldera",
+  "genre": "stealth_route",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_stealth_route_verdant_caldera:restore",
+  "objective": "deliver a sealed civic charter",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "stepped jungle terraces",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near hanging botanical lab",
+        "Seek a witness of geothermal plumes"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "hanging botanical lab",
+      "entry": "survey_complete",
+      "actions": [
+        "infiltrate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to mineral terraces",
+        "Establish an independent path around a surveillance guild"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "hanging botanical lab",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of hanging botanical lab",
+        "Construct a low-resource alternative using mineral terraces"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden geothermal plumes interrupts transfer",
+    "The a surveillance guild suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "mineral terraces",
+    "unlimited_rewards": false
+  }
+}

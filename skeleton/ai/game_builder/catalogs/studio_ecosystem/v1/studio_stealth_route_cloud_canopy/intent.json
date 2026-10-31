@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_cloud_canopy",
+  "title": "Cloud Canopy: Stealth Route",
+  "subtitle": "An original stealth route brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610300325,
+  "width": 19,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 4
+}
