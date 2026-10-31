@@ -63,28 +63,38 @@ def test_jeeves_host_registry_exposes_only_read_only_tools():
     jeeves = Jeeves()
     registry = jeeves.app_tool_registry()
     names = {s.name for s in registry.specs()}
-    assert names == {"app.capabilities", "app.concepts", "creator.operations", "creator.propose"}
+    assert names == {
+        "app_capabilities", "app_concepts", "app_features",
+        "app_planes", "app_dependency_impact", "app_interfaces",
+        "creator_plan", "creator_operations", "creator_propose",
+        "game_creation_catalog", "game_creation_questions",
+        "game_creation_compose",
+    }
     assert all(s.risk is RiskTier.READ_ONLY for s in registry.specs())
+    # A dotted legacy identifier is not an alternate capability or grant.
+    from skeleton.jeeves.agent.types import AgentContractError
+    with pytest.raises(AgentContractError):
+        ToolCall(call_id="legacy-alias", name="app.capabilities", arguments={})
     assert jeeves.app_capability_catalog(limit=1)["capabilities"]
     assert jeeves.creator_proposal("preview", "quest-studio", {
         "scopes": ["npc:merchant"], "mode": "static"})["execution_authority"] == "none"
 
     executor = ToolExecutor(registry)
     context = ToolExecutionContext(run_id="run-001", user_id="user-001", trace_id="trace-001")
-    call = ToolCall(call_id="call-001", name="app.capabilities", arguments={"limit": 1})
+    call = ToolCall(call_id="call-001", name="app_capabilities", arguments={"limit": 1})
     with pytest.raises(ToolDenied):
         executor.execute(call, context, grants=[])
     outcome = executor.execute(call, context, grants=[
-        ToolGrant(tool_name="app.capabilities", allowed_risks=(RiskTier.READ_ONLY,))
+        ToolGrant(tool_name="app_capabilities", allowed_risks=(RiskTier.READ_ONLY,))
     ])
     assert outcome.ok
     assert outcome.payload["limit"] == 1
     # Even an explicit high-risk grant cannot install an absent file editor.
     with pytest.raises(ToolDenied):
         executor.execute(
-            ToolCall(call_id="call-002", name="app.write_file",
+            ToolCall(call_id="call-002", name="app_write_file",
                      arguments={"path": "docs/PRODUCT.md", "content": "evil"}),
-            context, grants=[ToolGrant(tool_name="app.write_file",
+            context, grants=[ToolGrant(tool_name="app_write_file",
                                       allowed_risks=(RiskTier.HIGH_IMPACT,))],
         )
 
@@ -95,7 +105,7 @@ def test_repo_root_is_host_selected_not_a_model_path(tmp_path):
     registry = Jeeves().app_tool_registry()
     with pytest.raises(Exception):
         # ToolSpec does not accept unknown parameters such as "root".
-        registry.get("app.capabilities").spec.validate_arguments({"root": "/etc"})
+        registry.get("app_capabilities").spec.validate_arguments({"root": "/etc"})
 
 
 def test_explicit_host_authorization_and_high_impact_grant_are_both_required():
@@ -117,15 +127,15 @@ def test_explicit_host_authorization_and_high_impact_grant_are_both_required():
     ctx = ToolExecutionContext(run_id="run-002", user_id="user-002", trace_id="trace-002")
     args = {"operation": "preview", "project_id": "studio",
             "payload": {"scopes": ["world:start"], "mode": "static"}}
-    grant = ToolGrant(tool_name="creator.execute_authorized",
+    grant = ToolGrant(tool_name="creator_execute_authorized",
                       allowed_risks=(RiskTier.HIGH_IMPACT,), max_calls=1)
     with pytest.raises(ToolDenied):
         executor.execute(
-            ToolCall(call_id="attempt-no-grant", name="creator.execute_authorized", arguments=args),
+            ToolCall(call_id="attempt-no-grant", name="creator_execute_authorized", arguments=args),
             ctx, grants=[])
     assert not called
     denied = executor.execute(
-        ToolCall(call_id="attempt-unapproved", name="creator.execute_authorized", arguments=args),
+        ToolCall(call_id="attempt-unapproved", name="creator_execute_authorized", arguments=args),
         ctx, grants=[grant])
     assert denied.ok is False
     assert not called
@@ -135,7 +145,7 @@ def test_explicit_host_authorization_and_high_impact_grant_are_both_required():
     approved.add((cmd["digest"], ctx.user_id, ctx.run_id))
     with pytest.raises(ToolDenied):
         executor.execute(
-            ToolCall(call_id="attempt-exhausted", name="creator.execute_authorized", arguments=args),
+            ToolCall(call_id="attempt-exhausted", name="creator_execute_authorized", arguments=args),
             ctx, grants=[grant])
     assert not called
 
@@ -143,7 +153,7 @@ def test_explicit_host_authorization_and_high_impact_grant_are_both_required():
     fresh = ToolExecutionContext(run_id="run-003", user_id="user-002", trace_id="trace-003")
     approved.add((cmd["digest"], fresh.user_id, fresh.run_id))
     outcome = executor.execute(
-        ToolCall(call_id="attempt-approved", name="creator.execute_authorized", arguments=args),
+        ToolCall(call_id="attempt-approved", name="creator_execute_authorized", arguments=args),
         fresh, grants=[grant])
     assert outcome.ok is True
     assert called == [cmd["digest"]]
@@ -156,7 +166,7 @@ def test_authorization_callback_cannot_be_supplied_in_model_arguments():
     register_authorized_creator_tool(
         registry, handlers={"preview": lambda command: {}},
         authorize=lambda command, context: False)
-    spec = registry.get("creator.execute_authorized").spec
+    spec = registry.get("creator_execute_authorized").spec
     from skeleton.jeeves.agent.tools import ToolValidationError
     with pytest.raises(ToolValidationError):
         spec.validate_arguments({
@@ -194,10 +204,10 @@ def test_capability_concept_tool_is_host_granted_and_nonexecuting():
     registry = Jeeves().app_tool_registry()
     executor = ToolExecutor(registry)
     ctx = ToolExecutionContext(run_id="concept-001", user_id="user-003", trace_id="trace-003")
-    call = ToolCall(call_id="concept-call", name="app.concepts", arguments={"limit": 3})
+    call = ToolCall(call_id="concept-call", name="app_concepts", arguments={"limit": 3})
     with pytest.raises(ToolDenied):
         executor.execute(call, ctx, grants=[])
-    result = executor.execute(call, ctx, grants=[ToolGrant(tool_name="app.concepts")])
+    result = executor.execute(call, ctx, grants=[ToolGrant(tool_name="app_concepts")])
     assert result.ok is True
     assert len(result.payload["concepts"]) == 3
     assert result.payload["validation"].startswith("taxonomy declaration")

@@ -37,7 +37,13 @@ class ProductionGameCheckpointTests(unittest.TestCase):
     def test_refuses_checkpoint_digest_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp) / "own.json"
-            state.write_text('{"own":{},"lms":{},"transformer":{}}', encoding="utf-8")
+            # The digest-mismatch fixture must pass the independent minimum-size
+            # gate, so this regression reaches SHA-256 verification without
+            # relaxing the production checkpoint size boundary.
+            state.write_text(json.dumps({
+                "own": {}, "lms": {}, "transformer": {},
+                "evidence": "x" * 80,
+            }), encoding="utf-8")
             with patch.dict(os.environ, {"SKELETON_OWN": str(state)}):
                 with self.assertRaisesRegex(ProductionCheckpointError, "SHA-256"):
                     _production_source(None, "f" * 64)

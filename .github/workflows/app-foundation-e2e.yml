@@ -174,3 +174,89 @@ jobs:
       - name: Tear down stack
         if: always()
         run: docker compose -f docker-compose.yml down -v --remove-orphans || true
+
+  apple-metal-multisync:
+    name: Apple M1 Metal Multi-Sync Qualification
+    # Scope native qualification to the active hardware PR; normal app E2E
+    # remains unchanged for other branches and main. This is an existing
+    # workflow, not an additional automatically admitted workflow file.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.number == 4369 && !github.event.pull_request.draft) }}
+    runs-on: macos-15
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact branch source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Confirm real Apple Silicon architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "arm64"
+          /usr/bin/xcrun swift --version
+      - name: Run four-mode native Metal GPU synchronization
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/xcrun swift scripts/qualify_metal_shared.swift > "$RUNNER_TEMP/metal-multisync.json"
+      - name: Independently verify actual GPU output and sync proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path(os.environ["RUNNER_TEMP"]) / "metal-multisync.json"
+          payload = source.read_bytes()
+          if len(payload) > 8192:
+              raise SystemExit("Metal qualification: receipt exceeds bound")
+          report = json.loads(payload)
+          expected = {
+              "schema": "skeleton.apple.metal-multisync.v2",
+              "passed": True,
+              "shared_metal_buffers": 13,
+              "synchronized_command_buffers": 17,
+              "verified_values": 832,
+              "serial_cpu_gpu_cpu_round_trips": 4,
+              "cross_queue_event_handoffs": 4,
+              "parallel_independent_lanes": 3,
+              "shared_event_cpu_observations": 2,
+              "shared_event_cpu_acknowledgements": 2,
+              "model_tensor_fence_verified": False,
+              "llama_kv_cache_fence_verified": False,
+          }
+          if set(report) != set(expected) | {"output_sha256"}:
+              raise SystemExit("Metal qualification: missing or unexpected proof field")
+          if any(type(report[k]) is not type(v) or report[k] != v
+                 for k, v in expected.items()):
+              raise SystemExit("Metal qualification: a required synchronization mode failed")
+          digest = hashlib.sha256()
+          for seeds, depth in (
+              (range(4), 1),
+              (range(100, 104), 2),
+              (range(200, 203), 1),
+              (range(300, 302), 1),
+          ):
+              for seed in seeds:
+                  for index in range(64):
+                      value = seed * 100_003 + index * 97
+                      for _ in range(depth):
+                          value = ((value ^ 0x5A17B3E2) + index) & 0xFFFFFFFF
+                      digest.update(value.to_bytes(4, "little"))
+          if report["output_sha256"] != digest.hexdigest():
+              raise SystemExit("Metal qualification: GPU output digest mismatch")
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          summary.write_text(
+              "### Apple Silicon M1 GPU qualification\n"
+              "Real Metal device: four independent sync modes passed.\n"
+              "Completed command buffers: 17; verified values: 832.\n"
+              "Standalone probe output SHA-256: " + digest.hexdigest() + "\n"
+              "**Model-level llama.cpp tensor/KV synchronization remains unqualified.**\n",
+              encoding="utf-8",
+          )
+          PY

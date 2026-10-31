@@ -120,7 +120,18 @@ class FiveHundredThousandSourceProductions(unittest.TestCase):
         self.assertEqual(base.placements,result.placements[:len(base.placements)])
         self.assertEqual(len(base.placements)+4,len(result.placements))
         self.assertEqual(len(base.events)+4,len(result.events))
-        self.assertTrue(any(a.z>0 for a in result.placements[len(base.placements):]))
+        # Audio-cue direction 7 rotates newly authored cast; it does not
+        # raise actors into a different Z plane. Compare with the same
+        # undirected expansion to assert the exact direction contract.
+        source_action = EXPANDED_RECIPE_ACTIONS[(2*45000+7)//len(DIRECTORS)]
+        source = execute_authoring(base,source_action,arguments(source_action))
+        new_source = source.placements[len(base.placements):]
+        new_directed = result.placements[len(base.placements):]
+        self.assertEqual(len(new_source),len(new_directed))
+        for before,after in zip(new_source,new_directed):
+            self.assertEqual((before.x,before.y,before.z),
+                             (after.x,after.y,after.z))
+            self.assertEqual((before.facing_deg+180)%360,after.facing_deg)
 
     def test_original_story_gets_a_reachable_directed_side_stage(self):
         base=original_project()

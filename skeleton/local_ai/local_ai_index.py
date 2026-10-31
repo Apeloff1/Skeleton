@@ -12,5 +12,8 @@ SEAMS = [
     "grokbot_cos", "grokbot_factory", "house_fieldwalk", "jeeves_pipeline",
     "layer_adapters", "squash_ledger", "skeleton_cortex", "chief_of_staff",
     "clipped_mass", "era_citation", "specdec_local", "skill_creator",
-    "memory_edit", "pdf_ops", "pptx_ops", "xlsx_ops", "ffmpeg_ops", "docx_ops"
+    "memory_edit", "pdf_ops", "pptx_ops", "xlsx_ops", "ffmpeg_ops", "docx_ops",
+    # Existing enterprise modules complete the 50-seam declared inventory.
+    "enterprise_auth", "enterprise_gateway", "enterprise_policy",
+    "enterprise_observability", "enterprise_sla"
 ]
