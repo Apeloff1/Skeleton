@@ -112,3 +112,44 @@ def test_rejects_world_writable_destination_parent(tmp_path):
         assert not (parent / "game").exists()
     finally:
         parent.chmod(0o700)
+
+
+def test_source_tree_rejects_oversized_payload_without_writing(tmp_path):
+    with pytest.raises(publication.AtomicDirectoryPublicationError, match="budget"):
+        publication.publish_generated_tree(
+            {"index.html": b"x" * 2_100_001}, tmp_path / "game",
+        )
+    assert not (tmp_path / "game").exists()
+
+
+def test_real_original_game_compile_export_and_replay_roundtrip(tmp_path):
+    from hashlib import sha256
+    from skeleton.ai.game_builder.playable_compiler import compile_original_game
+    from skeleton.ai.game_builder.playable_world import GameBuildIntent
+    from skeleton.ai.game_builder.dual_runtime_export import (
+        render_dual_runtime_package, export_dual_runtime_package,
+    )
+    from skeleton.ai.game_builder.dual_runtime_verify import verify_exported_package
+
+    intent = GameBuildIntent(
+        project_id="atomic-publish-001", title="Original Orchard",
+        subtitle="A source-bound offline playable journey", seed=1729,
+        levels=1, width=9, height=9, collectibles_per_level=1,
+        hazards_per_level=0, starting_health=3,
+    )
+    compiled = compile_original_game(intent, authorized=True)
+    package = render_dual_runtime_package(compiled, authorized=True)
+    independent_pin = sha256(package.files["release.json"]).hexdigest()
+    output = export_dual_runtime_package(
+        package, tmp_path / "playable", authorized=True,
+    )
+    replay = verify_exported_package(
+        output, expected_manifest_sha256=independent_pin, authorized=True,
+    )
+    assert replay["offline_gameplay_reexecuted"] is True
+    assert replay["project_id"] == intent.project_id
+    assert replay["godot_executed"] is False
+    assert replay["release_certified"] is False
+    with pytest.raises(Exception):
+        export_dual_runtime_package(package, output, authorized=True)
+    assert sha256((output / "release.json").read_bytes()).hexdigest() == independent_pin

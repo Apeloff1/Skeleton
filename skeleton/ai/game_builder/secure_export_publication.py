@@ -87,7 +87,9 @@ def _write_one(stage_fd: int, relative: str, payload: bytes) -> None:
         or len(relative) > 512
         or relative.startswith("/")
         or "\\" in relative
-        or any(part in ("", ".", "..") for part in relative.split("/"))
+        or len(relative.split("/")) > 8
+        or any(len(part) > 127 or part in ("", ".", "..", ".git")
+               for part in relative.split("/"))
         or type(payload) is not bytes
     ):
         raise AtomicDirectoryPublicationError("invalid generated source entry")
@@ -138,6 +140,10 @@ def publish_generated_tree(
         )
     if not isinstance(files, dict) or not files or len(files) > 128:
         raise AtomicDirectoryPublicationError("invalid generated source inventory")
+    if any(type(payload) is not bytes for payload in files.values()):
+        raise AtomicDirectoryPublicationError("generated source must contain only bytes")
+    if sum(len(payload) for payload in files.values()) > 2_100_000:
+        raise AtomicDirectoryPublicationError("generated source exceeds 2.1 MB budget")
     target = Path(destination).expanduser().absolute()
     if target.name in ("", ".", "..") or len(target.name) > 127:
         raise AtomicDirectoryPublicationError("invalid destination name")
@@ -195,6 +201,11 @@ def publish_generated_tree(
             "atomic game-source publication failed"
         ) from exc
     finally:
+        if created and stage_fd < 0:
+            try:
+                os.rmdir(stage_name, dir_fd=parent_fd)
+            except OSError:
+                pass
         if created and stage_fd >= 0 and identity is not None:
             name = target.name if published else stage_name
             try:
