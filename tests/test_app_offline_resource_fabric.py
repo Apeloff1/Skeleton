@@ -34,6 +34,55 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def test_live_memory_pressure_recheck_aborts_long_stream_without_partial_receipt(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            payload = b"source-bound replay " * 8000
+            (root / "large.txt").write_bytes(payload)
+            fabric = AdaptiveResourceFabric(root)
+            healthy = hardware(ram=8_000_000)
+            pressured = hardware(ram=1000)
+            observations = {"count": 0}
+            def probe(_root):
+                observations["count"] += 1
+                return healthy if observations["count"] == 1 else pressured
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                side_effect=probe,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                with self.assertRaises(LocalResourcePressure):
+                    fabric.stream_readonly(root, ("large.txt",))
+            self.assertGreaterEqual(observations["count"], 2)
+            self.assertEqual(fabric.monitor()["active_streams"], 0)
+            self.assertGreaterEqual(
+                fabric.monitor()["controller"]["live_pressure_rechecks"], 1,
+            )
+            self.assertGreaterEqual(
+                fabric.monitor()["controller"]["failed_stream_batches"], 1,
+            )
+
+    def test_live_pressure_recheck_preserves_digest_when_headroom_is_stable(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            payload = b"stable long source " * 8000
+            (root / "large.txt").write_bytes(payload)
+            fabric = AdaptiveResourceFabric(root)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=8_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                records = fabric.stream_readonly(root, ("large.txt",))
+                self.assertEqual(records[0]["sha256"], sha256(payload).hexdigest())
+                self.assertGreaterEqual(
+                    fabric.monitor()["controller"]["live_pressure_rechecks"], 1,
+                )
+
     def test_thermal_hysteresis_prevents_repeated_gpu_admission_flapping(self):
         hot = GPUResource(
             device="gpu0", vendor="nvidia", dedicated_total_bytes=1_000_000_000,

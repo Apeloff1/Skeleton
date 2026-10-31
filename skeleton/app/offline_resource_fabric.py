@@ -436,6 +436,7 @@ class AdaptiveResourceFabric:
         self._stream_batches = 0
         self._stream_failures = 0
         self._stream_bytes = 0
+        self._stream_pressure_rechecks = 0
         self._stream_throughput_ema_bps: float | None = None
         self._last_stream_ns = 0
         self._learned_parallelism = 1.0
@@ -634,6 +635,7 @@ class AdaptiveResourceFabric:
             io_samples = self._stream_batches
             io_failures = self._stream_failures
             io_bytes = self._stream_bytes
+            pressure_rechecks = self._stream_pressure_rechecks
             io_rate = self._stream_throughput_ema_bps
             last_io = self._last_stream_ns
             learned = self._learned_parallelism
@@ -649,6 +651,7 @@ class AdaptiveResourceFabric:
             "completed_stream_batches": io_samples,
             "failed_stream_batches": io_failures,
             "verified_read_bytes": io_bytes,
+            "live_pressure_rechecks": pressure_rechecks,
             "smoothed_read_bytes_per_second": None if io_rate is None else int(io_rate),
             "last_verified_read_ns": last_io or None,
             "learned_parallelism_fraction": round(learned, 4),
@@ -765,6 +768,17 @@ class AdaptiveResourceFabric:
                         0, before.st_size, plan.transfer_chunk_bytes,
                     ):
                         check_interrupted()
+                        # Re-observe measured host RAM after each bounded
+                        # 16-window interval. The original plan is not an
+                        # indefinite lease against new competing allocations.
+                        if offset and (offset // plan.transfer_chunk_bytes) % 16 == 0:
+                            live = probe_local_resources(self.storage_path)
+                            with self._lock:
+                                self._stream_pressure_rechecks += 1
+                            if live.available_ram_bytes < 2 * live.read_chunk_bytes:
+                                raise LocalResourcePressure(
+                                    "physical RAM headroom fell during staged read"
+                                )
                         aligned = offset // granularity * granularity
                         displacement = offset - aligned
                         length = min(

@@ -512,3 +512,15 @@ The source count is limited per invocation for UI/CLI latency, not a maximum
 total project file count; large catalogs must page their source selections.
 A missing approval, symlink escape, malformed deadline or conflicting CLI
 mode is rejected before claiming provenance.
+
+
+## Mid-stream memory pressure recovery
+
+Read-only mmap staging does not treat its initial hardware plan as an
+unlimited resource lease. Every 16 bounded mapped windows, it re-probes
+measured host RAM and requires headroom for two current adaptive windows.
+If competing workloads consume that headroom, staging fails closed before
+emitting a partial source manifest, releases all stream leases and records
+a failed batch. The monitor exposes live_pressure_rechecks for diagnostics.
+This is cooperative memory-pressure protection, not a claim to prevent
+all operating-system OOM conditions or to control GPU driver allocation.
