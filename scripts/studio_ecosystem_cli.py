@@ -56,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
                             help="Compare this verified save to a second complete authored event history without changing it")
     route_mode.add_argument("--walk-rewind-choices", type=int, default=None, metavar="N",
                             help="Restore a verified save to before its last 1..32 authored choices")
+    route_mode.add_argument("--walk-audit-choices", action="store_true",
+                            help="Verify authored alternatives by collision-checked source replay")
     route_mode.add_argument("--walk-timeline", action="store_true",
                             help="Inspect bounded source-verified scene checkpoints without changing save")
     route_mode.add_argument("--walk-restore-checkpoint", type=int, default=None, metavar="INDEX",
@@ -72,7 +74,8 @@ def main(argv: list[str] | None = None) -> int:
                                or args.walk_preview_choices or args.walk_forecast
                                or args.walk_commit_forecast_branch is not None or args.walk_continuity
                                or args.walk_compare_events is not None or args.walk_rewind_choices is not None
-                               or args.walk_timeline or args.walk_restore_checkpoint is not None):
+                               or args.walk_timeline or args.walk_audit_choices
+                               or args.walk_restore_checkpoint is not None):
         ap.error("--walk-events and --walk-receipt require --play-walk")
     if args.play_walk:
         if (not args.project or args.play_quest or args.quest_actions is not None
@@ -193,6 +196,14 @@ def main(argv: list[str] | None = None) -> int:
                                   "timeline": walk_checkpoint_timeline(
                                       session, docs, authorized=True)},
                                  sort_keys=True, separators=(",", ":")))
+            elif args.walk_audit_choices:
+                from skeleton.ai.game_builder.studio_ecosystem_walk_coverage import (
+                    audit_walk_choice_coverage,
+                )
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "choice_coverage": audit_walk_choice_coverage(
+                                      session, docs, authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
             elif args.walk_continuity:
                 print(json.dumps({"receipt": json.loads(receipt),
                                   "narrative_continuity": walk_narrative_continuity(
@@ -206,7 +217,8 @@ def main(argv: list[str] | None = None) -> int:
                   and not args.walk_forecast and args.walk_commit_forecast_branch is None
                   and not args.walk_continuity and alternative_actions is None
                   and args.walk_rewind_choices is None
-                  and not args.walk_timeline and args.walk_restore_checkpoint is None):
+                  and not args.walk_timeline and not args.walk_audit_choices
+                  and args.walk_restore_checkpoint is None):
                 print(receipt.decode("ascii"))
         except (StudioQuestError, UnicodeError, ValueError, TypeError, OSError, RecursionError) as exc:
             ap.error(str(exc))

@@ -240,3 +240,28 @@ persistence, game certification, asset-rights verification, or device testing.
 Required validation includes restore→continue with a different choice, genesis
 and completed checkpoint restore, deterministic receipts, bounded longform
 truncation, stale-source and forged-session rejection, and CLI mode isolation.
+
+## Source-verified authored choice coverage (read-only)
+
+Use `--play-walk --walk-audit-choices` to verify the alternatives of upcoming
+authored scenes against real deterministic walk replay. The auditor checks the
+canonical quest/scene continuity contract, physically approaches each authored
+marker, then independently executes **every alternative at that marker** from
+the same pre-choice state. Only the first alternative advances a single
+reference path to the next stage. It does **not** enumerate the Cartesian
+product of all branch combinations, prove narrative originality, or certify a
+native game. The input save remains unchanged.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-audit-choices
+```
+
+The receipt includes stage/scene IDs, source/session hashes, per-choice
+successor digests, route digests and distances, explicit unverified alternative
+counts, and a SHA-256 coverage digest. It stops with an explicit reason for
+locked/unreachable scenes, event exhaustion, or the 24-stage, 96-choice and
+16,384 replay-work limits. A partial result always reports
+`complete_reference_path_coverage=false`; even a complete reference-path
+audit reports `all_branch_combinations_verified=false`. Authorization,
+source drift, forged saves, malformed choices and inconsistent successors fail
+closed. This is a local authoring QA tool, not a release gate or device test.
