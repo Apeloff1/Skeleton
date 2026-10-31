@@ -35,6 +35,7 @@ class TestEnergyHysteresis(TestCase):
         self.assertEqual(gate.step(healthy, now_ns=2, sampled_ns=2).admitted_workers, 0)
         self.assertEqual(gate.step(healthy, now_ns=3, sampled_ns=3).admitted_workers, 1)
         self.assertEqual(gate.step(healthy, now_ns=4, sampled_ns=4).admitted_workers, 1)
+        self.assertEqual(gate.step(healthy, now_ns=5, sampled_ns=5).admitted_workers, 1)
         self.assertEqual(gate.step(healthy, now_ns=6, sampled_ns=6).admitted_workers, 2)
 
     def test_critical_sheds_immediately(self):

@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-import math
 
 from skeleton.app.offline_energy_budget import EnergyAdmission
 
@@ -68,7 +67,8 @@ class EnergyHysteresis:
         if sampled_ns > now_ns or now_ns - sampled_ns > self.policy.max_sample_age_ns:
             target, reason = 0, "stale_or_future_telemetry"
         else:
-            target, reason = candidate.allowed_workers, "within_measured_energy_limit"
+            target = candidate.allowed_workers
+            reason = candidate.reason if target == 0 else "within_measured_energy_limit"
         if type(target) is not int or not 0 <= target <= candidate.base_workers <= 256:
             raise HysteresisError("candidate exceeds its source resource budget")
         if self.last_seen_ns is not None and now_ns < self.last_seen_ns:
