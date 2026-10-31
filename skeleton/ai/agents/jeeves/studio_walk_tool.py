@@ -1247,3 +1247,69 @@ def execute_dialogue_compare_tool(request: Mapping[str, Any], *,
         payload["author_receipt"] = author_receipt
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_FORK_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_fork_request.v1"
+DIALOGUE_FORK_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_fork_result.v1"
+
+
+def dialogue_fork_tool_schema() -> dict[str, object]:
+    """Discoverable typed checkpoint replacement; never grants authority."""
+    return {
+        "name": "studio_dialogue_history_fork",
+        "description": "Rewind an original NPC quest history and replay a different authored choice",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_FORK_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "checkpoint_index": {"type": "integer", "minimum": 0, "maximum": 63},
+                "alternative": {"type": "string", "minLength": 1, "maxLength": 256},
+                "preserve_suffix": {"type": "boolean"},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "expected_session_digest", "actions",
+                         "checkpoint_index", "alternative"],
+        },
+    }
+
+
+def execute_dialogue_fork_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    """Operator-gated Jeeves adapter over canonical replay and branch receipts."""
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue fork requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest",
+                "expected_session_digest", "actions", "checkpoint_index",
+                "alternative"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"preserve_suffix"}
+            or request.get("schema") != DIALOGUE_FORK_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue fork request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_fork import (
+        fork_dialogue_history,
+    )
+    source = read_blueprint(request["project_id"])
+    detail = fork_dialogue_history(
+        source, request["actions"], authorized=True,
+        checkpoint_index=request["checkpoint_index"],
+        alternative=request["alternative"],
+        expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request["expected_session_digest"],
+        preserve_suffix=request.get("preserve_suffix", False))
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_FORK_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

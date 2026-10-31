@@ -29,6 +29,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--dialogue-fork-index", type=int, default=None,
+                    help="Zero-based authored choice checkpoint to replace")
+    ap.add_argument("--dialogue-fork-alternative",
+                    help="Replacement authored alternative at the selected checkpoint")
+    ap.add_argument("--dialogue-fork-expected-session",
+                    help="Exact original quest session digest optimistic lease")
+    ap.add_argument("--dialogue-fork-preserve-suffix", action="store_true",
+                    help="Require every later choice to remain replayable; otherwise discard suffix")
     ap.add_argument("--dialogue-compare-actions", metavar="JSON",
                     help="Compare two replayed original NPC/quest choice histories without mutation")
     ap.add_argument("--dialogue-transcript", action="store_true",
@@ -254,6 +262,18 @@ def main(argv: list[str] | None = None) -> int:
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
+        if (args.dialogue_fork_index is not None and (
+                    args.dialogue_compare_actions is not None or args.dialogue_transcript
+                    or args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None or args.output is not None
+                    or not args.dialogue_fork_alternative
+                    or not args.dialogue_fork_expected_session)
+                or args.dialogue_fork_index is None and (
+                    args.dialogue_fork_alternative is not None
+                    or args.dialogue_fork_expected_session is not None
+                    or args.dialogue_fork_preserve_suffix)):
+            ap.error("dialogue fork requires checkpoint, alternative and session lease, excluding other modes")
         if (args.dialogue_compare_actions is not None and (
                     args.dialogue_transcript or args.dialogue_commit
                     or args.dialogue_preview or args.dialogue_restore_stdin
@@ -315,7 +335,18 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_compare_actions is not None:
+            if args.dialogue_fork_index is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_fork import (
+                    fork_dialogue_history,
+                )
+                result = fork_dialogue_history(
+                    docs, actions, checkpoint_index=args.dialogue_fork_index,
+                    alternative=args.dialogue_fork_alternative,
+                    expected_session_digest=args.dialogue_fork_expected_session,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    preserve_suffix=args.dialogue_fork_preserve_suffix,
+                    authorized=True)
+            elif args.dialogue_compare_actions is not None:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_compare import (
                     compare_dialogue_histories,
                 )
@@ -404,7 +435,10 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    if (args.dialogue_compare_actions is not None or args.dialogue_transcript
+    if (args.dialogue_fork_index is not None or args.dialogue_fork_alternative is not None
+            or args.dialogue_fork_expected_session is not None
+            or args.dialogue_fork_preserve_suffix
+            or args.dialogue_compare_actions is not None or args.dialogue_transcript
             or args.dialogue_restore_stdin
             or args.dialogue_commit
             or args.dialogue_preview or args.dialogue_export

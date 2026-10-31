@@ -659,3 +659,19 @@ branches to the same verified edited source. Typed Jeeves parity is
 `skeleton.jeeves.studio_dialogue_compare_request.v1`.
 The comparison never mutates either history, fabricates spoken NPC lines,
 or claims a native runtime result.
+
+## Source-leased original NPC dialogue checkpoint fork
+
+Use `--project <id> --dialogue-stage --dialogue-actions '<history>'`
+with `--dialogue-fork-index <zero-based>`,
+`--dialogue-fork-alternative <authored choice>`, and
+`--dialogue-fork-expected-session <64-hex original quest session digest>`.
+An optional `--dialogue-expected-digest` pins the canonical source.
+`--dialogue-fork-preserve-suffix` replays every subsequent choice or
+fails atomically. Without it, later choices are explicitly discarded and
+listed in the receipt; the original save is never overwritten. The result
+includes both canonical quest receipts, a source-bound dialogue comparison,
+post-fork NPC scene staging, and ending obligations. No generated speech,
+on-disk mutation, external evidence, or native runtime qualification is
+claimed. Typed Jeeves parity is `execute_dialogue_fork_tool` with schema
+`skeleton.jeeves.studio_dialogue_fork_request.v1`.
