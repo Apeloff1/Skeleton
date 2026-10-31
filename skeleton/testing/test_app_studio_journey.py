@@ -264,3 +264,43 @@ def test_existing_source_mutation_fails_closed_without_receipt(tmp_path, capsys)
     ]) == 2
     assert not receipt.exists()
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+def test_existing_export_preflight_never_runs_studio(tmp_path, monkeypatch, capsys):
+    from skeleton.app import studio_journey
+
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    output.mkdir()
+    (output / "marker").write_text("owner", encoding="utf-8")
+
+    def unexpected_studio(*_args, **_kwargs):
+        raise AssertionError("game construction must not run on occupied target")
+
+    monkeypatch.setattr(studio_journey, "run_original_game_studio", unexpected_studio)
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--trusted-local-operator",
+    ]) == 2
+    assert (output / "marker").read_text(encoding="utf-8") == "owner"
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_export_parent_symlink_preflight_never_runs_studio(tmp_path, monkeypatch, capsys):
+    from skeleton.app import studio_journey
+
+    source = _intent(tmp_path)
+    owned = tmp_path / "owned"
+    owned.mkdir()
+    alias = tmp_path / "link"
+    alias.symlink_to(owned, target_is_directory=True)
+
+    def unexpected_studio(*_args, **_kwargs):
+        raise AssertionError("game construction must not run through symlink")
+
+    monkeypatch.setattr(studio_journey, "run_original_game_studio", unexpected_studio)
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source),
+        "--output", str(alias / "game"), "--trusted-local-operator",
+    ]) == 2
+    assert not (owned / "game").exists()
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"

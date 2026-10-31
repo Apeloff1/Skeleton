@@ -25,6 +25,9 @@ from skeleton.ai.game_builder.original_game_studio import (
     StudioError, export_studio_run, run_original_game_studio,
 )
 from skeleton.ai.game_builder.playable_cli import MAX_INPUT_BYTES, _intent, _read_json
+from skeleton.ai.game_builder.secure_export_publication import (
+    AtomicDirectoryPublicationError, preflight_generated_tree_destination,
+)
 from skeleton.ai.game_builder.playable_compiler import PlayableCompilationError
 from skeleton.ai.game_builder.playable_simulation import GameplayError
 from skeleton.ai.game_builder.playable_world import PlayableWorldError
@@ -61,6 +64,7 @@ def build_first_playable_journey(
         raise FirstPlayableJourneyError("mirror attempt budget must be 64 to 512")
     if type(practice_games) is not int or not 0 <= practice_games <= 8:
         raise FirstPlayableJourneyError("practice game budget must be 0 to 8")
+    preflight_generated_tree_destination(destination)
     if receipt_destination is not None:
         preflight_receipt_destination(
             receipt_destination, protected_roots=(destination,), authorized=True,
@@ -228,7 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         FirstPlayableJourneyError, StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
         ToolFabricError, DualRuntimeExportError, DualRuntimeVerificationError,
-        ReceiptPublicationError,
+        ReceiptPublicationError, AtomicDirectoryPublicationError,
         PermissionError, OSError, TypeError, ValueError,
     ) as exc:
         # Do not print supplied input, credentials, arbitrary filesystem

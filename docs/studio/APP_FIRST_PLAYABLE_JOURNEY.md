@@ -77,3 +77,18 @@ post-export verification failure leaves the source unqualified for inspection.
 Verification reexecutes the canonical winning actions on the actual package
 bytes. It does not perform model inference, native Godot execution, hardware
 qualification, publisher identity attestation, rights clearance, or release.
+
+## First-run export admission and failure recovery
+
+Before allocating mirror/compilation work, the app checks the new export
+destination through a pinned POSIX directory descriptor. Existing output,
+symlinked ancestors, unowned or group/world-writable parents, unsupported
+hosts, and malformed names fail before generating a game. Receipt destination
+admission runs in the same preconstruction phase. These are preflights, not
+locks: the final source and receipt publishers independently enforce no-clobber
+and owner custody even if a competing process changes the filesystem.
+
+After publication, any replay or receipt failure remains an explicit blocked
+result. Never treat a leftover source directory as a qualified game; use
+`--verify-existing` with the separately held manifest pin to requalify
+without destroying or overwriting owner files.
