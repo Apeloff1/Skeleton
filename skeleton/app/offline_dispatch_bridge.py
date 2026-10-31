@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import sqlite3
+import os
 
 from skeleton.ai.model_runtime.fair_stream_dispatch import (
     DispatchUncertain, DurableExecutionOwner,
@@ -19,6 +20,7 @@ from skeleton.ai.model_runtime.fair_stream_session import (
     DurableFairStreamSession, TrustedHighWatermark,
 )
 from skeleton.ai.model_runtime.fair_stream_sqlite import DurableFairStreamStore
+from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle, open_private_sqlite
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +76,34 @@ class OfflineAdaptiveDispatchService:
             if bootstrap else DurableFairStreamSession(store, watermark)
         )
         return cls(session, owner, storage_path=storage_path)
+
+    @classmethod
+    def from_private_database(
+        cls, *, directory: str | os.PathLike[str],
+        custody_key: bytes, execution_key: bytes, session_id: str,
+        watermark: TrustedHighWatermark, owner: DurableExecutionOwner,
+        storage_path: str, bootstrap: bool = False,
+        max_database_bytes: int = 64 << 20,
+    ) -> tuple["OfflineAdaptiveDispatchService", PrivateSQLiteHandle]:
+        """App bootstrap with a private POSIX DB; caller retains handle custody.
+
+        This never provisions the external monotonic anchor or execution keys.
+        The caller must close the handle only after the service is quiescent.
+        """
+        handle = open_private_sqlite(
+            directory, create=bootstrap, max_database_bytes=max_database_bytes,
+        )
+        try:
+            service = cls.from_trusted_handles(
+                connection=handle.connection,
+                custody_key=custody_key, execution_key=execution_key,
+                session_id=session_id, watermark=watermark, owner=owner,
+                storage_path=storage_path, bootstrap=bootstrap,
+            )
+        except BaseException:
+            handle.close()
+            raise
+        return service, handle
 
     def status(self) -> OfflineDispatchStatus:
         state = self._session.verify()
