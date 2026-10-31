@@ -47,34 +47,16 @@ def _operator_budget(raw: object) -> MeasuredStreamBudget:
     return MeasuredStreamBudget(**raw)
 
 
-def _live_budget(token_budget: int, storage_path: str) -> tuple[MeasuredStreamBudget, bool]:
-    # The canonical app probe observes RAM, container limits, CPU affinity and
-    # pressure. The thermal probe only holds when a real kernel trip exists.
-    from skeleton.app.offline_resources import probe_local_resources
-    from skeleton.app.offline_cpu_thermal import CPUThermalController, probe_cpu_thermal
+# Retain pressure hysteresis across requests within the CLI process.
+_LIVE_SAMPLER = None
 
-    snapshot = probe_local_resources(storage_path)
-    controller = CPUThermalController()
-    controller.observe(probe_cpu_thermal())
-    thermal = controller.snapshot()
-    available = snapshot.available_ram_bytes
-    # Keep real physical headroom for the OS, UI, model weights and untracked
-    # allocations. This is a per-observation reserve, not a file-size cap.
-    reserve = max(available // 3, min(available, 64 * 1024 * 1024))
-    pressure = max(
-        snapshot.memory_pressure_ratio,
-        min(1.0, max(0.0, snapshot.cpu_load_ratio - 0.5)),
-    )
-    budget = MeasuredStreamBudget(
-        available_ram_bytes=available,
-        reserved_ram_bytes=reserve,
-        token_budget=token_budget,
-        stream_slots=min(64, snapshot.suggested_index_jobs),
-        pressure_ppm=min(1_000_000, max(0, int(pressure * 1_000_000))),
-        thermal_hold=bool(thermal["thermal_backpressure"]),
-        measurement="os_probe",
-    )
-    return budget, bool(thermal["trip_measured"])
+
+def _live_budget(token_budget: int, storage_path: str):
+    global _LIVE_SAMPLER
+    from .fair_stream_live_budget import LiveStreamBudgetSampler
+    if _LIVE_SAMPLER is None:
+        _LIVE_SAMPLER = LiveStreamBudgetSampler()
+    return _LIVE_SAMPLER.sample(token_budget=token_budget, storage_path=storage_path)
 
 
 def _command(raw: object, *, live: bool, storage_path: str) -> dict[str, object]:
@@ -110,17 +92,20 @@ def _command(raw: object, *, live: bool, storage_path: str) -> dict[str, object]
     if live:
         if raw["envelope"] is not None:
             raise ValueError("live probe cannot be combined with operator envelope")
-        budget, thermal_measured = _live_budget(raw["token_budget"], storage_path)
+        budget, live_evidence = _live_budget(raw["token_budget"], storage_path)
+        thermal_measured = bool(live_evidence["thermal_trip_measured"])
     else:
         if raw["token_budget"] is not None:
             raise ValueError("operator mode requires token_budget inside envelope")
         budget = _operator_budget(raw["envelope"])
         thermal_measured = False
+        live_evidence = None
     plan = scheduler.plan(budget)
     return {
         "schema": OUTPUT_SCHEMA,
         "measurement": budget.measurement,
         "thermal_trip_measured": thermal_measured,
+        "live_evidence": live_evidence,
         "budget": {
             "available_ram_bytes": budget.available_ram_bytes,
             "reserved_ram_bytes": budget.reserved_ram_bytes,
