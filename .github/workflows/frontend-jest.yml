@@ -1,0 +1,45 @@
+# Frontend Jest unit suites (frontend/__tests__) in CI.
+# Concurrency mirrors #4251: PR runs keyed by PR number and superseded heads
+# cancelled; push/dispatch runs keyed by SHA and queued, never cancelled.
+name: Frontend Jest
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-jest.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-jest.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-jest-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  jest:
+    name: Frontend Jest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults: {run: {working-directory: ./frontend}}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.20.0"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Patch node_modules
+        run: node ./scripts/patch-node-modules.js
+      - name: Run Jest
+        run: yarn test:jest
