@@ -4,6 +4,7 @@ This is a read-only authoring diagnostic, not native gameplay qualification.
 """
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .studio_ecosystem_catalog import (
@@ -119,4 +120,98 @@ def audit_catalog_walk_choices(
         "release_certified": False,
     }
     payload["audit_digest"] = _sha(payload)
+    return payload
+
+
+
+MAX_CATALOG_MERGE_PAGES = 4
+MAX_CATALOG_MERGE_BYTES = 131_072
+
+
+def merge_catalog_walk_audits(
+    pages: list[dict[str, object]], *, authorized: bool,
+) -> dict[str, object]:
+    """Revalidate each untrusted page against the live authoritative source.
+
+    A client page is never evidence on its own. Re-run bounded source replay,
+    require identical canonical receipts, and reject gaps, duplicates, stale
+    source identities and trailing pages after end-of-catalog.
+    """
+    if authorized is not True:
+        raise PermissionError("catalog audit aggregation requires operator authorization")
+    if type(pages) is not list or not 1 <= len(pages) <= MAX_CATALOG_MERGE_PAGES:
+        raise StudioQuestError("catalog audit merge requires 1..4 pages")
+    try:
+        encoded = json.dumps(
+            pages, sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ensure_ascii=True,
+        ).encode("ascii")
+    except (TypeError, ValueError, UnicodeError, RecursionError) as exc:
+        raise StudioQuestError("noncanonical catalog audit pages") from exc
+    if len(encoded) > MAX_CATALOG_MERGE_BYTES:
+        raise StudioQuestError("catalog audit merge exceeds byte budget")
+    first = pages[0]
+    if type(first) is not dict:
+        raise StudioQuestError("invalid first catalog audit page")
+    source_digest = first.get("catalog_digest")
+    if (type(source_digest) is not str or len(source_digest) != 64
+            or any(c not in "0123456789abcdef" for c in source_digest)):
+        raise StudioQuestError("invalid catalog merge source identity")
+    genre, biome = first.get("genre"), first.get("biome")
+    expected_offset = first.get("page_offset")
+    if type(expected_offset) is not int or expected_offset < 0:
+        raise StudioQuestError("invalid catalog merge start offset")
+    initial_offset = expected_offset
+    verified: list[dict[str, object]] = []
+    for position, page in enumerate(pages):
+        if type(page) is not dict or page.get("page_offset") != expected_offset:
+            raise StudioQuestError("catalog audit pages are not contiguous")
+        if page.get("catalog_digest") != source_digest:
+            raise StudioQuestError("catalog audit page source drift")
+        if page.get("genre") != genre or page.get("biome") != biome:
+            raise StudioQuestError("catalog audit page filters changed")
+        limit = page.get("page_limit")
+        if type(limit) is not int or not 1 <= limit <= MAX_CATALOG_AUDIT_PROJECTS:
+            raise StudioQuestError("invalid catalog audit page limit")
+        authoritative = audit_catalog_walk_choices(
+            authorized=True, genre=genre, biome=biome,
+            offset=expected_offset, limit=limit,
+            expected_catalog_digest=source_digest,
+        )
+        if _sha(page) != _sha(authoritative):
+            raise StudioQuestError("catalog audit page is not authoritative")
+        verified.append(authoritative)
+        expected_offset = authoritative["next_offset"]
+        if expected_offset is None and position != len(pages) - 1:
+            raise StudioQuestError("catalog audit pages continue past end of index")
+    projects = [record for page in verified for record in page["projects"]]
+    project_ids = [record["project_id"] for record in projects]
+    if len(project_ids) != len(set(project_ids)):
+        raise StudioQuestError("catalog audit merge repeated a project")
+    next_offset = verified[-1]["next_offset"]
+    covered = sum(record["status"] == "covered" for record in projects)
+    invalid = sum(record["status"] == "invalid_source" for record in projects)
+    partial = len(projects) - covered - invalid
+    payload: dict[str, object] = {
+        "schema": "skeleton.game_builder.studio_walk_catalog_audit_merge.v1",
+        "catalog_digest": source_digest,
+        "genre": genre,
+        "biome": biome,
+        "first_offset": initial_offset,
+        "next_offset": next_offset,
+        "pages_verified": len(verified),
+        "projects_verified": len(projects),
+        "projects_covered": covered,
+        "projects_partial": partial,
+        "projects_invalid": invalid,
+        "page_audit_digests": [page["audit_digest"] for page in verified],
+        "complete_catalog_coverage": bool(projects) and initial_offset == 0
+                                     and next_offset is None
+                                     and covered == len(projects),
+        "all_branch_combinations_verified": False,
+        "external_evidence_verified": False,
+        "native_genre_runtime_verified": False,
+        "release_certified": False,
+    }
+    payload["merge_digest"] = _sha(payload)
     return payload

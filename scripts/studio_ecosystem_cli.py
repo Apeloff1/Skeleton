@@ -38,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Projects per catalog audit page (1..4)")
     ap.add_argument("--walk-audit-expected-digest",
                     help="Required catalog SHA-256 from the preceding page for nonzero offset")
+    ap.add_argument("--walk-audit-aggregate-stdin", action="store_true",
+                    help="Revalidate and aggregate up to four canonical catalog audit pages from stdin")
     ap.add_argument("--play-walk", action="store_true",
                     help="Replay authoritative walk movement and scene choices; print save receipt")
     ap.add_argument("--walk-events", metavar="JSON",
@@ -85,6 +87,38 @@ def main(argv: list[str] | None = None) -> int:
                                or args.walk_timeline or args.walk_audit_choices
                                or args.walk_restore_checkpoint is not None):
         ap.error("--walk-events and --walk-receipt require --play-walk")
+    if args.walk_audit_aggregate_stdin:
+        if (args.walk_audit_catalog or args.play_walk or args.play_quest
+                or args.project or args.compile_preview or args.materialize_batch
+                or args.output or args.search is not None or args.deep_search
+                or args.limit != 20 or args.quest_actions is not None
+                or args.genre or args.biome or args.max_artifact_bytes is not None
+                or args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
+                or args.walk_audit_expected_digest is not None):
+            ap.error("--walk-audit-aggregate-stdin excludes other catalog and gameplay modes")
+        from skeleton.ai.game_builder.studio_ecosystem_walk_coverage_batch import (
+            merge_catalog_walk_audits, MAX_CATALOG_MERGE_BYTES,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        raw = sys.stdin.buffer.read(MAX_CATALOG_MERGE_BYTES + 1)
+        if len(raw) > MAX_CATALOG_MERGE_BYTES:
+            ap.error("catalog audit aggregate input exceeds byte budget")
+        def _unique_pairs(pairs):
+            obj = {}
+            for key, value in pairs:
+                if key in obj:
+                    raise ValueError("duplicate catalog audit JSON field")
+                obj[key] = value
+            return obj
+        try:
+            pages = json.loads(raw, object_pairs_hook=_unique_pairs,
+                               parse_constant=lambda _: (_ for _ in ()).throw(
+                                   ValueError("nonfinite catalog audit JSON")))
+            result = merge_catalog_walk_audits(pages, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, RecursionError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
     if args.walk_audit_catalog:
         if (args.play_walk or args.play_quest or args.project or args.compile_preview
                 or args.materialize_batch or args.output or args.search is not None

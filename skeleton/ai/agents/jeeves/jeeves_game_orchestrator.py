@@ -66,6 +66,11 @@ class JeevesGameOrchestrator:
         from .studio_walk_tool import execute_catalog_audit_tool
         return execute_catalog_audit_tool(request, authorized=authorized)
 
+    def authoritative_walk_catalog_merge(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Revalidate source-bound catalog audit pages under operator authority."""
+        from .studio_walk_tool import execute_catalog_merge_tool
+        return execute_catalog_merge_tool(request, authorized=authorized)
+
     def model_card(self) -> str:
         return (
             "Jeeves game orchestrator: one call produces unified brief, advanced systems, "

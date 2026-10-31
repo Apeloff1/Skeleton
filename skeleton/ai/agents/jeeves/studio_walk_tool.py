@@ -198,6 +198,8 @@ def execute_catalog_audit_tool(
     offset, limit = request.get("offset"), request.get("limit")
     genre, biome = request.get("genre"), request.get("biome")
     expected = request.get("expected_catalog_digest")
+    if "expected_catalog_digest" in request and expected is None:
+        raise StudioQuestError("null catalog continuation digest is not permitted")
     if (type(offset) is not int or offset < 0
             or type(limit) is not int or not 1 <= limit <= 4
             or any(value is not None and
@@ -222,6 +224,59 @@ def execute_catalog_audit_tool(
     )
     payload = {
         "schema": CATALOG_RESULT_SCHEMA,
+        "request_digest": _digest(request),
+        "catalog_digest": detail["catalog_digest"],
+        "detail": detail,
+        "external_evidence_verified": False,
+        "native_genre_runtime_verified": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
+
+
+
+CATALOG_MERGE_REQUEST_SCHEMA = "skeleton.jeeves.studio_walk_catalog_merge_request.v1"
+CATALOG_MERGE_RESULT_SCHEMA = "skeleton.jeeves.studio_walk_catalog_merge_result.v1"
+
+
+def catalog_merge_tool_schema() -> dict[str, object]:
+    """Typed, operator-gated, source-revalidated catalog page aggregation."""
+    return {
+        "name": "studio_authoritative_walk_catalog_merge",
+        "description": "Revalidate and aggregate up to four canonical catalog audit pages",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": CATALOG_MERGE_REQUEST_SCHEMA},
+                "pages": {"type": "array", "minItems": 1, "maxItems": 4,
+                          "items": {"type": "object"}},
+            },
+            "required": ["schema", "pages"],
+        },
+    }
+
+
+def execute_catalog_merge_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    """Re-read source for every supplied page, never trust client audit flags."""
+    if authorized is not True:
+        raise PermissionError("Jeeves catalog merge requires operator authorization")
+    if (type(request) is not dict or set(request) != {"schema", "pages"}
+            or request.get("schema") != CATALOG_MERGE_REQUEST_SCHEMA):
+        raise StudioQuestError("invalid Jeeves catalog merge request")
+    pages = request["pages"]
+    if type(pages) is not list or not 1 <= len(pages) <= 4:
+        raise StudioQuestError("invalid Jeeves catalog merge page count")
+    if len(_canonical(request)) > 131_072:
+        raise StudioQuestError("Jeeves catalog merge exceeds byte budget")
+    from skeleton.ai.game_builder.studio_ecosystem_walk_coverage_batch import (
+        merge_catalog_walk_audits,
+    )
+    detail = merge_catalog_walk_audits(pages, authorized=True)
+    payload = {
+        "schema": CATALOG_MERGE_RESULT_SCHEMA,
         "request_digest": _digest(request),
         "catalog_digest": detail["catalog_digest"],
         "detail": detail,

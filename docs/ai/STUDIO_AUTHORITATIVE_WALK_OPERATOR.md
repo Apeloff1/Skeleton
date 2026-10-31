@@ -331,3 +331,25 @@ The digest is a source identity, not a secret, authorization credential,
 cryptographic signature or release approval. For complete coverage, continue
 until `next_offset` is null; each individual page remains bounded to four
 projects, and a page receipt never claims native genre certification.
+
+## Source-revalidated aggregation of bounded catalog pages
+
+The CLI `--walk-audit-aggregate-stdin` accepts a JSON list containing one to
+four unmodified page receipts from `--walk-audit-catalog`. It reopens the
+canonical index and every selected project, repeats source-bound choice replay,
+and compares each page to its newly computed authoritative receipt. Forged
+coverage, missing or reordered pages, stale source, inconsistent filters,
+repeated projects, duplicate JSON keys, nonfinite values and oversized input
+fail closed. The input is limited to 128 KiB and no more than 16 projects.
+
+```sh
+python scripts/studio_ecosystem_cli.py --walk-audit-aggregate-stdin < pages.json
+```
+
+Jeeves exposes the same operation as the operator-authorized typed tool
+`studio_authoritative_walk_catalog_merge` with a `pages` array. Its receipt
+binds the current catalog digest, exact page audit digests, covered/partial/
+invalid counts and next offset. A merge covering only part of the index must
+not claim full coverage. Replaying source is deliberate: untrusted client
+JSON is never accepted as evidence merely because it carries a digest.
+This diagnostic does not certify game completeness, native execution or release.
