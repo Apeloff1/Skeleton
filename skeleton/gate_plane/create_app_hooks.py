@@ -222,3 +222,21 @@ def assert_layer_auth_planned() -> Dict[str, object]:
 def assert_layer_policy_gate_planned() -> Dict[str, object]:
     order = install_order(lifo=True)
     return {"layer": "policy_gate", "present": "policy_gate" in order, "index": order.index("policy_gate") if "policy_gate" in order else -1}
+
+
+# --- registered create_app hooks (extend-only; applied by the app factory) ---
+
+CREATE_APP_HOOKS: Tuple[str, ...] = (
+    "skeleton.gate_plane.core_mount:install_core_v1",
+)
+
+
+def resolve_create_app_hooks() -> List[object]:
+    """Import and return the registered hook callables, in order."""
+    import importlib
+
+    out: List[object] = []
+    for ref in CREATE_APP_HOOKS:
+        mod, _, attr = ref.partition(":")
+        out.append(getattr(importlib.import_module(mod), attr))
+    return out
