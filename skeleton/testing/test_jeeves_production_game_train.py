@@ -66,7 +66,8 @@ class ProductionGameCheckpointTests(unittest.TestCase):
                 ({"itos": ["<UNK>"], "E": [[0]], "layers": [], "dim": 1,
                   "ctx": 2, "steps": 0, "fitted": 0}, "no training history"),
             ):
-                data = json.dumps({"own": {}, "lms": {}, "transformer": snapshot}).encode()
+                data = json.dumps({"own": {}, "lms": {}, "transformer": snapshot,
+                                   "evidence": "x" * 64}).encode()
                 state.write_bytes(data)
                 with patch.dict(os.environ, {"SKELETON_OWN": str(state)}):
                     with self.assertRaisesRegex(ProductionCheckpointError, fragment):

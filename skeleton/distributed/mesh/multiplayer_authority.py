@@ -95,6 +95,39 @@ class SessionAuthority:
         """Predict peers through the same grant-checked bounded rollback transport."""
         self.distributed_sync(player_id, peer_id, pos, lag_ms)
 
+    def predictive_distributed_sync(
+        self, player_id: str, peer_id: str,
+        pos: tuple[float, float, float],
+        velocity: tuple[float, float, float], lag_ms: int,
+    ) -> None:
+        """Bounded velocity prediction using the authenticated rollback transport.
+
+        Validate the complete input before any tick or peer-state mutation.
+        A lag above the anti-cheat threshold is recorded by distributed_sync,
+        but never extends the prediction horizon beyond the safe limit.
+        """
+        grant = self.grants.get(player_id)
+        if grant is None or not self.verify_grant(player_id, grant.digest):
+            raise MultiplayerError("no active grant")
+        if type(peer_id) is not str or not 1 <= len(peer_id) <= 128:
+            raise MultiplayerError("invalid peer identity")
+        if (type(lag_ms) is not int or lag_ms < 0
+                or type(pos) not in (tuple, list) or len(pos) != 3
+                or type(velocity) not in (tuple, list) or len(velocity) != 3):
+            raise MultiplayerError("invalid predictive sync input")
+        if any(type(value) not in (int, float) or not math.isfinite(value)
+               for value in (*pos, *velocity)):
+            raise MultiplayerError("non-finite predictive sync input")
+        horizon_s = min(lag_ms, _MAX_LAG_MS) / 1000.0
+        predicted = tuple(
+            float(point) + float(speed) * horizon_s
+            for point, speed in zip(pos, velocity)
+        )
+        if any(not math.isfinite(value) for value in predicted):
+            raise MultiplayerError("predictive position outside finite range")
+        self.distributed_sync(player_id, peer_id, tuple(pos), lag_ms)
+        self.grants[player_id].peers[peer_id].predicted = predicted
+
     def verify(self, player_id: str, digest: str) -> bool:
         return self.verify_grant(player_id, digest)
 

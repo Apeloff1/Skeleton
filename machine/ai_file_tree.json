@@ -515,7 +515,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "f0f4d590b07dcf9ddc5485767cc5c7e5e5bcca54",
+      "source_git_object_sha": "e5c963752fe40bc1ce4fc5a576b8c26693d8223d",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -2091,7 +2091,7 @@
       "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "3eacca2702282e897be724dc80d099a6a4493e59",
+      "source_git_object_sha": "6bfff12c1e3afb90b3b5e5fd5046d976684d31fa",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -5449,7 +5449,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "57054c87ef4fc14713bdff9a8c4aca8b9d07a64c",
+      "source_git_object_sha": "e83e1a63c9a4e97b1f9b96823cebfedd337b96e9",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"
