@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/provenance_gap.schema.json",
+  "title": "security.provenance_gap observation contract",
+  "description": "Require artifact provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unsigned_artifact_count",
+        "untrusted_source_count"
+      ],
+      "properties": {
+        "unsigned_artifact_count": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for unsigned_artifact_count"
+        },
+        "untrusted_source_count": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for untrusted_source_count"
+        }
+      }
+    }
+  }
+}

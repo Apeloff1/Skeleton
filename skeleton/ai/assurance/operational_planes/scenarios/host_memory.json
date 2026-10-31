@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.operational_plane.scenarios.v1",
+  "plane": "hardware.host_memory",
+  "synthetic": true,
+  "examples": [
+    {
+      "name": "nominal",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "resident_memory_used_pct": 0,
+        "memory_fault_rate": 0
+      },
+      "expected": "nominal"
+    },
+    {
+      "name": "primary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "resident_memory_used_pct": 93,
+        "memory_fault_rate": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "secondary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "resident_memory_used_pct": 0,
+        "memory_fault_rate": 501
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "stale",
+      "observed_at": 1000,
+      "now": 1061,
+      "measurements": {
+        "resident_memory_used_pct": 0,
+        "memory_fault_rate": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "future",
+      "observed_at": 1001,
+      "now": 1000,
+      "measurements": {
+        "resident_memory_used_pct": 0,
+        "memory_fault_rate": 0
+      },
+      "expected": "blocked"
+    }
+  ]
+}

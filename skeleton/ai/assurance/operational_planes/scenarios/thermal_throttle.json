@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.operational_plane.scenarios.v1",
+  "plane": "hardware.thermal_throttle",
+  "synthetic": true,
+  "examples": [
+    {
+      "name": "nominal",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "device_temperature_c": 0,
+        "thermal_throttle_events_per_min": 0
+      },
+      "expected": "nominal"
+    },
+    {
+      "name": "primary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "device_temperature_c": 91,
+        "thermal_throttle_events_per_min": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "secondary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "device_temperature_c": 0,
+        "thermal_throttle_events_per_min": 5
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "stale",
+      "observed_at": 1000,
+      "now": 1061,
+      "measurements": {
+        "device_temperature_c": 0,
+        "thermal_throttle_events_per_min": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "future",
+      "observed_at": 1001,
+      "now": 1000,
+      "measurements": {
+        "device_temperature_c": 0,
+        "thermal_throttle_events_per_min": 0
+      },
+      "expected": "blocked"
+    }
+  ]
+}
