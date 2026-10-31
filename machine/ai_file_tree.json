@@ -2091,7 +2091,7 @@
       "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "589748c9ddda342775f8b9fff8746ba7e07d1407",
+      "source_git_object_sha": "3eacca2702282e897be724dc80d099a6a4493e59",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -3148,7 +3148,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "b71b9d8ab5740a50a7d9df4db8a3acd6e5a7194e",
-      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -5449,7 +5449,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "feeec724d4da5d17495b5c2227a9addd674deb44",
+      "source_git_object_sha": "57054c87ef4fc14713bdff9a8c4aca8b9d07a64c",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"
@@ -8640,7 +8640,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
+      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
       "volume_refs": [
         "VOL-006",
         "VOL-007",
