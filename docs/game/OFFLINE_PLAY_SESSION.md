@@ -28,3 +28,7 @@ resume; this is a deliberate correctness-over-throughput tradeoff.
 Supported: deterministic headless grid controls and local source-bound save
 replay. Not supported: on-device rendering, sound, multiplayer authority,
 third-party game imports, legal release clearance or native target binaries.
+
+The same actions are reachable from the assembled product via
+`python -m skeleton app game-project --play-capsule ...` and
+`python -m skeleton app game-project --verify-play-session ...`.

@@ -130,3 +130,22 @@ def test_play_cli_rejects_unknown_or_malformed_controls(tmp_path, capsys):
 def test_no_play_only_flags_on_other_cli_operations(capsys):
     assert main(["--catalog", "--save-session", "unexpected.json"]) == 2
     assert "play-session" in capsys.readouterr().err
+
+def test_canonical_app_cli_delegates_game_project_play_session(tmp_path, capsys):
+    from skeleton.app.cli import run_app_cli
+    source = tmp_path / "source.json"
+    controls = tmp_path / "controls.json"
+    saved = tmp_path / "session.json"
+    source.write_text(json.dumps(_capsule()), encoding="utf-8")
+    controls.write_text(json.dumps({"controls": [_move()]}), encoding="utf-8")
+    assert run_app_cli([
+        "game-project", "--play-capsule", str(source),
+        "--controls-file", str(controls), "--save-session", str(saved),
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["frame_count"] == 1
+    assert run_app_cli([
+        "game-project", "--verify-play-session", str(saved),
+        "--session-capsule", str(source),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["source_bound_replay_verified"]
