@@ -138,6 +138,12 @@ class ReclaimControllerTests(unittest.TestCase):
 
 
 class ResourceFabricIntegrationTests(unittest.TestCase):
+    def test_offline_browser_surfaces_measured_reclaim_and_plan_hold(self):
+        from skeleton.app.offline_web import JAVASCRIPT
+        self.assertIn("Kernel reclaim (", JAVASCRIPT)
+        self.assertIn("Kernel reclaim hold ", JAVASCRIPT)
+        self.assertIn("reclaim_pressure", JAVASCRIPT)
+
     def test_active_reclaim_hold_aborts_long_read_without_partial_receipt(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -221,7 +227,9 @@ class ResourceFabricIntegrationTests(unittest.TestCase):
             with fabric._lock:
                 fabric._active_streams = 0
             self.assertTrue(plan.as_dict()["reclaim_backpressure"])
-            self.assertTrue(fabric.monitor()["controller"]["reclaim_pressure"]["backpressure"])
+            monitor = fabric.monitor()
+            self.assertTrue(monitor["controller"]["reclaim_pressure"]["backpressure"])
+            self.assertEqual(monitor["controller"]["adaptive_stream_budget"], 1)
 
 
 if __name__ == "__main__":

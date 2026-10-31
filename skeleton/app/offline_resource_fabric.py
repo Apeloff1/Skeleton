@@ -729,10 +729,21 @@ class AdaptiveResourceFabric:
             thermal_holds = len(self._thermal_blocked)
             waiting_batches = len(self._wait_queue)
         result = snapshot.as_dict()
+        holds = (
+            self._cgroup.snapshot()["high_backpressure"]
+            or self._cgroup.snapshot()["oom_backpressure"]
+            or self._io.snapshot()["congested"]
+            or self._cpu_throttle.snapshot()["backpressure"]
+            or self._swap_churn.snapshot()["backpressure"]
+            or self._cpu_thermal.snapshot()["thermal_backpressure"]
+            or self._reclaim.snapshot()["backpressure"]
+        )
         result["controller"] = {
             "predictive_pressure": round(pressure or 0, 6),
             "observations": observations,
-            "adaptive_stream_budget": snapshot.hardware.suggested_index_jobs,
+            "adaptive_stream_budget": (
+                1 if holds else snapshot.hardware.suggested_index_jobs
+            ),
             "mode": "adaptive_deterministic_with_predictive_smoothing",
             "gpu_allocation_authority": "inference_backend_only",
             "onboard_readonly_staging": "host_mmap_page_cache",
