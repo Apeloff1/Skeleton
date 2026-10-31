@@ -306,6 +306,10 @@ class FabricTests(unittest.TestCase):
                 fabric.stream_readonly(root, ("source.txt",), deadline_s=0)
             with self.assertRaises(ResourceFabricError):
                 fabric.stream_readonly(root, ("source.txt",), deadline_s=float("nan"))
+            with self.assertRaises(ResourceFabricError):
+                fabric.stream_readonly(root, ("source.txt",), deadline_s=10 ** 1000)
+            with self.assertRaises(ResourceFabricError):
+                fabric.stream_readonly(root, ("source.txt",), deadline_s=True)
             self.assertEqual(len(fabric.stream_readonly(
                 root, ("source.txt",), deadline_s=10.0,
             )), 1)

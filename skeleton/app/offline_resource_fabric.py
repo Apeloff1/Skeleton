@@ -521,14 +521,26 @@ class AdaptiveResourceFabric:
         can coherently address or write the mapping. Only regular files in the
         selected root may be staged. No raw source bytes leave this API.
         """
-        if deadline_s is not None and (
-            type(deadline_s) not in (int, float)
-            or not math.isfinite(deadline_s) or deadline_s <= 0
-        ):
-            raise ResourceFabricError("finite positive stream deadline required")
+        if deadline_s is None:
+            deadline = None
+        else:
+            # JSON integers can exceed float range; reject them as a typed
+            # admission error rather than leaking OverflowError to the API.
+            if type(deadline_s) not in (int, float):
+                raise ResourceFabricError("finite positive stream deadline required")
+            try:
+                interval = float(deadline_s)
+            except (OverflowError, ValueError) as exc:
+                raise ResourceFabricError(
+                    "finite positive stream deadline required"
+                ) from exc
+            if not math.isfinite(interval) or interval <= 0:
+                raise ResourceFabricError("finite positive stream deadline required")
+            deadline = time.monotonic() + interval
+            if not math.isfinite(deadline):
+                raise ResourceFabricError("stream deadline exceeds clock range")
         if cancel_event is not None and not isinstance(cancel_event, threading.Event):
             raise ResourceFabricError("typed cancellation event required")
-        deadline = None if deadline_s is None else time.monotonic() + deadline_s
 
         def check_interrupted() -> None:
             if cancel_event is not None and cancel_event.is_set():
