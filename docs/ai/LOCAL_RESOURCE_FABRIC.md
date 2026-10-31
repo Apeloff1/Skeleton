@@ -454,3 +454,16 @@ A source mutation or reordered path list produces HTTP 409, not a stale
 success receipt. Missing/invalid input is rejected. This stateless recovery
 requires no new database authority and never trusts an old digest alone;
 it is available in the offline workspace via a separate approval control.
+
+
+## Driver-measured GPU thermal hold
+
+GPU telemetry now carries an optional driver-measured thermal limit, separate
+from the current temperature. NVML uses the device's slowdown threshold when
+available; Linux DRM uses hwmon temp1_max when published. No default 95 C
+threshold is fabricated for unsupported drivers or Apple Metal. A device at
+or above its reported threshold is excluded from GPU planning while CPU/disk
+read-only staging remains available. The monitor reports thermal_throttled
+per GPU; the planner reports thermal_holds and binds the count into the
+deterministic evidence digest. This is advisory GPU admission, not a claim
+to throttle hardware clocks or migrate an already executing GPU kernel.

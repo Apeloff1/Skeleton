@@ -102,6 +102,7 @@ class GPUResource:
     measurement: str = "unknown"
     utilization_ratio: float | None = None
     temperature_c: float | None = None
+    thermal_limit_c: float | None = None
     recommended_working_set_bytes: int | None = None
     current_allocated_bytes: int | None = None
 
@@ -115,7 +116,7 @@ class GPUResource:
             raise ValueError("GPU free VRAM cannot exceed total VRAM")
         if (self.shared_total_bytes is None) != (self.shared_free_bytes is None):
             raise ValueError("shared GPU memory must have complete telemetry")
-        for value in (self.utilization_ratio, self.temperature_c):
+        for value in (self.utilization_ratio, self.temperature_c, self.thermal_limit_c):
             if value is not None and (not isinstance(value, (int, float))
                                       or isinstance(value, bool)
                                       or not math.isfinite(value)):
@@ -124,6 +125,8 @@ class GPUResource:
             raise ValueError("invalid GPU utilization")
         if self.temperature_c is not None and not -50 <= self.temperature_c <= 200:
             raise ValueError("invalid GPU temperature")
+        if self.thermal_limit_c is not None and not -50 <= self.thermal_limit_c <= 200:
+            raise ValueError("invalid GPU thermal threshold")
         for key in ("recommended_working_set_bytes", "current_allocated_bytes"):
             value = getattr(self, key)
             if value is not None and (type(value) is not int or value < 0):
@@ -134,6 +137,11 @@ class GPUResource:
             or not 0 <= self.shared_free_bytes <= self.shared_total_bytes
         ):
             raise ValueError("invalid shared memory telemetry")
+
+    @property
+    def thermal_throttled(self) -> bool:
+        return (self.temperature_c is not None and self.thermal_limit_c is not None
+                and self.temperature_c >= self.thermal_limit_c)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -146,6 +154,8 @@ class GPUResource:
             "measurement": self.measurement,
             "utilization_ratio": self.utilization_ratio,
             "temperature_c": self.temperature_c,
+            "thermal_limit_c": self.thermal_limit_c,
+            "thermal_throttled": self.thermal_throttled,
             "recommended_working_set_bytes": self.recommended_working_set_bytes,
             "current_allocated_bytes": self.current_allocated_bytes,
         }
@@ -254,12 +264,26 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
                     ))
                 except Exception:
                     pass
+                thermal_limit = None
+                try:
+                    threshold_kind = getattr(
+                        pynvml, "NVML_TEMPERATURE_THRESHOLD_SLOWDOWN", None,
+                    )
+                    if threshold_kind is not None:
+                        thermal_limit = float(
+                            pynvml.nvmlDeviceGetTemperatureThreshold(
+                                handle, threshold_kind,
+                            )
+                        )
+                except Exception:
+                    pass  # Unsupported driver threshold is unknown, not 95 C.
                 devices.append(GPUResource(
                     device=str(name), vendor="nvidia",
                     dedicated_total_bytes=int(memory.total),
                     dedicated_free_bytes=int(memory.free),
                     measurement="nvml", utilization_ratio=utilization,
                     temperature_c=temperature,
+                    thermal_limit_c=thermal_limit,
                 ))
         finally:
             pynvml.nvmlShutdown()
@@ -287,11 +311,14 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
         )
         busy = _read_positive(physical / "gpu_busy_percent")
         temperature = None
+        thermal_limit = None
         try:
             temps = sorted(physical.glob("hwmon/hwmon*/temp1_input"))
             if temps:
                 milli = _read_positive(temps[0])
                 temperature = milli / 1000 if milli is not None else None
+                high = _read_positive(temps[0].with_name("temp1_max"))
+                thermal_limit = high / 1000 if high is not None else None
         except OSError:
             pass
         devices.append(GPUResource(
@@ -304,6 +331,7 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
             measurement="linux_drm_sysfs",
             utilization_ratio=min(1.0, busy / 100) if busy is not None else None,
             temperature_c=temperature,
+            thermal_limit_c=thermal_limit,
         ))
     return tuple(devices)
 
@@ -346,6 +374,7 @@ class FabricPlan:
     host_stream_capacity: int = 1
     available_stream_slots: int = 1
     readonly_stream: bool = False
+    thermal_holds: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -356,6 +385,7 @@ class FabricPlan:
             "host_stream_capacity": self.host_stream_capacity,
             "available_stream_slots": self.available_stream_slots,
             "readonly_stream": self.readonly_stream,
+            "thermal_holds": self.thermal_holds,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -486,8 +516,12 @@ class AdaptiveResourceFabric:
         )
         gpu = None
         budget = 0
+        thermal_holds = 0
         # Never count shared GPU RAM as additional system or dedicated VRAM.
         for device in snap.gpus:
+            if device.thermal_throttled:
+                thermal_holds += 1
+                continue  # Driver-measured thermal limits veto GPU planning.
             if (
                 device.shared_with_system_ram
                 and device.recommended_working_set_bytes is not None
@@ -515,6 +549,8 @@ class AdaptiveResourceFabric:
             "verified read-only host staging, SQLite spill when needed; "
             "GPU execution is exclusively backend-owned"
         )
+        if thermal_holds and not eligible:
+            reason += "; measured GPU thermal hold"
         evidence = {
             "source_bytes": source_bytes,
             "readonly_stream": readonly_stream,
@@ -526,6 +562,7 @@ class AdaptiveResourceFabric:
             "disk_free": hw.free_disk_bytes,
             "cpu_load": hw.cpu_load_ratio,
             "predictive_pressure": round(ema, 6),
+            "thermal_holds": thermal_holds,
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -539,6 +576,7 @@ class AdaptiveResourceFabric:
             host_stream_capacity=hw.suggested_index_jobs,
             available_stream_slots=headroom,
             readonly_stream=readonly_stream,
+            thermal_holds=thermal_holds,
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),

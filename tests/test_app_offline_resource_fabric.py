@@ -34,6 +34,45 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def test_driver_measured_thermal_limit_vetoes_gpu_plan(self):
+        hot = GPUResource(
+            device="gpu0", vendor="nvidia", dedicated_total_bytes=1_000_000_000,
+            dedicated_free_bytes=900_000_000, temperature_c=93,
+            thermal_limit_c=90, measurement="synthetic_test",
+        )
+        self.assertTrue(hot.thermal_throttled)
+        self.assertTrue(hot.as_dict()["thermal_throttled"])
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(hot,),
+            ) as devices:
+                held = fabric.plan(
+                    1000, allow_gpu=True, requested_gpu_bytes=100_000_000,
+                )
+                self.assertFalse(held.gpu_eligible)
+                self.assertEqual(held.thermal_holds, 1)
+                self.assertIn("thermal hold", held.reason)
+                devices.return_value = (replace(hot, temperature_c=60),)
+                clear = fabric.plan(
+                    1000, allow_gpu=True, requested_gpu_bytes=100_000_000,
+                )
+                self.assertTrue(clear.gpu_eligible)
+                self.assertEqual(clear.thermal_holds, 0)
+                self.assertNotEqual(clear.evidence_digest, held.evidence_digest)
+                devices.return_value = (replace(hot, thermal_limit_c=None),)
+                unknown = fabric.plan(
+                    1000, allow_gpu=True, requested_gpu_bytes=100_000_000,
+                )
+                self.assertEqual(unknown.thermal_holds, 0)
+        for invalid in (float("nan"), float("inf"), -100, 250):
+            with self.assertRaises(ValueError):
+                replace(hot, thermal_limit_c=invalid)
+
     def test_reverify_rejects_changed_source_and_changed_order(self):
         with TemporaryDirectory() as d:
             root = Path(d)
