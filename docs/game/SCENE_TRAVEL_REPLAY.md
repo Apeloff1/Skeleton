@@ -96,3 +96,22 @@ calls execute.
 
 Focused regression: \`python -m pytest
 skeleton/testing/test_scene_ending_audit.py -q\`.
+
+## Portable offline checkpoint export/import
+
+`python -m skeleton scene-travel export --session-json '<save-json>'`
+produces a versioned, size-bounded offline gameplay envelope.
+`python -m skeleton scene-travel import --bundle-json '<bundle-json>'`
+checks the envelope schema, kind, checksum and complete canonical source-bound
+journal before returning the exact saved checkpoint. The reusable
+`offline_portable.py` envelope supports future gameplay adapters without
+creating a second runtime owner. The maximum serialized envelope is 2 MiB;
+extra fields, malformed JSON, oversized input, mismatched source/state
+digests and recomputed checksums over forged game state fail closed.
+
+The checksum protects accidental alteration and detects ordinary tampering,
+not malicious re-signing: it is **not** a digital signature, author identity,
+asset-license attestation or remote installation verification. Importers
+must obtain trusted source provenance independently before using untrusted
+save data. Focused regression: `python -m pytest -q
+skeleton/testing/test_scene_portable.py`.

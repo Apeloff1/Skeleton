@@ -332,12 +332,12 @@ def original_demo() -> tuple[dict[str, Any], list[dict[str, str]]]:
     return world, actions
 
 
-def _json(text: str, label: str) -> Any:
+def _json(text: str, label: str, *, max_bytes: int = MAX_JSON_BYTES) -> Any:
     try:
-        if len(text.encode("utf-8")) > MAX_JSON_BYTES:
-            raise SceneTravelError(f"{label} exceeds 128 KiB")
+        if type(text) is not str or len(text.encode("utf-8")) > max_bytes:
+            raise SceneTravelError(f"{label} exceeds input size budget")
         return json.loads(text)
-    except (ValueError, UnicodeError) as exc:
+    except (ValueError, UnicodeError, TypeError, RecursionError) as exc:
         if isinstance(exc, SceneTravelError):
             raise
         raise SceneTravelError(f"invalid {label} JSON") from exc
@@ -476,6 +476,10 @@ def cli(argv: Sequence[str]) -> int:
     start.add_argument("--actions-json", required=True)
     verify = sub.add_parser("verify")
     verify.add_argument("--session-json", required=True)
+    exported = sub.add_parser("export", help="Export replay-verified offline save")
+    exported.add_argument("--session-json", required=True)
+    imported = sub.add_parser("import", help="Import replay-verified offline save")
+    imported.add_argument("--bundle-json", required=True)
     resume = sub.add_parser("resume")
     resume.add_argument("--session-json", required=True)
     resume.add_argument("--actions-json", required=True)
@@ -552,7 +556,18 @@ def cli(argv: Sequence[str]) -> int:
                 checkpoint_every=args.checkpoint_every,
             )
             return 0
-        if args.command == "demo":
+        if args.command in ("export", "import"):
+            from skeleton.game.gameplay.scene_portable import (
+                export_scene_bundle, import_scene_bundle,
+            )
+            result = (
+                export_scene_bundle(_json(args.session_json, "session"))
+                if args.command == "export"
+                else import_scene_bundle(
+                    _json(args.bundle_json, "scene bundle", max_bytes=2 * 1024 * 1024)
+                )
+            )
+        elif args.command == "demo":
             world, actions = original_demo()
             result = simulate(world, actions)
         elif args.command == "simulate":
