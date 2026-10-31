@@ -6,14 +6,16 @@ is replayed through the canonical NPC session before being shown to players.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
-from .flgb_gameplay_runtime import GameplayContractError, dig, req_id
+from .flgb_gameplay_runtime import GameplayContractError, dig
 from .npc_schedule import (
     NpcCommand, NpcSchedule, NpcSession, _integer, _keys,
 )
 
 SCHEMA = "skeleton.npc_interaction_calendar.v1"
+_PLAYER_ID = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}\\Z")
 MAX_ENTRIES = 128
 MAX_BYTES = 2_000_000
 
@@ -39,7 +41,8 @@ def forecast_calendar(
         raise GameplayContractError("invalid NPC calendar contract")
     if session.schedule.digest != schedule.digest:
         raise GameplayContractError("NPC calendar source identity mismatch")
-    req_id(player_id, "player_id")
+    if type(player_id) is not str or _PLAYER_ID.fullmatch(player_id) is None:
+        raise GameplayContractError("invalid calendar player_id")
     _integer(max_entries, "max_entries", 1, MAX_ENTRIES)
     # Canonical replay protects against forged in-memory facts or event buses.
     verified = NpcSession.restore(schedule, session.snapshot())
