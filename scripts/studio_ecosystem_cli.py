@@ -29,7 +29,15 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
-    ap.add_argument("--faction-plan", action="store_true",
+    ap.add_argument("--dialogue-stage", action="store_true",
+                    help="Compile source-bound NPC scene dialogue cues from quest replay")
+    ap.add_argument("--dialogue-actions", metavar="JSON",
+                    help="Canonical bounded [quest stage, alternative] history")
+    ap.add_argument("--dialogue-scene-id",
+                    help="Optional exact authored scene ID")
+    ap.add_argument("--dialogue-expected-digest",
+                    help="Optional exact original source SHA-256")
+    ap.add_argument("--faction-plan", action="store_true",    ap.add_argument("--faction-plan", action="store_true",
                     help="Plan a shortest replay-verified original faction negotiation")
     ap.add_argument("--faction-goal", metavar="JSON",
                     help='Exact faction threshold, e.g. {"faction_id":"residents","minimum":3}')
@@ -207,6 +215,49 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.dialogue_stage:
+        if (not args.project or args.faction_plan or args.faction_reputation
+                or args.ending_plan or args.author_revision or args.cherry_pick_revision
+                or args.merge_revisions or args.revision_impact or args.revision_lineage
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre
+                or args.biome or args.output or args.quest_actions is not None
+                or args.revision_source is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--dialogue-stage requires --project and excludes other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
+            compile_dialogue_staging,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = (args.dialogue_actions or "[]").encode("utf-8", "strict")
+            if len(encoded) > 16384:
+                raise StudioQuestError("dialogue actions exceed byte budget")
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate dialogue JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(
+                encoded, object_pairs_hook=unique,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite dialogue JSON")))
+            result = compile_dialogue_staging(
+                read_blueprint(args.project), actions, authorized=True,
+                expected_source_digest=args.dialogue_expected_digest,
+                scene_id=args.dialogue_scene_id)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.dialogue_actions is not None or args.dialogue_scene_id is not None
+            or args.dialogue_expected_digest is not None):
+        ap.error("--dialogue-* options require --dialogue-stage")
+    if args.faction_plan:
     if args.faction_plan:
         if (not args.project or args.faction_goal is None
                 or args.faction_reputation or args.ending_plan or args.author_revision

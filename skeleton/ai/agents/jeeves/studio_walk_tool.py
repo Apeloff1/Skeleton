@@ -822,3 +822,55 @@ def execute_faction_plan_tool(request: Mapping[str, Any], *,
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_STAGING_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_staging_request.v1"
+DIALOGUE_STAGING_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_staging_result.v1"
+
+
+def dialogue_staging_tool_schema() -> dict[str, object]:
+    """Discoverable typed scene/NPC dialogue authoring cues, no speech claims."""
+    return {
+        "name": "studio_dialogue_staging",
+        "description": "Source-verified NPC/scene/quest cues and replay-gated editor cards",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_STAGING_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_dialogue_staging_tool(request: Mapping[str, Any], *,
+                                  authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue staging requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"scene_id"}
+            or request.get("schema") != DIALOGUE_STAGING_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue staging request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
+        compile_dialogue_staging,
+    )
+    detail = compile_dialogue_staging(
+        read_blueprint(request["project_id"]), request["actions"],
+        expected_source_digest=request["expected_source_digest"],
+        scene_id=request.get("scene_id"), authorized=True)
+    payload = {
+        "schema": DIALOGUE_STAGING_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
