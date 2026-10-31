@@ -68,6 +68,12 @@ def main(argv: list[str] | None = None) -> int:
                             help="Restore a verified save to before its last 1..32 authored choices")
     route_mode.add_argument("--walk-audit-choices", action="store_true",
                             help="Verify authored alternatives by collision-checked source replay")
+    route_mode.add_argument("--walk-canon-journal", action="store_true",
+                            help="Read authored era, cast, scene and plot-beat canon for played choices")
+    ap.add_argument("--walk-journal-offset", type=int, default=0)
+    ap.add_argument("--walk-journal-limit", type=int, default=8)
+    ap.add_argument("--walk-journal-expected-session-digest")
+    ap.add_argument("--walk-journal-expected-source-digest")
     route_mode.add_argument("--walk-story-transcript", action="store_true",
                             help="Inspect verified authored scene choices without changing save")
     ap.add_argument("--walk-story-offset", type=int, default=0,
@@ -83,6 +89,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--walk-forecast-depth", type=int, default=None, metavar="N",
                     help="Forecast at most 1..3 authored scenes (requires --walk-forecast)")
     args = ap.parse_args(argv)
+    if (not args.walk_canon_journal and
+            (args.walk_journal_offset != 0 or args.walk_journal_limit != 8
+             or args.walk_journal_expected_session_digest is not None
+             or args.walk_journal_expected_source_digest is not None)):
+        ap.error("--walk-journal-* options require --walk-canon-journal")
     if (not args.walk_story_transcript and
             (args.walk_story_offset != 0 or args.walk_story_limit != 32
              or args.walk_story_expected_digest is not None)):
@@ -96,7 +107,8 @@ def main(argv: list[str] | None = None) -> int:
                                or args.walk_preview_choices or args.walk_forecast
                                or args.walk_commit_forecast_branch is not None or args.walk_continuity
                                or args.walk_compare_events is not None or args.walk_rewind_choices is not None
-                               or args.walk_timeline or args.walk_story_transcript or args.walk_audit_choices
+                               or args.walk_timeline or args.walk_story_transcript or args.walk_canon_journal
+                               or args.walk_audit_choices
                                or args.walk_restore_checkpoint is not None):
         ap.error("--walk-events and --walk-receipt require --play-walk")
     if args.walk_audit_aggregate_stdin:
@@ -268,6 +280,16 @@ def main(argv: list[str] | None = None) -> int:
                                   "comparison": compare_walk_sessions(
                                       session, alternative, docs, authorized=True)},
                                  sort_keys=True, separators=(",", ":")))
+            elif args.walk_canon_journal:
+                from skeleton.ai.game_builder.studio_ecosystem_walk_canon_journal import walk_canon_journal
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "canon_journal": walk_canon_journal(
+                                      session, docs, authorized=True,
+                                      offset=args.walk_journal_offset,
+                                      limit=args.walk_journal_limit,
+                                      expected_session_digest=args.walk_journal_expected_session_digest,
+                                      expected_source_digest=args.walk_journal_expected_source_digest)},
+                                 sort_keys=True, separators=(",", ":")))
             elif args.walk_story_transcript:
                 from skeleton.ai.game_builder.studio_ecosystem_walk_story_transcript import walk_story_transcript
                 print(json.dumps({"receipt": json.loads(receipt),
@@ -304,6 +326,7 @@ def main(argv: list[str] | None = None) -> int:
                   and not args.walk_continuity and alternative_actions is None
                   and args.walk_rewind_choices is None
                   and not args.walk_timeline and not args.walk_story_transcript
+                  and not args.walk_canon_journal
                   and not args.walk_audit_choices
                   and args.walk_restore_checkpoint is None):
                 print(receipt.decode("ascii"))

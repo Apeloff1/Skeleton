@@ -385,3 +385,16 @@ not mutate the save. `JeevesGameOrchestrator.authoritative_walk()` exposes the
 same behavior through operation `transcript` and typed `transcript_offset`,
 `transcript_limit`, and `transcript_expected_digest` request fields.
 The transcript remains a sandbox authoring diagnostic, not native gameplay proof.
+
+
+## Source-bound authored canon journal
+
+`--play-walk --walk-canon-journal` presents the era, protagonist, original
+scene site/weather, authored plot-beat cause/goal/decision, cast dialogue hook
+and possible consequence alongside the verified choices actually played.
+It distinguishes authored possible consequences from observed outcomes. Pages
+are limited to eight scenes. A continuation requires both the exact session
+SHA-256 and an independent digest of the narrative/scene/cast source, so
+changing canon between pages fails closed. The typed Jeeves walk tool exposes
+`operation=journal` and the equivalent bounded continuation fields.
+No provider, native engine or unverified evidence is activated by this read.

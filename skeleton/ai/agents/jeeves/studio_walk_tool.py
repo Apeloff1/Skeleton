@@ -23,11 +23,13 @@ REQUEST_SCHEMA = "skeleton.jeeves.studio_walk_tool_request.v1"
 RESULT_SCHEMA = "skeleton.jeeves.studio_walk_tool_result.v1"
 OPERATIONS = frozenset({
     "replay", "route", "follow_route", "choices", "forecast", "continuity",
-    "timeline", "compare", "coverage", "transcript",
+    "timeline", "compare", "coverage", "transcript", "journal",
 })
 _ALLOWED = frozenset({"schema", "project_id", "operation", "events", "receipt",
                       "forecast_depth", "compare_events", "transcript_offset",
-                      "transcript_limit", "transcript_expected_digest"})
+                      "transcript_limit", "transcript_expected_digest",
+                      "journal_offset", "journal_limit", "journal_expected_session_digest",
+                      "journal_expected_source_digest"})
 
 
 def _canonical(value: object) -> bytes:
@@ -67,6 +69,10 @@ def tool_schema() -> dict[str, object]:
                                      "items": {"type": "string"}}},
                 "receipt": {"type": ["object", "null"]},
                 "forecast_depth": {"type": "integer", "minimum": 1, "maximum": 3},
+                "journal_offset": {"type": "integer", "minimum": 0},
+                "journal_limit": {"type": "integer", "minimum": 1, "maximum": 8},
+                "journal_expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "journal_expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                 "transcript_offset": {"type": "integer", "minimum": 0},
                 "transcript_limit": {"type": "integer", "minimum": 1, "maximum": 32},
                 "transcript_expected_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -125,6 +131,22 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
                     "transcript_offset", "transcript_limit", "transcript_expected_digest"
                 )))):
         raise StudioQuestError("invalid Jeeves transcript continuation arguments")
+    journal_offset = request.get("journal_offset", 0)
+    journal_limit = request.get("journal_limit", 8)
+    journal_session = request.get("journal_expected_session_digest")
+    journal_source = request.get("journal_expected_source_digest")
+    if (type(journal_offset) is not int or journal_offset < 0
+            or type(journal_limit) is not int or not 1 <= journal_limit <= 8
+            or any(value is not None and
+                   (type(value) is not str or len(value) != 64 or
+                    any(ch not in "0123456789abcdef" for ch in value))
+                   for value in (journal_session, journal_source))
+            or (operation != "journal" and any(
+                field in request for field in (
+                    "journal_offset", "journal_limit", "journal_expected_session_digest",
+                    "journal_expected_source_digest"
+                )))):
+        raise StudioQuestError("invalid Jeeves canon journal arguments")
     raw_receipt = request.get("receipt")
     if raw_receipt is not None and type(raw_receipt) is not dict:
         raise StudioQuestError("invalid Jeeves walk receipt type")
@@ -158,6 +180,15 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
         detail = walk_narrative_continuity(session, docs, authorized=True)
     elif operation == "timeline":
         detail = walk_checkpoint_timeline(session, docs, authorized=True)
+    elif operation == "journal":
+        from skeleton.ai.game_builder.studio_ecosystem_walk_canon_journal import (
+            walk_canon_journal,
+        )
+        detail = walk_canon_journal(
+            session, docs, authorized=True, offset=journal_offset, limit=journal_limit,
+            expected_session_digest=journal_session,
+            expected_source_digest=journal_source,
+        )
     elif operation == "transcript":
         from skeleton.ai.game_builder.studio_ecosystem_walk_story_transcript import (
             walk_story_transcript,
