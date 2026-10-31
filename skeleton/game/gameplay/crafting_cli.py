@@ -70,11 +70,12 @@ def _write_new(path: Path, value: object) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Offline source-bound crafting transactions")
-    parser.add_argument("command", choices=("inspect", "run", "verify", "play", "solve", "solve-batch"))
+    parser.add_argument("command", choices=("inspect", "run", "verify", "play", "solve", "solve-batch", "ledger", "verify-ledger"))
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--actions", type=Path)
     parser.add_argument("--save", type=Path)
     parser.add_argument("--resume", type=Path)
+    parser.add_argument("--report", type=Path)
     parser.add_argument("--goal-item")
     parser.add_argument("--goal-quantity", type=int, default=1)
     parser.add_argument("--goal-flag")
@@ -85,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         plan = CraftPlan.parse(_read(args.plan))
         engine = CraftEngine(plan)
+        if args.command not in ("ledger", "verify-ledger") and args.report is not None:
+            raise GameplayContractError("report input requires verify-ledger")
         if args.command not in ("solve", "solve-batch") and (
             args.goal_item is not None or args.goal_flag is not None
             or args.goal_quantity != 1 or args.max_nodes != 1024
@@ -110,6 +113,16 @@ def main(argv: list[str] | None = None) -> int:
                 result = CraftPlanner(engine).solve(
                     goal, max_nodes=args.max_nodes, max_depth=args.max_depth,
                 ).record()
+        elif args.command == "ledger":
+            if args.save is None or any((args.actions, args.resume, args.report)):
+                raise GameplayContractError("ledger requires --save only")
+            from .crafting_ledger import inspect_ledger
+            result = inspect_ledger(engine, _read(args.save))
+        elif args.command == "verify-ledger":
+            if args.report is None or any((args.actions, args.resume, args.save)):
+                raise GameplayContractError("verify-ledger requires --report only")
+            from .crafting_ledger import verify_ledger
+            result = verify_ledger(engine, _read(args.report))
         elif args.command == "inspect":
             if any((args.actions, args.save, args.resume)):
                 raise GameplayContractError("inspect accepts only a plan")
