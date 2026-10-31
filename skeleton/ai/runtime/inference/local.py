@@ -55,6 +55,7 @@ from .linux_thermal import sample_linux_thermal
 from .linux_io_pressure import read_linux_io_pressure
 from .linux_swap import read_linux_swap
 from .windows_commit import probe_windows_commit
+from .darwin_swap import probe_darwin_swap
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
@@ -1493,6 +1494,8 @@ def _sample_darwin_resources() -> ServingResources:
 
     memory = available = rss = cpu = None
     sources: list[str] = []
+    swap = probe_darwin_swap()
+    sources.append(swap.source)
     library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
     library.mach_host_self.restype = ctypes.c_uint32
     task = ctypes.c_uint32.in_dll(library, "mach_task_self_").value
@@ -1605,7 +1608,11 @@ def _sample_darwin_resources() -> ServingResources:
         if library.task_info(task, 20, ctypes.byref(info), ctypes.byref(count)) == 0:
             rss = int(info.resident)
             sources.append("darwin_rss")
-        return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+        return ServingResources(
+            memory, cpu, rss, available, ",".join(sources),
+            swap_used_fraction=swap.used_fraction,
+            swap_available_bytes=swap.available_bytes,
+        )
     finally:
         library.mach_port_deallocate(task, host)
 
