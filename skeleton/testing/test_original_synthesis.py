@@ -75,7 +75,7 @@ class OriginalSynthesisTests(unittest.TestCase):
         a = synthesize(SoundPatch.from_mapping(noise))
         b = synthesize(SoundPatch.from_mapping(dict(noise, seed=noise["seed"] + 1)))
         self.assertNotEqual(a.wav_digest, b.wav_digest)
-        self.assertEqual(a.wav_bytes[44:46], b"\\x00\\x00")
+        self.assertEqual(a.wav_bytes[44:46], b"\x00\x00")
 
     def test_cli_no_clobber_and_inspection(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -48,7 +48,7 @@ def _write_new(path: Path, payload: bytes) -> None:
         info = os.fstat(fd)
         os.close(fd)
         try:
-            if path.stat(follow_symlinks=False).st_ino == info.st_ino:
+            if path.lstat().st_ino == info.st_ino:
                 path.unlink()
         except OSError:
             pass
