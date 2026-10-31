@@ -353,3 +353,22 @@ invalid counts and next offset. A merge covering only part of the index must
 not claim full coverage. Replaying source is deliberate: untrusted client
 JSON is never accepted as evidence merely because it carries a digest.
 This diagnostic does not certify game completeness, native execution or release.
+
+## Source-bound authored story transcript
+
+Use `--play-walk --walk-story-transcript` with a registered project and,
+optionally, a verified save receipt. The CLI emits the unchanged receipt plus
+source-verified played scene IDs, authored interaction objects, selected
+alternatives and the next scene. This is not generated dialogue or a second
+save authority. The transcript discloses omitted entries beyond the 32-scene
+presentation limit and binds its content to the session and source digest.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-story-transcript
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-receipt-stdin --walk-story-transcript < saved.json
+```
+
+No network/provider is used. Forged receipts, source drift, invalid limits and
+unauthorized invocation fail closed. A digest is not a signature or native
+runtime/release certification. Source-backed tests cover route, choice,
+replay, save/restore, forgery and deterministic receipts.
