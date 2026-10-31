@@ -55,6 +55,7 @@ hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
 skeleton = "skeleton.__main__:main"
+skeleton-game-craft = "skeleton.game.gameplay.crafting_cli:main"
 skeleton-dev = "skeleton.developer.cli:main"
 skeleton-bootstrap = "skeleton.developer.bootstrap:main"
 skeleton-repo-machine = "skeleton.repo_machine.cli:main"

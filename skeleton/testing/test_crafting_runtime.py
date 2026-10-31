@@ -109,6 +109,14 @@ def test_installed_module_cli_run_verify_and_no_clobber(tmp_path: Path) -> None:
     assert duplicate.returncode == 2
 
 
+def test_crafting_installed_console_entrypoint() -> None:
+    import tomllib
+    metadata = tomllib.loads((Path(__file__).resolve().parents[2] / "pyproject.toml").read_text())
+    assert metadata["project"]["scripts"]["skeleton-game-craft"] == (
+        "skeleton.game.gameplay.crafting_cli:main"
+    )
+
+
 def test_interactive_play_and_resume(tmp_path: Path) -> None:
     p = tmp_path / "plan.json"
     p.write_text(json.dumps(plan().record()))

@@ -1,7 +1,7 @@
 # Deterministic offline crafting and finite economy
 
 Canonical owner: skeleton/game/gameplay (FLGB-13).
-Installed module CLI: python -m skeleton.game.gameplay.crafting_cli.
+Installed CLI: skeleton-game-craft (also python -m skeleton.game.gameplay.crafting_cli).
 
 A source-bound authored recipe catalog defines finite owned ingredients, outputs,
 currency costs and unlockable recipe prerequisites. Crafting is atomic:
