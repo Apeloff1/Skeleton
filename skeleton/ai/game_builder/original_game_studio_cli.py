@@ -60,7 +60,20 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "diff-batch":
+        from .offline_export_batch_delta_cli import main as delta_main
+        return delta_main(arguments[1:])
+    if arguments and arguments[0] == "prepare-batch":
+        from .offline_export_batch_prepare_cli import main as prepare_main
+        return prepare_main(arguments[1:])
+    if arguments and arguments[0] == "verify-batch":
+        from .offline_export_batch_cli import main as batch_main
+        return batch_main(arguments[1:])
+    if arguments and arguments[0] == "verify-export":
+        from .dual_runtime_verify_cli import main as verify_main
+        return verify_main(arguments[1:])
+    args = parser().parse_args(arguments)
     if not args.trusted_local_operator:
         print("error: external operator authorization acknowledgement required", file=sys.stderr)
         return 2

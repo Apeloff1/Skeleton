@@ -221,7 +221,7 @@ def _world(native: dict[str, object], manifest: dict[str, object]) -> PlayableWo
 
 
 def verify_exported_package(
-    root: str | Path, *, expected_manifest_sha256: str, authorized: bool,
+    root: str | Path | int, *, expected_manifest_sha256: str, authorized: bool,
 ) -> dict[str, object]:
     """Read-only, independently pinned source and gameplay verification.
 
@@ -234,11 +234,15 @@ def verify_exported_package(
         expected_manifest_sha256
     ):
         raise DualRuntimeVerificationError("independent release pin required")
+    if isinstance(root, bool):
+        raise DualRuntimeVerificationError("invalid package root descriptor")
     try:
-        fd = _root_fd(root)
-    except OSError as exc:
+        fd = os.dup(root) if type(root) is int else _root_fd(root)
+    except (OSError, TypeError, ValueError) as exc:
         raise DualRuntimeVerificationError("unsafe or inaccessible package root") from exc
     try:
+        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise DualRuntimeVerificationError("package root descriptor is not a directory")
         release = _read(fd, "release.json", _MAX_MANIFEST)
         if sha256(release).hexdigest() != expected_manifest_sha256:
             raise DualRuntimeVerificationError("release differs from trusted pin")
