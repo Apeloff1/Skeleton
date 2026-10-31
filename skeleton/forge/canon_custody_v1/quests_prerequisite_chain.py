@@ -103,9 +103,11 @@ def _parse(raw: dict[str, Any]) -> tuple[str, str, str, str, str, str, str, int,
         )
     )
     for key, text in (("id", identity), ("entity", entity), ("value", value),
-                      ("evidence", proof), ("world", world)):
+                      ("world", world)):
         if type(text) is not str or not 1 <= len(text) <= 128:
             raise ValueError("invalid-" + key)
+    if type(proof) is not str or len(proof) > 128:
+        raise ValueError("invalid-evidence")
     if type(parent) is not str or len(parent) > 128:
         raise ValueError("invalid-predecessor")
     if type(action) is not str or action not in ACTIONS:
