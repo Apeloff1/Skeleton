@@ -85,6 +85,11 @@ class SessionAuthority:
         """Preserve the original public multiplayer sync API."""
         self.distributed_sync(player_id, peer_id, pos, lag)
 
+    def sync_peer(self, player_id: str, peer_id: str,
+                  pos: tuple[float, float, float], lag_ms: int) -> None:
+        """Legacy peer-sync entrypoint; enforce the canonical grant and lag policy."""
+        self.distributed_sync(player_id, peer_id, pos, lag_ms)
+
     def predictive_sync(self, player_id: str, peer_id: str,
                         pos: tuple[float, float, float], lag_ms: int) -> None:
         """Predict peers through the same grant-checked bounded rollback transport."""
@@ -121,9 +126,9 @@ class SessionAuthority:
             raise MultiplayerError("invalid peer position")
         if not isinstance(lag_ms, int) or lag_ms < 0:
             raise MultiplayerError("invalid peer lag")
-        if lag_ms > _MAX_LAG_MS:
-            grant.peers.get(peer_id, PeerState(peer_id)).cheat_score += 0.2
         peer = grant.peers.setdefault(peer_id, PeerState(peer_id))
+        if lag_ms > _MAX_LAG_MS:
+            peer.cheat_score += 0.2
         dx = pos[0] - peer.position[0]
         peer.predicted = (pos[0] + dx * 0.6, pos[1], pos[2])
         peer.position = pos
