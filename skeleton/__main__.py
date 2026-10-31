@@ -52,6 +52,7 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+    scene-author  Atomically edit playable scene worlds and preview routes
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-mission  Play authored mission DAG and branching choices over scenes
     scene-mission-route  Solve replayable authored mission ending paths
@@ -745,6 +746,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-mission":
         from skeleton.game.gameplay.scene_mission import cli as mission_cli
         return mission_cli(rest)
+    if cmd == "scene-author":
+        from skeleton.game.gameplay.scene_world_author import cli as scene_author_cli
+        return scene_author_cli(rest)
     if cmd == "scene-travel":
         from skeleton.game.gameplay.scene_travel import cli as scene_cli
         return scene_cli(rest)
