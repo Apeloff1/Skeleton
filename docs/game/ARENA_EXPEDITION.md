@@ -37,3 +37,27 @@ migration across incompatible authored arena revisions.
 Focused tests: \`python -m pytest
 skeleton/testing/test_arena_expedition.py -q\`. Required architecture,
 security, exact-head CI and platform qualification are separate gates.
+
+## Player-controlled tactical fights and JSON-line play
+
+`python -m skeleton combat-expedition play --demo` emits one JSON object
+per line. Each `turn` includes the next authored arena, available shop,
+earned currency, hero health, inventory and stable state digest. Send one
+JSON action per line on standard input. Invalid actions are rejected without
+mutating the checkpoint, with at most three attempts per turn. EOF before a
+terminal outcome fails closed. The terminal event contains the complete
+replay-verifiable expedition save. `play --resume-json JSON` accepts only a
+checkpoint whose normalized source digest matches the resumed expedition.
+
+Besides automatic `{"kind":"fight"}`, players may submit
+`{"kind":"fight_tactical","hero_actions":[...]}` with ordered canonical
+arena commands (`move`, `attack`, `guard`, `rest`) for the authored hero.
+Enemy turns use the deterministic offline arena policy. A script must supply
+exactly the hero actions required to reach a terminal victory, defeat or draw;
+missing, opponent-owned, illegal or surplus commands are rejected without
+awarding currency or committing the encounter. Full opponent actions, source
+identity, combat event receipts and parent save lineage are reconstructed on
+verification and portable bundle import. This is a bounded text interaction,
+not a graphical or network multiplayer implementation.
+
+Focused tests: `python -m pytest skeleton/testing/test_arena_player_policy.py -q`.

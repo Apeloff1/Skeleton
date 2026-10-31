@@ -22,6 +22,8 @@ from skeleton.game.gameplay.tactical_arena import (
     normalize_arena, original_arena,
 )
 from skeleton.game.gameplay.arena_policy import run_autoplay
+from skeleton.game.gameplay.arena_player_policy import run_player_tactics
+from skeleton.game.gameplay.tactical_arena import _action as _arena_action
 
 SCHEMA = "skeleton.arena_expedition.v1"
 MAX_ARENAS = 6
@@ -131,12 +133,23 @@ def new_expedition(source: Any) -> dict[str, Any]:
     }
 
 
-def _action(raw: Any) -> dict[str, str]:
+def _action(raw: Any) -> dict[str, Any]:
     if type(raw) is not dict:
         raise CombatSessionError("invalid expedition action")
     kind = raw.get("kind")
-    if type(kind) is not str or kind not in ("fight", "buy", "use"):
+    if type(kind) is not str or kind not in (
+        "fight", "fight_tactical", "buy", "use",
+    ):
         raise CombatSessionError("unsupported expedition action")
+    if kind == "fight_tactical":
+        _object(raw, {"kind", "hero_actions"}, "expedition action")
+        moves = raw["hero_actions"]
+        if type(moves) is not list or len(moves) > 64:
+            raise CombatSessionError("invalid tactical hero action budget")
+        return {
+            "kind": kind,
+            "hero_actions": [_arena_action(move) for move in moves],
+        }
     required = {"kind"} if kind == "fight" else {"kind", "item_id"}
     _object(raw, required, "expedition action")
     return (
@@ -167,7 +180,7 @@ def _advance(session: dict[str, Any], raw: Any) -> dict[str, Any]:
         "arenas": list(old["arenas"]),
     }
     outcome = None
-    if action["kind"] == "fight":
+    if action["kind"] in ("fight", "fight_tactical"):
         index = state["next_index"]
         if index >= len(source["arenas"]):
             raise CombatSessionError("no remaining arena")
@@ -177,7 +190,10 @@ def _advance(session: dict[str, Any], raw: Any) -> dict[str, Any]:
         hero["max_hp"] = state["hero_hp"]
         if hero["max_hp"] < 1:
             raise CombatSessionError("hero cannot fight with zero health")
-        result = run_autoplay(arena)
+        result = (
+            run_autoplay(arena) if action["kind"] == "fight"
+            else run_player_tactics(arena, source["hero_id"], action["hero_actions"])
+        )
         remaining = result["state"]["actors"][source["hero_id"]]["hp"]
         victory = (
             result["state"]["phase"] == "won"
@@ -315,6 +331,10 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton combat-expedition")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo", help="Run original two-arena campaign with earned rewards")
+    play = sub.add_parser("play", help="Play interactive offline JSON-line expedition")
+    play.add_argument("--demo", action="store_true")
+    play.add_argument("--source-json")
+    play.add_argument("--resume-json")
     sim = sub.add_parser("simulate", help="Run authored purchases, healing and fights")
     sim.add_argument("--source-json", required=True)
     sim.add_argument("--actions-json", required=True)
@@ -329,6 +349,26 @@ def cli(argv: Sequence[str]) -> int:
     resume.add_argument("--actions-json", required=True)
     args = parser.parse_args(list(argv))
     try:
+        if args.command == "play":
+            from skeleton.game.gameplay.arena_expedition_interactive import (
+                play_expedition,
+            )
+            if sum(bool(x) for x in (
+                args.demo, args.source_json, args.resume_json,
+            )) != 1:
+                raise CombatSessionError("play needs exactly one source or resume")
+            saved = (
+                _parse_json(args.resume_json, "expedition save")
+                if args.resume_json else None
+            )
+            authored = (
+                saved.get("source") if type(saved) is dict else None
+            ) if saved is not None else (
+                original_expedition() if args.demo
+                else _parse_json(args.source_json, "expedition source")
+            )
+            play_expedition(authored, resume=saved)
+            return 0
         if args.command in ("export", "import"):
             from skeleton.game.gameplay.arena_bundle import (
                 export_bundle, import_bundle,
