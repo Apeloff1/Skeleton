@@ -11,7 +11,9 @@ import json
 import re
 from typing import Any, Mapping
 
-from .game_play_session import verify_play_session
+from .game_play_session import (
+    fork_play_session, resume_play_session, verify_play_session,
+)
 from .gameplay_capabilities import compile_level, platformer_step
 
 MANIFEST_SCHEMA = "skeleton.game.play_quest_manifest.v1"
@@ -323,7 +325,48 @@ def verify_quest_overlay(capsule: Mapping[str, Any], overlay: Any) -> dict[str, 
     }
 
 
+def resume_quest_overlay(
+    capsule: Mapping[str, Any], overlay: Any, controls: Any, actions: Any,
+) -> dict[str, Any]:
+    """Append real controller frames and decisions after verifying the prior save.
+
+    The entire history is re-simulated from the original source. A completed
+    game cannot accept more inputs; a resumed quest cannot forge earlier
+    pickups, rewards or inventory balances.
+    """
+    verify_quest_overlay(capsule, overlay)
+    updated_session = resume_play_session(capsule, overlay["session"], controls)
+    if type(actions) is not list:
+        raise GameQuestError("resumed quest actions must be a list")
+    return pack_quest_overlay(
+        capsule, updated_session, overlay["manifest"],
+        overlay["actions"] + actions,
+    )
+
+
+def fork_quest_overlay(
+    capsule: Mapping[str, Any], overlay: Any, frame: Any,
+    controls: Any, actions: Any,
+) -> dict[str, Any]:
+    """Create an independent, source-replayed quest timeline at a saved frame.
+
+    The original overlay remains untouched. A fork after terminal victory
+    is forbidden by the canonical gameplay session engine.
+    """
+    verify_quest_overlay(capsule, overlay)
+    updated_session = fork_play_session(
+        capsule, overlay["session"], frame, controls,
+    )
+    if type(actions) is not list:
+        raise GameQuestError("forked quest actions must be a list")
+    return pack_quest_overlay(
+        capsule, updated_session, overlay["manifest"],
+        overlay["actions"][:frame] + actions,
+    )
+
+
 __all__ = [
     "MANIFEST_SCHEMA", "OVERLAY_SCHEMA", "GameQuestError",
     "validate_quest_manifest", "pack_quest_overlay", "verify_quest_overlay",
+    "resume_quest_overlay", "fork_quest_overlay",
 ]

@@ -48,6 +48,7 @@ from skeleton.ai.runtime.game_play_challenge import (
 )
 from skeleton.ai.runtime.game_play_quest import (
     GameQuestError, pack_quest_overlay, verify_quest_overlay,
+    resume_quest_overlay, fork_quest_overlay,
 )
 
 MAX_INPUT_BYTES = 96 * 1024
@@ -192,6 +193,10 @@ def _parser() -> argparse.ArgumentParser:
                             help="replay a game save with authored pickups, crafting and quests")
     operations.add_argument("--verify-quest-overlay", type=Path,
                             help="verify and reopen a source-bound offline quest save")
+    operations.add_argument("--resume-quest-overlay", type=Path,
+                            help="append real gameplay frames and decisions to a verified quest save")
+    operations.add_argument("--fork-quest-overlay", type=Path,
+                            help="rewind a verified quest save and play alternate decisions")
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -264,6 +269,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.terminal_play_capsule, args.terminal_resume_session,
         args.score_play_session, args.verify_play_score, args.verify_play_board,
         args.play_quest_overlay, args.verify_quest_overlay,
+        args.resume_quest_overlay, args.fork_quest_overlay,
     )) or args.rank_play_scores
     bundling = any(value is not None for value in (
         args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
@@ -271,7 +277,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ))
     seeking = any(value is not None for value in (
         args.inspect_play_frame, args.fork_play_session, args.fork_play_bundle,
-        args.render_play_comparison,
+        args.fork_quest_overlay, args.render_play_comparison,
     ))
     comparing = args.compare_play_sessions is not None or args.render_play_comparison is not None
     if (args.other_session is not None) != comparing:
@@ -299,11 +305,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("score inputs and board output require --rank-play-scores",
               file=sys.stderr)
         return 2
-    questing = args.play_quest_overlay is not None
-    if any((value is not None) != questing for value in (
-        args.quest_manifest, args.quest_actions, args.quest_output,
-    )):
-        print("quest manifest, actions and output require --play-quest-overlay",
+    quest_creating = args.play_quest_overlay is not None
+    quest_extending = (
+        args.resume_quest_overlay is not None or args.fork_quest_overlay is not None
+    )
+    quest_mutating = quest_creating or quest_extending
+    if ((args.quest_manifest is not None) != quest_creating
+            or (args.quest_actions is not None) != quest_mutating
+            or (args.quest_output is not None) != quest_mutating):
+        print("quest manifest, decisions and output do not match quest operation",
               file=sys.stderr)
         return 2
     if args.terminal_input_profile is not None and not terminal:
@@ -336,10 +346,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("play-bundle source, controls and output arguments mismatch", file=sys.stderr)
             return 2
     if playing:
-        needs_actions = any(value is not None for value in (
+        needs_session_actions = any(value is not None for value in (
             args.play_capsule, args.resume_play_session, args.fork_play_session,
         ))
-        needs_output = needs_actions or terminal
+        needs_actions = needs_session_actions or quest_extending
+        needs_output = needs_session_actions or terminal
         needs_source = (args.play_capsule is None
                         and args.terminal_play_capsule is None)
         if (needs_actions != (args.controls_file is not None)
@@ -410,6 +421,31 @@ def main(argv: Sequence[str] | None = None) -> int:
             elif args.verify_quest_overlay is not None:
                 overlay = _read_json(args.verify_quest_overlay, max_bytes=MAX_RESULT_BYTES)
                 report = verify_quest_overlay(capsule, overlay)
+            elif quest_extending:
+                previous = _read_json(
+                    args.resume_quest_overlay or args.fork_quest_overlay,
+                    max_bytes=MAX_RESULT_BYTES,
+                )
+                controls = _read_json(args.controls_file)
+                decisions = _read_json(args.quest_actions)
+                if set(controls) != {"controls"} or set(decisions) != {"actions"}:
+                    raise GameQuestError("quest continuation requires controls and actions")
+                if args.fork_quest_overlay is not None:
+                    overlay = fork_quest_overlay(
+                        capsule, previous, args.at_frame,
+                        controls["controls"], decisions["actions"],
+                    )
+                else:
+                    overlay = resume_quest_overlay(
+                        capsule, previous, controls["controls"], decisions["actions"],
+                    )
+                receipt = verify_quest_overlay(capsule, overlay)
+                report = {
+                    **receipt, "output_path": _write_new(args.quest_output, overlay),
+                }
+                if args.fork_quest_overlay is not None:
+                    report["fork_frame"] = args.at_frame
+                    report["forked_from_overlay_sha256"] = previous["body_sha256"]
             elif args.score_play_session is not None:
                 policy = _read_json(args.challenge_policy, max_bytes=4096)
                 saved = _read_json(args.score_play_session)

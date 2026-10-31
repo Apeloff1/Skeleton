@@ -203,3 +203,113 @@ def test_quest_cli_refuses_existing_output_or_untrusted_symlink(tmp_path, capsys
         "--quest-output", str(tmp_path / "fresh.json"),
     ]) == 1
     assert not (tmp_path / "fresh.json").exists()
+
+
+def test_resume_replays_original_inventory_and_claim_history():
+    from skeleton.ai.runtime.game_play_quest import resume_quest_overlay
+    capsule, session, manifest, actions = _setup()
+    first = pack_quest_overlay(capsule, session, manifest, actions)
+    resumed = resume_quest_overlay(
+        capsule, first, [_control()], [{"craft": None, "claim": None}],
+    )
+    checked = verify_quest_overlay(capsule, resumed)
+    assert checked["frame_count"] == 2
+    assert checked["inventory"] == {"medal": 1}
+    assert checked["picked_collectibles"] == ["ore-1"]
+    assert checked["claimed_quests"] == ["open-gate"]
+    assert resumed["body_sha256"] != first["body_sha256"]
+    assert verify_quest_overlay(capsule, first)["frame_count"] == 1
+
+
+def test_fork_rewinds_quest_state_without_copying_future_rewards():
+    from skeleton.ai.runtime.game_play_quest import fork_quest_overlay
+    capsule, session, manifest, actions = _setup()
+    first = pack_quest_overlay(capsule, session, manifest, actions)
+    alternative = fork_quest_overlay(
+        capsule, first, 0, [_control()],
+        [{"craft": None, "claim": None}],
+    )
+    checked = verify_quest_overlay(capsule, alternative)
+    assert checked["frame_count"] == 1
+    assert checked["inventory"] == {"ore": 2}
+    assert checked["claimed_quests"] == []
+    assert checked["picked_collectibles"] == ["ore-1"]
+    assert first["result"]["inventory"] == {"medal": 1}
+
+
+def test_fork_rejects_unverified_frame_and_does_not_mutate_parent():
+    from skeleton.ai.runtime.game_play_quest import fork_quest_overlay
+    capsule, session, manifest, actions = _setup()
+    first = pack_quest_overlay(capsule, session, manifest, actions)
+    original = json.dumps(first, sort_keys=True)
+    for frame in (-1, True, 2):
+        with pytest.raises(ValueError):
+            fork_quest_overlay(
+                capsule, first, frame, [_control()],
+                [{"craft": None, "claim": None}],
+            )
+    assert json.dumps(first, sort_keys=True) == original
+
+
+def test_canonical_cli_resumes_and_forks_quest_saves(tmp_path, capsys):
+    capsule, session, manifest, actions = _setup()
+    source = tmp_path / "source.json"
+    save = tmp_path / "session.json"
+    rules = tmp_path / "manifest.json"
+    decisions = tmp_path / "decisions.json"
+    first = tmp_path / "first.json"
+    resumed = tmp_path / "resumed.json"
+    forked = tmp_path / "forked.json"
+    controls = tmp_path / "controls.json"
+    empty_actions = tmp_path / "empty-actions.json"
+    for path, value in (
+        (source, capsule), (save, session), (rules, manifest),
+        (decisions, {"actions": actions}),
+        (controls, {"controls": [_control()]}),
+        (empty_actions, {"actions": [{"craft": None, "claim": None}]}),
+    ):
+        path.write_text(json.dumps(value), encoding="utf-8")
+    assert run_app_cli([
+        "game-project", "--play-quest-overlay", str(save),
+        "--session-capsule", str(source), "--quest-manifest", str(rules),
+        "--quest-actions", str(decisions), "--quest-output", str(first),
+    ]) == 0
+    capsys.readouterr()
+    assert run_app_cli([
+        "game-project", "--resume-quest-overlay", str(first),
+        "--session-capsule", str(source), "--controls-file", str(controls),
+        "--quest-actions", str(empty_actions), "--quest-output", str(resumed),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["frame_count"] == 2
+    assert main([
+        "--fork-quest-overlay", str(first), "--session-capsule", str(source),
+        "--at-frame", "0", "--controls-file", str(controls),
+        "--quest-actions", str(empty_actions), "--quest-output", str(forked),
+    ]) == 0
+    fork_report = json.loads(capsys.readouterr().out)
+    assert fork_report["inventory"] == {"ore": 2}
+    assert fork_report["fork_frame"] == 0
+    assert main([
+        "--verify-quest-overlay", str(resumed), "--session-capsule", str(source),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["overlay_replay_verified"]
+    assert main([
+        "--verify-quest-overlay", str(forked), "--session-capsule", str(source),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["overlay_replay_verified"]
+
+
+def test_cli_rejects_unpaired_quest_resume_and_fork_flags(tmp_path, capsys):
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps(_capsule()), encoding="utf-8")
+    assert main([
+        "--resume-quest-overlay", str(source), "--session-capsule", str(source),
+    ]) == 2
+    assert main([
+        "--fork-quest-overlay", str(source), "--session-capsule", str(source),
+        "--at-frame", "0",
+    ]) == 2
+    assert main([
+        "--verify-quest-overlay", str(source), "--session-capsule", str(source),
+        "--quest-actions", str(source),
+    ]) == 2

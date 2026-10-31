@@ -42,3 +42,21 @@ This is offline single-player simulation. The hash is **not a signature**
 or trusted multiplayer anti-cheat evidence. Native renderers, proprietary
 game exports, third-party content and independent legal clearance are
 not provided by this module.
+
+## Resume and alternate choices
+
+A quest save can be reopened and continued with new real controller frames,
+or forked from a verified frame into a separate choice history. Both paths
+recompute all earlier movement, pickups, inventory spending and quest rewards.
+The original save is never modified, and a terminal victory cannot be resumed.
+
+```sh
+python -m skeleton app game-project --resume-quest-overlay quest-save.json --session-capsule capsule.json --controls-file next-controls.json --quest-actions next-decisions.json --quest-output resumed.json
+python -m skeleton app game-project --fork-quest-overlay quest-save.json --session-capsule capsule.json --at-frame 0 --controls-file alternate-controls.json --quest-actions alternate-decisions.json --quest-output alternate.json
+```
+
+Each new control batch uses the canonical 1–64 frame budget. Its decisions
+array must contain exactly one craft/claim object for every new frame.
+A fork discards all future quest decisions and reconstructs the earlier
+inventory; it never copies future rewards into the alternate timeline.
+Only a fresh, exclusively created output file is accepted.
