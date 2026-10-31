@@ -53,6 +53,7 @@ Commands:
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     combat      Run and replay deterministic offline turn combat encounters
+    combat-tournament  Play and replay a source-bound four-entrant bracket
     combat-inspect  Inspect verified combat timelines and compare saved branches
     combat-drill  Play, grade, resume and verify offline combat lessons
     combat-drill-solve  Find replayable bounded shortest combat lesson solutions
@@ -764,6 +765,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-expedition":
         from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
         return expedition_cli(rest)
+    if cmd == "combat-tournament":
+        from skeleton.game.gameplay.combat_tournament import cli as tournament_cli
+        return tournament_cli(rest)
     if cmd == "combat-campaign":
         from skeleton.game.gameplay.combat_campaign import cli as campaign_cli
         return campaign_cli(rest)
