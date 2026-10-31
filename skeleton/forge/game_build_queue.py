@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import threading
 import time
 import uuid
@@ -87,10 +88,14 @@ def _builder_deadline_s(body: Mapping[str, Any], options: Mapping[str, Any], ctx
     raw_timeout = getattr(ctx, "timeout_s", None)
     if raw_timeout is None:
         raw_timeout = DEFAULT_TIMEOUT_S
+    if isinstance(raw_timeout, bool):
+        raise ValueError("timeout_s must be finite and positive")
     try:
         timeout_s = float(raw_timeout)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("timeout_s must be a number of seconds") from exc
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("timeout_s must be finite and positive") from exc
+    if not math.isfinite(timeout_s) or timeout_s <= 0:
+        raise ValueError("timeout_s must be finite and positive")
     raw = body.get("deadline_s", None)
     if raw is None:
         raw = options.get("deadline_s", None)
@@ -100,10 +105,10 @@ def _builder_deadline_s(body: Mapping[str, Any], options: Mapping[str, Any], ctx
         raise ValueError("deadline_s must be a number of seconds")
     try:
         asked = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("deadline_s must be a number of seconds") from exc
-    if asked < 0:
-        raise ValueError("deadline_s must be a number of seconds")
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("deadline_s must be finite and non-negative") from exc
+    if not math.isfinite(asked) or asked < 0:
+        raise ValueError("deadline_s must be finite and non-negative")
     return min(asked, timeout_s)
 
 
