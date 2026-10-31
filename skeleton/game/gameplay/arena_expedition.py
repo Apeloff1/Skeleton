@@ -320,12 +320,26 @@ def cli(argv: Sequence[str]) -> int:
     sim.add_argument("--actions-json", required=True)
     verify = sub.add_parser("verify", help="Replay-check expedition save and rewards")
     verify.add_argument("--session-json", required=True)
+    export = sub.add_parser("export", help="Export verified offline portable bundle")
+    export.add_argument("--session-json", required=True)
+    imported = sub.add_parser("import", help="Import and replay-check portable bundle")
+    imported.add_argument("--bundle-json", required=True)
     resume = sub.add_parser("resume", help="Continue source-bound expedition")
     resume.add_argument("--session-json", required=True)
     resume.add_argument("--actions-json", required=True)
     args = parser.parse_args(list(argv))
     try:
-        if args.command == "demo":
+        if args.command in ("export", "import"):
+            from skeleton.game.gameplay.arena_bundle import (
+                export_bundle, import_bundle,
+            )
+            result = (
+                export_bundle(_parse_json(args.session_json, "expedition save"))
+                if args.command == "export" else import_bundle(
+                    _parse_json(args.bundle_json, "expedition bundle")
+                )
+            )
+        elif args.command == "demo":
             result = simulate_expedition(
                 original_expedition(),
                 [{"kind": "fight"}, {"kind": "buy", "item_id": "tide_tonic"},

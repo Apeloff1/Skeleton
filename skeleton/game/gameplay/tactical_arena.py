@@ -374,11 +374,29 @@ def cli(argv: Sequence[str]) -> int:
     sim.add_argument("--actions-json", required=True)
     verify = sub.add_parser("verify", help="Replay-check exported arena save")
     verify.add_argument("--session-json", required=True)
+    inspect = sub.add_parser("inspect", help="Replay-derived tactical timeline")
+    inspect.add_argument("--session-json", required=True)
+    compare = sub.add_parser("compare", help="Compare two source-bound arena branches")
+    compare.add_argument("--left-json", required=True)
+    compare.add_argument("--right-json", required=True)
     resume = sub.add_parser("resume", help="Resume a verified arena save")
     resume.add_argument("--session-json", required=True)
     resume.add_argument("--actions-json", required=True)
     args = parser.parse_args(list(argv))
     try:
+        if args.command in ("inspect", "compare"):
+            from skeleton.game.gameplay.arena_inspector import (
+                inspect_session, compare_sessions,
+            )
+            result = (
+                inspect_session(_parse_json(args.session_json, "arena save"))
+                if args.command == "inspect" else compare_sessions(
+                    _parse_json(args.left_json, "left arena save"),
+                    _parse_json(args.right_json, "right arena save"),
+                )
+            )
+            print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return 0
         if args.command == "play":
             from skeleton.game.gameplay.arena_interactive import play_arena
             if sum(bool(x) for x in (
