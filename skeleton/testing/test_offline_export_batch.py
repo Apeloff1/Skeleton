@@ -179,3 +179,68 @@ def test_batch_root_entry_flood_rejected_before_replay(batch):
         (root / f"unlisted-{index:04d}").write_bytes(b"x")
     with pytest.raises(OfflineBatchVerificationError, match="batch verification rejected"):
         verify_export_batch(root, expected_index_sha256=pin, authorized=True)
+
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="descriptor-relative source identity")
+def test_batch_rejects_byte_identical_package_directory_replacement(batch, monkeypatch, tmp_path):
+    import skeleton.ai.game_builder.offline_export_batch as batch_module
+
+    root, pin, _ = batch
+    original = batch_module.verify_exported_package
+    replaced = False
+
+    def swap_after_verified_replay(*args, **kwargs):
+        nonlocal replaced
+        receipt = original(*args, **kwargs)
+        if not replaced:
+            replaced = True
+            moved = tmp_path / "moved-game-001"
+            (root / "game-001").rename(moved)
+            shutil.copytree(moved, root / "game-001")
+        return receipt
+
+    monkeypatch.setattr(batch_module, "verify_exported_package", swap_after_verified_replay)
+    with pytest.raises(OfflineBatchVerificationError, match="directory changed"):
+        verify_export_batch(root, expected_index_sha256=pin, authorized=True)
+
+
+def test_batch_rejects_index_rewrite_during_replay(batch, monkeypatch):
+    import skeleton.ai.game_builder.offline_export_batch as batch_module
+
+    root, pin, _ = batch
+    original = batch_module.verify_exported_package
+    rewritten = False
+
+    def rewrite_after_replay(*args, **kwargs):
+        nonlocal rewritten
+        receipt = original(*args, **kwargs)
+        if not rewritten:
+            rewritten = True
+            (root / "batch.json").write_bytes(b"{}\\n")
+        return receipt
+
+    monkeypatch.setattr(batch_module, "verify_exported_package", rewrite_after_replay)
+    with pytest.raises(OfflineBatchVerificationError, match="index changed"):
+        verify_export_batch(root, expected_index_sha256=pin, authorized=True)
+
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="descriptor-relative source identity")
+def test_batch_rejects_root_path_swap_after_replay(batch, monkeypatch, tmp_path):
+    import skeleton.ai.game_builder.offline_export_batch as batch_module
+
+    root, pin, _ = batch
+    original = batch_module.verify_exported_package
+    swapped = False
+
+    def replace_root_after_replay(*args, **kwargs):
+        nonlocal swapped
+        receipt = original(*args, **kwargs)
+        if not swapped:
+            swapped = True
+            root.rename(tmp_path / "original-batch")
+            root.mkdir()
+        return receipt
+
+    monkeypatch.setattr(batch_module, "verify_exported_package", replace_root_after_replay)
+    with pytest.raises(OfflineBatchVerificationError, match="batch verification rejected"):
+        verify_export_batch(root, expected_index_sha256=pin, authorized=True)

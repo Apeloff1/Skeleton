@@ -16,6 +16,7 @@ from .contracts import canonical_digest
 from .dual_runtime_verify import (
     DualRuntimeVerificationError,
     _canonical_bytes,
+    _assert_original_root,
     _bounded_names,
     _child_fd,
     _json,
@@ -94,13 +95,19 @@ def verify_export_batch(
             raise OfflineBatchVerificationError("unlisted or missing batch entries")
 
         receipts: list[dict[str, object]] = []
+        # A descriptor can remain valid after its pathname is replaced.
+        # Retain each verified package's inode identity for final publication
+        # continuity; a byte-identical replacement is still a different source.
+        package_inodes: dict[str, tuple[int, int]] = {}
         total_bytes = 0
         total_actions = 0
         for project_id, directory, pin in entries:
             child_fd = _child_fd(root_fd, (directory,), directory=True)
             try:
-                if not stat.S_ISDIR(os.fstat(child_fd).st_mode):
+                child_info = os.fstat(child_fd)
+                if not stat.S_ISDIR(child_info.st_mode):
                     raise OfflineBatchVerificationError("package entry is not a directory")
+                package_inodes[directory] = (child_info.st_dev, child_info.st_ino)
                 receipt = verify_exported_package(
                     child_fd, expected_manifest_sha256=pin, authorized=True,
                 )
@@ -124,6 +131,22 @@ def verify_export_batch(
             })
         if set(_bounded_names(root_fd, MAX_PACKAGES + 1)) != set(dirs) | {"batch.json"}:
             raise OfflineBatchVerificationError("batch entries changed during verification")
+        # Re-open every verified directory from the pinned root. Merely
+        # comparing directory names misses rename-and-replace attacks while
+        # replay continues on an already-open original descriptor.
+        for directory in dirs:
+            reopened_fd = _child_fd(root_fd, (directory,), directory=True)
+            try:
+                current = os.fstat(reopened_fd)
+                if (current.st_dev, current.st_ino) != package_inodes[directory]:
+                    raise OfflineBatchVerificationError(
+                        "verified package directory changed during replay"
+                    )
+            finally:
+                os.close(reopened_fd)
+        if _read(root_fd, "batch.json", MAX_INDEX_BYTES) != raw:
+            raise OfflineBatchVerificationError("batch index changed during replay")
+        _assert_original_root(root, root_fd)
         body = {
             "schema": RECEIPT_SCHEMA,
             "index_sha256": expected_index_sha256,
