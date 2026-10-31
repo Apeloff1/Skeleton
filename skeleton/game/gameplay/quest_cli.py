@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 from skeleton.game.gameplay.quest_session import (
-    GameplayContractError, QuestEngine, QuestPlan, QuestTrigger,
+    GameplayContractError, QuestEngine, QuestPlan, QuestTrigger, MAX_EVENTS,
 )
 
 MAX_FILE = 1_048_576
@@ -85,27 +85,63 @@ def _events(path: Path) -> list[QuestTrigger]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Deterministic offline quest journal")
-    parser.add_argument("command", choices=("inspect", "run", "verify"))
+    parser.add_argument("command", choices=("inspect", "run", "verify", "play"))
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--events", type=Path, help="ordered authored event triggers for run")
-    parser.add_argument("--save", type=Path, help="new no-clobber save output for run, or input for verify")
+    parser.add_argument("--save", type=Path, help="new no-clobber save output, or input for verify")
+    parser.add_argument("--resume", type=Path, help="verified previous save for play; output must be a new file")
     args = parser.parse_args(argv)
     try:
         plan = QuestPlan.from_record(_read(args.plan))
         engine = QuestEngine(plan)
         if args.command == "inspect":
-            if args.events or args.save:
-                raise GameplayContractError("inspect does not accept events or save")
+            if args.events or args.save or args.resume:
+                raise GameplayContractError("inspect does not accept events or saves")
             result = {"world_id": plan.world_id, "plan_digest": plan.digest, "quest_order": plan.order}
         elif args.command == "run":
-            if args.events is None or args.save is None:
-                raise GameplayContractError("run requires --events and --save")
+            if args.events is None or args.save is None or args.resume is not None:
+                raise GameplayContractError("run requires --events and --save, without --resume")
             session = engine.replay(_events(args.events))
             _write_new(args.save, session.save_record())
             result = {"state": session.as_state(), "state_digest": session.state_digest, "save_digest": session.save_metadata.digest}
-        else:
+        elif args.command == "play":
             if args.save is None or args.events is not None:
-                raise GameplayContractError("verify requires --save and forbids --events")
+                raise GameplayContractError("play requires --save and forbids --events")
+            session = engine.restore(_read(args.resume)) if args.resume is not None else engine.new_session()
+            # Choice-driven terminal gameplay; no physical movement or AI behavior is claimed.
+            while session.ending_id is None:
+                available = [quest for quest in plan.quests
+                             if quest.quest_id not in session.completed
+                             and set(quest.dependencies).issubset(session.completed)]
+                if not available:
+                    break
+                if len(session.events) >= MAX_EVENTS:
+                    raise GameplayContractError("event budget exhausted")
+                print("Available choices: " + ", ".join(
+                    quest.quest_id + " (" + quest.event_type + " @ " + quest.source_id + ")"
+                    for quest in available
+                ), flush=True)
+                try:
+                    selected = input("Choose quest ID, or quit: ").strip()
+                except EOFError:
+                    selected = "quit"
+                if selected == "quit":
+                    break
+                chosen = next((quest for quest in available if quest.quest_id == selected), None)
+                if chosen is None:
+                    print("Invalid choice; no state changed.", flush=True)
+                    continue
+                session = engine.apply(session, QuestTrigger(
+                    len(session.events), chosen.quest_id, chosen.event_type,
+                    chosen.source_id, chosen.payload_digest,
+                ))
+                print("Completed: " + chosen.quest_id, flush=True)
+            _write_new(args.save, session.save_record())
+            result = {"state": session.as_state(), "state_digest": session.state_digest,
+                      "save_digest": session.save_metadata.digest}
+        else:
+            if args.save is None or args.events is not None or args.resume is not None:
+                raise GameplayContractError("verify requires --save and forbids --events/--resume")
             session = engine.restore(_read(args.save))
             result = {"state": session.as_state(), "state_digest": session.state_digest, "save_digest": session.save_metadata.digest}
         print(json.dumps(result, sort_keys=True))

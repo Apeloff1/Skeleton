@@ -160,6 +160,24 @@ def test_original_fixture_cli_journey(tmp_path: Path) -> None:
     assert json.loads(run.stdout)["save_digest"] == json.loads(verify.stdout)["save_digest"]
 
 
+def test_interactive_choice_play_save_resume_and_replay(tmp_path: Path) -> None:
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps(make_plan().as_record()), encoding="utf-8")
+    first_save = tmp_path / "first.json"
+    second_save = tmp_path / "second.json"
+    command = [sys.executable, "-m", "skeleton", "quest", "play", "--plan", str(plan)]
+    first = subprocess.run(command + ["--save", str(first_save)], input="arrival\\nquit\\n",
+                           capture_output=True, text=True)
+    assert first.returncode == 0, first.stderr
+    assert json.loads(first_save.read_text())["state"]["completed"] == ["arrival"]
+    resumed = subprocess.run(command + ["--resume", str(first_save), "--save", str(second_save)],
+                             input="beacon\\n", capture_output=True, text=True)
+    assert resumed.returncode == 0, resumed.stderr
+    saved = json.loads(second_save.read_text())
+    assert saved["state"]["ending_id"] == "safe_harbor"
+    assert QuestEngine(make_plan()).restore(saved).completed == ("arrival", "beacon")
+
+
 def test_cli_duplicate_json_and_tampered_save_rejected(tmp_path: Path) -> None:
     plan = tmp_path / "plan.json"
     plan.write_text('{"schema_version":1,"schema_version":1,"world_id":"w","quests":[]}')

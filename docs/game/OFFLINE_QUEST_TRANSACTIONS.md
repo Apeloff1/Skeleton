@@ -19,6 +19,8 @@ CLI:
   python -m skeleton quest inspect --plan plan.json
   python -m skeleton quest run --plan plan.json --events events.json --save new-save.json
   python -m skeleton quest verify --plan plan.json --save new-save.json
+  python -m skeleton quest play --plan plan.json --save new-save.json
+  python -m skeleton quest play --plan plan.json --resume old-save.json --save new-save.json
 
 The CLI does not contact any provider or network. Inputs must be bounded
 regular UTF-8 JSON files; duplicate object keys, non-finite values, unknown
@@ -36,3 +38,8 @@ digests are authored game event identities, not user authorization tokens.
 This source branch remains WIP until actual exact-head CI and admission.
 
 Original authored offline fixture: docs/game/fixtures/lantern_harbor_quests.json and lantern_harbor_events.json.
+
+The terminal play mode presents eligible quest choices and advances one
+canonical trigger per explicit choice. Invalid choices do not mutate state.
+Quitting or EOF writes a resumable no-clobber save. It is a text choice
+interface, not a spatial renderer, NPC simulator or physical interaction proof.
