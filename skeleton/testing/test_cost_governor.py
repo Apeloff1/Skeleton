@@ -490,6 +490,7 @@ def test_cost_overrun_completes_durably_but_is_not_accepted_evidence(
     governor.reserve(
         _request(
             "op-overrun",
+            max_cost_usd=1.0,
             estimate=UsageEstimate(
                 input_tokens=100,
                 output_tokens=50,
