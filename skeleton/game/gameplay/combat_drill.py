@@ -15,7 +15,7 @@ from typing import Any
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.tactical_policy import _decide_verified, POLICY_VERSION
 from skeleton.game.gameplay.turn_combat import (
-    CombatSessionError, MAX_CLI_BYTES, MAX_TURNS, _active_actor, _advance,
+    CombatSessionError, MAX_CLI_BYTES, _active_actor, _advance,
     _id, _integer, _object, _parse_json, new_session, normalize_scenario,
     original_demo, verify_session,
 )
