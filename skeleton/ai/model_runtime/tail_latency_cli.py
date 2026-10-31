@@ -13,7 +13,7 @@ from .execution_telemetry import ExecutionTiming
 from .offline_json_guard import load_strict_telemetry_json
 from .tail_latency_profile import (
     LocalTailProfiler, ProfileIdentity, ResourceObservation,
-    compare_tail_profiles,
+    compare_tail_profiles, mark_unattested_operator_profile,
 )
 
 
@@ -69,7 +69,7 @@ def _command(raw: object) -> dict[str, object]:
         "ttft_slo_ms", "inter_token_slo_ms", "e2e_slo_ms",
     }:
         raise ValueError("invalid SLO targets")
-    summary = profiler.summary(**slo)
+    summary = mark_unattested_operator_profile(profiler.summary(**slo))
     baseline = raw["baseline"]
     comparison = None
     if baseline is not None:

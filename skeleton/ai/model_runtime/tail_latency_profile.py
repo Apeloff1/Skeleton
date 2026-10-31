@@ -375,7 +375,28 @@ def compare_tail_profiles(
     }
 
 
+def mark_unattested_operator_profile(summary: Mapping[str, object]) -> dict[str, object]:
+    """Fail-close operator-supplied samples without falsifying timing values.
+
+    A canonical source digest proves only that a profile has not changed;
+    it cannot attest who measured it. Rebind the profile digest after
+    downgrading qualification so downstream regression checks return pending.
+    """
+    if not isinstance(summary, Mapping) or summary.get("schema") != PROFILE_SCHEMA:
+        raise ValueError("invalid operator profile")
+    digest = summary.get("digest")
+    if type(digest) is not str or len(digest) != 64:
+        raise ValueError("invalid operator profile digest")
+    body = {key: summary[key] for key in summary if key != "digest"}
+    if not hmac.compare_digest(_digest(body), digest):
+        raise ValueError("operator profile integrity mismatch")
+    body["qualification"] = "unverified_operator_input"
+    body["input_attestation"] = "unverified_operator_json"
+    return {**body, "digest": _digest(body)}
+
+
 __all__ = [
     "LocalTailProfiler", "ProfileIdentity", "ProfileRecord",
     "ResourceObservation", "compare_tail_profiles",
+    "mark_unattested_operator_profile",
 ]

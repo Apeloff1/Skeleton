@@ -292,3 +292,33 @@ def test_cli_marks_operator_json_unattested_even_when_measured_claimed() -> None
     assert receipt["input_attestation"] == "unverified_operator_json"
     assert receipt["admission_qualified"] is False
     assert receipt["device_qualified"] is False
+
+
+def test_operator_claimed_measured_profile_cannot_certify_tail_regression() -> None:
+    from skeleton.ai.model_runtime.tail_latency_profile import mark_unattested_operator_profile
+    claimed = summary(profile(evidence="measured"))
+    assert claimed["qualification"] == "measured_tail_profile"
+    downgraded = mark_unattested_operator_profile(claimed)
+    assert downgraded["qualification"] == "unverified_operator_input"
+    assert downgraded["input_attestation"] == "unverified_operator_json"
+    assert downgraded["tail"] == claimed["tail"]
+    assert downgraded["digest"] != claimed["digest"]
+    result = compare_tail_profiles(claimed, downgraded)
+    assert result == {"status": "pending", "reason": "insufficient_or_unqualified_samples"}
+    with pytest.raises(ValueError, match="integrity"):
+        mark_unattested_operator_profile({**claimed, "requests": 1000})
+
+
+def test_operator_cli_summary_is_unqualified_even_if_identity_claims_measured() -> None:
+    payload = _payload()
+    payload["identity"]["evidence"] = "measured"
+    result = _command(payload)
+    assert result["summary"]["qualification"] == "unverified_operator_input"
+    assert result["summary"]["input_attestation"] == "unverified_operator_json"
+    assert result["input_attestation"] == "unverified_operator_json"
+    assert result["admission_qualified"] is False
+    followup = _payload()
+    followup["identity"]["evidence"] = "measured"
+    followup["checkpoint"] = result["checkpoint"]
+    followup["records"] = []
+    assert _command(followup)["summary"]["digest"] == result["summary"]["digest"]
