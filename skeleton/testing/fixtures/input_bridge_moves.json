@@ -1,0 +1,10 @@
+[
+  {
+    "event_id": "e0",
+    "sequence": 0,
+    "device_class": "keyboard",
+    "control_path": "KeyD",
+    "modifiers": [],
+    "pressed": true
+  }
+]

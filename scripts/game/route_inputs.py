@@ -84,12 +84,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-profile", type=Path, help="Write a new revisioned profile")
     parser.add_argument("--resume", type=Path, help="Verified prior input session")
     parser.add_argument("--out-session", type=Path, help="Write a new replayable session")
+    parser.add_argument("--game-source", type=Path, help="Route inputs into original playable grid game")
+    parser.add_argument("--goal-ending", help="Select an authored ending for confirm")
+    parser.add_argument("--out-game", type=Path, help="Write new replay-bound input/game report")
     args = parser.parse_args(argv)
     try:
         profile = InputProfile.load(_read(args.profile))
         if args.rebind is not None:
             if (args.events is not None or args.control is None or args.revision is None
-                    or args.resume is not None or args.out_session is not None):
+                    or args.resume is not None or args.out_session is not None
+                    or args.game_source is not None or args.goal_ending is not None
+                    or args.out_game is not None):
                 raise PresentationContractError("rebind requires --control and --revision only")
             revised = profile.rebind(args.rebind, args.control, args.revision)
             if args.out_profile is not None:
@@ -102,6 +107,21 @@ def main(argv: list[str] | None = None) -> int:
         raw = _read(args.events)
         if not isinstance(raw, list) or len(raw) > 4096:
             raise PresentationContractError("invalid input event batch")
+        if args.game_source is not None:
+            if args.resume is not None or args.out_session is not None:
+                raise PresentationContractError("gameplay routing forbids input resume/output")
+            from skeleton.game.gameplay.offline_grid_campaign import Campaign
+            from skeleton.game.presentation.input_gameplay_bridge import play_inputs
+            campaign = Campaign.load(_read(args.game_source))
+            result = play_inputs(
+                campaign, profile, raw, selected_ending=args.goal_ending,
+            )
+            if args.out_game is not None:
+                _write_new(args.out_game, result)
+            print(json.dumps(result, sort_keys=True))
+            return 0
+        if args.goal_ending is not None or args.out_game is not None:
+            raise PresentationContractError("game options require --game-source")
         session = (InputSession.restore(profile, _read(args.resume))
                    if args.resume is not None else InputSession(profile))
         for event in raw:
