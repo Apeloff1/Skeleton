@@ -151,7 +151,7 @@ def test_interactive_eof_checkpoint_resume_preserves_exact_tactical_history():
     writer = io.StringIO()
     with pytest.raises(CombatSessionError, match="checkpoint emitted"):
         play_expedition(
-            source, input_stream=io.StringIO(json.dumps(first_action) + "\\n"),
+            source, input_stream=io.StringIO(json.dumps(first_action) + "\n"),
             output_stream=writer,
         )
     events = [json.loads(line) for line in writer.getvalue().splitlines()]
@@ -162,7 +162,7 @@ def test_interactive_eof_checkpoint_resume_preserves_exact_tactical_history():
     recovered = play_expedition(
         source, resume=checkpoint["session"],
         expected_source_digest=checkpoint["source_digest"],
-        input_stream=io.StringIO('{"kind":"fight"}\\n'),
+        input_stream=io.StringIO('{"kind":"fight"}\n'),
         output_stream=io.StringIO(),
     )
     assert recovered == simulate_expedition(
@@ -175,7 +175,7 @@ def test_interactive_three_rejections_checkpoint_unchanged():
     writer = io.StringIO()
     with pytest.raises(CombatSessionError, match="checkpoint emitted"):
         play_expedition(
-            source, input_stream=io.StringIO("bad\\nbad\\nbad\\n"),
+            source, input_stream=io.StringIO("bad\nbad\nbad\n"),
             output_stream=writer,
         )
     events = [json.loads(line) for line in writer.getvalue().splitlines()]
@@ -188,7 +188,7 @@ def test_interactive_checkpoint_interval_and_source_fence():
     source, _ = _first()
     output = io.StringIO()
     saved = play_expedition(
-        source, input_stream=io.StringIO('{"kind":"fight"}\\n{"kind":"fight"}\\n'),
+        source, input_stream=io.StringIO('{"kind":"fight"}\n{"kind":"fight"}\n'),
         output_stream=output, checkpoint_every=1,
     )
     events = [json.loads(line) for line in output.getvalue().splitlines()]
@@ -214,7 +214,7 @@ def test_installed_expedition_play_cli(monkeypatch, capsys):
     import sys
     from skeleton.__main__ import main
     monkeypatch.setattr(
-        sys, "stdin", io.StringIO('{"kind":"fight"}\\n{"kind":"fight"}\\n'),
+        sys, "stdin", io.StringIO('{"kind":"fight"}\n{"kind":"fight"}\n'),
     )
     assert main(["combat-expedition", "play", "--demo",
                  "--checkpoint-every", "1"]) == 0
