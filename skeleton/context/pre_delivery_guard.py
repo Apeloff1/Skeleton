@@ -476,7 +476,11 @@ class GuardedLocalInference:
         # No client-controlled callback is accepted through that service.
         if _before_dispatch is not None:
             try:
-                await asyncio.wait_for(_before_dispatch(), timeout=remaining_timeout())
+                # Scoped source authority is bound to this exact asyncio task.
+                # wait_for(coroutine) creates a child task and breaks that
+                # custody; timeout() keeps the reread in the owning task.
+                async with asyncio.timeout(remaining_timeout()):
+                    await _before_dispatch()
             except TimeoutError as exc:
                 raise SealedContextBoundaryError("canonical authority timed out before dispatch") from exc
         if reviewer is not self.reviewer:
