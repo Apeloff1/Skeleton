@@ -107,5 +107,22 @@ def test_route_containing_illegal_edge_rejected():
     assert not validate_route(illegal)
 
 
+def test_forged_cost_is_rejected_with_valid_edges():
+    valid = plan()
+    assert valid is not None
+    forged = Route(valid.nodes, valid.distance, valid.danger,
+                   valid.energy, valid.cost + 1, valid.weights)
+    assert not validate_route(forged)
+
+
+def test_custom_weights_are_bound_to_route_receipt():
+    weights = (3, 4, 5)
+    route = plan(distance_weight=3, danger_weight=4, energy_weight=5)
+    assert route is not None
+    assert route.weights == weights
+    assert validate_route(route, expected_weights=weights)
+    assert not validate_route(route, expected_weights=(1, 2, 1))
+
+
 def test_nonroute_object_rejected():
     assert validate_route(None) is False

@@ -36,6 +36,7 @@ class Route:
     danger: int
     energy: int
     cost: int
+    weights: tuple[int, int, int] = (1, 2, 1)
 
     def __post_init__(self) -> None:
         if type(self.nodes) is not tuple or not self.nodes:
@@ -46,6 +47,10 @@ class Route:
             self.distance, self.danger, self.energy, self.cost
         )):
             raise ValueError("invalid-route-metric")
+        if (type(self.weights) is not tuple or len(self.weights) != 3
+                or any(type(w) is not int or not 0 <= w <= MAX_BUDGET for w in self.weights)
+                or not any(self.weights)):
+            raise ValueError("invalid-route-weights")
 
 
 def _budget(value: int, label: str) -> int:
@@ -90,7 +95,7 @@ def plan(
     if origin in blocked or destination in blocked:
         return None
     if origin == destination:
-        return Route((origin,), 0, 0, 0, 0)
+        return Route((origin,), 0, 0, 0, 0, (distance_weight, danger_weight, energy_weight))
 
     adjacency: dict[str, list[tuple[str, int, int, int]]] = {
         node: [] for node in NODES
@@ -109,7 +114,7 @@ def plan(
         cost, path, distance, danger, energy = heappop(queue)
         node = path[-1]
         if node == destination:
-            return Route(path, distance, danger, energy, cost)
+            return Route(path, distance, danger, energy, cost, (distance_weight, danger_weight, energy_weight))
         if len(path) >= MAX_HOPS:
             continue
         for next_node, delta_distance, delta_danger, delta_energy in adjacency[node]:
@@ -147,9 +152,12 @@ def inspect() -> dict[str, Any]:
     }
 
 
-def validate_route(route: Route, blocked: tuple[str, ...] = ()) -> bool:
+def validate_route(route: Route, blocked: tuple[str, ...] = (), *,
+                   expected_weights: tuple[int, int, int] | None = None) -> bool:
     """Verify returned edge sequence without trusting a client-supplied route."""
     if type(route) is not Route:
+        return False
+    if expected_weights is not None and route.weights != expected_weights:
         return False
     if type(blocked) is not tuple or any(
         type(n) is not str or n not in NODES for n in blocked
@@ -172,4 +180,7 @@ def validate_route(route: Route, blocked: tuple[str, ...] = ()) -> bool:
         distance == route.distance
         and danger == route.danger
         and energy == route.energy
+        and route.cost == sum(metric * weight for metric, weight in zip(
+            (distance, danger, energy), route.weights
+        ))
     )
