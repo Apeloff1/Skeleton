@@ -38,6 +38,15 @@ class InputRoutingTests(unittest.TestCase):
         self.assertEqual(InputSession.restore(self.profile, controller.snapshot()), controller)
         self.assertEqual(controller.snapshot(), InputSession.restore(self.profile, controller.snapshot()).snapshot())
 
+    def test_receipts_cannot_mutate_authoritative_session(self):
+        session = InputSession(self.profile).step(InputEvent.load(event("one", 0)))
+        before = session.snapshot()
+        leaked = session.events[0]
+        leaked["command"]["target"] = "west"
+        leaked["event"]["event_id"] = "forged"
+        self.assertEqual(session.snapshot(), before)
+        self.assertEqual(InputSession.restore(self.profile, before), session)
+
     def test_rebinding_is_revision_fenced_and_session_source_bound(self):
         revised = self.profile.rebind("keyboard-east", "ArrowRight", 0)
         self.assertEqual(revised.revision, 1)

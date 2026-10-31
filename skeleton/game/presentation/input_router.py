@@ -147,13 +147,21 @@ class InputEvent:
 
 @dataclass(frozen=True)
 class InputSession:
+    """Replayable session with immutable canonical event storage."""
+
     profile: InputProfile
-    events: tuple[dict, ...] = ()
+    _events: tuple[str, ...] = ()
+
+    @property
+    def events(self) -> tuple[dict, ...]:
+        # Return detached copies; callers cannot mutate the authoritative ledger.
+        return tuple(json.loads(record) for record in self._events)
 
     def step(self, event: InputEvent) -> "InputSession":
-        if len(self.events) >= MAX_EVENTS or event.sequence != len(self.events):
+        event = InputEvent.load(event.manifest())
+        if len(self._events) >= MAX_EVENTS or event.sequence != len(self._events):
             raise PresentationContractError("input sequence or budget violation")
-        if any(receipt["event"]["event_id"] == event.event_id for receipt in self.events):
+        if any(json.loads(record)["event"]["event_id"] == event.event_id for record in self._events):
             raise PresentationContractError("duplicate input event identity")
         chord = (event.device_class, event.control_path, event.modifiers)
         binding = next(
@@ -167,15 +175,17 @@ class InputSession:
             "event": event.manifest(), "binding_id": binding.binding_id,
             "action_id": binding.action_id,
             "command": {"kind": kind, "target": target} if event.pressed else None,
-            "previous_digest": self.events[-1]["digest"] if self.events else self.profile.digest,
+            "previous_digest": json.loads(self._events[-1])["digest"]
+                               if self._events else self.profile.digest,
         }
         receipt["digest"] = digest_json({"profile": self.profile.digest, "receipt": receipt})
-        return InputSession(self.profile, (*self.events, receipt))
+        encoded = json.dumps(receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return InputSession(self.profile, (*self._events, encoded))
 
     def snapshot(self) -> dict:
         return {
             "schema_version": 1, "profile_digest": self.profile.digest,
-            "events": [dict(item) for item in self.events],
+            "events": list(self.events),
             "session_digest": digest_json(self.events),
         }
 
