@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_time_loop_detective_sunken_metro",
+  "genre": "time_loop_detective",
+  "biome": "sunken_metro",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Sunken Metro: Time Loop Detective",
+  "foundation": {
+    "setting": "Sunken Metro",
+    "era": "early reconstruction",
+    "environment": "submerged tunnels",
+    "history": "A forgotten underwater tram hub once protected recycled batteries, until recurring rising flood gates forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Fen Navin, a chronologist, must prevent a repeat reactor incident, relying on event-order inference despite rising flood gates.",
+  "central_conflict": "a self-reinforcing paradox threatens the underwater tram hub by restricting recycled batteries.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "rising flood gates destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a self-reinforcing paradox contests access to recycled batteries",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The underwater tram hub becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers recycled batteries"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "underwater tram hub",
+    "critical_resource": "recycled batteries",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

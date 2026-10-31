@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_time_loop_detective_echo_caverns",
+  "title": "Echo Caverns: Time Loop Detective",
+  "subtitle": "An original time loop detective brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610303328,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "arcade",
+  "starting_health": 6
+}

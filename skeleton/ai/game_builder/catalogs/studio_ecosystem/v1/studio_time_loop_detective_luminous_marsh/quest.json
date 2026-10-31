@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_time_loop_detective_luminous_marsh",
+  "genre": "time_loop_detective",
+  "biome": "luminous_marsh",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_time_loop_detective_luminous_marsh:restore",
+  "objective": "prevent a repeat reactor incident",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "glowing reed fields",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before bioluminescent flooding"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "submerged civic bell",
+      "verb": "replay",
+      "requirements": [
+        "Establish control of reeds and peat"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "submerged civic bell",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the submerged civic bell"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "bioluminescent flooding",
+    "a self-reinforcing paradox"
+  ],
+  "resource_constraints": {
+    "resource": "reeds and peat",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

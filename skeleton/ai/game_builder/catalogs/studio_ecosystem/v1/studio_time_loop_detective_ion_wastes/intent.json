@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_time_loop_detective_ion_wastes",
+  "title": "Ion Wastes: Time Loop Detective",
+  "subtitle": "An original time loop detective brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610303158,
+  "width": 21,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 4
+}
