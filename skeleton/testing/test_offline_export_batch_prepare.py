@@ -149,3 +149,39 @@ def test_preparation_root_entry_flood_never_publishes_index(unpublished):
     with pytest.raises(OfflineBatchVerificationError, match="batch preparation rejected"):
         prepare_export_batch(root, entries=entries, authorized=True)
     assert not (root / "batch.json").exists()
+
+
+def test_concurrent_sibling_after_replay_rejects_preparation_without_index(unpublished, monkeypatch):
+    import skeleton.ai.game_builder.offline_export_batch_prepare as module
+
+    root, entries = unpublished
+    original = module.verify_exported_package
+    calls = 0
+
+    def inject_after_replay(*args, **kwargs):
+        nonlocal calls
+        receipt = original(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            (root / "unlisted-during-replay.txt").write_bytes(b"untrusted")
+        return receipt
+
+    monkeypatch.setattr(module, "verify_exported_package", inject_after_replay)
+    with pytest.raises(OfflineBatchVerificationError, match="changed during replay"):
+        prepare_export_batch(root, entries=entries, authorized=True)
+    assert not (root / "batch.json").exists()
+
+
+def test_concurrent_sibling_during_atomic_link_rolls_back_own_index(unpublished, monkeypatch):
+    root, entries = unpublished
+    original_link = os.link
+
+    def insert_during_link(*args, **kwargs):
+        (root / "unlisted-at-link.txt").write_bytes(b"untrusted")
+        return original_link(*args, **kwargs)
+
+    monkeypatch.setattr(os, "link", insert_during_link)
+    with pytest.raises(OfflineBatchVerificationError, match="atomic publication"):
+        prepare_export_batch(root, entries=entries, authorized=True)
+    assert not (root / "batch.json").exists()
+    assert not any(path.name.startswith(".batch-") for path in root.iterdir())

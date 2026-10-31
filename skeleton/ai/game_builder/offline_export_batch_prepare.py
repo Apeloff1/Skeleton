@@ -82,6 +82,14 @@ def prepare_export_batch(
                 raise OfflineBatchVerificationError("package identity differs from entry")
             replay_digests.append(result["replay_digest"])
 
+        # Reconcile the directory after gameplay replay. A concurrent writer
+        # must not add an unlisted package between the initial inventory and
+        # publication of an independently transferable trusted index.
+        if set(_bounded_names(root_fd, MAX_PACKAGES)) != set(directories):
+            raise OfflineBatchVerificationError(
+                "batch root changed during replay before publication"
+            )
+
         temporary = ".batch-" + secrets.token_hex(16)
         temp_fd = -1
         published = False
@@ -116,6 +124,15 @@ def prepare_export_batch(
                     or linked.st_size != len(data)):
                 raise OfflineBatchVerificationError(
                     "published index identity differs from verified temporary file"
+                )
+            # The private temporary hardlink still exists here. Check the
+            # complete directory before dropping it, so a concurrent
+            # insertion causes rollback of only our own published inode.
+            if set(_bounded_names(root_fd, MAX_PACKAGES + 2)) != (
+                set(directories) | {temporary, "batch.json"}
+            ):
+                raise OfflineBatchVerificationError(
+                    "batch root changed during atomic publication"
                 )
             os.fsync(root_fd)
         except BaseException:
