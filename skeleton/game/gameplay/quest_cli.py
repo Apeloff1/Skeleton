@@ -89,7 +89,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--events", type=Path, help="ordered authored event triggers for run")
     parser.add_argument("--save", type=Path, help="new no-clobber save output, or input for verify")
-    parser.add_argument("--resume", type=Path, help="verified previous save for play; output must be a new file")
+    parser.add_argument(
+        "--resume", type=Path,
+        help="verified previous save for play; output must be a new file",
+    )
     args = parser.parse_args(argv)
     try:
         plan = QuestPlan.from_record(_read(args.plan))
@@ -103,7 +106,10 @@ def main(argv: list[str] | None = None) -> int:
                 raise GameplayContractError("run requires --events and --save, without --resume")
             session = engine.replay(_events(args.events))
             _write_new(args.save, session.save_record())
-            result = {"state": session.as_state(), "state_digest": session.state_digest, "save_digest": session.save_metadata.digest}
+            result = {
+                "state": session.as_state(), "state_digest": session.state_digest,
+                "save_digest": session.save_metadata.digest,
+            }
         elif args.command == "play":
             if args.save is None or args.events is not None:
                 raise GameplayContractError("play requires --save and forbids --events")
@@ -143,7 +149,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.save is None or args.events is not None or args.resume is not None:
                 raise GameplayContractError("verify requires --save and forbids --events/--resume")
             session = engine.restore(_read(args.save))
-            result = {"state": session.as_state(), "state_digest": session.state_digest, "save_digest": session.save_metadata.digest}
+            result = {
+                "state": session.as_state(), "state_digest": session.state_digest,
+                "save_digest": session.save_metadata.digest,
+            }
         print(json.dumps(result, sort_keys=True))
         return 0
     except (GameplayContractError, ValueError, TypeError, KeyError, UnicodeError, OSError) as exc:
