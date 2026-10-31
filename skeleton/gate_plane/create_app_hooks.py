@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
-from skeleton.gate_plane.stack import GATE_LAYERS, describe_stack, install_order
+from skeleton.gate_plane.stack import describe_stack, install_order
 
 
 DEFAULT_OPEN_PROBES: Tuple[str, ...] = (
@@ -240,3 +240,51 @@ def resolve_create_app_hooks() -> List[object]:
         mod, _, attr = ref.partition(":")
         out.append(getattr(importlib.import_module(mod), attr))
     return out
+
+
+CREATE_APP_HOOKS_ENV = "SKELETON_CREATE_APP_HOOKS"
+
+
+def create_app_hooks_enabled() -> bool:
+    """Env flag, default on; ``0/false/no/off`` disables every hook."""
+    import os
+
+    raw = os.environ.get(CREATE_APP_HOOKS_ENV, "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def apply_create_app_hooks(app, hooks: Optional[Sequence[object]] = None) -> Dict[str, object]:
+    """Run registered hooks on ``app`` at factory time (never in a lifespan).
+
+    Idempotent per app (``app.state.create_app_hooks_applied``); each hook is
+    error-isolated so one failing hook cannot break app construction.
+    """
+    import logging
+
+    log = logging.getLogger(__name__)
+    state = getattr(app, "state", None)
+    if not create_app_hooks_enabled():
+        return {"enabled": False, "applied": [], "errors": {}}
+    if state is not None and getattr(state, "create_app_hooks_applied", False):
+        return {"enabled": True, "applied": [], "errors": {}, "skipped": "already-applied"}
+    applied: List[str] = []
+    errors: Dict[str, str] = {}
+    try:
+        resolved = list(hooks) if hooks is not None else resolve_create_app_hooks()
+    except Exception as exc:  # isolate import failures
+        log.warning("create_app hooks failed to resolve: %s", exc)
+        resolved = []
+        errors["<resolve>"] = f"{type(exc).__name__}: {exc}"
+    for hook in resolved:
+        name = getattr(hook, "__qualname__", repr(hook))
+        try:
+            hook(app)
+            applied.append(name)
+        except Exception as exc:
+            errors[name] = f"{type(exc).__name__}: {exc}"
+            log.warning("create_app hook %s failed: %s", name, errors[name])
+    report = {"enabled": True, "applied": applied, "errors": errors}
+    if state is not None:
+        state.create_app_hooks_applied = True
+        state.create_app_hooks_report = report
+    return report
