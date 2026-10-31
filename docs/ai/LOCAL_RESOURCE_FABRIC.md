@@ -537,3 +537,22 @@ under the existing measured stream capacity, cannot be overtaken by new
 fail-fast requests, and release their ticket on cancellation or deadline.
 The monitor exposes waiting_stream_batches. This is a process-local queue,
 not a claim of distributed scheduling or GPU kernel preemption.
+
+
+## Linux cgroup-v2 memory event feedback
+
+The offline resource fabric samples the kernel's memory.events.local file,
+falling back to memory.events only when local counters are unavailable.
+Cumulative high/max/OOM/OOM-kill counters are compared only against a previous
+sample from the same scope; the first sample is a baseline, not a current OOM.
+Invalid or missing telemetry remains unknown, never an invented zero reading.
+
+A newly observed high/max event temporarily caps read-only staging at one
+stream and vetoes shared/unified-memory GPU planning. OOM/OOM-kill deltas
+reject new read-only staging and are rechecked during long reads. Counter
+resets and missing samples do not erase existing holds. Recovery uses
+monotonic five-second high and thirty-second OOM windows. This is cooperative
+software backpressure, not GPU preemption, kernel swap reconfiguration or
+proof that other processes cannot exhaust memory. The resource monitor exposes
+sensor scope, observed deltas and current holds. Non-Linux platforms report
+this Linux-only sensor as unavailable and retain their existing memory guards.

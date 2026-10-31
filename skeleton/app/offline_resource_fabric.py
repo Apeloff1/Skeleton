@@ -25,6 +25,7 @@ import threading
 import time
 from typing import Any, Iterable
 
+from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
 )
@@ -375,6 +376,8 @@ class FabricPlan:
     available_stream_slots: int = 1
     readonly_stream: bool = False
     thermal_holds: int = 0
+    cgroup_high_backpressure: bool = False
+    cgroup_oom_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -386,6 +389,8 @@ class FabricPlan:
             "available_stream_slots": self.available_stream_slots,
             "readonly_stream": self.readonly_stream,
             "thermal_holds": self.thermal_holds,
+            "cgroup_high_backpressure": self.cgroup_high_backpressure,
+            "cgroup_oom_backpressure": self.cgroup_oom_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -445,10 +450,12 @@ class AdaptiveResourceFabric:
         self._learned_parallelism = 1.0
         self._previous_batch_throughput: float | None = None
         self._thermal_blocked: set[tuple[int, str, str]] = set()
+        self._cgroup = CgroupPressureTracker()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
         gpus = probe_gpu_resources()
+        self._cgroup.sample(probe_cgroup_events())
         ram_pressure = 1 - hardware.available_ram_bytes / hardware.total_ram_bytes
         swap_pressure = (
             1 - hardware.free_swap_bytes / hardware.total_swap_bytes
@@ -482,6 +489,9 @@ class AdaptiveResourceFabric:
             raise ValueError("invalid concurrent resource request")
         snap = self.observe()
         hw = snap.hardware
+        cgroup = self._cgroup.snapshot()
+        if readonly_stream and cgroup["oom_backpressure"]:
+            raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
             ema = self._pressure_ema if self._pressure_ema is not None else 1.0
             running = self._active_streams
@@ -519,6 +529,8 @@ class AdaptiveResourceFabric:
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
         )
+        if cgroup["high_backpressure"]:
+            streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
         # The index distinguishes identical GPUs; absent devices are retired.
@@ -569,6 +581,8 @@ class AdaptiveResourceFabric:
         eligible = bool(
             allow_gpu and gpu is not None and requested_gpu_bytes > 0
             and requested_gpu_bytes <= budget
+            and not cgroup["oom_backpressure"]
+            and not (cgroup["high_backpressure"] and gpu.shared_with_system_ram)
         )
         reason = (
             "verified read-only host staging, SQLite spill when needed; "
@@ -588,6 +602,8 @@ class AdaptiveResourceFabric:
             "cpu_load": hw.cpu_load_ratio,
             "predictive_pressure": round(ema, 6),
             "thermal_holds": thermal_holds,
+            "cgroup_high_backpressure": cgroup["high_backpressure"],
+            "cgroup_oom_backpressure": cgroup["oom_backpressure"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -602,6 +618,8 @@ class AdaptiveResourceFabric:
             available_stream_slots=headroom,
             readonly_stream=readonly_stream,
             thermal_holds=thermal_holds,
+            cgroup_high_backpressure=bool(cgroup["high_backpressure"]),
+            cgroup_oom_backpressure=bool(cgroup["oom_backpressure"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -663,6 +681,7 @@ class AdaptiveResourceFabric:
             "learned_parallelism_fraction": round(learned, 4),
             "thermal_hold_devices": thermal_holds,
             "waiting_stream_batches": waiting_batches,
+            "cgroup_memory_events": self._cgroup.snapshot(),
         }
         return result
 
@@ -813,6 +832,9 @@ class AdaptiveResourceFabric:
                             live = probe_local_resources(self.storage_path)
                             with self._lock:
                                 self._stream_pressure_rechecks += 1
+                            self._cgroup.sample(probe_cgroup_events())
+                            if self._cgroup.snapshot()["oom_backpressure"]:
+                                raise LocalResourcePressure("cgroup OOM during staged read")
                             if live.available_ram_bytes < 2 * live.read_chunk_bytes:
                                 raise LocalResourcePressure(
                                     "physical RAM headroom fell during staged read"

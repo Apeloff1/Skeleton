@@ -633,5 +633,113 @@ class FabricTests(unittest.TestCase):
                 fabric.plan(1, desired_streams=0)
 
 
+
+class CgroupPressureTests(unittest.TestCase):
+    """Synthetic counters verify canonical hardware admission and recovery."""
+
+    def test_kernel_counter_probe_and_strict_unknown(self):
+        from skeleton.app.offline_cgroup_events import probe_cgroup_events
+        with TemporaryDirectory() as d:
+            path = Path(d) / "memory.events.local"
+            path.write_text("low 0\nhigh 7\nmax 2\noom 1\noom_kill 0\n")
+            with patch("skeleton.app.offline_cgroup_events.sys.platform", "linux"):
+                sample = probe_cgroup_events(d)
+                self.assertEqual((sample.scope, sample.high, sample.maximum), ("local", 7, 2))
+                path.write_text("high 3\nhigh 4\nmax 0\noom 0\noom_kill 0\n")
+                self.assertIsNone(probe_cgroup_events(d))
+                path.unlink()
+                self.assertIsNone(probe_cgroup_events(d))
+            with patch("skeleton.app.offline_cgroup_events.sys.platform", "win32"):
+                self.assertIsNone(probe_cgroup_events(d))
+
+    def test_high_event_caps_streams_and_vetoes_shared_gpu(self):
+        from skeleton.app.offline_cgroup_events import CgroupEvents, CgroupPressureTracker
+        now = [1_000_000_000]
+        before = CgroupEvents("local", 1, 0, 0, 0)
+        after = CgroupEvents("local", 2, 0, 0, 0)
+        gpu = GPUResource(
+            device="UMA", vendor="apple", dedicated_total_bytes=0,
+            dedicated_free_bytes=0, shared_with_system_ram=True,
+            recommended_working_set_bytes=2_000_000_000, current_allocated_bytes=0,
+        )
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            fabric._cgroup = CgroupPressureTracker(clock_ns=lambda: now[0])
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(gpu,),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_cgroup_events",
+                side_effect=[before, after, after],
+            ):
+                normal = fabric.plan(10_000, desired_streams=8, allow_gpu=True,
+                                     requested_gpu_bytes=100_000_000)
+                self.assertTrue(normal.gpu_eligible)
+                throttled = fabric.plan(10_000, desired_streams=8, allow_gpu=True,
+                                        requested_gpu_bytes=100_000_000)
+                self.assertEqual(throttled.stream_count, 1)
+                self.assertFalse(throttled.gpu_eligible)
+                self.assertTrue(throttled.cgroup_high_backpressure)
+                self.assertEqual(
+                    fabric.monitor()["controller"]["cgroup_memory_events"][
+                        "high_transitions"], 1,
+                )
+            now[0] += 6_000_000_000
+            self.assertFalse(fabric._cgroup.snapshot()["high_backpressure"])
+
+    def test_oom_denies_staging_then_recovers(self):
+        from skeleton.app.offline_cgroup_events import CgroupEvents, CgroupPressureTracker
+        now = [1_000_000_000]
+        before = CgroupEvents("local", 0, 0, 0, 0)
+        oom = CgroupEvents("local", 0, 0, 1, 0)
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            fabric._cgroup = CgroupPressureTracker(clock_ns=lambda: now[0])
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_cgroup_events",
+                side_effect=[before, oom, None, oom],
+            ):
+                fabric.plan(1000, readonly_stream=True)
+                with self.assertRaisesRegex(LocalResourcePressure, "cgroup OOM"):
+                    fabric.plan(1000, readonly_stream=True)
+                self.assertTrue(fabric._cgroup.snapshot()["oom_backpressure"])
+                now[0] += 31_000_000_000
+                self.assertFalse(fabric.plan(1000, readonly_stream=True).cgroup_oom_backpressure)
+
+    def test_counter_reset_and_unknown_keep_oom_hold(self):
+        from skeleton.app.offline_cgroup_events import CgroupEvents, CgroupPressureTracker
+        now = [10_000_000_000]
+        tracker = CgroupPressureTracker(clock_ns=lambda: now[0])
+        tracker.sample(CgroupEvents("local", 5, 0, 1, 1))
+        tracker.sample(CgroupEvents("local", 5, 0, 2, 2))
+        tracker.sample(CgroupEvents("local", 0, 0, 0, 0))
+        tracker.sample(None)
+        self.assertFalse(tracker.snapshot()["measured"])
+        self.assertTrue(tracker.snapshot()["oom_backpressure"])
+        self.assertEqual(tracker.snapshot()["oom_transitions"], 1)
+        now[0] += 31_000_000_000
+        self.assertFalse(tracker.snapshot()["oom_backpressure"])
+
+    def test_invalid_sample_and_clock_regression_rejected(self):
+        from skeleton.app.offline_cgroup_events import CgroupPressureTracker
+        now = [5]
+        tracker = CgroupPressureTracker(clock_ns=lambda: now[0])
+        with self.assertRaises(TypeError):
+            tracker.sample({"high": 1})
+        tracker.sample(None)
+        now[0] = 4
+        with self.assertRaises(ValueError):
+            tracker.snapshot()
+
+
 if __name__ == "__main__":
     unittest.main()
