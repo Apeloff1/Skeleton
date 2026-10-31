@@ -45,11 +45,15 @@ def test_explored_atlas_has_canonical_history_and_ending() -> None:
 
 def test_route_to_discovered_room_respects_held_keys() -> None:
     world, actions, _ = _play()
+    world["scenes"][1]["exits"].append({
+        "id": "south", "to": "quay", "requires_item": None,
+    })
     partial = simulate(world, actions[:2])
     result = route_known(partial, "quay")
     assert result["reachable"] is True
-    assert result["steps"] is not None
-    assert all(step["kind"] == "travel" for step in result["steps"])
+    assert result["steps"] == [{
+        "kind": "travel", "exit_id": "south", "from": "gate", "to": "quay",
+    }]
     assert result["source_digest"] == partial["source_digest"]
 
 
@@ -145,4 +149,19 @@ def test_cli_route_and_invalid_json(capsys) -> None:
                 "--target-scene", "quay"]) == 0
     assert json.loads(capsys.readouterr().out)["steps"] == []
     assert cli(["inspect", "--session-json", "{"]) == 2
+    assert json.loads(capsys.readouterr().err)["ok"] is False
+
+
+def test_route_reports_unreachable_without_inventing_reverse_exit() -> None:
+    world, actions, _ = _play()
+    session = simulate(world, actions[:2])
+    result = route_known(session, "quay")
+    assert result["reachable"] is False
+    assert result["steps"] is None
+
+
+def test_cli_rejects_duplicate_and_nonfinite_json(capsys) -> None:
+    assert cli(["inspect", "--session-json", '{"x":1,"x":2}']) == 2
+    assert json.loads(capsys.readouterr().err)["ok"] is False
+    assert cli(["inspect", "--session-json", "NaN"]) == 2
     assert json.loads(capsys.readouterr().err)["ok"] is False

@@ -14,7 +14,7 @@ from typing import Any
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import dig
 from skeleton.game.gameplay.scene_travel import (
-    MAX_JSON_BYTES, SceneTravelError, _advance, _id, _json, _object,
+    SceneTravelError, _advance, _id, _object,
     new_session, original_demo, simulate, verify_session,
 )
 
@@ -33,6 +33,32 @@ def _size(value: Any) -> None:
         raise SceneTravelError("invalid atlas JSON") from exc
     if len(encoded) > MAX_BUNDLE_BYTES:
         raise SceneTravelError("atlas export exceeds bounded size")
+
+
+def _strict_json(text: str, label: str, *, max_bytes: int = MAX_BUNDLE_BYTES) -> Any:
+    """Reject duplicate keys, nonfinite numbers and oversized untrusted input."""
+    if type(text) is not str:
+        raise SceneTravelError(f"invalid {label} JSON")
+    try:
+        if len(text.encode("utf-8")) > max_bytes:
+            raise SceneTravelError(f"{label} exceeds input budget")
+        def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate JSON key")
+                result[key] = value
+            return result
+
+        def reject_nonfinite(value: str) -> None:
+            raise ValueError("nonfinite JSON value")
+
+        return json.loads(
+            text, object_pairs_hook=unique_pairs,
+            parse_constant=reject_nonfinite,
+        )
+    except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
+        raise SceneTravelError(f"invalid {label} JSON") from exc
 
 
 def inspect_atlas(payload: Any) -> dict[str, Any]:
@@ -259,21 +285,21 @@ def cli(argv: Sequence[str]) -> int:
             world, actions = original_demo()
             result = export_atlas(simulate(world, actions))
         elif args.command == "inspect":
-            result = inspect_atlas(_json(args.session_json, "session", max_bytes=MAX_BUNDLE_BYTES))
+            result = inspect_atlas(_strict_json(args.session_json, "session", max_bytes=MAX_BUNDLE_BYTES))
         elif args.command == "export":
-            result = export_atlas(_json(args.session_json, "session", max_bytes=MAX_BUNDLE_BYTES))
+            result = export_atlas(_strict_json(args.session_json, "session", max_bytes=MAX_BUNDLE_BYTES))
         elif args.command == "route":
             result = route_known(
-                _json(args.session_json, "session", max_bytes=MAX_BUNDLE_BYTES),
+                _strict_json(args.session_json, "session", max_bytes=MAX_BUNDLE_BYTES),
                 args.target_scene,
             )
         elif args.command == "compare":
             result = compare_atlases(
-                _json(args.left_json, "left session", max_bytes=MAX_BUNDLE_BYTES),
-                _json(args.right_json, "right session", max_bytes=MAX_BUNDLE_BYTES),
+                _strict_json(args.left_json, "left session", max_bytes=MAX_BUNDLE_BYTES),
+                _strict_json(args.right_json, "right session", max_bytes=MAX_BUNDLE_BYTES),
             )
         else:
-            result = import_atlas(_json(args.bundle_json, "atlas bundle", max_bytes=MAX_BUNDLE_BYTES))
+            result = import_atlas(_strict_json(args.bundle_json, "atlas bundle", max_bytes=MAX_BUNDLE_BYTES))
         _size(result)
         print(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
         return 0
