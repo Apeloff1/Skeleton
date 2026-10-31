@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb:npc-schedule:v1",
+  "title": "Deterministic NPC route schedule",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "world_id",
+    "canon_digest",
+    "horizon_ticks",
+    "initial_facts",
+    "routes",
+    "endings",
+    "canon_source"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "world_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "canon_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "horizon_ticks": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "initial_facts": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "npc_id",
+          "stops"
+        ],
+        "properties": {
+          "npc_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "stops": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start_tick",
+                "end_tick",
+                "location_id",
+                "interaction_id",
+                "requires",
+                "grants"
+              ],
+              "properties": {
+                "start_tick": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "end_tick": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "location_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "interaction_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "requires": {
+                  "type": "array",
+                  "maxItems": 4096,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "grants": {
+                  "type": "array",
+                  "maxItems": 4096,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "endings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ending_id",
+          "required_facts",
+          "forbidden_facts",
+          "priority"
+        ],
+        "properties": {
+          "ending_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "required_facts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "forbidden_facts": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        }
+      }
+    },
+    "canon_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "origin",
+        "license_id",
+        "author"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "origin": {
+          "const": "project-original"
+        },
+        "license_id": {
+          "const": "CC0-1.0"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}
