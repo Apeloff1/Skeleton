@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_sunken_metro",
+  "title": "Sunken Metro: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010311866,
+  "width": 25,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 10,
+  "theme": "arcade",
+  "starting_health": 6
+}

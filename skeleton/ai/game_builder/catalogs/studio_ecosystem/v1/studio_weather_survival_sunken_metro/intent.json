@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_sunken_metro",
+  "title": "Sunken Metro: Stormline",
+  "subtitle": "Original stormline design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010316776,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 4
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_frosted_crater",
+  "title": "Frosted Crater: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010311792,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 4
+}

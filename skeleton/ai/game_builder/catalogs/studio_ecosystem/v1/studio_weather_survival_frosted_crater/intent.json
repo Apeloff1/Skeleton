@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_frosted_crater",
+  "title": "Frosted Crater: Stormline",
+  "subtitle": "Original stormline design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010316702,
+  "width": 21,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 6
+}

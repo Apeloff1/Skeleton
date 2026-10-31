@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_amber_highlands",
+  "title": "Amber Highlands: Stormline",
+  "subtitle": "Original stormline design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010316998,
+  "width": 27,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 6
+}

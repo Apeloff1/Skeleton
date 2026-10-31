@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_misty_breakwater",
+  "title": "Misty Breakwater: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010312014,
+  "width": 23,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 6
+}

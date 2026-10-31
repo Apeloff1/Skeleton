@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_misty_breakwater",
+  "title": "Misty Breakwater: Stormline",
+  "subtitle": "Original stormline design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010316924,
+  "width": 23,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 4,
+  "theme": "ocean",
+  "starting_health": 4
+}

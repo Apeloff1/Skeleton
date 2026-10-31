@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_weather_survival_neon_undercity",
+  "genre": "weather_survival",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Neon Undercity",
+    "landmark": "hidden radio library",
+    "era": "the forgotten century",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control community capacitors while grid brownouts destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "forensic"
+  },
+  "premise": "Pela Nilo, a meteorologist with expertise in microclimate sheltering and heat-loss modeling, must guide families through a destabilizing climate zone before grid brownouts reaches the hidden radio library.",
+  "stakes": [
+    "Residents lose access to community capacitors",
+    "a private evacuation broker gains authority without independent evidence",
+    "The hidden radio library becomes inaccessible beyond elevated night markets"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured grid brownouts closes the main approach",
+      "goal": "Acquire an independent account of community capacitors",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a private evacuation broker challenges Pela Nilo's mandate",
+      "goal": "Apply microclimate sheltering and heat-loss modeling in elevated night markets",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of hidden radio library",
+      "goal": "guide families through a destabilizing climate zone",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains hidden radio library with auditable access to community capacitors"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain water, warmth and emergency stock without a private evacuation broker"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over community capacitors persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "hidden radio library",
+      "elevated night markets",
+      "power duty cycles"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

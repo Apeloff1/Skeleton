@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_underwater_archaeology_amber_highlands",
+  "genre": "underwater_archaeology",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Amber Highlands",
+    "landmark": "mountain hospice",
+    "era": "post-transit reconstruction",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control resin lamps while landslides destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "forensic"
+  },
+  "premise": "Sela Varis, a diver with expertise in buoyancy, decompression and noninvasive survey, must recover archival evidence without damaging a protected ruin before landslides reaches the mountain hospice.",
+  "stakes": [
+    "Residents lose access to resin lamps",
+    "an illegal salvage contractor gains authority without independent evidence",
+    "The mountain hospice becomes inaccessible beyond terraced ridgepaths"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured landslides closes the main approach",
+      "goal": "Acquire an independent account of resin lamps",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "an illegal salvage contractor challenges Sela Varis's mandate",
+      "goal": "Apply buoyancy, decompression and noninvasive survey in terraced ridgepaths",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of mountain hospice",
+      "goal": "recover archival evidence without damaging a protected ruin",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains mountain hospice with auditable access to resin lamps"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain air and research grants without an illegal salvage contractor"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over resin lamps persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "mountain hospice",
+      "terraced ridgepaths",
+      "unstable inclines"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}
