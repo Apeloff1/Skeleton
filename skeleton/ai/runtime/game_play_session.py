@@ -28,15 +28,18 @@ class GamePlaySessionError(ValueError):
     """Malformed, tampered, over-budget or incompatible play session."""
 
 
-def _hash(value: Any) -> str:
+def _canonical(value: Any) -> bytes:
     try:
-        raw = json.dumps(
+        return json.dumps(
             value, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             allow_nan=False,
         ).encode("ascii")
     except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
         raise GamePlaySessionError("noncanonical play session value") from exc
-    return hashlib.sha256(raw).hexdigest()
+
+
+def _hash(value: Any) -> str:
+    return hashlib.sha256(_canonical(value)).hexdigest()
 
 
 def _admit_controls(controls: Any, *, batch: bool) -> list[dict[str, bool]]:
@@ -107,7 +110,9 @@ def verify_play_session(capsule: Mapping[str, Any], session: Any) -> dict[str, A
         raise GamePlaySessionError("unsupported play session version")
     controls = _admit_controls(session["controls"], batch=False)
     expected = _seal(capsule, controls)
-    if expected != session:
+    # Python dict equality treats bool as int (True == 1). Compare typed
+    # canonical JSON, not loose object equality, before trusting a save.
+    if _canonical(expected) != _canonical(session):
         raise GamePlaySessionError("play session differs from source-bound replay")
     return {
         "schema_version": "skeleton.game.play_session.verify.v1",
@@ -133,7 +138,29 @@ def resume_play_session(
     return _seal(capsule, session["controls"] + admitted)
 
 
+def render_play_session(
+    capsule: Mapping[str, Any], session: Any,
+) -> dict[str, Any]:
+    """Show verified, bounded ASCII game state without native renderer claims."""
+    receipt = verify_play_session(capsule, session)
+    rows = [list(row) for row in capsule["tilemap"]]
+    position = session["final_avatar"]
+    rows[position["y"]][position["x"]] = "@"
+    return {
+        "schema_version": "skeleton.game.play_session.render.v1",
+        "project_id": capsule["project_id"],
+        "frame_count": receipt["frame_count"],
+        "victory": receipt["victory_frame"] is not None,
+        "grid": ["".join(row) for row in rows],
+        "legend": {"@": "player", "#": "wall", ".": "floor", "G": "goal"},
+        "render_backend": "ascii_offline",
+        "native_renderer_used": False,
+        "session_sha256": receipt["session_sha256"],
+    }
+
+
 __all__ = [
     "SCHEMA", "MAX_FRAMES", "MAX_BATCH_FRAMES", "GamePlaySessionError",
     "start_play_session", "resume_play_session", "verify_play_session",
+    "render_play_session",
 ]

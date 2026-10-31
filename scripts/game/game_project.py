@@ -32,7 +32,7 @@ from skeleton.ai.runtime.gameplay_capabilities import (
 )
 from skeleton.ai.runtime.game_play_session import (
     GamePlaySessionError, start_play_session, resume_play_session,
-    verify_play_session,
+    verify_play_session, render_play_session,
 )
 
 MAX_INPUT_BYTES = 96 * 1024
@@ -141,6 +141,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="verify and append frames to a source-bound saved session")
     operations.add_argument("--verify-play-session", type=Path,
                             help="replay a saved session against its original capsule")
+    operations.add_argument("--render-play-session", type=Path,
+                            help="show verified offline game state as an ASCII grid")
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -174,14 +176,17 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    playing = args.play_capsule is not None or args.resume_play_session is not None or args.verify_play_session is not None
+    playing = any(value is not None for value in (
+        args.play_capsule, args.resume_play_session,
+        args.verify_play_session, args.render_play_session,
+    ))
     if not playing and any(value is not None for value in (
         args.controls_file, args.session_capsule, args.save_session,
     )):
         print("play-session flags require a play-session operation", file=sys.stderr)
         return 2
     if playing:
-        needs_actions = args.verify_play_session is None
+        needs_actions = args.verify_play_session is None and args.render_play_session is None
         needs_source = args.play_capsule is None
         if (needs_actions != (args.controls_file is not None)
                 or needs_actions != (args.save_session is not None)
@@ -208,6 +213,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             capsule = _read_json(args.play_capsule or args.session_capsule)
             if args.verify_play_session is not None:
                 report = verify_play_session(capsule, _read_json(args.verify_play_session))
+            elif args.render_play_session is not None:
+                report = render_play_session(capsule, _read_json(args.render_play_session))
             else:
                 actions = _read_json(args.controls_file)
                 if set(actions) != {"controls"}:
@@ -227,6 +234,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "victory_frame": session["victory_frame"],
                     "native_export_created": False,
                     "output_path": output_path,
+                    "rendered_grid": render_play_session(capsule, session)["grid"],
                 }
         elif args.catalog:
             report = catalog_summary()

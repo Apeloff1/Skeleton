@@ -149,3 +149,44 @@ def test_canonical_app_cli_delegates_game_project_play_session(tmp_path, capsys)
         "--session-capsule", str(source),
     ]) == 0
     assert json.loads(capsys.readouterr().out)["source_bound_replay_verified"]
+
+@pytest.mark.parametrize(("field", "forgery"), [
+    ("frame_count", True),
+    ("offline_replay", 1),
+    ("native_export_created", 0),
+])
+def test_typed_save_replay_rejects_bool_int_confusion(field, forgery):
+    capsule = _capsule()
+    session = start_play_session(capsule, [_move()])
+    session[field] = forgery
+    with pytest.raises(GamePlaySessionError):
+        verify_play_session(capsule, session)
+
+
+def test_ascii_renderer_only_accepts_replayed_verified_session():
+    from skeleton.ai.runtime.game_play_session import render_play_session
+    capsule = _capsule()
+    session = start_play_session(capsule, [_move()])
+    rendered = render_play_session(capsule, session)
+    assert rendered["render_backend"] == "ascii_offline"
+    assert rendered["native_renderer_used"] is False
+    assert sum(row.count("@") for row in rendered["grid"]) == 1
+    assert rendered["session_sha256"] == session["session_sha256"]
+    session["frame_count"] = 999
+    with pytest.raises(GamePlaySessionError):
+        render_play_session(capsule, session)
+
+
+def test_canonical_app_renders_source_bound_session(tmp_path, capsys):
+    from skeleton.app.cli import run_app_cli
+    source = tmp_path / "source.json"
+    saved = tmp_path / "session.json"
+    source.write_text(json.dumps(_capsule()), encoding="utf-8")
+    saved.write_text(json.dumps(start_play_session(_capsule(), [_move()])), encoding="utf-8")
+    assert run_app_cli([
+        "game-project", "--render-play-session", str(saved),
+        "--session-capsule", str(source),
+    ]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["render_backend"] == "ascii_offline"
+    assert any("@" in row for row in receipt["grid"])

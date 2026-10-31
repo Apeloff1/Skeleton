@@ -32,3 +32,8 @@ third-party game imports, legal release clearance or native target binaries.
 The same actions are reachable from the assembled product via
 `python -m skeleton app game-project --play-capsule ...` and
 `python -m skeleton app game-project --verify-play-session ...`.
+
+For a read-only ASCII preview of the last verified player position, run
+`python -m skeleton app game-project --render-play-session save.json --session-capsule project.json`.
+This renders a text grid with `@` for the player; it does not assert GPU,
+native desktop or mobile renderer support.
