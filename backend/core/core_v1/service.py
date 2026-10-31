@@ -20,8 +20,8 @@ from .models import (MAX_PAYLOAD_BYTES, TERMINAL, Attempt, Delivery, DeliverySta
                      SubscriptionDraft, WebhookSubscription, validate_draft, validate_event_type,
                      validate_filters)
 from .pagination import CursorCodec, Page, build_page
-from .ports import (DeliveryRepository, EventRepository, SecretRepository, SubscriptionRepository,
-                    Transport, UrlPolicy)
+from .ports import (DeliveryRepository, EventRepository, RetryPolicyRepository, SecretRepository,
+                    SubscriptionRepository, Transport, UrlPolicy)
 from .retry import RetryPolicy, classify
 
 WRITE_ROLES = frozenset({"owner", "admin", "editor"})
@@ -50,11 +50,21 @@ class WebhookService:
                  events: EventRepository, deliveries: DeliveryRepository, transport: Transport,
                  url_policy: UrlPolicy, clock: Clock, cursor_codec: CursorCodec,
                  retry: RetryPolicy | None = None, lease_seconds: float = 60.0,
-                 timeout_seconds: float = 10.0) -> None:
+                 timeout_seconds: float = 10.0,
+                 retry_policies: RetryPolicyRepository | None = None) -> None:
         self.subs, self.secrets, self.events, self.deliveries = subs, secrets, events, deliveries
         self.transport, self.url_policy, self.clock = transport, url_policy, clock
         self.codec, self.retry = cursor_codec, retry or RetryPolicy()
         self.lease_seconds, self.timeout_seconds = lease_seconds, timeout_seconds
+        self.retry_policies = retry_policies
+
+    def policy_for(self, tenant_id: str, webhook_id: str) -> RetryPolicy:
+        """Per-subscription override, else the service default."""
+        if self.retry_policies is not None:
+            p = self.retry_policies.get(tenant_id, webhook_id)
+            if p is not None:
+                return p
+        return self.retry
 
     # ------------------------------------------------------------ helpers
     @staticmethod
@@ -198,11 +208,20 @@ class WebhookService:
                            "data": event.payload}, sort_keys=True, separators=(",", ":")).encode()
 
     def _signing_secrets(self, sub: WebhookSubscription) -> list[bytes]:
-        out = []
+        """Secrets that can sign. Raises ``SecretDecryptError`` only if *none* open
+        (a missing KEK is operational, so the attempt is retried, not dead-lettered)."""
+        from .secret_vault import SecretDecryptError
+        out, failed = [], None
         for sid in sub.secret_ids:
-            s = self.secrets.get(sub.tenant_id, sid)
+            try:
+                s = self.secrets.get(sub.tenant_id, sid)
+            except SecretDecryptError as exc:
+                failed = exc
+                continue
             if s is not None:
                 out.append(s)
+        if not out and failed is not None:
+            raise failed
         return out
 
     def dispatch_due(self, limit: int = 50) -> DispatchReport:
@@ -229,7 +248,11 @@ class WebhookService:
         if sub is None or event is None or not sub.active:
             reason = "subscription_inactive" if sub is not None and event is not None else "missing_reference"
             return self._finish(d, n, start, None, f"policy:{reason}", "dead", 0.0)
-        secrets = self._signing_secrets(sub)
+        from .secret_vault import SecretDecryptError
+        try:
+            secrets = self._signing_secrets(sub)
+        except SecretDecryptError:
+            return self._retry_or_dead(d, sub, n, start, None, "secret_unavailable", 0.0)
         if not secrets:
             return self._finish(d, n, start, None, "policy:no_secret", "dead", 0.0)
         body = self.body_for(event, d)
@@ -240,19 +263,30 @@ class WebhookService:
         result = self.transport.post(sub.url, body, headers, self.timeout_seconds)
         kind = classify(result.status_code, result.error)
         if kind == "success":
-            outcome = "success"
-        elif kind == "retry" and n < sub.max_attempts:
-            outcome = "retry"
-        else:
-            outcome = "dead"
-        return self._finish(d, n, start, result.status_code, result.error, outcome, result.duration_ms)
+            return self._finish(d, n, start, result.status_code, result.error, "success", result.duration_ms)
+        if kind == "retry":
+            return self._retry_or_dead(d, sub, n, start, result.status_code, result.error, result.duration_ms)
+        return self._finish(d, n, start, result.status_code, result.error, "dead", result.duration_ms)
+
+    def _retry_or_dead(self, d: Delivery, sub: WebhookSubscription, n: int, start: float,
+                       code: int | None, error: str, duration_ms: float) -> str:
+        policy = self.policy_for(d.tenant_id, d.webhook_id)
+        if n >= sub.max_attempts:
+            return self._finish(d, n, start, code, error, "dead", duration_ms, policy)
+        if policy.max_age_seconds is not None:
+            next_at = self.clock.now() + policy.delay(d.delivery_id, n)
+            if next_at - d.created_at > policy.max_age_seconds:
+                reason = f"{error}; policy:max_age" if error else "policy:max_age"
+                return self._finish(d, n, start, code, reason, "dead", duration_ms, policy)
+        return self._finish(d, n, start, code, error, "retry", duration_ms, policy)
 
     def _finish(self, d: Delivery, n: int, start: float, code: int | None, error: str,
-                outcome: str, duration_ms: float) -> str:
+                outcome: str, duration_ms: float, policy: RetryPolicy | None = None) -> str:
         now = self.clock.now()
         status = {"success": DeliveryStatus.SUCCEEDED, "retry": DeliveryStatus.FAILED,
                   "dead": DeliveryStatus.DEAD}[outcome]
-        nxt = now + self.retry.delay(d.delivery_id, n) if outcome == "retry" else now
+        policy = policy or self.retry
+        nxt = now + policy.delay(d.delivery_id, n) if outcome == "retry" else now
         new = replace(d, status=status, attempts=n, next_attempt_at=nxt, last_status_code=code,
                       last_error=error[:500], updated_at=now)
         if not self.deliveries.complete(new, Attempt(d.delivery_id, n, start, duration_ms, code,
