@@ -35,7 +35,7 @@ class OfflinePackageTests(unittest.TestCase):
             self.assertEqual(archive.read("game/story.txt"), FILES["game/story.txt"])
 
     def test_reject_traversal_reserved_and_budget(self):
-        for path in ("../secret", "/absolute", "dir/../secret", "a\\\\b", "manifest.json", "dir//x", "a/./b"):
+        for path in ("../secret", "/absolute", "dir/../secret", "a\\\\b", "manifest.json", "dir//x", "a/./b", ".git/config", "payload.sh", ".github/workflows/evil.yml"):
             with self.subTest(path=path), self.assertRaises(BuildContractError):
                 build_package("test", "Skeleton original studio", "CC0-1.0", {path: b"x"})
         with self.assertRaises(BuildContractError):

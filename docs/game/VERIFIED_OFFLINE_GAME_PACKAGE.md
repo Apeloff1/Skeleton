@@ -30,3 +30,8 @@ platforms; output uses exclusive no-clobber creation, restrictive permissions
 and fsync. The caller must select a trusted destination parent and verify
 asset rights independently; this is a safe source package, not a signed
 release or a sandbox for executing untrusted game code.
+
+Package member suffixes are intentionally limited to `.json`, `.txt`, `.md`,
+`.csv`, and `.wav`. Git internals, GitHub workflow paths and executable/script
+extensions are rejected at both build and verify. This is an additional
+content admission boundary, **not** a malware scan or executable sandbox.

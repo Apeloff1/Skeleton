@@ -22,6 +22,8 @@ MAX_ARCHIVE = 10_000_000
 MAX_MANIFEST = 131_072
 FILE_NAME = re.compile(r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+){0,7}$")
 ALLOWED_LICENSES = ("CC0-1.0", "CC-BY-4.0")
+SAFE_SUFFIXES = (".json", ".txt", ".md", ".csv", ".wav")
+FORBIDDEN_SEGMENTS = (".git", ".github", ".gitmodules", ".gitattributes")
 
 
 def _canonical(value: object) -> bytes:
@@ -35,7 +37,9 @@ def _canonical(value: object) -> bytes:
 def _path(name: object) -> str:
     if (not isinstance(name, str) or len(name.encode("utf-8")) > 240
         or not FILE_NAME.fullmatch(name) or any(segment in (".", "..") for segment in name.split("/"))
-        or name == "manifest.json"):
+        or name == "manifest.json"
+        or any(segment.lower() in FORBIDDEN_SEGMENTS for segment in name.split("/"))
+        or not name.lower().endswith(SAFE_SUFFIXES)):
         raise BuildContractError("unsafe or reserved archive path")
     return name
 
