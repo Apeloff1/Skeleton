@@ -10,6 +10,10 @@ from importlib import import_module
 
 # Keep all public contract names available without importing optional runtimes.
 _LAZY_EXPORTS = {
+    "GuardedFairStreamDispatch": ".fair_stream_dispatch",
+    "DispatchDeferred": ".fair_stream_dispatch",
+    "DispatchUncertain": ".fair_stream_dispatch",
+    "DispatchObservation": ".fair_stream_dispatch",
     "FairStreamScheduler": ".fair_stream_queue",
     "FairStreamPlan": ".fair_stream_queue",
     "MeasuredStreamBudget": ".fair_stream_queue",
@@ -282,6 +286,10 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "GuardedFairStreamDispatch",
+    "DispatchDeferred",
+    "DispatchUncertain",
+    "DispatchObservation",
     "FairStreamScheduler",
     "FairStreamPlan",
     "MeasuredStreamBudget",
