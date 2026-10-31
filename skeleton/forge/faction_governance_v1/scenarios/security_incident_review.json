@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "security_incident_review",
+  "domain": "security",
+  "topic": "incident_review",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 4,
+  "approval": 3,
+  "commands": [
+    {
+      "id": "security_incident_review:open",
+      "action": "open",
+      "proposal": "security_incident_review",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "security_incident_review:vote:0",
+      "action": "cast",
+      "proposal": "security_incident_review",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "security_incident_review:vote:1",
+      "action": "cast",
+      "proposal": "security_incident_review",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "security_incident_review:vote:2",
+      "action": "cast",
+      "proposal": "security_incident_review",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "security_incident_review:vote:3",
+      "action": "cast",
+      "proposal": "security_incident_review",
+      "delegate": "delegate_4",
+      "choice": "yes",
+      "expected_version": 4
+    },
+    {
+      "id": "security_incident_review:finalize",
+      "action": "finalize",
+      "proposal": "security_incident_review",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 5
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 4,
+    "yes": 4,
+    "final_version": 6
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}

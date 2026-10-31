@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "frontier_land_stewardship ballot command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "proposal",
+    "delegate",
+    "choice",
+    "expected_version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "open",
+        "cast",
+        "finalize",
+        "cancel",
+        "inspect"
+      ]
+    },
+    "proposal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "delegate": {
+      "type": "string",
+      "enum": [
+        "",
+        "delegate_1",
+        "delegate_2",
+        "delegate_3",
+        "delegate_4",
+        "delegate_5",
+        "delegate_6",
+        "delegate_7"
+      ]
+    },
+    "choice": {
+      "type": "string",
+      "enum": [
+        "",
+        "yes",
+        "no"
+      ]
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "description": "Fictional governance. Delegate identity and proposal authority must be verified by the host; schema is not authorization."
+}
