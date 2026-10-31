@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_luminous_marsh",
+  "title": "Luminous Marsh: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610303636,
+  "width": 25,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 6,
+  "theme": "forest",
+  "starting_health": 4
+}

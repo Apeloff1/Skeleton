@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_glacial_fjord",
+  "title": "Glacial Fjord: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610303602,
+  "width": 21,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "ocean",
+  "starting_health": 6
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_ashen_archipelago",
+  "title": "Ashen Archipelago: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610303619,
+  "width": 23,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 3
+}
