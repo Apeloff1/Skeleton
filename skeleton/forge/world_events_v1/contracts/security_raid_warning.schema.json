@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "security_raid_warning world event command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "tick",
+    "expected_version",
+    "intensity",
+    "evidence"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "activate",
+        "resolve",
+        "abort",
+        "release_cooldown",
+        "observe"
+      ]
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "intensity": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20
+    },
+    "evidence": {
+      "type": "string",
+      "maxLength": 128
+    }
+  },
+  "$comment": "Host verifies provenance and persists receipts; command strings are never credential evidence."
+}
