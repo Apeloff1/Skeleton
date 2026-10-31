@@ -33,7 +33,7 @@ def _digest(value: object) -> str:
 
 
 def _safe_directory(path: Path) -> None:
-    if (type(path) is not Path or ".." in path.parts
+    if (not isinstance(path, Path) or ".." in path.parts
             or path.name in ("", ".", "..") or path.is_symlink()):
         raise StudioQuestError("invalid dialogue handoff path")
 
