@@ -102,9 +102,9 @@ def test_source_tamper_and_save_tamper_fail_closed() -> None:
 
 def test_quest_control_character_injection_and_invalid_runtime_types() -> None:
     with pytest.raises(GameplayContractError, match="control character"):
-        QuestSpec("line\\nbreak", (), "interact", "gate", digest("greet"))
+        QuestSpec("line\nbreak", (), "interact", "gate", digest("greet"))
     with pytest.raises(GameplayContractError, match="control character"):
-        QuestPlan("world\\x00id", [QuestSpec("a", (), "interact", "gate", digest("greet"))])
+        QuestPlan("world\x00id", [QuestSpec("a", (), "interact", "gate", digest("greet"))])
     with pytest.raises(GameplayContractError, match="invalid reward"):
         QuestSpec("a", (), "interact", "gate", digest("greet"), reward={})
     with pytest.raises(GameplayContractError, match="invalid quest contract"):
