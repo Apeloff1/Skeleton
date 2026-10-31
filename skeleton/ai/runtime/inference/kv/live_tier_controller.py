@@ -123,6 +123,9 @@ class KVLiveTierController:
                 or fresh.cpu_available_bytes is None
                 or old.disk_free_bytes is None
                 or fresh.disk_free_bytes is None
+                or old.cpu_pressure_pct is None
+                or fresh.cpu_pressure_pct is None
+                or fresh.cpu_pressure_pct > old.cpu_pressure_pct
                 or fresh.cpu_available_bytes < old.cpu_available_bytes
                 or fresh.disk_free_bytes < old.disk_free_bytes
             ):

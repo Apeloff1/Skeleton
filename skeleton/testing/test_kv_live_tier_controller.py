@@ -77,6 +77,28 @@ class KVLiveTierTests(unittest.TestCase):
             ctl.apply_live(plan)
         self.assertEqual(self.storage.moves, [])
 
+    def test_swap_pressure_increase_blocks_even_when_ram_headroom_is_unchanged(self):
+        # RAM and disk capacity stay unchanged; worsening swap pressure
+        # must not be hidden by a superficially stable byte headroom check.
+        ctl = self.controller([
+            host(ram_free=50, disk_free=900, swap_free=1000),
+            host(ram_free=50, disk_free=900, swap_free=0),
+        ])
+        plan, _ = ctl.plan_live()
+        self.assertTrue(plan.moves)
+        with self.assertRaisesRegex(KVPressureDeferred, "worsening"):
+            ctl.apply_live(plan)
+        self.assertEqual(self.storage.moves, [])
+
+    def test_stable_swap_pressure_remains_eligible(self):
+        ctl = self.controller([
+            host(ram_free=50, swap_free=1000),
+            host(ram_free=50, swap_free=1000),
+        ])
+        plan, _ = ctl.plan_live()
+        receipt = ctl.apply_live(plan)
+        self.assertEqual(receipt.moved, self.keys)
+
     def test_stale_probe_prevents_any_movement(self):
         ctl = self.controller([host(), host()], ticks=(1000, 2000))
         plan, _ = ctl.plan_live()

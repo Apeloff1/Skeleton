@@ -21,3 +21,9 @@ Injection requires explicit `simulated=True` and cannot qualify
 hardware. Production uses the existing platform-gated OS resource
 probe and monotonic clock; unsupported platform sensors remain
 conservative, not fabricated.
+
+The second OS probe must also confirm that effective CPU pressure has **not
+increased**, even if available RAM and disk bytes are unchanged. Swap churn
+or kernel pressure can worsen independently of byte headroom; such changes
+fail closed before any KV storage adapter move. Synthetic tests exercise
+worsening swap pressure with stable RAM/disk readings.
