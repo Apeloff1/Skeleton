@@ -80,7 +80,7 @@ class CanonicalGuardedLocalService:
         ):
             raise SealedContextBoundaryError("canonical guard scope or contract missing")
         if any(key in engine_options for key in (
-            "snapshot", "tenant_scope_id", "contract", "prepared_input",
+            "snapshot", "tenant_scope_id", "contract", "prepared_input", "_before_dispatch",
         )):
             raise SealedContextBoundaryError("caller attempted to override guarded authority")
         digest = getattr(request, "digest", None)
@@ -90,9 +90,18 @@ class CanonicalGuardedLocalService:
             tenant_scope_id=tenant_scope_id, context_id=context_id,
             request_digest=digest,
         )
+
+        async def check_before_dispatch() -> None:
+            current = await self._read(
+                tenant_scope_id=tenant_scope_id, context_id=context_id,
+                request_digest=digest,
+            )
+            if current != before:
+                raise SealedContextReplayError("canonical context changed before local inference")
+
         result, receipt = await self.guard.generate(
             request, snapshot=before, tenant_scope_id=tenant_scope_id,
-            contract=contract, **engine_options,
+            contract=contract, _before_dispatch=check_before_dispatch, **engine_options,
         )
         # Local model generation happened, but no answer has been released.
         # Reject concurrent edits, revocations and policy/version changes.

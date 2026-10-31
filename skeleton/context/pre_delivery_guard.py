@@ -9,10 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from contextlib import nullcontext
+import asyncio
 import hashlib
 import json
+import math
 import re
-from typing import Any, Callable, Mapping, Protocol, Sequence
+import threading
+import time
+from typing import Any, Awaitable, Callable, Mapping, Protocol, Sequence
 
 from skeleton.context.delivery_regex import match_delivery_regex, validate_delivery_regex
 from skeleton.context.delivery_schema import (
@@ -189,6 +193,18 @@ class ReviewVerdict:
     reason_code: str
 
 
+@dataclass(frozen=True, slots=True)
+class _PreflightEvidence:
+    root: str
+    token_echo: str | None
+    token_sequence_digest: str | None
+    untrusted_text: str
+    untrusted_sha256: str
+    request_digest: Any
+    delivery_schema: str | None
+    native_schema: str | None
+
+
 class BoundedAdversarialReviewer(Protocol):
     def __call__(self, untrusted_text: str, context_sha256: str) -> ReviewVerdict: ...
 
@@ -238,9 +254,15 @@ class GuardedLocalInference:
         projection_attestor: Callable[[Any, str, str], bool] | None = None,
         tokenizer_identity_attestor: Callable[[], bool] | None = None,
         require_token_echo: bool = True,
+        review_timeout_seconds: float = 5.0,
     ) -> None:
         if not hasattr(engine, "generate") or not callable(reviewer):
             raise SealedContextError("local engine and independent reviewer are required")
+        if (isinstance(review_timeout_seconds, bool)
+                or not isinstance(review_timeout_seconds, (int, float))
+                or not math.isfinite(review_timeout_seconds)
+                or not 0 < review_timeout_seconds <= 30):
+            raise SealedContextError("review timeout must be finite and within 30 seconds")
         self.engine = engine
         self.reviewer = reviewer
         self.tokenize = tokenize
@@ -249,6 +271,10 @@ class GuardedLocalInference:
         self.projection_attestor = projection_attestor
         self.tokenizer_identity_attestor = tokenizer_identity_attestor
         self.require_token_echo = require_token_echo
+        self.review_timeout_seconds = float(review_timeout_seconds)
+        # A stuck reviewer retains its slot until the underlying call returns.
+        # Timeouts/cancellations do not create an unbounded queue of workers.
+        self._review_slot = threading.BoundedSemaphore(1)
 
     def _attest_tokenizer_identity(self) -> None:
         verifier = self.tokenizer_identity_attestor
@@ -261,12 +287,15 @@ class GuardedLocalInference:
         if verified is not True:
             raise SealedContextIntegrityError("native tokenizer identity changed")
 
-    def preflight(
+    def _preflight_evidence(
         self, request: Any, *, snapshot: TrustedContextSnapshot,
         tenant_scope_id: str, contract: DeliveryContract,
-    ) -> tuple[str, str | None, str, str | None]:
-        if contract.format == "json":
-            _schema_snapshot(contract.json_schema)
+    ) -> _PreflightEvidence:
+        delivery_schema = _schema_snapshot(contract.json_schema) if contract.format == "json" else None
+        native_schema = (
+            _schema_snapshot(getattr(request, "structured_output_schema", None))
+            if delivery_schema is not None and contract.require_sampler_enforcement else None
+        )
         self._attest_tokenizer_identity()
         if snapshot.tenant_id != tenant_scope_id:
             raise SealedContextBoundaryError("context snapshot crossed tenant boundary")
@@ -311,10 +340,20 @@ class GuardedLocalInference:
             token_digest = _hash(encoded)
         untrusted = "\n".join(text for _, text in request.history) + "\n" + request.prompt
         context_sha = _hash(untrusted.encode("utf-8", errors="strict"))
-        verdict = self.reviewer(untrusted, context_sha)
-        if (not isinstance(verdict, ReviewVerdict) or not verdict.allowed
-                or verdict.context_sha256 != context_sha or not verdict.reviewer_id
-                or not verdict.reason_code):
+        return _PreflightEvidence(actual_root, token_digest, token_sequence_digest,
+                                  untrusted, context_sha, getattr(request, "digest", None),
+                                  delivery_schema, native_schema)
+
+    def _finish_preflight(
+        self, request: Any, *, contract: DeliveryContract,
+        evidence: _PreflightEvidence, verdict: Any,
+    ) -> tuple[str, str | None, str, str | None]:
+        if (not isinstance(verdict, ReviewVerdict) or verdict.allowed is not True
+                or verdict.context_sha256 != evidence.untrusted_sha256
+                or not isinstance(verdict.reviewer_id, str) or not verdict.reviewer_id.strip()
+                or len(verdict.reviewer_id) > 256
+                or not isinstance(verdict.reason_code, str) or not verdict.reason_code.strip()
+                or len(verdict.reason_code) > 256):
             raise SealedContextBoundaryError("adversarial review declined or was unbound")
         if contract.format != "text" and contract.require_sampler_enforcement:
             if contract.format == "json" and contract.json_schema is not None:
@@ -326,23 +365,133 @@ class GuardedLocalInference:
                     )
             if self.sampler_support is None or not self.sampler_support(self.engine.model, contract):
                 raise SealedContextBoundaryError("local sampler lacks required grammar constraint")
-        return actual_root, token_digest, verdict.reviewer_id, token_sequence_digest
+        return evidence.root, evidence.token_echo, verdict.reviewer_id, evidence.token_sequence_digest
+
+    def preflight(
+        self, request: Any, *, snapshot: TrustedContextSnapshot,
+        tenant_scope_id: str, contract: DeliveryContract,
+    ) -> tuple[str, str | None, str, str | None]:
+        """Synchronous admission for callers that manage their own deadline.
+
+        The asynchronous generation path uses bounded review instead.
+        """
+        evidence = self._preflight_evidence(
+            request, snapshot=snapshot, tenant_scope_id=tenant_scope_id, contract=contract,
+        )
+        if not self._review_slot.acquire(blocking=False):
+            raise SealedContextBoundaryError("adversarial reviewer is busy")
+        try:
+            verdict = self.reviewer(evidence.untrusted_text, evidence.untrusted_sha256)
+        finally:
+            self._review_slot.release()
+        return self._finish_preflight(request, contract=contract, evidence=evidence, verdict=verdict)
+
+    async def _bounded_review(self, evidence: _PreflightEvidence, timeout: float) -> tuple[Any, Any]:
+        if not self._review_slot.acquire(blocking=False):
+            raise SealedContextBoundaryError("adversarial reviewer is busy")
+        reviewer = self.reviewer
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[Any] = loop.create_future()
+
+        def run_review() -> None:
+            try:
+                verdict = reviewer(evidence.untrusted_text, evidence.untrusted_sha256)
+                failed = False
+            except BaseException:
+                verdict = None
+                failed = True
+            finally:
+                self._review_slot.release()
+
+            def deliver() -> None:
+                if future.done():
+                    return
+                if failed:
+                    future.set_exception(SealedContextBoundaryError("adversarial reviewer unavailable"))
+                else:
+                    future.set_result(verdict)
+
+            try:
+                loop.call_soon_threadsafe(deliver)
+            except RuntimeError:
+                # The requesting event loop may have closed after a timeout.
+                pass
+
+        try:
+            threading.Thread(target=run_review, name="skeleton-local-review", daemon=True).start()
+        except Exception as exc:
+            self._review_slot.release()
+            raise SealedContextBoundaryError("adversarial reviewer worker unavailable") from exc
+        except BaseException:
+            self._review_slot.release()
+            raise
+
+        # A timed-out/cancelled caller must not cancel the shared worker or
+        # leave a late exception unobserved. Python cannot kill a stuck thread.
+        def observe(done: asyncio.Future[Any]) -> None:
+            if not done.cancelled():
+                done.exception()
+
+        future.add_done_callback(observe)
+        try:
+            verdict = await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
+            return reviewer, verdict
+        except TimeoutError as exc:
+            raise SealedContextBoundaryError("adversarial reviewer timed out") from exc
+        except Exception as exc:
+            raise SealedContextBoundaryError("adversarial reviewer unavailable") from exc
 
     async def generate(
         self, request: Any, *, snapshot: TrustedContextSnapshot,
         tenant_scope_id: str, contract: DeliveryContract = DeliveryContract(),
+        _before_dispatch: Callable[[], Awaitable[None]] | None = None,
         **engine_options: Any,
     ) -> tuple[Any, PreDeliveryReceipt]:
+        if "tenant_scope_id" in engine_options or "prepared_input" in engine_options:
+            raise SealedContextBoundaryError("caller cannot override verified local scopes")
+        deadline = engine_options.get("deadline")
+
+        def remaining_timeout() -> float:
+            if deadline is None:
+                return self.review_timeout_seconds
+            if (isinstance(deadline, bool) or not isinstance(deadline, (int, float))
+                    or not math.isfinite(deadline)):
+                raise SealedContextBoundaryError("local inference deadline is invalid")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise SealedContextBoundaryError("local inference deadline elapsed during admission")
+            return min(self.review_timeout_seconds, remaining)
+
+        remaining_timeout()
         pinned_schema = _schema_snapshot(contract.json_schema) if contract.format == "json" else None
         pinned_native_schema = (
             _schema_snapshot(getattr(request, "structured_output_schema", None))
             if pinned_schema is not None and contract.require_sampler_enforcement else None
         )
-        root, token_echo, reviewer_id, admitted_token_ids = self.preflight(
+        evidence = self._preflight_evidence(
             request, snapshot=snapshot, tenant_scope_id=tenant_scope_id, contract=contract,
         )
-        if "tenant_scope_id" in engine_options or "prepared_input" in engine_options:
-            raise SealedContextBoundaryError("caller cannot override verified local scopes")
+        reviewer, verdict = await self._bounded_review(evidence, remaining_timeout())
+        # The canonical service supplies an authority re-read after review.
+        # No client-controlled callback is accepted through that service.
+        if _before_dispatch is not None:
+            try:
+                await asyncio.wait_for(_before_dispatch(), timeout=remaining_timeout())
+            except TimeoutError as exc:
+                raise SealedContextBoundaryError("canonical authority timed out before dispatch") from exc
+        if reviewer is not self.reviewer:
+            raise SealedContextIntegrityError("adversarial reviewer changed during admission")
+        # Async review permits other tasks to run. Recheck all admitted input,
+        # token and schema evidence before minting the model execution permit.
+        after_review = self._preflight_evidence(
+            request, snapshot=snapshot, tenant_scope_id=tenant_scope_id, contract=contract,
+        )
+        if after_review != evidence:
+            raise SealedContextIntegrityError("local input changed during adversarial review")
+        root, token_echo, reviewer_id, admitted_token_ids = self._finish_preflight(
+            request, contract=contract, evidence=evidence, verdict=verdict,
+        )
+        remaining_timeout()
         # Protected LocalInferenceEngine refuses direct/cached/batched work
         # without this task-local permit, minted only after the preflight.
         # Other engines retain the portable adapter contract.

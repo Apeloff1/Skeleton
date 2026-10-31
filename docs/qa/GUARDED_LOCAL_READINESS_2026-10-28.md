@@ -38,17 +38,23 @@ Generic transfer-policy and admission decision identifiers can be present for
 legacy local inference. They are not evidence of a sealed-context review or a
 native execution receipt.
 
-The current reviewer and tokenizer calls run synchronously on the event loop;
-the protected route does not yet enforce an independent resource or time
-limit around those calls. Multi-model catalog activation and its exact native
+Guarded generation now bounds the independent reviewer to one daemon worker
+per guard, with a five-second default timeout capped by the caller deadline.
+A timed-out worker keeps its slot until the underlying call returns; Python
+cannot forcibly cancel it. The canonical service re-reads its source before
+dispatch and again before delivering output. Those reads do not provide an
+atomic cross-process revocation fence. Tokenizer and renderer calls remain
+synchronous and unbounded; multi-model catalog activation and exact native
 tokenizer bindings also require production qualification.
 
 Existing checkpoints that only contain the older `local_provider_binding`, or
 no provider binding, do not establish the newer route, verifier, cooperation
 and tenant identities. Unfinished work that would need execution therefore
 fails closed after upgrade rather than reconstructing an unverifiable binding.
-Committed results remain readable, cancellation and deadline termination are
-preserved when the configured provider is available, and an unresolved approval
-can remain observable without executing its tool. Approval does not authorize
-resuming unbound work. A staged but uncommitted result remains subject to the
-provider binding check; it is not treated as an already committed result.
+Committed results remain readable. Cancellation, deadlines and unresolved
+approvals can be recovered without an available provider; approved tool work
+and staged results remain retained until the original provider can be checked.
+A staged result is never treated as an already committed result. If admission
+completion fails after a terminal result commits, current maintenance scans
+nonterminal executions and does not independently retry completion; a durable
+completion outbox or equivalent reconciliation remains required.

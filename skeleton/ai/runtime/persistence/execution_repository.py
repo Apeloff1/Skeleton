@@ -1625,9 +1625,12 @@ class SQLiteExecutionRepository:
         *,
         expected_execution_version: int,
         now: datetime | None = None,
+        require_no_staged_intent: bool = False,
     ) -> AIExecution:
         if not isinstance(result, AIExecutionResult):
             raise TypeError("result must be AIExecutionResult")
+        if type(require_no_staged_intent) is not bool:
+            raise TypeError("require_no_staged_intent must be a boolean")
         instant = _utc(now or result.completed_at)
         terminal_state = {
             "completed": ExecutionState.COMPLETED,
@@ -1656,6 +1659,12 @@ class SQLiteExecutionRepository:
                     )
                     self._connection.execute("COMMIT")
                     return current
+                if require_no_staged_intent and self._connection.execute(
+                    "SELECT 1 FROM ai_execution_finalization_intent "
+                    "WHERE namespace = ? AND execution_id = ?",
+                    (self.namespace, result.execution_id),
+                ).fetchone() is not None:
+                    raise ExecutionRepositoryConflict("staged finalization intent must be preserved")
                 if current.version != expected_execution_version:
                     raise ExecutionRepositoryConflict("execution version changed before finalization")
 

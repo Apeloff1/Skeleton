@@ -4,6 +4,8 @@ from dataclasses import dataclass, replace
 import asyncio
 import hashlib
 import json
+import threading
+import time
 
 import pytest
 
@@ -105,6 +107,162 @@ def test_adversarial_reviewer_block_is_fail_closed():
     with pytest.raises(SealedContextBoundaryError):
         asyncio.run(guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant"))
     assert engine.calls == 0
+
+
+@pytest.mark.parametrize("allowed,reviewer_id,reason", [
+    (1, "reviewer", "pass"), ("yes", "reviewer", "pass"),
+    (True, 7, "pass"), (True, "reviewer", "  "),
+])
+def test_malformed_reviewer_verdict_never_dispatches(allowed, reviewer_id, reason):
+    req = Request("policy", (), "hello")
+    engine = Engine()
+    guard = GuardedLocalInference(
+        engine, reviewer=lambda text, digest: ReviewVerdict(allowed, digest, reviewer_id, reason),
+        tokenize=lambda text: tuple(text.encode()), detokenize=lambda ids: bytes(ids).decode(),
+    )
+    with pytest.raises(SealedContextBoundaryError, match="declined or was unbound"):
+        asyncio.run(guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant"))
+    assert engine.calls == 0
+
+
+def test_stalled_reviewer_times_out_without_queueing_or_dispatch():
+    req = Request("policy", (), "hello")
+    engine = Engine()
+    entered = threading.Event()
+    release = threading.Event()
+    calls = []
+
+    def stalled(text, digest):
+        calls.append(text)
+        entered.set()
+        release.wait(timeout=3)
+        return reviewer(text, digest)
+
+    guard = GuardedLocalInference(
+        engine, reviewer=stalled, tokenize=lambda text: tuple(text.encode()),
+        detokenize=lambda ids: bytes(ids).decode(), review_timeout_seconds=0.05,
+    )
+
+    async def scenario():
+        try:
+            with pytest.raises(SealedContextBoundaryError, match="timed out"):
+                await guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant")
+            assert entered.is_set()
+            with pytest.raises(SealedContextBoundaryError, match="busy"):
+                await guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant")
+            assert len(calls) == 1 and engine.calls == 0
+        finally:
+            release.set()
+
+    asyncio.run(scenario())
+
+
+def test_input_mutation_during_async_review_never_reaches_model():
+    req = Request("policy", (), "original")
+    authority = snapshot(req)
+    engine = Engine()
+    entered = threading.Event()
+    release = threading.Event()
+
+    def waiting(text, digest):
+        entered.set()
+        release.wait(timeout=3)
+        return reviewer(text, digest)
+
+    guard = GuardedLocalInference(
+        engine, reviewer=waiting, tokenize=lambda text: tuple(text.encode()),
+        detokenize=lambda ids: bytes(ids).decode(), review_timeout_seconds=1,
+    )
+
+    async def scenario():
+        task = asyncio.create_task(guard.generate(req, snapshot=authority, tenant_scope_id="tenant"))
+        try:
+            assert await asyncio.to_thread(entered.wait, 1)
+            object.__setattr__(req, "prompt", "changed while under review")
+            release.set()
+            with pytest.raises(SealedContextIntegrityError):
+                await task
+            assert engine.calls == 0
+        finally:
+            release.set()
+
+    asyncio.run(scenario())
+
+
+def test_cancelled_review_keeps_its_capacity_slot_until_worker_returns():
+    req = Request("policy", (), "hello")
+    engine = Engine()
+    entered, release = threading.Event(), threading.Event()
+
+    def waiting(text, digest):
+        entered.set()
+        release.wait(timeout=3)
+        return reviewer(text, digest)
+
+    guard = GuardedLocalInference(
+        engine, reviewer=waiting, tokenize=lambda text: tuple(text.encode()),
+        detokenize=lambda ids: bytes(ids).decode(), review_timeout_seconds=1,
+    )
+
+    async def scenario():
+        task = asyncio.create_task(guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant"))
+        try:
+            assert await asyncio.to_thread(entered.wait, 1)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            with pytest.raises(SealedContextBoundaryError, match="busy"):
+                await guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant")
+            assert engine.calls == 0
+        finally:
+            release.set()
+
+    asyncio.run(scenario())
+
+
+def test_reviewer_wait_respects_shorter_inference_deadline():
+    req = Request("policy", (), "hello")
+    engine = Engine()
+    release = threading.Event()
+
+    def waiting(text, digest):
+        release.wait(timeout=3)
+        return reviewer(text, digest)
+
+    guard = GuardedLocalInference(
+        engine, reviewer=waiting, tokenize=lambda text: tuple(text.encode()),
+        detokenize=lambda ids: bytes(ids).decode(), review_timeout_seconds=2,
+    )
+
+    async def scenario():
+        try:
+            with pytest.raises(SealedContextBoundaryError, match="timed out"):
+                await asyncio.wait_for(guard.generate(
+                    req, snapshot=snapshot(req), tenant_scope_id="tenant",
+                    deadline=time.monotonic() + 0.05,
+                ), timeout=1)
+            assert engine.calls == 0
+        finally:
+            release.set()
+
+    asyncio.run(scenario())
+
+
+def test_reviewer_worker_start_failure_does_not_dispatch_or_leak_capacity(monkeypatch):
+    req = Request("policy", (), "hello")
+    engine = Engine()
+    guard = runner(engine)
+
+    def unavailable(_thread):
+        raise RuntimeError("thread unavailable")
+
+    with monkeypatch.context() as scope:
+        scope.setattr(threading.Thread, "start", unavailable)
+        with pytest.raises(SealedContextBoundaryError, match="worker unavailable"):
+            asyncio.run(guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant"))
+    assert engine.calls == 0
+    asyncio.run(guard.generate(req, snapshot=snapshot(req), tenant_scope_id="tenant"))
+    assert engine.calls == 1
 
 
 def test_tokenizer_roundtrip_and_missing_sampler_rejected():
@@ -423,7 +581,7 @@ def test_native_projection_attestation_revoked_after_native_generation_withholds
         asyncio.run(guard.generate(
             req, snapshot=snapshot(req), tenant_scope_id="tenant",
         ))
-    assert engine.calls == 1 and state["checks"] == 2
+    assert engine.calls == 1 and state["checks"] == 3
 
 
 def test_native_grammar_and_projection_positive_recheck_required_on_success():
@@ -459,7 +617,7 @@ def test_native_grammar_and_projection_positive_recheck_required_on_success():
     ))
     assert output.text == '{"ok":true}'
     assert receipt.context_root == snapshot(req).root
-    assert calls == {"sampler": 2, "projection": 2}
+    assert calls == {"sampler": 2, "projection": 3}
 
 
 def test_native_token_mapping_drift_blocks_delivery_even_with_identical_text():

@@ -60,6 +60,17 @@ class EngineExecutionCoordinatorError(RuntimeError):
     """Engine execution could not be scheduled or reconciled safely."""
 
 
+class _PassiveRecoveryUnavailable(EngineExecutionCoordinatorError):
+    """Passive checkpoint recovery could not complete without losing custody."""
+
+
+class _PassiveRecoveryProvider:
+    """Fail-closed placeholder for provider-free checkpoint observation."""
+
+    async def generate(self, *_args, **_kwargs):
+        raise ProviderUnavailableError("provider is unavailable during passive recovery")
+
+
 class _ExecutionDatabaseOwner:
     """Exclusive live coordinator custody over the existing database inode.
 
@@ -699,10 +710,16 @@ class EngineExecutionCoordinator:
                 type(exc).__name__,
                 frames,
             )
+            # A failed passive recovery may already have a staged intent or an
+            # unavailable meter. Keep it for a later retry rather than bypassing
+            # the canonical metering path with an unmetered failure result.
+            if isinstance(exc, _PassiveRecoveryUnavailable):
+                return
             try:
                 await self._finalize_failure(
                     command.execution_request.execution_id,
                     "engine_coordinator_exception",
+                    preserve_staged=True,
                 )
             except Exception:
                 self._driver_finalization_failures += 1
@@ -731,9 +748,42 @@ class EngineExecutionCoordinator:
                 command.execution_request.context_policy,
             )
         except ProviderUnavailableError:
+            # A retained checkpoint can still record a cancellation/deadline
+            # or expose an unresolved approval. These paths never dispatch a
+            # provider or tool, and never publish a staged result. Preserve
+            # normal storage metering and admission completion on terminality.
+            if self.service.repository.latest_checkpoint(execution_id) is not None:
+                passive_runtime = CognitiveExecutionRuntime(
+                    self.service.repository,
+                    _PassiveRecoveryProvider(),
+                    self.tool_runtime,
+                    storage_meter=(
+                        lambda resource_id, write_id, payload, meter_now=None: (
+                            self.service.meter_execution_storage(
+                                command, resource_id, write_id, payload, now=meter_now,
+                            )
+                        )
+                    ),
+                )
+                try:
+                    recovered = passive_runtime.recover_passively(
+                        execution_id,
+                        approval_refs=self.service.active_approval_refs(execution_id),
+                    )
+                except Exception as exc:
+                    raise _PassiveRecoveryUnavailable("passive checkpoint recovery deferred") from exc
+                if recovered is not None:
+                    if recovered.result is not None:
+                        self.service.complete_execution_admission(execution_id)
+                    return
+                # Existing approved work or a staged finalization must be
+                # retried only after the original provider is available. Do
+                # not convert an outage into a destructive terminal failure.
+                return
             await self._finalize_failure(
                 execution_id,
                 "provider_unavailable",
+                preserve_staged=True,
             )
             return
 
@@ -864,6 +914,8 @@ class EngineExecutionCoordinator:
         self,
         execution_id: str,
         error_code: str,
+        *,
+        preserve_staged: bool = True,
     ) -> None:
         repository = self.service.repository
         existing = repository.result(execution_id)
@@ -914,6 +966,7 @@ class EngineExecutionCoordinator:
                 result,
                 expected_execution_version=current.version,
                 now=now,
+                require_no_staged_intent=preserve_staged,
             )
             self.service.complete_execution_admission(
                 execution_id,
@@ -922,7 +975,8 @@ class EngineExecutionCoordinator:
         except Exception:
             # A concurrent driver may have completed or advanced the execution.
             # Re-read and leave durable reconciliation to the canonical state.
-            if repository.result(execution_id) is None:
+            if (repository.result(execution_id) is None
+                    and not (preserve_staged and repository.finalization_intent(execution_id) is not None)):
                 raise
 
 

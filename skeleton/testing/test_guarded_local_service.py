@@ -50,14 +50,14 @@ class _Authority:
             1, "tenant", "thread",
         )
         self.calls = 0
-        self.drift = False
+        self.drift_at = None
         self.cross_tenant = False
 
     async def resolve(self, *, tenant_scope_id, context_id, request_digest):
         assert request_digest == "request-digest"
         self.calls += 1
         old = self.snapshot
-        if self.drift and self.calls == 2:
+        if self.drift_at == self.calls:
             return TrustedContextSnapshot(
                 old.root, old.policy_sha256, old.snapshot_version + 1,
                 old.tenant_id, old.context_id,
@@ -87,18 +87,45 @@ def test_preflight_and_postflight_accept_unchanged_authority():
         request, tenant_scope_id="tenant", context_id="thread",
     ))
     assert answer.result.text == "ok" and engine.calls == 1
-    assert authority.calls == 2 and answer.canonical_snapshot_version == 1
+    assert authority.calls == 3 and answer.canonical_snapshot_version == 1
 
 
 def test_concurrent_policy_or_thread_edit_suppresses_output():
     request, engine = _Request(), _Engine()
     authority = _Authority(request)
-    authority.drift = True
+    authority.drift_at = 3
     with pytest.raises(SealedContextReplayError):
         asyncio.run(_service(engine, authority).generate(
             request, tenant_scope_id="tenant", context_id="thread",
         ))
     assert engine.calls == 1
+
+
+def test_revocation_during_review_denies_before_model_execution():
+    request, engine = _Request(), _Engine()
+    authority = _Authority(request)
+    authority.drift_at = 2
+    with pytest.raises(SealedContextReplayError, match="before local inference"):
+        asyncio.run(_service(engine, authority).generate(
+            request, tenant_scope_id="tenant", context_id="thread",
+        ))
+    assert engine.calls == 0
+
+
+def test_stalled_pre_dispatch_authority_is_bounded_and_fails_closed():
+    request, engine = _Request(), _Engine()
+
+    class StalledAuthority(_Authority):
+        async def resolve(self, **kwargs):
+            if self.calls == 1:
+                await asyncio.Event().wait()
+            return await super().resolve(**kwargs)
+
+    service = _service(engine, StalledAuthority(request))
+    service.guard.review_timeout_seconds = 0.05
+    with pytest.raises(SealedContextBoundaryError, match="authority timed out"):
+        asyncio.run(service.generate(request, tenant_scope_id="tenant", context_id="thread"))
+    assert engine.calls == 0
 
 
 def test_cross_tenant_reader_denies_before_model_execution():
@@ -119,5 +146,10 @@ def test_caller_cannot_supply_prepared_tensors_or_snapshot():
         asyncio.run(service.generate(
             request, tenant_scope_id="tenant", context_id="thread",
             prepared_input=object(),
+        ))
+    with pytest.raises(SealedContextBoundaryError):
+        asyncio.run(service.generate(
+            request, tenant_scope_id="tenant", context_id="thread",
+            _before_dispatch=lambda: None,
         ))
     assert engine.calls == 0
