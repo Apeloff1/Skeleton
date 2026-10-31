@@ -440,6 +440,7 @@ class AdaptiveResourceFabric:
         self._last_stream_ns = 0
         self._learned_parallelism = 1.0
         self._previous_batch_throughput: float | None = None
+        self._thermal_blocked: set[tuple[int, str, str]] = set()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
@@ -514,14 +515,34 @@ class AdaptiveResourceFabric:
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
         )
+        # Per-device measured thermal admission with anti-thrash hysteresis.
+        # Never invent a threshold: unknown telemetry only retains a prior hold.
+        # The index distinguishes identical GPUs; absent devices are retired.
+        with self._lock:
+            present: set[tuple[int, str, str]] = set()
+            for index, device in enumerate(snap.gpus):
+                key = (index, device.vendor, device.device)
+                present.add(key)
+                limit = device.thermal_limit_c
+                temp = device.temperature_c
+                if limit is None or temp is None:
+                    continue
+                if temp >= limit:
+                    self._thermal_blocked.add(key)
+                elif key in self._thermal_blocked:
+                    recovery = limit - max(2.0, limit * 0.05)
+                    if temp <= recovery:
+                        self._thermal_blocked.remove(key)
+            self._thermal_blocked.intersection_update(present)
+            thermal_blocked = frozenset(self._thermal_blocked)
         gpu = None
         budget = 0
         thermal_holds = 0
         # Never count shared GPU RAM as additional system or dedicated VRAM.
-        for device in snap.gpus:
-            if device.thermal_throttled:
+        for index, device in enumerate(snap.gpus):
+            if (index, device.vendor, device.device) in thermal_blocked:
                 thermal_holds += 1
-                continue  # Driver-measured thermal limits veto GPU planning.
+                continue  # Driver-measured threshold plus cooldown veto GPU planning.
             if (
                 device.shared_with_system_ram
                 and device.recommended_working_set_bytes is not None
@@ -616,6 +637,7 @@ class AdaptiveResourceFabric:
             io_rate = self._stream_throughput_ema_bps
             last_io = self._last_stream_ns
             learned = self._learned_parallelism
+            thermal_holds = len(self._thermal_blocked)
         result = snapshot.as_dict()
         result["controller"] = {
             "predictive_pressure": round(pressure or 0, 6),
@@ -630,6 +652,7 @@ class AdaptiveResourceFabric:
             "smoothed_read_bytes_per_second": None if io_rate is None else int(io_rate),
             "last_verified_read_ns": last_io or None,
             "learned_parallelism_fraction": round(learned, 4),
+            "thermal_hold_devices": thermal_holds,
         }
         return result
 

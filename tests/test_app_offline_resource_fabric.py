@@ -34,6 +34,34 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def test_thermal_hysteresis_prevents_repeated_gpu_admission_flapping(self):
+        hot = GPUResource(
+            device="gpu0", vendor="nvidia", dedicated_total_bytes=1_000_000_000,
+            dedicated_free_bytes=900_000_000, temperature_c=93,
+            thermal_limit_c=90, measurement="synthetic_test",
+        )
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(hot,),
+            ) as devices:
+                self.assertEqual(fabric.plan(1000).thermal_holds, 1)
+                devices.return_value = (replace(hot, temperature_c=89),)
+                self.assertEqual(fabric.plan(1000).thermal_holds, 1)
+                self.assertEqual(fabric.monitor()["controller"]["thermal_hold_devices"], 1)
+                devices.return_value = (replace(hot, temperature_c=None),)
+                self.assertEqual(fabric.plan(1000).thermal_holds, 1)
+                devices.return_value = (replace(hot, temperature_c=80),)
+                self.assertEqual(fabric.plan(1000).thermal_holds, 0)
+                devices.return_value = (replace(hot, temperature_c=93),)
+                self.assertEqual(fabric.plan(1000).thermal_holds, 1)
+                devices.return_value = ()
+                self.assertEqual(fabric.plan(1000).thermal_holds, 0)
+
     def test_driver_measured_thermal_limit_vetoes_gpu_plan(self):
         hot = GPUResource(
             device="gpu0", vendor="nvidia", dedicated_total_bytes=1_000_000_000,

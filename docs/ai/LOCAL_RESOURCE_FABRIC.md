@@ -467,3 +467,14 @@ read-only staging remains available. The monitor reports thermal_throttled
 per GPU; the planner reports thermal_holds and binds the count into the
 deterministic evidence digest. This is advisory GPU admission, not a claim
 to throttle hardware clocks or migrate an already executing GPU kernel.
+
+
+## GPU thermal recovery hysteresis
+
+A GPU admitted at a measured driver threshold is held out of new GPU
+plans until its measured temperature falls at least max(2 C, 5% of the
+published threshold) below the limit. Missing sensor data never clears an
+existing hold, and disconnected devices are retired from the in-process
+controller. This avoids repeated admit/reject oscillation during cooling;
+it does not claim OS clock control, device-level isolation or persistence
+across a process restart. The monitor exposes the number of held devices.
