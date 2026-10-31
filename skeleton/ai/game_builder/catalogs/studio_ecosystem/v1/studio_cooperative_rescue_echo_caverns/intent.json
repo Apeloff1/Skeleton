@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_echo_caverns",
+  "title": "Echo Caverns: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610304096,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 5
+}

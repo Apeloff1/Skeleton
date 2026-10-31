@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_orbital_gardens",
+  "title": "Orbital Gardens: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010313941,
+  "width": 21,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 5
+}

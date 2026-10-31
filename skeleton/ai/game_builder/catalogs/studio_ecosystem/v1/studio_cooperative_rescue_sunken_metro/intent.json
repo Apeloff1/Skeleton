@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_sunken_metro",
+  "title": "Sunken Metro: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610303977,
+  "width": 19,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 6
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_glass_steppe",
+  "title": "Glass Steppe: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Glass Steppe; prototype maps are not full genre implementations.",
+  "seed": 202610304011,
+  "width": 23,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 4
+}
