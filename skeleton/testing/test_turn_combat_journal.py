@@ -129,3 +129,34 @@ def test_cli_demo_and_roundtrip(capsys) -> None:
 def test_cli_invalid_json_is_explicit_failure(capsys) -> None:
     assert cli(["simulate", "--scenario-json", "{", "--actions-json", "[]"]) == 2
     assert json.loads(capsys.readouterr().err)["ok"] is False
+
+def test_interactive_offline_play_with_recoverable_invalid_action() -> None:
+    from io import StringIO
+    from skeleton.game.gameplay.turn_combat import play_interactive
+    scenario, actions = original_demo()
+    invalid = {"kind": "attack", "actor_id": "warden", "target_id": "scout"}
+    reader = StringIO("\n".join(json.dumps(item) for item in [invalid, *actions]) + "\n")
+    writer = StringIO()
+    result = play_interactive(scenario, input_stream=reader, output_stream=writer)
+    events = [json.loads(line) for line in writer.getvalue().splitlines()]
+    assert [event["event"] for event in events] == [
+        "turn", "rejected", "turn", "turn", "terminal"
+    ]
+    assert events[1]["remaining_retries"] == 2
+    assert events[-1]["session"] == result
+    assert verify_session(result)["state"]["winner"] == "wayfarers"
+
+
+def test_interactive_rejects_eof_and_bounded_invalid_attempts() -> None:
+    from io import StringIO
+    from skeleton.game.gameplay.turn_combat import play_interactive
+    scenario, _ = original_demo()
+    with pytest.raises(CombatSessionError, match="input ended"):
+        play_interactive(scenario, input_stream=StringIO(""), output_stream=StringIO())
+    with pytest.raises(CombatSessionError, match="three invalid"):
+        play_interactive(
+            scenario,
+            input_stream=StringIO('{"kind":"bad"}\n' * 3),
+            output_stream=StringIO(),
+        )
+

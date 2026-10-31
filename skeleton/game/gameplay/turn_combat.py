@@ -282,6 +282,60 @@ def original_demo() -> tuple[dict[str, Any], list[dict[str, str]]]:
     return spec, actions
 
 
+
+def play_interactive(scenario: Any, *, input_stream: Any = None,
+                     output_stream: Any = None) -> dict[str, Any]:
+    """Play a live offline encounter using bounded, accessible JSON-line turns.
+
+    Each prompt carries the current actor and state hash. Invalid input can
+    be retried up to three times per turn without mutating the saved state.
+    EOF is an explicit failure, never an implicit victory or fabricated save.
+    """
+    reader = sys.stdin if input_stream is None else input_stream
+    writer = sys.stdout if output_stream is None else output_stream
+    session = new_session(scenario)
+    while session["state"]["phase"] == "active":
+        actor_id, _ = _active_actor(session["scenario"], session["state"])
+        opponents = sorted(
+            actor["id"] for actor in session["scenario"]["actors"]
+            if actor["team"] != next(
+                item["team"] for item in session["scenario"]["actors"]
+                if item["id"] == actor_id
+            ) and session["state"]["actors"][actor["id"]]["hp"] > 0
+        )
+        writer.write(json.dumps({
+            "event": "turn", "actor_id": actor_id, "tick": session["state"]["tick"],
+            "state_digest": session["state_digest"], "targets": opponents,
+            "actions": ["attack", "guard", "rest"],
+            "hp": {key: value["hp"] for key, value in session["state"]["actors"].items()},
+        }, sort_keys=True) + "\n")
+        writer.flush()
+        for attempt in range(3):
+            line = reader.readline(MAX_CLI_BYTES + 1)
+            if not line:
+                raise CombatSessionError("input ended before terminal combat")
+            if len(line.encode("utf-8")) > MAX_CLI_BYTES:
+                raise CombatSessionError("interactive action exceeds 128 KiB")
+            try:
+                action = _parse_json(line, "action")
+                next_session = _advance(session, action)
+            except CombatSessionError as exc:
+                writer.write(json.dumps({
+                    "event": "rejected", "error": str(exc), "remaining_retries": 2 - attempt,
+                }, sort_keys=True) + "\n")
+                writer.flush()
+                if attempt == 2:
+                    raise CombatSessionError("three invalid actions in one turn") from exc
+            else:
+                session = next_session
+                break
+    writer.write(json.dumps({
+        "event": "terminal", "session": session,
+    }, sort_keys=True, separators=(",", ":")) + "\n")
+    writer.flush()
+    return session
+
+
 def _parse_json(raw: str, label: str) -> Any:
     if len(raw.encode("utf-8")) > MAX_CLI_BYTES:
         raise CombatSessionError(f"{label} exceeds 128 KiB")
@@ -294,7 +348,7 @@ def _parse_json(raw: str, label: str) -> Any:
 def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton combat")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("demo", help="Run a complete original offline encounter")
+    sub.add_parser("demo", help="Run a complete original offline encounter")\n    live = sub.add_parser("play", help="Interactively play an offline encounter")\n    live.add_argument("--scenario-json")\n    live.add_argument("--demo", action="store_true")
     start = sub.add_parser("simulate", help="Compile source and apply ordered actions")
     start.add_argument("--scenario-json", required=True)
     start.add_argument("--actions-json", required=True)
@@ -305,7 +359,7 @@ def cli(argv: Sequence[str]) -> int:
     resume.add_argument("--actions-json", required=True)
     try:
         args = parser.parse_args(list(argv))
-        if args.command == "demo":
+        if args.command == "play":\n            if bool(args.demo) == bool(args.scenario_json):\n                raise CombatSessionError("play needs exactly one of --demo or --scenario-json")\n            scenario = original_demo()[0] if args.demo else _parse_json(args.scenario_json, "scenario")\n            play_interactive(scenario)\n            return 0\n        if args.command == "demo":
             spec, actions = original_demo()
             result = simulate(spec, actions)
         elif args.command == "simulate":
