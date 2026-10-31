@@ -11,7 +11,8 @@
     "horizon_ticks",
     "initial_facts",
     "routes",
-    "endings"
+    "endings",
+    "canon_source"
   ],
   "properties": {
     "schema_version": {
@@ -163,6 +164,34 @@
             "minimum": 0,
             "maximum": 1000000
           }
+        }
+      }
+    },
+    "canon_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "origin",
+        "license_id",
+        "author"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "origin": {
+          "const": "project-original"
+        },
+        "license_id": {
+          "const": "CC0-1.0"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
         }
       }
     }

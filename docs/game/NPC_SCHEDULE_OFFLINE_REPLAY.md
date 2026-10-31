@@ -84,3 +84,12 @@ Completing the lens, beacon and tide-gate sequence ends the game as
 and deterministic priorities; once one is reached, no more player commands
 can mutate the terminal story. The chosen ending is included in the
 source-bound state digest and verified during replay.
+
+## Canonical original-content provenance
+
+The schedule embeds a bounded original canon text, explicit project-original
+origin, CC0-1.0 license identifier and author. The canonical canon digest
+must equal SHA-256 of the exact UTF-8 authored text; a modified source,
+unsupported license or missing provenance fails before gameplay starts.
+This is machine-verifiable source binding, not an independent external
+copyright clearance or marketplace rights certification.

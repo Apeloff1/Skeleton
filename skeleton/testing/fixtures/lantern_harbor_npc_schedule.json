@@ -104,5 +104,11 @@
       ],
       "priority": 10
     }
-  ]
+  ],
+  "canon_source": {
+    "text": "Lantern Harbor original NPC schedule canon v1: lighthouse keeper Mira, dockwright Sol, and tide-gate relief",
+    "origin": "project-original",
+    "license_id": "CC0-1.0",
+    "author": "Skeleton Studio B"
+  }
 }

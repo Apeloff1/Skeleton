@@ -6,6 +6,7 @@ service and consumes the canonical FLGB-13 EventBus and SaveableGameplayState.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any, Mapping, Sequence
 
 from .flgb_gameplay_runtime import (
@@ -132,6 +133,7 @@ class NpcEnding:
 class NpcSchedule:
     world_id: str
     canon_digest: str
+    canon_source: Mapping[str, str]
     horizon_ticks: int
     initial_facts: tuple[str, ...]
     routes: tuple[NpcRoute, ...]
@@ -139,11 +141,20 @@ class NpcSchedule:
 
     @classmethod
     def parse(cls, raw: Any) -> "NpcSchedule":
-        row = _keys(raw, {"schema_version", "world_id", "canon_digest",
+        row = _keys(raw, {"schema_version", "world_id", "canon_digest", "canon_source",
                           "horizon_ticks", "initial_facts", "routes", "endings"}, "schedule")
         if row["schema_version"] != 1 or type(row["schema_version"]) is not int:
             raise GameplayContractError("unsupported schedule schema")
         horizon = _integer(row["horizon_ticks"], "horizon_ticks", 1, MAX_HORIZON)
+        source = _keys(row["canon_source"], {"text", "origin", "license_id",
+                                             "author"}, "canon source")
+        if (source["origin"] != "project-original" or source["license_id"] != "CC0-1.0"
+                or type(source["text"]) is not str or not 1 <= len(source["text"]) <= 4096
+                or type(source["author"]) is not str):
+            raise GameplayContractError("unsupported original canon provenance")
+        req_id(source["author"], "canon author")
+        if sha256(source["text"].encode("utf-8")).hexdigest() != row["canon_digest"]:
+            raise GameplayContractError("canon source digest mismatch")
         routes_raw = row["routes"]
         if type(routes_raw) is not list or not 1 <= len(routes_raw) <= MAX_NPCS:
             raise GameplayContractError("invalid NPC route count")
@@ -160,12 +171,15 @@ class NpcSchedule:
                 or len({e.priority for e in endings}) != len(endings)):
             raise GameplayContractError("ambiguous NPC ending")
         return cls(req_id(row["world_id"], "world_id"),
-                   req_digest(row["canon_digest"], "canon_digest"), horizon,
+                   req_digest(row["canon_digest"], "canon_digest"),
+                   dict(source), horizon,
                    _facts(row["initial_facts"], "initial_facts"), routes, endings)
 
     def as_dict(self) -> dict[str, Any]:
         return {"schema_version": 1, "world_id": self.world_id,
-                "canon_digest": self.canon_digest, "horizon_ticks": self.horizon_ticks,
+                "canon_digest": self.canon_digest,
+                "canon_source": dict(self.canon_source),
+                "horizon_ticks": self.horizon_ticks,
                 "initial_facts": list(self.initial_facts),
                 "routes": [r.as_dict() for r in self.routes],
                 "endings": [e.as_dict() for e in self.endings]}

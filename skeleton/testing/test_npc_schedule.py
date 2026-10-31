@@ -243,3 +243,19 @@ def test_terminal_outcome_is_bound_to_save_digest():
     raw["endings"][0]["ending_id"] = "counterfeit_victory"
     with pytest.raises(GameplayContractError, match="source mismatch"):
         NpcSession.restore(NpcSchedule.parse(raw), original)
+
+
+def test_original_canon_provenance_is_content_bound():
+    raw = source()
+    assert NpcSchedule.parse(raw).canon_digest == raw["canon_digest"]
+    raw["canon_source"]["text"] += " forged"
+    with pytest.raises(GameplayContractError, match="digest mismatch"):
+        NpcSchedule.parse(raw)
+    raw = source()
+    raw["canon_source"]["license_id"] = "unverified"
+    with pytest.raises(GameplayContractError, match="provenance"):
+        NpcSchedule.parse(raw)
+    raw = source()
+    del raw["canon_source"]["author"]
+    with pytest.raises(GameplayContractError):
+        NpcSchedule.parse(raw)
