@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "exploration_landmark_discovery",
+  "domain": "exploration",
+  "stages": [
+    {
+      "key": "discover_landmark_discovery",
+      "evidence": "exploration:landmark_discovery:discover:proof",
+      "grants": "exploration:landmark_discovery:stage:1",
+      "risk": 4,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_landmark_discovery",
+      "evidence": "exploration:landmark_discovery:prepare:proof",
+      "grants": "exploration:landmark_discovery:stage:2",
+      "risk": 5,
+      "sequence": 1,
+      "requires_previous_grant": "exploration:landmark_discovery:stage:1"
+    },
+    {
+      "key": "execute_landmark_discovery",
+      "evidence": "exploration:landmark_discovery:execute:proof",
+      "grants": "exploration:landmark_discovery:stage:3",
+      "risk": 6,
+      "sequence": 2,
+      "requires_previous_grant": "exploration:landmark_discovery:stage:2"
+    },
+    {
+      "key": "resolve_landmark_discovery",
+      "evidence": "exploration:landmark_discovery:resolve:proof",
+      "grants": "exploration:landmark_discovery:stage:4",
+      "risk": 7,
+      "sequence": 3,
+      "requires_previous_grant": "exploration:landmark_discovery:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "exploration_landmark_discovery:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "exploration:landmark_discovery:discover:proof"
+      ]
+    },
+    {
+      "id": "exploration_landmark_discovery:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "exploration:landmark_discovery:prepare:proof"
+      ]
+    },
+    {
+      "id": "exploration_landmark_discovery:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "exploration:landmark_discovery:execute:proof"
+      ]
+    },
+    {
+      "id": "exploration_landmark_discovery:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "exploration:landmark_discovery:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
