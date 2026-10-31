@@ -1,0 +1,13 @@
+"""Enemy apex 0439.
+"""
+from __future__ import annotations
+
+ID = "enemy_apex_0439"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "enemy", "index": 439, "tier": 439 % 5}
+
+def apply(context: str = "") -> dict:
+    if not context and 439 % 29 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:140], "active": True}
