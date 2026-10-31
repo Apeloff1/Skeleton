@@ -163,3 +163,25 @@ def test_invalid_replay_fork_rejected_without_overwriting_save(tmp_path, capsys,
     )) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
     assert save.read_bytes() == before
+
+
+@pytest.mark.parametrize("attack", ["group_readable", "hardlink", "symlink"])
+def test_private_save_rejects_nonprivate_or_aliased_files(tmp_path, capsys, attack):
+    root, pin = _build(tmp_path, capsys)
+    save = tmp_path / "save.json"
+    assert run_app_cli(_play(root, pin, "--moves", "up", "--save", str(save))) == 0
+    result = json.loads(capsys.readouterr().out)
+    target = save
+    if attack == "group_readable":
+        save.chmod(0o640)
+    elif attack == "hardlink":
+        target = tmp_path / "linked.json"
+        target.hardlink_to(save)
+    else:
+        target = tmp_path / "symlinked.json"
+        target.symlink_to(save)
+    assert run_app_cli(_play(
+        root, pin, "--load-save", str(target),
+        "--expected-save-sha256", result["independent_save_sha256"],
+    )) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"

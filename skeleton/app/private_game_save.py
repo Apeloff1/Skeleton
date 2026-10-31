@@ -16,7 +16,7 @@ import stat
 from typing import Sequence
 
 from skeleton.ai.game_builder.dual_runtime_verify import (
-    DualRuntimeVerificationError, _assert_original_root, _read, _root_fd,
+    DualRuntimeVerificationError, _assert_original_root, _root_fd,
 )
 from skeleton.ai.game_builder.offline_receipt_publication import (
     _NAME, preflight_receipt_destination,
@@ -62,11 +62,46 @@ def read_private_game_save(
         raise PrivateGameSaveError("independent offline save pin required")
     target, fd = _parent(path)
     try:
-        raw = _read(fd, target.name, MAX_SERIALIZED_REPLAY_BYTES)
+        flags = os.O_RDONLY | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        handle = os.open(target.name, flags, dir_fd=fd)
+        try:
+            before = os.fstat(handle)
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                    or before.st_uid != os.geteuid()
+                    or before.st_mode & 0o077
+                    or not 0 < before.st_size <= MAX_SERIALIZED_REPLAY_BYTES):
+                raise PrivateGameSaveError("save is not an owner-private regular file")
+            chunks: list[bytes] = []
+            remaining = before.st_size
+            while remaining:
+                chunk = os.read(handle, min(remaining, 64 * 1024))
+                if not chunk:
+                    raise PrivateGameSaveError("offline save truncated during restore")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            raw = b"".join(chunks)
+            after = os.fstat(handle)
+            identity = lambda item: (
+                item.st_dev, item.st_ino, item.st_size, item.st_nlink,
+                item.st_uid, item.st_mode, item.st_mtime_ns, item.st_ctime_ns,
+            )
+            if identity(before) != identity(after):
+                raise PrivateGameSaveError("offline save changed during restore")
+        finally:
+            os.close(handle)
         if not hmac.compare_digest(sha256(raw).hexdigest(), expected_sha256):
             raise PrivateGameSaveError("offline save differs from independent pin")
-        if _read(fd, target.name, MAX_SERIALIZED_REPLAY_BYTES) != raw:
-            raise PrivateGameSaveError("offline save changed during restore")
+        # Reopen by name after the descriptor-bound read to reject a file
+        # replacement while preserving the independent digest authority.
+        second = os.open(target.name, flags, dir_fd=fd)
+        try:
+            newer = os.fstat(second)
+            if identity(before) != identity(newer):
+                raise PrivateGameSaveError("offline save replaced during restore")
+        finally:
+            os.close(second)
         _assert_original_root(target.parent, fd)
         return raw
     except (DualRuntimeVerificationError, OSError, ValueError) as exc:
