@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import sqlite3
-from typing import Mapping
 
 from skeleton.ai.model_runtime.fair_stream_dispatch import (
-    DispatchDeferred, DispatchUncertain, DurableExecutionOwner,
+    DispatchUncertain, DurableExecutionOwner,
     GuardedFairStreamDispatch,
 )
 from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler

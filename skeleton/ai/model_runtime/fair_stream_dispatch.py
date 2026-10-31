@@ -14,7 +14,7 @@ from typing import Mapping, Protocol
 from .fair_stream_live_budget import LiveStreamBudgetSampler
 from .fair_stream_queue import MeasuredStreamBudget, StreamRequest, MAX_TOKENS
 from .fair_stream_session import (
-    CustodyQuarantined, DispatchPermit, DurableFairStreamSession,
+    DispatchPermit, DurableFairStreamSession,
 )
 
 
@@ -148,10 +148,11 @@ class GuardedFairStreamDispatch:
             return permits, observation
 
     def _validate_pending(self, permit: DispatchPermit) -> dict[str, object]:
+        if type(permit) is not DispatchPermit:
+            raise DispatchUncertain("canonical typed dispatch permit required")
         state = self._session.verify()
         if (
             self._issued.get(permit.lease_id) != permit
-            or type(permit) is not DispatchPermit
             or permit.device_qualified
             or permit.generation != state["generation"]
             or permit.checkpoint_digest != state["checkpoint_digest"]

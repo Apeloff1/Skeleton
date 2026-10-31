@@ -207,3 +207,15 @@ def test_pending_lease_refuses_second_plan(monkeypatch):
     assert permits
     with pytest.raises(DispatchUncertain, match="pending"):
         guard.plan_live(token_budget=40)
+
+
+def test_invalid_permit_type_fails_closed_before_owner(monkeypatch):
+    install_probe(monkeypatch, [budget()])
+    owner = SimulatedCommittedOwner()
+    guard = make(owner)
+    guard.submit(request())
+    permits, _ = guard.plan_live(token_budget=40)
+    assert permits
+    with pytest.raises(DispatchUncertain, match="canonical typed"):
+        guard.execute_once(None)
+    assert owner.calls == 0
