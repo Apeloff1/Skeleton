@@ -141,9 +141,13 @@ def _read(root: int, path: str, limit: int) -> bytes:
             raise DualRuntimeVerificationError("unsafe or oversized package file")
         with os.fdopen(os.dup(with_fd), "rb", closefd=True) as stream:
             data = stream.read(limit + 1)
-        if len(data) > limit or len(data) != info.st_size:
-            raise DualRuntimeVerificationError("file changed while verifying")
-        if os.fstat(with_fd).st_size != info.st_size:
+        after = os.fstat(with_fd)
+        identity = lambda item: (
+            item.st_dev, item.st_ino, item.st_size, item.st_nlink,
+            item.st_mtime_ns, item.st_ctime_ns,
+        )
+        if (len(data) > limit or len(data) != info.st_size
+                or identity(after) != identity(info)):
             raise DualRuntimeVerificationError("file changed while verifying")
         return data
     finally:
@@ -184,6 +188,11 @@ def _inventory(root: int) -> set[str]:
             if stat.S_ISDIR(info.st_mode):
                 child = os.open(name, _flags(True), dir_fd=fd)
                 try:
+                    opened = os.fstat(child)
+                    if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+                        raise DualRuntimeVerificationError(
+                            "directory changed during inventory"
+                        )
                     visit(child, parts)
                 finally:
                     os.close(child)
@@ -336,6 +345,10 @@ def verify_exported_package(
                 or replay.digest != manifest.get("proof_digest")
                 or replay.final_state.to_payload() != proof.get("final_state")):
             raise DualRuntimeVerificationError("winning replay does not reproduce")
+        # A replay receipt must not attest a package whose manifest was
+        # replaced after the initial independent pin was checked.
+        if _read(fd, "release.json", _MAX_MANIFEST) != release:
+            raise DualRuntimeVerificationError("release changed during verification")
         return {
             "schema": SCHEMA,
             "project_id": world.intent.project_id,

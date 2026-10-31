@@ -201,3 +201,51 @@ def test_untrusted_world_level_count_rejected_before_path_solver(monkeypatch):
     ))
     with pytest.raises(DualRuntimeVerificationError, match="level count"):
         verifier._world(native, manifest)
+
+
+def test_release_replacement_during_replay_is_rejected(package, monkeypatch):
+    from skeleton.ai.game_builder import dual_runtime_verify as verifier
+
+    root, pin = package
+    original = verifier._read
+    changed = False
+
+    def mutate_after_source_read(fd, path, limit):
+        nonlocal changed
+        payload = original(fd, path, limit)
+        if path == "index.html" and not changed:
+            changed = True
+            release = root / "release.json"
+            release.write_bytes(b"x" * release.stat().st_size)
+        return payload
+
+    monkeypatch.setattr(verifier, "_read", mutate_after_source_read)
+    with pytest.raises(DualRuntimeVerificationError, match="release changed"):
+        verifier.verify_exported_package(
+            root, expected_manifest_sha256=pin, authorized=True,
+        )
+    assert changed
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor identity")
+def test_directory_swap_between_stat_and_open_is_rejected(package, monkeypatch):
+    from skeleton.ai.game_builder import dual_runtime_verify as verifier
+
+    root, pin = package
+    real_open = verifier.os.open
+    swapped = False
+
+    def swap_before_open(path, flags, *args, **kwargs):
+        nonlocal swapped
+        if path == "godot" and kwargs.get("dir_fd") is not None and not swapped:
+            swapped = True
+            (root / "godot").rename(root / "godot-old")
+            (root / "godot").mkdir()
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(verifier.os, "open", swap_before_open)
+    with pytest.raises(DualRuntimeVerificationError, match="directory changed"):
+        verifier.verify_exported_package(
+            root, expected_manifest_sha256=pin, authorized=True,
+        )
+    assert swapped
