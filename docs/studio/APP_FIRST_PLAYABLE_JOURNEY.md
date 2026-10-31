@@ -212,3 +212,12 @@ AI inference or consumer release certification. No network access is required.
 
 Focused tests: `python -m pytest -q
 skeleton/testing/test_app_offline_gameplay.py`.
+
+### Reversible original-game replay branches
+
+Use `--fork-at N` together with `--load-save` and its independent pin to
+replay the first N canonical actions, then append alternative moves and publish
+a **new** no-clobber save. The original save remains unchanged. A fork beyond
+the verified action history, a negative step, or a fork without a loaded save
+is rejected before a new save is published. This is deterministic local
+choice exploration, not a networked save synchronization service.

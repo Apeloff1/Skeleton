@@ -120,3 +120,46 @@ def test_gameplay_flags_are_not_accepted_by_other_journey_modes(tmp_path, capsys
         "--moves", "up", "--trusted-local-operator",
     ]) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+
+def test_fork_replay_preserves_original_save_and_supports_alternate_actions(tmp_path, capsys):
+    root, pin = _build(tmp_path, capsys)
+    save = tmp_path / "original-save.json"
+    forked_save = tmp_path / "forked-save.json"
+    assert run_app_cli(_play(root, pin, "--moves", "up,right,down", "--save", str(save))) == 0
+    first = json.loads(capsys.readouterr().out)
+    original_bytes = save.read_bytes()
+    assert run_app_cli(_play(
+        root, pin, "--load-save", str(save),
+        "--expected-save-sha256", first["independent_save_sha256"],
+        "--fork-at", "1", "--moves", "left",
+        "--save", str(forked_save),
+    )) == 0
+    alternative = json.loads(capsys.readouterr().out)
+    assert alternative["action_count"] == 2
+    assert alternative["final_state"]["steps"] == 2
+    assert alternative["replay_digest"] != first["replay_digest"]
+    assert save.read_bytes() == original_bytes
+    assert forked_save.is_file()
+    assert run_app_cli(_play(
+        root, pin, "--load-save", str(forked_save),
+        "--expected-save-sha256", alternative["independent_save_sha256"],
+    )) == 0
+    replayed = json.loads(capsys.readouterr().out)
+    assert replayed["replay_digest"] == alternative["replay_digest"]
+
+
+@pytest.mark.parametrize("step", ["-1", "4", "9999"])
+def test_invalid_replay_fork_rejected_without_overwriting_save(tmp_path, capsys, step):
+    root, pin = _build(tmp_path, capsys)
+    save = tmp_path / "original-save.json"
+    assert run_app_cli(_play(root, pin, "--moves", "up", "--save", str(save))) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    before = save.read_bytes()
+    assert run_app_cli(_play(
+        root, pin, "--load-save", str(save),
+        "--expected-save-sha256", receipt["independent_save_sha256"],
+        "--fork-at", step, "--moves", "down",
+    )) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert save.read_bytes() == before

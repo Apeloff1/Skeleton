@@ -37,7 +37,7 @@ from skeleton.ai.game_builder.secure_export_publication import (
 )
 from skeleton.ai.game_builder.playable_compiler import PlayableCompilationError
 from skeleton.ai.game_builder.playable_simulation import (
-    GameplayError, deserialize_replay, play_actions, resume_replay,
+    GameplayError, deserialize_replay, play_actions, replay_prefix, resume_replay,
     serialize_replay,
 )
 from skeleton.app.private_game_save import (
@@ -317,6 +317,7 @@ def play_existing_source_game(
     load_save: str | Path | None = None,
     expected_save_sha256: str | None = None,
     save_destination: str | Path | None = None,
+    fork_at_step: int | None = None,
 ) -> dict[str, object]:
     """Execute actual offline player moves on a verified source-bound world.
 
@@ -331,6 +332,10 @@ def play_existing_source_game(
                 "up", "down", "left", "right",
             ) for move in moves)):
         raise FirstPlayableJourneyError("invalid bounded offline player moves")
+    if fork_at_step is not None and (
+        type(fork_at_step) is not int or fork_at_step < 0 or load_save is None
+    ):
+        raise FirstPlayableJourneyError("fork requires a saved verified replay and nonnegative step")
     if (load_save is None) != (expected_save_sha256 is None):
         raise FirstPlayableJourneyError("restoring a save requires independent pin")
     if save_destination is not None:
@@ -348,6 +353,8 @@ def play_existing_source_game(
             load_save, expected_sha256=expected_save_sha256, authorized=True,
         )
         replay = deserialize_replay(world, data, authorized=True)
+        if fork_at_step is not None:
+            replay = replay_prefix(world, replay, fork_at_step, authorized=True)
     replay = resume_replay(world, replay, moves, authorized=True)
     save_pin = None
     if save_destination is not None:
@@ -422,6 +429,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="previous private canonical replay save for --play-existing")
     parser.add_argument("--expected-save-sha256",
                         help="independently held save digest required by --load-save")
+    parser.add_argument("--fork-at", type=int,
+                        help="fork a verified loaded save at an earlier action boundary")
     parser.add_argument("--save",
                         help="new owner-private no-clobber replay save .json destination")
     parser.add_argument("--reconcile-receipt", action="store_true",
@@ -468,9 +477,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 load_save=args.load_save,
                 expected_save_sha256=args.expected_save_sha256,
                 save_destination=args.save,
+                fork_at_step=args.fork_at,
             )
         elif args.reconcile_receipt:
-            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None or args.fork_at is not None:
                 raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
             if (args.inspect_receipt or args.verify_existing or args.onboard
                     or args.output is None or args.receipt is None
@@ -487,7 +497,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authorized=args.trusted_local_operator,
             )
         elif args.inspect_receipt:
-            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None or args.fork_at is not None:
                 raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
             if (args.play_existing or args.reconcile_receipt or args.verify_existing or args.onboard or args.output is not None
                     or any(value is not None for value in onboarding_values)
@@ -500,7 +510,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authorized=args.trusted_local_operator,
             )
         elif args.verify_existing:
-            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None or args.fork_at is not None:
                 raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
             if (args.play_existing or args.reconcile_receipt or args.output is None or args.intent is not None or args.onboard
                     or any(value is not None for value in onboarding_values)
@@ -515,7 +525,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 receipt_destination=args.receipt,
             )
         else:
-            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None or args.fork_at is not None:
                 raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
             if (args.play_existing or args.reconcile_receipt or args.output is None or args.expected_manifest_sha256 is not None
                     or args.expected_receipt_sha256 is not None):
