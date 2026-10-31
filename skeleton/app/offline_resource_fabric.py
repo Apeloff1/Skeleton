@@ -11,7 +11,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import ctypes
 import hashlib
+import hmac
+from itertools import islice
 import json
+import math
 import mmap
 import os
 from pathlib import Path
@@ -22,6 +25,11 @@ import threading
 import time
 from typing import Any, Iterable
 
+from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
+from .offline_io_pressure import IOPressureController, probe_io_pressure
+from .offline_cpu_throttle import CPUThrottleController, probe_cpu_throttle
+from .offline_swap_churn import SwapChurnController, probe_swap_counters
+from .offline_cpu_thermal import CPUThermalController, probe_cpu_thermal
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
 )
@@ -29,6 +37,62 @@ from .offline_resources import (
 
 class ResourceFabricError(RuntimeError):
     """The resource fabric cannot safely stage or schedule this operation."""
+
+
+class StagingManifestMismatch(ResourceFabricError):
+    """Previously pinned source bytes or ordered source identities changed."""
+
+
+STAGING_MANIFEST_SCHEMA = "skeleton.offline.staging-manifest.v1"
+
+
+def build_staging_manifest(records: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    """Bind ordered verified source identities; no signature or GPU claim."""
+    if type(records) is not tuple or not 1 <= len(records) <= 10000:
+        raise ResourceFabricError("bounded staged source receipts required")
+    sources: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    total = 0
+    expected = {"source", "size_bytes", "sha256", "readonly", "staging",
+                "gpu_coherence_verified"}
+    for record in records:
+        if type(record) is not dict or set(record) != expected:
+            raise ResourceFabricError("unexpected staged source receipt fields")
+        name, size, digest = record["source"], record["size_bytes"], record["sha256"]
+        if type(name) is not str or not name or name in seen:
+            raise ResourceFabricError("unique staged source identity required")
+        try:
+            encoded = name.encode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise ResourceFabricError("invalid UTF-8 staged source identity") from exc
+        if (len(encoded) > 4096 or any(ord(ch) < 32 for ch in name)
+                or name.startswith("/") or "\\" in name
+                or any(part in {"", ".", ".."} for part in name.split("/"))):
+            raise ResourceFabricError("invalid staged source identity")
+        if type(size) is not int or size < 0:
+            raise ResourceFabricError("invalid staged source byte count")
+        if (type(digest) is not str or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)):
+            raise ResourceFabricError("invalid staged source SHA-256")
+        if (record["readonly"] is not True
+                or record["staging"] != "os_file_backed_mmap"
+                or record["gpu_coherence_verified"] is not False):
+            raise ResourceFabricError("staging receipt claims unsupported authority")
+        seen.add(name)
+        total += size
+        sources.append({"source": name, "size_bytes": size, "sha256": digest})
+    canonical = {"schema": STAGING_MANIFEST_SCHEMA, "sources": sources}
+    encoded = json.dumps(
+        canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+    ).encode("utf-8")
+    return {
+        "schema": "skeleton.offline.readonly-staging.v1",
+        "manifest_schema": STAGING_MANIFEST_SCHEMA,
+        "manifest_digest": hashlib.sha256(encoded).hexdigest(),
+        "source_count": len(sources), "source_bytes": total,
+        "sources": list(records), "verified": True,
+        "gpu_transfer_executed": False, "manifest_authenticated": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -43,6 +107,7 @@ class GPUResource:
     measurement: str = "unknown"
     utilization_ratio: float | None = None
     temperature_c: float | None = None
+    thermal_limit_c: float | None = None
     recommended_working_set_bytes: int | None = None
     current_allocated_bytes: int | None = None
 
@@ -56,14 +121,17 @@ class GPUResource:
             raise ValueError("GPU free VRAM cannot exceed total VRAM")
         if (self.shared_total_bytes is None) != (self.shared_free_bytes is None):
             raise ValueError("shared GPU memory must have complete telemetry")
-        for value in (self.utilization_ratio, self.temperature_c):
+        for value in (self.utilization_ratio, self.temperature_c, self.thermal_limit_c):
             if value is not None and (not isinstance(value, (int, float))
-                                      or isinstance(value, bool)):
+                                      or isinstance(value, bool)
+                                      or not math.isfinite(value)):
                 raise ValueError("invalid GPU sensor value")
         if self.utilization_ratio is not None and not 0 <= self.utilization_ratio <= 1:
             raise ValueError("invalid GPU utilization")
         if self.temperature_c is not None and not -50 <= self.temperature_c <= 200:
             raise ValueError("invalid GPU temperature")
+        if self.thermal_limit_c is not None and not -50 <= self.thermal_limit_c <= 200:
+            raise ValueError("invalid GPU thermal threshold")
         for key in ("recommended_working_set_bytes", "current_allocated_bytes"):
             value = getattr(self, key)
             if value is not None and (type(value) is not int or value < 0):
@@ -74,6 +142,11 @@ class GPUResource:
             or not 0 <= self.shared_free_bytes <= self.shared_total_bytes
         ):
             raise ValueError("invalid shared memory telemetry")
+
+    @property
+    def thermal_throttled(self) -> bool:
+        return (self.temperature_c is not None and self.thermal_limit_c is not None
+                and self.temperature_c >= self.thermal_limit_c)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +159,8 @@ class GPUResource:
             "measurement": self.measurement,
             "utilization_ratio": self.utilization_ratio,
             "temperature_c": self.temperature_c,
+            "thermal_limit_c": self.thermal_limit_c,
+            "thermal_throttled": self.thermal_throttled,
             "recommended_working_set_bytes": self.recommended_working_set_bytes,
             "current_allocated_bytes": self.current_allocated_bytes,
         }
@@ -194,12 +269,26 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
                     ))
                 except Exception:
                     pass
+                thermal_limit = None
+                try:
+                    threshold_kind = getattr(
+                        pynvml, "NVML_TEMPERATURE_THRESHOLD_SLOWDOWN", None,
+                    )
+                    if threshold_kind is not None:
+                        thermal_limit = float(
+                            pynvml.nvmlDeviceGetTemperatureThreshold(
+                                handle, threshold_kind,
+                            )
+                        )
+                except Exception:
+                    pass  # Unsupported driver threshold is unknown, not 95 C.
                 devices.append(GPUResource(
                     device=str(name), vendor="nvidia",
                     dedicated_total_bytes=int(memory.total),
                     dedicated_free_bytes=int(memory.free),
                     measurement="nvml", utilization_ratio=utilization,
                     temperature_c=temperature,
+                    thermal_limit_c=thermal_limit,
                 ))
         finally:
             pynvml.nvmlShutdown()
@@ -227,11 +316,14 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
         )
         busy = _read_positive(physical / "gpu_busy_percent")
         temperature = None
+        thermal_limit = None
         try:
             temps = sorted(physical.glob("hwmon/hwmon*/temp1_input"))
             if temps:
                 milli = _read_positive(temps[0])
                 temperature = milli / 1000 if milli is not None else None
+                high = _read_positive(temps[0].with_name("temp1_max"))
+                thermal_limit = high / 1000 if high is not None else None
         except OSError:
             pass
         devices.append(GPUResource(
@@ -244,6 +336,7 @@ def probe_gpu_resources() -> tuple[GPUResource, ...]:
             measurement="linux_drm_sysfs",
             utilization_ratio=min(1.0, busy / 100) if busy is not None else None,
             temperature_c=temperature,
+            thermal_limit_c=thermal_limit,
         ))
     return tuple(devices)
 
@@ -283,6 +376,16 @@ class FabricPlan:
     memory_pressure: float
     reason: str
     evidence_digest: str
+    host_stream_capacity: int = 1
+    available_stream_slots: int = 1
+    readonly_stream: bool = False
+    thermal_holds: int = 0
+    cgroup_high_backpressure: bool = False
+    cgroup_oom_backpressure: bool = False
+    io_backpressure: bool = False
+    cpu_throttle_backpressure: bool = False
+    swap_churn_backpressure: bool = False
+    cpu_thermal_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -290,6 +393,16 @@ class FabricPlan:
             "residency": self.residency,
             "readonly_staging": self.readonly_staging,
             "stream_count": self.stream_count,
+            "host_stream_capacity": self.host_stream_capacity,
+            "available_stream_slots": self.available_stream_slots,
+            "readonly_stream": self.readonly_stream,
+            "thermal_holds": self.thermal_holds,
+            "cgroup_high_backpressure": self.cgroup_high_backpressure,
+            "cgroup_oom_backpressure": self.cgroup_oom_backpressure,
+            "io_backpressure": self.io_backpressure,
+            "cpu_throttle_backpressure": self.cpu_throttle_backpressure,
+            "swap_churn_backpressure": self.swap_churn_backpressure,
+            "cpu_thermal_backpressure": self.cpu_thermal_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -305,21 +418,33 @@ class FabricPlan:
 
 
 def _open_source_at(root: Path, relative: Path) -> int:
-    """Open beneath a stable root without following POSIX parent symlinks."""
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    if os.name != "posix":
-        return os.open(root / relative, flags)
-    parent_flags = (
-        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-        | getattr(os, "O_NOFOLLOW", 0)
-    )
-    parent_fd = os.open(root, parent_flags)
+    """Anchor every directory component, including ancestors of the root.
+
+    A no-follow flag on the final root pathname does not protect its
+    ancestors from concurrent symlink replacement. Without native
+    descriptor-relative no-follow primitives, staging fails closed.
+    """
+    if (os.name != "posix" or not getattr(os, "O_NOFOLLOW", 0)
+            or not getattr(os, "O_DIRECTORY", 0)):
+        raise ResourceFabricError(
+            "descriptor-anchored no-follow source opening unavailable"
+        )
+    base = Path(root)
+    child = Path(relative)
+    if (not base.is_absolute() or child.is_absolute() or not child.parts
+            or any(part in {".", ".."} for part in child.parts)):
+        raise ResourceFabricError("unsafe descriptor-relative source path")
+    parent_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    parent_fd = os.open(base.anchor, parent_flags)
     try:
-        for component in relative.parts[:-1]:
+        for component in (*base.parts[1:], *child.parts[:-1]):
             child_fd = os.open(component, parent_flags, dir_fd=parent_fd)
             os.close(parent_fd)
             parent_fd = child_fd
-        return os.open(relative.parts[-1], flags, dir_fd=parent_fd)
+        return os.open(
+            child.parts[-1], os.O_RDONLY | os.O_NOFOLLOW,
+            dir_fd=parent_fd,
+        )
     finally:
         os.close(parent_fd)
 
@@ -334,20 +459,37 @@ class AdaptiveResourceFabric:
     def __init__(self, storage_path: str | Path):
         self.storage_path = Path(storage_path)
         self._lock = threading.RLock()
+        self._slot_condition = threading.Condition(self._lock)
+        self._wait_queue: list[int] = []
+        self._next_ticket = 0
         self._pressure_ema: float | None = None
         self._active_streams = 0
         self._observations = 0
         self._stream_batches = 0
         self._stream_failures = 0
         self._stream_bytes = 0
+        self._stream_pressure_rechecks = 0
         self._stream_throughput_ema_bps: float | None = None
         self._last_stream_ns = 0
         self._learned_parallelism = 1.0
         self._previous_batch_throughput: float | None = None
+        self._thermal_blocked: set[tuple[int, str, str]] = set()
+        self._cgroup = CgroupPressureTracker()
+        self._io = IOPressureController()
+        self._cpu_throttle = CPUThrottleController()
+        self._swap_churn = SwapChurnController()
+        self._cpu_thermal = CPUThermalController()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
+        self._swap_churn.observe(
+            probe_swap_counters(), physical_ram_bytes=hardware.total_ram_bytes,
+        )
         gpus = probe_gpu_resources()
+        self._cgroup.sample(probe_cgroup_events())
+        self._io.observe(probe_io_pressure())
+        self._cpu_throttle.observe(probe_cpu_throttle())
+        self._cpu_thermal.observe(probe_cpu_thermal())
         ram_pressure = 1 - hardware.available_ram_bytes / hardware.total_ram_bytes
         swap_pressure = (
             1 - hardware.free_swap_bytes / hardware.total_swap_bytes
@@ -371,29 +513,48 @@ class AdaptiveResourceFabric:
     def plan(
         self, source_bytes: int, *, desired_streams: int = 1,
         requested_gpu_bytes: int = 0, allow_gpu: bool = False,
+        readonly_stream: bool = False,
     ) -> FabricPlan:
         for value in (source_bytes, desired_streams, requested_gpu_bytes):
             if type(value) is not int or value < 0:
                 raise ValueError("resource requests must be non-negative integers")
-        if desired_streams == 0 or type(allow_gpu) is not bool:
+        if (desired_streams == 0 or type(allow_gpu) is not bool
+                or type(readonly_stream) is not bool):
             raise ValueError("invalid concurrent resource request")
         snap = self.observe()
         hw = snap.hardware
+        cgroup = self._cgroup.snapshot()
+        io = self._io.snapshot()
+        cpu_throttle = self._cpu_throttle.snapshot()
+        swap_churn = self._swap_churn.snapshot()
+        cpu_thermal = self._cpu_thermal.snapshot()
+        if readonly_stream and cgroup["oom_backpressure"]:
+            raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
             ema = self._pressure_ema if self._pressure_ema is not None else 1.0
             running = self._active_streams
             learned_parallelism = self._learned_parallelism
-        if source_bytes > hw.disk_document_budget and source_bytes > hw.resident_document_budget:
+        # A verified read-only mmap stream does not duplicate the source on
+        # disk or materialize it in RAM. It still needs measured headroom
+        # for a bounded mmap window and digest/update buffers.
+        if readonly_stream and hw.available_ram_bytes < 2 * hw.read_chunk_bytes:
+            raise LocalResourcePressure(
+                "insufficient measured RAM for bounded read-only staging"
+            )
+        # Apply spill/storage admission only to operations that allocate it.
+        if (not readonly_stream and source_bytes > hw.disk_document_budget
+                and source_bytes > hw.resident_document_budget):
             raise LocalResourcePressure("not enough RAM or disk headroom to stage requested source")
         residency = "disk_chunks" if (
-            source_bytes > hw.resident_document_budget or hw.should_spill_early
+            readonly_stream or source_bytes > hw.resident_document_budget or hw.should_spill_early
             or ema >= 0.8
         ) else "system_ram"
         # "Read-only on-board" is host page-cache-backed immutable mmap staging.
         # On UMA systems it may be physically shared with the GPU, but without
         # an explicit driver API this is NOT a GPU-coherent allocation.
         staging = residency == "disk_chunks" or source_bytes > hw.read_chunk_bytes
-        headroom = max(1, hw.suggested_index_jobs - running)
+        # Planning does not reserve capacity: expose zero slots honestly.
+        headroom = max(0, hw.suggested_index_jobs - running)
         # Capacity follows measured headroom; ordinary 50%-used RAM must
         # not collapse a many-core machine to a single stream. Throttle
         # aggressively only as predictive pressure approaches saturation.
@@ -402,14 +563,43 @@ class AdaptiveResourceFabric:
             1.0, hw.available_ram_bytes / (hw.total_ram_bytes * 0.35),
         )
         capacity = max(1, int(hw.cpu_count * pressure_factor * ram_factor))
-        streams = max(1, min(
+        streams = min(
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
-        ))
+        )
+        if (cgroup["high_backpressure"] or io["congested"]
+                or cpu_throttle["backpressure"]
+                or swap_churn["backpressure"]
+                or cpu_thermal["thermal_backpressure"]):
+            streams = min(streams, 1)
+        # Per-device measured thermal admission with anti-thrash hysteresis.
+        # Never invent a threshold: unknown telemetry only retains a prior hold.
+        # The index distinguishes identical GPUs; absent devices are retired.
+        with self._lock:
+            present: set[tuple[int, str, str]] = set()
+            for index, device in enumerate(snap.gpus):
+                key = (index, device.vendor, device.device)
+                present.add(key)
+                limit = device.thermal_limit_c
+                temp = device.temperature_c
+                if limit is None or temp is None:
+                    continue
+                if temp >= limit:
+                    self._thermal_blocked.add(key)
+                elif key in self._thermal_blocked:
+                    recovery = limit - max(2.0, limit * 0.05)
+                    if temp <= recovery:
+                        self._thermal_blocked.remove(key)
+            self._thermal_blocked.intersection_update(present)
+            thermal_blocked = frozenset(self._thermal_blocked)
         gpu = None
         budget = 0
+        thermal_holds = 0
         # Never count shared GPU RAM as additional system or dedicated VRAM.
-        for device in snap.gpus:
+        for index, device in enumerate(snap.gpus):
+            if (index, device.vendor, device.device) in thermal_blocked:
+                thermal_holds += 1
+                continue  # Driver-measured threshold plus cooldown veto GPU planning.
             if (
                 device.shared_with_system_ram
                 and device.recommended_working_set_bytes is not None
@@ -432,13 +622,26 @@ class AdaptiveResourceFabric:
         eligible = bool(
             allow_gpu and gpu is not None and requested_gpu_bytes > 0
             and requested_gpu_bytes <= budget
+            and not cgroup["oom_backpressure"]
+            and not (cgroup["high_backpressure"] and gpu.shared_with_system_ram)
         )
         reason = (
             "verified read-only host staging, SQLite spill when needed; "
             "GPU execution is exclusively backend-owned"
         )
+        if thermal_holds and not eligible:
+            reason += "; measured GPU thermal hold"
+        if io["congested"]:
+            reason += "; observed IO stall backpressure"
+        if cpu_throttle["backpressure"]:
+            reason += "; observed cgroup CPU throttling"
+        if swap_churn["backpressure"]:
+            reason += "; observed host swap page churn"
+        if cpu_thermal["thermal_backpressure"]:
+            reason += "; measured CPU thermal trip hold"
         evidence = {
             "source_bytes": source_bytes,
+            "readonly_stream": readonly_stream,
             "residency": residency, "streams": streams,
             "requested_gpu_bytes": requested_gpu_bytes,
             "gpu": gpu.device if eligible and gpu else None,
@@ -447,6 +650,13 @@ class AdaptiveResourceFabric:
             "disk_free": hw.free_disk_bytes,
             "cpu_load": hw.cpu_load_ratio,
             "predictive_pressure": round(ema, 6),
+            "thermal_holds": thermal_holds,
+            "cgroup_high_backpressure": cgroup["high_backpressure"],
+            "cgroup_oom_backpressure": cgroup["oom_backpressure"],
+            "io_backpressure": io["congested"],
+            "cpu_throttle_backpressure": cpu_throttle["backpressure"],
+            "swap_churn_backpressure": swap_churn["backpressure"],
+            "cpu_thermal_backpressure": cpu_thermal["thermal_backpressure"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -457,10 +667,45 @@ class AdaptiveResourceFabric:
             requested_gpu_bytes=requested_gpu_bytes,
             dedicated_gpu_budget_bytes=budget,
             memory_pressure=round(ema, 6), reason=reason,
+            host_stream_capacity=hw.suggested_index_jobs,
+            available_stream_slots=headroom,
+            readonly_stream=readonly_stream,
+            thermal_holds=thermal_holds,
+            cgroup_high_backpressure=bool(cgroup["high_backpressure"]),
+            cgroup_oom_backpressure=bool(cgroup["oom_backpressure"]),
+            io_backpressure=bool(io["congested"]),
+            cpu_throttle_backpressure=bool(cpu_throttle["backpressure"]),
+            swap_churn_backpressure=bool(swap_churn["backpressure"]),
+            cpu_thermal_backpressure=bool(cpu_thermal["thermal_backpressure"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
         )
+
+    def reverify_staging_manifest(
+        self, root: str | Path, relative_paths: Iterable[str],
+        expected_digest: str, *, desired_streams: int = 4,
+        deadline_s: float | None = None,
+        cancel_event: threading.Event | None = None,
+        wait_for_slot: bool = False,
+    ) -> dict[str, Any]:
+        """Re-read original bytes before replay; a prior digest grants no trust.
+
+        No receipt store is created. The operator must reselect the source
+        root and names after restart, and approve this new read operation.
+        """
+        if (type(expected_digest) is not str or len(expected_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in expected_digest)):
+            raise ResourceFabricError("lowercase SHA-256 manifest digest required")
+        records = self.stream_readonly(
+            root, relative_paths, desired_streams=desired_streams,
+            deadline_s=deadline_s, cancel_event=cancel_event,
+            wait_for_slot=wait_for_slot,
+        )
+        receipt = build_staging_manifest(records)
+        if not hmac.compare_digest(receipt["manifest_digest"], expected_digest):
+            raise StagingManifestMismatch("staged source manifest changed")
+        return dict(receipt, reverified=True)
 
     def monitor(self) -> dict[str, Any]:
         snapshot = self.observe()
@@ -470,9 +715,12 @@ class AdaptiveResourceFabric:
             io_samples = self._stream_batches
             io_failures = self._stream_failures
             io_bytes = self._stream_bytes
+            pressure_rechecks = self._stream_pressure_rechecks
             io_rate = self._stream_throughput_ema_bps
             last_io = self._last_stream_ns
             learned = self._learned_parallelism
+            thermal_holds = len(self._thermal_blocked)
+            waiting_batches = len(self._wait_queue)
         result = snapshot.as_dict()
         result["controller"] = {
             "predictive_pressure": round(pressure or 0, 6),
@@ -484,15 +732,26 @@ class AdaptiveResourceFabric:
             "completed_stream_batches": io_samples,
             "failed_stream_batches": io_failures,
             "verified_read_bytes": io_bytes,
+            "live_pressure_rechecks": pressure_rechecks,
             "smoothed_read_bytes_per_second": None if io_rate is None else int(io_rate),
             "last_verified_read_ns": last_io or None,
             "learned_parallelism_fraction": round(learned, 4),
+            "thermal_hold_devices": thermal_holds,
+            "waiting_stream_batches": waiting_batches,
+            "cgroup_memory_events": self._cgroup.snapshot(),
+            "io_pressure": self._io.snapshot(),
+            "cpu_throttle": self._cpu_throttle.snapshot(),
+            "swap_churn": self._swap_churn.snapshot(),
+            "cpu_thermal": self._cpu_thermal.snapshot(),
         }
         return result
 
     def stream_readonly(
         self, root: str | Path, relative_paths: Iterable[str],
         *, desired_streams: int = 4,
+        deadline_s: float | None = None,
+        cancel_event: threading.Event | None = None,
+        wait_for_slot: bool = False,
     ) -> tuple[dict[str, Any], ...]:
         """Verified concurrent read-only mmap streams with bounded copied chunks.
 
@@ -500,14 +759,50 @@ class AdaptiveResourceFabric:
         can coherently address or write the mapping. Only regular files in the
         selected root may be staged. No raw source bytes leave this API.
         """
+        if deadline_s is None:
+            deadline = None
+        else:
+            # JSON integers can exceed float range; reject them as a typed
+            # admission error rather than leaking OverflowError to the API.
+            if type(deadline_s) not in (int, float):
+                raise ResourceFabricError("finite positive stream deadline required")
+            try:
+                interval = float(deadline_s)
+            except (OverflowError, ValueError) as exc:
+                raise ResourceFabricError(
+                    "finite positive stream deadline required"
+                ) from exc
+            if not math.isfinite(interval) or interval <= 0:
+                raise ResourceFabricError("finite positive stream deadline required")
+            deadline = time.monotonic() + interval
+            if not math.isfinite(deadline):
+                raise ResourceFabricError("stream deadline exceeds clock range")
+        if cancel_event is not None and not isinstance(cancel_event, threading.Event):
+            raise ResourceFabricError("typed cancellation event required")
+        if type(wait_for_slot) is not bool or (wait_for_slot and deadline is None):
+            raise ResourceFabricError("bounded boolean slot wait requires a deadline")
+
+        def check_interrupted() -> None:
+            if cancel_event is not None and cancel_event.is_set():
+                raise ResourceFabricError("read-only staging cancelled")
+            if deadline is not None and time.monotonic() >= deadline:
+                raise ResourceFabricError("read-only staging deadline exceeded")
+
+        check_interrupted()
         base = Path(root).resolve(strict=True)
         if not base.is_dir() or Path(root).is_symlink():
             raise ResourceFabricError("trusted regular directory required")
-        names = tuple(relative_paths)
-        if not names or len(names) != len(set(names)):
-            raise ResourceFabricError("nonempty, unique source paths required")
+        # Do not materialize unbounded iterables or hash untyped inputs.
+        try:
+            names = tuple(islice(iter(relative_paths), 10001))
+        except (TypeError, ValueError) as exc:
+            raise ResourceFabricError("iterable source paths required") from exc
         if len(names) > 10000:
             raise ResourceFabricError("one request must page source identity lists")
+        if not names or any(type(name) is not str for name in names):
+            raise ResourceFabricError("nonempty string source paths required")
+        if len(names) != len(set(names)):
+            raise ResourceFabricError("unique source paths required")
         entries: list[tuple[str, Path, int]] = []
         total = 0
         for name in names:
@@ -530,13 +825,52 @@ class AdaptiveResourceFabric:
                 raise ResourceFabricError("source cannot be safely statted") from exc
             entries.append((name, target, info.st_size))
             total += info.st_size
-        plan = self.plan(total, desired_streams=desired_streams)
+        # Fail-fast calls cannot overtake FIFO waiters. Waiting is opt-in,
+        # deadline-bound, cancellation-aware, and capacity-derived.
+        with self._slot_condition:
+            plan = self.plan(
+                total, desired_streams=desired_streams, readonly_stream=True,
+            )
+            reserved = min(plan.stream_count, len(entries))
+            if not wait_for_slot:
+                if (self._wait_queue or reserved < 1
+                        or self._active_streams + reserved > plan.host_stream_capacity):
+                    raise LocalResourcePressure(
+                        "measured read-stream slots occupied; retry after completion"
+                    )
+                self._active_streams += reserved
+            else:
+                if len(self._wait_queue) >= max(1, plan.host_stream_capacity * 2):
+                    raise LocalResourcePressure("bounded stream wait queue is full")
+                self._next_ticket += 1
+                ticket = self._next_ticket
+                self._wait_queue.append(ticket)
+                try:
+                    while True:
+                        check_interrupted()
+                        if self._wait_queue[0] == ticket:
+                            plan = self.plan(
+                                total, desired_streams=desired_streams,
+                                readonly_stream=True,
+                            )
+                            reserved = min(plan.stream_count, len(entries))
+                            if (reserved >= 1 and self._active_streams + reserved
+                                    <= plan.host_stream_capacity):
+                                self._active_streams += reserved
+                                self._wait_queue.pop(0)
+                                self._slot_condition.notify_all()
+                                break
+                        remaining = max(0.0, deadline - time.monotonic())
+                        self._slot_condition.wait(timeout=min(0.1, remaining))
+                finally:
+                    if ticket in self._wait_queue:
+                        self._wait_queue.remove(ticket)
+                        self._slot_condition.notify_all()
         # Never create 1 mmap covering the entire source; map the file
         # read-only, then read bounded spans from OS pages with no writes.
-        with self._lock:
-            self._active_streams += plan.stream_count
         def worker(entry: tuple[str, Path, int]) -> dict[str, Any]:
             name, path, expected_size = entry
+            check_interrupted()
             fd = _open_source_at(base, Path(name))
             try:
                 before = os.fstat(fd)
@@ -551,6 +885,21 @@ class AdaptiveResourceFabric:
                     for offset in range(
                         0, before.st_size, plan.transfer_chunk_bytes,
                     ):
+                        check_interrupted()
+                        # Re-observe measured host RAM after each bounded
+                        # 16-window interval. The original plan is not an
+                        # indefinite lease against new competing allocations.
+                        if offset and (offset // plan.transfer_chunk_bytes) % 16 == 0:
+                            live = probe_local_resources(self.storage_path)
+                            with self._lock:
+                                self._stream_pressure_rechecks += 1
+                            self._cgroup.sample(probe_cgroup_events())
+                            if self._cgroup.snapshot()["oom_backpressure"]:
+                                raise LocalResourcePressure("cgroup OOM during staged read")
+                            if live.available_ram_bytes < 2 * live.read_chunk_bytes:
+                                raise LocalResourcePressure(
+                                    "physical RAM headroom fell during staged read"
+                                )
                         aligned = offset // granularity * granularity
                         displacement = offset - aligned
                         length = min(
@@ -563,6 +912,7 @@ class AdaptiveResourceFabric:
                             digest.update(view[displacement:displacement + min(
                                 plan.transfer_chunk_bytes, before.st_size - offset,
                             )])
+                check_interrupted()
                 after = os.fstat(fd)
                 current = path.lstat()
                 if (
@@ -583,7 +933,7 @@ class AdaptiveResourceFabric:
         started = time.monotonic_ns()
         succeeded = False
         try:
-            with ThreadPoolExecutor(max_workers=plan.stream_count) as pool:
+            with ThreadPoolExecutor(max_workers=reserved) as pool:
                 futures = [pool.submit(worker, item) for item in entries]
                 records = [future.result() for future in futures]
             succeeded = True
@@ -591,8 +941,9 @@ class AdaptiveResourceFabric:
         finally:
             elapsed = max(1, time.monotonic_ns() - started)
             rate = total * 1_000_000_000.0 / elapsed
-            with self._lock:
-                self._active_streams -= plan.stream_count
+            with self._slot_condition:
+                self._active_streams -= reserved
+                self._slot_condition.notify_all()
                 if succeeded:
                     self._stream_batches += 1
                     self._stream_bytes += total
@@ -606,7 +957,7 @@ class AdaptiveResourceFabric:
                     if self._previous_batch_throughput is not None:
                         if rate < self._previous_batch_throughput * 0.8:
                             self._learned_parallelism = max(
-                                1 / max(1, plan.stream_count),
+                                1 / max(1, reserved),
                                 self._learned_parallelism * 0.75,
                             )
                         elif rate > self._previous_batch_throughput * 1.1:
@@ -617,7 +968,7 @@ class AdaptiveResourceFabric:
                 else:
                     self._stream_failures += 1
                     self._learned_parallelism = max(
-                        1 / max(1, plan.stream_count),
+                        1 / max(1, reserved),
                         self._learned_parallelism * 0.5,
                     )
 
@@ -625,4 +976,6 @@ class AdaptiveResourceFabric:
 __all__ = [
     "GPUResource", "FabricSnapshot", "FabricPlan", "AdaptiveResourceFabric",
     "ResourceFabricError", "probe_gpu_resources",
+    "build_staging_manifest", "STAGING_MANIFEST_SCHEMA",
+    "StagingManifestMismatch",
 ]

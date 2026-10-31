@@ -76,6 +76,24 @@ HTML = r"""<!doctype html>
       <input id="resource-streams" type="number" min="1" step="1" value="4">
       <button id="resource-plan" class="secondary" disabled>Calculate adaptive plan</button>
       <pre id="resource-plan-result">No workload planned.</pre>
+      <details><summary>Verified multi-source staging</summary>
+        <p class="hint">Select local regular files by relative name. Read-only hashing
+        never uploads content or grants a model access to the selected files.
+        The SHA-256 manifest is integrity evidence, not an author signature.</p>
+        <label for="resource-stage-root">Trusted local directory (absolute path)</label>
+        <input id="resource-stage-root" type="text" autocomplete="off" spellcheck="false">
+        <label for="resource-stage-paths">Relative filenames, one per line (max 64)</label>
+        <textarea id="resource-stage-paths" rows="4" spellcheck="false"></textarea>
+        <label for="resource-stage-grant"><input id="resource-stage-grant" type="checkbox">
+          I approve read-only access to these exact local files</label>
+        <label for="resource-stage-wait"><input id="resource-stage-wait" type="checkbox">
+          Wait fairly for a busy read slot (up to ten seconds)</label>
+        <button id="resource-stage" class="secondary" disabled>Verify source manifest</button>
+        <pre id="resource-stage-status" aria-live="polite">No source manifest verified.</pre>
+        <label for="resource-stage-digest">Previously pinned manifest SHA-256</label>
+        <input id="resource-stage-digest" type="text" autocomplete="off" spellcheck="false">
+        <button id="resource-stage-reverify" class="secondary" disabled>Reverify source bytes</button>
+      </details>
       <details><summary>Long-form virtual memory (Mac M-series / local)</summary>
         <p class="hint">Spool selected, trusted local text files as compressed,
         verified disk pages without loading the whole file into RAM.
@@ -251,6 +269,8 @@ JAVASCRIPT = r"""'use strict';
     get('disconnect').disabled = !state.connected && !state.token;
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
+    get('resource-stage').disabled = locked || state.busy;
+    get('resource-stage-reverify').disabled = locked || state.busy;
     get('longform-ingest').disabled = locked || state.busy;
     get('longform-import-restore').disabled = locked || state.busy;
     get('longform-query').disabled = locked || state.busy || !state.longformSourceId;
@@ -287,6 +307,12 @@ JAVASCRIPT = r"""'use strict';
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
     get('resource-plan-result').textContent = 'No workload planned.';
+    get('resource-stage-status').textContent = 'No source manifest verified.';
+    get('resource-stage-root').value = '';
+    get('resource-stage-paths').value = '';
+    get('resource-stage-grant').checked = false;
+    get('resource-stage-wait').checked = false;
+    get('resource-stage-digest').value = '';
     get('longform-status').textContent = 'No staged source.';
     get('longform-work-status').textContent = 'No active work cursor.';
     get('longform-work-id').value = '';
@@ -656,6 +682,69 @@ JAVASCRIPT = r"""'use strict';
       '\nChunk bytes ' + plan.transfer_chunk_bytes +
       '\nRead-only staging ' + (plan.readonly_staging ? 'recommended' : 'optional') +
       '\nGPU transfer: backend qualification required';
+  }));
+  get('resource-stage').addEventListener('click', () => run(async () => {
+    if (!get('resource-stage-grant').checked) {
+      throw new Error('Approve these exact local source files first.');
+    }
+    const root = get('resource-stage-root').value.trim();
+    const paths = get('resource-stage-paths').value.split(/\r?\n/)
+      .map(name => name.trim()).filter(Boolean);
+    const desired_streams = Number(get('resource-streams').value);
+    if (!root || !paths.length || paths.length > 64 ||
+        new Set(paths).size !== paths.length) {
+      throw new Error('Select a trusted directory and 1–64 unique relative files.');
+    }
+    if (paths.some(name => name.startsWith('/') || name.includes('\\') ||
+        name.split('/').some(part => part === '..' || part === '.' || !part))) {
+      throw new Error('Only portable relative filenames are accepted.');
+    }
+    if (!Number.isSafeInteger(desired_streams) || desired_streams < 1 ||
+        desired_streams > 64) {
+      throw new Error('Choose 1–64 concurrent read streams.');
+    }
+    get('resource-stage-status').textContent = 'Verifying selected local sources…';
+    const receipt = await api('POST', '/v1/resources/stage', {
+      root, paths, desired_streams, approved: true, deadline_s: 10,
+      wait_for_slot: get('resource-stage-wait').checked,
+    });
+    if (!receipt.verified || receipt.manifest_authenticated !== false ||
+        !/^[0-9a-f]{64}$/.test(receipt.manifest_digest) ||
+        receipt.source_count !== paths.length) {
+      throw new Error('Local source manifest receipt is incomplete.');
+    }
+    get('resource-stage-grant').checked = false;
+    get('resource-stage-digest').value = receipt.manifest_digest;
+    get('resource-stage-status').textContent =
+      'Verified SHA-256 manifest: ' + receipt.manifest_digest +
+      '\nFiles: ' + receipt.source_count +
+      '\nBytes: ' + receipt.source_bytes +
+      '\nSource content remains local; manifest is not signed.';
+  }));
+  get('resource-stage-reverify').addEventListener('click', () => run(async () => {
+    if (!get('resource-stage-grant').checked) {
+      throw new Error('Approve a fresh read of these exact sources first.');
+    }
+    const manifest_digest = get('resource-stage-digest').value.trim();
+    const root = get('resource-stage-root').value.trim();
+    const paths = get('resource-stage-paths').value.split(/\r?\n/)
+      .map(name => name.trim()).filter(Boolean);
+    if (!/^[0-9a-f]{64}$/.test(manifest_digest) || !root ||
+        !paths.length || paths.length > 64 || new Set(paths).size !== paths.length) {
+      throw new Error('Select a valid prior digest and 1–64 unique local files.');
+    }
+    get('resource-stage-status').textContent = 'Rehashing source bytes…';
+    const result = await api('POST', '/v1/resources/stage/reverify', {
+      root, paths, manifest_digest, approved: true, deadline_s: 10,
+      wait_for_slot: get('resource-stage-wait').checked,
+    });
+    if (result.reverified !== true || result.manifest_digest !== manifest_digest) {
+      throw new Error('Source re-verification did not match the pinned digest.');
+    }
+    get('resource-stage-grant').checked = false;
+    get('resource-stage-status').textContent =
+      'Reverified source bytes: ' + result.manifest_digest +
+      '\nFiles: ' + result.source_count + '\nNo model or GPU transfer performed.';
   }));
   get('longform-ingest').addEventListener('click', () => run(async () => {
     if (!get('longform-grant').checked) throw new Error('Approve this source first.');

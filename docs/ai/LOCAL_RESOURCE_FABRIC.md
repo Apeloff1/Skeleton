@@ -41,10 +41,16 @@ Local sources
   -> canonical inference backend (independent GPU ownership)
 ```
 
-The Linux mmap path binds individual path components through `O_DIRECTORY`
-and `O_NOFOLLOW`, and final files are opened read-only. The Windows path
-re-checks canonical paths, source identity and modification metadata; it
-does not claim an atomic kernel-enforced no-follow parent-path fence.
+On POSIX the read-only mmap path opens every component of the canonical
+operator root from the filesystem anchor, then every source subdirectory and
+final file by held directory descriptors with `O_DIRECTORY` and `O_NOFOLLOW`.
+A replaced ancestor symlink cannot redirect the staging open. Where those
+primitives are unavailable (including the current Windows staging adapter),
+source mmap staging fails closed rather than silently substituting a
+path-based check that could be raced. The Windows resource monitor and
+other independently authorized offline functions remain available; safe
+Windows streaming requires separately reviewed native handle-relative
+reparse-point protections and real Windows qualification.
 
 A mapped file is read-only from this process's perspective, but that does
 **not** make DRAM immutable, GPU-coherent, or physically dedicated. Page-cache
@@ -372,3 +378,241 @@ mutable checkout. The diagnostic process output is bounded and the result
 checked against a fixed independent CPU digest. An unsigned or modified
 source, a missing Apple toolchain, a non-Apple Silicon host, or unverified
 model-specific synchronization cannot satisfy final release qualification.
+
+## cgroup v1/v2 swap accounting
+
+Linux cgroup v2 `memory.swap.max` measures swap-only bytes. The older cgroup
+v1 `memory.memsw.limit_in_bytes` includes both physical memory and swap;
+subtract the v1 physical memory limit to avoid double-counting host RAM as
+available swap. Derive swap use from memsw usage minus memory usage. Missing
+or contradictory v1 counters fail closed to unknown/zero swap capacity rather
+than fabricating available virtual memory. The unlimited kernel sentinel is
+not treated as a real quota. This is admission telemetry, not a swapfile or
+kernel memory-configuration modification.
+
+## Read-only staging is not a disk-spill allocation
+
+The versioned `/v1/resources/plan` request accepts optional
+`readonly_stream: true` for operator-selected, descriptor-verified mmap
+reads. Such reads do not allocate a second source-sized disk copy or load
+an entire source into resident Python objects, so their planning no longer
+rejects a source solely because its length exceeds SQLite/WAL spill budget.
+They still require measured host stream slots, bounded mmap windows and
+stable source identity; I/O, cancellation and physical-memory failures
+remain possible. Write/index/ingest plans retain the strict existing disk
+and resident-memory admission. The evidence digest binds the read-only mode.
+
+## Effective Linux CPU topology
+
+The CPU scheduler now uses the intersection of observed online logical CPUs,
+process CPU affinity and both cgroup v2 `cpu.max` and cgroup v1 CFS
+quota/period ceilings. Fractional quotas round up to at least one executable
+worker; an unlimited or unreadable v1 quota is not misread as zero capacity.
+This controls admission/stream parallelism, not CPU pinning or privileged
+kernel scheduling. Canonical tests cover a three-CPU affinity mask with a
+1.5-CPU v1 quota and the unlimited-v1 fallback.
+
+## Bounded read-only staging interruption
+
+Operator-approved `/v1/resources/stage` accepts an optional finite positive
+`deadline_s` for an application-level staging deadline. The canonical fabric
+also accepts an in-process `threading.Event` cancellation signal for local
+workers. Interruption is checked before file opening, at every bounded mmap
+window, and before the final source identity check. An interrupted batch
+returns no partial proof set and releases measured stream slots even when a
+worker raises. This is cooperative per-window cancellation, not a guarantee
+that an in-flight kernel page fault can be interrupted instantaneously.
+
+Even read-only streaming requires two live bounded transfer windows of
+measured RAM headroom before admission. A host reporting no free physical
+memory is rejected instead of treating zero RAM as safe because the source
+already resides on disk. The check scales with the live adaptive chunk size,
+not with total source length or an arbitrary per-file limit.
+
+
+## Source-bound staging manifest and offline UI
+
+The private POST /v1/resources/stage response now includes a deterministic
+ordered SHA-256 manifest digest, source count, byte count, and explicit
+manifest_authenticated=false. The digest covers each verified source's
+relative identity, byte count and SHA-256, not file contents or host paths.
+It is a reproducible integrity identifier, **not** a cryptographic signature
+or proof that an inference backend consumed the data. It cannot authorize a
+GPU transfer or model tool call.
+
+The offline web workspace exposes a guarded multi-file source-staging form.
+It accepts 1–64 unique portable relative filenames, requires an explicit
+operator approval, submits a bounded ten-second read-only verification, and
+displays the full manifest digest for subsequent provenance binding.
+Disconnect clears the selection and approval. The server independently
+enforces file-path, symlink, byte-window, deadline and concurrent-stream
+policy; UI validation is only an additional usability safeguard.
+
+
+## Source re-verification after restart
+
+An authenticated operator can POST /v1/resources/stage/reverify with the
+original selected root, ordered relative paths, previously pinned
+manifest_digest, approved=true, and a bounded deadline. The fabric reopens
+each regular file with the existing path/symlink fences, rehashes every byte,
+reconstructs the ordered manifest, and compares digests in constant time.
+A source mutation or reordered path list produces HTTP 409, not a stale
+success receipt. Missing/invalid input is rejected. This stateless recovery
+requires no new database authority and never trusts an old digest alone;
+it is available in the offline workspace via a separate approval control.
+
+
+## Driver-measured GPU thermal hold
+
+GPU telemetry now carries an optional driver-measured thermal limit, separate
+from the current temperature. NVML uses the device's slowdown threshold when
+available; Linux DRM uses hwmon temp1_max when published. No default 95 C
+threshold is fabricated for unsupported drivers or Apple Metal. A device at
+or above its reported threshold is excluded from GPU planning while CPU/disk
+read-only staging remains available. The monitor reports thermal_throttled
+per GPU; the planner reports thermal_holds and binds the count into the
+deterministic evidence digest. This is advisory GPU admission, not a claim
+to throttle hardware clocks or migrate an already executing GPU kernel.
+
+
+## GPU thermal recovery hysteresis
+
+A GPU admitted at a measured driver threshold is held out of new GPU
+plans until its measured temperature falls at least max(2 C, 5% of the
+published threshold) below the limit. Missing sensor data never clears an
+existing hold, and disconnected devices are retired from the in-process
+controller. This avoids repeated admit/reject oscillation during cooling;
+it does not claim OS clock control, device-level isolation or persistence
+across a process restart. The monitor exposes the number of held devices.
+
+
+## Provider-free hardware resource CLI
+
+The canonical offline application CLI supports a model-free hardware query:
+
+    python -m skeleton.app.offline_cli --resource-monitor --json
+    python -m skeleton.app.offline_cli --resource-monitor --json --resource-plan-bytes 1000000 --resource-streams 4
+
+Optional --resource-root selects the local storage directory whose free-space
+telemetry is measured. The JSON output uses the same versioned resource
+fabric monitor and read-only plan contracts as the authenticated local API.
+Unknown GPU telemetry is not treated as available VRAM. Conflicting model,
+job, workspace or capability flags fail closed; invalid roots, nonpositive
+stream counts and negative source sizes are rejected. The deterministic
+test uses explicitly simulated hardware snapshots and is not device
+qualification.
+
+
+## Provider-free CLI source staging and replay
+
+The same canonical offline CLI also supports explicitly approved read-only
+source verification without a model or network:
+
+    python -m skeleton.app.offline_cli --stage-sources --stage-approve --stage-root ./project --stage-path story.txt --json
+
+The response includes a deterministic manifest_digest. A later invocation
+can supply --stage-manifest-digest with the same ordered --stage-path values
+to rehash current source bytes and reject mutation or reordering. Use
+--stage-streams and --stage-deadline-s to request bounded concurrent reads.
+The source count is limited per invocation for UI/CLI latency, not a maximum
+total project file count; large catalogs must page their source selections.
+A missing approval, symlink escape, malformed deadline or conflicting CLI
+mode is rejected before claiming provenance.
+
+
+## Mid-stream memory pressure recovery
+
+Read-only mmap staging does not treat its initial hardware plan as an
+unlimited resource lease. Every 16 bounded mapped windows, it re-probes
+measured host RAM and requires headroom for two current adaptive windows.
+If competing workloads consume that headroom, staging fails closed before
+emitting a partial source manifest, releases all stream leases and records
+a failed batch. The monitor exposes live_pressure_rechecks for diagnostics.
+This is cooperative memory-pressure protection, not a claim to prevent
+all operating-system OOM conditions or to control GPU driver allocation.
+
+
+## Opt-in FIFO read-stream backpressure
+
+The default stage and reverify operations remain fail-fast under concurrent
+resource contention. The authenticated HTTP routes also accept a typed
+wait_for_slot=true option with a finite deadline; the offline UI exposes a
+separate checkbox. The canonical CLI supports --stage-wait only together
+with --stage-deadline-s. Queued readers are admitted in FIFO ticket order
+under the existing measured stream capacity, cannot be overtaken by new
+fail-fast requests, and release their ticket on cancellation or deadline.
+The monitor exposes waiting_stream_batches. This is a process-local queue,
+not a claim of distributed scheduling or GPU kernel preemption.
+
+
+## Linux cgroup-v2 memory event feedback
+
+The offline resource fabric samples the kernel's memory.events.local file,
+falling back to memory.events only when local counters are unavailable.
+Cumulative high/max/OOM/OOM-kill counters are compared only against a previous
+sample from the same scope; the first sample is a baseline, not a current OOM.
+Invalid or missing telemetry remains unknown, never an invented zero reading.
+
+A newly observed high/max event temporarily caps read-only staging at one
+stream and vetoes shared/unified-memory GPU planning. OOM/OOM-kill deltas
+reject new read-only staging and are rechecked during long reads. Counter
+resets and missing samples do not erase existing holds. Recovery uses
+monotonic five-second high and thirty-second OOM windows. This is cooperative
+software backpressure, not GPU preemption, kernel swap reconfiguration or
+proof that other processes cannot exhaust memory. The resource monitor exposes
+sensor scope, observed deltas and current holds. Non-Linux platforms report
+this Linux-only sensor as unavailable and retain their existing memory guards.
+
+
+## Linux kernel I/O stall pressure
+
+The same offline planner samples cgroup-v2 io.pressure (falling back to host
+/proc/pressure/io) when Linux PSI is available. It parses the measured
+some/full avg10 stall percentages, retaining their scope and cumulative
+microsecond counters without presenting them as disk bandwidth or free bytes.
+At >=15% some or >=5% full stalls, future staging is reduced to one stream.
+It recovers only below <=8% some and <=2% full, avoiding oscillation; an
+unknown sample retains a prior congestion hold. This is advisory cooperative
+backpressure, not an OS I/O scheduler override. The resource monitor reports
+whether the reading was actually measured and the current hysteresis state.
+Windows and macOS remain explicitly unsupported by this Linux PSI probe.
+
+
+## Linux cgroup CPU quota-throttling feedback
+
+The controller reads v2 cpu.stat counters for scheduling periods, throttled
+periods and throttled microseconds. It derives a throttled-period ratio only
+from consecutive monotonic counter deltas, never from the cumulative total.
+When at least 20% of sampled periods are throttled, future read-stream plans
+are capped at one worker; they recover after a subsequent valid sample with
+at most 5% throttled periods. Missing, reset or inconsistent counters cannot
+clear an existing hold. The monitor reports whether the sensor was measured,
+observed delta ratio and transition count. This is a CPU scheduling hint, not
+an OS quota modification or a claim of universal platform support.
+
+
+## Host swap-page churn protection
+
+Linux /proc/vmstat pswpin/pswpout counters are sampled as host-wide page
+traffic, never as free RAM. Consecutive monotonic counter deltas and the
+measured OS page size yield a byte-per-second swap churn rate. When that rate
+exceeds 0.2% of measured physical RAM per second, future source staging is
+limited to one stream; a subsequent rate below 0.05% permits recovery.
+Missing telemetry and counter resets preserve an active hold. This policy
+never changes system swap or assumes host traffic belongs to Skeleton alone.
+On platforms without measured page size or Linux vmstat, the sensor remains
+unavailable rather than substituting guessed capacity. The resource monitor
+exposes the actual observation scope, rate and backpressure state.
+
+
+## Linux CPU/SOC thermal trip admission
+
+Read-only Linux sysfs CPU/SOC thermal zones expose measured temperatures and
+kernel trip points where available. Only a valid passive/hot/critical trip
+can trigger a CPU thermal hold; no universal 90-degree threshold is invented.
+A measured trip caps new source staging to one stream until every observed
+tripped CPU zone cools at least five degrees below its own trip. Missing
+trip metadata, unknown sensors and non-Linux platforms remain explicit
+unknowns and cannot erase a prior measured hold. The monitor exposes each
+source zone and its trip measurement, not an asserted CPU package temperature
+on unsupported systems. This does not change firmware fan/thermal policy.

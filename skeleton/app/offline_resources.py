@@ -171,18 +171,38 @@ def _linux_swap() -> tuple[int, int]:
         return 0, 0
     total = max(0, values.get("SwapTotal", 0))
     free = min(total, max(0, values.get("SwapFree", 0)))
-    for ceiling_path, usage_path in (
-        ("/sys/fs/cgroup/memory.swap.max",
-         "/sys/fs/cgroup/memory.swap.current"),
-        ("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes",
-         "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes"),
-    ):
-        ceiling = _read_counter(Path(ceiling_path))
-        used = _read_counter(Path(usage_path))
-        if ceiling is not None and used is not None and ceiling < total:
-            total = max(0, ceiling)
-            free = min(free, max(0, ceiling - used))
-            break
+    # cgroup v2 swap.max is swap-only, unlike v1 memory.memsw.* which
+    # includes both physical memory and swap. Never interpret v1 memsw
+    # capacity as additional virtual memory: subtract the physical limit.
+    v2_ceiling = _read_counter(Path("/sys/fs/cgroup/memory.swap.max"))
+    v2_used = _read_counter(Path("/sys/fs/cgroup/memory.swap.current"))
+    if v2_ceiling is not None and v2_used is not None:
+        if v2_ceiling < total:
+            total = v2_ceiling
+            free = min(free, max(0, total - v2_used))
+        return total, free
+    v1_ceiling = _read_counter(
+        Path("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes")
+    )
+    v1_used = _read_counter(
+        Path("/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes")
+    )
+    if v1_ceiling is not None and v1_used is not None:
+        memory_ceiling = _read_counter(
+            Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+        )
+        memory_used = _read_counter(
+            Path("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+        )
+        if (memory_ceiling is None or memory_used is None
+                or v1_ceiling < memory_ceiling or v1_used < memory_used):
+            return 0, 0  # Incomplete/inconsistent telemetry is not free swap.
+        if v1_ceiling >= (1 << 60):
+            return total, free  # Linux unlimited sentinel, not a real quota.
+        swap_ceiling = v1_ceiling - memory_ceiling
+        swap_used = v1_used - memory_used
+        total = min(total, swap_ceiling)
+        free = min(free, max(0, total - swap_used))
     return total, free
 
 
@@ -380,6 +400,14 @@ def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapsh
     except OSError as exc:
         raise LocalResourcePressure("Cannot measure local storage headroom") from exc
     cores = max(1, os.cpu_count() or 1)
+    # Linux process affinity may be narrower than visible host topology.
+    # It is an OS-backed effective CPU count, not a guessed worker quota.
+    try:
+        affinity = os.sched_getaffinity(0)
+        if affinity:
+            cores = min(cores, len(affinity))
+    except (AttributeError, OSError, ValueError):
+        pass
     # cgroup CPU quotas can be smaller than the visible host core count.
     try:
         quota_file = Path("/sys/fs/cgroup/cpu.max")
@@ -390,6 +418,16 @@ def probe_local_resources(storage_path: str | Path = ".") -> LocalResourceSnapsh
                 cores = min(cores, max(1, math.ceil(quota / period)))
     except (OSError, UnicodeError, ValueError):
         pass
+    # cgroup v1 stores quota and period in separate cpu controller files.
+    # A negative quota means unlimited; never turn it into a zero-core host.
+    quota_v1 = _read_counter(Path(
+        "/sys/fs/cgroup/cpu/cpu.cfs_quota_us"
+    ))
+    period_v1 = _read_counter(Path(
+        "/sys/fs/cgroup/cpu/cpu.cfs_period_us"
+    ))
+    if quota_v1 is not None and period_v1 is not None and period_v1 > 0:
+        cores = min(cores, max(1, math.ceil(quota_v1 / period_v1)))
     try:
         load = os.getloadavg()[0] / cores
     except (AttributeError, OSError):

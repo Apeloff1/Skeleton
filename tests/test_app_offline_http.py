@@ -205,6 +205,17 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(planned["backend_gpu_transfer_executed"])
         self.assertTrue(planned["evidence_digest"])
+        self.assertFalse(planned["readonly_stream"])
+        status, read_plan, _ = self._request("POST", "/v1/resources/plan", {
+            "source_bytes": 5000, "readonly_stream": True,
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(read_plan["readonly_stream"])
+        self.assertNotEqual(read_plan["evidence_digest"], planned["evidence_digest"])
+        status, _, _ = self._request("POST", "/v1/resources/plan", {
+            "source_bytes": 5000, "readonly_stream": "true",
+        })
+        self.assertEqual(status, 422)
         source = self.folder / "selected"
         source.mkdir()
         (source / "first.txt").write_text("immutable selected file")
@@ -220,8 +231,50 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(output["verified"])
         self.assertFalse(output["gpu_transfer_executed"])
+        self.assertFalse(output["manifest_authenticated"])
+        self.assertEqual(output["source_count"], 2)
+        self.assertEqual(
+            output["source_bytes"],
+            sum(item["size_bytes"] for item in output["sources"]),
+        )
+        canonical = {
+            "schema": output["manifest_schema"],
+            "sources": [
+                {key: item[key] for key in ("source", "size_bytes", "sha256")}
+                for item in output["sources"]
+            ],
+        }
+        expected = sha256(json.dumps(
+            canonical, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")).hexdigest()
+        self.assertEqual(output["manifest_digest"], expected)
+        reverify = dict(request, manifest_digest=output["manifest_digest"])
+        status, replay, _ = self._request(
+            "POST", "/v1/resources/stage/reverify", reverify,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(replay["reverified"])
+        (source / "first.txt").write_text("changed after first staging")
+        status, _, _ = self._request(
+            "POST", "/v1/resources/stage/reverify", reverify,
+        )
+        self.assertEqual(status, 409)
+        (source / "first.txt").write_text("immutable selected file")
+        reverify["manifest_digest"] = "invalid"
+        status, _, _ = self._request(
+            "POST", "/v1/resources/stage/reverify", reverify,
+        )
+        self.assertEqual(status, 422)
         self.assertEqual(len(output["sources"]), 2)
         self.assertTrue(all(item["readonly"] for item in output["sources"]))
+        request["deadline_s"] = 0
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 422)
+        request["deadline_s"] = 10.0
+        status, timed, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(timed["sources"]), 2)
         self.assertEqual((source / "first.txt").read_text(),
                          "immutable selected file")
         request["paths"] = ["../http.sqlite3"]
@@ -989,6 +1042,23 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
                 "http://127.0.0.1:"
             ))
         self.assertFalse(secret_path.exists())
+
+    def test_offline_stage_ui_requires_explicit_grant_and_shows_manifest_digest(self):
+        from skeleton.app.offline_web import HTML, JAVASCRIPT
+        for marker in (
+            'id="resource-stage-root"', 'id="resource-stage-paths"',
+            'id="resource-stage-grant"', 'id="resource-stage-status"',
+            'aria-live="polite"',
+        ):
+            self.assertIn(marker, HTML)
+        self.assertIn("get('resource-stage').addEventListener", JAVASCRIPT)
+        self.assertIn("receipt.manifest_digest", JAVASCRIPT)
+        self.assertIn("manifest_authenticated !== false", JAVASCRIPT)
+        self.assertIn("deadline_s: 10", JAVASCRIPT)
+        self.assertIn("resource-stage-reverify", JAVASCRIPT)
+        self.assertIn("resource-stage-digest", HTML)
+        self.assertIn("resource-stage-wait", HTML)
+        self.assertIn("wait_for_slot", JAVASCRIPT)
 
     def test_owner_only_token_file_is_create_once(self) -> None:
         path = self.folder / "bearer.secret"

@@ -37,7 +37,9 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
-from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
+from skeleton.app.offline_resource_fabric import (
+    AdaptiveResourceFabric, build_staging_manifest, StagingManifestMismatch,
+)
 from skeleton.app.offline_longform_virtual import (
     LongformVirtualMemory, LongformMemoryError,
 )
@@ -447,22 +449,43 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(503, "local resource telemetry unavailable") from exc
         if path == "/v1/resources/plan" and method == "POST":
             _fields(body, {"source_bytes", "desired_streams", "requested_gpu_bytes",
-                           "allow_gpu"}, {"source_bytes"})
+                           "allow_gpu", "readonly_stream"}, {"source_bytes"})
             try:
                 return 200, self.resource_fabric.plan(
                     body["source_bytes"],
                     desired_streams=body.get("desired_streams", 1),
                     requested_gpu_bytes=body.get("requested_gpu_bytes", 0),
                     allow_gpu=body.get("allow_gpu", False),
+                    readonly_stream=body.get("readonly_stream", False),
                 ).as_dict()
             except (OSError, ValueError, RuntimeError) as exc:
                 raise OfflineHTTPError(422, "resource plan rejected by live hardware policy") from exc
+        if path == "/v1/resources/stage/reverify" and method == "POST":
+            _fields(body, {"root", "paths", "manifest_digest", "desired_streams",
+                           "approved", "deadline_s", "wait_for_slot"},
+                    {"root", "paths", "manifest_digest", "approved"})
+            if body["approved"] is not True:
+                raise OfflineHTTPError(403, "source re-verification requires operator approval")
+            if (type(body["root"]) is not str or type(body["paths"]) is not list
+                    or any(type(item) is not str for item in body["paths"])):
+                raise OfflineHTTPError(400, "invalid selected local sources")
+            try:
+                return 200, self.resource_fabric.reverify_staging_manifest(
+                    body["root"], body["paths"], body["manifest_digest"],
+                    desired_streams=body.get("desired_streams", 4),
+                    deadline_s=body.get("deadline_s"),
+                    wait_for_slot=body.get("wait_for_slot", False),
+                )
+            except StagingManifestMismatch as exc:
+                raise OfflineHTTPError(409, "staged source manifest changed") from exc
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise OfflineHTTPError(422, "source re-verification rejected") from exc
         if path == "/v1/resources/stage" and method == "POST":
             # An explicit authenticated local operator may stage selected
             # regular files for read-only, digest-verified concurrent I/O.
             # No file contents or credential-bearing paths are returned.
-            _fields(body, {"root", "paths", "desired_streams", "approved"},
-                    {"root", "paths", "approved"})
+            _fields(body, {"root", "paths", "desired_streams", "approved",
+                           "deadline_s", "wait_for_slot"}, {"root", "paths", "approved"})
             if body["approved"] is not True:
                 raise OfflineHTTPError(403, "read-only file staging requires operator approval")
             if (not isinstance(body["root"], str) or
@@ -473,10 +496,10 @@ class OfflineHTTPApplication:
                 records = self.resource_fabric.stream_readonly(
                     body["root"], body["paths"],
                     desired_streams=body.get("desired_streams", 4),
+                    deadline_s=body.get("deadline_s"),
+                    wait_for_slot=body.get("wait_for_slot", False),
                 )
-                return 200, {"schema": "skeleton.offline.readonly-staging.v1",
-                             "sources": list(records), "verified": True,
-                             "gpu_transfer_executed": False}
+                return 200, build_staging_manifest(records)
             except (OSError, ValueError, RuntimeError) as exc:
                 raise OfflineHTTPError(422, "local read-only staging rejected") from exc
         if path.startswith("/v1/resources/longform/"):

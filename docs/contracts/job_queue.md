@@ -50,3 +50,13 @@ h = job_api.enqueue("game.build", {"target": "gb"}, actor_id=user, tenant_id=ten
 - **Failures**: a handler exception fails the job with `error.code = "handler_error"`; the message is redacted by `safe_exception_text`. `max_attempts` defaults to 1 for the public API, so there are no automatic retries. Cancelled jobs report `error.code = "cancelled"`.
 - **Events**: `build.started`, `build.progress`, `build.log`, `build.completed` and `build.failed` go out as envelope v1 on the AppServices `FanOutPublisher` (Walt's hub subscribes there). The payload always carries `build_id` (= execution_id), `execution_id` and `kind`; secrets are redacted.
 - **Workers**: only kinds with a registered handler are claimed. A `game.build` enqueued before #4119 registers its handler stays `queued`.
+
+## Fail-closed game-build execution deadlines
+
+The canonical `game.build` adapter rejects missing/invalid queue execution
+budgets, nonfinite numbers and overflowing JSON integers before invoking the
+playable builder. A caller may request a smaller finite nonnegative
+`deadline_s`, but cannot extend the measured queue `timeout_s` lease.
+A zero explicit deadline is an immediate-failure budget, not an unbounded
+execution. This protects offline hardware-adaptive longform work from
+`NaN`/infinite/overflowed time budgets while preserving normal valid jobs.
