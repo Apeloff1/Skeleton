@@ -839,6 +839,8 @@ def dialogue_staging_tool_schema() -> dict[str, object]:
                 "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
                 "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                 "scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                          "items": {"type": "object"}},
                 "actions": {"type": "array", "maxItems": 64,
                             "items": {"type": "array", "minItems": 2, "maxItems": 2,
                                       "items": {"type": "string"}}},
@@ -854,16 +856,28 @@ def execute_dialogue_staging_tool(request: Mapping[str, Any], *,
         raise PermissionError("Jeeves dialogue staging requires operator authorization")
     required = {"schema", "project_id", "expected_source_digest", "actions"}
     if (type(request) is not dict or not required.issubset(request)
-            or set(request) - required - {"scene_id"}
+            or set(request) - required - {"scene_id", "edits"}
             or request.get("schema") != DIALOGUE_STAGING_REQUEST_SCHEMA
             or len(_canonical(request)) > 16384):
         raise StudioQuestError("invalid typed Jeeves dialogue staging request")
     from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
         compile_dialogue_staging,
     )
+    source = read_blueprint(request["project_id"])
+    author_receipt = None
+    expected = request["expected_source_digest"]
+    if "edits" in request:
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            REVISION_SCHEMA, preview_canon_revision,
+        )
+        source, _, author_receipt = preview_canon_revision(
+            source, {
+                "schema": REVISION_SCHEMA, "project_id": request["project_id"],
+                "expected_source_digest": expected, "edits": request["edits"],
+            }, authorized=True)
+        expected = author_receipt["revised_source_digest"]
     detail = compile_dialogue_staging(
-        read_blueprint(request["project_id"]), request["actions"],
-        expected_source_digest=request["expected_source_digest"],
+        source, request["actions"], expected_source_digest=expected,
         scene_id=request.get("scene_id"), authorized=True)
     payload = {
         "schema": DIALOGUE_STAGING_RESULT_SCHEMA,
@@ -872,5 +886,7 @@ def execute_dialogue_staging_tool(request: Mapping[str, Any], *,
         "detail": detail, "file_write_performed": False,
         "release_certified": False,
     }
+    if author_receipt is not None:
+        payload["author_receipt"] = author_receipt
     payload["result_digest"] = _digest(payload)
     return payload

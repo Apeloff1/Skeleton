@@ -571,3 +571,7 @@ The canonical `--dialogue-stage` CLI mode and typed Jeeves `studio_dialogue_stag
 ### Durable private dialogue handoff for the playable engine
 
 The `--dialogue-stage --dialogue-export --output NEW_DIRECTORY` CLI command creates an exclusive private `dialogue.json` and `receipt.json` handoff. `--dialogue-stage --dialogue-import DIRECTORY` reopens it and recompiles every scene card against the current canonical project source, rejecting stale digests, unexpected files, links, forged qualifications and modified receipts. Writes use private permissions, no-follow file descriptors, exclusive creation, fsync and cleanup on failure. This is an original authored scene-data handoff for Studio B/D integration, **not** evidence of spoken dialogue, native-engine execution or consumer certification.
+
+### Persisted original dialogue editing
+
+`--dialogue-stage --dialogue-revision-source VERIFIED_DIRECTORY` loads a source-leased authored revision before staging, export or import. Typed Jeeves `studio_dialogue_staging` accepts optional bounded `edits`, delegates to canonical `preview_canon_revision`, and returns revised source cards and author receipt without file writes. Edited NPC knowledge changes the source digest, invalidating older handoffs; protected NPC identifiers, stage IDs and evidence remain uneditable.

@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
     ap.add_argument("--dialogue-export", action="store_true",
                     help="Write exclusive private source-bound dialogue handoff")
+    ap.add_argument("--dialogue-revision-source", type=Path,
+                    help="Verified original authored revision for NPC scene cues")
     ap.add_argument("--dialogue-import", type=Path,
                     help="Verify an existing dialogue handoff against current source")
     ap.add_argument("--dialogue-stage", action="store_true",    ap.add_argument("--dialogue-stage", action="store_true",
@@ -258,7 +260,15 @@ def main(argv: list[str] | None = None) -> int:
                 encoded, object_pairs_hook=unique,
                 parse_constant=lambda _: (_ for _ in ()).throw(
                     StudioQuestError("nonfinite dialogue JSON")))
-            docs = read_blueprint(args.project)
+            if args.dialogue_revision_source is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+                    load_revision_bundle,
+                )
+                docs = load_revision_bundle(
+                    args.dialogue_revision_source, authorized=True,
+                    project_id=args.project)[0]
+            else:
+                docs = read_blueprint(args.project)
             if args.dialogue_import is not None:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
                     import_dialogue_handoff,
@@ -291,7 +301,8 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("--dialogue-export and --dialogue-import require --dialogue-stage")
     if (args.dialogue_actions is not None or args.dialogue_scene_id is not None
     if (args.dialogue_actions is not None or args.dialogue_scene_id is not None
-            or args.dialogue_expected_digest is not None):
+            or args.dialogue_expected_digest is not None
+            or args.dialogue_revision_source is not None):
         ap.error("--dialogue-* options require --dialogue-stage")
     if args.faction_plan:
     if args.faction_plan:
