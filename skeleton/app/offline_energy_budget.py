@@ -19,7 +19,7 @@ import time
 from typing import Sequence
 
 from skeleton.app.offline_cpu_budget import (
-    CpuWorkerPlan, plan_cpu_workers,
+    plan_cpu_workers,
     probe_cpu_topology, probe_memory_topology,
 )
 
