@@ -61,3 +61,16 @@ verification and portable bundle import. This is a bounded text interaction,
 not a graphical or network multiplayer implementation.
 
 Focused tests: `python -m pytest skeleton/testing/test_arena_player_policy.py -q`.
+
+### Interrupted play and trusted source recovery
+
+Interactive play emits replay-verified `checkpoint` events every
+`--checkpoint-every N` accepted actions (N=1..32, default 8), and
+immediately before failing closed on EOF or three rejected commands.
+The checkpoint contains the complete source-bound session and can be
+passed back with `--resume-json`. For imported saves, provide a trusted
+external manifest digest with `--source-digest`; a mismatched or malformed
+64-character lowercase SHA-256 digest is rejected. The emitted digest alone
+does not authenticate the game author or its license. Partial actions never
+consume rewards, and all restored journal entries are re-executed before
+accepting a new action.

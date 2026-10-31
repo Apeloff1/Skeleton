@@ -6,6 +6,7 @@ claiming native graphics, voice, networking or a signed save format.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from typing import Any
 
@@ -32,16 +33,35 @@ def _write(writer: Any, value: dict[str, Any]) -> None:
     writer.flush()
 
 
+def _checkpoint(writer: Any, session: dict[str, Any], reason: str) -> None:
+    verified = verify_expedition(session)
+    _write(writer, {
+        "event": "checkpoint", "reason": reason,
+        "source_digest": verified["source_digest"],
+        "state_digest": verified["state_digest"], "session": verified,
+    })
+
+
 def play_expedition(
     source: Any, *, input_stream: Any = None,
     output_stream: Any = None, resume: Any = None,
+    expected_source_digest: str | None = None,
+    checkpoint_every: int = 8,
 ) -> dict[str, Any]:
     reader = sys.stdin if input_stream is None else input_stream
     writer = sys.stdout if output_stream is None else output_stream
+    if type(checkpoint_every) is not int or not 1 <= checkpoint_every <= 32:
+        raise CombatSessionError("invalid expedition checkpoint interval")
     spec = normalize_expedition(source)
     session = new_expedition(spec) if resume is None else verify_expedition(resume)
     if session["source_digest"] != dig(spec):
         raise CombatSessionError("interactive expedition source mismatch")
+    if expected_source_digest is not None and (
+        type(expected_source_digest) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", expected_source_digest) is None
+        or expected_source_digest != session["source_digest"]
+    ):
+        raise CombatSessionError("expedition trusted source digest mismatch")
     while session["state"]["phase"] == "active":
         state = session["state"]
         index = state["next_index"]
@@ -67,7 +87,10 @@ def play_expedition(
         for attempt in range(MAX_RETRIES):
             line = reader.readline(MAX_CLI_BYTES + 1)
             if not line:
-                raise CombatSessionError("input ended before expedition terminal")
+                _checkpoint(writer, session, "input_eof")
+                raise CombatSessionError(
+                    "input ended before expedition terminal; checkpoint emitted"
+                )
             try:
                 if len(line.encode("utf-8")) > MAX_CLI_BYTES:
                     raise CombatSessionError("interactive expedition action exceeds 128 KiB")
@@ -80,8 +103,9 @@ def play_expedition(
                     "state_digest": session["state_digest"],
                 })
                 if attempt == MAX_RETRIES - 1:
+                    _checkpoint(writer, session, "invalid_actions")
                     raise CombatSessionError(
-                        "three invalid actions in one expedition turn"
+                        "three invalid actions in one expedition turn; checkpoint emitted"
                     ) from exc
             else:
                 session = updated
@@ -90,6 +114,8 @@ def play_expedition(
                     "state_digest": session["state_digest"],
                     "receipt": session["journal"][-1]["receipt"],
                 })
+                if session["state"]["tick"] % checkpoint_every == 0:
+                    _checkpoint(writer, session, "periodic")
                 break
     verified = verify_expedition(session)
     _write(writer, {"event": "terminal", "session": verified})

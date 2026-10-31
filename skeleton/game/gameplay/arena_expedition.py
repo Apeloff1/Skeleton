@@ -335,6 +335,8 @@ def cli(argv: Sequence[str]) -> int:
     play.add_argument("--demo", action="store_true")
     play.add_argument("--source-json")
     play.add_argument("--resume-json")
+    play.add_argument("--source-digest")
+    play.add_argument("--checkpoint-every", type=int, default=8)
     sim = sub.add_parser("simulate", help="Run authored purchases, healing and fights")
     sim.add_argument("--source-json", required=True)
     sim.add_argument("--actions-json", required=True)
@@ -367,7 +369,11 @@ def cli(argv: Sequence[str]) -> int:
                 original_expedition() if args.demo
                 else _parse_json(args.source_json, "expedition source")
             )
-            play_expedition(authored, resume=saved)
+            play_expedition(
+                authored, resume=saved,
+                expected_source_digest=args.source_digest,
+                checkpoint_every=args.checkpoint_every,
+            )
             return 0
         if args.command in ("export", "import"):
             from skeleton.game.gameplay.arena_bundle import (

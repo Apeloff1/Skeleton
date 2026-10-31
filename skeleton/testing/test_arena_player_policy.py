@@ -143,3 +143,81 @@ def test_cli_manual_tactical_simulate_and_replay(capsys):
     assert saved["state"]["currency"] == 10
     assert cli(["verify", "--session-json", json.dumps(saved)]) == 0
     assert json.loads(capsys.readouterr().out) == saved
+
+
+def test_interactive_eof_checkpoint_resume_preserves_exact_tactical_history():
+    source, arena = _first()
+    first_action = {"kind": "fight_tactical", "hero_actions": _script(arena)}
+    writer = io.StringIO()
+    with pytest.raises(CombatSessionError, match="checkpoint emitted"):
+        play_expedition(
+            source, input_stream=io.StringIO(json.dumps(first_action) + "\\n"),
+            output_stream=writer,
+        )
+    events = [json.loads(line) for line in writer.getvalue().splitlines()]
+    checkpoint = events[-1]
+    assert checkpoint["event"] == "checkpoint"
+    assert checkpoint["reason"] == "input_eof"
+    assert checkpoint["session"]["state"]["tick"] == 1
+    recovered = play_expedition(
+        source, resume=checkpoint["session"],
+        expected_source_digest=checkpoint["source_digest"],
+        input_stream=io.StringIO('{"kind":"fight"}\\n'),
+        output_stream=io.StringIO(),
+    )
+    assert recovered == simulate_expedition(
+        source, [first_action, {"kind": "fight"}],
+    )
+
+
+def test_interactive_three_rejections_checkpoint_unchanged():
+    source, _ = _first()
+    writer = io.StringIO()
+    with pytest.raises(CombatSessionError, match="checkpoint emitted"):
+        play_expedition(
+            source, input_stream=io.StringIO("bad\\nbad\\nbad\\n"),
+            output_stream=writer,
+        )
+    events = [json.loads(line) for line in writer.getvalue().splitlines()]
+    assert events[-1]["reason"] == "invalid_actions"
+    assert events[-1]["session"]["state"]["tick"] == 0
+    assert events[-1]["session"]["state_digest"] == events[0]["state_digest"]
+
+
+def test_interactive_checkpoint_interval_and_source_fence():
+    source, _ = _first()
+    output = io.StringIO()
+    saved = play_expedition(
+        source, input_stream=io.StringIO('{"kind":"fight"}\\n{"kind":"fight"}\\n'),
+        output_stream=output, checkpoint_every=1,
+    )
+    events = [json.loads(line) for line in output.getvalue().splitlines()]
+    assert [e["reason"] for e in events if e["event"] == "checkpoint"] == [
+        "periodic", "periodic",
+    ]
+    assert events[-1]["session"] == saved
+    for interval in (0, 33, True, -1):
+        with pytest.raises(CombatSessionError, match="checkpoint interval"):
+            play_expedition(
+                source, input_stream=io.StringIO(), output_stream=io.StringIO(),
+                checkpoint_every=interval,
+            )
+    for digest in ("0" * 64, "bad", "A" * 64, 7):
+        with pytest.raises(CombatSessionError, match="trusted source digest"):
+            play_expedition(
+                source, input_stream=io.StringIO(), output_stream=io.StringIO(),
+                expected_source_digest=digest,
+            )
+
+
+def test_installed_expedition_play_cli(monkeypatch, capsys):
+    import sys
+    from skeleton.__main__ import main
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO('{"kind":"fight"}\\n{"kind":"fight"}\\n'),
+    )
+    assert main(["combat-expedition", "play", "--demo",
+                 "--checkpoint-every", "1"]) == 0
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert events[-1]["event"] == "terminal"
+    assert events[-1]["session"]["state"]["phase"] == "won"
