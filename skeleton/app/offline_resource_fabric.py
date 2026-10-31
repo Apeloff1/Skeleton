@@ -430,6 +430,9 @@ class AdaptiveResourceFabric:
     def __init__(self, storage_path: str | Path):
         self.storage_path = Path(storage_path)
         self._lock = threading.RLock()
+        self._slot_condition = threading.Condition(self._lock)
+        self._wait_queue: list[int] = []
+        self._next_ticket = 0
         self._pressure_ema: float | None = None
         self._active_streams = 0
         self._observations = 0
@@ -609,6 +612,7 @@ class AdaptiveResourceFabric:
         expected_digest: str, *, desired_streams: int = 4,
         deadline_s: float | None = None,
         cancel_event: threading.Event | None = None,
+        wait_for_slot: bool = False,
     ) -> dict[str, Any]:
         """Re-read original bytes before replay; a prior digest grants no trust.
 
@@ -621,6 +625,7 @@ class AdaptiveResourceFabric:
         records = self.stream_readonly(
             root, relative_paths, desired_streams=desired_streams,
             deadline_s=deadline_s, cancel_event=cancel_event,
+            wait_for_slot=wait_for_slot,
         )
         receipt = build_staging_manifest(records)
         if not hmac.compare_digest(receipt["manifest_digest"], expected_digest):
@@ -640,6 +645,7 @@ class AdaptiveResourceFabric:
             last_io = self._last_stream_ns
             learned = self._learned_parallelism
             thermal_holds = len(self._thermal_blocked)
+            waiting_batches = len(self._wait_queue)
         result = snapshot.as_dict()
         result["controller"] = {
             "predictive_pressure": round(pressure or 0, 6),
@@ -656,6 +662,7 @@ class AdaptiveResourceFabric:
             "last_verified_read_ns": last_io or None,
             "learned_parallelism_fraction": round(learned, 4),
             "thermal_hold_devices": thermal_holds,
+            "waiting_stream_batches": waiting_batches,
         }
         return result
 
@@ -664,6 +671,7 @@ class AdaptiveResourceFabric:
         *, desired_streams: int = 4,
         deadline_s: float | None = None,
         cancel_event: threading.Event | None = None,
+        wait_for_slot: bool = False,
     ) -> tuple[dict[str, Any], ...]:
         """Verified concurrent read-only mmap streams with bounded copied chunks.
 
@@ -691,6 +699,8 @@ class AdaptiveResourceFabric:
                 raise ResourceFabricError("stream deadline exceeds clock range")
         if cancel_event is not None and not isinstance(cancel_event, threading.Event):
             raise ResourceFabricError("typed cancellation event required")
+        if type(wait_for_slot) is not bool or (wait_for_slot and deadline is None):
+            raise ResourceFabricError("bounded boolean slot wait requires a deadline")
 
         def check_interrupted() -> None:
             if cancel_event is not None and cancel_event.is_set():
@@ -735,19 +745,47 @@ class AdaptiveResourceFabric:
                 raise ResourceFabricError("source cannot be safely statted") from exc
             entries.append((name, target, info.st_size))
             total += info.st_size
-        # Hold the reentrant lock across fresh planning and reservation so
-        # two readers cannot claim the same measured host capacity.
-        with self._lock:
+        # Fail-fast calls cannot overtake FIFO waiters. Waiting is opt-in,
+        # deadline-bound, cancellation-aware, and capacity-derived.
+        with self._slot_condition:
             plan = self.plan(
                 total, desired_streams=desired_streams, readonly_stream=True,
             )
             reserved = min(plan.stream_count, len(entries))
-            if (reserved < 1 or self._active_streams + reserved
-                    > plan.host_stream_capacity):
-                raise LocalResourcePressure(
-                    "measured read-stream slots occupied; retry after completion"
-                )
-            self._active_streams += reserved
+            if not wait_for_slot:
+                if (self._wait_queue or reserved < 1
+                        or self._active_streams + reserved > plan.host_stream_capacity):
+                    raise LocalResourcePressure(
+                        "measured read-stream slots occupied; retry after completion"
+                    )
+                self._active_streams += reserved
+            else:
+                if len(self._wait_queue) >= max(1, plan.host_stream_capacity * 2):
+                    raise LocalResourcePressure("bounded stream wait queue is full")
+                self._next_ticket += 1
+                ticket = self._next_ticket
+                self._wait_queue.append(ticket)
+                try:
+                    while True:
+                        check_interrupted()
+                        if self._wait_queue[0] == ticket:
+                            plan = self.plan(
+                                total, desired_streams=desired_streams,
+                                readonly_stream=True,
+                            )
+                            reserved = min(plan.stream_count, len(entries))
+                            if (reserved >= 1 and self._active_streams + reserved
+                                    <= plan.host_stream_capacity):
+                                self._active_streams += reserved
+                                self._wait_queue.pop(0)
+                                self._slot_condition.notify_all()
+                                break
+                        remaining = max(0.0, deadline - time.monotonic())
+                        self._slot_condition.wait(timeout=min(0.1, remaining))
+                finally:
+                    if ticket in self._wait_queue:
+                        self._wait_queue.remove(ticket)
+                        self._slot_condition.notify_all()
         # Never create 1 mmap covering the entire source; map the file
         # read-only, then read bounded spans from OS pages with no writes.
         def worker(entry: tuple[str, Path, int]) -> dict[str, Any]:
@@ -820,8 +858,9 @@ class AdaptiveResourceFabric:
         finally:
             elapsed = max(1, time.monotonic_ns() - started)
             rate = total * 1_000_000_000.0 / elapsed
-            with self._lock:
+            with self._slot_condition:
                 self._active_streams -= reserved
+                self._slot_condition.notify_all()
                 if succeeded:
                     self._stream_batches += 1
                     self._stream_bytes += total

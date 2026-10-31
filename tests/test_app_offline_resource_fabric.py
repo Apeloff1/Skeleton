@@ -34,6 +34,68 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def test_bounded_waiter_gets_stream_slot_after_prior_reader_finishes(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "one.txt").write_bytes(b"first" * 100)
+            (root / "two.txt").write_bytes(b"second" * 100)
+            fabric = AdaptiveResourceFabric(root)
+            single = replace(hardware(ram=4_000_000_000), cpu_count=1)
+            entered, release = Event(), Event()
+            results: dict[str, object] = {}
+            from skeleton.app.offline_resource_fabric import _open_source_at
+            def delayed_open(base, relative):
+                if relative.name == "one.txt":
+                    entered.set()
+                    if not release.wait(5):
+                        raise RuntimeError("first reader did not release")
+                return _open_source_at(base, relative)
+            def first():
+                try:
+                    results["first"] = fabric.stream_readonly(root, ("one.txt",))
+                except BaseException as exc:
+                    results["first"] = exc
+            def second():
+                try:
+                    results["second"] = fabric.stream_readonly(
+                        root, ("two.txt",), deadline_s=3, wait_for_slot=True,
+                    )
+                except BaseException as exc:
+                    results["second"] = exc
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=single,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric._open_source_at",
+                side_effect=delayed_open,
+            ):
+                a = Thread(target=first, daemon=True)
+                b = Thread(target=second, daemon=True)
+                a.start()
+                self.assertTrue(entered.wait(3))
+                b.start()
+                try:
+                    for _ in range(100):
+                        if fabric.monitor()["controller"]["waiting_stream_batches"] == 1:
+                            break
+                        release.wait(0.01)
+                    self.assertEqual(fabric.monitor()["controller"]["waiting_stream_batches"], 1)
+                    with self.assertRaises(LocalResourcePressure):
+                        fabric.stream_readonly(root, ("two.txt",))
+                finally:
+                    release.set()
+                    a.join(timeout=5)
+                    b.join(timeout=5)
+                self.assertFalse(a.is_alive())
+                self.assertFalse(b.is_alive())
+                self.assertIsInstance(results.get("first"), tuple)
+                self.assertIsInstance(results.get("second"), tuple)
+                self.assertEqual(fabric.monitor()["active_streams"], 0)
+                self.assertEqual(fabric.monitor()["controller"]["waiting_stream_batches"], 0)
+
     def test_live_memory_pressure_recheck_aborts_long_stream_without_partial_receipt(self):
         with TemporaryDirectory() as d:
             root = Path(d)
