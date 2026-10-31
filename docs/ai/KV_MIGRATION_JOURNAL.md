@@ -33,3 +33,17 @@ Focused simulated regression:
 rejected move, the journal deliberately remains RUNNING. An adapter may have
 moved a page before raising, so a rejection is not proof of no side effects.
 No further plan is admitted until an authorized storage reconciliation.
+
+
+## Verified historical inventory before new physical movement
+
+The write-ahead journal now authenticates the entire bounded history before
+admitting another physical KV page migration. Every stored plan and receipt
+must be canonical, HMAC-authenticated, bound to the same session and page
+identity set, and have a valid RUNNING/COMMITTED state. Corruption or a
+foreign-session row fails closed; unresolved RUNNING rows still prohibit new
+moves. `verified_journal_status()` exposes only aggregate row counts and
+simulation/device-qualification flags to the application. A valid journal
+receipt is NOT evidence of current page residency, a disk quota reservation,
+or GPU/M-chip device qualification. SQLite rollback protection and physical
+backend reconciliation remain separate application responsibilities.

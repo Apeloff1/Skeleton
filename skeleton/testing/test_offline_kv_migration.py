@@ -97,3 +97,16 @@ def test_app_rejects_invalid_simulation_flag():
     controller, journal, storage = simulated_service()
     with pytest.raises(ValueError, match="simulation"):
         OfflineKVPageTierService(controller, journal, simulated=1)
+
+
+def test_app_exposes_authenticated_migration_inventory_without_device_claim():
+    service, journal, storage = setup()
+    inventory = service.verified_journal_status()
+    assert inventory["rows"] == 0
+    assert inventory["gpu_device_qualified"] is False
+    plan, _ = service.plan_live()
+    service.apply_once(plan)
+    inventory = service.verified_journal_status()
+    assert inventory["committed"] == 1
+    assert inventory["running"] == 0
+    assert inventory["gpu_device_qualified"] is False

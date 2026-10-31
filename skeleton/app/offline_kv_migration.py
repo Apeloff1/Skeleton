@@ -64,6 +64,15 @@ class OfflineKVPageTierService:
         )
         return cls(controller, journal)
 
+    def verified_journal_status(self) -> dict[str, int | str | bool]:
+        """Read authenticated history; never treat a receipt as GPU evidence."""
+        inventory = self._service._journal.verified_inventory()
+        return {
+            **inventory,
+            "simulated": self._simulated,
+            "gpu_device_qualified": False,
+        }
+
     def plan_live(self) -> tuple[TierPlan, OfflineKVMigrationStatus]:
         plan, observation = self._service.plan_live()
         if observation.gpu_device_qualified:

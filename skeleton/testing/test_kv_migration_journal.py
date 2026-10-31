@@ -177,3 +177,56 @@ def test_journal_capacity_fail_closed(monkeypatch):
     with pytest.raises(KVMigrationOutcomeUnknown, match="capacity"):
         journal.begin(plan)
     assert storage.calls == 0
+
+
+def test_verified_history_rejects_tampered_committed_plan_before_new_move():
+    connection = sqlite3.connect(":memory:")
+    service, journal, storage = setup(connection=connection)
+    plan, _ = service.plan_live()
+    service.apply_once(plan)
+    assert journal.verified_inventory()["committed"] == 1
+    connection.execute(
+        "UPDATE local_kv_migration_journal SET plan_mac = ?",
+        ("0" * 64,),
+    )
+    connection.commit()
+    with pytest.raises(KVMigrationOutcomeUnknown, match="unverifiable"):
+        journal.verified_inventory()
+    with pytest.raises(KVMigrationOutcomeUnknown, match="unverifiable"):
+        journal.begin(plan)
+    assert storage.calls == 1
+
+
+def test_verified_history_distinguishes_running_without_replaying():
+    service, journal, storage = setup()
+    plan, _ = service.plan_live()
+    journal.begin(plan)
+    inventory = journal.verified_inventory()
+    assert inventory["rows"] == 1
+    assert inventory["running"] == 1
+    assert inventory["committed"] == 0
+    with pytest.raises(KVMigrationOutcomeUnknown, match="unresolved"):
+        journal.begin(plan)
+    assert storage.calls == 0
+
+
+def test_verified_history_rejects_forged_receipt_accounting():
+    connection = sqlite3.connect(":memory:")
+    service, journal, storage = setup(connection=connection)
+    plan, _ = service.plan_live()
+    service.apply_once(plan)
+    from skeleton.ai.runtime.inference.kv import migration_journal as module
+    fake = {
+        "schema": "skeleton.ai.kv-pressure-apply.v1",
+        "plan_digest": plan.digest,
+        "moved": [],
+        "rejected": [],
+    }
+    connection.execute(
+        "UPDATE local_kv_migration_journal SET receipt_payload=?, receipt_mac=?",
+        (module._encode(fake), module._sign(KEY, fake)),
+    )
+    connection.commit()
+    with pytest.raises(KVMigrationOutcomeUnknown, match="unverifiable"):
+        journal.verified_inventory()
+    assert storage.calls == 1

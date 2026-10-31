@@ -137,6 +137,128 @@ class KVMigrationJournal:
             raise KVMigrationOutcomeUnknown("migration journal has active transaction")
         self._connection.execute("BEGIN IMMEDIATE")
 
+    def verified_inventory(self) -> dict[str, int | str]:
+        """Authenticate ALL bounded historical rows before new physical work.
+
+        A signed committed receipt is not proof that a backend is presently
+        resident in the claimed tier. This read-only integrity check merely
+        prevents new work from silently proceeding past forged/corrupted
+        journal history. RUNNING intents remain unresolved, never replayed.
+        """
+        with self._lock:
+            try:
+                rows = self._connection.execute(
+                    "SELECT plan_digest, session_id, inventory_digest,"
+                    " plan_payload, plan_mac, state, receipt_payload, receipt_mac"
+                    " FROM " + TABLE
+                ).fetchall()
+                if len(rows) > MAX_ROWS:
+                    raise ValueError("unbounded migration journal")
+                running = 0
+                committed = 0
+                for (
+                    plan_digest, session_id, inventory_digest, payload,
+                    plan_mac, state, receipt_payload, receipt_mac,
+                ) in rows:
+                    _hex(plan_digest, "stored plan digest")
+                    _hex(inventory_digest, "stored inventory digest")
+                    if session_id != self.session_id:
+                        raise ValueError("foreign migration session")
+                    if type(payload) is not bytes or len(payload) > MAX_RECEIPT_BYTES:
+                        raise ValueError("unbounded stored migration plan")
+                    plan = json.loads(payload)
+                    if (
+                        type(plan) is not dict
+                        or set(plan) != {
+                            "schema", "session_id", "plan_digest",
+                            "inventory_digest", "moves",
+                        }
+                        or plan["schema"] != SCHEMA
+                        or plan["session_id"] != session_id
+                        or plan["plan_digest"] != plan_digest
+                        or plan["inventory_digest"] != inventory_digest
+                        or type(plan["moves"]) is not list
+                        or len(plan["moves"]) > MAX_MOVES
+                        or _encode(plan) != payload
+                        or type(plan_mac) is not str
+                        or not hmac.compare_digest(
+                            _hex(plan_mac, "stored plan MAC"),
+                            _sign(self._key, plan),
+                        )
+                    ):
+                        raise ValueError("untrusted historical migration plan")
+                    moves = plan["moves"]
+                    if any(
+                        type(move) is not dict
+                        or set(move) != {"page_key", "source", "target", "bytes"}
+                        or type(move["page_key"]) is not str
+                        or not move["page_key"]
+                        or type(move["source"]) is not str
+                        or type(move["target"]) is not str
+                        or type(move["bytes"]) is not int
+                        or move["bytes"] <= 0
+                        for move in moves
+                    ):
+                        raise ValueError("invalid historical page move")
+                    keys = [move["page_key"] for move in moves]
+                    if len(set(keys)) != len(keys):
+                        raise ValueError("duplicate historical page identity")
+                    if state == "running":
+                        if receipt_payload is not None or receipt_mac is not None:
+                            raise ValueError("uncommitted migration has a receipt")
+                        running += 1
+                    elif state == "committed":
+                        if (
+                            type(receipt_payload) is not bytes
+                            or len(receipt_payload) > MAX_RECEIPT_BYTES
+                            or type(receipt_mac) is not str
+                        ):
+                            raise ValueError("missing committed migration receipt")
+                        receipt = json.loads(receipt_payload)
+                        if (
+                            type(receipt) is not dict
+                            or set(receipt) != {
+                                "schema", "plan_digest", "moved", "rejected",
+                            }
+                            or receipt["schema"] != "skeleton.ai.kv-pressure-apply.v1"
+                            or receipt["plan_digest"] != plan_digest
+                            or type(receipt["moved"]) is not list
+                            or type(receipt["rejected"]) is not list
+                            or _encode(receipt) != receipt_payload
+                            or not hmac.compare_digest(
+                                _hex(receipt_mac, "stored receipt MAC"),
+                                _sign(self._key, receipt),
+                            )
+                        ):
+                            raise ValueError("untrusted historical migration receipt")
+                        moved = receipt["moved"]
+                        rejected = receipt["rejected"]
+                        if (
+                            any(type(key) is not str for key in moved)
+                            or any(type(item) is not list or len(item) != 2
+                                   or type(item[0]) is not str
+                                   or type(item[1]) is not str
+                                   or not 1 <= len(item[1]) <= 128
+                                   for item in rejected)
+                            or len(set(moved + [item[0] for item in rejected]))
+                                != len(moved) + len(rejected)
+                            or set(moved + [item[0] for item in rejected]) != set(keys)
+                        ):
+                            raise ValueError("historical migration accounting mismatch")
+                        committed += 1
+                    else:
+                        raise ValueError("invalid historical migration state")
+                return {
+                    "schema": "skeleton.ai.kv-migration-inventory.v1",
+                    "rows": len(rows), "running": running,
+                    "committed": committed,
+                }
+            except (sqlite3.Error, ValueError, TypeError, KeyError,
+                    OverflowError, RecursionError) as exc:
+                raise KVMigrationOutcomeUnknown(
+                    "migration journal history unverifiable"
+                ) from exc
+
     def begin(self, plan: TierPlan) -> None:
         """Commit intent before touching the physical KV storage adapter."""
         body = _plan_body(plan, self.session_id)
@@ -145,9 +267,9 @@ class KVMigrationJournal:
         with self._lock:
             self._begin()
             try:
-                if self._connection.execute(
-                    "SELECT 1 FROM " + TABLE + " WHERE state = 'running' LIMIT 1"
-                ).fetchone():
+                inventory = self.verified_inventory()
+                if inventory["running"]:
+
                     raise KVMigrationOutcomeUnknown(
                         "unresolved physical migration blocks new work"
                     )
