@@ -107,7 +107,7 @@ def test_tampered_save_and_journal_rejected(mutation):
 
 def test_wall_and_living_actor_block_ray():
     source = original_arena()
-    source["actors"][0]["position"] = [2, 0]
+    source["actors"][0]["position"] = [3, 0]
     with pytest.raises(CombatSessionError, match="blocked"):
         normalize_arena(source)
     source = original_arena()
