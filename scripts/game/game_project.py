@@ -32,11 +32,12 @@ from skeleton.ai.runtime.gameplay_capabilities import (
 )
 from skeleton.ai.runtime.game_play_session import (
     GamePlaySessionError, start_play_session, resume_play_session,
-    verify_play_session, render_play_session,
+    verify_play_session, render_play_session, render_play_frame,
+    fork_play_session,
 )
 from skeleton.ai.runtime.game_play_bundle import (
     GamePlayBundleError, pack_play_bundle, verify_play_bundle,
-    resume_play_bundle,
+    resume_play_bundle, fork_play_bundle,
 )
 
 MAX_INPUT_BYTES = 96 * 1024
@@ -147,12 +148,18 @@ def _parser() -> argparse.ArgumentParser:
                             help="replay a saved session against its original capsule")
     operations.add_argument("--render-play-session", type=Path,
                             help="show verified offline game state as an ASCII grid")
+    operations.add_argument("--inspect-play-frame", type=Path,
+                            help="replay and render a verified saved frame without changing it")
+    operations.add_argument("--fork-play-session", type=Path,
+                            help="create an independent save with alternate inputs at a verified frame")
     operations.add_argument("--export-play-bundle", type=Path,
                             help="package a verified original capsule and save for offline transfer")
     operations.add_argument("--verify-play-bundle", type=Path,
                             help="reopen and verify a self-contained offline game bundle")
     operations.add_argument("--resume-play-bundle", type=Path,
                             help="append controller frames to a verified portable bundle")
+    operations.add_argument("--fork-play-bundle", type=Path,
+                            help="create a portable alternate timeline from a verified bundle")
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -163,6 +170,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="verify portable project and recalculate scene digests")
     operations.add_argument("--demo-project", type=Path,
                             help="write a new small original portable game capsule")
+    parser.add_argument("--at-frame", type=int,
+                        help="zero-based replay seek/fork frame; zero is the original spawn")
     parser.add_argument("--controls-file", type=Path,
                         help="JSON object containing a bounded controls array")
     parser.add_argument("--session-capsule", type=Path,
@@ -191,10 +200,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     playing = any(value is not None for value in (
         args.play_capsule, args.resume_play_session,
         args.verify_play_session, args.render_play_session,
+        args.inspect_play_frame, args.fork_play_session,
     ))
     bundling = any(value is not None for value in (
         args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
+        args.fork_play_bundle,
     ))
+    seeking = any(value is not None for value in (
+        args.inspect_play_frame, args.fork_play_session, args.fork_play_bundle,
+    ))
+    if (seeking != (args.at_frame is not None)):
+        print("--at-frame is required only for timeline inspection or forks", file=sys.stderr)
+        return 2
     if not playing and not bundling and any(value is not None for value in (
         args.controls_file, args.session_capsule, args.save_session, args.bundle_output,
     )):
@@ -204,7 +221,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("bundle output requires a bundle operation", file=sys.stderr)
         return 2
     if bundling:
-        needs_actions = args.resume_play_bundle is not None
+        needs_actions = (args.resume_play_bundle is not None
+                         or args.fork_play_bundle is not None)
         needs_source = args.export_play_bundle is not None
         needs_output = args.verify_play_bundle is None
         if (needs_actions != (args.controls_file is not None)
@@ -214,7 +232,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("play-bundle source, controls and output arguments mismatch", file=sys.stderr)
             return 2
     if playing:
-        needs_actions = args.verify_play_session is None and args.render_play_session is None
+        needs_actions = any(value is not None for value in (
+            args.play_capsule, args.resume_play_session, args.fork_play_session,
+        ))
         needs_source = args.play_capsule is None
         if (needs_actions != (args.controls_file is not None)
                 or needs_actions != (args.save_session is not None)
@@ -248,25 +268,44 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output = _write_new(args.bundle_output, bundle)
                 report = {**verify_play_bundle(bundle), "output_path": output}
             else:
-                bundle = _read_json(args.resume_play_bundle, max_bytes=MAX_RESULT_BYTES)
+                bundle = _read_json(
+                    args.resume_play_bundle or args.fork_play_bundle,
+                    max_bytes=MAX_RESULT_BYTES,
+                )
                 actions = _read_json(args.controls_file)
                 if set(actions) != {"controls"}:
                     raise GamePlayBundleError("play controls require exactly controls")
-                updated = resume_play_bundle(bundle, actions["controls"])
+                if args.fork_play_bundle is not None:
+                    updated = fork_play_bundle(bundle, args.at_frame, actions["controls"])
+                else:
+                    updated = resume_play_bundle(bundle, actions["controls"])
                 output = _write_new(args.bundle_output, updated)
                 report = {**verify_play_bundle(updated), "output_path": output}
+                if args.fork_play_bundle is not None:
+                    report["fork_frame"] = args.at_frame
+                    report["forked_from_bundle_sha256"] = bundle["bundle_sha256"]
         elif playing:
             capsule = _read_json(args.play_capsule or args.session_capsule)
             if args.verify_play_session is not None:
                 report = verify_play_session(capsule, _read_json(args.verify_play_session))
             elif args.render_play_session is not None:
                 report = render_play_session(capsule, _read_json(args.render_play_session))
+            elif args.inspect_play_frame is not None:
+                report = render_play_frame(
+                    capsule, _read_json(args.inspect_play_frame), args.at_frame,
+                )
             else:
                 actions = _read_json(args.controls_file)
                 if set(actions) != {"controls"}:
                     raise GamePlaySessionError("play controls require exactly controls")
+                parent_session = None
                 if args.play_capsule is not None:
                     session = start_play_session(capsule, actions["controls"])
+                elif args.fork_play_session is not None:
+                    parent_session = _read_json(args.fork_play_session)
+                    session = fork_play_session(
+                        capsule, parent_session, args.at_frame, actions["controls"],
+                    )
                 else:
                     session = resume_play_session(
                         capsule, _read_json(args.resume_play_session), actions["controls"],
@@ -282,6 +321,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "output_path": output_path,
                     "rendered_grid": render_play_session(capsule, session)["grid"],
                 }
+                if parent_session is not None:
+                    report["fork_frame"] = args.at_frame
+                    report["forked_from_session_sha256"] = parent_session["session_sha256"]
         elif args.catalog:
             report = catalog_summary()
         elif args.plan:

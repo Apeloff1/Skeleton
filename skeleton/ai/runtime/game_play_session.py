@@ -159,8 +159,67 @@ def render_play_session(
     }
 
 
+def inspect_play_frame(
+    capsule: Mapping[str, Any], session: Any, frame: Any,
+) -> dict[str, Any]:
+    """Seek a verified save to an exact deterministic frame, including spawn."""
+    receipt = verify_play_session(capsule, session)
+    if type(frame) is not int or not 0 <= frame <= receipt["frame_count"]:
+        raise GamePlaySessionError("play timeline frame outside verified history")
+    prefix = _replay(capsule, session["controls"][:frame])
+    return {
+        "schema_version": "skeleton.game.play_session.frame.v1",
+        "capsule_sha256": receipt["capsule_sha256"],
+        "source_session_sha256": receipt["session_sha256"],
+        "frame": frame,
+        "total_frames": receipt["frame_count"],
+        "avatar": prefix["final_avatar"],
+        "victory_frame": prefix["victory_frame"],
+        "prefix_trace_sha256": prefix["trace_sha256"],
+        "source_bound_replay_verified": True,
+        "native_renderer_used": False,
+    }
+
+
+def render_play_frame(
+    capsule: Mapping[str, Any], session: Any, frame: Any,
+) -> dict[str, Any]:
+    """Read-only offline ASCII timeline view, never trusting saved coordinates."""
+    receipt = inspect_play_frame(capsule, session, frame)
+    rows = [list(row) for row in capsule["tilemap"]]
+    avatar = receipt["avatar"]
+    rows[avatar["y"]][avatar["x"]] = "@"
+    return {
+        **receipt,
+        "grid": ["".join(row) for row in rows],
+        "legend": {"@": "player", "#": "wall", ".": "floor", "G": "goal"},
+        "render_backend": "ascii_offline",
+    }
+
+
+def fork_play_session(
+    capsule: Mapping[str, Any], session: Any, frame: Any, controls: Any,
+) -> dict[str, Any]:
+    """Branch verified history at a frame, then execute real alternate inputs.
+
+    No source save is modified. A fork at frame zero starts from the canonical
+    spawn. A fork after terminal victory is prohibited, and each newly appended
+    control is bounded by the same session and batch limits as normal play.
+    """
+    receipt = verify_play_session(capsule, session)
+    if type(frame) is not int or not 0 <= frame <= receipt["frame_count"]:
+        raise GamePlaySessionError("play fork frame outside verified history")
+    if receipt["victory_frame"] is not None and frame >= receipt["victory_frame"]:
+        raise GamePlaySessionError("terminal victory cannot be forked after winning")
+    admitted = _admit_controls(controls, batch=True)
+    if frame + len(admitted) > MAX_FRAMES:
+        raise GamePlaySessionError("forked play session exceeded frame budget")
+    return _seal(capsule, session["controls"][:frame] + admitted)
+
+
 __all__ = [
     "SCHEMA", "MAX_FRAMES", "MAX_BATCH_FRAMES", "GamePlaySessionError",
     "start_play_session", "resume_play_session", "verify_play_session",
-    "render_play_session",
+    "render_play_session", "inspect_play_frame", "render_play_frame",
+    "fork_play_session",
 ]

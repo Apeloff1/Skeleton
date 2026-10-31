@@ -11,7 +11,7 @@ import json
 from typing import Any
 
 from .game_play_session import (
-    resume_play_session, verify_play_session,
+    fork_play_session, resume_play_session, verify_play_session,
 )
 
 SCHEMA = "skeleton.game.play_bundle.v1"
@@ -100,7 +100,17 @@ def resume_play_bundle(bundle: Any, controls: Any) -> dict[str, Any]:
     return pack_play_bundle(bundle["capsule"], updated)
 
 
+def fork_play_bundle(bundle: Any, frame: Any, controls: Any) -> dict[str, Any]:
+    """Create an independent portable alternate timeline after full replay."""
+    verify_play_bundle(bundle)
+    session = fork_play_session(
+        bundle["capsule"], bundle["session"], frame, controls,
+    )
+    return pack_play_bundle(bundle["capsule"], session)
+
+
 __all__ = [
     "SCHEMA", "MAX_BUNDLE_BYTES", "GamePlayBundleError",
     "pack_play_bundle", "verify_play_bundle", "resume_play_bundle",
+    "fork_play_bundle",
 ]
