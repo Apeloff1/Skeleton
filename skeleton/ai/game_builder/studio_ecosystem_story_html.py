@@ -39,7 +39,7 @@ function act(id,option){
 function render(){
  host.replaceChildren();endings.replaceChildren();
  summary.textContent=completed.size+" of "+source.stages.length+" authored stages complete";
- premise.textContent=source.premise;
+ premise.textContent=source.premise+" — "+source.protagonist_name;
  for(const stage of source.stages){
    const open=!completed.has(stage.id)&&stage.prerequisites.every(dep=>completed.has(dep));
    const box=node("section");box.setAttribute("aria-label",stage.id);
@@ -83,6 +83,11 @@ def story_source(documents: Mapping[str, Any]) -> dict[str, object]:
     if type(narrative) is not dict or type(narrative.get("premise")) is not str:
         raise StudioQuestError("missing authored story premise")
     premise=narrative["premise"]
+    cast=documents.get("cast")
+    protagonist=cast.get("protagonist") if type(cast) is dict else None
+    name=protagonist.get("name") if type(protagonist) is dict else None
+    if type(name) is not str or not 1 <= len(name) <= 512:
+        raise StudioQuestError("invalid authored protagonist presentation")
     beats=narrative.get("plot_beats")
     if (not 1 <= len(premise) <= 1024 or type(beats) is not list
             or len(beats) != len(program.stages)):
@@ -102,7 +107,7 @@ def story_source(documents: Mapping[str, Any]) -> dict[str, object]:
                        "authored_goal":beat["goal"],"authored_decision":beat["decision"]})
     return {"schema":"skeleton.game_builder.offline_story_source.v1",
             "project_id":program.project_id,"source_digest":program.source_digest,
-            "premise":premise,
+            "premise":premise,"protagonist_name":name,
             "stages":stages,
             "endings":[{"id":key,"requires":list(reqs)} for key,reqs in program.endings],
             "external_evidence_verified":False,"release_certified":False}
