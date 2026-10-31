@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_cloud_canopy",
+  "title": "Cloud Canopy: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010317610,
+  "width": 27,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 14,
+  "theme": "forest",
+  "starting_health": 6
+}

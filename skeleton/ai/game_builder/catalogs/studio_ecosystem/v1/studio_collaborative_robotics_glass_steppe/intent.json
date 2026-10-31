@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_glass_steppe",
+  "title": "Glass Steppe: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010317832,
+  "width": 19,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 14,
+  "theme": "desert",
+  "starting_health": 4
+}

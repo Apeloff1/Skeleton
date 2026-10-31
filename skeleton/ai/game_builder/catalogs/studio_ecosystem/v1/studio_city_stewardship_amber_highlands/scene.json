@@ -1,0 +1,61 @@
+{
+  "project_id": "studio_city_stewardship_amber_highlands",
+  "genre": "city_stewardship",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.scene.v1",
+  "world": "Amber Highlands",
+  "episode_plan": [
+    {
+      "id": "arrival",
+      "location": "terraced ridgepaths",
+      "quest": "arrival",
+      "trigger": "landslides",
+      "objects": [
+        "hazard_monitor",
+        "navigation_marker",
+        "witness_letter"
+      ]
+    },
+    {
+      "id": "dispute",
+      "location": "mountain hospice",
+      "quest": "dispute",
+      "trigger": "Access dispute over resin lamps",
+      "objects": [
+        "public_ledger",
+        "interview_station",
+        "faction_delegate"
+      ]
+    },
+    {
+      "id": "repair",
+      "location": "boundary of terraced ridgepaths",
+      "quest": "repair",
+      "trigger": "Repair budget becomes binding",
+      "objects": [
+        "repair_terminal",
+        "community_board",
+        "verification_station"
+      ]
+    }
+  ],
+  "continuity": {
+    "state_keys": [
+      "route_discovered",
+      "claims_reviewed",
+      "repair_verification"
+    ],
+    "carry_forward": true
+  },
+  "engine": {
+    "design_target": "city_stewardship",
+    "preview_actual": "existing_det_grid_maze",
+    "preview_includes_full_genre": false,
+    "interaction_binding": "requires_further_editor_implementation"
+  },
+  "navigation_design": {
+    "alternate_exits": 2,
+    "weather_consequence": "landslides"
+  }
+}

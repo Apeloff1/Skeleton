@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_sunken_metro",
+  "title": "Sunken Metro: City Stewardship",
+  "subtitle": "An original city stewardship brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610303465,
+  "width": 19,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 4
+}
