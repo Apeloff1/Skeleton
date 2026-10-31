@@ -25,7 +25,11 @@ requires successful decryption with the exact model/tokenizer/context identity.
 ## Integrity and recovery
 
 AES-256-GCM encrypts bytes using a random nonce and authenticates canonical
-manifest metadata. Data is fsynced before its manifest commit marker. Restart
+manifest metadata. A separate domain-separated HMAC-SHA256 authenticates
+manifest metadata for listing without decrypting all ciphertext; wrong keys
+and altered manifests fail closed. The manifest schema is v2; earlier draft
+v1 records are not silently migrated or accepted. Data is fsynced before
+its manifest commit marker. Restart
 with the same key recovers committed records; prune deletes uncommitted
 ciphertext/temp objects after interrupted publication. Corrupt committed
 records are not silently removed. A platform OS lock serializes mutations.

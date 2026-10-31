@@ -64,6 +64,27 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
         with self.assertRaisesRegex(SpillError, "authentication"):
             self.store.read(receipt["record_id"], IDENTITY)
 
+    def test_list_requires_authenticated_manifest(self):
+        receipt = self.store.put(b"private", IDENTITY)
+        self.assertEqual(self.store.records()[0]["record_id"], receipt["record_id"])
+        with self.assertRaisesRegex(SpillError, "authentication"):
+            EncryptedSpillStore(self.root, b"\\x13" * 32).records()
+        path = self.root / (receipt["record_id"] + ".json")
+        manifest = json.loads(path.read_text())
+        manifest["context_id"] = "forged-context"
+        path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(SpillError, "authentication"):
+            self.store.records()
+
+    def test_missing_manifest_mac_rejected(self):
+        receipt = self.store.put(b"private", IDENTITY)
+        path = self.root / (receipt["record_id"] + ".json")
+        manifest = json.loads(path.read_text())
+        manifest.pop("manifest_mac")
+        path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(SpillError, "fields"):
+            self.store.records()
+
     def test_unknown_manifest_fields(self):
         receipt = self.store.put(b"private", IDENTITY)
         path = self.root / (receipt["record_id"] + ".json")

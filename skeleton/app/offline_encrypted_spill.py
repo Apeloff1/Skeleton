@@ -4,6 +4,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
+import hmac
 import json
 import os
 from pathlib import Path
@@ -18,7 +19,7 @@ from typing import Iterator
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-SCHEMA = "skeleton.offline.encrypted_spill.v1"
+SCHEMA = "skeleton.offline.encrypted_spill.v2"
 RECORD = re.compile(r"[0-9a-f]{32}\Z")
 DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 CONTEXT = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
@@ -190,6 +191,9 @@ class EncryptedSpillStore:
         self._root_identity = (mode.st_dev, mode.st_ino)
         self._dir_fd: int | None = None
         self._cipher = AESGCM(key)
+        self._manifest_mac_key = hmac.new(
+            key, b"skeleton.offline.encrypted_spill.manifest.v2", sha256
+        ).digest()
         self._thread = threading.RLock()
 
     @contextmanager
@@ -351,7 +355,8 @@ class EncryptedSpillStore:
         except (ValueError, UnicodeError) as exc:
             raise SpillError("malformed spill manifest") from exc
         keys = {"schema", "record_id", "model_sha256", "tokenizer_sha256",
-                "context_id", "chunk_index", "size", "sha256", "nonce", "created_ns"}
+                "context_id", "chunk_index", "size", "sha256", "nonce",
+                "created_ns", "manifest_mac"}
         if type(value) is not dict or set(value) != keys:
             raise SpillError("unexpected spill manifest fields")
         if value["schema"] != SCHEMA or value["record_id"] != record_id:
@@ -366,6 +371,13 @@ class EncryptedSpillStore:
             raise SpillError("invalid plaintext digest")
         if type(value["nonce"]) is not str or not re.fullmatch(r"[0-9a-f]{24}", value["nonce"]):
             raise SpillError("invalid AES-GCM nonce")
+        claimed = value["manifest_mac"]
+        if type(claimed) is not str or not DIGEST.fullmatch(claimed):
+            raise SpillError("invalid manifest authentication tag")
+        unsigned = {key: item for key, item in value.items() if key != "manifest_mac"}
+        expected = hmac.new(self._manifest_mac_key, _canonical(unsigned), sha256).hexdigest()
+        if not hmac.compare_digest(claimed, expected):
+            raise SpillError("manifest authentication failed")
         return value
 
     def _open(self, record_id: str, identity: SpillIdentity) -> bytes:
@@ -412,6 +424,9 @@ class EncryptedSpillStore:
                 "size": len(payload), "sha256": sha256(payload).hexdigest(),
                 "nonce": nonce.hex(), "created_ns": time.time_ns(),
             }
+            meta["manifest_mac"] = hmac.new(
+                self._manifest_mac_key, _canonical(meta), sha256
+            ).hexdigest()
             ciphertext = self._cipher.encrypt(nonce, payload, _canonical(meta))
             temp_data = ".tmp-" + record_id + "-" + secrets.token_hex(8)
             temp_meta = ".tmp-" + record_id + "-" + secrets.token_hex(8)
@@ -425,7 +440,7 @@ class EncryptedSpillStore:
             finally:
                 self._unlink_member(temp_data, missing_ok=True)
                 self._unlink_member(temp_meta, missing_ok=True)
-            return {k: v for k, v in meta.items() if k != "nonce"}
+            return {k: v for k, v in meta.items() if k not in ("nonce", "manifest_mac")}
 
     def read(self, record_id: str, identity: SpillIdentity) -> bytes:
         if not isinstance(identity, SpillIdentity):
@@ -436,7 +451,7 @@ class EncryptedSpillStore:
     def records(self) -> list[dict[str, object]]:
         with self._lock():
             manifests, _, _ = self._scan()
-            return [{k: v for k, v in self._metadata(name[:-5]).items() if k != "nonce"}
+            return [{k: v for k, v in self._metadata(name[:-5]).items() if k not in ("nonce", "manifest_mac")}
                     for name in manifests]
 
     def verify(self) -> dict[str, int]:
