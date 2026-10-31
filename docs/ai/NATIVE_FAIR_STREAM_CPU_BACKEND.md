@@ -35,3 +35,11 @@ Focused simulated CPU validation:
 `python -m pytest -q skeleton/testing/test_native_fair_stream_backend.py`
 plus the existing fair-stream dispatch, journal and vault regression tests.
 Actual hardware, performance, device and release qualification remain held.
+
+The app binding now requires a canonical `LiveStreamBudgetSampler` and a
+selected storage volume. `NativeTokenPressureGuard` checks pressure at
+native runtime interrupt checkpoints (including inside transformer compute),
+stops on missing evidence, RAM pressure, thermal hold or probe exhaustion,
+and retains a stopped state after any failure. A stop is not a successful
+completion or a retry permit. The outer journal must reconcile the uncertain
+RUNNING intent through the authorized recovery path.

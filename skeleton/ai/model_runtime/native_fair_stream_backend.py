@@ -17,6 +17,7 @@ from .fair_stream_result_vault import MAX_RESULT_BYTES
 from .fair_stream_session import DispatchPermit
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig
+from .native_token_pressure import NativeTokenPressureGuard
 
 MAX_PROMPT_BYTES = 64 << 10
 MAX_STAGED_PROMPTS = 256
@@ -199,12 +200,16 @@ class NativeFairStreamBackend:
 
     def __init__(
         self, runtime: NativeLLMRuntime, registry: NativePromptRegistry,
+        *, pressure_guard: NativeTokenPressureGuard | None = None,
     ) -> None:
         model, tokenizer = _cpu_runtime(runtime)
         if type(registry) is not NativePromptRegistry:
             raise NativeFairStreamDenied("canonical prompt registry required")
         self.runtime = runtime
         self.registry = registry
+        if pressure_guard is not None and type(pressure_guard) is not NativeTokenPressureGuard:
+            raise NativeFairStreamDenied("canonical native pressure guard required")
+        self._pressure_guard = pressure_guard
         self.model_digest = model
         self.tokenizer_digest = tokenizer
         self._lock = RLock()
@@ -274,8 +279,18 @@ class NativeFairStreamBackend:
                         ) > self.runtime.limits.max_kv_bytes):
                     raise NativeFairStreamDenied("native context/KV pressure limit")
                 config = GenerationConfig(max_new_tokens=permit.tokens)
-                result = self.runtime.generate_sequence(sequence, config)
-                _cpu_runtime(self.runtime)
+                guard = self._pressure_guard
+                interrupt = guard.start(permit) if guard is not None else None
+                succeeded = False
+                try:
+                    result = self.runtime.generate_sequence(
+                        sequence, config, interrupt=interrupt,
+                    )
+                    _cpu_runtime(self.runtime)
+                    succeeded = True
+                finally:
+                    if guard is not None:
+                        guard.finish(success=succeeded)
             except NativeFairStreamDenied:
                 raise
             except Exception as exc:

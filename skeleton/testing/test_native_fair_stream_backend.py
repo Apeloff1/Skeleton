@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from hashlib import sha256
-
 import pytest
 
 from skeleton.cortex.transformer import TinyTransformer

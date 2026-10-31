@@ -19,12 +19,14 @@ from skeleton.ai.model_runtime.native_fair_stream_backend import (
 )
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle
+from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
+from skeleton.ai.model_runtime.native_token_pressure import NativeTokenPressureGuard
 
 
 def bind_native_cpu_result_owner(
     *, runtime: NativeLLMRuntime, registry: NativePromptRegistry,
     result_handle: PrivateSQLiteHandle, journal: FairStreamExecutionJournal,
-    result_key: bytes,
+    result_key: bytes, sampler: LiveStreamBudgetSampler, storage_path: str,
 ) -> tuple[JournaledExecutionOwner, SealedFairStreamResultVault]:
     """Bind actual native CPU inference to signed journal + AES-GCM vault.
 
@@ -49,7 +51,10 @@ def bind_native_cpu_result_owner(
         raise ValueError("result and execution journal must use different inodes")
     if registry.session_id != journal.session_id:
         raise ValueError("native prompt and execution journal session mismatch")
-    backend = NativeFairStreamBackend(runtime, registry)
+    backend = NativeFairStreamBackend(
+        runtime, registry,
+        pressure_guard=NativeTokenPressureGuard(sampler, storage_path=storage_path),
+    )
     vault = SealedFairStreamResultVault(
         result_handle, session_id=journal.session_id,
         model_digest=backend.model_digest,
