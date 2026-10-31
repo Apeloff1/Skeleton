@@ -123,6 +123,23 @@ class OfflineAdaptiveDispatchService:
         self._guard.cancel(request_id)
         return self.status()
 
+    def reconcile_committed(
+        self, *, journal: "FairStreamExecutionJournal",
+        authorization: "RecoveryAuthorization", recovery_key: bytes,
+    ) -> OfflineDispatchStatus:
+        """Explicit operator-only recovery of an ALREADY committed receipt.
+
+        Never invoke this automatically on startup. The caller must hold an
+        independently signed, exact-generation operator approval and an
+        exclusive canonical execution-journal handle. No model execution
+        occurs during reconciliation, and no keys enter public status.
+        """
+        self._guard.reconcile_committed(
+            journal=journal, authorization=authorization,
+            recovery_key=recovery_key,
+        )
+        return self.status()
+
     def execute_next(self, *, token_budget: int) -> dict[str, object]:
         """Plan and execute ONE source-bound slice; no backend on a hold.
 

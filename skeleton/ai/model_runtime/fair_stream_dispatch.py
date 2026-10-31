@@ -173,6 +173,65 @@ class GuardedFairStreamDispatch:
             raise DispatchUncertain("durable lease differs from permit")
         return state
 
+    def reconcile_committed(
+        self, *, journal: "FairStreamExecutionJournal",
+        authorization: "RecoveryAuthorization", recovery_key: bytes,
+    ) -> dict[str, object]:
+        """Explicitly retire an ALREADY committed lease; never run a backend.
+
+        This administrative in-process seam must only be exposed behind the
+        application's independent operator authentication. It cannot repair
+        an uncommitted execution, an unknown result or a rolled-back anchor.
+        """
+        from .fair_stream_execution_journal import (
+            ExecutionOutcomeUnknown, FairStreamExecutionJournal,
+        )
+        from .fair_stream_recovery import (
+            RecoveryAuthorization, verify_recovery_authorization,
+        )
+
+        if type(journal) is not FairStreamExecutionJournal:
+            raise ValueError("canonical committed execution journal required")
+        with self._lock:
+            state = self._session.verify()
+            checkpoint = state.get("checkpoint")
+            pending = checkpoint.get("pending") if isinstance(checkpoint, Mapping) else None
+            if type(pending) is not list or len(pending) != 1:
+                raise DispatchUncertain("exactly one pending lease required")
+            lease = pending[0]
+            if type(lease) is not dict:
+                raise DispatchUncertain("invalid pending lease")
+            try:
+                permit = DispatchPermit(
+                    lease_id=lease["lease_id"],
+                    request_id=lease["request_id"],
+                    generation=state["generation"],
+                    checkpoint_digest=state["checkpoint_digest"],
+                    tokens=lease["tokens"],
+                    bytes_reserved=lease["bytes_reserved"],
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise DispatchUncertain("invalid canonical pending lease") from exc
+            if self._issued and self._issued.get(permit.lease_id) != permit:
+                raise DispatchUncertain("in-memory lease differs from durable custody")
+            verify_recovery_authorization(
+                authorization, recovery_key=recovery_key,
+                state=state, lease_id=permit.lease_id,
+            )
+            # Never call execute_and_commit, even if the journal has only a
+            # RUNNING intent. The execution result must already be durable.
+            try:
+                receipt = journal.recover_committed_receipt(permit)
+                updated = self._session.acknowledge(receipt)
+            except (ExecutionOutcomeUnknown, ValueError, RuntimeError) as exc:
+                self._uncertain = True
+                raise DispatchUncertain(
+                    "committed receipt unavailable or custody reconciliation failed"
+                ) from exc
+            self._issued.clear()
+            self._uncertain = False
+            return updated
+
     def execute_once(self, permit: DispatchPermit) -> dict[str, object]:
         """Execute at most once, with a fresh OS re-probe and signed receipt.
 
