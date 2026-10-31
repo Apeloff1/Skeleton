@@ -99,12 +99,14 @@ def solve_batches(
                     incomplete = True
                     queue.clear()
                     break
+                # Count attempted edges, including invalid overflow paths,
+                # so adversarial recipe catalogs cannot evade the CPU budget.
+                transitions += 1
                 action = CraftAction(len(state.actions), recipe.recipe_id, batches)
                 try:
                     candidate = engine._apply_verified(state, action)
                 except GameplayContractError:
                     continue
-                transitions += 1
                 if candidate.digest in seen:
                     continue
                 if goal.reached(candidate):
