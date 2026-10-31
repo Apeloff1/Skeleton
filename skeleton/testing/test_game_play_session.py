@@ -190,3 +190,45 @@ def test_canonical_app_renders_source_bound_session(tmp_path, capsys):
     receipt = json.loads(capsys.readouterr().out)
     assert receipt["render_backend"] == "ascii_offline"
     assert any("@" in row for row in receipt["grid"])
+
+def test_portable_bundle_round_trip_and_recovery(tmp_path, capsys):
+    from skeleton.ai.runtime.game_play_bundle import (
+        pack_play_bundle, verify_play_bundle, resume_play_bundle,
+    )
+    capsule = _capsule()
+    saved = start_play_session(capsule, [_move()])
+    bundle = pack_play_bundle(capsule, saved)
+    assert verify_play_bundle(bundle)["offline_replay_verified"]
+    assert bundle == pack_play_bundle(capsule, saved)
+    if saved["victory_frame"] is None:
+        recovered = resume_play_bundle(bundle, [_move()])
+        assert verify_play_bundle(recovered)["frame_count"] == 2
+    source = tmp_path / "source.json"
+    session = tmp_path / "session.json"
+    package = tmp_path / "portable.json"
+    source.write_text(json.dumps(capsule), encoding="utf-8")
+    session.write_text(json.dumps(saved), encoding="utf-8")
+    assert main([
+        "--export-play-bundle", str(session), "--session-capsule", str(source),
+        "--bundle-output", str(package),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["offline_replay_verified"]
+    assert main(["--verify-play-bundle", str(package)]) == 0
+    assert json.loads(capsys.readouterr().out)["offline_replay_verified"]
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda b: b.update(body_bytes=True),
+    lambda b: b.update(bundle_sha256="0" * 64),
+    lambda b: b["session"].update(frame_count=999),
+    lambda b: b["capsule"].update(legal_release_authorized=True),
+    lambda b: b.update(untrusted="extra"),
+])
+def test_portable_bundle_rejects_tampering(mutation):
+    from skeleton.ai.runtime.game_play_bundle import (
+        GamePlayBundleError, pack_play_bundle, verify_play_bundle,
+    )
+    bundle = pack_play_bundle(_capsule(), start_play_session(_capsule(), [_move()]))
+    mutation(bundle)
+    with pytest.raises((GamePlayBundleError, GamePlaySessionError, ValueError)):
+        verify_play_bundle(bundle)

@@ -34,6 +34,10 @@ from skeleton.ai.runtime.game_play_session import (
     GamePlaySessionError, start_play_session, resume_play_session,
     verify_play_session, render_play_session,
 )
+from skeleton.ai.runtime.game_play_bundle import (
+    GamePlayBundleError, pack_play_bundle, verify_play_bundle,
+    resume_play_bundle,
+)
 
 MAX_INPUT_BYTES = 96 * 1024
 MAX_RESULT_BYTES = 160 * 1024
@@ -52,16 +56,16 @@ def _nonfinite(_: str) -> None:
     raise GameCapsuleError("nonfinite game project numbers are inadmissible")
 
 
-def _read_json(path: Path) -> dict[str, Any]:
+def _read_json(path: Path, *, max_bytes: int = MAX_INPUT_BYTES) -> dict[str, Any]:
     if path.is_symlink() or not path.is_file():
         raise GameCapsuleError("game input must be an existing regular local file")
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(fd, "rb") as stream:
         info = os.fstat(stream.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_INPUT_BYTES:
+        if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
             raise GameCapsuleError("game project input exceeded local file budget")
-        data = stream.read(MAX_INPUT_BYTES + 1)
-    if len(data) > MAX_INPUT_BYTES:
+        data = stream.read(max_bytes + 1)
+    if len(data) > max_bytes:
         raise GameCapsuleError("game project input exceeded local file budget")
     try:
         value = json.loads(
@@ -143,6 +147,12 @@ def _parser() -> argparse.ArgumentParser:
                             help="replay a saved session against its original capsule")
     operations.add_argument("--render-play-session", type=Path,
                             help="show verified offline game state as an ASCII grid")
+    operations.add_argument("--export-play-bundle", type=Path,
+                            help="package a verified original capsule and save for offline transfer")
+    operations.add_argument("--verify-play-bundle", type=Path,
+                            help="reopen and verify a self-contained offline game bundle")
+    operations.add_argument("--resume-play-bundle", type=Path,
+                            help="append controller frames to a verified portable bundle")
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -159,6 +169,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="original capsule for session resume/verification")
     parser.add_argument("--save-session", type=Path,
                         help="write a new exclusive offline session JSON file")
+    parser.add_argument("--bundle-output", type=Path,
+                        help="exclusive new output for a portable play bundle")
     parser.add_argument("--output", type=Path,
                         help="exclusive new file for --compose")
     parser.add_argument("--seed", type=int, default=1729,
@@ -180,11 +192,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.play_capsule, args.resume_play_session,
         args.verify_play_session, args.render_play_session,
     ))
-    if not playing and any(value is not None for value in (
-        args.controls_file, args.session_capsule, args.save_session,
+    bundling = any(value is not None for value in (
+        args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
+    ))
+    if not playing and not bundling and any(value is not None for value in (
+        args.controls_file, args.session_capsule, args.save_session, args.bundle_output,
     )):
         print("play-session flags require a play-session operation", file=sys.stderr)
         return 2
+    if playing and args.bundle_output is not None:
+        print("bundle output requires a bundle operation", file=sys.stderr)
+        return 2
+    if bundling:
+        needs_actions = args.resume_play_bundle is not None
+        needs_source = args.export_play_bundle is not None
+        needs_output = args.verify_play_bundle is None
+        if (needs_actions != (args.controls_file is not None)
+                or needs_source != (args.session_capsule is not None)
+                or needs_output != (args.bundle_output is not None)
+                or args.save_session is not None):
+            print("play-bundle source, controls and output arguments mismatch", file=sys.stderr)
+            return 2
     if playing:
         needs_actions = args.verify_play_session is None and args.render_play_session is None
         needs_source = args.play_capsule is None
@@ -209,7 +237,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("--targets is only for --demo-project", file=sys.stderr)
         return 2
     try:
-        if playing:
+        if bundling:
+            if args.verify_play_bundle is not None:
+                bundle = _read_json(args.verify_play_bundle, max_bytes=MAX_RESULT_BYTES)
+                report = verify_play_bundle(bundle)
+            elif args.export_play_bundle is not None:
+                capsule = _read_json(args.session_capsule)
+                session = _read_json(args.export_play_bundle)
+                bundle = pack_play_bundle(capsule, session)
+                output = _write_new(args.bundle_output, bundle)
+                report = {**verify_play_bundle(bundle), "output_path": output}
+            else:
+                bundle = _read_json(args.resume_play_bundle, max_bytes=MAX_RESULT_BYTES)
+                actions = _read_json(args.controls_file)
+                if set(actions) != {"controls"}:
+                    raise GamePlayBundleError("play controls require exactly controls")
+                updated = resume_play_bundle(bundle, actions["controls"])
+                output = _write_new(args.bundle_output, updated)
+                report = {**verify_play_bundle(updated), "output_path": output}
+        elif playing:
             capsule = _read_json(args.play_capsule or args.session_capsule)
             if args.verify_play_session is not None:
                 report = verify_play_session(capsule, _read_json(args.verify_play_session))
@@ -285,7 +331,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             report = verify_game_capsule(_read_json(args.verify_capsule))
         print(json.dumps(report, sort_keys=True, ensure_ascii=True))
         return 0
-    except (GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
+    except (GamePlayBundleError, GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
             GameplayError, ValueError, TypeError, KeyError, OSError) as exc:
         print(
             "cross-era game project rejected: " + type(exc).__name__ + ": " + str(exc),

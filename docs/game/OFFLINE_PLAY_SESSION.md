@@ -37,3 +37,22 @@ For a read-only ASCII preview of the last verified player position, run
 `python -m skeleton app game-project --render-play-session save.json --session-capsule project.json`.
 This renders a text grid with `@` for the player; it does not assert GPU,
 native desktop or mobile renderer support.
+
+## Portable offline transfer
+
+Create a source-bound, rights-attested, engine-neutral transfer bundle:
+
+`python -m skeleton app game-project --export-play-bundle save.json --session-capsule project.json --bundle-output portable.json`
+
+Reopen without needing the separate original files:
+
+`python -m skeleton app game-project --verify-play-bundle portable.json`
+
+Continue the same replay history on another offline machine:
+
+`python -m skeleton app game-project --resume-play-bundle portable.json --controls-file more.json --bundle-output portable-next.json`
+
+Bundles are bounded to 150 KiB of canonical content and use a strict
+checksum, embedded capsule rights evidence and complete controller replay.
+A digest is **not** an authentication signature or independent proof of
+copyright ownership. Bundle export is portable JSON, not a native binary.
