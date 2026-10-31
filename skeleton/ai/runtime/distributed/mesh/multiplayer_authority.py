@@ -85,6 +85,11 @@ class SessionAuthority:
         """Preserve the original public multiplayer sync API."""
         self.distributed_sync(player_id, peer_id, pos, lag)
 
+    def predictive_sync(self, player_id: str, peer_id: str,
+                        pos: tuple[float, float, float], lag_ms: int) -> None:
+        """Predict peers through the same grant-checked bounded rollback transport."""
+        self.distributed_sync(player_id, peer_id, pos, lag_ms)
+
     def verify(self, player_id: str, digest: str) -> bool:
         return self.verify_grant(player_id, digest)
 
