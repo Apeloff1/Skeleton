@@ -44,9 +44,13 @@ def audit_walk_choice_coverage(
     expected = sum(len(stage["alternatives"]) for stage in remaining)
     if expected > 4096:
         raise StudioQuestError("walk choice audit source exceeds stage budget")
+    world_digest = _sha(world)
     cursor = session
     records: list[dict[str, object]] = []
     stage_count = 0
+    # Count source replay work conservatively: authorization/continuity and
+    # final verification are bounded separately; each walk_action verifies the
+    # previous state and recomputes the successor from genesis.
     replay_work = 0
     stop_reason = "complete"
 
@@ -79,7 +83,8 @@ def audit_walk_choice_coverage(
         if len(proposed) + 1 > MAX_WALK_EVENTS:
             stop_reason = "event_budget_exhausted"
             break
-        cost = len(proposed) + len(alternatives) * (len(proposed) + 1)
+        cost = (len(cursor.events) + len(proposed)
+                + len(alternatives) * (2 * len(proposed) + 1))
         if replay_work + cost > MAX_COVERAGE_REPLAY_EVENTS:
             stop_reason = "replay_budget_exhausted"
             break
@@ -88,14 +93,14 @@ def audit_walk_choice_coverage(
                 or approached.scene_index != cursor.scene_index
                 or approached.chosen != cursor.chosen):
             raise StudioQuestError("walk choice audit route/source drift")
-        replay_work += len(proposed)
+        replay_work += len(cursor.events) + len(proposed)
         first_successor = None
         for alternative in alternatives:
             successor = walk_action(
                 approached, documents, action="choose",
                 value=alternative, authorized=True,
             )
-            replay_work += len(successor.events)
+            replay_work += 2 * len(approached.events) + 1
             if (successor.scene_index != cursor.scene_index + 1
                     or successor.source_digest != session.source_digest
                     or successor.chosen[-1] != (stage["id"], alternative)):
@@ -116,6 +121,11 @@ def audit_walk_choice_coverage(
         stage_count += 1
 
     verify_walk(session, documents)
+    if (_sha(playable_world_source(documents)) != world_digest
+            or walk_narrative_continuity(
+                session, documents, authorized=True)["continuity_digest"]
+            != continuity["continuity_digest"]):
+        raise StudioQuestError("walk choice audit source changed during replay")
     if cursor.source_digest != session.source_digest:
         raise StudioQuestError("walk choice audit changed authoritative source")
     complete = stop_reason == "complete" and cursor.scene_index == len(world["stages"])

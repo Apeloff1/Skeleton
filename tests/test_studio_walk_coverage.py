@@ -120,3 +120,33 @@ def test_cli_choice_coverage_and_mode_exclusion(documents, monkeypatch, capsys):
             "--walk-audit-choices", "--walk-route",
         ])
     assert error.value.code == 2
+
+
+def test_world_changes_during_audit_are_rejected(documents, monkeypatch):
+    initial = start_walk(documents, authorized=True)
+    original = coverage.playable_world_source
+    calls = 0
+
+    def changing(source):
+        nonlocal calls
+        calls += 1
+        world = original(source)
+        if calls >= 2:
+            return {**world, "source_digest": "0" * 64}
+        return world
+
+    monkeypatch.setattr(coverage, "playable_world_source", changing)
+    with pytest.raises(StudioQuestError, match="source changed"):
+        coverage.audit_walk_choice_coverage(
+            initial, documents, authorized=True,
+        )
+
+
+def test_coverage_replay_work_never_exceeds_admitted_budget(documents, monkeypatch):
+    initial = start_walk(documents, authorized=True)
+    monkeypatch.setattr(coverage, "MAX_COVERAGE_REPLAY_EVENTS", 48)
+    result = coverage.audit_walk_choice_coverage(
+        initial, documents, authorized=True,
+    )
+    assert result["replay_work_events"] <= 48
+    assert result["alternatives_verified"] <= result["alternatives_expected_from_input"]
