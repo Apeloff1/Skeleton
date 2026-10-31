@@ -1,4 +1,5 @@
 from .manager import KVCacheManager, KVCacheTransaction
+from .live_tier_controller import KVLiveTierController, KVLiveObservation, KVPressureDeferred
 from .pressure_tiering import (
     KVPressureTierPlanner, TierApplyReceipt, TierMove, TierPlan,
     TierPressurePolicy, TierPressureSample,
@@ -17,6 +18,9 @@ from .types import (
 )
 
 __all__ = [
+    "KVLiveTierController",
+    "KVLiveObservation",
+    "KVPressureDeferred",
     "CacheTier",
     "KVCacheConfig",
     "KVCacheManager",
