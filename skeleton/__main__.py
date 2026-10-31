@@ -55,6 +55,7 @@ Commands:
     combat      Run and replay deterministic offline turn combat encounters
     combat-inspect  Inspect verified combat timelines and compare saved branches
     combat-arena    Play source-bound tactical grid combat with offline replay
+    arena-terrain  Generate and verify original playable tactical geometry
     combat-expedition  Play original multi-arena campaigns with earned inventory
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-author  Edit original quest source and preview offline gameplay
@@ -745,6 +746,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat":
         from skeleton.game.gameplay.turn_combat import cli as combat_cli
         return combat_cli(rest)
+    if cmd == "arena-terrain":
+        from skeleton.game.gameplay.arena_terrain import cli as terrain_cli
+        return terrain_cli(rest)
     if cmd == "combat-arena":
         from skeleton.game.gameplay.tactical_arena import cli as arena_cli
         return arena_cli(rest)
