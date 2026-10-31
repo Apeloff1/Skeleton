@@ -33,6 +33,9 @@ def test_revision_compiles_and_persists_original_interactive_story(tmp_path):
     assert receipt["canon_consistent"] is True
     assert receipt["release_certified"] is False
     assert b"Original interactive quest" in html
+    assert b"Authored goal:" in html
+    assert b"premise" in html
+    assert b"Miro Rook must document" in html
     out = tmp_path / "revision"
     write_revision_bundle(out, revised, html, receipt)
     assert json.loads((out / "source.json").read_text()) == revised

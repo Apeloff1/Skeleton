@@ -25,6 +25,7 @@ const completed=new Set();
 const byId=new Map(source.stages.map(s=>[s.id,s]));
 const host=document.getElementById("stages");
 const summary=document.getElementById("summary");
+const premise=document.getElementById("premise");
 const transcript=document.getElementById("transcript");
 const endings=document.getElementById("endings");
 function node(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el;}
@@ -38,10 +39,13 @@ function act(id,option){
 function render(){
  host.replaceChildren();endings.replaceChildren();
  summary.textContent=completed.size+" of "+source.stages.length+" authored stages complete";
+ premise.textContent=source.premise;
  for(const stage of source.stages){
    const open=!completed.has(stage.id)&&stage.prerequisites.every(dep=>completed.has(dep));
    const box=node("section");box.setAttribute("aria-label",stage.id);
    box.append(node("h2",stage.id),node("p","Scene: "+stage.scene_id));
+   box.append(node("p","Authored goal: "+stage.authored_goal),
+              node("p","Decision: "+stage.authored_decision));
    if(completed.has(stage.id)){box.append(node("p","Completed, sandbox reward: "+stage.reward));}
    else if(!open){box.append(node("p","Locked until dependencies are complete"));}
    else{
@@ -75,15 +79,30 @@ def story_source(documents: Mapping[str, Any]) -> dict[str, object]:
     scenes=scene_catalog(documents)
     if len(scenes)!=len(program.stages):
         raise StudioQuestError("scene/quest cardinality mismatch")
+    narrative=documents.get("narrative")
+    if type(narrative) is not dict or type(narrative.get("premise")) is not str:
+        raise StudioQuestError("missing authored story premise")
+    premise=narrative["premise"]
+    beats=narrative.get("plot_beats")
+    if (not 1 <= len(premise) <= 1024 or type(beats) is not list
+            or len(beats) != len(program.stages)):
+        raise StudioQuestError("invalid authored story presentation")
     stages=[]
-    for stage,scene in zip(program.stages,scenes,strict=True):
+    for stage,scene,beat in zip(program.stages,scenes,beats,strict=True):
+        if type(beat) is not dict:
+            raise StudioQuestError("invalid authored story beat")
+        for key in ("goal", "decision"):
+            if type(beat.get(key)) is not str or not 1 <= len(beat[key]) <= 1024:
+                raise StudioQuestError("invalid authored story beat presentation")
         if stage.key!=scene["quest_stage"]:
             raise StudioQuestError("scene and authored quest stage differ")
         stages.append({"id":stage.key,"prerequisites":list(stage.prerequisites),
                        "alternatives":list(stage.alternatives),"reward":stage.reward,
-                       "scene_id":scene["scene_id"],"objects":list(scene["objects"])})
+                       "scene_id":scene["scene_id"],"objects":list(scene["objects"]),
+                       "authored_goal":beat["goal"],"authored_decision":beat["decision"]})
     return {"schema":"skeleton.game_builder.offline_story_source.v1",
             "project_id":program.project_id,"source_digest":program.source_digest,
+            "premise":premise,
             "stages":stages,
             "endings":[{"id":key,"requires":list(reqs)} for key,reqs in program.endings],
             "external_evidence_verified":False,"release_certified":False}
@@ -112,7 +131,7 @@ def render_story_html(documents: Mapping[str, Any]) -> bytes:
         "<style>"+_CSS+"</style></head><body>"
         "<header><h1>Original interactive quest</h1><p>Project: "+project+"</p>"
         "<p>Sandbox choices, not native world interactions</p></header>"
-        "<main><p id='summary' role='status' aria-live='polite'></p>"
+        "<main><p id='premise'></p><p id='summary' role='status' aria-live='polite'></p>"
         "<div id='stages'></div><section><h2>Ending requirements</h2>"
         "<ul id='endings'></ul></section>"
         "<section><h2>Replay transcript</h2><button type='button' id='restart'>"
