@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "project_id": "studio_underwater_archaeology_amber_highlands",
+  "genre": "underwater_archaeology",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "sound_design": {
+    "acoustics": "wind through amber pines",
+    "genre": "underwater_archaeology",
+    "tempo_bpm": 128,
+    "meter": "5/4",
+    "tonality": "minor",
+    "rendered": false
+  },
+  "sound_layers": [
+    {
+      "id": "ambient",
+      "trigger": "outdoor_amber_highlands",
+      "source": "Original environmental Foley emphasizing wind through amber pines",
+      "spatial": "outdoor_binaural",
+      "ducking": "below_dialogue"
+    },
+    {
+      "id": "mechanic",
+      "trigger": "survey",
+      "source": "Percussive feedback to buoyancy, decompression and noninvasive survey",
+      "spatial": "diegetic_close",
+      "ducking": "below_warning"
+    },
+    {
+      "id": "risk",
+      "trigger": "landslides",
+      "source": "Nonverbal hazard escalation for unstable inclines",
+      "spatial": "wide_dynamic",
+      "ducking": "priority_warning"
+    },
+    {
+      "id": "resolution",
+      "trigger": "verified_branch",
+      "source": "Original acoustic theme varying with air and research grants stewardship",
+      "spatial": "narrative_bus",
+      "ducking": "dialogue_priority"
+    }
+  ],
+  "dialogue_voice": {
+    "casts": [
+      "protagonist",
+      "witness",
+      "technician",
+      "rival"
+    ],
+    "performance_requirement": "new_original_voice_material",
+    "localized_content": "not_recorded"
+  },
+  "audio_accessibility": [
+    "complete_captions",
+    "no_audio_only_navigation",
+    "adjustable_mixer",
+    "dynamic_range_modes"
+  ],
+  "audio_processing": {
+    "cpu_budget": "runtime_measured",
+    "compression": "hardware_profile_adaptive",
+    "sample_quality": "audited_per_target"
+  }
+}

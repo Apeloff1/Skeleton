@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_neon_undercity",
+  "title": "Neon Undercity: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010312051,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 3
+}

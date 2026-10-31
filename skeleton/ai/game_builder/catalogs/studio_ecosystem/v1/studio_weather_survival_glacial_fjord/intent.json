@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_glacial_fjord",
+  "title": "Glacial Fjord: Stormline",
+  "subtitle": "Original stormline design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010316517,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 5
+}
