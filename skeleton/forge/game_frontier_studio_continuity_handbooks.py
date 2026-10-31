@@ -97,6 +97,13 @@ class ContinuityBookPaths(Sequence[str]):
             if len(indices) > 64:
                 raise StudioError("virtual catalogue slices are limited to 64 entries")
             return tuple(self[i] for i in indices)
+        # Python sequences accept negative indexes; normalize before the strict
+        # identity validator, which deliberately rejects out-of-range values.
+        # Reject bool as an index rather than silently treating True as 1.
+        if type(index) is not int:
+            raise TypeError("continuity handbook index must be an integer or slice")
+        if index < 0:
+            index += BOOK_COUNT
         d, t, director, world, phase, campaign, chronicle, epoch, continuity = identity(index)
         return (f"game_studio_5000000000000/{d}/{t}/{director}/{world}/"
                 f"{phase}/{campaign}/{chronicle}/{epoch}/{continuity}.md")
