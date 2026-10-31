@@ -1,0 +1,150 @@
+{
+  "schema": "skeleton.npc_behavior_scenario.v1",
+  "identity": "crisis_evacuation_guide",
+  "domain": "crisis",
+  "role": "evacuation_guide",
+  "policy": {
+    "id": "crisis_evacuation_guide",
+    "domain": "crisis",
+    "role": "evacuation_guide",
+    "revision": "npc_behavior.v1",
+    "initial": {
+      "energy": 70,
+      "trust": 19,
+      "stress": 0,
+      "location": "home"
+    },
+    "limits": {
+      "energy": 100,
+      "trust": 100,
+      "stress": 100,
+      "events": 4096,
+      "effort": 12,
+      "identifier_length": 128
+    },
+    "actions": {
+      "observe": {
+        "energy": 0,
+        "trust": 0,
+        "stress": 0
+      },
+      "work": {
+        "base_energy_cost": 6,
+        "stress_gain": 4
+      },
+      "rest": {
+        "base_energy_recovery": 11,
+        "stress_reduction": 4
+      },
+      "socialize": {
+        "base_trust_gain": 6,
+        "energy_cost": 1
+      },
+      "travel": {
+        "energy_cost": 3,
+        "allowed_locations": [
+          "home",
+          "market",
+          "outpost",
+          "sanctuary",
+          "camp",
+          "hall"
+        ]
+      },
+      "retreat": {
+        "base_stress_reduction": 11,
+        "trust_cost": 1
+      },
+      "negotiate": {
+        "required_witness": true,
+        "trust_gain": 8,
+        "energy_cost": 2
+      },
+      "guard": {
+        "energy_cost": 7,
+        "stress_gain": 1
+      }
+    },
+    "preferred_location": "market",
+    "secondary_location": "sanctuary",
+    "requires_trusted_world_evidence": true
+  },
+  "events": [
+    {
+      "id": "crisis_evacuation_guide:1",
+      "action": "observe",
+      "effort": 0,
+      "tick": 1,
+      "expected_version": 0,
+      "destination": "market",
+      "witness": ""
+    },
+    {
+      "id": "crisis_evacuation_guide:2",
+      "action": "work",
+      "effort": 2,
+      "tick": 2,
+      "expected_version": 1,
+      "destination": "market",
+      "witness": ""
+    },
+    {
+      "id": "crisis_evacuation_guide:3",
+      "action": "rest",
+      "effort": 1,
+      "tick": 3,
+      "expected_version": 2,
+      "destination": "market",
+      "witness": ""
+    },
+    {
+      "id": "crisis_evacuation_guide:4",
+      "action": "socialize",
+      "effort": 1,
+      "tick": 4,
+      "expected_version": 3,
+      "destination": "market",
+      "witness": ""
+    },
+    {
+      "id": "crisis_evacuation_guide:5",
+      "action": "travel",
+      "effort": 0,
+      "tick": 5,
+      "expected_version": 4,
+      "destination": "market",
+      "witness": ""
+    },
+    {
+      "id": "crisis_evacuation_guide:6",
+      "action": "negotiate",
+      "effort": 0,
+      "tick": 6,
+      "expected_version": 5,
+      "destination": "market",
+      "witness": "trusted-world-event:6"
+    },
+    {
+      "id": "crisis_evacuation_guide:7",
+      "action": "retreat",
+      "effort": 0,
+      "tick": 7,
+      "expected_version": 6,
+      "destination": "home",
+      "witness": ""
+    }
+  ],
+  "expected": {
+    "accepted": 7,
+    "final_version": 7,
+    "final_location": "home",
+    "duplicate_is_rejected": true,
+    "stale_version_is_rejected": true,
+    "untrusted_evidence_authority": false
+  },
+  "qualification": {
+    "synthetic": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
