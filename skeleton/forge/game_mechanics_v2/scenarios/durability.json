@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "durability",
+  "domain": "economy",
+  "initial": 60,
+  "capacity": 100,
+  "events": [
+    {
+      "id": "durability:gain:1",
+      "action": "gain",
+      "amount": 7,
+      "tick": 1
+    },
+    {
+      "id": "durability:spend:2",
+      "action": "spend",
+      "amount": 5,
+      "tick": 2
+    },
+    {
+      "id": "durability:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "durability:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "durability:decay:5",
+      "action": "decay",
+      "amount": 2,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      100
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for economy simulation with bounded stock units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}
