@@ -71,8 +71,8 @@ class EnergyHysteresis:
             reason = candidate.reason if target == 0 else "within_measured_energy_limit"
         if type(target) is not int or not 0 <= target <= candidate.base_workers <= 256:
             raise HysteresisError("candidate exceeds its source resource budget")
-        if self.last_seen_ns is not None and now_ns < self.last_seen_ns:
-            raise HysteresisError("monotonic clock moved backwards")
+        if self.last_seen_ns is not None and now_ns <= self.last_seen_ns:
+            raise HysteresisError("non-advancing monotonic sample clock")
         self.last_seen_ns = now_ns
         if target < self.workers:
             self.workers = target

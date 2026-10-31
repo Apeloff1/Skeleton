@@ -116,6 +116,13 @@ class TestEnergyHysteresis(TestCase):
         self.assertEqual(len(data["hysteresis"]), 3)
         self.assertEqual(data["allowed_workers"], 1)
 
+    def test_duplicate_sample_clock_cannot_accelerate_recovery(self):
+        gate = EnergyHysteresis(HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0))
+        gate.step(candidate(), now_ns=10, sampled_ns=10)
+        with self.assertRaises(HysteresisError):
+            gate.step(candidate(), now_ns=10, sampled_ns=10)
+        self.assertEqual(gate.workers, 0)
+
     def test_invalid_policy(self):
         for options in (
             {"recovery_samples": 1},
