@@ -23,6 +23,37 @@ MAX_ACTIVE = 64
 MAX_FINISHED = 10_000
 
 
+def _worst_resource(first: ResourceObservation, last: ResourceObservation) -> ResourceObservation:
+    """Use the more restrictive of start/end evidence, never the best sample.
+
+    Unknown thermal/GPU telemetry stays unknown. A late measured thermal hold
+    overrides an earlier healthy sample. This is telemetry, not a hardware
+    reservation; the execution owner must independently enforce quotas.
+    """
+    thermal = (
+        "measured_hold" if "measured_hold" in (first.thermal, last.thermal)
+        else "unavailable" if "unavailable" in (first.thermal, last.thermal)
+        else "measured_ok"
+    )
+    gpu_available = (
+        first.gpu_free_bytes is not None and last.gpu_free_bytes is not None
+    )
+    return ResourceObservation(
+        ram_available_bytes=min(first.ram_available_bytes, last.ram_available_bytes),
+        ram_total_bytes=min(first.ram_total_bytes, last.ram_total_bytes),
+        swap_free_bytes=min(first.swap_free_bytes, last.swap_free_bytes),
+        swap_total_bytes=min(first.swap_total_bytes, last.swap_total_bytes),
+        cpu_load_ppm=max(first.cpu_load_ppm, last.cpu_load_ppm),
+        thermal=thermal,
+        gpu_free_bytes=(
+            min(first.gpu_free_bytes, last.gpu_free_bytes) if gpu_available else None
+        ),
+        gpu_total_bytes=(
+            min(first.gpu_total_bytes, last.gpu_total_bytes) if gpu_available else None
+        ),
+    )
+
+
 @dataclass(slots=True)
 class _Active:
     request_id: str
@@ -151,7 +182,12 @@ class LiveTailCapture:
             )
             # If recording fails, retain the active record; never report
             # success for a profile that was not committed.
-            self._profile.record(timing, state.resource)
+            # Re-probe AFTER completion before committing the profile.
+            # A thermal trip, swap spike, or RAM collapse during execution
+            # must never be hidden by a healthy start-of-request sample.
+            # Probe failure retains the active record and grants no evidence.
+            end_resource = self._resource()
+            self._profile.record(timing, _worst_resource(state.resource, end_resource))
             del self._active[request_id]
             self._finished.add(request_id)
             return timing

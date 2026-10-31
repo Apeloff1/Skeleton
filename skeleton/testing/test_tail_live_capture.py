@@ -120,3 +120,70 @@ def test_finished_identity_window_is_bounded_and_fails_closed(monkeypatch):
     with pytest.raises(ValueError, match="window exhausted"):
         owner.begin(request_id="second", prompt_tokens=1)
     assert owner.active_count == 0
+
+
+def test_completion_resource_recheck_uses_worst_observed_pressure():
+    observations = iter([
+        LocalResourceSnapshot(
+            total_ram_bytes=8192, available_ram_bytes=4096,
+            total_disk_bytes=4096, free_disk_bytes=2048,
+            cpu_count=4, cpu_load_ratio=0.2,
+        ),
+        LocalResourceSnapshot(
+            total_ram_bytes=8192, available_ram_bytes=512,
+            total_disk_bytes=4096, free_disk_bytes=1024,
+            cpu_count=4, cpu_load_ratio=0.9,
+        ),
+    ])
+    owner = LiveTailCapture(
+        identity(), storage_path=".", clock=iter([10, 20, 40]).__next__,
+        resource_probe=lambda _: next(observations),
+    )
+    owner.begin(request_id="pressure", prompt_tokens=16)
+    owner.first_token("pressure")
+    owner.complete("pressure", output_tokens=2)
+    summary = owner.snapshot(
+        ttft_slo_ms=10, inter_token_slo_ms=10, e2e_slo_ms=10,
+    )
+    assert summary["resource"]["min_ram_available_bytes"] == 512
+    assert summary["resource"]["thermal_unavailable_samples"] == 1
+    assert summary["qualification"] == "simulated"
+
+
+def test_failed_completion_probe_does_not_publish_healthy_profile():
+    calls = 0
+
+    def failing_probe(_):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise OSError("resource telemetry lost")
+        return snapshot(".")
+
+    owner = LiveTailCapture(
+        identity(), storage_path=".", clock=iter([10, 20, 40]).__next__,
+        resource_probe=failing_probe,
+    )
+    owner.begin(request_id="lost", prompt_tokens=16)
+    owner.first_token("lost")
+    with pytest.raises(OSError, match="telemetry lost"):
+        owner.complete("lost", output_tokens=2)
+    assert owner.active_count == 1
+    with pytest.raises(ValueError, match="empty"):
+        owner.snapshot(
+            ttft_slo_ms=10, inter_token_slo_ms=10, e2e_slo_ms=10,
+        )
+
+
+def test_worst_resource_thermal_hold_and_gpu_unknown_are_conservative():
+    from skeleton.ai.model_runtime.tail_live_capture import _worst_resource
+    from skeleton.ai.model_runtime.tail_latency_profile import ResourceObservation
+
+    first = ResourceObservation(4096, 8192, 1024, 2048, 100_000, "measured_ok", 4096, 8192)
+    last = ResourceObservation(1024, 8192, 512, 2048, 900_000, "measured_hold", None, None)
+    worst = _worst_resource(first, last)
+    assert worst.ram_available_bytes == 1024
+    assert worst.cpu_load_ppm == 900_000
+    assert worst.thermal == "measured_hold"
+    assert worst.gpu_free_bytes is None
+    assert worst.gpu_total_bytes is None
