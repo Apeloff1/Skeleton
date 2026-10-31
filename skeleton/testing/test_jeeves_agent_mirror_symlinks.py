@@ -136,3 +136,27 @@ def test_symlinked_root_is_rejected(tmp_path: Path) -> None:
     result = check_parity(alias)
     assert result["status"] == "blocked"
     assert all(item["status"] == "symlink" for item in result["files"])
+
+
+def test_canonical_external_hardlink_is_rejected(tmp_path: Path) -> None:
+    import os
+
+    _fixture(tmp_path)
+    canonical = tmp_path / CANONICAL / REQUIRED[0]
+    external = tmp_path / "external-source.py"
+    os.link(canonical, external)
+    result = check_parity(tmp_path)
+    assert result["status"] == "blocked"
+    assert result["files"][0]["status"] == "unsafe"
+
+
+def test_mirror_external_hardlink_is_rejected(tmp_path: Path) -> None:
+    import os
+
+    _fixture(tmp_path)
+    mirror = tmp_path / MIRROR / REQUIRED[0]
+    external = tmp_path / "external-mirror.py"
+    os.link(mirror, external)
+    result = check_parity(tmp_path)
+    assert result["status"] == "blocked"
+    assert result["files"][0]["status"] == "unsafe"

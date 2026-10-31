@@ -50,7 +50,7 @@ def _source_bytes(root: Path, relative: Path) -> bytes:
     """Walk from / using no-follow directory FDs, then read a regular file FD.
 
     A concurrent rename cannot redirect an already-open directory descriptor.
-    O_NOFOLLOW rejects a file swapped to a symlink at the open boundary.
+    O_NOFOLLOW rejects a file swapped to a symlink at the open boundary.\n    Reject multi-linked inodes before and after reading: a hardlink outside\n    the checkout otherwise allows external mutation of an accepted source.
     No path-based check followed by an unguarded open is permitted.
     """
     if not all(hasattr(os, flag) for flag in ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")):
@@ -71,7 +71,7 @@ def _source_bytes(root: Path, relative: Path) -> bytes:
             fd = os.open(relative.name, file_flags, dir_fd=directory)
             stack.callback(os.close, fd)
             before = os.fstat(fd)
-            if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_SOURCE_BYTES:
+            if (\n                not stat.S_ISREG(before.st_mode)\n                or before.st_nlink != 1\n                or before.st_size > MAX_SOURCE_BYTES\n            ):
                 raise SourceBlocked("unsafe")
             chunks = []
             total = 0
@@ -82,7 +82,7 @@ def _source_bytes(root: Path, relative: Path) -> bytes:
                 chunks.append(part)
                 total += len(part)
             after = os.fstat(fd)
-            def identity(snapshot: os.stat_result) -> tuple[int, int, int, int, int]:
+            def identity(snapshot: os.stat_result) -> tuple[int, int, int, int, int, int]:
                 return (
                     snapshot.st_dev,
                     snapshot.st_ino,
