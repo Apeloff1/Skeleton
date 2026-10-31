@@ -145,6 +145,20 @@ def write_revision_bundle(
     """Create private directory with exclusive source, playable HTML and receipt."""
     if not isinstance(output, Path) or ".." in output.parts or output.exists() or output.is_symlink():
         raise StudioQuestError("authored revision requires a new safe output directory")
+    if type(receipt) is not dict or receipt.get("schema") != RECEIPT_SCHEMA:
+        raise StudioQuestError("invalid authored revision export receipt")
+    proof = audit_canon_source(documents, authorized=True)
+    unsigned = dict(receipt)
+    digest = unsigned.pop("receipt_digest", None)
+    if (not proof["canon_consistent"]
+            or receipt.get("project_id") != proof["project_id"]
+            or receipt.get("revised_source_digest") != proof["source_digest"]
+            or receipt.get("revised_proof_digest") != proof["proof_digest"]
+            or receipt.get("playable_html_sha256") != sha256(html).hexdigest()
+            or receipt.get("release_certified") is not False
+            or digest != _digest(unsigned)
+            or html != render_story_html(documents)):
+        raise StudioQuestError("authored revision export source/receipt drift")
     payloads = {
         "source.json": _canonical(documents) + b"\n",
         "story.html": html,

@@ -118,3 +118,13 @@ def test_reopen_rejects_tampering_and_symlink(tmp_path):
     link.symlink_to(out, target_is_directory=True)
     with pytest.raises(StudioQuestError):
         load_revision_bundle(link, authorized=True, project_id=PROJECT)
+
+
+def test_export_rejects_forged_receipt_without_creating_directory(tmp_path):
+    docs = read_blueprint(PROJECT)
+    source, html, receipt = preview_canon_revision(docs, request(docs), authorized=True)
+    forged = {**receipt, "revised_source_digest": "f" * 64}
+    destination = tmp_path / "must-not-exist"
+    with pytest.raises(StudioQuestError):
+        write_revision_bundle(destination, source, html, forged)
+    assert not destination.exists()
