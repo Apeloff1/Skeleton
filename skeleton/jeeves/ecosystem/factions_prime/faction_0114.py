@@ -1,0 +1,13 @@
+"""Faction prime 0114.
+"""
+from __future__ import annotations
+
+ID = "faction_prime_0114"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "faction", "index": 114, "tier": 114 % 5}
+
+def apply(context: str = "") -> dict:
+    if not context and 114 % 31 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:140], "active": True}
