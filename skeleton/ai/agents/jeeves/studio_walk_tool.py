@@ -713,3 +713,52 @@ def execute_ending_plan_tool(request: Mapping[str, Any], *,
     }
     result["result_digest"] = _digest(result)
     return result
+
+FACTION_REPUTATION_REQUEST_SCHEMA = "skeleton.jeeves.studio_faction_reputation_request.v1"
+FACTION_REPUTATION_RESULT_SCHEMA = "skeleton.jeeves.studio_faction_reputation_result.v1"
+
+
+def faction_reputation_tool_schema() -> dict[str, object]:
+    """Typed operator-gated original faction consequence simulator."""
+    return {
+        "name": "studio_faction_reputation",
+        "description": "Replay authored faction reputation rules without mutating canon",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": FACTION_REPUTATION_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "decisions": {"type": "array", "maxItems": 32,
+                              "uniqueItems": True, "items": {"type": "string"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "decisions"],
+        },
+    }
+
+
+def execute_faction_reputation_tool(request: Mapping[str, Any], *,
+                                    authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves faction reputation requires operator authorization")
+    if (type(request) is not dict
+            or set(request) != {"schema", "project_id", "expected_source_digest",
+                                "decisions"}
+            or request.get("schema") != FACTION_REPUTATION_REQUEST_SCHEMA
+            or len(_canonical(request)) > 8192):
+        raise StudioQuestError("invalid typed Jeeves faction reputation request")
+    from skeleton.ai.game_builder.studio_ecosystem_faction_reputation import (
+        simulate_faction_reputation,
+    )
+    detail = simulate_faction_reputation(
+        read_blueprint(request["project_id"]), request["decisions"],
+        expected_source_digest=request["expected_source_digest"], authorized=True)
+    result = {
+        "schema": FACTION_REPUTATION_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    result["result_digest"] = _digest(result)
+    return result

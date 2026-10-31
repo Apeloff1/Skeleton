@@ -29,6 +29,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--faction-reputation", action="store_true",
+                    help="Replay original authored faction reputation consequences")
+    ap.add_argument("--faction-decisions", metavar="JSON",
+                    help="Bounded JSON list of distinct authored faction decisions")
+    ap.add_argument("--faction-expected-digest",
+                    help="Optional exact source SHA-256 for faction replay continuation")
     ap.add_argument("--ending-plan", action="store_true",
                     help="Replay-verify a deterministic authored quest route toward one ending")
     ap.add_argument("--ending-id", help="Exact authored ending ID for --ending-plan")
@@ -197,6 +203,37 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.faction_reputation:
+        if (not args.project or args.ending_plan or args.author_revision
+                or args.cherry_pick_revision or args.merge_revisions
+                or args.revision_impact or args.revision_lineage or args.audit_canon
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome or args.output
+                or args.quest_actions is not None or args.revision_source is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None):
+            ap.error("--faction-reputation requires --project and excludes other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_faction_reputation import (
+            simulate_faction_reputation,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.faction_decisions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 8192:
+                raise StudioQuestError("faction decisions exceed byte budget")
+            decisions = json.loads(
+                encoded, parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite faction decision JSON")))
+            result = simulate_faction_reputation(
+                read_blueprint(args.project), decisions, authorized=True,
+                expected_source_digest=args.faction_expected_digest)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.faction_decisions is not None or args.faction_expected_digest is not None:
+        ap.error("--faction-decisions and --faction-expected-digest require --faction-reputation")
     if args.ending_plan:
         if (not args.project or not args.ending_id or args.cherry_pick_revision
                 or args.play_quest

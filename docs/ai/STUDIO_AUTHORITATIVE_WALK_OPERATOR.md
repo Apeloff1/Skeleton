@@ -546,3 +546,16 @@ rewards, prerequisites, release certification, quest graph shape and evidence
 remain protected; changing a choice invalidates prior source-bound saves.
 This edits original author-owned prose, not external evidence or a native
 genre runtime.
+
+### Original faction reputation consequences (Studio A)
+
+`--project PROJECT --faction-reputation --faction-decisions
+'["publish_ledger","neutral_audit"]'` replays distinct authored social
+decisions against the canonical cast's initial faction reputation. Optionally
+pass `--faction-expected-digest SHA256` to fail closed on source drift. Rules
+must name exactly the registered factions, use bounded integer deltas and
+never exceed reputation [-100,100]. The CLI and typed
+`studio_faction_reputation` Jeeves preview return identical deterministic
+per-decision digest receipts without mutating source, claiming external
+evidence, or certifying a runtime. Unknown/repeated decisions, forged
+reputations, malformed rules and stale source fail closed.
