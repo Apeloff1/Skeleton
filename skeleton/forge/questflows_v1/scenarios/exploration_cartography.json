@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "exploration_cartography",
+  "domain": "exploration",
+  "stages": [
+    {
+      "key": "discover_cartography",
+      "evidence": "exploration:cartography:discover:proof",
+      "grants": "exploration:cartography:stage:1",
+      "risk": 2,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_cartography",
+      "evidence": "exploration:cartography:prepare:proof",
+      "grants": "exploration:cartography:stage:2",
+      "risk": 3,
+      "sequence": 1,
+      "requires_previous_grant": "exploration:cartography:stage:1"
+    },
+    {
+      "key": "execute_cartography",
+      "evidence": "exploration:cartography:execute:proof",
+      "grants": "exploration:cartography:stage:3",
+      "risk": 4,
+      "sequence": 2,
+      "requires_previous_grant": "exploration:cartography:stage:2"
+    },
+    {
+      "key": "resolve_cartography",
+      "evidence": "exploration:cartography:resolve:proof",
+      "grants": "exploration:cartography:stage:4",
+      "risk": 5,
+      "sequence": 3,
+      "requires_previous_grant": "exploration:cartography:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "exploration_cartography:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "exploration:cartography:discover:proof"
+      ]
+    },
+    {
+      "id": "exploration_cartography:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "exploration:cartography:prepare:proof"
+      ]
+    },
+    {
+      "id": "exploration_cartography:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "exploration:cartography:execute:proof"
+      ]
+    },
+    {
+      "id": "exploration_cartography:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "exploration:cartography:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

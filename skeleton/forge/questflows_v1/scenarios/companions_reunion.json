@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "companions_reunion",
+  "domain": "companions",
+  "stages": [
+    {
+      "key": "discover_reunion",
+      "evidence": "companions:reunion:discover:proof",
+      "grants": "companions:reunion:stage:1",
+      "risk": 4,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_reunion",
+      "evidence": "companions:reunion:prepare:proof",
+      "grants": "companions:reunion:stage:2",
+      "risk": 5,
+      "sequence": 1,
+      "requires_previous_grant": "companions:reunion:stage:1"
+    },
+    {
+      "key": "execute_reunion",
+      "evidence": "companions:reunion:execute:proof",
+      "grants": "companions:reunion:stage:3",
+      "risk": 6,
+      "sequence": 2,
+      "requires_previous_grant": "companions:reunion:stage:2"
+    },
+    {
+      "key": "resolve_reunion",
+      "evidence": "companions:reunion:resolve:proof",
+      "grants": "companions:reunion:stage:4",
+      "risk": 7,
+      "sequence": 3,
+      "requires_previous_grant": "companions:reunion:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "companions_reunion:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "companions:reunion:discover:proof"
+      ]
+    },
+    {
+      "id": "companions_reunion:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "companions:reunion:prepare:proof"
+      ]
+    },
+    {
+      "id": "companions_reunion:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "companions:reunion:execute:proof"
+      ]
+    },
+    {
+      "id": "companions_reunion:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "companions:reunion:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
