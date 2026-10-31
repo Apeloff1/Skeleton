@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_command_orbital_gardens",
+  "title": "Orbital Gardens: The Citizen Fleet",
+  "subtitle": "Original the citizen fleet design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010313450,
+  "width": 21,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "space",
+  "starting_health": 4
+}

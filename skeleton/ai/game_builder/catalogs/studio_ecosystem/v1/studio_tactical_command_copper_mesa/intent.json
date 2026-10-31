@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_command_copper_mesa",
+  "title": "Copper Mesa: The Citizen Fleet",
+  "subtitle": "Original the citizen fleet design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010313043,
+  "width": 19,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "desert",
+  "starting_health": 5
+}
