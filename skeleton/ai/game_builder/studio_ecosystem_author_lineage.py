@@ -4,7 +4,7 @@ from __future__ import annotations
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
 
-from .studio_ecosystem_author_revision import RECEIPT_SCHEMA, _canonical, _digest
+from .studio_ecosystem_author_revision import (RECEIPT_SCHEMA, _allowed_path, _canonical, _digest)
 from .studio_ecosystem_canon_proof import audit_canon_source
 from .studio_ecosystem_quest import StudioQuestError
 from .studio_ecosystem_revision_impact import compare_revision_sources
@@ -70,6 +70,12 @@ def trace_canon_lineage(
         impact = compare_revision_sources(previous, source, authorized=True)
         if impact["changed_path_count"] == 0:
             raise StudioQuestError("authored lineage rejects empty revision")
+        for change in impact["changed_paths"]:
+            path = change["path"]
+            if (type(path) is not list or len(path) < 2
+                    or type(path[0]) is not str
+                    or not _allowed_path(path[0], path[1:])):
+                raise StudioQuestError("authored lineage rejects protected source mutation")
         steps.append({
             "index": index,
             "parent_source_digest": previous_proof["source_digest"],

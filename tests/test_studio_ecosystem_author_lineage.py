@@ -95,3 +95,24 @@ def test_jeeves_lineage_preview_is_typed_and_operator_gated():
                                     authorized=True)
     with pytest.raises(StudioQuestError):
         execute_author_lineage_tool({**req, "edit_batches": [[]]}, authorized=True)
+
+
+def test_lineage_rejects_protected_change_even_with_self_consistent_digest():
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import _digest
+    from skeleton.ai.game_builder.studio_ecosystem_story_html import render_story_html
+    from hashlib import sha256
+    base = read_blueprint(PROJECT)
+    source, _, receipt = revision(
+        base, "narrative", ["premise"], "The archive must be audited.")
+    forged = deepcopy(source)
+    forged["quest"]["stage_graph"][0]["reward"] = "unapproved_quest_reward"
+    proof = audit_canon_source(forged, authorized=True)
+    assert proof["canon_consistent"] is True
+    forged_receipt = deepcopy(receipt)
+    forged_receipt["revised_source_digest"] = proof["source_digest"]
+    forged_receipt["revised_proof_digest"] = proof["proof_digest"]
+    forged_receipt["playable_html_sha256"] = sha256(render_story_html(forged)).hexdigest()
+    forged_receipt.pop("receipt_digest")
+    forged_receipt["receipt_digest"] = _digest(forged_receipt)
+    with pytest.raises(StudioQuestError, match="protected"):
+        trace_canon_lineage(base, [(forged, forged_receipt)], authorized=True)
