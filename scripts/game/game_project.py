@@ -46,6 +46,9 @@ from skeleton.ai.runtime.game_play_challenge import (
     GameChallengeError, pack_play_score, verify_play_score,
     rank_play_scores, verify_play_board,
 )
+from skeleton.ai.runtime.game_play_quest import (
+    GameQuestError, pack_quest_overlay, verify_quest_overlay,
+)
 
 MAX_INPUT_BYTES = 96 * 1024
 MAX_RESULT_BYTES = 160 * 1024
@@ -185,6 +188,10 @@ def _parser() -> argparse.ArgumentParser:
                             help="rank up to eight verified local challenge scores")
     operations.add_argument("--verify-play-board", type=Path,
                             help="replay and verify every entry of an offline challenge board")
+    operations.add_argument("--play-quest-overlay", type=Path,
+                            help="replay a game save with authored pickups, crafting and quests")
+    operations.add_argument("--verify-quest-overlay", type=Path,
+                            help="verify and reopen a source-bound offline quest save")
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -223,6 +230,12 @@ def _parser() -> argparse.ArgumentParser:
                         help="repeat for each verified score to rank (maximum eight)")
     parser.add_argument("--board-output", type=Path,
                         help="exclusive new offline challenge board output")
+    parser.add_argument("--quest-manifest", type=Path,
+                        help="source-bound authored collectibles, recipes and quests")
+    parser.add_argument("--quest-actions", type=Path,
+                        help="per-frame craft and claim decisions for verified gameplay")
+    parser.add_argument("--quest-output", type=Path,
+                        help="exclusive new quest overlay save")
     parser.add_argument("--output", type=Path,
                         help="exclusive new file for --compose")
     parser.add_argument("--seed", type=int, default=1729,
@@ -250,6 +263,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.inspect_play_trace,
         args.terminal_play_capsule, args.terminal_resume_session,
         args.score_play_session, args.verify_play_score, args.verify_play_board,
+        args.play_quest_overlay, args.verify_quest_overlay,
     )) or args.rank_play_scores
     bundling = any(value is not None for value in (
         args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
@@ -283,6 +297,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if (bool(args.score_input) != ranking
             or (args.board_output is not None) != ranking):
         print("score inputs and board output require --rank-play-scores",
+              file=sys.stderr)
+        return 2
+    questing = args.play_quest_overlay is not None
+    if any((value is not None) != questing for value in (
+        args.quest_manifest, args.quest_actions, args.quest_output,
+    )):
+        print("quest manifest, actions and output require --play-quest-overlay",
               file=sys.stderr)
         return 2
     if args.terminal_input_profile is not None and not terminal:
@@ -373,7 +394,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             capsule = _read_json(
                 args.play_capsule or args.terminal_play_capsule or args.session_capsule,
             )
-            if args.score_play_session is not None:
+            if args.play_quest_overlay is not None:
+                manifest = _read_json(args.quest_manifest)
+                decisions = _read_json(args.quest_actions)
+                if set(decisions) != {"actions"}:
+                    raise GameQuestError("quest decisions require exactly actions")
+                session = _read_json(args.play_quest_overlay)
+                overlay = pack_quest_overlay(
+                    capsule, session, manifest, decisions["actions"],
+                )
+                receipt = verify_quest_overlay(capsule, overlay)
+                report = {
+                    **receipt, "output_path": _write_new(args.quest_output, overlay),
+                }
+            elif args.verify_quest_overlay is not None:
+                overlay = _read_json(args.verify_quest_overlay, max_bytes=MAX_RESULT_BYTES)
+                report = verify_quest_overlay(capsule, overlay)
+            elif args.score_play_session is not None:
                 policy = _read_json(args.challenge_policy, max_bytes=4096)
                 saved = _read_json(args.score_play_session)
                 score = pack_play_score(capsule, saved, policy)
@@ -522,7 +559,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             report = verify_game_capsule(_read_json(args.verify_capsule))
         print(json.dumps(report, sort_keys=True, ensure_ascii=True))
         return 0
-    except (GameChallengeError, GamePlayBundleError, GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
+    except (GameQuestError, GameChallengeError, GamePlayBundleError, GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
             GameplayError, ValueError, TypeError, KeyError, OSError) as exc:
         print(
             "cross-era game project rejected: " + type(exc).__name__ + ": " + str(exc),
