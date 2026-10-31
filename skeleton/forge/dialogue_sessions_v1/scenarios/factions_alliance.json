@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "factions_alliance",
+  "domain": "factions",
+  "role": "alliance",
+  "rapport_threshold": 23,
+  "rapport_gain": 5,
+  "stress_increment": 3,
+  "steps": [
+    {
+      "id": "factions_alliance:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "factions_alliance:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "factions_alliance:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "factions_alliance:proof-1"
+    },
+    {
+      "id": "factions_alliance:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "factions_alliance:proof-2"
+    },
+    {
+      "id": "factions_alliance:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "factions_alliance:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}

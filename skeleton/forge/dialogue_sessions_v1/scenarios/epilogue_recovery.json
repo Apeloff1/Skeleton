@@ -1,0 +1,59 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "epilogue_recovery",
+  "domain": "epilogue",
+  "role": "recovery",
+  "rapport_gate": 21,
+  "rapport_gain": 4,
+  "tension_cost": 3,
+  "steps": [
+    {
+      "id": "epilogue_recovery:0",
+      "choice": "introduce",
+      "version": 0,
+      "evidence": ""
+    },
+    {
+      "id": "epilogue_recovery:1",
+      "choice": "listen",
+      "version": 1,
+      "evidence": ""
+    },
+    {
+      "id": "epilogue_recovery:2",
+      "choice": "reveal",
+      "version": 2,
+      "evidence": "epilogue_recovery:proof-1"
+    },
+    {
+      "id": "epilogue_recovery:3",
+      "choice": "propose",
+      "version": 3,
+      "evidence": "epilogue_recovery:proof-2"
+    },
+    {
+      "id": "epilogue_recovery:4",
+      "choice": "agree",
+      "version": 4,
+      "evidence": ""
+    },
+    {
+      "id": "epilogue_recovery:5",
+      "choice": "leave",
+      "version": 5,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate",
+    "out-of-order",
+    "proof-used",
+    "proof-required"
+  ],
+  "production_certified": false
+}

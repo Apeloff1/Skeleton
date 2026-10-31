@@ -1,0 +1,63 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "exploration_ranger",
+  "domain": "exploration",
+  "stages": [
+    "greet",
+    "ask",
+    "explain",
+    "negotiate",
+    "reconcile",
+    "close"
+  ],
+  "raport_threshold": 30,
+  "trust_gain": 5,
+  "tension_step": 6,
+  "commands": [
+    {
+      "id": "a",
+      "choice": "greet",
+      "expected_version": 0,
+      "evidence": ""
+    },
+    {
+      "id": "b",
+      "choice": "ask",
+      "expected_version": 1,
+      "evidence": ""
+    },
+    {
+      "id": "c",
+      "choice": "explain",
+      "expected_version": 2,
+      "evidence": "world-proof:1"
+    },
+    {
+      "id": "d",
+      "choice": "negotiate",
+      "expected_version": 3,
+      "evidence": "world-proof:2"
+    },
+    {
+      "id": "e",
+      "choice": "reconcile",
+      "expected_version": 4,
+      "evidence": ""
+    },
+    {
+      "id": "f",
+      "choice": "close",
+      "expected_version": 5,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6,
+    "proof_count": 2
+  },
+  "holds": {
+    "trusted_producer_required": true,
+    "production_certified": false
+  }
+}
