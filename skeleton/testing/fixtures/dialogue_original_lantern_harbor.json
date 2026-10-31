@@ -1,0 +1,69 @@
+{
+  "schema": "skeleton.game.dialogue_session.v1",
+  "world_id": "lantern-harbor",
+  "conversation_id": "beacon-keeper-conversation",
+  "start_node": "greeting",
+  "ending_ids": [
+    "pact",
+    "departure"
+  ],
+  "nodes": [
+    {
+      "id": "greeting",
+      "text": "The tideglass beacon flickers. Will you hear the keeper's warning?",
+      "choices": [
+        {
+          "id": "listen",
+          "target": "warning",
+          "requires": [],
+          "grants": [
+            "heard-tide-warning"
+          ],
+          "reputation_delta": 2
+        },
+        {
+          "id": "depart",
+          "target": "departure",
+          "requires": [],
+          "grants": [],
+          "reputation_delta": -2
+        }
+      ]
+    },
+    {
+      "id": "warning",
+      "text": "The western lens is cracked. A careful hand could restore it before dusk.",
+      "choices": [
+        {
+          "id": "promise-repair",
+          "target": "pact",
+          "requires": [
+            "heard-tide-warning"
+          ],
+          "grants": [
+            "beacon-promise"
+          ],
+          "reputation_delta": 5,
+          "quest_id": "restore-western-lens"
+        },
+        {
+          "id": "decline",
+          "target": "departure",
+          "requires": [],
+          "grants": [],
+          "reputation_delta": -1
+        }
+      ]
+    },
+    {
+      "id": "pact",
+      "text": "The keeper entrusts you with the lantern key. The repair begins.",
+      "choices": []
+    },
+    {
+      "id": "departure",
+      "text": "You leave the harbor with the keeper's words behind you.",
+      "choices": []
+    }
+  ]
+}

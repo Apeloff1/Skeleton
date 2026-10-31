@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:game:dialogue_session:v1",
+  "title": "Source-bound original dialogue choices",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "world_id",
+    "conversation_id",
+    "start_node",
+    "ending_ids",
+    "nodes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "skeleton.game.dialogue_session.v1"
+    },
+    "world_id": {
+      "$ref": "#/$defs/id"
+    },
+    "conversation_id": {
+      "$ref": "#/$defs/id"
+    },
+    "start_node": {
+      "$ref": "#/$defs/id"
+    },
+    "ending_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "flags": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "text",
+        "choices"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "choices": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/choice"
+          }
+        }
+      }
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "target",
+        "requires",
+        "grants",
+        "reputation_delta"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "target": {
+          "$ref": "#/$defs/id"
+        },
+        "requires": {
+          "$ref": "#/$defs/flags"
+        },
+        "grants": {
+          "$ref": "#/$defs/flags"
+        },
+        "reputation_delta": {
+          "type": "integer",
+          "minimum": -20,
+          "maximum": 20
+        },
+        "quest_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    }
+  }
+}
