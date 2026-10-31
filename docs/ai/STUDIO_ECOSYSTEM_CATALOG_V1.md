@@ -2,12 +2,15 @@
 
 Owner: `skeleton/ai/game_builder`, extending the existing original studio and playable compiler.
 
-The catalog contains 256 *linked source-production briefs*: eight purpose-specific
-JSON documents per project (2,048 original documents). Each includes playable
+The catalog contains 512 *linked source-production briefs*: eight purpose-specific
+JSON documents per project (4,096 original documents). Each includes playable
 offline-grid preview intent, narrative/canon, character relationships, branching
 quests, scene direction, visual recipes, audio direction, and explicit verification
-obligations. Genre x biome combinations give differentiated starting points,
-not consumer-ready games. No copied engine source, model checkpoints, third-party
+obligations. The current index spans 32 genres and 16 biomes. Genre/biome combinations
+provide differentiated starting points,
+not consumer-ready games. The 512-project/4,096-section inventory is a
+Git-tree and index completeness statement, not originality, gameplay or
+release certification. No copied engine source, model checkpoints, third-party
 training sets, executable source downloads, or copyrighted game assets are embedded.
 
 Use `python scripts/studio_ecosystem_cli.py --genre puzzle_expedition` to search

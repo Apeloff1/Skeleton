@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import (
-    ROOT, SECTIONS, catalog_index, compile_preview, read_blueprint,
+    ROOT, SECTIONS, _read_bytes, catalog_index, compile_preview, read_blueprint,
     StudioEcosystemError,
 )
 
@@ -40,10 +40,13 @@ def audit(*, compile_samples: bool = False, root: Path = ROOT) -> dict[str, obje
         sample_per_genre.setdefault(record["genre"], pid)
         for section in SECTIONS:
             path = entry_dir / (section + ".json")
-            if path.is_symlink():
-                problems.append(pid + ": linked source document")
+            try:
+                # Do not reopen pathname after a symlink check: use the same
+                # descriptor-anchored, bounded reader as the catalog loader.
+                digest = sha256(_read_bytes(path, root=root)).hexdigest()
+            except (StudioEcosystemError, OSError) as exc:
+                problems.append(pid + ": unsafe source document: " + str(exc))
                 continue
-            digest = sha256(path.read_bytes()).hexdigest()
             if digest in hashes:
                 problems.append(pid + ": duplicate or filler-identical document")
             hashes.add(digest)

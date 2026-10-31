@@ -51,10 +51,10 @@ class StudioEcosystemError(ValueError):
     """Untrusted or incomplete studio production blueprint."""
 
 
-def _read_json(
+def _read_bytes(
     path: Path, *, maximum: int = MAX_FILE_BYTES, root: Path,
-) -> dict[str, Any]:
-    """Read a catalog object without following untrusted POSIX path components.
+) -> bytes:
+    """Read catalog bytes without following untrusted POSIX path components.
 
     The catalog root is the authority boundary. Each descendant directory and
     the final regular file are opened relative to already-open descriptors.
@@ -128,6 +128,14 @@ def _read_json(
         raise StudioEcosystemError("catalog filesystem access refused") from exc
     if len(data) > maximum:
         raise StudioEcosystemError("oversize blueprint file")
+    return data
+
+
+def _read_json(
+    path: Path, *, maximum: int = MAX_FILE_BYTES, root: Path,
+) -> dict[str, Any]:
+    """Parse the same bounded, descriptor-anchored bytes used for source receipts."""
+    data = _read_bytes(path, maximum=maximum, root=root)
     try:
         def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             output: dict[str, Any] = {}
