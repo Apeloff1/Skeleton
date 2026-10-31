@@ -502,6 +502,58 @@ class LongContextSpool:
                 raise LongContextSpoolError("checkpoint ancestry mismatch")
         return checkpoint, sequence
 
+    def audit_history(
+        self, checkpoint_digest: str, *, expected_tokenizer_digest: str,
+        max_checkpoints: int = 4096,
+    ) -> dict[str, object]:
+        """Verify the entire immutable ancestry up to a bounded genesis.
+
+        No token bytes are returned. This is a custody/integrity audit, not
+        proof of trusted publisher identity or a cross-process replay fence.
+        A chain longer than the bound fails closed rather than claiming a
+        complete audit. The caller must retain its trusted latest digest.
+        """
+        _digest(checkpoint_digest, "checkpoint_digest")
+        _digest(expected_tokenizer_digest, "expected_tokenizer_digest")
+        _positive(max_checkpoints, "max_checkpoints", 100_000)
+        seen: set[str] = set()
+        current = checkpoint_digest
+        newest: SpoolCheckpoint | None = None
+        previous: SpoolCheckpoint | None = None
+        for depth in range(max_checkpoints):
+            if current in seen:
+                raise LongContextSpoolError("checkpoint ancestry cycle")
+            seen.add(current)
+            item = self._read_checkpoint(current)
+            if item.tokenizer_digest != expected_tokenizer_digest:
+                raise LongContextSpoolError("checkpoint tokenizer drift")
+            if newest is None:
+                newest = item
+                # The content digest must still match the source sequence.
+                self.load(current, expected_tokenizer_digest=expected_tokenizer_digest)
+            elif (item.sequence_digest != newest.sequence_digest
+                  or item.object_digest != newest.object_digest
+                  or item.tokenizer_digest != newest.tokenizer_digest):
+                raise LongContextSpoolError("checkpoint ancestry identity drift")
+            if previous is not None and item.cursor >= previous.cursor:
+                raise LongContextSpoolError("checkpoint ancestry cursor rollback")
+            if item.parent_digest is None:
+                if item.cursor != 0:
+                    raise LongContextSpoolError("checkpoint genesis is not zero")
+                return {
+                    "schema": "skeleton.ai.long-context-history-audit.v1",
+                    "checkpoint_digest": checkpoint_digest,
+                    "genesis_digest": current,
+                    "checkpoints_verified": depth + 1,
+                    "cursor": newest.cursor,
+                    "complete": True,
+                    "trusted_publisher_attested": False,
+                    "replay_fence_attested": False,
+                }
+            previous = item
+            current = item.parent_digest
+        raise LongContextSpoolError("checkpoint ancestry exceeds audit bound")
+
     def next_window(
         self, checkpoint_digest: str, *, expected_tokenizer_digest: str, max_tokens: int,
     ) -> TokenWindow | None:

@@ -235,6 +235,54 @@ class TestLongContextSpool(unittest.TestCase):
         self.assertEqual(invoke("window", "--checkpoint", child,
                                 "--max-tokens", "3")["window"]["token_ids"], [3, 4, 5])
 
+    def test_bounded_history_audit_survives_restart_and_rejects_missing_ancestor(self):
+        start = self.stage()
+        child = self.spool.advance(
+            start, expected_tokenizer_digest=TOKENIZER, consumed_tokens=3,
+        )
+        grandchild = self.spool.advance(
+            child, expected_tokenizer_digest=TOKENIZER, consumed_tokens=5,
+        )
+        restarted = LongContextSpool(self.root, disk_reserve_bytes=0)
+        audit = restarted.audit_history(
+            grandchild, expected_tokenizer_digest=TOKENIZER,
+        )
+        self.assertEqual(audit["checkpoints_verified"], 3)
+        self.assertEqual(audit["genesis_digest"], start)
+        self.assertEqual(audit["cursor"], 8)
+        self.assertTrue(audit["complete"])
+        self.assertFalse(audit["trusted_publisher_attested"])
+        with self.assertRaisesRegex(LongContextSpoolError, "audit bound"):
+            restarted.audit_history(
+                grandchild, expected_tokenizer_digest=TOKENIZER,
+                max_checkpoints=2,
+            )
+        with self.assertRaises(LongContextSpoolError):
+            restarted.audit_history(
+                grandchild, expected_tokenizer_digest=SOURCE,
+            )
+        self.spool._path("checkpoint", start).unlink()
+        with self.assertRaises(LongContextSpoolError):
+            restarted.audit_history(
+                grandchild, expected_tokenizer_digest=TOKENIZER,
+            )
+
+    def test_cli_history_audit_exposes_no_tokens(self):
+        start = self.stage()
+        child = self.spool.advance(
+            start, expected_tokenizer_digest=TOKENIZER, consumed_tokens=2,
+        )
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(cli_main([
+                "--root", str(self.root), "--tokenizer-digest", TOKENIZER,
+                "audit", "--checkpoint", child, "--max-checkpoints", "2",
+            ]), 0)
+        receipt = json.loads(output.getvalue())
+        self.assertEqual(receipt["checkpoints_verified"], 2)
+        self.assertEqual(receipt["cursor"], 2)
+        self.assertNotIn("token_ids", output.getvalue())
+
     def test_byte_budget_and_invalid_checkpoint(self):
         tiny = LongContextSpool(self.root / "tiny",
             max_sequence_bytes=1, disk_reserve_bytes=0)

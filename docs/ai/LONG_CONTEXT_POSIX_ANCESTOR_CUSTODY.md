@@ -14,3 +14,15 @@ fallback remains explicitly unqualified against same-user ancestor races;
 this is not a claim of a native handle-relative Windows security boundary.
 The spool still requires trusted checkpoint digest custody for rollback
 detection and does not serialize model KV tensors.
+
+## Bounded full-chain restart audit
+
+Use `python -m skeleton.ai.model_runtime.long_context_cli --root ROOT
+--tokenizer-digest DIGEST audit --checkpoint CHECKPOINT
+--max-checkpoints 4096` to walk the entire immutable progress chain to its
+zero-cursor genesis. The verifier rechecks every checkpoint digest, source,
+tokenizer, object identity, and strictly descending cursor. A missing ancestor,
+wrong tokenizer, rollback, or exhausted audit bound fails closed. Receipts
+expose only digests, cursor and verified checkpoint count, never token IDs.
+This audit does not authenticate the publisher or replace a trusted external
+latest-checkpoint replay fence. It does not qualify KV tensor persistence.

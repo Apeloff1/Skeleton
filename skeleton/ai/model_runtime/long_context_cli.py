@@ -18,6 +18,9 @@ def main(argv: list[str] | None = None) -> int:
     stage = commands.add_parser("stage", help="Store canonical serialized TokenSequence")
     stage.add_argument("--sequence-file", type=Path, required=True)
     inspect = commands.add_parser("inspect", help="Verify a persisted checkpoint")
+    audit = commands.add_parser("audit", help="Verify bounded checkpoint ancestry to genesis")
+    audit.add_argument("--checkpoint", required=True)
+    audit.add_argument("--max-checkpoints", type=int, default=4096)
     inspect.add_argument("--checkpoint", required=True)
     window = commands.add_parser("window", help="Read next bounded token window")
     window.add_argument("--checkpoint", required=True)
@@ -42,6 +45,11 @@ def main(argv: list[str] | None = None) -> int:
                       "checkpoint": spool.advance(args.checkpoint,
                           expected_tokenizer_digest=args.tokenizer_digest,
                           consumed_tokens=args.consumed_tokens)}
+        elif args.command == "audit":
+            result = spool.audit_history(
+                args.checkpoint, expected_tokenizer_digest=args.tokenizer_digest,
+                max_checkpoints=args.max_checkpoints,
+            )
         elif args.command == "inspect":
             checkpoint, sequence = spool.load(
                 args.checkpoint, expected_tokenizer_digest=args.tokenizer_digest)
