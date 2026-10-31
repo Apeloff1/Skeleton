@@ -15,7 +15,7 @@ from .npc_schedule import (
 )
 
 SCHEMA = "skeleton.npc_interaction_calendar.v1"
-_PLAYER_ID = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}\\Z")
+_PLAYER_ID = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}")
 MAX_ENTRIES = 128
 MAX_BYTES = 2_000_000
 
