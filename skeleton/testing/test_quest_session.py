@@ -166,12 +166,12 @@ def test_interactive_choice_play_save_resume_and_replay(tmp_path: Path) -> None:
     first_save = tmp_path / "first.json"
     second_save = tmp_path / "second.json"
     command = [sys.executable, "-m", "skeleton", "quest", "play", "--plan", str(plan)]
-    first = subprocess.run(command + ["--save", str(first_save)], input="arrival\\nquit\\n",
+    first = subprocess.run(command + ["--save", str(first_save)], input="arrival\nquit\n",
                            capture_output=True, text=True)
     assert first.returncode == 0, first.stderr
     assert json.loads(first_save.read_text())["state"]["completed"] == ["arrival"]
     resumed = subprocess.run(command + ["--resume", str(first_save), "--save", str(second_save)],
-                             input="beacon\\n", capture_output=True, text=True)
+                             input="beacon\n", capture_output=True, text=True)
     assert resumed.returncode == 0, resumed.stderr
     saved = json.loads(second_save.read_text())
     assert saved["state"]["ending_id"] == "safe_harbor"
