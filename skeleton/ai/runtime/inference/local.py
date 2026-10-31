@@ -50,6 +50,7 @@ from skeleton.providers.contract import FinishReason, ProviderToolCall, Provider
 from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 
 from .adaptive_serving import AdaptiveServingController, ServingResources
+from .linux_pressure import read_linux_memory_pressure
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
@@ -1216,7 +1217,15 @@ def _sample_linux_resources() -> ServingResources:
         except (OSError, ValueError, KeyError):
             cpu = None
             sources.append("cgroup_cpu_unknown")
-    return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+    pressure = read_linux_memory_pressure(
+        _resource_text, cgroup_directory=unified[0] if unified is not None else None
+    )
+    sources.append(pressure.source)
+    return ServingResources(
+        memory, cpu, rss, available, ",".join(sources),
+        memory_stall_fraction=pressure.some_avg10,
+        memory_full_stall_fraction=pressure.full_avg10,
+    )
 
 
 def _sample_windows_resources() -> ServingResources:

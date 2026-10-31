@@ -102,16 +102,18 @@ class ServingResources:
     process_rss_bytes: int | None = None
     available_memory_bytes: int | None = None
     source: str = "unavailable"
+    memory_stall_fraction: float | None = None
+    memory_full_stall_fraction: float | None = None
 
     def __post_init__(self) -> None:
-        for name in ("memory_used_fraction", "cpu_load_fraction"):
+        for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction"):
             value = getattr(self, name)
             if value is not None and (
                 isinstance(value, bool)
                 or not isinstance(value, (int, float))
                 or not math.isfinite(value)
                 or value < 0
-                or (name == "memory_used_fraction" and value > 1)
+                or (name != "cpu_load_fraction" and value > 1)
             ):
                 raise ValueError(f"{name} must be a finite non-negative resource measurement")
         for name in ("process_rss_bytes", "available_memory_bytes"):
@@ -182,12 +184,26 @@ class AdaptiveServingController:
         policy = self.policy
         memory = resources.memory_used_fraction
         cpu = resources.cpu_load_fraction
-        critical = memory is not None and memory >= min(
+        partial_stall = resources.memory_stall_fraction
+        full_stall = resources.memory_full_stall_fraction
+        memory_critical = memory is not None and memory >= min(
             0.99, policy.memory_high_watermark + 0.05, policy.memory_shed_watermark,
         )
+        stall_critical = (
+            (partial_stall is not None and partial_stall >= 0.50)
+            or (full_stall is not None and full_stall >= 0.10)
+        )
+        critical = memory_critical or stall_critical
         reason = "within_operator_limits"
-        if critical:
+        if memory_critical:
             reason = "memory_critical"
+        elif stall_critical:
+            reason = "memory_stall_critical"
+        elif (
+            (partial_stall is not None and partial_stall >= 0.15)
+            or (full_stall is not None and full_stall >= 0.03)
+        ):
+            reason = "memory_stall_pressure"
         elif memory is not None and memory >= policy.memory_high_watermark:
             reason = "memory_pressure"
         elif cpu is not None and cpu >= 0.95:
@@ -203,6 +219,8 @@ class AdaptiveServingController:
         pressured = reason != "within_operator_limits"
         healthy = (
             (memory is None or memory <= policy.memory_low_watermark)
+            and (partial_stall is None or partial_stall <= 0.03)
+            and (full_stall is None or full_stall <= 0.01)
             and (cpu is None or cpu < 0.85)
             and self.failure_ewma < 0.1
             and (self.latency_ewma_ms is None or self.latency_ewma_ms < policy.target_latency_ms * 0.85)
