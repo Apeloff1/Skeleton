@@ -187,5 +187,10 @@ def test_machine_product_tree_manifest_is_fail_closed() -> None:
 
 def test_observatory_ci_surface_runs_canonical_domain_regressions() -> None:
     workflow = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
-    assert "Run complete canonical domain suite" in workflow
-    assert "skeleton/testing --tb=short" in workflow
+    # Every deterministic shard must run and the stable Unit check must
+    # depend on their collective result; a skipped or failed shard is not green.
+    assert "Canonical Domain Suite (${{ matrix.shard }})" in workflow
+    assert "shard: [0, 1, 2, 3, 4, 5, 6, 7]" in workflow
+    assert "python scripts/run_domain_suite_shard.py --index ${{ matrix.shard }} --count 8" in workflow
+    assert "needs: domain_suite" in workflow
+    assert "name: Unit" in workflow
