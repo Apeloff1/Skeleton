@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_naval_navigation_luminous_marsh",
+  "genre": "naval_navigation",
+  "biome": "luminous_marsh",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Luminous Marsh: Naval Navigation",
+  "foundation": {
+    "setting": "Luminous Marsh",
+    "era": "post-isolation",
+    "environment": "glowing reed fields",
+    "history": "The submerged civic bell was built to protect reeds and peat, but bioluminescent flooding interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Kela Rowan, a captain, must reconnect isolated trading ports using route and tide planning while bioluminescent flooding threatens the submerged civic bell.",
+  "central_conflict": "a blockade fleet seeks control of reeds and peat; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "bioluminescent flooding isolates the submerged civic bell",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a blockade fleet offers privileged access to reeds and peat",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "submerged civic bell",
+    "critical_resource": "reeds and peat",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

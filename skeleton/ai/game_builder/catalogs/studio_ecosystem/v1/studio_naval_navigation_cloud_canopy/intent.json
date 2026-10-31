@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_cloud_canopy",
+  "title": "Cloud Canopy: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610301861,
+  "width": 19,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 6
+}

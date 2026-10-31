@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_narrative_mystery_misty_breakwater",
+  "genre": "narrative_mystery",
+  "biome": "misty_breakwater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Misty Breakwater: Narrative Mystery",
+  "foundation": {
+    "setting": "Misty Breakwater",
+    "era": "decades after the crossing",
+    "environment": "mist-channel locks",
+    "history": "The historic sea wall was built to protect fog horns, but low-visibility tides interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Tavi Kiri, a investigator, must reconstruct an erased civic record using evidence synthesis while low-visibility tides threatens the historic sea wall.",
+  "central_conflict": "a record-forging council seeks control of fog horns; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "low-visibility tides isolates the historic sea wall",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a record-forging council offers privileged access to fog horns",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "historic sea wall",
+    "critical_resource": "fog horns",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}
