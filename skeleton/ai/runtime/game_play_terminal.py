@@ -13,24 +13,29 @@ from .game_play_session import (
     resume_play_session, start_play_session, verify_play_session,
 )
 from .game_project_capsule import verify_game_capsule
+from .game_input_profile import validate_terminal_input_profile, terminal_profile_receipt
 
 MAX_COMMAND_BYTES = 16
 
 
-def parse_terminal_control(command: str) -> dict[str, bool] | None:
-    """Parse a/d/w combinations, '.' for wait, or 'q' for quit."""
+def parse_terminal_control(
+    command: str, *, input_profile: Any = None,
+) -> dict[str, bool] | None:
+    """Parse semantic controls using a strictly validated local key layout."""
+    bindings = validate_terminal_input_profile(input_profile)
     if type(command) is not str or len(command) > MAX_COMMAND_BYTES:
         raise GamePlaySessionError("terminal command exceeded input budget")
     word = command.strip().lower()
-    if word == "q":
+    if word == bindings["quit"]:
         return None
-    if word == ".":
+    if word == bindings["wait"]:
         word = ""
-    if any(letter not in "adw" for letter in word) or len(set(word)) != len(word):
-        raise GamePlaySessionError("terminal command requires unique a/d/w buttons")
-    if "a" in word and "d" in word:
+    movement_keys = {bindings[action] for action in ("left", "right", "jump")}
+    if any(letter not in movement_keys for letter in word) or len(set(word)) != len(word):
+        raise GamePlaySessionError("terminal command contains unknown or duplicate keys")
+    if bindings["left"] in word and bindings["right"] in word:
         raise GamePlaySessionError("terminal cannot press left and right together")
-    return {"left": "a" in word, "right": "d" in word, "jump": "w" in word}
+    return {action: bindings[action] in word for action in ("left", "right", "jump")}
 
 
 def run_terminal_play(
@@ -40,6 +45,7 @@ def run_terminal_play(
     output_stream: TextIO,
     *,
     max_frames: int = 32,
+    input_profile: Any = None,
 ) -> dict[str, Any]:
     """Read bounded commands, display actual grid frames, return replayable save.
 
@@ -47,6 +53,8 @@ def run_terminal_play(
     session to an exclusive new path. An early quit without new input is an
     error rather than a fabricated progress receipt.
     """
+    bindings = validate_terminal_input_profile(input_profile)
+    profile_receipt = terminal_profile_receipt(input_profile)
     if type(max_frames) is not int or not 1 <= max_frames <= MAX_BATCH_FRAMES:
         raise GamePlaySessionError("terminal frame budget must be between 1 and 64")
     verify_game_capsule(capsule)
@@ -60,14 +68,17 @@ def run_terminal_play(
     session = saved
     played = 0
     for _ in range(min(max_frames, remaining)):
-        output_stream.write("Controls: a=left d=right w=jump .=wait q=quit > ")
+        output_stream.write("Controls: " + " ".join(
+            bindings[action] + "=" + action
+            for action in ("left", "right", "jump", "wait", "quit")
+        ) + " > ")
         output_stream.flush()
         line = input_stream.readline(MAX_COMMAND_BYTES + 1)
         if len(line) > MAX_COMMAND_BYTES:
             raise GamePlaySessionError("terminal command exceeded input budget")
         if line == "":
             break
-        control = parse_terminal_control(line)
+        control = parse_terminal_control(line, input_profile=input_profile)
         if control is None:
             break
         if session is None:
@@ -95,6 +106,7 @@ def run_terminal_play(
         "victory_frame": receipt["victory_frame"],
         "session_sha256": receipt["session_sha256"],
         "terminal_backend": "ascii_turn_based",
+        "input_profile_sha256": profile_receipt["profile_sha256"],
         "native_renderer_used": False,
     }
 

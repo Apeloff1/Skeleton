@@ -40,6 +40,7 @@ from skeleton.ai.runtime.game_play_bundle import (
     resume_play_bundle, fork_play_bundle,
 )
 from skeleton.ai.runtime.game_play_terminal import run_terminal_play
+from skeleton.ai.runtime.game_input_profile import validate_terminal_input_profile
 
 MAX_INPUT_BYTES = 96 * 1024
 MAX_RESULT_BYTES = 160 * 1024
@@ -175,6 +176,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="verify portable project and recalculate scene digests")
     operations.add_argument("--demo-project", type=Path,
                             help="write a new small original portable game capsule")
+    parser.add_argument("--terminal-input-profile", type=Path,
+                        help="strict local JSON keymap for accessible offline terminal controls")
     parser.add_argument("--terminal-max-frames", type=int,
                         help="terminal frames this invocation (1-64, default 32)")
     parser.add_argument("--at-frame", type=int,
@@ -221,6 +224,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     ))
     if (seeking != (args.at_frame is not None)):
         print("--at-frame is required only for timeline inspection or forks", file=sys.stderr)
+        return 2
+    if args.terminal_input_profile is not None and not terminal:
+        print("--terminal-input-profile requires terminal play", file=sys.stderr)
         return 2
     if (args.terminal_max_frames is not None and not terminal):
         print("--terminal-max-frames requires a terminal play operation", file=sys.stderr)
@@ -312,9 +318,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                     _read_json(args.terminal_resume_session)
                     if args.terminal_resume_session is not None else None
                 )
+                input_profile = (
+                    _read_json(args.terminal_input_profile, max_bytes=4096)
+                    if args.terminal_input_profile is not None else None
+                )
+                validate_terminal_input_profile(input_profile)
                 terminal_result = run_terminal_play(
                     capsule, previous, sys.stdin, sys.stderr,
                     max_frames=args.terminal_max_frames or 32,
+                    input_profile=input_profile,
                 )
                 session = terminal_result["session"]
                 output_path = _write_new(args.save_session, session)
