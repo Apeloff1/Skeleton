@@ -26,6 +26,7 @@ import time
 from typing import Any, Iterable
 
 from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
+from .offline_io_pressure import IOPressureController, probe_io_pressure
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
 )
@@ -378,6 +379,7 @@ class FabricPlan:
     thermal_holds: int = 0
     cgroup_high_backpressure: bool = False
     cgroup_oom_backpressure: bool = False
+    io_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -391,6 +393,7 @@ class FabricPlan:
             "thermal_holds": self.thermal_holds,
             "cgroup_high_backpressure": self.cgroup_high_backpressure,
             "cgroup_oom_backpressure": self.cgroup_oom_backpressure,
+            "io_backpressure": self.io_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -451,11 +454,13 @@ class AdaptiveResourceFabric:
         self._previous_batch_throughput: float | None = None
         self._thermal_blocked: set[tuple[int, str, str]] = set()
         self._cgroup = CgroupPressureTracker()
+        self._io = IOPressureController()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
         gpus = probe_gpu_resources()
         self._cgroup.sample(probe_cgroup_events())
+        self._io.observe(probe_io_pressure())
         ram_pressure = 1 - hardware.available_ram_bytes / hardware.total_ram_bytes
         swap_pressure = (
             1 - hardware.free_swap_bytes / hardware.total_swap_bytes
@@ -490,6 +495,7 @@ class AdaptiveResourceFabric:
         snap = self.observe()
         hw = snap.hardware
         cgroup = self._cgroup.snapshot()
+        io = self._io.snapshot()
         if readonly_stream and cgroup["oom_backpressure"]:
             raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
@@ -529,7 +535,7 @@ class AdaptiveResourceFabric:
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
         )
-        if cgroup["high_backpressure"]:
+        if cgroup["high_backpressure"] or io["congested"]:
             streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
@@ -590,6 +596,8 @@ class AdaptiveResourceFabric:
         )
         if thermal_holds and not eligible:
             reason += "; measured GPU thermal hold"
+        if io["congested"]:
+            reason += "; observed IO stall backpressure"
         evidence = {
             "source_bytes": source_bytes,
             "readonly_stream": readonly_stream,
@@ -604,6 +612,7 @@ class AdaptiveResourceFabric:
             "thermal_holds": thermal_holds,
             "cgroup_high_backpressure": cgroup["high_backpressure"],
             "cgroup_oom_backpressure": cgroup["oom_backpressure"],
+            "io_backpressure": io["congested"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -620,6 +629,7 @@ class AdaptiveResourceFabric:
             thermal_holds=thermal_holds,
             cgroup_high_backpressure=bool(cgroup["high_backpressure"]),
             cgroup_oom_backpressure=bool(cgroup["oom_backpressure"]),
+            io_backpressure=bool(io["congested"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -682,6 +692,7 @@ class AdaptiveResourceFabric:
             "thermal_hold_devices": thermal_holds,
             "waiting_stream_batches": waiting_batches,
             "cgroup_memory_events": self._cgroup.snapshot(),
+            "io_pressure": self._io.snapshot(),
         }
         return result
 

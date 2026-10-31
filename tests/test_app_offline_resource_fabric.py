@@ -741,5 +741,77 @@ class CgroupPressureTests(unittest.TestCase):
             tracker.snapshot()
 
 
+
+class IOPressureTests(unittest.TestCase):
+    """Kernel PSI parser and canonical source planner use simulated readings."""
+
+    def test_linux_psi_parser_and_invalid_values(self):
+        from skeleton.app.offline_io_pressure import probe_io_pressure
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "io.pressure").write_text(
+                "some avg10=19.25 avg60=8.0 avg300=3.0 total=10000\n"
+                "full avg10=6.25 avg60=2.0 avg300=1.0 total=2000\n"
+            )
+            with patch("skeleton.app.offline_io_pressure.sys.platform", "linux"):
+                sample = probe_io_pressure(root, root / "missing")
+                self.assertEqual(sample.scope, "cgroup")
+                self.assertEqual(sample.some_avg10, 19.25)
+                (root / "io.pressure").write_text(
+                    "some avg10=nan total=0\nfull avg10=0 total=0\n"
+                )
+                self.assertIsNone(probe_io_pressure(root, root / "missing"))
+            with patch("skeleton.app.offline_io_pressure.sys.platform", "darwin"):
+                self.assertIsNone(probe_io_pressure(root, root / "missing"))
+
+    def test_io_stall_hysteresis_reduces_actual_staging_plan(self):
+        from skeleton.app.offline_io_pressure import IOPressure
+        fast = IOPressure("cgroup", 0.5, 0.0, 100, 0)
+        stalled = IOPressure("cgroup", 22.0, 6.0, 1000, 400)
+        recovering = IOPressure("cgroup", 12.0, 3.0, 1200, 420)
+        clear = IOPressure("cgroup", 4.0, 0.5, 1500, 430)
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_cgroup_events",
+                return_value=None,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_io_pressure",
+                side_effect=[fast, stalled, recovering, clear, clear],
+            ):
+                normal = fabric.plan(1000, desired_streams=8)
+                self.assertGreater(normal.stream_count, 1)
+                slowed = fabric.plan(1000, desired_streams=8)
+                self.assertEqual(slowed.stream_count, 1)
+                self.assertTrue(slowed.io_backpressure)
+                self.assertIn("IO stall", slowed.reason)
+                self.assertTrue(fabric.plan(1000, desired_streams=8).io_backpressure)
+                resumed = fabric.plan(1000, desired_streams=8)
+                self.assertFalse(resumed.io_backpressure)
+                self.assertGreater(resumed.stream_count, 1)
+                receipt = fabric.monitor()["controller"]["io_pressure"]
+                self.assertTrue(receipt["measured"])
+                self.assertEqual(receipt["transitions"], 2)
+
+    def test_missing_io_sample_retains_congestion(self):
+        from skeleton.app.offline_io_pressure import IOPressure, IOPressureController
+        controller = IOPressureController()
+        controller.observe(IOPressure("host", 25.0, 5.0, 100, 100))
+        controller.observe(None)
+        self.assertFalse(controller.snapshot()["measured"])
+        self.assertTrue(controller.snapshot()["congested"])
+        controller.observe(IOPressure("host", 3.0, 0.0, 120, 100))
+        self.assertFalse(controller.snapshot()["congested"])
+        self.assertEqual(controller.snapshot()["transitions"], 2)
+        with self.assertRaises(TypeError):
+            controller.observe({"some": 25})
+
+
 if __name__ == "__main__":
     unittest.main()

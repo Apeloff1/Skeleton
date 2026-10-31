@@ -556,3 +556,17 @@ software backpressure, not GPU preemption, kernel swap reconfiguration or
 proof that other processes cannot exhaust memory. The resource monitor exposes
 sensor scope, observed deltas and current holds. Non-Linux platforms report
 this Linux-only sensor as unavailable and retain their existing memory guards.
+
+
+## Linux kernel I/O stall pressure
+
+The same offline planner samples cgroup-v2 io.pressure (falling back to host
+/proc/pressure/io) when Linux PSI is available. It parses the measured
+some/full avg10 stall percentages, retaining their scope and cumulative
+microsecond counters without presenting them as disk bandwidth or free bytes.
+At >=15% some or >=5% full stalls, future staging is reduced to one stream.
+It recovers only below <=8% some and <=2% full, avoiding oscillation; an
+unknown sample retains a prior congestion hold. This is advisory cooperative
+backpressure, not an OS I/O scheduler override. The resource monitor reports
+whether the reading was actually measured and the current hysteresis state.
+Windows and macOS remain explicitly unsupported by this Linux PSI probe.
