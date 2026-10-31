@@ -95,6 +95,20 @@ def test_unavailable_receipt_cannot_claim_measured_devices() -> None:
         ), 4096, 3072)
 
 
+
+@pytest.mark.parametrize("source,status,total,free", [
+    ("unavailable", "unavailable", 4096, 0),
+    ("unavailable", "unavailable", 0, 1),
+    ("linux_nvml", "unavailable", 0, 0),
+    ("simulated_nvml", "unavailable", 0, 0),
+    ("unavailable", "measured", 0, 0),
+])
+def test_unavailable_receipt_rejects_fabricated_counters_or_source(
+    source: str, status: str, total: int, free: int
+) -> None:
+    with pytest.raises(NVMLProbeError):
+        NativeGpuMemoryReceipt(source, status, (), total, free)
+
 def test_actual_probe_never_invents_gpu_when_unavailable() -> None:
     result = probe_linux_nvidia_memory()
     assert result.source in {"linux_nvml", "unavailable"}
