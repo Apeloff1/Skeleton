@@ -486,8 +486,32 @@ def cli(argv: Sequence[str]) -> int:
     source.add_argument("--session-json")
     play.add_argument("--source-digest")
     play.add_argument("--checkpoint-every", type=int, default=8)
+    hint = sub.add_parser("hint", help="Find a bounded replay-proven victory route")
+    hint_source = hint.add_mutually_exclusive_group(required=True)
+    hint_source.add_argument("--demo", action="store_true")
+    hint_source.add_argument("--world-json")
+    hint_source.add_argument("--session-json")
+    hint.add_argument("--max-states", type=int, default=1024)
+    hint.add_argument("--max-depth", type=int, default=64)
     args = parser.parse_args(list(argv))
     try:
+        if args.command == "hint":
+            from skeleton.game.gameplay.scene_route_solver import plan_victory
+            world = (
+                original_demo()[0] if args.demo else
+                _json(args.world_json, "world")
+                if args.world_json is not None else None
+            )
+            session = (
+                _json(args.session_json, "session")
+                if args.session_json is not None else None
+            )
+            result = plan_victory(
+                world, session=session,
+                max_states=args.max_states, max_depth=args.max_depth,
+            )
+            print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return 0
         if args.command == "play":
             world = (
                 original_demo()[0] if args.demo else
