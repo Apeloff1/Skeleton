@@ -54,6 +54,7 @@ Commands:
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     combat      Run and replay deterministic offline turn combat encounters
     combat-inspect  Inspect verified combat timelines and compare saved branches
+    combat-balance  Analyze source-bound combat victory and verify replay receipts
     combat-arena    Play source-bound tactical grid combat with offline replay
     arena-terrain  Generate and verify original playable tactical geometry
     combat-expedition  Play original multi-arena campaigns with earned inventory
@@ -764,6 +765,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-campaign":
         from skeleton.game.gameplay.combat_campaign import cli as campaign_cli
         return campaign_cli(rest)
+    if cmd == "combat-balance":
+        from skeleton.game.gameplay.combat_balance import cli as balance_cli
+        return balance_cli(rest)
     if cmd == "combat-inspect":
         from skeleton.game.gameplay.combat_inspector import cli as inspect_cli
         return inspect_cli(rest)
