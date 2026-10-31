@@ -177,6 +177,20 @@ def test_empty_merge_diff_fails_closed_to_every_lane(tmp_path: Path) -> None:
     assert set(_scope(repo, "pull_request").values()) == {"true"}
 
 
+def test_ci_scope_router_change_runs_all_lanes(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init(repo)
+    _git(repo, "checkout", "-b", "feature")
+    changed = repo / "scripts" / "ci_change_scope.sh"
+    changed.parent.mkdir(parents=True)
+    changed.write_text("# updated scope router\\n", encoding="utf-8")
+    _git(repo, "add", "--all")
+    _git(repo, "commit", "-m", "scope router")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature", "-m", "merge scope router")
+    assert set(_scope(repo, "pull_request").values()) == {"true"}
+
+
 @pytest.mark.parametrize("changed_path", [
     "machine/unknown_policy_contract.json",
     ".github/workflows/new-security-gate.yml",

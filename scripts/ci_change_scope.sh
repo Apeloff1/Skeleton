@@ -44,7 +44,7 @@ git diff --name-only -z HEAD^1 HEAD | {
     seen=true
     classified=false
     case "$path" in
-      .github/workflows/ci.yml|.github/workflows/merge-readiness.yml|.github/ci/*|pyproject.toml|requirements*.txt)
+      .github/workflows/ci.yml|.github/workflows/merge-readiness.yml|.github/ci/*|scripts/ci_change_scope.sh|tests/test_ci_change_scope.py|pyproject.toml|requirements*.txt)
         force_all=true
         classified=true
         ;;
