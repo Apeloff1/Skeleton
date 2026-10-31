@@ -140,9 +140,31 @@ class NonceStore(Protocol):
 
 True means fresh, and the nonce is recorded until `ts + ttl_s`. False means replay
 (or an invalid argument). `scope` namespaces callers (`"seal"`, `"s2s:<service>"`).
-The default `InMemoryNonceStore(max_entries=100_000)` is thread-safe and bounded:
-it drops expired entries first, then evicts the least recently used entry. Size it
-above the peak number of nonces per TTL so that live nonces are never evicted.
+The default `InMemoryNonceStore` is thread-safe, bounded and **fail-closed**:
+
+- **Sizing:** `max_entries` comes from `SKELETON_SEAL_NONCE_STORE_MAX`, default `100_000`.
+  An invalid value (not a positive integer) raises at startup. Each entry lives for
+  `ts + SEAL_SKEW_SECS + REPLAY_SKEW_SECS` (about 330 s by default). Size the store above
+  the peak number of v3 seals verified per process in that window, with headroom.
+  For example, 200 req/s × 330 s ≈ 66 000.
+- **Full store:** expired entries are reclaimed first. If every entry is still live,
+  the new seal is **refused** and nothing is evicted. Live nonces are never dropped,
+  so a full store can't reopen a replay window. There is no LRU mode.
+- **Signalling:** `check_and_record` keeps its signature. On a full store it **raises
+  `skeleton.api.nonce_store.NonceStoreFull`** (with `retry_after_s`, at least 1, equal to the
+  seconds until the soonest entry expires) rather than returning a value. `verify_seal`
+  lets `NonceStoreFull` propagate. Any other store exception still becomes an opaque
+  `AuthError`. `RequestSealMiddleware` answers
+  `503 {"error":"nonce_store_full"}` with `Retry-After: <retry_after_s>`. Clients should
+  back off and re-seal, because each retry needs a fresh nonce.
+- **Metrics:** each refusal increments `store.nonce_store_full`, which `store.stats()`
+  returns along with `entries`, `max_entries` and `reclaimed`. If the store is built with
+  `metrics=` (any object with `increment(name, value, labels)`, such as
+  `skeleton.observability.metrics.MetricsCollector`), it also emits the counter
+  `nonce_store_full{scope=...}`. Alert on any non-zero rate.
+
+Shared stores (e.g. Redis) must keep the same contract: raise `NonceStoreFull` when they
+can't record, and never evict live nonces.
 Multi-replica deployments pass a shared store, for example
 `RequestSealMiddleware(app, nonce_store=...)` backed by Redis `SET NX EXAT`.
 
@@ -194,6 +216,7 @@ v1 traffic is gone.
 | Missing / malformed / expired / bad signature | `401 {"error":"invalid_seal"}` | `401` (opaque) |
 | v2 domain mismatch, replayed nonce, missing/bad nonce, expiry too far out, replay cache full | `401 {"error":"invalid_seal"}` | `401` (MAC/expiry/format only) |
 | v3 method/path/query/body/tenant mismatch, timestamp outside skew, replayed nonce, body > 8 MiB, duplicate tenant header | `401 {"error":"invalid_seal"}` | `401` unless middleware verified it |
+| v3 seal valid, but nonce store full of live nonces | `503 {"error":"nonce_store_full"}` + `Retry-After` | n/a (raises `NonceStoreFull`) |
 | v1 seal on a domain refused by `GF_SEAL_LEGACY` | `401 {"error":"invalid_seal"}` | n/a |
 
 Failure reasons are deliberately opaque.
