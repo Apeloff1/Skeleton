@@ -7,7 +7,7 @@ Data-only. Operator remains the gate.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 try:
     from skeleton.ai.agents.jeeves.unified_game_capability import make_unified
@@ -55,6 +55,11 @@ class JeevesGameOrchestrator:
             "Only then consider native evidence on a qualified core",
         ]
         return out
+
+    def authoritative_walk(self, request: Mapping[str, Any], *, authorized: bool = False) -> dict[str, Any]:
+        """Execute the typed canonical offline walk tool under explicit operator authority."""
+        from .studio_walk_tool import execute_walk_tool
+        return execute_walk_tool(request, authorized=authorized)
 
     def model_card(self) -> str:
         return (
