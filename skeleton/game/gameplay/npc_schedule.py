@@ -97,6 +97,37 @@ class NpcRoute:
         return {"npc_id": self.npc_id, "stops": [s.as_dict() for s in self.stops]}
 
 
+
+@dataclass(frozen=True)
+class NpcEnding:
+    ending_id: str
+    required_facts: tuple[str, ...]
+    forbidden_facts: tuple[str, ...]
+    priority: int
+
+    @classmethod
+    def parse(cls, raw: Any) -> "NpcEnding":
+        row = _keys(raw, {"ending_id", "required_facts", "forbidden_facts",
+                          "priority"}, "ending")
+        required = _facts(row["required_facts"], "required_facts")
+        forbidden = _facts(row["forbidden_facts"], "forbidden_facts")
+        if not required or set(required).intersection(forbidden):
+            raise GameplayContractError("invalid ending condition")
+        return cls(req_id(row["ending_id"], "ending_id"), required, forbidden,
+                   _integer(row["priority"], "ending priority", 0, 1_000_000))
+
+    def matches(self, facts: Sequence[str]) -> bool:
+        present = set(facts)
+        return set(self.required_facts).issubset(present) and not (
+            set(self.forbidden_facts) & present)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"ending_id": self.ending_id,
+                "required_facts": list(self.required_facts),
+                "forbidden_facts": list(self.forbidden_facts),
+                "priority": self.priority}
+
+
 @dataclass(frozen=True)
 class NpcSchedule:
     world_id: str
@@ -104,11 +135,12 @@ class NpcSchedule:
     horizon_ticks: int
     initial_facts: tuple[str, ...]
     routes: tuple[NpcRoute, ...]
+    endings: tuple[NpcEnding, ...]
 
     @classmethod
     def parse(cls, raw: Any) -> "NpcSchedule":
         row = _keys(raw, {"schema_version", "world_id", "canon_digest",
-                          "horizon_ticks", "initial_facts", "routes"}, "schedule")
+                          "horizon_ticks", "initial_facts", "routes", "endings"}, "schedule")
         if row["schema_version"] != 1 or type(row["schema_version"]) is not int:
             raise GameplayContractError("unsupported schedule schema")
         horizon = _integer(row["horizon_ticks"], "horizon_ticks", 1, MAX_HORIZON)
@@ -119,19 +151,34 @@ class NpcSchedule:
                               key=lambda r: r.npc_id))
         if len({r.npc_id for r in routes}) != len(routes):
             raise GameplayContractError("duplicate NPC route")
+        endings_raw = row["endings"]
+        if type(endings_raw) is not list or not 1 <= len(endings_raw) <= 64:
+            raise GameplayContractError("invalid ending count")
+        endings = tuple(sorted((NpcEnding.parse(e) for e in endings_raw),
+                               key=lambda e: (-e.priority, e.ending_id)))
+        if (len({e.ending_id for e in endings}) != len(endings)
+                or len({e.priority for e in endings}) != len(endings)):
+            raise GameplayContractError("ambiguous NPC ending")
         return cls(req_id(row["world_id"], "world_id"),
                    req_digest(row["canon_digest"], "canon_digest"), horizon,
-                   _facts(row["initial_facts"], "initial_facts"), routes)
+                   _facts(row["initial_facts"], "initial_facts"), routes, endings)
 
     def as_dict(self) -> dict[str, Any]:
         return {"schema_version": 1, "world_id": self.world_id,
                 "canon_digest": self.canon_digest, "horizon_ticks": self.horizon_ticks,
                 "initial_facts": list(self.initial_facts),
-                "routes": [r.as_dict() for r in self.routes]}
+                "routes": [r.as_dict() for r in self.routes],
+                "endings": [e.as_dict() for e in self.endings]}
 
     @property
     def digest(self) -> str:
         return dig(self.as_dict())
+
+    def ending_for(self, facts: Sequence[str]) -> str:
+        for ending in self.endings:
+            if ending.matches(facts):
+                return ending.ending_id
+        return "in_progress"
 
     def active(self, tick: int) -> tuple[dict[str, str], ...]:
         _integer(tick, "tick", 0, self.horizon_ticks)
@@ -194,7 +241,13 @@ class NpcSession:
     def start(cls, schedule: NpcSchedule) -> "NpcSession":
         return cls(schedule, 0, schedule.initial_facts, (), EventBus())
 
+    @property
+    def ending(self) -> str:
+        return self.schedule.ending_for(self.facts)
+
     def apply(self, command: NpcCommand) -> "NpcSession":
+        if self.ending != "in_progress":
+            raise GameplayContractError("NPC story already ended")
         if len(self.commands) >= MAX_COMMANDS:
             raise GameplayContractError("NPC command budget exceeded")
         if command.kind == "advance":
@@ -233,7 +286,8 @@ class NpcSession:
     def state_digest(self) -> str:
         return dig({"world_id": self.schedule.world_id,
                     "schedule_digest": self.schedule.digest, "tick": self.tick,
-                    "facts": list(self.facts), "events_digest": self.events.digest,
+                    "facts": list(self.facts), "ending": self.ending,
+                    "events_digest": self.events.digest,
                     "commands": [c.as_dict() for c in self.commands]})
 
     def snapshot(self, parent_save_digest: str | None = None) -> dict[str, Any]:

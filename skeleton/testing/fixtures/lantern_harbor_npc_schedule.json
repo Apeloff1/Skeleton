@@ -64,6 +64,45 @@
           ]
         }
       ]
+    },
+    {
+      "npc_id": "harbor_council",
+      "stops": [
+        {
+          "start_tick": 0,
+          "end_tick": 24,
+          "location_id": "council_steps",
+          "interaction_id": "seal_harbor",
+          "requires": [
+            "harbor_arrival"
+          ],
+          "grants": [
+            "harbor_sealed"
+          ]
+        }
+      ]
+    }
+  ],
+  "endings": [
+    {
+      "ending_id": "harbor_restored",
+      "required_facts": [
+        "tide_gate_open"
+      ],
+      "forbidden_facts": [
+        "harbor_sealed"
+      ],
+      "priority": 20
+    },
+    {
+      "ending_id": "harbor_sealed",
+      "required_facts": [
+        "harbor_sealed"
+      ],
+      "forbidden_facts": [
+        "tide_gate_open"
+      ],
+      "priority": 10
     }
   ]
 }

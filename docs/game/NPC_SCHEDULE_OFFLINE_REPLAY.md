@@ -74,3 +74,13 @@ ask_for_lens` to start the quest, `talk sol_dockwright repair_lens`,
 consequences; `quit` saves when `--save` is supplied. Rejected
 actions leave the original session untouched. The terminal game requires
 no AI provider, audio or network access.
+
+## Authored alternate endings
+
+The same original harbor includes a council interaction, `talk harbor_council
+seal_harbor`, available at tick 0. It ends the game as `harbor_sealed`.
+Completing the lens, beacon and tide-gate sequence ends the game as
+`harbor_restored`. Endings have explicit, non-conflicting fact predicates
+and deterministic priorities; once one is reached, no more player commands
+can mutate the terminal story. The chosen ending is included in the
+source-bound state digest and verified during replay.

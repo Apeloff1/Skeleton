@@ -101,7 +101,8 @@ def interactive_session(session: NpcSession, player_id: str) -> NpcSession:
             else:
                 raise GameplayContractError("unknown player command")
             session = session.apply(command)
-            print(json.dumps({"tick": session.tick, "facts": list(session.facts),
+            print(json.dumps({"tick": session.tick, "ending": session.ending,
+                              "facts": list(session.facts),
                               "state_digest": session.state_digest}, sort_keys=True))
         except (GameplayContractError, ValueError) as exc:
             print(f"rejected: {exc}")
@@ -131,7 +132,8 @@ def main(argv: list[str] | None = None) -> int:
             session = interactive_session(session, args.player_id)
         tick = session.tick if args.inspect_tick is None else args.inspect_tick
         result = {"world_id": schedule.world_id, "schedule_digest": schedule.digest,
-                  "tick": session.tick, "state_digest": session.state_digest,
+                  "tick": session.tick, "ending": session.ending,
+                  "state_digest": session.state_digest,
                   "facts": list(session.facts), "events_digest": session.events.digest,
                   "active": list(schedule.active(tick)), "inspected_tick": tick}
         if args.save:

@@ -32,6 +32,7 @@ def test_original_lantern_harbor_end_to_end():
     spec = schedule()
     session = play(spec, commands())
     assert session.tick == 12
+    assert session.ending == "harbor_restored"
     assert session.facts == ("beacon_lit", "harbor_arrival", "lens_repaired",
                              "lens_request", "tide_gate_open")
     assert len(session.events.events) == 6
@@ -138,6 +139,7 @@ def test_cli_offline_replay_and_immutable_save(tmp_path, capsys):
     assert main(args) == 0
     first = json.loads(capsys.readouterr().out)
     assert "tide_gate_open" in first["facts"]
+    assert first["ending"] == "harbor_restored"
     assert first["save_digest"] == read_json(str(save_path))["save_digest"]
     assert main(["--schedule", str(FIXTURE), "--resume", str(save_path)]) == 0
     assert json.loads(capsys.readouterr().out)["state_digest"] == first["state_digest"]
@@ -209,3 +211,35 @@ def test_terminal_rejects_invalid_commands_without_state_change(monkeypatch, cap
     assert session.tick == 0
     assert not session.commands
     assert capsys.readouterr().out.count("rejected:") == 3
+
+
+def test_alternate_original_harbor_ending_is_terminal():
+    spec = schedule()
+    command = {"kind": "interact", "tick": 0, "npc_id": "harbor_council",
+               "interaction_id": "seal_harbor", "player_id": "player"}
+    session = play(spec, [command])
+    assert session.ending == "harbor_sealed"
+    assert NpcSession.restore(spec, session.snapshot()).ending == "harbor_sealed"
+    with pytest.raises(GameplayContractError, match="already ended"):
+        session.apply(NpcCommand("advance", 1))
+
+
+def test_ending_policy_rejects_ambiguous_priorities_and_conflicts():
+    raw = source()
+    raw["endings"][1]["priority"] = raw["endings"][0]["priority"]
+    with pytest.raises(GameplayContractError, match="ambiguous"):
+        NpcSchedule.parse(raw)
+    raw = source()
+    raw["endings"][0]["forbidden_facts"] = ["tide_gate_open"]
+    with pytest.raises(GameplayContractError, match="invalid ending"):
+        NpcSchedule.parse(raw)
+
+
+def test_terminal_outcome_is_bound_to_save_digest():
+    session = play(schedule(), commands())
+    original = session.snapshot()
+    assert original["state_digest"] == session.state_digest
+    raw = source()
+    raw["endings"][0]["ending_id"] = "counterfeit_victory"
+    with pytest.raises(GameplayContractError, match="source mismatch"):
+        NpcSession.restore(NpcSchedule.parse(raw), original)

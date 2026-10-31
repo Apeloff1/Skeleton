@@ -10,7 +10,8 @@
     "canon_digest",
     "horizon_ticks",
     "initial_facts",
-    "routes"
+    "routes",
+    "endings"
   ],
   "properties": {
     "schema_version": {
@@ -113,6 +114,54 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "endings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ending_id",
+          "required_facts",
+          "forbidden_facts",
+          "priority"
+        ],
+        "properties": {
+          "ending_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "required_facts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "forbidden_facts": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
           }
         }
       }
