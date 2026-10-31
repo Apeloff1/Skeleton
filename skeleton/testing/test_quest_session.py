@@ -135,6 +135,31 @@ def test_cli_offline_run_verify_and_no_clobber(tmp_path: Path) -> None:
     assert json.loads(save_path.read_text())["state"]["currency"] == 14
 
 
+def test_installed_skeleton_quest_command(tmp_path: Path) -> None:
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps(make_plan().as_record()), encoding="utf-8")
+    result = subprocess.run([sys.executable, "-m", "skeleton", "quest", "inspect",
+                             "--plan", str(plan)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["world_id"] == "harbor"
+
+
+def test_original_fixture_cli_journey(tmp_path: Path) -> None:
+    fixture_dir = Path(__file__).resolve().parents[2] / "docs" / "game" / "fixtures"
+    plan = fixture_dir / "lantern_harbor_quests.json"
+    events = fixture_dir / "lantern_harbor_events.json"
+    save = tmp_path / "original-save.json"
+    command = [sys.executable, "-m", "skeleton", "quest"]
+    run = subprocess.run(command + ["run", "--plan", str(plan), "--events", str(events),
+                                 "--save", str(save)], capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout)["state"]["ending_id"] == "safe_harbor"
+    verify = subprocess.run(command + ["verify", "--plan", str(plan), "--save", str(save)],
+                            capture_output=True, text=True)
+    assert verify.returncode == 0, verify.stderr
+    assert json.loads(run.stdout)["save_digest"] == json.loads(verify.stdout)["save_digest"]
+
+
 def test_cli_duplicate_json_and_tampered_save_rejected(tmp_path: Path) -> None:
     plan = tmp_path / "plan.json"
     plan.write_text('{"schema_version":1,"schema_version":1,"world_id":"w","quests":[]}')

@@ -1,7 +1,7 @@
 # Offline source-bound quest transactions
 
 Owner: canonical FLGB-13 gameplay plane, under skeleton/game/gameplay.
-Entry point: python -m scripts.game.quest_journal.
+Installed entry point: python -m skeleton quest (repository shim: python -m scripts.game.quest_journal).
 
 The authored plan declares a world ID, DAG of quest IDs, deterministic event
 identities and bounded item/currency rewards. An event completes one quest only
@@ -16,9 +16,9 @@ then compares the entire canonical state, source digest and save digest. A
 changed source, event order, forged reward or edited ending is rejected.
 
 CLI:
-  python -m scripts.game.quest_journal inspect --plan plan.json
-  python -m scripts.game.quest_journal run --plan plan.json --events events.json --save new-save.json
-  python -m scripts.game.quest_journal verify --plan plan.json --save new-save.json
+  python -m skeleton quest inspect --plan plan.json
+  python -m skeleton quest run --plan plan.json --events events.json --save new-save.json
+  python -m skeleton quest verify --plan plan.json --save new-save.json
 
 The CLI does not contact any provider or network. Inputs must be bounded
 regular UTF-8 JSON files; duplicate object keys, non-finite values, unknown
@@ -34,3 +34,5 @@ Architecture/security holds: no native renderer, AI authoring, installer,
 player authentication or release qualification is claimed. Completion trigger
 digests are authored game event identities, not user authorization tokens.
 This source branch remains WIP until actual exact-head CI and admission.
+
+Original authored offline fixture: docs/game/fixtures/lantern_harbor_quests.json and lantern_harbor_events.json.
