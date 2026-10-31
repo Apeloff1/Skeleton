@@ -56,6 +56,7 @@ Commands:
     combat-inspect  Inspect verified combat timelines and compare saved branches
     combat-arena    Play source-bound tactical grid combat with offline replay
     combat-expedition  Play original multi-arena campaigns with earned inventory
+    quest-expedition  Play authored NPC/choice/crafting quest over combat
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -746,6 +747,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "combat-arena":
         from skeleton.game.gameplay.tactical_arena import cli as arena_cli
         return arena_cli(rest)
+    if cmd == "quest-expedition":
+        from skeleton.game.gameplay.expedition_quest import cli as quest_cli
+        return quest_cli(rest)
     if cmd == "combat-expedition":
         from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
         return expedition_cli(rest)
