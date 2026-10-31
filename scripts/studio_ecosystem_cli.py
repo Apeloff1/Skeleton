@@ -217,8 +217,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"receipt": receipt, "output": str(args.output)},
                          sort_keys=True, separators=(",", ":")))
         return 0
-    if args.revision_request is not None or args.revision_source is not None:
-        ap.error("--revision-request and --revision-source require --author-revision")
+    if args.revision_request is not None:
+        ap.error("--revision-request requires --author-revision")
+    if args.revision_source is not None and not (args.audit_canon or args.play_walk):
+        ap.error("--revision-source requires --author-revision, --audit-canon or --play-walk")
     if args.audit_canon:
         if (not args.project or args.play_walk or args.play_quest
                 or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
@@ -230,7 +232,13 @@ def main(argv: list[str] | None = None) -> int:
         from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
         from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
         try:
-            proof = audit_canon_source(read_blueprint(args.project), authorized=True)
+            if args.revision_source is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+                docs = load_revision_bundle(args.revision_source, authorized=True,
+                                            project_id=args.project)[0]
+            else:
+                docs = read_blueprint(args.project)
+            proof = audit_canon_source(docs, authorized=True)
         except (StudioQuestError, ValueError, TypeError, OSError) as exc:
             ap.error(str(exc))
         print(json.dumps(proof, sort_keys=True, separators=(",", ":")))
@@ -290,7 +298,12 @@ def main(argv: list[str] | None = None) -> int:
                 raw = None
             if raw is not None and len(raw) > MAX_WALK_RECEIPT_BYTES:
                 raise StudioQuestError("walk receipt exceeds input byte budget")
-            docs = read_blueprint(args.project)
+            if args.revision_source is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+                docs = load_revision_bundle(args.revision_source, authorized=True,
+                                            project_id=args.project)[0]
+            else:
+                docs = read_blueprint(args.project)
             previous = (restore_walk_receipt(docs, raw, authorized=True)
                         if raw is not None else None)
             prior_events = previous.events if previous is not None else ()

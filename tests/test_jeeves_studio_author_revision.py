@@ -43,3 +43,25 @@ def test_cli_revision_writes_source_html_and_receipt(tmp_path, capsys):
     assert (output / "source.json").exists()
     assert (output / "story.html").exists()
     assert (output / "receipt.json").exists()
+
+
+def test_cli_replays_and_audits_persisted_revised_story(tmp_path, capsys):
+    from scripts.studio_ecosystem_cli import main
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+        REVISION_SCHEMA, preview_canon_revision, write_revision_bundle,
+    )
+    docs = read_blueprint(PROJECT)
+    req = _request()
+    req["schema"] = REVISION_SCHEMA
+    source, html, receipt = preview_canon_revision(docs, req, authorized=True)
+    directory = tmp_path / "revision"
+    write_revision_bundle(directory, source, html, receipt)
+    assert main(["--project", PROJECT, "--audit-canon",
+                 "--revision-source", str(directory)]) == 0
+    audit = json.loads(capsys.readouterr().out)
+    assert audit["source_digest"] == receipt["revised_source_digest"]
+    assert main(["--project", PROJECT, "--play-walk",
+                 "--revision-source", str(directory),
+                 "--walk-events", "[]"]) == 0
+    played = json.loads(capsys.readouterr().out)
+    assert played["source_digest"] == receipt["revised_source_digest"]

@@ -435,3 +435,10 @@ EXISTING_DIRECTORY alongside --author-revision, --revision-request and a
 different new --output directory. The previous source, receipt and playable
 HTML are revalidated against their canonical digests before any further edit.
 These digests prove consistency, not cryptographic authorship or asset rights.
+
+
+An exported original revision can also be used with --project PROJECT
+--revision-source EXISTING_DIRECTORY --audit-canon or --play-walk, so the
+offline replay engine consumes the same source-verified authored content
+rather than silently reverting to the registered catalog. Forged, stale,
+symlinked or contradictory bundles fail before gameplay.
