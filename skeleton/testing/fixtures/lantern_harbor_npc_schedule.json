@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "world_id": "lantern_harbor",
+  "canon_digest": "3fa3d24d8012dd1c7b794c87036924ae9e7b927c84f600540184836b17b8b18f",
+  "horizon_ticks": 24,
+  "initial_facts": [
+    "harbor_arrival"
+  ],
+  "routes": [
+    {
+      "npc_id": "mira_keeper",
+      "stops": [
+        {
+          "start_tick": 0,
+          "end_tick": 8,
+          "location_id": "lighthouse_gate",
+          "interaction_id": "ask_for_lens",
+          "requires": [
+            "harbor_arrival"
+          ],
+          "grants": [
+            "lens_request"
+          ]
+        },
+        {
+          "start_tick": 8,
+          "end_tick": 24,
+          "location_id": "lighthouse_top",
+          "interaction_id": "restore_beacon",
+          "requires": [
+            "lens_repaired"
+          ],
+          "grants": [
+            "beacon_lit"
+          ]
+        }
+      ]
+    },
+    {
+      "npc_id": "sol_dockwright",
+      "stops": [
+        {
+          "start_tick": 0,
+          "end_tick": 12,
+          "location_id": "dock_workshop",
+          "interaction_id": "repair_lens",
+          "requires": [
+            "lens_request"
+          ],
+          "grants": [
+            "lens_repaired"
+          ]
+        },
+        {
+          "start_tick": 12,
+          "end_tick": 24,
+          "location_id": "tide_gate",
+          "interaction_id": "open_tide_gate",
+          "requires": [
+            "beacon_lit"
+          ],
+          "grants": [
+            "tide_gate_open"
+          ]
+        }
+      ]
+    }
+  ]
+}
