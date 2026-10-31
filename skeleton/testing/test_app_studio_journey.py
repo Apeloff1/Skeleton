@@ -304,3 +304,48 @@ def test_export_parent_symlink_preflight_never_runs_studio(tmp_path, monkeypatch
     ]) == 2
     assert not (owned / "game").exists()
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+
+def test_app_inspects_archived_receipt_without_replaying_source(tmp_path, capsys):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    receipt = tmp_path / "archived.json"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--receipt", str(receipt), "--trusted-local-operator",
+    ]) == 0
+    original = json.loads(capsys.readouterr().out)
+    assert run_app_cli([
+        "studio-journey", "--inspect-receipt", "--receipt", str(receipt),
+        "--expected-receipt-sha256", original["independent_receipt_sha256"],
+        "--trusted-local-operator",
+    ]) == 0
+    inspected = json.loads(capsys.readouterr().out)
+    assert inspected["schema"] == "skeleton.app.first_playable_receipt_inspection.v1"
+    assert inspected["receipt_integrity_verified"] is True
+    assert inspected["gameplay_reexecuted_now"] is False
+    assert inspected["release_certified"] is False
+    assert inspected["canonical_inspection"]["native_hardware_tested"] is False
+
+
+def test_app_archived_receipt_rejects_bad_pin_authority_and_mode_mix(tmp_path, capsys):
+    source = _intent(tmp_path)
+    output = tmp_path / "game"
+    receipt = tmp_path / "archived.json"
+    assert run_app_cli([
+        "studio-journey", "--intent", str(source), "--output", str(output),
+        "--receipt", str(receipt), "--trusted-local-operator",
+    ]) == 0
+    capsys.readouterr()
+    attempts = (
+        ["--inspect-receipt", "--receipt", str(receipt),
+         "--expected-receipt-sha256", "0" * 64, "--trusted-local-operator"],
+        ["--inspect-receipt", "--receipt", str(receipt),
+         "--expected-receipt-sha256", "0" * 64],
+        ["--inspect-receipt", "--receipt", str(receipt), "--output", str(output),
+         "--expected-receipt-sha256", "0" * 64, "--trusted-local-operator"],
+        ["--inspect-receipt", "--receipt", str(receipt), "--trusted-local-operator"],
+    )
+    for args in attempts:
+        assert run_app_cli(["studio-journey", *args]) == 2
+        assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert (output / "release.json").is_file()

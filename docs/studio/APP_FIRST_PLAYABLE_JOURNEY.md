@@ -92,3 +92,20 @@ After publication, any replay or receipt failure remains an explicit blocked
 result. Never treat a leftover source directory as a qualified game; use
 `--verify-existing` with the separately held manifest pin to requalify
 without destroying or overwriting owner files.
+
+## Inspect archived replay evidence from the app
+
+For an already archived owner-private receipt, use the app entrypoint:
+
+```sh
+python -m skeleton app studio-journey --inspect-receipt \
+  --receipt ./private-reverification.json \
+  --expected-receipt-sha256 <independently-stored-receipt-pin> \
+  --trusted-local-operator
+```
+
+The app delegates to the canonical descriptor-safe receipt inspector, validates
+the independent SHA-256 and schema, and reports receipt integrity without
+opening or executing the game. A historical replay record is not proof of
+present gameplay, native hardware, legal rights, or release qualification.
+The inspection mode rejects build/verify options and never writes a receipt.

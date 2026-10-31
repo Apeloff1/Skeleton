@@ -18,6 +18,9 @@ from skeleton.ai.game_builder.dual_runtime_export import DualRuntimeExportError
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, verify_exported_package,
 )
+from skeleton.ai.game_builder.offline_receipt_inspection import (
+    ReceiptInspectionError, inspect_verified_receipt,
+)
 from skeleton.ai.game_builder.offline_receipt_publication import (
     ReceiptPublicationError, preflight_receipt_destination, publish_verified_receipt,
 )
@@ -37,6 +40,7 @@ from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
 
 SCHEMA = "skeleton.app.first_playable_journey.v1"
 VERIFY_SCHEMA = "skeleton.app.first_playable_journey_verification.v1"
+INSPECT_SCHEMA = "skeleton.app.first_playable_receipt_inspection.v1"
 
 
 class FirstPlayableJourneyError(ValueError):
@@ -182,6 +186,34 @@ def verify_existing_playable_journey(
     }
 
 
+
+def inspect_first_playable_receipt(
+    receipt_path: str | Path, *, expected_sha256: str, authorized: bool,
+) -> dict[str, object]:
+    """Inspect an archived replay receipt without replaying source or trusting it."""
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    verified = inspect_verified_receipt(
+        receipt_path, expected_sha256=expected_sha256, authorized=True,
+    )
+    if (verified.get("receipt_integrity_verified") is not True
+            or verified.get("gameplay_reexecuted_now") is not False
+            or verified.get("release_certified") is not False):
+        raise FirstPlayableJourneyError("archived receipt integrity is unqualified")
+    return {
+        "schema": INSPECT_SCHEMA,
+        "status": "archived_receipt_integrity_verified_not_replayed",
+        "receipt_sha256": expected_sha256,
+        "receipt_schema": verified["receipt_schema"],
+        "receipt_integrity_verified": True,
+        "gameplay_reexecuted_now": False,
+        "native_device_qualified": False,
+        "rights_certified": False,
+        "release_certified": False,
+        "canonical_inspection": verified,
+    }
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m skeleton app studio-journey",
@@ -190,12 +222,18 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--intent", help="bounded original game intent JSON for new builds")
     parser.add_argument("--verify-existing", action="store_true",
                         help="read-only re-verification of an existing exported game")
+    parser.add_argument("--inspect-receipt", action="store_true",
+                        help="read-only inspection of an independently pinned archived receipt")
     parser.add_argument("--expected-manifest-sha256",
                         help="independent SHA-256 pin required for --verify-existing")
-    parser.add_argument("--output", required=True, help="new destination directory")
+    parser.add_argument("--expected-receipt-sha256",
+                        help="independent SHA-256 pin required for --inspect-receipt")
+    parser.add_argument("--output",
+                        help="new export destination or existing game package")
     parser.add_argument("--mirror-attempts", type=int, default=64)
     parser.add_argument("--practice-games", type=int, default=0)
-    parser.add_argument("--receipt", help="new owner-private .json receipt outside game package")
+    parser.add_argument("--receipt",
+                        help="new owner-private receipt or existing receipt to inspect")
     parser.add_argument(
         "--trusted-local-operator", action="store_true",
         help="acknowledge separately established local operator authority",
@@ -206,8 +244,20 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.verify_existing:
-            if args.intent is not None or args.mirror_attempts != 64 or args.practice_games != 0:
+        if args.inspect_receipt:
+            if (args.verify_existing or args.output is not None
+                    or args.intent is not None or args.expected_manifest_sha256 is not None
+                    or args.receipt is None or args.expected_receipt_sha256 is None
+                    or args.mirror_attempts != 64 or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid archived receipt inspection mode")
+            receipt = inspect_first_playable_receipt(
+                args.receipt, expected_sha256=args.expected_receipt_sha256,
+                authorized=args.trusted_local_operator,
+            )
+        elif args.verify_existing:
+            if (args.output is None or args.intent is not None
+                    or args.expected_receipt_sha256 is not None
+                    or args.mirror_attempts != 64 or args.practice_games != 0):
                 raise FirstPlayableJourneyError(
                     "existing verification cannot build or tune a new game"
                 )
@@ -217,9 +267,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 receipt_destination=args.receipt,
             )
         else:
-            if args.intent is None or args.expected_manifest_sha256 is not None:
+            if (args.output is None or args.intent is None
+                    or args.expected_manifest_sha256 is not None
+                    or args.expected_receipt_sha256 is not None):
                 raise FirstPlayableJourneyError(
-                    "new game builds require --intent and reject external verification pins"
+                    "new game builds require --intent and --output and reject verification pins"
                 )
             receipt = build_first_playable_journey(
                 args.intent, args.output,
@@ -232,7 +284,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         FirstPlayableJourneyError, StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
         ToolFabricError, DualRuntimeExportError, DualRuntimeVerificationError,
-        ReceiptPublicationError, AtomicDirectoryPublicationError,
+        ReceiptPublicationError, ReceiptInspectionError,
+        AtomicDirectoryPublicationError,
         PermissionError, OSError, TypeError, ValueError,
     ) as exc:
         # Do not print supplied input, credentials, arbitrary filesystem
@@ -251,4 +304,8 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["SCHEMA", "VERIFY_SCHEMA", "FirstPlayableJourneyError", "build_first_playable_journey", "verify_existing_playable_journey", "main"]
+__all__ = [
+    "SCHEMA", "VERIFY_SCHEMA", "INSPECT_SCHEMA", "FirstPlayableJourneyError",
+    "build_first_playable_journey", "verify_existing_playable_journey",
+    "inspect_first_playable_receipt", "main",
+]
