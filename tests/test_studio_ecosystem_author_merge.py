@@ -131,8 +131,26 @@ def test_cli_merges_verified_bundles_and_rejects_conflict(tmp_path, capsys):
     result = json.loads(capsys.readouterr().out)
     assert result["impact"]["changed_path_count"] == 2
     assert (destination / "story.html").is_file()
+    conflicting, conflicting_html, conflicting_receipt = edit(
+        base, "narrative", ["premise"], "The archive must be sealed.")
+    conflict_dir = tmp_path / "conflict"
+    write_revision_bundle(conflict_dir, conflicting, conflicting_html, conflicting_receipt)
+    rejected = tmp_path / "must-not-exist"
     with pytest.raises(SystemExit):
         main(["--project", PROJECT, "--merge-revisions",
               "--merge-left-source", str(left_dir),
-              "--merge-right-source", str(left_dir),
-              "--output", str(tmp_path / "missing")])
+              "--merge-right-source", str(conflict_dir),
+              "--output", str(rejected)])
+    assert not rejected.exists()
+
+
+def test_merge_rejects_protected_but_canon_consistent_change():
+    base = read_blueprint(PROJECT)
+    left, _, _ = edit(base, "narrative", ["premise"], "The archive must be audited.")
+    tampered = deepcopy(base)
+    tampered["cast"]["protagonist"]["public_goal"] = "An unapproved but valid edit"
+    # The merge itself must reject protected data even if a future canon checker
+    # happens to accept that particular structural mutation.
+    tampered["quest"]["stage_graph"][0]["reward"] = "unauthorized_reward"
+    with pytest.raises(StudioQuestError):
+        merge_canon_revisions(base, left, tampered, authorized=True)
