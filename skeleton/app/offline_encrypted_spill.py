@@ -26,6 +26,50 @@ TEMP = re.compile(r"\.tmp-[0-9a-f]{32}-[0-9a-f]{16}\Z")
 NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 
+@contextmanager
+def _directory_fd(path: Path) -> Iterator[int | None]:
+    """Open each POSIX ancestor without following links; keep final inode pinned.
+
+    Windows has no portable openat/dir_fd contract in Python. The existing
+    Windows ACL/locking path is retained, but is not certified against a
+    same-user adversary replacing directory ancestors.
+    """
+    if os.name != "posix":
+        _safe(path, directory=True)
+        yield None
+        return
+    if not NOFOLLOW or not hasattr(os, "O_DIRECTORY"):
+        raise SpillError("safe directory descriptor operations unavailable")
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    fd = os.open(os.path.sep, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        try:
+            for name in absolute.parts[1:]:
+                if name in ("", ".", ".."):
+                    raise SpillError("unsafe directory component")
+                next_fd = os.open(
+                    name, os.O_RDONLY | os.O_DIRECTORY | NOFOLLOW, dir_fd=fd
+                )
+                os.close(fd)
+                fd = next_fd
+        except OSError as exc:
+            raise SpillError("symlinked or unsafe directory") from exc
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def _read_fd(fd: int, limit: int) -> bytes:
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+        raise SpillError("invalid or oversized regular file")
+    with os.fdopen(os.dup(fd), "rb") as source:
+        data = source.read(limit + 1)
+    if len(data) > limit:
+        raise SpillError("oversized file")
+    return data
+
+
 class SpillError(ValueError):
     """Invalid, unsafe, corrupt, unauthenticated or over-budget local spill."""
 
@@ -84,38 +128,46 @@ def _safe(path: Path, *, directory: bool = False) -> None:
 
 def _read(path: Path, limit: int) -> bytes:
     _safe(path)
-    fd = os.open(path, os.O_RDONLY | NOFOLLOW)
-    try:
-        if not stat.S_ISREG(os.fstat(fd).st_mode) or os.fstat(fd).st_size > limit:
-            raise SpillError("invalid or oversized regular file")
-        with os.fdopen(os.dup(fd), "rb") as source:
-            data = source.read(limit + 1)
-        if len(data) > limit:
-            raise SpillError("oversized file")
-        return data
-    finally:
-        os.close(fd)
+    with _directory_fd(path.parent) as parent:
+        fd = os.open(
+            path.name if parent is not None else path,
+            os.O_RDONLY | NOFOLLOW,
+            **({"dir_fd": parent} if parent is not None else {}),
+        )
+        try:
+            return _read_fd(fd, limit)
+        finally:
+            os.close(fd)
+
+
+def _write_fd(fd: int, payload: bytes) -> None:
+    with os.fdopen(os.dup(fd), "wb") as stream:
+        stream.write(payload)
+        stream.flush()
+    os.fsync(fd)
 
 
 def _new(path: Path, payload: bytes) -> None:
     _safe(path.parent, directory=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600)
-    try:
-        with os.fdopen(os.dup(fd), "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-        os.fsync(fd)
-    finally:
-        os.close(fd)
+    with _directory_fd(path.parent) as parent:
+        fd = os.open(
+            path.name if parent is not None else path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW,
+            0o600,
+            **({"dir_fd": parent} if parent is not None else {}),
+        )
+        try:
+            _write_fd(fd, payload)
+        finally:
+            os.close(fd)
 
 
 def _sync(path: Path) -> None:
     if os.name == "posix":
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | NOFOLLOW)
-        try:
+        with _directory_fd(path) as fd:
+            if fd is None:
+                raise SpillError("directory fsync unavailable")
             os.fsync(fd)
-        finally:
-            os.close(fd)
 
 
 class EncryptedSpillStore:
@@ -131,46 +183,125 @@ class EncryptedSpillStore:
         _safe(self.root, directory=True)
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         _safe(self.root, directory=True)
-        mode = self.root.stat()
+        with _directory_fd(self.root) as root_fd:
+            mode = os.fstat(root_fd) if root_fd is not None else self.root.stat()
         if os.name == "posix" and (mode.st_uid != os.getuid() or mode.st_mode & 0o077):
             raise SpillError("store must be user-owned and mode 0700")
+        self._root_identity = (mode.st_dev, mode.st_ino)
+        self._dir_fd: int | None = None
         self._cipher = AESGCM(key)
         self._thread = threading.RLock()
 
     @contextmanager
     def _lock(self) -> Iterator[None]:
         with self._thread:
-            lock = self.root / ".lock"
-            _safe(lock)
-            fd = os.open(lock, os.O_RDWR | os.O_CREAT | NOFOLLOW, 0o600)
-            try:
-                if not stat.S_ISREG(os.fstat(fd).st_mode):
-                    raise SpillError("invalid lock file")
-                if os.name == "posix":
-                    import fcntl
-                    fcntl.flock(fd, fcntl.LOCK_EX)
-                elif os.name == "nt":
-                    import msvcrt
-                    if not os.fstat(fd).st_size:
-                        os.write(fd, b"0")
-                    os.lseek(fd, 0, os.SEEK_SET)
-                    msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
-                else:
-                    raise SpillError("platform lacks supported process locking")
+            with _directory_fd(self.root) as root_fd:
+                mode = os.fstat(root_fd) if root_fd is not None else self.root.stat()
+                if (mode.st_dev, mode.st_ino) != self._root_identity:
+                    raise SpillError("spill store root identity changed")
+                if os.name == "posix" and (
+                    mode.st_uid != os.getuid() or mode.st_mode & 0o077
+                ):
+                    raise SpillError("spill store permissions changed")
+                self._dir_fd = root_fd
                 try:
-                    yield
+                    lock = self.root / ".lock"
+                    fd = os.open(
+                        ".lock" if root_fd is not None else lock,
+                        os.O_RDWR | os.O_CREAT | NOFOLLOW, 0o600,
+                        **({"dir_fd": root_fd} if root_fd is not None else {}),
+                    )
+                    try:
+                        info = os.fstat(fd)
+                        if not stat.S_ISREG(info.st_mode):
+                            raise SpillError("invalid lock file")
+                        if os.name == "posix" and (
+                            info.st_uid != os.getuid() or info.st_mode & 0o077
+                        ):
+                            raise SpillError("insecure lock file")
+                        if os.name == "posix":
+                            import fcntl
+                            fcntl.flock(fd, fcntl.LOCK_EX)
+                        elif os.name == "nt":
+                            import msvcrt
+                            if not info.st_size:
+                                os.write(fd, b"0")
+                            os.lseek(fd, 0, os.SEEK_SET)
+                            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                        else:
+                            raise SpillError("platform lacks supported process locking")
+                        try:
+                            yield
+                        finally:
+                            if os.name == "posix":
+                                fcntl.flock(fd, fcntl.LOCK_UN)
+                            else:
+                                os.lseek(fd, 0, os.SEEK_SET)
+                                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    finally:
+                        os.close(fd)
                 finally:
-                    if os.name == "posix":
-                        fcntl.flock(fd, fcntl.LOCK_UN)
-                    else:
-                        os.lseek(fd, 0, os.SEEK_SET)
-                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-            finally:
-                os.close(fd)
+                    self._dir_fd = None
+
+    def _read_member(self, name: str, limit: int) -> bytes:
+        if self._dir_fd is None:
+            return _read(self.root / name, limit)
+        fd = os.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=self._dir_fd)
+        try:
+            return _read_fd(fd, limit)
+        finally:
+            os.close(fd)
+
+    def _new_member(self, name: str, payload: bytes) -> None:
+        if self._dir_fd is None:
+            _new(self.root / name, payload)
+            return
+        fd = os.open(
+            name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW,
+            0o600, dir_fd=self._dir_fd,
+        )
+        try:
+            _write_fd(fd, payload)
+        finally:
+            os.close(fd)
+
+    def _replace_member(self, source: str, destination: str) -> None:
+        if self._dir_fd is None:
+            os.replace(self.root / source, self.root / destination)
+        else:
+            os.replace(source, destination,
+                       src_dir_fd=self._dir_fd, dst_dir_fd=self._dir_fd)
+
+    def _unlink_member(self, name: str, *, missing_ok: bool = False) -> None:
+        try:
+            if self._dir_fd is None:
+                (self.root / name).unlink()
+            else:
+                os.unlink(name, dir_fd=self._dir_fd)
+        except FileNotFoundError:
+            if not missing_ok:
+                raise
+
+    def _member_stat(self, name: str) -> os.stat_result:
+        if self._dir_fd is None:
+            return (self.root / name).lstat()
+        return os.stat(name, dir_fd=self._dir_fd, follow_symlinks=False)
+
+    def _sync_store(self) -> None:
+        if self._dir_fd is not None:
+            os.fsync(self._dir_fd)
+        else:
+            _sync(self.root)
+
+    def _free_bytes(self) -> int:
+        if self._dir_fd is not None:
+            info = os.fstatvfs(self._dir_fd)
+            return info.f_bavail * info.f_frsize
+        return shutil.disk_usage(self.root).free
 
     def _scan(self) -> tuple[list[str], list[str], list[str]]:
         manifests, data, temps = [], [], []
-        with os.scandir(self.root) as items:
+        with os.scandir(self._dir_fd if self._dir_fd is not None else self.root) as items:
             for item in items:
                 name = item.name
                 if name == ".lock":
@@ -193,7 +324,7 @@ class EncryptedSpillStore:
         if type(record_id) is not str or not RECORD.fullmatch(record_id):
             raise SpillError("invalid record id")
         try:
-            value = json.loads(_read(self.root / (record_id + ".json"), 8192))
+            value = json.loads(self._read_member(record_id + ".json", 8192))
         except (ValueError, UnicodeError) as exc:
             raise SpillError("malformed spill manifest") from exc
         keys = {"schema", "record_id", "model_sha256", "tokenizer_sha256",
@@ -220,7 +351,7 @@ class EncryptedSpillStore:
                               meta["context_id"], meta["chunk_index"])
         if bound != identity:
             raise SpillError("model/tokenizer/context mismatch")
-        encrypted = _read(self.root / (record_id + ".bin"), int(meta["size"]) + 16)
+        encrypted = self._read_member(record_id + ".bin", int(meta["size"]) + 16)
         if len(encrypted) != int(meta["size"]) + 16:
             raise SpillError("ciphertext size mismatch")
         try:
@@ -241,13 +372,13 @@ class EncryptedSpillStore:
             manifests, data, temps = self._scan()
             if len(manifests) >= self.policy.max_entries:
                 raise SpillError("entry quota exhausted")
-            usage = sum((self.root / name).stat().st_size for name in (*data, *temps))
+            usage = sum(self._member_stat(name).st_size for name in (*data, *temps))
             if usage + len(payload) + 16 > self.policy.max_total_bytes:
                 raise SpillError("byte quota exhausted")
-            if shutil.disk_usage(self.root).free - len(payload) - 16 < self.policy.min_free_bytes:
+            if self._free_bytes() - len(payload) - 16 < self.policy.min_free_bytes:
                 raise SpillError("disk reserve exhausted")
             record_id = secrets.token_hex(16)
-            while (self.root / (record_id + ".bin")).exists() or (self.root / (record_id + ".json")).exists():
+            while record_id + ".bin" in data or record_id + ".json" in manifests:
                 record_id = secrets.token_hex(16)
             nonce = secrets.token_bytes(12)
             meta: dict[str, object] = {
@@ -259,18 +390,18 @@ class EncryptedSpillStore:
                 "nonce": nonce.hex(), "created_ns": time.time_ns(),
             }
             ciphertext = self._cipher.encrypt(nonce, payload, _canonical(meta))
-            temp_data = self.root / (".tmp-" + record_id + "-" + secrets.token_hex(8))
-            temp_meta = self.root / (".tmp-" + record_id + "-" + secrets.token_hex(8))
+            temp_data = ".tmp-" + record_id + "-" + secrets.token_hex(8)
+            temp_meta = ".tmp-" + record_id + "-" + secrets.token_hex(8)
             try:
-                _new(temp_data, ciphertext)
-                os.replace(temp_data, self.root / (record_id + ".bin"))
-                _sync(self.root)
-                _new(temp_meta, _canonical(meta))
-                os.replace(temp_meta, self.root / (record_id + ".json"))
-                _sync(self.root)
+                self._new_member(temp_data, ciphertext)
+                self._replace_member(temp_data, record_id + ".bin")
+                self._sync_store()
+                self._new_member(temp_meta, _canonical(meta))
+                self._replace_member(temp_meta, record_id + ".json")
+                self._sync_store()
             finally:
-                temp_data.unlink(missing_ok=True)
-                temp_meta.unlink(missing_ok=True)
+                self._unlink_member(temp_data, missing_ok=True)
+                self._unlink_member(temp_meta, missing_ok=True)
             return {k: v for k, v in meta.items() if k != "nonce"}
 
     def read(self, record_id: str, identity: SpillIdentity) -> bytes:
@@ -299,10 +430,10 @@ class EncryptedSpillStore:
     def delete(self, record_id: str, identity: SpillIdentity) -> None:
         with self._lock():
             self._open(record_id, identity)
-            (self.root / (record_id + ".json")).unlink()
-            _sync(self.root)
-            (self.root / (record_id + ".bin")).unlink()
-            _sync(self.root)
+            self._unlink_member(record_id + ".json")
+            self._sync_store()
+            self._unlink_member(record_id + ".bin")
+            self._sync_store()
 
     def prune_orphans(self) -> dict[str, int]:
         with self._lock():
@@ -310,6 +441,6 @@ class EncryptedSpillStore:
             committed = {name[:-5] + ".bin" for name in manifests}
             orphans = [name for name in data if name not in committed]
             for name in (*orphans, *temps):
-                (self.root / name).unlink()
-            _sync(self.root)
+                self._unlink_member(name)
+            self._sync_store()
             return {"orphan_data_removed": len(orphans), "temp_files_removed": len(temps)}

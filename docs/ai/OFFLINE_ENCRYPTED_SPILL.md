@@ -42,3 +42,15 @@ locking, or accelerator memory persistence.
 Focused canonical tests:
 
     python -m pytest -q --noconftest skeleton/testing/test_offline_encrypted_spill.py
+
+## POSIX directory race hardening
+
+Store operations open every ancestor with `O_DIRECTORY | O_NOFOLLOW`,
+pin the root device/inode across the lock, and perform reads, writes,
+renames, scans, deletion, quota accounting and fsync relative to that
+descriptor. A replaced root or symlinked ancestor fails closed. CLI
+input and output files use descriptor-relative parent traversal on POSIX.
+This is filesystem race hardening, not secure deletion or a claim of
+protection from a malicious process running with the same account's
+ability to replace the lock file. Windows continues to rely on OS ACLs
+and is not certified against same-user ancestor substitution.

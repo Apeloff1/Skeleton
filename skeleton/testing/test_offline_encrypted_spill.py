@@ -85,7 +85,7 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
 
     def test_disk_reserve(self):
         usage = type("Usage", (), {"free": 1})()
-        with patch("skeleton.app.offline_encrypted_spill.shutil.disk_usage", return_value=usage):
+        with patch.object(self.store, "_free_bytes", return_value=usage.free):
             with self.assertRaisesRegex(SpillError, "reserve"):
                 self.store.put(b"payload", IDENTITY)
 
@@ -119,6 +119,33 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
             SpillIdentity(MODEL, TOKENIZER, "../escape", 0)
         with self.assertRaises(SpillError):
             SpillIdentity(MODEL, TOKENIZER, "valid", True)
+
+    def test_replaced_store_directory_fails_closed(self):
+        if os.name != "posix":
+            self.skipTest("POSIX directory-descriptor pinning")
+        receipt = self.store.put(b"private", IDENTITY)
+        moved = self.temp / "moved-store"
+        self.root.rename(moved)
+        self.root.mkdir(mode=0o700)
+        with self.assertRaisesRegex(SpillError, "identity changed"):
+            self.store.read(receipt["record_id"], IDENTITY)
+        self.assertEqual((moved / (receipt["record_id"] + ".bin")).is_file(), True)
+        self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_ancestor_symlink_swap_rejected(self):
+        if os.name != "posix":
+            self.skipTest("POSIX nofollow directory traversal")
+        parent = self.temp / "anchor"
+        parent.mkdir()
+        root = parent / "store"
+        pinned = EncryptedSpillStore(root, self.key)
+        receipt = pinned.put(b"private", IDENTITY)
+        renamed = self.temp / "renamed-anchor"
+        parent.rename(renamed)
+        parent.symlink_to(renamed, target_is_directory=True)
+        with self.assertRaisesRegex(SpillError, "symlinked or unsafe"):
+            pinned.read(receipt["record_id"], IDENTITY)
+        self.assertTrue((renamed / "store" / (receipt["record_id"] + ".bin")).is_file())
 
     def test_cli_round_trip_and_no_clobber(self):
         keyfile = self.temp / "key"
