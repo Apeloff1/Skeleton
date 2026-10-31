@@ -63,6 +63,18 @@ def test_finish_before_stages_rejected():
     assert unchanged is state
     assert receipt.reason == "stages-incomplete"
 
+def test_extra_advance_after_final_stage_fails_closed():
+    state, _ = replay(execution()[:4])
+    assert state.stage == len(STAGES)
+    unchanged, receipt = transition(
+        state, cmd("extra-stage", "advance", state.batch,
+                   state.version, state.tick + 1, "duplicate-stage-evidence")
+    )
+    assert unchanged is state
+    assert not receipt.accepted
+    assert receipt.reason == "stages-complete-awaiting-quality"
+
+
 def test_finish_requires_quality_evidence():
     state, _ = replay(execution()[:4])
     unchanged, receipt = transition(state, cmd("finish", "finish", 1, 4, 5))

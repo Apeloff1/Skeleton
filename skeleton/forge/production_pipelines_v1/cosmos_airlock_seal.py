@@ -152,6 +152,8 @@ def transition(
     elif action == "advance":
         if status != "working" or batch != lot:
             return reject("not-current-lot")
+        if stage >= len(STAGES):
+            return reject("stages-complete-awaiting-quality")
         if not evidence:
             return reject("stage-evidence-missing")
         required_energy = ENERGY_PER_STAGE * lot
