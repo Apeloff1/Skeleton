@@ -102,24 +102,54 @@ class ServingResources:
     process_rss_bytes: int | None = None
     available_memory_bytes: int | None = None
     source: str = "unavailable"
+    memory_stall_fraction: float | None = None
+    memory_full_stall_fraction: float | None = None
+    io_stall_fraction: float | None = None
+    io_full_stall_fraction: float | None = None
+    swap_used_fraction: float | None = None
+    swap_available_bytes: int | None = None
+    commit_used_fraction: float | None = None
+    commit_available_bytes: int | None = None
+    thermal_level: str | None = None
+    thermal_headroom_c: float | None = None
 
     def __post_init__(self) -> None:
-        for name in ("memory_used_fraction", "cpu_load_fraction"):
+        for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction", "io_stall_fraction", "io_full_stall_fraction", "swap_used_fraction", "commit_used_fraction"):
             value = getattr(self, name)
             if value is not None and (
                 isinstance(value, bool)
                 or not isinstance(value, (int, float))
                 or not math.isfinite(value)
                 or value < 0
-                or (name == "memory_used_fraction" and value > 1)
+                or (name != "cpu_load_fraction" and value > 1)
             ):
                 raise ValueError(f"{name} must be a finite non-negative resource measurement")
-        for name in ("process_rss_bytes", "available_memory_bytes"):
+        for name in ("process_rss_bytes", "available_memory_bytes", "swap_available_bytes", "commit_available_bytes"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a non-negative byte count")
         if not isinstance(self.source, str) or not self.source or len(self.source) > 256:
             raise ValueError("resource measurement source must be bounded")
+        if self.thermal_level not in {None, "normal", "elevated", "critical"} or (
+            self.thermal_level is not None and type(self.thermal_level) is not str
+        ):
+            raise ValueError("invalid thermal pressure level")
+        if self.thermal_headroom_c is not None and (
+            isinstance(self.thermal_headroom_c, bool)
+            or not isinstance(self.thermal_headroom_c, (int, float))
+            or not math.isfinite(self.thermal_headroom_c)
+            or not -250.0 <= self.thermal_headroom_c <= 250.0
+        ):
+            raise ValueError("invalid measured thermal headroom")
+
+    @property
+    def allocation_headroom_bytes(self) -> int | None:
+        """Conservative shared physical/Windows commit admission headroom."""
+        bounds = tuple(
+            value for value in (self.available_memory_bytes, self.commit_available_bytes)
+            if value is not None
+        )
+        return min(bounds) if bounds else None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -165,8 +195,14 @@ class AdaptiveServingController:
         self._last_sample = None
 
     def observe(self, *, elapsed_ms: float, queue_wait_ms: float, failed: bool) -> None:
-        self.latency_ewma_ms = self._ewma(self.latency_ewma_ms, max(0.0, elapsed_ms))
-        self.queue_wait_ewma_ms = self._ewma(self.queue_wait_ewma_ms, max(0.0, queue_wait_ms))
+        for name, value in (("elapsed_ms", elapsed_ms), ("queue_wait_ms", queue_wait_ms)):
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value < 0):
+                raise ValueError(f"{name} must be finite and non-negative")
+        if type(failed) is not bool:
+            raise ValueError("failed must be boolean")
+        self.latency_ewma_ms = self._ewma(self.latency_ewma_ms, elapsed_ms)
+        self.queue_wait_ewma_ms = self._ewma(self.queue_wait_ewma_ms, queue_wait_ms)
         self.failure_ewma = self._ewma(self.failure_ewma, 1.0 if failed else 0.0)
         self.observations += 1
 
@@ -182,12 +218,50 @@ class AdaptiveServingController:
         policy = self.policy
         memory = resources.memory_used_fraction
         cpu = resources.cpu_load_fraction
-        critical = memory is not None and memory >= min(
+        partial_stall = resources.memory_stall_fraction
+        full_stall = resources.memory_full_stall_fraction
+        io_stall = resources.io_stall_fraction
+        io_full_stall = resources.io_full_stall_fraction
+        commit_fraction = resources.commit_used_fraction
+        commit_critical = commit_fraction is not None and commit_fraction >= 0.97
+        io_critical = (
+            (io_stall is not None and io_stall >= 0.70)
+            or (io_full_stall is not None and io_full_stall >= 0.30)
+        )
+        memory_critical = memory is not None and memory >= min(
             0.99, policy.memory_high_watermark + 0.05, policy.memory_shed_watermark,
         )
+        stall_critical = (
+            (partial_stall is not None and partial_stall >= 0.50)
+            or (full_stall is not None and full_stall >= 0.10)
+        )
+        thermal_critical = resources.thermal_level == "critical"
+        critical = memory_critical or stall_critical or thermal_critical or io_critical or commit_critical
         reason = "within_operator_limits"
-        if critical:
+        if memory_critical:
             reason = "memory_critical"
+        elif stall_critical:
+            reason = "memory_stall_critical"
+        elif thermal_critical:
+            reason = "thermal_critical"
+        elif io_critical:
+            reason = "io_stall_critical"
+        elif commit_critical:
+            reason = "windows_commit_critical"
+        elif resources.thermal_level == "elevated":
+            reason = "thermal_pressure"
+        elif commit_fraction is not None and commit_fraction >= 0.90:
+            reason = "windows_commit_pressure"
+        elif (
+            (io_stall is not None and io_stall >= 0.30)
+            or (io_full_stall is not None and io_full_stall >= 0.10)
+        ):
+            reason = "io_stall_pressure"
+        elif (
+            (partial_stall is not None and partial_stall >= 0.15)
+            or (full_stall is not None and full_stall >= 0.03)
+        ):
+            reason = "memory_stall_pressure"
         elif memory is not None and memory >= policy.memory_high_watermark:
             reason = "memory_pressure"
         elif cpu is not None and cpu >= 0.95:
@@ -201,8 +275,21 @@ class AdaptiveServingController:
         ):
             reason = "latency_pressure"
         pressured = reason != "within_operator_limits"
+        # A wholly unavailable resource snapshot cannot certify recovery.
+        capacity_observed = (
+            memory is not None or partial_stall is not None or full_stall is not None
+            or io_stall is not None or io_full_stall is not None
+            or resources.thermal_level is not None or commit_fraction is not None
+        )
         healthy = (
-            (memory is None or memory <= policy.memory_low_watermark)
+            capacity_observed
+            and (memory is None or memory <= policy.memory_low_watermark)
+            and (partial_stall is None or partial_stall <= 0.03)
+            and (full_stall is None or full_stall <= 0.01)
+            and (io_stall is None or io_stall <= 0.05)
+            and (io_full_stall is None or io_full_stall <= 0.01)
+            and (commit_fraction is None or commit_fraction <= 0.80)
+            and resources.thermal_level in {None, "normal"}
             and (cpu is None or cpu < 0.85)
             and self.failure_ewma < 0.1
             and (self.latency_ewma_ms is None or self.latency_ewma_ms < policy.target_latency_ms * 0.85)
