@@ -963,3 +963,77 @@ def execute_dialogue_preview_tool(request: Mapping[str, Any], *,
         payload["author_receipt"] = author_receipt
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_COMMIT_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_commit_request.v1"
+DIALOGUE_COMMIT_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_commit_result.v1"
+
+
+def dialogue_commit_tool_schema() -> dict[str, object]:
+    """Typed optimistic commit of one previewed authored quest decision."""
+    return {
+        "name": "studio_dialogue_choice_commit",
+        "description": "Replay an exact source-leased NPC choice and return a verified quest save receipt",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_COMMIT_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_preview_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "stage_id": {"type": "string", "minLength": 1, "maxLength": 256},
+                "alternative": {"type": "string", "minLength": 1, "maxLength": 256},
+                "scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                          "items": {"type": "object"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "expected_preview_digest", "stage_id", "alternative", "actions"],
+        },
+    }
+
+
+def execute_dialogue_commit_tool(request: Mapping[str, Any], *,
+                                 authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue choice commit requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest",
+                "expected_preview_digest", "stage_id", "alternative", "actions"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"scene_id", "edits"}
+            or request.get("schema") != DIALOGUE_COMMIT_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue choice commit request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_choice_commit import (
+        commit_dialogue_choice,
+    )
+    source = read_blueprint(request["project_id"])
+    expected = request["expected_source_digest"]
+    author_receipt = None
+    if "edits" in request:
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            REVISION_SCHEMA, preview_canon_revision,
+        )
+        source, _, author_receipt = preview_canon_revision(
+            source, {
+                "schema": REVISION_SCHEMA, "project_id": request["project_id"],
+                "expected_source_digest": expected, "edits": request["edits"],
+            }, authorized=True)
+        expected = author_receipt["revised_source_digest"]
+    detail = commit_dialogue_choice(
+        source, request["actions"], authorized=True,
+        stage_id=request["stage_id"], alternative=request["alternative"],
+        expected_preview_digest=request["expected_preview_digest"],
+        expected_source_digest=expected, scene_id=request.get("scene_id"))
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_COMMIT_RESULT_SCHEMA,
+        "project_id": request["project_id"], "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    if author_receipt is not None:
+        payload["author_receipt"] = author_receipt
+    payload["result_digest"] = _digest(payload)
+    return payload

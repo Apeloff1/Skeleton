@@ -598,3 +598,21 @@ The CLI syntax and revision identity regression suite is
 `tests/test_studio_ecosystem_dialogue_choice_preview.py`, alongside the
 existing dialogue revision/handoff and faction-plan tests. Exact-head
 repository CI remains mandatory before promotion.
+
+## Source-leased NPC choice commitment
+
+The `--project <id> --dialogue-stage --dialogue-commit` command requires
+`--dialogue-choice-stage`, `--dialogue-choice-alternative`, and the exact
+`--dialogue-preview-digest` obtained from a current `--dialogue-preview`
+result. The preview digest is an optimistic lease on the authored choice,
+source identity, and complete quest history. A stale, locked, completed, or
+unwritten alternative fails closed. The output contains a canonical quest
+receipt, source-bound next-scene cards, and deterministic progress, so the
+operator can explicitly persist and resume the simulation. No file is
+silently written and no external evidence or native runtime completion is
+claimed.
+
+Typed Jeeves parity is provided by `execute_dialogue_commit_tool`, using
+`skeleton.jeeves.studio_dialogue_commit_request.v1`; authored revision
+inputs are source-leased before commitment. Regression coverage lives in
+`tests/test_studio_ecosystem_dialogue_choice_commit.py`.
