@@ -54,12 +54,24 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
     capabilities.add_argument("--resource-monitor", action="store_true",
                               help="inspect measured local hardware without a model")
+    capabilities.add_argument("--stage-sources", action="store_true",
+                              help="verify selected local sources without a model")
     parser.add_argument("--resource-plan-bytes", type=int,
                         help="optional read-only source size for adaptive planning")
     parser.add_argument("--resource-streams", type=int,
                         help="optional desired concurrent read streams")
     parser.add_argument("--resource-root",
                         help="selected local storage directory for disk telemetry")
+    parser.add_argument("--stage-root", help="trusted local source directory")
+    parser.add_argument("--stage-path", action="append", help="relative file to hash (repeat)")
+    parser.add_argument("--stage-approve", action="store_true",
+                        help="explicitly approve read-only access to selected files")
+    parser.add_argument("--stage-manifest-digest",
+                        help="previously pinned digest to reverify against live bytes")
+    parser.add_argument("--stage-streams", type=int,
+                        help="desired concurrent file streams")
+    parser.add_argument("--stage-deadline-s", type=float,
+                        help="finite positive staging deadline in seconds")
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
     capabilities.add_argument("--homebrew-editor", help="open native visual editor for a verified ORIGINAL homebrew capsule")
@@ -163,6 +175,65 @@ def main(argv: Sequence[str] | None = None) -> int:
     if (args.resource_plan_bytes is not None or args.resource_streams is not None
             or args.resource_root is not None):
         print("resource planning options require --resource-monitor", file=sys.stderr)
+        return 2
+    if args.stage_sources:
+        baseline = vars(_parser().parse_args([]))
+        allowed = {
+            "stage_sources", "stage_root", "stage_path", "stage_approve",
+            "stage_manifest_digest", "stage_streams", "stage_deadline_s",
+            "json_output",
+        }
+        if any(
+            getattr(args, name) != default for name, default in baseline.items()
+            if name not in allowed
+        ):
+            print("source staging cannot combine with model or job modes",
+                  file=sys.stderr)
+            return 2
+        names = args.stage_path or []
+        if (not args.stage_approve or not args.stage_root or not names
+                or len(names) > 64 or len(names) != len(set(names))
+                or args.stage_streams is not None and args.stage_streams <= 0):
+            print("explicit approval, trusted root and 1–64 unique files required",
+                  file=sys.stderr)
+            return 2
+        root = Path(args.stage_root)
+        if root.is_symlink() or not root.is_dir():
+            print("stage root must be a regular local directory", file=sys.stderr)
+            return 2
+        from .offline_resource_fabric import (
+            AdaptiveResourceFabric, build_staging_manifest,
+        )
+        fabric = AdaptiveResourceFabric(root)
+        try:
+            if args.stage_manifest_digest is None:
+                records = fabric.stream_readonly(
+                    root, names, desired_streams=args.stage_streams or 1,
+                    deadline_s=args.stage_deadline_s,
+                )
+                receipt = build_staging_manifest(records)
+            else:
+                receipt = fabric.reverify_staging_manifest(
+                    root, names, args.stage_manifest_digest,
+                    desired_streams=args.stage_streams or 1,
+                    deadline_s=args.stage_deadline_s,
+                )
+            if args.json_output:
+                print(json.dumps(receipt, sort_keys=True, allow_nan=False))
+            else:
+                print("Verified local source manifest: " + receipt["manifest_digest"])
+                print("Sources: " + str(receipt["source_count"]))
+                print("Bytes: " + str(receipt["source_bytes"]))
+                print("No model, GPU transfer, or remote provider was used.")
+            return 0
+        except (OSError, ValueError, RuntimeError) as exc:
+            print("source staging or re-verification rejected: " + str(exc),
+                  file=sys.stderr)
+            return 1
+    if (args.stage_root is not None or args.stage_path is not None
+            or args.stage_approve or args.stage_manifest_digest is not None
+            or args.stage_streams is not None or args.stage_deadline_s is not None):
+        print("source staging options require --stage-sources", file=sys.stderr)
         return 2
     library_mode = args.index_dir is not None or args.search is not None
     snapshot_mode = bool(

@@ -495,3 +495,20 @@ job, workspace or capability flags fail closed; invalid roots, nonpositive
 stream counts and negative source sizes are rejected. The deterministic
 test uses explicitly simulated hardware snapshots and is not device
 qualification.
+
+
+## Provider-free CLI source staging and replay
+
+The same canonical offline CLI also supports explicitly approved read-only
+source verification without a model or network:
+
+    python -m skeleton.app.offline_cli --stage-sources --stage-approve --stage-root ./project --stage-path story.txt --json
+
+The response includes a deterministic manifest_digest. A later invocation
+can supply --stage-manifest-digest with the same ordered --stage-path values
+to rehash current source bytes and reject mutation or reordering. Use
+--stage-streams and --stage-deadline-s to request bounded concurrent reads.
+The source count is limited per invocation for UI/CLI latency, not a maximum
+total project file count; large catalogs must page their source selections.
+A missing approval, symlink escape, malformed deadline or conflicting CLI
+mode is rejected before claiming provenance.

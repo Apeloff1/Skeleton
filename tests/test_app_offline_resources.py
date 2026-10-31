@@ -17,6 +17,58 @@ from skeleton.app.offline_resources import (
 
 
 class LocalResourceBudgetTests(unittest.TestCase):
+    def test_canonical_offline_cli_stages_and_reverifies_actual_source_bytes(self):
+        from skeleton.app.offline_cli import main
+        measured = self.snapshot(memory=8_000_000_000, disk=300_000_000_000)
+        with TemporaryDirectory() as root:
+            selected = Path(root) / "story.txt"
+            selected.write_text("original narrative continuity")
+            flags = [
+                "--stage-sources", "--stage-approve", "--stage-root", root,
+                "--stage-path", "story.txt", "--stage-streams", "2", "--json",
+            ]
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=measured,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                out, err = StringIO(), StringIO()
+                with redirect_stdout(out), redirect_stderr(err):
+                    self.assertEqual(main(flags), 0, err.getvalue())
+                manifest = json.loads(out.getvalue())
+                self.assertEqual(manifest["source_count"], 1)
+                self.assertEqual(manifest["source_bytes"], selected.stat().st_size)
+                self.assertFalse(manifest["manifest_authenticated"])
+                replay = flags + [
+                    "--stage-manifest-digest", manifest["manifest_digest"],
+                ]
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    self.assertEqual(main(replay), 0)
+                selected.write_text("mutated narrative continuity")
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    self.assertEqual(main(replay), 1)
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    self.assertEqual(main(flags[:-1]), 0)
+
+    def test_stage_cli_fails_closed_without_approval_or_valid_deadline(self):
+        from skeleton.app.offline_cli import main
+        with TemporaryDirectory() as root:
+            (Path(root) / "file.txt").write_text("original")
+            cases = (
+                ["--stage-sources", "--stage-root", root, "--stage-path", "file.txt"],
+                ["--stage-sources", "--stage-approve", "--stage-root", root,
+                 "--stage-path", "../escape"],
+                ["--stage-sources", "--stage-approve", "--stage-root", root,
+                 "--stage-path", "file.txt", "--stage-deadline-s", "nan"],
+                ["--stage-path", "file.txt"],
+            )
+            for args in cases:
+                with self.subTest(args=args), redirect_stdout(StringIO()), \
+                     redirect_stderr(StringIO()):
+                    self.assertNotEqual(main(args), 0)
+
     def test_canonical_offline_cli_measures_resources_without_model(self):
         from skeleton.app.offline_cli import main
         measured = self.snapshot(memory=8_000_000_000, disk=300_000_000_000)
