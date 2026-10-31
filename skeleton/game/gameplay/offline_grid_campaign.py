@@ -199,7 +199,12 @@ class Session:
     ending: str | None = None
     health: int = 10
     enemies: tuple[tuple[str, int], ...] = ()
-    events: tuple[dict, ...] = ()
+    _events: tuple[str, ...] = ()
+
+    @property
+    def events(self) -> tuple[dict, ...]:
+        # Return detached values; a consumer cannot rewrite authoritative replay.
+        return tuple(json.loads(event) for event in self._events)
 
     @classmethod
     def new(cls, campaign: Campaign) -> "Session":
@@ -224,9 +229,9 @@ class Session:
     def step(self, command: Command) -> "Session":
         if self.ending is not None:
             _fail("terminal game state")
-        if len(self.events) >= MAX_EVENTS:
+        if len(self._events) >= MAX_EVENTS:
             _fail("event budget exhausted")
-        if command.command_id in {event["command_id"] for event in self.events}:
+        if command.command_id in {json.loads(event)["command_id"] for event in self._events}:
             _fail("replayed command identity")
         x, y = self.x, self.y
         inventory = self.inventory
@@ -291,7 +296,8 @@ class Session:
             "kind": command.kind,
             "target": command.target,
             "tick": self.tick + 1,
-            "previous_digest": self.events[-1]["digest"] if self.events else self.campaign.source_digest,
+            "previous_digest": json.loads(self._events[-1])["digest"]
+                               if self._events else self.campaign.source_digest,
         }
         event["digest"] = dig({
             "event": event, "source": self.campaign.source_digest, "position": [x, y],
@@ -300,7 +306,7 @@ class Session:
         })
         return Session(
             self.campaign, x, y, self.tick + 1, inventory, spoken, quests, ending,
-            health, tuple(sorted(enemies.items())), (*self.events, event),
+            health, tuple(sorted(enemies.items())), (*self._events, _canonical(event)),
         )
 
     @property

@@ -52,6 +52,15 @@ class OfflineGridCampaignTests(unittest.TestCase):
         with self.assertRaises(GameplayContractError):
             self.play(movements[:-1] + [("bad", "finish", "homecoming")])
 
+    def test_event_views_cannot_corrupt_authoritative_replay(self):
+        session = self.play()
+        original = session.snapshot()
+        leaked = session.events[0]
+        leaked["command_id"] = "forged"
+        leaked["digest"] = "0" * 64
+        self.assertEqual(session.snapshot(), original)
+        self.assertEqual(Session.restore(self.campaign, original), session)
+
     def test_replay_and_collision_do_not_mutate_state(self):
         state = Session.new(self.campaign)
         with self.assertRaises(GameplayContractError):
