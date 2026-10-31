@@ -86,7 +86,7 @@ def _events(path: Path) -> list[QuestTrigger]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Deterministic offline quest journal")
-    parser.add_argument("command", choices=("inspect", "run", "verify", "play", "solve"))
+    parser.add_argument("command", choices=("inspect", "run", "verify", "play", "solve", "timeline", "compare"))
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--events", type=Path, help="ordered authored event triggers for run")
     parser.add_argument("--save", type=Path, help="new no-clobber save output, or input for verify")
@@ -94,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
         "--resume", type=Path,
         help="verified previous save for play; output must be a new file",
     )
+    parser.add_argument("--left-save", type=Path)
+    parser.add_argument("--right-save", type=Path)
     parser.add_argument("--goal-ending")
     parser.add_argument("--max-search-nodes", type=int, default=1024)
     parser.add_argument("--max-search-depth", type=int, default=24)
@@ -106,7 +108,21 @@ def main(argv: list[str] | None = None) -> int:
             or args.max_search_depth != 24
         ):
             raise GameplayContractError("route options require solve")
-        if args.command == "solve":
+        if args.command in ("timeline", "compare"):
+            from skeleton.game.gameplay.quest_timeline import (
+                compare_journals, inspect_journal,
+            )
+            if args.events is not None or args.resume is not None:
+                raise GameplayContractError("timeline forbids event and resume inputs")
+            if args.command == "timeline":
+                if args.save is None or args.left_save or args.right_save:
+                    raise GameplayContractError("timeline requires only --save")
+                result = inspect_journal(engine, _read(args.save))
+            else:
+                if args.save is not None or args.left_save is None or args.right_save is None:
+                    raise GameplayContractError("compare requires --left-save and --right-save")
+                result = compare_journals(engine, _read(args.left_save), _read(args.right_save))
+        elif args.command == "solve":
             if args.events or args.save or args.resume or not args.goal_ending:
                 raise GameplayContractError("solve requires --goal-ending only")
             result = QuestRoutePlanner(engine).solve(
