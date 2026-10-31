@@ -284,12 +284,16 @@ jobs:
           uv run python scripts/check_live_service_test_boundaries.py
           uv run python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
       - name: Run in-process backend suite
-        env: {MONGO_URL: mongodb://localhost:27017/test}
+        env: {MONGO_URL: mongodb://localhost:27017/test, PYTHONPATH: ".:..:core"}
         run: |
           # Remote/deployed service regressions are explicitly marked live_service;
           # this job validates the checked-out backend without assuming a server
           # is already listening on localhost:8001 or a mutable preview deployment.
-          uv run pytest tests/ -m "not live_service" -v --cov=. --cov-report=xml
+          extra=()
+          for p in ../skeleton/economy/gameplay/tests ../skeleton/gameforge/batch_b07* ../skeleton/gameforge/batch_b080 ../tests/api_v1_edge ../tests/backend_core ../tests/forge_ai_builder ../tests/frontier/worldsim ../tests/game ../tests/game_asset_ingest ../tests/game_builder ../tests/gate_plane_core_mount ../tests/gate_plane_hooks_wire ../tests/perf_profiler ../tests/test_api_v1_reference_drift.py ../tests/test_architecture_current_docs_refs.py ../tests/test_frontier_nav_cognition_loop.py ../tests/test_frontier_nav_route_repair.py ../tests/test_game_frontier_event_authority.py ../tests/test_game_frontier_runtime_binding.py ../tests/test_game_frontier_scene_qa.py ../tests/test_game_multi_actor_semantic.py ../tests/test_gf_b032_memory_planes.py ../tests/test_gf_b034_npc_cognition.py ../tests/test_gf_b035_canon.py ../tests/test_gf_b036_dialogue.py ../tests/test_gf_b092_ir.py ../tests/test_gf_b093_targets.py ../tests/test_gf_b095_plugin_sdk.py ../tests/test_gf_b097_semantic_merge.py ../tests/test_gf_b099_ugc_sandbox.py ../tests/test_request_seal_v2.py ../tests/test_request_seal_v3_binding.py ../tests/game_mods ../tests/gate_plane_s2s_auth; do
+            [ -e "$p" ] && extra+=("$p")
+          done
+          uv run pytest tests/ "${extra[@]}" -m "not live_service" -v --cov=. --cov-report=xml
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   backend-import-smoke:
