@@ -76,7 +76,6 @@ def test_alternate_ending_blocks_future_chapters_without_granting_flags():
     lambda s: s["journal"][0].update(receipt="0" * 64),
     lambda s: s["journal"][1]["action"].update(kind="advance"),
     lambda s: s["save"].update(parent_save_digest=None),
-    lambda s: s["state"]["active_quest"].update(state_digest="0" * 64),
 ])
 def test_tampered_campaign_save_is_rejected(mutation):
     saved = simulate_campaign(original_campaign(), demo_campaign_actions()[:4])
@@ -141,3 +140,10 @@ def test_cli_is_reachable_and_errors_are_nonzero(capsys):
     assert cli(["simulate", "--source-json", '{"bad":true}',
                 "--actions-json", "[]"]) == 2
     assert json.loads(capsys.readouterr().err)["ok"] is False
+
+
+def test_forged_active_quest_digest_is_rejected():
+    saved = simulate_campaign(original_campaign(), demo_campaign_actions()[:4])
+    saved["state"]["active_quest"]["state_digest"] = "0" * 64
+    with pytest.raises(CombatSessionError):
+        verify_campaign(saved)

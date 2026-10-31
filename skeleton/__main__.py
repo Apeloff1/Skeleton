@@ -65,6 +65,7 @@ Commands:
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-author  Edit original quest source and preview offline gameplay
     quest-campaign  Play, resume, verify and export multi-chapter offline quests
+    quest-campaign-author  Edit and preview replay-verified chapter campaigns
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -767,6 +768,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-campaign":
         from skeleton.game.gameplay.quest_chapter_campaign import cli as campaign_cli
         return campaign_cli(rest)
+    if cmd == "quest-campaign-author":
+        from skeleton.game.gameplay.quest_chapter_campaign_author import cli as campaign_author_cli
+        return campaign_author_cli(rest)
     if cmd == "combat-expedition":
         from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
         return expedition_cli(rest)
