@@ -10,7 +10,8 @@ from typing import Callable
 from ._helpers import canonical, digest
 from .b095_plugin_sdk import SDK_API
 
-MOD_PERMISSIONS = frozenset({"read_save", "add_content", "ui_overlay"})
+# override_content: replace/remove existing plan values (mods package, declarative hooks).
+MOD_PERMISSIONS = frozenset({"read_save", "add_content", "override_content", "ui_overlay"})
 
 
 @dataclass(frozen=True)
