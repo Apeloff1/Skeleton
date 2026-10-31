@@ -162,6 +162,9 @@ def verify_package(payload: bytes) -> dict:
             expected = _manifest(manifest["package_id"], manifest["author"], manifest["license"], entries)
             if manifest != expected:
                 raise BuildContractError("package manifest integrity mismatch")
+            if build_package(manifest["package_id"], manifest["author"],
+                             manifest["license"], files) != payload:
+                raise BuildContractError("noncanonical archive representation")
             return {
                 "ok": True, "package_id": manifest["package_id"],
                 "package_digest": manifest["package_digest"],

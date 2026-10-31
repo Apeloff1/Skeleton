@@ -62,6 +62,11 @@ class OfflinePackageTests(unittest.TestCase):
         with self.assertRaises(BuildContractError):
             verify_package(output.getvalue())
 
+    def test_reject_trailing_bytes_and_noncanonical_metadata(self):
+        original = build_package("harbor-demo", "Skeleton original studio", "CC0-1.0", FILES)
+        with self.assertRaises(BuildContractError):
+            verify_package(original + b"untrusted-trailer")
+
     def test_reject_zip_slip_symlink_and_compression(self):
         for name, mode, compression in (
             ("../escape", 0o100644, zipfile.ZIP_STORED),
