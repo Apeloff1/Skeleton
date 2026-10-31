@@ -51,8 +51,6 @@ def audit_catalog_walk_choices(
                 session, documents, authorized=True,
             )
             replay_work += result["replay_work_events"]
-            if replay_work > MAX_CATALOG_AUDIT_REPLAY_EVENTS:
-                raise StudioQuestError("catalog choice audit replay budget exceeded")
             projects.append({
                 "project_id": project_id,
                 "status": "covered" if result["complete_reference_path_coverage"]
@@ -73,6 +71,8 @@ def audit_catalog_walk_choices(
                 "alternatives_unverified": None,
                 "stop_reason": "source_or_replay_validation_failed",
             })
+    if replay_work > MAX_CATALOG_AUDIT_REPLAY_EVENTS:
+        raise StudioQuestError("catalog choice audit replay budget exceeded")
     if _sha(list_blueprints(genre=genre, biome=biome)) != index_digest:
         raise StudioQuestError("catalog changed during choice audit")
     next_offset = offset + len(selected)
@@ -92,8 +92,8 @@ def audit_catalog_walk_choices(
         "next_offset": next_offset,
         "replay_work_events": replay_work,
         "complete_page_coverage": complete_page,
-        "complete_catalog_coverage": offset == 0 and next_offset is None
-                                     and complete_page,
+        "complete_catalog_coverage": bool(records) and offset == 0
+                                     and next_offset is None and complete_page,
         "all_branch_combinations_verified": False,
         "external_evidence_verified": False,
         "native_genre_runtime_verified": False,

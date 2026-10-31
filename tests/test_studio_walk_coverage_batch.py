@@ -75,7 +75,7 @@ def test_cli_catalog_audit_and_mode_exclusion(monkeypatch, capsys):
     assert cli.main(["--walk-audit-catalog"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["filtered_project_count"] == 0
-    assert result["complete_catalog_coverage"] is True
+    assert result["complete_catalog_coverage"] is False
     with pytest.raises(SystemExit) as error:
         cli.main(["--walk-audit-catalog", "--play-walk", "--project", "x"])
     assert error.value.code == 2
