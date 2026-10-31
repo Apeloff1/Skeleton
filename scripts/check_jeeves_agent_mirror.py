@@ -34,6 +34,18 @@ REQUIRED = (
 )
 
 
+def _has_symlink_component(root: Path, target: Path) -> bool:
+    """Reject redirected directories as well as linked source files."""
+    if root.is_symlink():
+        return True
+    current = root
+    for component in target.relative_to(root).parts:
+        current = current / component
+        if current.is_symlink():
+            return True
+    return False
+
+
 def check_parity(root: Path = ROOT) -> dict[str, object]:
     """Rebuild equality evidence from immutable checked-out files."""
     records = []
@@ -42,7 +54,7 @@ def check_parity(root: Path = ROOT) -> dict[str, object]:
         mirror = root / MIRROR / name
         # is_file() follows symlinks: a redirected file must not satisfy
         # canonical/mirror custody even when its target has identical bytes.
-        if original.is_symlink() or mirror.is_symlink():
+        if _has_symlink_component(root, original) or _has_symlink_component(root, mirror):
             records.append({"name": name, "status": "symlink"})
             continue
         if not original.is_file() or not mirror.is_file():
