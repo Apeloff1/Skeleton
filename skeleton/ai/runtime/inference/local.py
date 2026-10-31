@@ -51,6 +51,7 @@ from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 
 from .adaptive_serving import AdaptiveServingController, ServingResources
 from .linux_pressure import read_linux_memory_pressure
+from .linux_thermal import sample_linux_thermal
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
@@ -1221,10 +1222,14 @@ def _sample_linux_resources() -> ServingResources:
         _resource_text, cgroup_directory=unified[0] if unified is not None else None
     )
     sources.append(pressure.source)
+    thermal = sample_linux_thermal(_resource_text)
+    sources.append(thermal.source)
     return ServingResources(
         memory, cpu, rss, available, ",".join(sources),
         memory_stall_fraction=pressure.some_avg10,
         memory_full_stall_fraction=pressure.full_avg10,
+        thermal_level=thermal.level,
+        thermal_headroom_c=thermal.minimum_headroom_c,
     )
 
 

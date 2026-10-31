@@ -104,6 +104,8 @@ class ServingResources:
     source: str = "unavailable"
     memory_stall_fraction: float | None = None
     memory_full_stall_fraction: float | None = None
+    thermal_level: str | None = None
+    thermal_headroom_c: float | None = None
 
     def __post_init__(self) -> None:
         for name in ("memory_used_fraction", "cpu_load_fraction", "memory_stall_fraction", "memory_full_stall_fraction"):
@@ -122,6 +124,17 @@ class ServingResources:
                 raise ValueError(f"{name} must be a non-negative byte count")
         if not isinstance(self.source, str) or not self.source or len(self.source) > 256:
             raise ValueError("resource measurement source must be bounded")
+        if self.thermal_level not in {None, "normal", "elevated", "critical"} or (
+            self.thermal_level is not None and type(self.thermal_level) is not str
+        ):
+            raise ValueError("invalid thermal pressure level")
+        if self.thermal_headroom_c is not None and (
+            isinstance(self.thermal_headroom_c, bool)
+            or not isinstance(self.thermal_headroom_c, (int, float))
+            or not math.isfinite(self.thermal_headroom_c)
+            or not -250.0 <= self.thermal_headroom_c <= 250.0
+        ):
+            raise ValueError("invalid measured thermal headroom")
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -193,12 +206,17 @@ class AdaptiveServingController:
             (partial_stall is not None and partial_stall >= 0.50)
             or (full_stall is not None and full_stall >= 0.10)
         )
-        critical = memory_critical or stall_critical
+        thermal_critical = resources.thermal_level == "critical"
+        critical = memory_critical or stall_critical or thermal_critical
         reason = "within_operator_limits"
         if memory_critical:
             reason = "memory_critical"
         elif stall_critical:
             reason = "memory_stall_critical"
+        elif thermal_critical:
+            reason = "thermal_critical"
+        elif resources.thermal_level == "elevated":
+            reason = "thermal_pressure"
         elif (
             (partial_stall is not None and partial_stall >= 0.15)
             or (full_stall is not None and full_stall >= 0.03)
@@ -221,6 +239,7 @@ class AdaptiveServingController:
             (memory is None or memory <= policy.memory_low_watermark)
             and (partial_stall is None or partial_stall <= 0.03)
             and (full_stall is None or full_stall <= 0.01)
+            and resources.thermal_level in {None, "normal"}
             and (cpu is None or cpu < 0.85)
             and self.failure_ewma < 0.1
             and (self.latency_ewma_ms is None or self.latency_ewma_ms < policy.target_latency_ms * 0.85)
