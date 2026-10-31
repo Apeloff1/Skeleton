@@ -198,7 +198,8 @@ def main(argv: list[str] | None = None) -> int:
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
     if args.ending_plan:
-        if (not args.project or not args.ending_id or args.play_quest
+        if (not args.project or not args.ending_id or args.cherry_pick_revision
+                or args.play_quest
                 or args.play_walk or args.author_revision or args.merge_revisions
                 or args.revision_lineage or args.revision_impact or args.audit_canon
                 or args.compile_preview or args.materialize_batch

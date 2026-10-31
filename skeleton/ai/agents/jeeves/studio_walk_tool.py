@@ -695,6 +695,9 @@ def execute_ending_plan_tool(request: Mapping[str, Any], *,
         raise StudioQuestError("invalid typed Jeeves ending plan request")
     from skeleton.ai.game_builder.studio_ecosystem_ending_plan import plan_authored_ending
     from skeleton.ai.game_builder.studio_ecosystem_quest import replay_quest
+    if ("preferred_choices" in request
+            and type(request["preferred_choices"]) is not dict):
+        raise StudioQuestError("invalid typed Jeeves preferred ending choices")
     source = read_blueprint(request["project_id"])
     session = replay_quest(source, request["actions"], authorized=True)
     detail = plan_authored_ending(

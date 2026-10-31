@@ -141,3 +141,14 @@ def test_preferred_alternative_cli_and_jeeves_parity(capsys):
                                  authorized=True)
     with pytest.raises(SystemExit):
         main(["--project", PROJECT, "--ending-choices", "{}"])
+
+def test_jeeves_rejects_null_preference_and_cli_conflicting_modes():
+    from scripts.studio_ecosystem_cli import main
+    request = {"schema": ENDING_PLAN_REQUEST_SCHEMA,
+               "project_id": PROJECT, "ending_id": "commons", "actions": [],
+               "preferred_choices": None}
+    with pytest.raises(StudioQuestError, match="preferred"):
+        execute_ending_plan_tool(request, authorized=True)
+    with pytest.raises(SystemExit):
+        main(["--project", PROJECT, "--ending-plan", "--ending-id", "commons",
+              "--cherry-pick-revision", "--ending-choices", "{}"])
