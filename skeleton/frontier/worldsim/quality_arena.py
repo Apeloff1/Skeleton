@@ -28,35 +28,78 @@ class ArenaScore:
     parts: Mapping[str, float]
     passed: bool
     failures: tuple[str, ...]
+    warnings: tuple[str, ...] = ()  # non-failing notes, e.g. "tile_layout_fallback"
+
+
+class TileLayoutError(ValueError):
+    pass
 
 
 def score(c: WorldCandidate, budget_ms: float,
-          constraints: Mapping[str, Callable[[WorldCandidate], bool]] | None = None) -> ArenaScore:
+          constraints: Mapping[str, Callable[[WorldCandidate], bool]] | None = None,
+          strict_tiles: bool = False) -> ArenaScore:
     rep = reachability_report(c.grid, c.spawn, c.objectives)
     reach = 1.0 - (len(rep["unreachable"]) / len(c.objectives) if c.objectives else 0.0)
-    variety = structured_variety(_tile_grid(c))
+    tiles, fallback = tile_layout(c, strict=strict_tiles)
+    variety = structured_variety(tiles)
     perf = 1.0 if c.cost_ms <= budget_ms else max(0.0, budget_ms / c.cost_ms)
     failed = tuple(sorted(n for n, f in (constraints or {}).items() if not f(c)))
     cons = 1.0 - (len(failed) / len(constraints) if constraints else 0.0)
     parts = {"reachability": round(reach, 6), "variety": round(variety, 6),
              "performance": round(perf, 6), "constraints": round(cons, 6)}
     fails = failed + (("unreachable_objectives",) if not rep["ok"] else ()) + (("over_budget",) if perf < 1 else ())
-    return ArenaScore(c.world_id, round(sum(WEIGHTS[k] * v for k, v in parts.items()), 6), parts, not fails, fails)
+    return ArenaScore(c.world_id, round(sum(WEIGHTS[k] * v for k, v in parts.items()), 6), parts, not fails, fails,
+                      ("tile_layout_fallback",) if fallback else ())
+
+
+def tile_layout(c: WorldCandidate, strict: bool = False) -> tuple[list[list[str]], bool]:
+    """2D tiles for variety plus a fallback flag.
+
+    Explicit ``tile_rows`` win; else ``tile_kinds`` laid out over the nav grid
+    when sizes match. On a size mismatch the tiles become a single row and the
+    flag is True (variety is then unreliable); with ``strict`` it raises instead.
+    """
+    if c.tile_rows:
+        return [list(r) for r in c.tile_rows], False
+    k, w = list(c.tile_kinds), c.grid.width
+    if not k:
+        return [], False
+    if len(k) == w * c.grid.height:
+        return [k[i:i + w] for i in range(0, len(k), w)], False
+    if strict:
+        raise TileLayoutError(f"{c.world_id}: {len(k)} tile_kinds for {w}x{c.grid.height} grid; pass tile_rows")
+    return [k], True
 
 
 def _tile_grid(c: WorldCandidate) -> list[list[str]]:
-    """2D tiles for variety: explicit ``tile_rows``, else ``tile_kinds`` laid out
-    over the nav grid when sizes match, else a single row."""
-    if c.tile_rows:
-        return [list(r) for r in c.tile_rows]
-    k, w = list(c.tile_kinds), c.grid.width
-    if k and len(k) == w * c.grid.height:
-        return [k[i:i + w] for i in range(0, len(k), w)]
-    return [k] if k else []
+    return tile_layout(c)[0]
 
 
-def rank(cands: Sequence[WorldCandidate], budget_ms: float, constraints: Any = None) -> list[ArenaScore]:
-    return sorted((score(c, budget_ms, constraints) for c in cands), key=lambda s: (-s.passed, -s.total, s.world_id))
+def _gate_failures(c: WorldCandidate, base: ArenaScore, gates: GateSpec | None) -> tuple[str, ...]:
+    """Hard reachability gate shared by ``rank`` and ``score_paced``."""
+    if not c.objectives:
+        return ()
+    lock = detect_softlocks(c.grid, gates or GateSpec(), c.spawn, c.objectives)
+    return (("softlock",) if lock["softlock_cells"] else ()) + \
+        (("unreachable_objectives",) if "unreachable_objectives" not in base.failures
+         and not lock.get("goal_reachable", True) else ())
+
+
+def rank(cands: Sequence[WorldCandidate], budget_ms: float, constraints: Any = None,
+         gates: GateSpec | None = None) -> list[ArenaScore]:
+    """Rank candidates. Same hard gate as ``score_paced``: a softlocked world or
+    one with an unreachable objective scores 0 and fails, so it can't rank high.
+    ``gates`` (optional) describes keys/doors; default is an ungated GateSpec."""
+    out = []
+    for c in cands:
+        s = score(c, budget_ms, constraints)
+        gf = _gate_failures(c, s, gates)
+        if "unreachable_objectives" in s.failures:  # already failing; softlock adds no signal
+            gf = tuple(f for f in gf if f != "softlock")
+        if gf or "unreachable_objectives" in s.failures:
+            s = ArenaScore(s.world_id, 0.0, s.parts, False, s.failures + gf, s.warnings)
+        out.append(s)
+    return sorted(out, key=lambda s: (-s.passed, -s.total, s.world_id))
 
 
 # --- Pacing and encounter spacing (Wally review on #4268) ---
@@ -99,21 +142,17 @@ def score_paced(c: WorldCandidate, budget_ms: float, intensity: Sequence[float],
     """Paced score. Reachability is a hard gate: any unreachable objective or
     softlock (state from which no objective can be reached) scores 0 and fails."""
     base = score(c, budget_ms, constraints)
-    lock = detect_softlocks(c.grid, gates or GateSpec(), c.spawn, c.objectives) if c.objectives \
-        else {"ok": True, "softlock_cells": []}
-    gate_fails = (("softlock",) if lock["softlock_cells"] else ()) + \
-        (("unreachable_objectives",) if "unreachable_objectives" not in base.failures
-         and c.objectives and not lock.get("goal_reachable", True) else ())
+    gate_fails = _gate_failures(c, base, gates)
     if gate_fails or "unreachable_objectives" in base.failures:
         parts = dict(base.parts, pacing=0.0, encounter_spacing=0.0)
-        return ArenaScore(c.world_id, 0.0, parts, False, base.failures + gate_fails)
+        return ArenaScore(c.world_id, 0.0, parts, False, base.failures + gate_fails, base.warnings)
     parts = dict(base.parts)
     parts["pacing"] = pacing_score(intensity)
     parts["encounter_spacing"] = encounter_spacing_score(encounters, *gap)
     fails = base.failures + (("flat_pacing",) if parts["pacing"] < 0.5 else ()) \
         + (("encounter_spacing",) if parts["encounter_spacing"] < 0.5 else ())
     total = round(sum(PACED_WEIGHTS[k] * v for k, v in parts.items()), 6)
-    return ArenaScore(c.world_id, total, parts, not fails, fails)
+    return ArenaScore(c.world_id, total, parts, not fails, fails, base.warnings)
 
 
 # --- Structured variety (Wally LD review on #4268, note 4) ---

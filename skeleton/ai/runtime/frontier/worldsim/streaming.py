@@ -33,7 +33,7 @@ class StreamPlan:
 def plan_tick(focus: CellId, resident: Iterable[CellId], sizes: Mapping[CellId, int],
               budget: StreamBudget, heading: tuple[float, float] | None = None,
               path: Iterable[CellId] = (), ahead_bias: float = 1.5,
-              behind_radius: int | None = None) -> StreamPlan:
+              behind_radius: int | None = None, path_lookahead: int = 2) -> StreamPlan:
     """Load within radius under memory and per-tick load budgets.
 
     With ``heading`` (or a nav ``path``), cells ahead of the player and on the
@@ -42,7 +42,8 @@ def plan_tick(focus: CellId, resident: Iterable[CellId], sizes: Mapping[CellId, 
     path = tuple(path)
     if heading is not None or path:
         return plan_tick_directed(focus, heading or (0.0, 0.0), resident, sizes, budget,
-                                  ahead_bias=ahead_bias, path=path, behind_radius=behind_radius)
+                                  ahead_bias=ahead_bias, path=path, behind_radius=behind_radius,
+                                  path_lookahead=path_lookahead)
     fx, fy = focus
     dist = lambda c: max(abs(c[0] - fx), abs(c[1] - fy))  # noqa: E731
     wanted = sorted((c for c in sizes if dist(c) <= budget.radius), key=lambda c: (dist(c), c))
@@ -87,15 +88,20 @@ def _priority(c: CellId, focus: CellId, heading: tuple[float, float],
 def plan_tick_directed(focus: CellId, heading: tuple[float, float], resident: Iterable[CellId],
                        sizes: Mapping[CellId, int], budget: StreamBudget,
                        ahead_bias: float = 1.5, path: Iterable[CellId] = (),
-                       behind_radius: int | None = None) -> StreamPlan:
+                       behind_radius: int | None = None, path_lookahead: int = 2) -> StreamPlan:
     """Like ``plan_tick`` but loads cells ahead of the player (and on ``path``) first.
 
     ``behind_radius`` optionally shrinks the wanted radius for cells behind the
     heading (cosine < 0), freeing memory for look-ahead. Zero heading falls back
     to nearest-first ordering, so stationary players behave like ``plan_tick``.
+
+    Path cells may extend past ``radius`` by at most ``path_lookahead`` cells,
+    and any such cell is ordered after every in-radius cell (near before far).
     """
     if ahead_bias < 0:
         raise StreamingError("ahead_bias must be >= 0")
+    if path_lookahead < 0:
+        raise StreamingError("path_lookahead must be >= 0")
     fx, fy = focus
     hx, hy = heading
     path_rank = {c: i for i, c in enumerate(path) if c in sizes}
@@ -104,13 +110,14 @@ def plan_tick_directed(focus: CellId, heading: tuple[float, float], resident: It
         dx, dy = c[0] - fx, c[1] - fy
         d = max(abs(dx), abs(dy))
         if c in path_rank:
-            return True
+            return d <= budget.radius + path_lookahead
         if behind_radius is not None and dx * hx + dy * hy < 0:
             return d <= min(behind_radius, budget.radius)
         return d <= budget.radius
 
+    beyond = lambda c: max(abs(c[0] - fx), abs(c[1] - fy)) > budget.radius  # noqa: E731
     wanted = sorted((c for c in sizes if in_range(c)),
-                    key=lambda c: _priority(c, focus, heading, ahead_bias, path_rank))
+                    key=lambda c: (beyond(c), _priority(c, focus, heading, ahead_bias, path_rank)))
     wanted_set = set(wanted)
     res = set(resident)
     unload = sorted(c for c in res if c not in wanted_set)
