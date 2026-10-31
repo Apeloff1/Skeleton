@@ -101,6 +101,8 @@ class OfflineGridCampaignTests(unittest.TestCase):
             lambda v: v["rows"].__setitem__(0, "##X######"),
             lambda v: v["objects"].append(dict(v["objects"][0])),
             lambda v: v["objects"][0].update(x=0, y=0),
+            lambda v: v["objects"][2].update(hp=0),
+            lambda v: v["objects"][2].update(attack=True),
             lambda v: v["quests"][0].update(requires_items=["unknown"]),
             lambda v: v["quests"][0].update(requires_quests=["lightkeeper"]),
             lambda v: v["endings"][0].update(requires_quests=["missing"]),
@@ -115,6 +117,27 @@ class OfflineGridCampaignTests(unittest.TestCase):
                 Campaign.load(source)
         with self.assertRaises(GameplayContractError):
             Campaign.load({"rows": []})
+
+    def test_combat_collision_damage_and_replay(self):
+        state = Session.new(self.campaign)
+        for identity, direction in (
+            ("e1", "east"), ("e2", "east"), ("s1", "south"),
+            ("s2", "south"), ("e3", "east"), ("e4", "east"),
+        ):
+            state = state.step(Command(identity, "move", direction))
+        self.assertEqual((state.x, state.y), (5, 3))
+        self.assertIn("E", state.render())
+        with self.assertRaises(GameplayContractError):
+            state.step(Command("blocked", "move", "east"))
+        first = state.step(Command("strike1", "strike", "mireling"))
+        self.assertEqual(first.health, 9)
+        self.assertEqual(dict(first.enemies)["mireling"], 1)
+        defeated = first.step(Command("strike2", "strike", "mireling"))
+        self.assertEqual(dict(defeated.enemies)["mireling"], 0)
+        self.assertEqual(defeated.health, 9)
+        self.assertEqual(Session.restore(self.campaign, defeated.snapshot()), defeated)
+        with self.assertRaises(GameplayContractError):
+            defeated.step(Command("strike3", "strike", "mireling"))
 
     def test_terminal_and_event_limits(self):
         state = self.play()

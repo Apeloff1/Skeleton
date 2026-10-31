@@ -44,3 +44,10 @@ It renders the current map after each accepted action, rejects invalid commands
 without advancing the tick, and prints a replayable save as the final output
 line on victory, quit, or end-of-file. Keyboard text input is supported; touch,
 controller, screen-reader and native rendering qualification remain separate.
+
+A bounded turn-based enemy is also supported: original `mireling` starts
+with 3 HP and attack 1. `strike mireling` requires Manhattan adjacency,
+inflicts 2 damage, and permits a counterattack only while the enemy survives.
+Living enemies block movement. Health starts at 10; zero health terminates in
+`defeat`. No RNG, external game assets, or hidden real-time simulation is used.
+Combat health and enemy state are included in source-bound save/replay hashes.

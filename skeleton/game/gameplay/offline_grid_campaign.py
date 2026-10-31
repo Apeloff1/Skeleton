@@ -87,14 +87,18 @@ class Campaign:
         object_ids = set()
         item_ids = set()
         npc_ids = set()
+        enemy_ids = set()
         occupied = set()
         for obj in objects:
-            _keys(obj, {"id", "kind", "x", "y"})
+            if not isinstance(obj, dict):
+                _fail("invalid game object")
+            _keys(obj, {"id", "kind", "x", "y"},
+                  {"hp", "attack"} if obj.get("kind") == "enemy" else frozenset())
             identifier = req_id(obj["id"], "object id")
             if identifier in object_ids:
                 _fail("duplicate object")
             object_ids.add(identifier)
-            if obj["kind"] not in ("item", "npc"):
+            if obj["kind"] not in ("item", "npc", "enemy"):
                 _fail("invalid object kind")
             x, y = obj["x"], obj["y"]
             if type(x) is not int or type(y) is not int or not (0 <= x < width and 0 <= y < len(rows)):
@@ -102,7 +106,13 @@ class Campaign:
             if rows[y][x] == "#" or (x, y) in occupied:
                 _fail("object on wall or overlapping")
             occupied.add((x, y))
-            (item_ids if obj["kind"] == "item" else npc_ids).add(identifier)
+            if obj["kind"] == "enemy":
+                if (type(obj.get("hp")) is not int or not 1 <= obj["hp"] <= 20
+                    or type(obj.get("attack")) is not int or not 0 <= obj["attack"] <= 5):
+                    _fail("invalid enemy combat bounds")
+                enemy_ids.add(identifier)
+            else:
+                (item_ids if obj["kind"] == "item" else npc_ids).add(identifier)
         quests = source["quests"]
         if not isinstance(quests, list) or len(quests) > MAX_OBJECTS:
             _fail("invalid quests")
@@ -150,11 +160,11 @@ class Command:
 
     def __post_init__(self) -> None:
         req_id(self.command_id, "command_id")
-        if self.kind not in ("move", "collect", "talk", "finish", "wait"):
+        if self.kind not in ("move", "collect", "talk", "strike", "finish", "wait"):
             _fail("unknown command")
         if self.kind == "move" and self.target not in DIRECTIONS:
             _fail("unknown direction")
-        if self.kind in ("collect", "talk", "finish"):
+        if self.kind in ("collect", "talk", "strike", "finish"):
             req_id(self.target, "target")
         if self.kind == "wait" and self.target:
             _fail("wait cannot have target")
@@ -172,12 +182,17 @@ class Session:
     spoken: tuple[str, ...] = ()
     quests: tuple[str, ...] = ()
     ending: str | None = None
+    health: int = 10
+    enemies: tuple[tuple[str, int], ...] = ()
     events: tuple[dict, ...] = ()
 
     @classmethod
     def new(cls, campaign: Campaign) -> "Session":
         x, y = campaign.start
-        return cls(campaign, x, y)
+        enemies = tuple(sorted(
+            (obj["id"], obj["hp"]) for obj in campaign.spec["objects"] if obj["kind"] == "enemy"
+        ))
+        return cls(campaign, x, y, enemies=enemies)
 
     def _completed(self, inventory: tuple[str, ...], spoken: tuple[str, ...]) -> tuple[str, ...]:
         completed: set[str] = set()
@@ -202,6 +217,8 @@ class Session:
         inventory = self.inventory
         spoken = self.spoken
         ending = None
+        health = self.health
+        enemies = dict(self.enemies)
         spec = self.campaign.spec
         if command.kind == "move":
             dx, dy = DIRECTIONS[command.target]
@@ -209,6 +226,9 @@ class Session:
             rows = spec["rows"]
             if not (0 <= ny < len(rows) and 0 <= nx < len(rows[0])) or rows[ny][nx] == "#":
                 _fail("collision with wall or boundary")
+            if any(obj["kind"] == "enemy" and obj["x"] == nx and obj["y"] == ny
+                   and enemies[obj["id"]] > 0 for obj in spec["objects"]):
+                _fail("living enemy blocks movement")
             x, y = nx, ny
         elif command.kind in ("collect", "talk"):
             expected_kind = "item" if command.kind == "collect" else "npc"
@@ -223,6 +243,17 @@ class Session:
                 if command.target in spoken:
                     _fail("NPC already contacted")
                 spoken = tuple(sorted((*spoken, command.target)))
+        elif command.kind == "strike":
+            target = next((obj for obj in spec["objects"]
+                           if obj["id"] == command.target and obj["kind"] == "enemy"), None)
+            if (target is None or enemies[target["id"]] <= 0
+                or abs(target["x"] - x) + abs(target["y"] - y) != 1):
+                _fail("combat target unavailable or out of range")
+            enemies[target["id"]] = max(0, enemies[target["id"]] - 2)
+            if enemies[target["id"]] > 0:
+                health = max(0, health - target["attack"])
+                if health == 0:
+                    ending = "defeat"
         elif command.kind == "finish":
             if spec["rows"][y][x] != "G":
                 _fail("finish requires goal tile")
@@ -241,9 +272,12 @@ class Session:
         event["digest"] = dig({
             "event": event, "source": self.campaign.source_digest, "position": [x, y],
             "inventory": inventory, "spoken": spoken, "quests": quests, "ending": ending,
+            "health": health, "enemies": sorted(enemies.items()),
         })
-        return Session(self.campaign, x, y, self.tick + 1, inventory, spoken, quests, ending,
-                       (*self.events, event))
+        return Session(
+            self.campaign, x, y, self.tick + 1, inventory, spoken, quests, ending,
+            health, tuple(sorted(enemies.items())), (*self.events, event),
+        )
 
     @property
     def state_digest(self) -> str:
@@ -254,6 +288,7 @@ class Session:
             "x": self.x, "y": self.y, "tick": self.tick,
             "inventory": list(self.inventory), "spoken": list(self.spoken),
             "quests": list(self.quests), "ending": self.ending,
+            "health": self.health, "enemies": [list(pair) for pair in self.enemies],
         }
 
     def snapshot(self) -> dict:
@@ -288,6 +323,10 @@ class Session:
         for obj in self.campaign.spec["objects"]:
             if obj["kind"] == "item" and obj["id"] in self.inventory:
                 continue
-            rows[obj["y"]][obj["x"]] = "*" if obj["kind"] == "item" else "N"
+            if obj["kind"] == "enemy":
+                if dict(self.enemies)[obj["id"]] > 0:
+                    rows[obj["y"]][obj["x"]] = "E"
+            else:
+                rows[obj["y"]][obj["x"]] = "*" if obj["kind"] == "item" else "N"
         rows[self.y][self.x] = "@"
         return "\n".join("".join(row) for row in rows)

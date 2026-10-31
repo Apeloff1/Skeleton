@@ -24,6 +24,14 @@
       "kind": "npc",
       "x": 3,
       "y": 1
+    },
+    {
+      "id": "mireling",
+      "kind": "enemy",
+      "x": 6,
+      "y": 3,
+      "hp": 3,
+      "attack": 1
     }
   ],
   "quests": [
