@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import tomllib
 
 
@@ -29,12 +30,16 @@ def test_native_assembly_sources_and_header_are_package_data() -> None:
     assert "asm/*.h" in setup_cfg
 
 
-def test_packaging_workflow_watches_native_source_tree() -> None:
+def test_archived_packaging_workflow_retains_native_wheel_check() -> None:
+    # The specialist was intentionally archived under the slim CI policy.
+    # Its presence here is not a runnable workflow or release qualification.
+    assert not (ROOT / ".github" / "workflows" / "packaging-runtime-image.yml").exists()
     workflow = (
-        ROOT / ".github" / "workflows" / "packaging-runtime-image.yml"
+        ROOT / ".github" / "workflows-archive" / "packaging-runtime-image.yml"
     ).read_text(encoding="utf-8")
 
-    assert workflow.count('      - "skeleton/native/**"') == 2
+    assert "on:\n  workflow_dispatch:" in workflow
+    assert "python -m pip wheel --no-deps" in workflow
     assert "Verify native Assembly payload in wheel" in workflow
     assert "skeleton/native/asm/skeleton_asm.h" in workflow
 
@@ -45,8 +50,8 @@ def test_runtime_image_excludes_development_payload() -> None:
     assert '.[dev]' not in dockerfile
     assert "p['optional-dependencies']['local-inference']" in dockerfile
     assert "p['optional-dependencies']['hosted-inference']" in dockerfile
-    assert "pip install --no-cache-dir -r /tmp/skeleton-runtime-requirements.txt" in dockerfile
-    assert "pip install --no-cache-dir --no-deps --no-build-isolation ." in dockerfile
+    assert re.search(r"pip install --no-cache-dir (?:--no-compile )?-r /tmp/skeleton-runtime-requirements\.txt", dockerfile)
+    assert re.search(r"pip install --no-cache-dir (?:--no-compile )?--no-deps --no-build-isolation \.", dockerfile)
     assert "pip install --no-cache-dir -e" not in dockerfile
     assert "COPY tests" not in dockerfile
     assert "USER appuser" in dockerfile
