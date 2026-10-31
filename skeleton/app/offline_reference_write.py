@@ -16,7 +16,6 @@ from typing import Any
 from uuid import UUID
 
 from skeleton.app.offline_knowledge import (
-    MAX_DOCUMENT_BYTES,
     MAX_TITLE_BYTES,
     OfflineKnowledgeLibrary,
     _terms,
@@ -87,8 +86,6 @@ def _body(value: object) -> str:
         raise ReferenceWriteRejected("text must contain text")
     if value != value.strip() or "\x00" in value:
         raise ReferenceWriteRejected("text must be normalized")
-    if len(value.encode("utf-8")) > MAX_DOCUMENT_BYTES:
-        raise ReferenceWriteRejected("text exceeds the local reference budget")
     if not _terms(value):
         raise ReferenceWriteRejected("text has no searchable terms")
     return value
@@ -115,7 +112,7 @@ def _manifest() -> ToolManifest:
             "required": ["title", "text"],
             "properties": {
                 "title": {"type": "string", "minLength": 1, "maxLength": MAX_TITLE_BYTES},
-                "text": {"type": "string", "minLength": 1, "maxLength": MAX_DOCUMENT_BYTES},
+                "text": {"type": "string", "minLength": 1},
             },
         },
         effect=ToolEffect.REVERSIBLE,

@@ -41,6 +41,8 @@ async def run_session(body: RunBody):
     result = get_orchestrator().run(body.session_id, actor="api")
     if not result.get("ok") and result.get("reason") in ("session_not_found", "invalid_session"):
         raise HTTPException(status_code=404, detail=result.get("reason"))
+    if not result.get("ok") and result.get("reason") == "studio_busy":
+        raise HTTPException(status_code=409, detail="studio_busy")
     return result
 
 

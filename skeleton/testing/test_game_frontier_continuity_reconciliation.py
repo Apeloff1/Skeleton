@@ -250,6 +250,23 @@ def test_continuity_book_has_repeatable_digest_and_comparable_variants():
     assert all(item["content_sha256"] for item in ranked["items"])
 
 
+def test_virtual_handbook_negative_indices_follow_sequence_bounds():
+    from skeleton.forge.game_frontier_studio_continuity_handbooks import (
+        BOOK_COUNT, CONTINUITY_BOOK_PATHS,
+    )
+
+    paths = CONTINUITY_BOOK_PATHS
+    assert paths[-1] == paths[BOOK_COUNT - 1]
+    assert paths[-BOOK_COUNT] == paths[0]
+    assert paths[-3:] == tuple(paths[i] for i in range(BOOK_COUNT - 3, BOOK_COUNT))
+    with pytest.raises(StudioError, match="outside source catalogue"):
+        paths[-BOOK_COUNT - 1]
+    with pytest.raises(StudioError, match="outside source catalogue"):
+        paths[BOOK_COUNT]
+    with pytest.raises(TypeError, match="integer or slice"):
+        paths[True]
+
+
 def test_virtual_handbook_membership_and_rank_are_constant_space():
     from skeleton.forge.game_frontier_studio_continuity_handbooks import (
         CONTINUITY_BOOK_PATHS, BOOK_COUNT,
