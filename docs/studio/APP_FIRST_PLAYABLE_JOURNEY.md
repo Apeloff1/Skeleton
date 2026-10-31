@@ -169,3 +169,46 @@ rights clearance, native Godot test or consumer release qualification.
 
 Focused canonical regression:
 `python -m pytest -q skeleton/testing/test_app_receipt_reconciliation.py`.
+
+## Play, save and resume a verified offline game without network or model access
+
+The application can now run actual canonical player moves on an existing
+independently pinned original game source package. This does **not** execute
+untrusted browser JavaScript or Godot GDScript; the canonical typed Python
+gameplay engine performs each state transition and produces a hash-chained
+replay. It first verifies the package and reconstructs the original world from
+its pinned manifest, then verifies source again before handing it to gameplay.
+
+```sh
+python -m skeleton app studio-journey --play-existing \\
+  --output ./existing-original-game \\
+  --expected-manifest-sha256 <independent-game-pin> \\
+  --moves up,right,down --save ./private-save.json \\
+  --trusted-local-operator
+```
+
+A new save is published atomically and without clobbering an existing file,
+through POSIX owner-controlled, nofollow directory descriptors. Store the
+returned `independent_save_sha256` separately from the save file. To resume
+and append new player actions:
+
+```sh
+python -m skeleton app studio-journey --play-existing \\
+  --output ./existing-original-game \\
+  --expected-manifest-sha256 <independent-game-pin> \\
+  --load-save ./private-save.json \\
+  --expected-save-sha256 <independent-save-pin> \\
+  --moves left,up --trusted-local-operator
+```
+
+Restore rejects unpinned, changed, symlinked or hardlinked save files and
+foreign-world replay histories. The canonical deserializer independently
+reexecutes the entire action chain and checks every transition before adding
+moves. Source is reverified after save publication; if a concurrent source
+mutation is found, the save remains **unqualified**, not silently deleted.
+This is deterministic reference gameplay and private local save/recovery,
+not native Godot device qualification, multiplayer security, rights clearance,
+AI inference or consumer release certification. No network access is required.
+
+Focused tests: `python -m pytest -q
+skeleton/testing/test_app_offline_gameplay.py`.

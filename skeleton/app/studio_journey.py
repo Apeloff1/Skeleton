@@ -18,6 +18,7 @@ from typing import Sequence
 from skeleton.ai.game_builder.dual_runtime_export import DualRuntimeExportError
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, _read, _root_fd, verify_exported_package,
+    load_verified_playable_world,
 )
 from skeleton.ai.game_builder.offline_receipt_inspection import (
     ReceiptInspectionError, inspect_verified_receipt,
@@ -35,7 +36,13 @@ from skeleton.ai.game_builder.secure_export_publication import (
     AtomicDirectoryPublicationError, preflight_generated_tree_destination,
 )
 from skeleton.ai.game_builder.playable_compiler import PlayableCompilationError
-from skeleton.ai.game_builder.playable_simulation import GameplayError
+from skeleton.ai.game_builder.playable_simulation import (
+    GameplayError, deserialize_replay, play_actions, resume_replay,
+    serialize_replay,
+)
+from skeleton.app.private_game_save import (
+    PrivateGameSaveError, publish_private_game_save, read_private_game_save,
+)
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, PlayableWorldError
 from skeleton.ai.game_builder.mirror_room_runtime import MirrorRoomError
 from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
@@ -45,6 +52,7 @@ SCHEMA = "skeleton.app.first_playable_journey.v1"
 VERIFY_SCHEMA = "skeleton.app.first_playable_journey_verification.v1"
 INSPECT_SCHEMA = "skeleton.app.first_playable_receipt_inspection.v1"
 RECONCILE_SCHEMA = "skeleton.app.first_playable_receipt_reconciliation.v1"
+PLAY_SCHEMA = "skeleton.app.offline_source_gameplay.v1"
 
 
 class FirstPlayableJourneyError(ValueError):
@@ -303,6 +311,91 @@ def reconcile_first_playable_receipt(
     }
 
 
+def play_existing_source_game(
+    source_directory: str | Path, *, expected_manifest_sha256: str,
+    authorized: bool, moves: Sequence[str] = (),
+    load_save: str | Path | None = None,
+    expected_save_sha256: str | None = None,
+    save_destination: str | Path | None = None,
+) -> dict[str, object]:
+    """Execute actual offline player moves on a verified source-bound world.
+
+    A save is a canonical hash-chained replay, not a trusted state snapshot.
+    Restores reexecute every recorded move; fresh actions are appended only
+    after canonical verification. New saves are private and no-clobber.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    if (type(moves) not in (tuple, list) or len(moves) > 512
+            or any(type(move) is not str or move not in (
+                "up", "down", "left", "right",
+            ) for move in moves)):
+        raise FirstPlayableJourneyError("invalid bounded offline player moves")
+    if (load_save is None) != (expected_save_sha256 is None):
+        raise FirstPlayableJourneyError("restoring a save requires independent pin")
+    if save_destination is not None:
+        preflight_receipt_destination(
+            save_destination, protected_roots=(source_directory,), authorized=True,
+        )
+    world = load_verified_playable_world(
+        source_directory, expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    if load_save is None:
+        replay = play_actions(world, (), authorized=True)
+    else:
+        data = read_private_game_save(
+            load_save, expected_sha256=expected_save_sha256, authorized=True,
+        )
+        replay = deserialize_replay(world, data, authorized=True)
+    replay = resume_replay(world, replay, moves, authorized=True)
+    save_pin = None
+    if save_destination is not None:
+        data = serialize_replay(world, replay, authorized=True)
+        save_pin = publish_private_game_save(
+            data, save_destination, protected_roots=(source_directory,),
+            authorized=True,
+        )
+    # Source must still be the pinned game after gameplay/save publication.
+    final = verify_exported_package(
+        source_directory, expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    if final.get("world_digest") != world.digest:
+        raise FirstPlayableJourneyError("source changed during offline play")
+    return {
+        "schema": PLAY_SCHEMA,
+        "status": "offline_gameplay_replayed_release_blocked",
+        "project_id": world.intent.project_id,
+        "manifest_sha256": expected_manifest_sha256,
+        "world_digest": world.digest,
+        "replay_digest": replay.digest,
+        "action_count": len(replay.action_receipts),
+        "final_state": replay.final_state.to_payload(),
+        "save_file": str(save_destination) if save_pin is not None else None,
+        "independent_save_sha256": save_pin,
+        "offline_gameplay_reexecuted": True,
+        "model_inference_observed": False,
+        "native_godot_executed": False,
+        "native_device_qualified": False,
+        "rights_certified": False,
+        "release_certified": False,
+    }
+
+
+def _parse_moves(value: str | None) -> tuple[str, ...]:
+    if value is None or value == "":
+        return ()
+    if type(value) is not str or len(value) > 4096:
+        raise FirstPlayableJourneyError("offline move list exceeds byte budget")
+    moves = tuple(value.split(","))
+    if len(moves) > 512 or any(
+        move not in ("up", "down", "left", "right") for move in moves
+    ):
+        raise FirstPlayableJourneyError("invalid offline player action list")
+    return moves
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m skeleton app studio-journey",
@@ -321,6 +414,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--levels", type=int, help="level count for --onboard")
     parser.add_argument("--verify-existing", action="store_true",
                         help="read-only re-verification of an existing exported game")
+    parser.add_argument("--play-existing", action="store_true",
+                        help="run bounded player moves on independently verified offline game source")
+    parser.add_argument("--moves",
+                        help="comma-separated up/down/left/right controls for --play-existing")
+    parser.add_argument("--load-save",
+                        help="previous private canonical replay save for --play-existing")
+    parser.add_argument("--expected-save-sha256",
+                        help="independently held save digest required by --load-save")
+    parser.add_argument("--save",
+                        help="new owner-private no-clobber replay save .json destination")
     parser.add_argument("--reconcile-receipt", action="store_true",
                         help="bind an archived receipt to freshly replayed source using two independent pins")
     parser.add_argument("--inspect-receipt", action="store_true",
@@ -349,7 +452,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.project_id, args.title, args.subtitle, args.seed,
             args.theme, args.width, args.height, args.levels,
         )
-        if args.reconcile_receipt:
+        if args.play_existing:
+            if (args.reconcile_receipt or args.inspect_receipt or args.verify_existing
+                    or args.onboard or args.output is None
+                    or args.expected_manifest_sha256 is None
+                    or args.expected_receipt_sha256 is not None
+                    or args.receipt is not None or args.intent is not None
+                    or any(value is not None for value in onboarding_values)
+                    or args.mirror_attempts != 64 or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid offline gameplay mode")
+            receipt = play_existing_source_game(
+                args.output, expected_manifest_sha256=args.expected_manifest_sha256,
+                authorized=args.trusted_local_operator,
+                moves=_parse_moves(args.moves),
+                load_save=args.load_save,
+                expected_save_sha256=args.expected_save_sha256,
+                save_destination=args.save,
+            )
+        elif args.reconcile_receipt:
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+                raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
             if (args.inspect_receipt or args.verify_existing or args.onboard
                     or args.output is None or args.receipt is None
                     or args.expected_manifest_sha256 is None
@@ -365,7 +487,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authorized=args.trusted_local_operator,
             )
         elif args.inspect_receipt:
-            if (args.reconcile_receipt or args.verify_existing or args.onboard or args.output is not None
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+                raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
+            if (args.play_existing or args.reconcile_receipt or args.verify_existing or args.onboard or args.output is not None
                     or any(value is not None for value in onboarding_values)
                     or args.intent is not None or args.expected_manifest_sha256 is not None
                     or args.receipt is None or args.expected_receipt_sha256 is None
@@ -376,7 +500,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authorized=args.trusted_local_operator,
             )
         elif args.verify_existing:
-            if (args.reconcile_receipt or args.output is None or args.intent is not None or args.onboard
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+                raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
+            if (args.play_existing or args.reconcile_receipt or args.output is None or args.intent is not None or args.onboard
                     or any(value is not None for value in onboarding_values)
                     or args.expected_receipt_sha256 is not None
                     or args.mirror_attempts != 64 or args.practice_games != 0):
@@ -389,7 +515,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 receipt_destination=args.receipt,
             )
         else:
-            if (args.reconcile_receipt or args.output is None or args.expected_manifest_sha256 is not None
+            if args.moves is not None or args.load_save is not None or args.save is not None or args.expected_save_sha256 is not None:
+                raise FirstPlayableJourneyError("offline gameplay options require --play-existing")
+            if (args.play_existing or args.reconcile_receipt or args.output is None or args.expected_manifest_sha256 is not None
                     or args.expected_receipt_sha256 is not None):
                 raise FirstPlayableJourneyError(
                     "new game builds require --output and reject verification pins"
@@ -427,7 +555,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 receipt_destination=args.receipt,
             )
     except (
-        FirstPlayableJourneyError, StudioError, PlayableWorldError,
+        FirstPlayableJourneyError, PrivateGameSaveError, StudioError, PlayableWorldError,
         PlayableCompilationError, GameplayError, MirrorRoomError,
         ToolFabricError, DualRuntimeExportError, DualRuntimeVerificationError,
         ReceiptPublicationError, ReceiptInspectionError,
@@ -451,7 +579,8 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "SCHEMA", "VERIFY_SCHEMA", "INSPECT_SCHEMA", "RECONCILE_SCHEMA", "FirstPlayableJourneyError",
+    "SCHEMA", "VERIFY_SCHEMA", "INSPECT_SCHEMA", "RECONCILE_SCHEMA", "PLAY_SCHEMA", "FirstPlayableJourneyError",
     "build_first_playable_journey", "verify_existing_playable_journey",
-    "inspect_first_playable_receipt", "reconcile_first_playable_receipt", "main",
+    "inspect_first_playable_receipt", "reconcile_first_playable_receipt",
+    "play_existing_source_game", "main",
 ]

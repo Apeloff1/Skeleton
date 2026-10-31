@@ -394,4 +394,42 @@ def verify_exported_package(
         os.close(fd)
 
 
-__all__ = ["DualRuntimeVerificationError", "verify_exported_package"]
+def load_verified_playable_world(
+    root: str | Path, *, expected_manifest_sha256: str, authorized: bool,
+) -> PlayableWorld:
+    """Load a canonical world only from independently pinned replayable source.
+
+    The source is verified both before and after reading the world. This
+    returns a typed in-memory snapshot for offline play, never executable
+    content from the untrusted package or a persistent filesystem lock.
+    """
+    if authorized is not True:
+        raise PermissionError("operator authorization required for offline gameplay")
+    before = verify_exported_package(
+        root, expected_manifest_sha256=expected_manifest_sha256, authorized=True,
+    )
+    try:
+        fd = _root_fd(root)
+    except (OSError, TypeError, ValueError) as exc:
+        raise DualRuntimeVerificationError("unsafe offline game source") from exc
+    try:
+        manifest = _json(_read(fd, "release.json", _MAX_MANIFEST), _MAX_MANIFEST)
+        native = _json(_read(fd, "godot/world.json", _MAX_BYTES), _MAX_BYTES)
+        world = _world(native, manifest)
+        if world.digest != before["world_digest"]:
+            raise DualRuntimeVerificationError("offline world identity changed")
+        _assert_original_root(root, fd)
+    finally:
+        os.close(fd)
+    after = verify_exported_package(
+        root, expected_manifest_sha256=expected_manifest_sha256, authorized=True,
+    )
+    if after != before or world.digest != after["world_digest"]:
+        raise DualRuntimeVerificationError("offline game source changed during load")
+    return world
+
+
+__all__ = [
+    "DualRuntimeVerificationError", "verify_exported_package",
+    "load_verified_playable_world",
+]
