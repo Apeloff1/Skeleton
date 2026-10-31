@@ -1,8 +1,7 @@
 """Packaging parity for the optional hosted inference SDK.
 
-This test does not imply that OpenAI SDK v3 is runtime-compatible; it prevents
-the two supported packaging metadata sources from declaring conflicting
-major-version guarantees.
+The optional extra remains on the backend-compatible 2.x line until the
+provider stack and its regression tests qualify a 3.x migration.
 """
 from __future__ import annotations
 
@@ -30,7 +29,11 @@ def test_hosted_inference_sdk_requirements_match() -> None:
     assert _sdk_requirement(pyreqs) == _sdk_requirement(cfgreqs)
 
 
-def test_hosted_sdk_major_upgrade_uses_one_consistent_v3_floor() -> None:
+def test_hosted_sdk_floor_matches_current_backend_compatible_major() -> None:
+    """Do not advertise a v3 upgrade before the backend provider graph migrates."""
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     requirement = _sdk_requirement(pyproject["project"]["optional-dependencies"][EXTRA])
-    assert requirement == "openai>=3.37.0,<4", requirement
+    assert requirement == "openai>=2.54.0,<3", requirement
+    backend = (ROOT / "backend/requirements.txt").read_text(encoding="utf-8").splitlines()
+    pinned = [line.strip() for line in backend if line.strip().startswith("openai==")]
+    assert pinned == ["openai==2.54.0"], pinned
