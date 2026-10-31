@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--dialogue-compare-actions", metavar="JSON",
+                    help="Compare two replayed original NPC/quest choice histories without mutation")
     ap.add_argument("--dialogue-transcript", action="store_true",
                     help="Page source-verified NPC scene dialogue cues from authored quest history")
     ap.add_argument("--dialogue-transcript-offset", type=int, default=0)
@@ -252,7 +254,12 @@ def main(argv: list[str] | None = None) -> int:
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
-        if (args.dialogue_transcript and (
+        if (args.dialogue_compare_actions is not None and (
+                    args.dialogue_transcript or args.dialogue_commit
+                    or args.dialogue_preview or args.dialogue_restore_stdin
+                    or args.dialogue_export or args.dialogue_import is not None
+                    or args.output is not None)
+                or args.dialogue_transcript and (
                     args.dialogue_commit or args.dialogue_preview
                     or args.dialogue_restore_stdin or args.dialogue_export
                     or args.dialogue_import is not None or args.output is not None)
@@ -308,7 +315,22 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_transcript:
+            if args.dialogue_compare_actions is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_compare import (
+                    compare_dialogue_histories,
+                )
+                other_raw = args.dialogue_compare_actions.encode("utf-8", "strict")
+                if len(other_raw) > 16384:
+                    raise StudioQuestError("dialogue comparison exceeds byte budget")
+                other = json.loads(
+                    other_raw, object_pairs_hook=unique,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite dialogue comparison JSON")))
+                result = compare_dialogue_histories(
+                    docs, actions, other, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+            elif args.dialogue_transcript:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_transcript import (
                     compile_dialogue_transcript,
                 )
@@ -382,7 +404,8 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    if (args.dialogue_transcript or args.dialogue_restore_stdin
+    if (args.dialogue_compare_actions is not None or args.dialogue_transcript
+            or args.dialogue_restore_stdin
             or args.dialogue_commit
             or args.dialogue_preview or args.dialogue_export
             or args.dialogue_import is not None):

@@ -645,3 +645,17 @@ No generated speech, earned testimony, native engine or release qualification
 is implied. The typed Jeeves operation is
 `execute_dialogue_transcript_tool`; regression tests are in
 `tests/test_studio_ecosystem_dialogue_transcript.py`.
+
+## Original NPC dialogue branch comparison
+
+`--project <id> --dialogue-stage --dialogue-actions '<left>'`
+`--dialogue-compare-actions '<right>'` compares two independently
+source-replayed original quest histories. Both sides must use the same
+verified authored source; the result identifies the common choice prefix,
+first divergence, per-scene NPC/choice status changes, and each side's
+unresolved ending predicates. `--dialogue-revision-source` may bind both
+branches to the same verified edited source. Typed Jeeves parity is
+`execute_dialogue_compare_tool` and
+`skeleton.jeeves.studio_dialogue_compare_request.v1`.
+The comparison never mutates either history, fabricates spoken NPC lines,
+or claims a native runtime result.

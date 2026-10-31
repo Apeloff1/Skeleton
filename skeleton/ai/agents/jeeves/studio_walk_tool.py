@@ -1174,3 +1174,76 @@ def execute_dialogue_transcript_tool(request: Mapping[str, Any], *,
         payload["author_receipt"] = author_receipt
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_COMPARE_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_compare_request.v1"
+DIALOGUE_COMPARE_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_compare_result.v1"
+
+
+def dialogue_compare_tool_schema() -> dict[str, object]:
+    """Typed comparison of two independently replayed authored NPC branches."""
+    return {
+        "name": "studio_dialogue_branch_compare",
+        "description": "Compare two source-verified original NPC quest histories without changing either",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_COMPARE_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "compare_actions": {"type": "array", "maxItems": 64,
+                                    "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                              "items": {"type": "string"}}},
+                "edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                          "items": {"type": "object"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "actions", "compare_actions"],
+        },
+    }
+
+
+def execute_dialogue_compare_tool(request: Mapping[str, Any], *,
+                                  authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue comparison requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest",
+                "actions", "compare_actions"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"scene_id", "edits"}
+            or request.get("schema") != DIALOGUE_COMPARE_REQUEST_SCHEMA
+            or len(_canonical(request)) > 32768):
+        raise StudioQuestError("invalid typed Jeeves dialogue comparison request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_compare import (
+        compare_dialogue_histories,
+    )
+    source = read_blueprint(request["project_id"])
+    expected = request["expected_source_digest"]
+    author_receipt = None
+    if "edits" in request:
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            REVISION_SCHEMA, preview_canon_revision,
+        )
+        source, _, author_receipt = preview_canon_revision(
+            source, {
+                "schema": REVISION_SCHEMA, "project_id": request["project_id"],
+                "expected_source_digest": expected, "edits": request["edits"],
+            }, authorized=True)
+        expected = author_receipt["revised_source_digest"]
+    detail = compare_dialogue_histories(
+        source, request["actions"], request["compare_actions"],
+        authorized=True, expected_source_digest=expected,
+        scene_id=request.get("scene_id"))
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_COMPARE_RESULT_SCHEMA,
+        "project_id": request["project_id"], "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    if author_receipt is not None:
+        payload["author_receipt"] = author_receipt
+    payload["result_digest"] = _digest(payload)
+    return payload
