@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_narrative_mystery_salt_dunes",
+  "title": "Salt Dunes: Narrative Mystery",
+  "subtitle": "An original narrative mystery brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610301400,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "desert",
+  "starting_health": 3
+}
