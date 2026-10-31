@@ -28,6 +28,7 @@ from typing import Any, Iterable
 from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from .offline_io_pressure import IOPressureController, probe_io_pressure
 from .offline_cpu_throttle import CPUThrottleController, probe_cpu_throttle
+from .offline_swap_churn import SwapChurnController, probe_swap_counters
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
 )
@@ -382,6 +383,7 @@ class FabricPlan:
     cgroup_oom_backpressure: bool = False
     io_backpressure: bool = False
     cpu_throttle_backpressure: bool = False
+    swap_churn_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -397,6 +399,7 @@ class FabricPlan:
             "cgroup_oom_backpressure": self.cgroup_oom_backpressure,
             "io_backpressure": self.io_backpressure,
             "cpu_throttle_backpressure": self.cpu_throttle_backpressure,
+            "swap_churn_backpressure": self.swap_churn_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -459,9 +462,13 @@ class AdaptiveResourceFabric:
         self._cgroup = CgroupPressureTracker()
         self._io = IOPressureController()
         self._cpu_throttle = CPUThrottleController()
+        self._swap_churn = SwapChurnController()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
+        self._swap_churn.observe(
+            probe_swap_counters(), physical_ram_bytes=hardware.total_ram_bytes,
+        )
         gpus = probe_gpu_resources()
         self._cgroup.sample(probe_cgroup_events())
         self._io.observe(probe_io_pressure())
@@ -502,6 +509,7 @@ class AdaptiveResourceFabric:
         cgroup = self._cgroup.snapshot()
         io = self._io.snapshot()
         cpu_throttle = self._cpu_throttle.snapshot()
+        swap_churn = self._swap_churn.snapshot()
         if readonly_stream and cgroup["oom_backpressure"]:
             raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
@@ -542,7 +550,8 @@ class AdaptiveResourceFabric:
             max(1, int(hw.cpu_count * learned_parallelism)),
         )
         if (cgroup["high_backpressure"] or io["congested"]
-                or cpu_throttle["backpressure"]):
+                or cpu_throttle["backpressure"]
+                or swap_churn["backpressure"]):
             streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
@@ -607,6 +616,8 @@ class AdaptiveResourceFabric:
             reason += "; observed IO stall backpressure"
         if cpu_throttle["backpressure"]:
             reason += "; observed cgroup CPU throttling"
+        if swap_churn["backpressure"]:
+            reason += "; observed host swap page churn"
         evidence = {
             "source_bytes": source_bytes,
             "readonly_stream": readonly_stream,
@@ -623,6 +634,7 @@ class AdaptiveResourceFabric:
             "cgroup_oom_backpressure": cgroup["oom_backpressure"],
             "io_backpressure": io["congested"],
             "cpu_throttle_backpressure": cpu_throttle["backpressure"],
+            "swap_churn_backpressure": swap_churn["backpressure"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -641,6 +653,7 @@ class AdaptiveResourceFabric:
             cgroup_oom_backpressure=bool(cgroup["oom_backpressure"]),
             io_backpressure=bool(io["congested"]),
             cpu_throttle_backpressure=bool(cpu_throttle["backpressure"]),
+            swap_churn_backpressure=bool(swap_churn["backpressure"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -705,6 +718,7 @@ class AdaptiveResourceFabric:
             "cgroup_memory_events": self._cgroup.snapshot(),
             "io_pressure": self._io.snapshot(),
             "cpu_throttle": self._cpu_throttle.snapshot(),
+            "swap_churn": self._swap_churn.snapshot(),
         }
         return result
 

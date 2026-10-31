@@ -37,7 +37,7 @@ class FabricTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle']:
+        for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_swap_counters']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -649,7 +649,7 @@ class CgroupPressureTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_io_pressure','probe_cpu_throttle']:
+        for name in ['probe_io_pressure','probe_cpu_throttle','probe_swap_counters']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -767,7 +767,7 @@ class IOPressureTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_cgroup_events','probe_cpu_throttle']:
+        for name in ['probe_cgroup_events','probe_cpu_throttle','probe_swap_counters']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -849,7 +849,7 @@ class CPUThrottleTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_cgroup_events','probe_io_pressure']:
+        for name in ['probe_cgroup_events','probe_io_pressure','probe_swap_counters']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -921,6 +921,90 @@ class CPUThrottleTests(unittest.TestCase):
         self.assertFalse(controller.snapshot()["backpressure"])
         with self.assertRaises(TypeError):
             controller.observe({"periods": 100})
+
+
+
+class SwapChurnTests(unittest.TestCase):
+    """Synthetic Linux swap counters exercise the real adaptive staging planner."""
+
+    def setUp(self):
+        super().setUp()
+        for name in ('probe_cgroup_events','probe_io_pressure','probe_cpu_throttle'):
+            guard = patch("skeleton.app.offline_resource_fabric." + name,
+                          return_value=None)
+            guard.start()
+            self.addCleanup(guard.stop)
+
+    def test_proc_vmstat_probe_and_non_linux_gate(self):
+        from skeleton.app.offline_swap_churn import probe_swap_counters
+        with TemporaryDirectory() as d:
+            source = Path(d) / "vmstat"
+            source.write_text("pgpgin 10\npswpin 200\npswpout 300\n")
+            with patch("skeleton.app.offline_swap_churn.sys.platform", "linux"):
+                sample = probe_swap_counters(source)
+                self.assertEqual((sample.pages_in, sample.pages_out), (200, 300))
+                source.write_text("pswpin -1\npswpout 300\n")
+                self.assertIsNone(probe_swap_counters(source))
+            with patch("skeleton.app.offline_swap_churn.sys.platform", "win32"):
+                self.assertIsNone(probe_swap_counters(source))
+
+    def test_measured_swap_churn_caps_streams_and_recovers(self):
+        from skeleton.app.offline_swap_churn import SwapCounters, SwapChurnController
+        now = [1_000_000_000]
+        baseline = SwapCounters(100, 100)
+        busy = SwapCounters(5100, 5100)
+        recovered = SwapCounters(5300, 5300)
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            fabric._swap_churn = SwapChurnController(
+                clock_ns=lambda: now[0], page_size=4096,
+            )
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_swap_counters",
+                side_effect=[baseline, busy, recovered, recovered],
+            ):
+                self.assertGreater(fabric.plan(1000, desired_streams=8).stream_count, 1)
+                now[0] += 1_000_000_000
+                slowed = fabric.plan(1000, desired_streams=8)
+                self.assertTrue(slowed.swap_churn_backpressure)
+                self.assertEqual(slowed.stream_count, 1)
+                self.assertIn("swap page churn", slowed.reason)
+                now[0] += 1_000_000_000
+                self.assertFalse(fabric.plan(1000, desired_streams=8).swap_churn_backpressure)
+                monitor = fabric.monitor()["controller"]["swap_churn"]
+                self.assertTrue(monitor["measured"])
+                self.assertEqual(monitor["transitions"], 2)
+
+    def test_unknown_and_counter_reset_keep_pressure_hold(self):
+        from skeleton.app.offline_swap_churn import SwapCounters, SwapChurnController
+        now = [1_000_000_000]
+        tracker = SwapChurnController(clock_ns=lambda: now[0], page_size=4096)
+        tracker.observe(SwapCounters(0, 0), physical_ram_bytes=1_000_000_000)
+        now[0] += 1_000_000_000
+        tracker.observe(SwapCounters(2000, 2000), physical_ram_bytes=1_000_000_000)
+        self.assertTrue(tracker.snapshot()["backpressure"])
+        tracker.observe(None, physical_ram_bytes=1_000_000_000)
+        self.assertFalse(tracker.snapshot()["measured"])
+        tracker.observe(SwapCounters(0, 0), physical_ram_bytes=1_000_000_000)
+        self.assertTrue(tracker.snapshot()["backpressure"])
+        now[0] += 1_000_000_000
+        tracker.observe(SwapCounters(1, 1), physical_ram_bytes=1_000_000_000)
+        self.assertFalse(tracker.snapshot()["backpressure"])
+
+    def test_unsupported_page_size_is_unknown_not_guessed(self):
+        from skeleton.app.offline_swap_churn import SwapChurnController, SwapCounters
+        with patch("skeleton.app.offline_swap_churn.os.sysconf", side_effect=OSError):
+            tracker = SwapChurnController()
+        tracker.observe(None, physical_ram_bytes=1000)
+        self.assertIsNone(tracker.snapshot()["page_bytes"])
+        with self.assertRaises(ValueError):
+            tracker.observe(SwapCounters(0, 0), physical_ram_bytes=1000)
 
 
 if __name__ == "__main__":

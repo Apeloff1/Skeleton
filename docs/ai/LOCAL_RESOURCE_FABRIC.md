@@ -583,3 +583,17 @@ at most 5% throttled periods. Missing, reset or inconsistent counters cannot
 clear an existing hold. The monitor reports whether the sensor was measured,
 observed delta ratio and transition count. This is a CPU scheduling hint, not
 an OS quota modification or a claim of universal platform support.
+
+
+## Host swap-page churn protection
+
+Linux /proc/vmstat pswpin/pswpout counters are sampled as host-wide page
+traffic, never as free RAM. Consecutive monotonic counter deltas and the
+measured OS page size yield a byte-per-second swap churn rate. When that rate
+exceeds 0.2% of measured physical RAM per second, future source staging is
+limited to one stream; a subsequent rate below 0.05% permits recovery.
+Missing telemetry and counter resets preserve an active hold. This policy
+never changes system swap or assumes host traffic belongs to Skeleton alone.
+On platforms without measured page size or Linux vmstat, the sensor remains
+unavailable rather than substituting guessed capacity. The resource monitor
+exposes the actual observation scope, rate and backpressure state.
