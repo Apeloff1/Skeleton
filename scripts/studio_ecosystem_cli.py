@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--dialogue-restore-stdin", action="store_true",
+                    help="Verify a bounded canonical quest save from standard input and stage NPC scenes")
     ap.add_argument("--dialogue-commit", action="store_true",
                     help="Replay-verify and commit one previewed NPC quest choice to a receipt")
     ap.add_argument("--dialogue-choice-stage",
@@ -244,7 +246,11 @@ def main(argv: list[str] | None = None) -> int:
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
-        if (args.dialogue_commit and (
+        if (args.dialogue_restore_stdin and (
+                    args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_export or args.dialogue_import is not None
+                    or args.dialogue_actions is not None or args.output is not None)
+                or args.dialogue_commit and (
                     args.dialogue_preview or args.dialogue_export
                     or args.dialogue_import is not None or args.output is not None
                     or not args.dialogue_choice_stage or not args.dialogue_choice_alternative
@@ -288,7 +294,27 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_commit:
+            if args.dialogue_restore_stdin:
+                from skeleton.ai.game_builder.studio_ecosystem_quest_receipt_restore import (
+                    restore_quest_receipt, MAX_QUEST_RECEIPT_BYTES,
+                )
+                from skeleton.ai.game_builder.studio_ecosystem_quest import quest_progress
+                raw_receipt = sys.stdin.buffer.read(MAX_QUEST_RECEIPT_BYTES + 1)
+                restored = restore_quest_receipt(
+                    docs, raw_receipt, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest)
+                restored_actions = [list(pair) for pair in restored.choices]
+                staged = compile_dialogue_staging(
+                    docs, restored_actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+                result = {
+                    "receipt": restored.receipt(), "staging": staged,
+                    "progress": quest_progress(restored, docs),
+                    "restore_verified": True, "file_write_performed": False,
+                    "release_certified": False,
+                }
+            elif args.dialogue_commit:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_choice_commit import (
                     commit_dialogue_choice,
                 )
@@ -331,7 +357,8 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    if (args.dialogue_commit or args.dialogue_preview or args.dialogue_export
+    if (args.dialogue_restore_stdin or args.dialogue_commit
+            or args.dialogue_preview or args.dialogue_export
             or args.dialogue_import is not None):
         ap.error("--dialogue-preview, --dialogue-export and --dialogue-import require --dialogue-stage")
     if (args.dialogue_choice_stage is not None

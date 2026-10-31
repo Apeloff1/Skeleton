@@ -616,3 +616,19 @@ Typed Jeeves parity is provided by `execute_dialogue_commit_tool`, using
 `skeleton.jeeves.studio_dialogue_commit_request.v1`; authored revision
 inputs are source-leased before commitment. Regression coverage lives in
 `tests/test_studio_ecosystem_dialogue_choice_commit.py`.
+
+## Durable quest receipt restoration for original NPC scenes
+
+`--project <id> --dialogue-stage --dialogue-restore-stdin` reads one bounded
+canonical quest receipt from standard input and replays it from authoritative
+source. The output contains the verified receipt, currently available NPC
+scene cards, and progress. An optional `--dialogue-revision-source` loads a
+previously verified edited source before restoration; use
+`--dialogue-expected-digest` to bind that source explicitly.
+
+Duplicate JSON fields, nonfinite values, unknown receipt fields, forged
+completion/certification flags, stale source, altered history or digests, and
+oversized saves fail closed. The restore path never writes to the filesystem.
+Typed Jeeves parity is `execute_dialogue_restore_tool` with schema
+`skeleton.jeeves.studio_dialogue_restore_request.v1`. Canonical replay
+remains the sole authority; this does not claim native engine qualification.

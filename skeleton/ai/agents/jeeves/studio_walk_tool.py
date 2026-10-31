@@ -1037,3 +1037,66 @@ def execute_dialogue_commit_tool(request: Mapping[str, Any], *,
         payload["author_receipt"] = author_receipt
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_RESTORE_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_restore_request.v1"
+DIALOGUE_RESTORE_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_restore_result.v1"
+
+
+def dialogue_restore_tool_schema() -> dict[str, object]:
+    """Typed offline restoration of canonical quest saves and NPC editor state."""
+    return {
+        "name": "studio_dialogue_quest_restore",
+        "description": "Verify source-bound quest receipt and resume original NPC scene cards",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_RESTORE_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "receipt": {"type": "object"},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "receipt"],
+        },
+    }
+
+
+def execute_dialogue_restore_tool(request: Mapping[str, Any], *,
+                                  authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue restore requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "receipt"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"scene_id"}
+            or request.get("schema") != DIALOGUE_RESTORE_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue restore request")
+    from skeleton.ai.game_builder.studio_ecosystem_quest_receipt_restore import (
+        restore_quest_receipt,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
+        compile_dialogue_staging,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_quest import quest_progress
+    source = read_blueprint(request["project_id"])
+    restored = restore_quest_receipt(
+        source, _canonical(request["receipt"]), authorized=True,
+        expected_source_digest=request["expected_source_digest"])
+    staged = compile_dialogue_staging(
+        source, [list(pair) for pair in restored.choices], authorized=True,
+        expected_source_digest=request["expected_source_digest"],
+        scene_id=request.get("scene_id"))
+    detail = {
+        "receipt": restored.receipt(), "staging": staged,
+        "progress": quest_progress(restored, source),
+        "restore_verified": True, "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload = {
+        "schema": DIALOGUE_RESTORE_RESULT_SCHEMA,
+        "project_id": request["project_id"], "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload
