@@ -11,7 +11,6 @@ from hashlib import sha256
 import json
 import math
 import os
-from pathlib import Path
 import platform
 import re
 import subprocess
@@ -130,8 +129,6 @@ def _linux_physical(visible: set[int]) -> int | None:
         return None
     for cpu in visible:
         base = f"/sys/devices/system/cpu/cpu{cpu}/topology"
-        package = _positive_int(_bounded_text(base + "/physical_package_id", 32))
-        core = _positive_int(_bounded_text(base + "/core_id", 32))
         # Linux identifiers legitimately start at zero.
         raw_package = _bounded_text(base + "/physical_package_id", 32)
         raw_core = _bounded_text(base + "/core_id", 32)
@@ -185,7 +182,7 @@ def _sysctl_int(key: str) -> int | None:
 
 def probe_cpu_topology() -> CpuTopology:
     system = platform.system()
-    logical = os.cpu_count() or 1
+    logical = max(1, min(os.cpu_count() or 1, MAX_VISIBLE_CPUS))
     affinity_source = "os.cpu_count-fallback"
     visible = set(range(logical))
     if hasattr(os, "sched_getaffinity"):
@@ -240,7 +237,8 @@ def probe_memory_topology() -> MemoryTopology:
             available = fields.get("MemAvailable")
             if total and available is not None:
                 limit = _positive_int(_bounded_text("/sys/fs/cgroup/memory.max", 64))
-                used = _positive_int(_bounded_text("/sys/fs/cgroup/memory.current", 64))
+                used_raw = _bounded_text("/sys/fs/cgroup/memory.current", 64)
+                used = int(used_raw) if used_raw is not None and re.fullmatch(r"[0-9]{1,20}", used_raw) else None
                 source = "linux-proc-meminfo"
                 if limit and used is not None and limit < total:
                     total = limit
