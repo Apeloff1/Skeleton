@@ -101,3 +101,22 @@ def test_invalid_counts_rejected_before_completion():
     with pytest.raises(ValueError, match="prefix"):
         owner.complete("a", output_tokens=1, prefix_reused_tokens=11)
     assert owner.active_count == 1
+
+
+def test_control_characters_and_surrogates_never_enter_timing_state():
+    owner = capture()
+    for name in ("bad\\nrequest", "\\ud800", "x" * 129):
+        with pytest.raises(ValueError, match="bounded request ID"):
+            owner.begin(request_id=name, prompt_tokens=1)
+    assert owner.active_count == 0
+
+
+def test_finished_identity_window_is_bounded_and_fails_closed(monkeypatch):
+    from skeleton.ai.model_runtime import tail_live_capture as module
+    monkeypatch.setattr(module, "MAX_FINISHED", 1)
+    owner = capture([1, 2])
+    owner.begin(request_id="first", prompt_tokens=1)
+    owner.abort("first")
+    with pytest.raises(ValueError, match="window exhausted"):
+        owner.begin(request_id="second", prompt_tokens=1)
+    assert owner.active_count == 0

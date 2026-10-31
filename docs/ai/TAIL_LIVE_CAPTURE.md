@@ -21,3 +21,8 @@ hardware. Synthetic tests use injected clocks and resources and always
 carry `evidence="simulated"`. This module does not claim a device,
 GPU memory transfer, cross-process reservation, model quality, or release
 qualification.
+
+Completed and aborted request identities are retained only up to the bounded
+10,000-request window. When exhausted, admission fails closed and the host
+must rotate to a new source-bound session; no unbounded tombstone growth or
+silent replay of an evicted request ID is permitted.

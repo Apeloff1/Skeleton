@@ -20,6 +20,7 @@ from .tail_latency_profile import (
 )
 
 MAX_ACTIVE = 64
+MAX_FINISHED = 10_000
 
 
 @dataclass(slots=True)
@@ -97,13 +98,21 @@ class LiveTailCapture:
         )
 
     def begin(self, *, request_id: str, prompt_tokens: int) -> None:
-        if type(request_id) is not str or not request_id or len(request_id.encode("utf-8")) > 128:
+        if type(request_id) is not str or not request_id:
+            raise ValueError("bounded request ID required")
+        try:
+            encoded = request_id.encode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise ValueError("bounded request ID required") from exc
+        if len(encoded) > 128 or any(ord(ch) < 32 or ord(ch) == 127 for ch in request_id):
             raise ValueError("bounded request ID required")
         if type(prompt_tokens) is not int or not 0 <= prompt_tokens <= (1 << 24):
             raise ValueError("bounded prompt token count required")
         with self._lock:
             if request_id in self._active or request_id in self._finished:
                 raise ValueError("duplicate local execution request")
+            if len(self._finished) >= MAX_FINISHED:
+                raise ValueError("completed identity window exhausted; rotate source session")
             if len(self._active) >= self._max_active:
                 raise ValueError("active execution telemetry capacity exhausted")
             # Both the resource observation and the clock must succeed before
