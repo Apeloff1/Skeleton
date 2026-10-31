@@ -242,15 +242,39 @@ class KVMigrationJournal:
                     "no authenticated committed migration receipt"
                 )
             try:
+                if len(row[5]) > MAX_RECEIPT_BYTES:
+                    raise ValueError("receipt byte budget exceeded")
                 receipt = json.loads(row[5])
+                if type(receipt) is not dict or set(receipt) != {
+                    "schema", "plan_digest", "moved", "rejected",
+                }:
+                    raise ValueError("invalid committed receipt shape")
+                if _encode(receipt) != row[5]:
+                    raise ValueError("noncanonical committed receipt")
                 if not hmac.compare_digest(
                     _hex(row[6], "receipt MAC"), _sign(self._key, receipt)
                 ):
                     raise ValueError("receipt authentication failed")
-                if receipt["plan_digest"] != plan.digest:
-                    raise ValueError("receipt plan mismatch")
-                if len(row[5]) > MAX_RECEIPT_BYTES:
-                    raise ValueError("receipt byte budget exceeded")
+                if (
+                    receipt["schema"] != "skeleton.ai.kv-pressure-apply.v1"
+                    or receipt["plan_digest"] != plan.digest
+                    or type(receipt["moved"]) is not list
+                    or type(receipt["rejected"]) is not list
+                    or any(type(key) is not str for key in receipt["moved"])
+                    or any(
+                        type(item) is not list or len(item) != 2
+                        or any(type(value) is not str for value in item)
+                        for item in receipt["rejected"]
+                    )
+                ):
+                    raise ValueError("invalid committed migration accounting")
+                canonical = TierApplyReceipt(
+                    plan.digest, tuple(receipt["moved"]),
+                    tuple(tuple(item) for item in receipt["rejected"]),
+                    sha256(_encode(receipt)).hexdigest(),
+                )
+                if _receipt_body(plan, canonical) != receipt:
+                    raise ValueError("committed migration accounting mismatch")
                 return receipt
             except (TypeError, ValueError, KeyError) as exc:
                 raise KVMigrationOutcomeUnknown(
