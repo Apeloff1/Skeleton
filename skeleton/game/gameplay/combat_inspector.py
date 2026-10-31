@@ -9,11 +9,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from skeleton.game.gameplay.turn_combat import (
-    MAX_CLI_BYTES, CombatSessionError, _advance, _parse_json, new_session,
+    CombatSessionError, _advance, _parse_json, new_session,
     verify_session,
 )
 
