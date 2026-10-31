@@ -57,3 +57,25 @@ def test_canonical_symlink_to_mirror_fails_closed(tmp_path: Path) -> None:
     result = check_parity(tmp_path)
     assert result["status"] == "blocked"
     assert result["files"][0]["status"] == "symlink"
+
+
+def test_mirror_parent_directory_symlink_fails_closed(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    mirror_dir = tmp_path / MIRROR
+    redirected = tmp_path / "redirected-agent"
+    mirror_dir.rename(redirected)
+    mirror_dir.symlink_to(redirected, target_is_directory=True)
+    result = check_parity(tmp_path)
+    assert result["status"] == "blocked"
+    assert all(item["status"] == "symlink" for item in result["files"])
+
+
+def test_canonical_parent_directory_symlink_fails_closed(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    canonical_dir = tmp_path / CANONICAL
+    redirected = tmp_path / "redirected-canonical"
+    canonical_dir.rename(redirected)
+    canonical_dir.symlink_to(redirected, target_is_directory=True)
+    result = check_parity(tmp_path)
+    assert result["status"] == "blocked"
+    assert all(item["status"] == "symlink" for item in result["files"])
