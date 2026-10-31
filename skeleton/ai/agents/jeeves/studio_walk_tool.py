@@ -23,10 +23,11 @@ REQUEST_SCHEMA = "skeleton.jeeves.studio_walk_tool_request.v1"
 RESULT_SCHEMA = "skeleton.jeeves.studio_walk_tool_result.v1"
 OPERATIONS = frozenset({
     "replay", "route", "follow_route", "choices", "forecast", "continuity",
-    "timeline", "compare", "coverage",
+    "timeline", "compare", "coverage", "transcript",
 })
 _ALLOWED = frozenset({"schema", "project_id", "operation", "events", "receipt",
-                      "forecast_depth", "compare_events"})
+                      "forecast_depth", "compare_events", "transcript_offset",
+                      "transcript_limit", "transcript_expected_digest"})
 
 
 def _canonical(value: object) -> bytes:
@@ -66,6 +67,9 @@ def tool_schema() -> dict[str, object]:
                                      "items": {"type": "string"}}},
                 "receipt": {"type": ["object", "null"]},
                 "forecast_depth": {"type": "integer", "minimum": 1, "maximum": 3},
+                "transcript_offset": {"type": "integer", "minimum": 0},
+                "transcript_limit": {"type": "integer", "minimum": 1, "maximum": 32},
+                "transcript_expected_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                 "compare_events": {"type": "array", "maxItems": MAX_WALK_EVENTS,
                                    "items": {"type": "array", "minItems": 2, "maxItems": 2,
                                              "items": {"type": "string"}}},
@@ -107,6 +111,20 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
         _validate_tool_events(comparison)
     elif "compare_events" in request:
         raise StudioQuestError("compare_events requires compare operation")
+    transcript_offset = request.get("transcript_offset", 0)
+    transcript_limit = request.get("transcript_limit", 32)
+    transcript_expected = request.get("transcript_expected_digest")
+    if (type(transcript_offset) is not int or transcript_offset < 0
+            or type(transcript_limit) is not int or not 1 <= transcript_limit <= 32
+            or (transcript_expected is not None and
+                (type(transcript_expected) is not str or
+                 len(transcript_expected) != 64 or
+                 any(c not in "0123456789abcdef" for c in transcript_expected)))
+            or (operation != "transcript" and any(
+                field in request for field in (
+                    "transcript_offset", "transcript_limit", "transcript_expected_digest"
+                )))):
+        raise StudioQuestError("invalid Jeeves transcript continuation arguments")
     raw_receipt = request.get("receipt")
     if raw_receipt is not None and type(raw_receipt) is not dict:
         raise StudioQuestError("invalid Jeeves walk receipt type")
@@ -140,6 +158,15 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
         detail = walk_narrative_continuity(session, docs, authorized=True)
     elif operation == "timeline":
         detail = walk_checkpoint_timeline(session, docs, authorized=True)
+    elif operation == "transcript":
+        from skeleton.ai.game_builder.studio_ecosystem_walk_story_transcript import (
+            walk_story_transcript,
+        )
+        detail = walk_story_transcript(
+            session, docs, authorized=True, offset=transcript_offset,
+            max_scenes=transcript_limit,
+            expected_session_digest=transcript_expected,
+        )
     elif operation == "compare":
         other = replay_walk(docs, comparison, authorized=True)
         detail = compare_walk_sessions(session, other, docs, authorized=True)

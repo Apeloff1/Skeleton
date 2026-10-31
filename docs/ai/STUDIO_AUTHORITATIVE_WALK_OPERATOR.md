@@ -372,3 +372,16 @@ No network/provider is used. Forged receipts, source drift, invalid limits and
 unauthorized invocation fail closed. A digest is not a signature or native
 runtime/release certification. Source-backed tests cover route, choice,
 replay, save/restore, forgery and deterministic receipts.
+
+
+## Paginated authored transcripts and Jeeves parity
+
+For longform played campaigns, `--walk-story-transcript --walk-story-limit 1`
+returns a bounded page and `next_offset` with a `continuation_session_digest`.
+Continue with `--walk-story-offset N --walk-story-expected-digest SHA256`.
+The digest binds continuation to the exact replayed save; changes to played
+choices or source invalidate the next page. Pages are source-replayed and do
+not mutate the save. `JeevesGameOrchestrator.authoritative_walk()` exposes the
+same behavior through operation `transcript` and typed `transcript_offset`,
+`transcript_limit`, and `transcript_expected_digest` request fields.
+The transcript remains a sandbox authoring diagnostic, not native gameplay proof.

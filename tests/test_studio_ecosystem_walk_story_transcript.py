@@ -58,3 +58,40 @@ def test_transcript_rejects_invalid_scene_limits(limit):
     with pytest.raises(StudioQuestError):
         walk_story_transcript(start_walk(docs, authorized=True), docs,
                               authorized=True, max_scenes=limit)
+
+
+@pytest.mark.parametrize("offset", [True, False, -1, "1", None])
+def test_transcript_rejects_invalid_offsets(offset):
+    docs = read_blueprint(PROJECT)
+    with pytest.raises(StudioQuestError):
+        walk_story_transcript(start_walk(docs, authorized=True), docs,
+                              authorized=True, offset=offset)
+
+
+def test_transcript_page_requires_exact_session_digest_and_keeps_save():
+    docs = read_blueprint(PROJECT)
+    session = start_walk(docs, authorized=True)
+    for _ in range(2):
+        session, _route = follow_walk_route(session, docs, authorized=True)
+        stage = playable_world_source(docs)["stages"][session.scene_index]
+        session = walk_action(session, docs, action="choose",
+                              value=stage["alternatives"][0], authorized=True)
+    saved = export_walk_receipt(session, docs, authorized=True)
+    first = walk_story_transcript(session, docs, authorized=True, max_scenes=1)
+    assert first["page_offset"] == 0
+    assert first["next_offset"] == 1
+    assert first["continuation_session_digest"] == session.digest
+    with pytest.raises(StudioQuestError):
+        walk_story_transcript(session, docs, authorized=True, offset=1, max_scenes=1)
+    with pytest.raises(StudioQuestError):
+        walk_story_transcript(session, docs, authorized=True, offset=1,
+                              max_scenes=1, expected_session_digest="0" * 64)
+    second = walk_story_transcript(
+        session, docs, authorized=True, offset=1, max_scenes=1,
+        expected_session_digest=first["continuation_session_digest"],
+    )
+    assert second["completed_scenes"][0]["index"] == 1
+    assert second["next_offset"] is None
+    assert [first["completed_scenes"][0]["index"],
+            second["completed_scenes"][0]["index"]] == [0, 1]
+    assert saved == export_walk_receipt(session, docs, authorized=True)

@@ -28,6 +28,7 @@ def _text(value: object) -> str:
 def walk_story_transcript(
     session: WalkSession, documents: Mapping[str, Any], *,
     authorized: bool, max_scenes: int = MAX_TRANSCRIPT_SCENES,
+    offset: int = 0, expected_session_digest: str | None = None,
 ) -> dict[str, object]:
     """Reconstruct played scenes; never trust client-supplied narrative claims."""
     if not authorized:
@@ -35,6 +36,15 @@ def walk_story_transcript(
     if type(max_scenes) is not int or not 1 <= max_scenes <= MAX_TRANSCRIPT_SCENES:
         raise StudioQuestError("story transcript scene limit must be 1..32")
     verify_walk(session, documents)
+    if type(offset) is not int or not 0 <= offset <= session.scene_index:
+        raise StudioQuestError("invalid story transcript page offset")
+    if offset and expected_session_digest is None:
+        raise StudioQuestError("story transcript continuation requires session digest")
+    if expected_session_digest is not None and (
+        type(expected_session_digest) is not str
+        or expected_session_digest != session.digest
+    ):
+        raise StudioQuestError("stale or invalid story transcript continuation")
     world = playable_world_source(documents)
     stages = world["stages"]
     if (world["project_id"] != session.project_id
@@ -43,7 +53,8 @@ def walk_story_transcript(
             or session.scene_index > len(stages)):
         raise StudioQuestError("story transcript source or history mismatch")
     completed = []
-    for index, (stage_id, choice) in enumerate(session.chosen[:max_scenes]):
+    for index in range(offset, min(offset + max_scenes, session.scene_index)):
+        stage_id, choice = session.chosen[index]
         stage = stages[index]
         if stage_id != stage["id"] or choice not in stage["alternatives"]:
             raise StudioQuestError("story transcript choice is not authored")
@@ -74,6 +85,11 @@ def walk_story_transcript(
         "status": "sandbox_complete" if pending is None else "in_progress",
         "completed_scene_count": session.scene_index,
         "displayed_scene_count": len(completed),
+        "page_offset": offset, "page_limit": max_scenes,
+        "next_offset": (offset + len(completed)
+                        if offset + len(completed) < session.scene_index else None),
+        "continuation_session_digest": (session.digest
+                        if offset + len(completed) < session.scene_index else None),
         "omitted_scene_count": session.scene_index - len(completed),
         "completed_scenes": completed, "pending_scene": pending,
         "position": list(session.position),

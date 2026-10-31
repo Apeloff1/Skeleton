@@ -70,6 +70,12 @@ def main(argv: list[str] | None = None) -> int:
                             help="Verify authored alternatives by collision-checked source replay")
     route_mode.add_argument("--walk-story-transcript", action="store_true",
                             help="Inspect verified authored scene choices without changing save")
+    ap.add_argument("--walk-story-offset", type=int, default=0,
+                    help="Zero-based completed-scene page offset for --walk-story-transcript")
+    ap.add_argument("--walk-story-limit", type=int, default=32,
+                    help="Completed scenes per transcript page, 1..32")
+    ap.add_argument("--walk-story-expected-digest",
+                    help="Session SHA-256 required to continue a transcript from nonzero offset")
     route_mode.add_argument("--walk-timeline", action="store_true",
                             help="Inspect bounded source-verified scene checkpoints without changing save")
     route_mode.add_argument("--walk-restore-checkpoint", type=int, default=None, metavar="INDEX",
@@ -77,6 +83,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--walk-forecast-depth", type=int, default=None, metavar="N",
                     help="Forecast at most 1..3 authored scenes (requires --walk-forecast)")
     args = ap.parse_args(argv)
+    if (not args.walk_story_transcript and
+            (args.walk_story_offset != 0 or args.walk_story_limit != 32
+             or args.walk_story_expected_digest is not None)):
+        ap.error("--walk-story-* page options require --walk-story-transcript")
     if (args.walk_forecast_depth is not None and not args.walk_forecast
             and args.walk_commit_forecast_branch is None):
         ap.error("--walk-forecast-depth requires --walk-forecast or --walk-commit-forecast-branch")
@@ -262,7 +272,10 @@ def main(argv: list[str] | None = None) -> int:
                 from skeleton.ai.game_builder.studio_ecosystem_walk_story_transcript import walk_story_transcript
                 print(json.dumps({"receipt": json.loads(receipt),
                                   "story_transcript": walk_story_transcript(
-                                      session, docs, authorized=True)},
+                                      session, docs, authorized=True,
+                                      offset=args.walk_story_offset,
+                                      max_scenes=args.walk_story_limit,
+                                      expected_session_digest=args.walk_story_expected_digest)},
                                  sort_keys=True, separators=(",", ":")))
             elif args.walk_timeline:
                 print(json.dumps({"receipt": json.loads(receipt),
