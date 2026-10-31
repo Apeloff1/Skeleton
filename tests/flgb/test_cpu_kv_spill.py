@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-import json
+from hashlib import sha256
 import os
 from pathlib import Path
-from hashlib import sha256
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -112,6 +111,18 @@ class TestCpuKVSpill(unittest.TestCase):
         self.cache.V[0].pop()
         with self.assertRaises(CpuKVSpillError):
             self.store.stage(self.runtime, self.cache)
+
+    def test_reject_nonresident_cpu_policy_violation(self):
+        self.model.resident = True
+        with self.assertRaises(CpuKVSpillError):
+            self.store.stage(self.runtime, self.cache)
+
+    def test_reject_disk_reserve_exhaustion(self):
+        reserved = CpuKVSpillStore(
+            self.root / "reserved", disk_reserve_bytes=2**60,
+        )
+        with self.assertRaises(CpuKVSpillError):
+            reserved.stage(self.runtime, self.cache)
 
     def test_reject_overbudget(self):
         tiny = CpuKVSpillStore(self.root / "tiny", max_snapshot_bytes=1,
