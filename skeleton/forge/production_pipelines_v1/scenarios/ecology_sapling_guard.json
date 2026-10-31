@@ -1,0 +1,90 @@
+{
+  "schema": "skeleton.production_scenario.v1",
+  "recipe": "ecology_sapling_guard",
+  "domain": "ecology",
+  "inputs": {
+    "material_per_batch": 4,
+    "energy_per_stage": 5
+  },
+  "outputs": {
+    "products_per_batch": 2,
+    "scrap_per_batch": 1
+  },
+  "stages": [
+    "prepare",
+    "fabricate",
+    "inspect"
+  ],
+  "initial": {
+    "materials": 40,
+    "energy": 71,
+    "products": 0,
+    "scrap": 0
+  },
+  "commands": [
+    {
+      "id": "ecology_sapling_guard:start",
+      "action": "start",
+      "batch": 1,
+      "expected_version": 0,
+      "tick": 1,
+      "evidence": ""
+    },
+    {
+      "id": "ecology_sapling_guard:prep",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 1,
+      "tick": 2,
+      "evidence": "trusted-stage-prep"
+    },
+    {
+      "id": "ecology_sapling_guard:work",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 2,
+      "tick": 3,
+      "evidence": "trusted-stage-work"
+    },
+    {
+      "id": "ecology_sapling_guard:inspect",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 3,
+      "tick": 4,
+      "evidence": "trusted-stage-inspect"
+    },
+    {
+      "id": "ecology_sapling_guard:finish",
+      "action": "finish",
+      "batch": 1,
+      "expected_version": 4,
+      "tick": 5,
+      "evidence": "trusted-quality-acceptance"
+    }
+  ],
+  "expected": {
+    "final_status": "completed",
+    "final_stage": 3,
+    "version": 5,
+    "product_count": 2,
+    "spent_materials": 4,
+    "energy_cost": 15,
+    "all_accepted": true
+  },
+  "negative_cases": [
+    "missing-stage-evidence",
+    "stages-incomplete",
+    "missing-quality-evidence",
+    "stale-version",
+    "duplicate-event",
+    "insufficient-energy",
+    "insufficient-material"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "physical_machine_control": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

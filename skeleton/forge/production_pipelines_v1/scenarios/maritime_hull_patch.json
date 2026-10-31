@@ -1,0 +1,90 @@
+{
+  "schema": "skeleton.production_scenario.v1",
+  "recipe": "maritime_hull_patch",
+  "domain": "maritime",
+  "inputs": {
+    "material_per_batch": 6,
+    "energy_per_stage": 5
+  },
+  "outputs": {
+    "products_per_batch": 2,
+    "scrap_per_batch": 1
+  },
+  "stages": [
+    "prepare",
+    "fabricate",
+    "inspect"
+  ],
+  "initial": {
+    "materials": 47,
+    "energy": 80,
+    "products": 0,
+    "scrap": 0
+  },
+  "commands": [
+    {
+      "id": "maritime_hull_patch:start",
+      "action": "start",
+      "batch": 1,
+      "expected_version": 0,
+      "tick": 1,
+      "evidence": ""
+    },
+    {
+      "id": "maritime_hull_patch:prep",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 1,
+      "tick": 2,
+      "evidence": "trusted-stage-prep"
+    },
+    {
+      "id": "maritime_hull_patch:work",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 2,
+      "tick": 3,
+      "evidence": "trusted-stage-work"
+    },
+    {
+      "id": "maritime_hull_patch:inspect",
+      "action": "advance",
+      "batch": 1,
+      "expected_version": 3,
+      "tick": 4,
+      "evidence": "trusted-stage-inspect"
+    },
+    {
+      "id": "maritime_hull_patch:finish",
+      "action": "finish",
+      "batch": 1,
+      "expected_version": 4,
+      "tick": 5,
+      "evidence": "trusted-quality-acceptance"
+    }
+  ],
+  "expected": {
+    "final_status": "completed",
+    "final_stage": 3,
+    "version": 5,
+    "product_count": 2,
+    "spent_materials": 6,
+    "energy_cost": 15,
+    "all_accepted": true
+  },
+  "negative_cases": [
+    "missing-stage-evidence",
+    "stages-incomplete",
+    "missing-quality-evidence",
+    "stale-version",
+    "duplicate-event",
+    "insufficient-energy",
+    "insufficient-material"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "physical_machine_control": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
