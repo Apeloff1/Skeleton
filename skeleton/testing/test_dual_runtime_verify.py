@@ -249,3 +249,43 @@ def test_directory_swap_between_stat_and_open_is_rejected(package, monkeypatch):
             root, expected_manifest_sha256=pin, authorized=True,
         )
     assert swapped
+
+
+def test_source_replaced_during_replay_fails_final_integrity_pass(package, monkeypatch):
+    from skeleton.ai.game_builder import dual_runtime_verify as verifier
+
+    root, pin = package
+    real_play = verifier.play_actions
+
+    def swap_after_replay(*args, **kwargs):
+        result = real_play(*args, **kwargs)
+        (root / "index.html").write_bytes(b"forged browser source")
+        return result
+
+    monkeypatch.setattr(verifier, "play_actions", swap_after_replay)
+    with pytest.raises(DualRuntimeVerificationError, match="source changed"):
+        verifier.verify_exported_package(
+            root, expected_manifest_sha256=pin, authorized=True,
+        )
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX pinned directory root")
+def test_replaced_package_root_during_replay_cannot_receive_receipt(package, monkeypatch):
+    from skeleton.ai.game_builder import dual_runtime_verify as verifier
+
+    root, pin = package
+    original = root.parent / "original-export"
+    real_play = verifier.play_actions
+
+    def move_root_after_replay(*args, **kwargs):
+        result = real_play(*args, **kwargs)
+        root.rename(original)
+        root.mkdir()
+        return result
+
+    monkeypatch.setattr(verifier, "play_actions", move_root_after_replay)
+    with pytest.raises(DualRuntimeVerificationError, match="root changed"):
+        verifier.verify_exported_package(
+            root, expected_manifest_sha256=pin, authorized=True,
+        )
+    assert original.is_dir()

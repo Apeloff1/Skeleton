@@ -262,6 +262,22 @@ def _world(native: dict[str, object], manifest: dict[str, object]) -> PlayableWo
     return world
 
 
+def _assert_original_root(root: str | Path | int, descriptor: int) -> None:
+    """Reject a package pathname that no longer resolves to the verified inode.
+
+    Callers providing an already-open descriptor explicitly own its lifetime.
+    """
+    if type(root) is int:
+        return
+    current = _root_fd(root)
+    try:
+        pinned, reopened = os.fstat(descriptor), os.fstat(current)
+        if (pinned.st_dev, pinned.st_ino) != (reopened.st_dev, reopened.st_ino):
+            raise DualRuntimeVerificationError("package root changed during verification")
+    finally:
+        os.close(current)
+
+
 def verify_exported_package(
     root: str | Path | int, *, expected_manifest_sha256: str, authorized: bool,
 ) -> dict[str, object]:
@@ -345,10 +361,19 @@ def verify_exported_package(
                 or replay.digest != manifest.get("proof_digest")
                 or replay.final_state.to_payload() != proof.get("final_state")):
             raise DualRuntimeVerificationError("winning replay does not reproduce")
+        # The replay must not attest a package whose non-manifest files were
+        # replaced after the first digest pass. This is a bounded second
+        # read of at most _MAX_BYTES across the same pinned directory tree.
+        for path, expected_digest in sorted(declared.items()):
+            if sha256(_read(fd, path, _MAX_BYTES)).hexdigest() != expected_digest:
+                raise DualRuntimeVerificationError("package source changed during replay")
+        if _inventory(fd) != expected:
+            raise DualRuntimeVerificationError("package entries changed during replay")
         # A replay receipt must not attest a package whose manifest was
         # replaced after the initial independent pin was checked.
         if _read(fd, "release.json", _MAX_MANIFEST) != release:
             raise DualRuntimeVerificationError("release changed during verification")
+        _assert_original_root(root, fd)
         return {
             "schema": SCHEMA,
             "project_id": world.intent.project_id,
