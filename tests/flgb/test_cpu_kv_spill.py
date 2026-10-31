@@ -5,12 +5,15 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+from hashlib import sha256
 from tempfile import TemporaryDirectory
 import unittest
 
 from skeleton.cortex.transformer import KVCache, TinyTransformer
 from skeleton.ai.model_runtime.cpu_kv_spill import CpuKVSpillError, CpuKVSpillStore
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+from skeleton.ai.model_runtime.flgb_model_runtime import TokenSequence
+from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
 
 
 class TestCpuKVSpill(unittest.TestCase):
@@ -36,6 +39,27 @@ class TestCpuKVSpill(unittest.TestCase):
         self.assertEqual(self.model._logits_window([1, 2, 3], restored), self.logits)
         self.assertEqual(self.model._logits_window([1, 2, 3, 2], restored),
                          self.model._logits_window([1, 2, 3, 2], self.cache))
+
+    def test_restored_cache_is_reachable_through_public_inference(self):
+        digest = self.runtime.spill_cpu_kv(self.cache, self.store)
+        restored = self.runtime.restore_cpu_kv(digest, self.store)
+        sequence = TokenSequence(
+            self.runtime.tokenizer.digest, (1, 2, 3), sha256(b"exact-source").hexdigest(),
+        )
+        result = self.runtime.infer_sequence(sequence, cache=restored)
+        self.assertEqual(result.logits, tuple(self.logits))
+        self.assertEqual(result.cache_tokens, 3)
+        with self.assertRaises(RuntimeContractError):
+            self.runtime.infer_sequence(sequence, use_cache=False, cache=restored)
+
+    def test_explicit_cache_cannot_cross_model_ownership(self):
+        sequence = TokenSequence(
+            self.runtime.tokenizer.digest, (1, 2, 3), sha256(b"exact-source").hexdigest(),
+        )
+        other = KVCache(self.model.n_layers, self.model.ctx)
+        other.owner = object()
+        with self.assertRaises(RuntimeContractError):
+            self.runtime.infer_sequence(sequence, cache=other)
 
     def test_restart_store_and_idempotence(self):
         digest = self.store.stage(self.runtime, self.cache)
@@ -66,7 +90,7 @@ class TestCpuKVSpill(unittest.TestCase):
     def test_mutated_model_is_not_accepted(self):
         digest = self.store.stage(self.runtime, self.cache)
         self.model.E[0][0] += 0.01
-        with self.assertRaises((CpuKVSpillError, Exception)):
+        with self.assertRaises(RuntimeContractError):
             self.store.restore(self.runtime, digest)
 
     def test_reject_stale_cache_revision(self):

@@ -46,3 +46,12 @@ python -m unittest tests.flgb.test_cpu_kv_spill -v
 
 The implementation is not device qualified, and no GPU or release
 qualification is claimed.
+
+## Integrated inference reuse
+
+`NativeLLMRuntime.infer_sequence(sequence, cache=restored)` now accepts an
+explicit model-bound CPU KV cache. The runtime rejects a cache if caching is
+disabled, the model owner or revision has changed, the cache shape differs, or
+an accelerator is active. The standard no-cache and internally allocated
+cache paths retain their previous semantics. The returned inference receipt
+still validates model/tokenizer/device identity and finite logits.
