@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_orbital_gardens",
+  "title": "Orbital Gardens: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610302236,
+  "width": 25,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 6
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_glacial_fjord",
+  "title": "Glacial Fjord: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610302066,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 4
+}

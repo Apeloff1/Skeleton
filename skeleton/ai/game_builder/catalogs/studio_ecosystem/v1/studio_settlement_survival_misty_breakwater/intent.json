@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_misty_breakwater",
+  "title": "Misty Breakwater: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610301741,
+  "width": 19,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 5
+}

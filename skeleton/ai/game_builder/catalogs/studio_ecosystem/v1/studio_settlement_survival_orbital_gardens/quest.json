@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_settlement_survival_orbital_gardens",
+  "genre": "settlement_survival",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_settlement_survival_orbital_gardens:restore",
+  "objective": "establish a resilient shelter network",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "rotating arboretums",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near ring garden habitat",
+        "Seek a witness of life-support imbalance"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "ring garden habitat",
+      "entry": "survey_complete",
+      "actions": [
+        "construct",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to hydroponic nutrients",
+        "Establish an independent path around an approaching storm"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "ring garden habitat",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of ring garden habitat",
+        "Construct a low-resource alternative using hydroponic nutrients"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden life-support imbalance interrupts transfer",
+    "The an approaching storm suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "hydroponic nutrients",
+    "unlimited_rewards": false
+  }
+}

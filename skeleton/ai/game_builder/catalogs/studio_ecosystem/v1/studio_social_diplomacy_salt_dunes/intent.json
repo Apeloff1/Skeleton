@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_salt_dunes",
+  "title": "Salt Dunes: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610302168,
+  "width": 25,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "desert",
+  "starting_health": 6
+}

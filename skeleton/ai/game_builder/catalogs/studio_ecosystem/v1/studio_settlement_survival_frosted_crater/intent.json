@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_frosted_crater",
+  "title": "Frosted Crater: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610301639,
+  "width": 23,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 3
+}
