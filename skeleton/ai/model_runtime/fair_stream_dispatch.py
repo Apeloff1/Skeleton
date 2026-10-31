@@ -223,7 +223,10 @@ class GuardedFairStreamDispatch:
             try:
                 receipt = journal.recover_committed_receipt(permit)
                 updated = self._session.acknowledge(receipt)
-            except (ExecutionOutcomeUnknown, ValueError, RuntimeError) as exc:
+            except BaseException as exc:
+                # SQLite I/O errors, interruption and malformed receipts are
+                # also uncertain outcomes. Do not leave the app reporting an
+                # apparently healthy executor after a failed reconciliation.
                 self._uncertain = True
                 raise DispatchUncertain(
                     "committed receipt unavailable or custody reconciliation failed"

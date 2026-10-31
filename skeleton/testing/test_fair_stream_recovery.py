@@ -251,3 +251,16 @@ def test_recovery_key_and_grant_never_enter_public_status(monkeypatch, tmp_path)
     }
     assert RECOVERY_KEY.hex() not in repr(status)
     assert backend.calls == 1
+
+
+def test_closed_journal_connection_marks_execution_uncertain(monkeypatch, tmp_path):
+    app, journal, backend, _ = setup_pending(monkeypatch, tmp_path)
+    approval = grant(app)
+    journal._connection.close()
+    with pytest.raises(DispatchUncertain, match="committed receipt"):
+        app.reconcile_committed(
+            journal=journal, authorization=approval, recovery_key=RECOVERY_KEY,
+        )
+    assert app.status().pending_leases == 1
+    assert app.status().execution_uncertain
+    assert backend.calls == 1
