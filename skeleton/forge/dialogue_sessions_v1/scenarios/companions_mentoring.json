@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "companions_mentoring",
+  "domain": "companions",
+  "role": "mentoring",
+  "rapport_threshold": 33,
+  "rapport_gain": 7,
+  "stress_increment": 5,
+  "steps": [
+    {
+      "id": "companions_mentoring:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "companions_mentoring:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "companions_mentoring:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "companions_mentoring:proof-1"
+    },
+    {
+      "id": "companions_mentoring:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "companions_mentoring:proof-2"
+    },
+    {
+      "id": "companions_mentoring:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "companions_mentoring:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}

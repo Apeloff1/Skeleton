@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "companions_rescue",
+  "domain": "companions",
+  "role": "rescue",
+  "rapport_threshold": 28,
+  "rapport_gain": 6,
+  "stress_increment": 4,
+  "steps": [
+    {
+      "id": "companions_rescue:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "companions_rescue:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "companions_rescue:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "companions_rescue:proof-1"
+    },
+    {
+      "id": "companions_rescue:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "companions_rescue:proof-2"
+    },
+    {
+      "id": "companions_rescue:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "companions_rescue:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}
