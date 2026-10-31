@@ -96,3 +96,28 @@ detection, replay, tamper, resource consistency and bounded CLI parsing.
 Real device qualification still requires direct on-target macOS Metal,
 Windows WDDM and Linux CUDA/ROCm runs with actual model weights, failure
 injection, power/thermal observations and p95/p99 saturation curves.
+
+## Canonical live resource capture adapter
+
+skeleton/app/offline_tail_profile_adapter.py connects real offline app probes to
+the same model-runtime profiler. The caller supplies an actual ExecutionTiming
+receipt from its native model execution, and the adapter samples the canonical
+LocalResourceSnapshot, CPU/SOC thermal trips and optional selected GPUResource.
+It records the observation only after every required probe succeeds.
+
+The selected GPU must match an explicit device identity. Multiple matches
+fail closed; missing telemetry remains null. NVML and Linux DRM dedicated
+VRAM are counted independently of host-backed GTT, but Apple Silicon Metal
+unified working-set estimates are not represented as free dedicated VRAM.
+Unknown thermal sensors remain unavailable; a measured trip produces a hold.
+
+These measurements occur after execution and may miss transient peaks. They
+do not replace allocation-time native guards or prove GPU cache coherence.
+The adapter's deterministic tests use labeled simulated probes and never
+claim hardware qualification.
+
+Additional focused suite:
+
+~~~sh
+python -m pytest -q skeleton/testing/test_offline_tail_profile_adapter.py
+~~~
