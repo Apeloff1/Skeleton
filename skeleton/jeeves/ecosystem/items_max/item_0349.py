@@ -1,0 +1,13 @@
+"""Item max 0349.
+"""
+from __future__ import annotations
+
+ID = "item_max_0349"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "item", "index": 349, "tier": 349 % 5}
+
+def apply(context: str = "") -> dict:
+    if not context and 349 % 19 == 0:
+        return {"ok": False, "reason": "empty_context"}
+    return {"ok": True, "id": ID, "context": context[:140], "active": True}
