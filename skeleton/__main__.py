@@ -56,6 +56,7 @@ Commands:
     scene-travel  Simulate, verify and resume original offline scene journeys
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
+    scene-npc-solve  Find bounded replayable routes through NPC dialogue
     scene-atlas  Explore fog-of-war maps, legal known routes and portable replay
     scene-consequences  Inspect replay-derived mission choices and endings
     scene-mission  Play authored mission DAG and branching choices over scenes
@@ -768,6 +769,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-npc":
         from skeleton.game.gameplay.scene_npc_encounter import cli as npc_cli
         return npc_cli(rest)
+    if cmd == "scene-npc-solve":
+        from skeleton.game.gameplay.scene_npc_solver import cli as npc_solver_cli
+        return npc_solver_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
