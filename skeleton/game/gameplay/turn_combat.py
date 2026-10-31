@@ -284,7 +284,8 @@ def original_demo() -> tuple[dict[str, Any], list[dict[str, str]]]:
 
 
 def play_interactive(scenario: Any, *, input_stream: Any = None,
-                     output_stream: Any = None) -> dict[str, Any]:
+                     output_stream: Any = None, auto_teams: Any = None,
+                     resume: Any = None) -> dict[str, Any]:
     """Play a live offline encounter using bounded, accessible JSON-line turns.
 
     Each prompt carries the current actor and state hash. Invalid input can
@@ -293,7 +294,21 @@ def play_interactive(scenario: Any, *, input_stream: Any = None,
     """
     reader = sys.stdin if input_stream is None else input_stream
     writer = sys.stdout if output_stream is None else output_stream
-    session = new_session(scenario)
+    spec = normalize_scenario(scenario)
+    teams = {actor["team"] for actor in spec["actors"]}
+    if auto_teams is None:
+        automated: set[str] = set()
+    else:
+        if type(auto_teams) is not list or any(type(x) is not str for x in auto_teams):
+            raise CombatSessionError("invalid auto-team selection")
+        automated = set(auto_teams)
+        if len(automated) != len(auto_teams) or not automated.issubset(teams):
+            raise CombatSessionError("invalid auto-team identity or duplicate")
+        if automated == teams:
+            raise CombatSessionError("interactive auto-teams require a human-controlled team")
+    session = new_session(spec) if resume is None else verify_session(resume)
+    if session["source_digest"] != dig(spec):
+        raise CombatSessionError("resumed session source mismatch")
     while session["state"]["phase"] == "active":
         actor_id, _ = _active_actor(session["scenario"], session["state"])
         opponents = sorted(
@@ -303,6 +318,25 @@ def play_interactive(scenario: Any, *, input_stream: Any = None,
                 if item["id"] == actor_id
             ) and session["state"]["actors"][actor["id"]]["hp"] > 0
         )
+        actor_team = next(
+            item["team"] for item in session["scenario"]["actors"]
+            if item["id"] == actor_id
+        )
+        if actor_team in automated:
+            from skeleton.game.gameplay.tactical_policy import (
+                _decide_verified, POLICY_VERSION,
+            )
+            before_digest = session["state_digest"]
+            action = _decide_verified(session)
+            session = _advance(session, action)
+            writer.write(json.dumps({
+                "event": "auto_action", "policy": POLICY_VERSION,
+                "actor_id": actor_id, "action": action,
+                "before": before_digest, "after": session["state_digest"],
+                "receipt": session["journal"][-1]["receipt"],
+            }, sort_keys=True) + "\n")
+            writer.flush()
+            continue
         writer.write(json.dumps({
             "event": "turn", "actor_id": actor_id, "tick": session["state"]["tick"],
             "state_digest": session["state_digest"], "targets": opponents,
@@ -339,9 +373,20 @@ def play_interactive(scenario: Any, *, input_stream: Any = None,
 def _parse_json(raw: str, label: str) -> Any:
     if len(raw.encode("utf-8")) > MAX_CLI_BYTES:
         raise CombatSessionError(f"{label} exceeds 128 KiB")
+    def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        obj: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in obj:
+                raise ValueError("duplicate JSON key")
+            obj[key] = value
+        return obj
+
+    def reject_constant(value: str) -> None:
+        raise ValueError("nonfinite JSON constant")
+
     try:
-        return json.loads(raw)
-    except (ValueError, UnicodeError) as exc:
+        return json.loads(raw, object_pairs_hook=unique_pairs, parse_constant=reject_constant)
+    except (ValueError, UnicodeError, RecursionError) as exc:
         raise CombatSessionError(f"invalid {label} JSON") from exc
 
 
@@ -352,6 +397,11 @@ def cli(argv: Sequence[str]) -> int:
     live = sub.add_parser("play", help="Interactively play an offline encounter")
     live.add_argument("--scenario-json")
     live.add_argument("--demo", action="store_true")
+    live.add_argument("--resume-json")
+    live.add_argument("--auto-team", action="append", default=[])
+    auto = sub.add_parser("auto", help="Run a deterministic offline tactical encounter")
+    auto.add_argument("--demo", action="store_true")
+    auto.add_argument("--scenario-json")
     start = sub.add_parser("simulate", help="Compile source and apply ordered actions")
     start.add_argument("--scenario-json", required=True)
     start.add_argument("--actions-json", required=True)
@@ -363,10 +413,23 @@ def cli(argv: Sequence[str]) -> int:
     try:
         args = parser.parse_args(list(argv))
         if args.command == "play":
+            if sum(bool(x) for x in (args.demo, args.scenario_json, args.resume_json)) != 1:
+                raise CombatSessionError("play needs one of --demo, --scenario-json or --resume-json")
+            saved = _parse_json(args.resume_json, "session") if args.resume_json else None
+            scenario = (
+                saved.get("scenario") if type(saved) is dict else None
+            ) if saved is not None else (
+                original_demo()[0] if args.demo else _parse_json(args.scenario_json, "scenario")
+            )
+            play_interactive(scenario, auto_teams=args.auto_team, resume=saved)
+            return 0
+        if args.command == "auto":
             if bool(args.demo) == bool(args.scenario_json):
-                raise CombatSessionError("play needs exactly one of --demo or --scenario-json")
+                raise CombatSessionError("auto needs exactly one of --demo or --scenario-json")
+            from skeleton.game.gameplay.tactical_policy import run_autoplay
             scenario = original_demo()[0] if args.demo else _parse_json(args.scenario_json, "scenario")
-            play_interactive(scenario)
+            result = run_autoplay(scenario)
+            print(json.dumps(result, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
             return 0
         if args.command == "demo":
             spec, actions = original_demo()

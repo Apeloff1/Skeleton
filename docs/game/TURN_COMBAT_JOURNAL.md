@@ -34,3 +34,21 @@ from another principal. This module has no provider, network, model,
 native 3D, sound or device qualification claims.
 
 Regression: `python -m pytest skeleton/testing/test_turn_combat_journal.py -q`.
+
+## Deterministic offline tactical opponents and resume
+
+Run python -m skeleton combat play --demo --auto-team reedbound to control
+wayfarers while reedbound selects bounded deterministic actions. Each automated
+action passes the same canonical validator and save journal as human input.
+Use python -m skeleton combat auto --demo for all-automated offline play.
+Resume an already replay-verified partial session using combat play
+--resume-json '<session-json>' --auto-team reedbound. The session source,
+journal and parent-save lineage are verified before any new action.
+
+This is a transparent rule-based opponent, NOT model inference. Checksums
+are integrity receipts, not authenticity signatures. No network or provider
+is required. Duplicate or unknown auto-teams, all-auto interactive sessions,
+malformed duplicate-key JSON and nonfinite values fail closed. The caller
+owns durable storage; no untrusted path is opened by the engine.
+
+Regression: python -m pytest -q skeleton/testing/test_tactical_combat.py
