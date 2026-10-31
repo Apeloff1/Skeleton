@@ -737,7 +737,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
-    if cmd == "combat":\n        from skeleton.game.gameplay.turn_combat import cli as combat_cli\n        return combat_cli(rest)\n    if cmd == "combat-inspect":
+    if cmd == "combat":\n        from skeleton.game.gameplay.turn_combat import cli as combat_cli\n        return combat_cli(rest)\n    if cmd == "combat-campaign":
+        from skeleton.game.gameplay.combat_campaign import cli as campaign_cli
+        return campaign_cli(rest)
+    if cmd == "combat-inspect":
         from skeleton.game.gameplay.combat_inspector import cli as inspect_cli
         return inspect_cli(rest)
     if cmd == "game":
