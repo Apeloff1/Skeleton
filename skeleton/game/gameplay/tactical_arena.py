@@ -153,7 +153,7 @@ def _action(raw: Any) -> dict[str, Any]:
         "guard": {"kind", "actor_id"},
         "rest": {"kind", "actor_id"},
     }
-    if kind not in keys:
+    if type(kind) is not str or kind not in keys:
         raise CombatSessionError("unsupported arena action")
     _object(raw, keys[kind], "arena action")
     result = {"kind": kind, "actor_id": _id(raw["actor_id"], "actor_id")}
@@ -362,6 +362,11 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton combat-arena")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo", help="Play original offline arena with deterministic AI")
+    play = sub.add_parser("play", help="Play interactive JSON-line tactical turns")
+    play.add_argument("--demo", action="store_true")
+    play.add_argument("--source-json")
+    play.add_argument("--resume-json")
+    play.add_argument("--auto-team", action="append", default=[])
     auto = sub.add_parser("auto", help="Autoplay an authored tactical arena")
     auto.add_argument("--source-json", required=True)
     sim = sub.add_parser("simulate", help="Apply source-bound player commands")
@@ -374,6 +379,20 @@ def cli(argv: Sequence[str]) -> int:
     resume.add_argument("--actions-json", required=True)
     args = parser.parse_args(list(argv))
     try:
+        if args.command == "play":
+            from skeleton.game.gameplay.arena_interactive import play_arena
+            if sum(bool(x) for x in (
+                args.demo, args.source_json, args.resume_json
+            )) != 1:
+                raise CombatSessionError("play needs exactly one source or resume")
+            saved = _parse_json(args.resume_json, "arena save") if args.resume_json else None
+            authored = (
+                saved.get("source") if type(saved) is dict else None
+            ) if saved is not None else (
+                original_arena() if args.demo else _parse_json(args.source_json, "arena source")
+            )
+            play_arena(authored, resume=saved, auto_teams=args.auto_team)
+            return 0
         if args.command in ("demo", "auto"):
             from skeleton.game.gameplay.arena_policy import run_autoplay
             source = original_arena() if args.command == "demo" else _parse_json(

@@ -4,7 +4,7 @@ from typing import Any
 
 from skeleton.game.gameplay.turn_combat import CombatSessionError
 from skeleton.game.gameplay.tactical_arena import (
-    _active, _advance, legal_moves, legal_targets,
+    _active, _advance, legal_targets,
     new_arena, verify_arena,
 )
 
@@ -39,29 +39,10 @@ def _decide(session: dict[str, Any]) -> dict[str, str]:
     ]
     if not opponents:
         raise CombatSessionError("arena has no live opponent")
-    x, y = state["actors"][actor_id]["position"]
-    directions = {
-        "north": (0, -1), "east": (1, 0),
-        "south": (0, 1), "west": (-1, 0),
-    }
-    choices = []
-    for direction in legal_moves(source, state, actor_id):
-        dx, dy = directions[direction]
-        distances = [
-            abs(x + dx - state["actors"][foe["id"]]["position"][0])
-            + abs(y + dy - state["actors"][foe["id"]]["position"][1])
-            for foe in opponents
-        ]
-        choices.append((min(distances), direction))
-    current = min(
-        abs(x - state["actors"][foe["id"]]["position"][0])
-        + abs(y - state["actors"][foe["id"]]["position"][1])
-        for foe in opponents
-    )
-    if choices:
-        distance, direction = min(choices)
-        if distance < current:
-            return {"kind": "move", "actor_id": actor_id, "direction": direction}
+    from skeleton.game.gameplay.arena_routes import _route_verified
+    route = _route_verified(session)
+    if route:
+        return {"kind": "move", "actor_id": actor_id, "direction": route[0]}
     status = state["actors"][actor_id]
     if status["hp"] < actor["max_hp"] and status["guard"]:
         return {"kind": "rest", "actor_id": actor_id}

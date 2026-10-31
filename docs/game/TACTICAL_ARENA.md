@@ -51,3 +51,27 @@ python scripts/check_capability_interfaces.py
 Full repository exact-head checks and device qualification remain
 separate release gates. The tactical arena is intentionally a source-
 bound offline simulation with explicit unsupported renderer capabilities.
+
+## Interactive offline play and pathfinding
+
+\`python -m skeleton combat-arena play --demo\` prints one JSON object
+per line. Each human turn includes an accessible ASCII grid, stable actor
+legend, legal cardinal moves, legal targets, source-bound state digest
+and valid action kinds. Supply an action JSON line such as
+\`{"kind":"move","actor_id":"scout","direction":"east"}\` or
+\`{"kind":"guard","actor_id":"scout"}\`. Use \`--auto-team reedbound\`
+to assign one authored team to the deterministic offline opponent. The
+opponent uses bounded breadth-first search over the actual collision
+map, not a model call or network service. At least one team must remain
+human-controlled in interactive mode.
+
+A complete terminal session is emitted only after a genuine win or draw.
+EOF, oversized commands, malformed JSON, out-of-turn actions and retry
+exhaustion fail closed. Interactive checkpoints can be replay-verified and
+resumed with \`--resume-json JSON\` after the author source is checked.
+The policy never teleports an actor, skips an obstacle, or bypasses the
+canonical turn engine. An unreachable opponent yields a guard/rest action
+rather than a fabricated route.
+
+Run \`python -m pytest skeleton/testing/test_arena_interactive.py -q\`
+alongside the core tactical arena suite before exact-head CI qualification.
