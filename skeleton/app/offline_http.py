@@ -462,8 +462,8 @@ class OfflineHTTPApplication:
             # An explicit authenticated local operator may stage selected
             # regular files for read-only, digest-verified concurrent I/O.
             # No file contents or credential-bearing paths are returned.
-            _fields(body, {"root", "paths", "desired_streams", "approved"},
-                    {"root", "paths", "approved"})
+            _fields(body, {"root", "paths", "desired_streams", "approved",
+                           "deadline_s"}, {"root", "paths", "approved"})
             if body["approved"] is not True:
                 raise OfflineHTTPError(403, "read-only file staging requires operator approval")
             if (not isinstance(body["root"], str) or
@@ -474,6 +474,7 @@ class OfflineHTTPApplication:
                 records = self.resource_fabric.stream_readonly(
                     body["root"], body["paths"],
                     desired_streams=body.get("desired_streams", 4),
+                    deadline_s=body.get("deadline_s"),
                 )
                 return 200, {"schema": "skeleton.offline.readonly-staging.v1",
                              "sources": list(records), "verified": True,

@@ -233,6 +233,13 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertFalse(output["gpu_transfer_executed"])
         self.assertEqual(len(output["sources"]), 2)
         self.assertTrue(all(item["readonly"] for item in output["sources"]))
+        request["deadline_s"] = 0
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 422)
+        request["deadline_s"] = 10.0
+        status, timed, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(timed["sources"]), 2)
         self.assertEqual((source / "first.txt").read_text(),
                          "immutable selected file")
         request["paths"] = ["../http.sqlite3"]

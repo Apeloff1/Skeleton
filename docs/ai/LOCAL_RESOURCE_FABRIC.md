@@ -405,3 +405,14 @@ worker; an unlimited or unreadable v1 quota is not misread as zero capacity.
 This controls admission/stream parallelism, not CPU pinning or privileged
 kernel scheduling. Canonical tests cover a three-CPU affinity mask with a
 1.5-CPU v1 quota and the unlimited-v1 fallback.
+
+## Bounded read-only staging interruption
+
+Operator-approved `/v1/resources/stage` accepts an optional finite positive
+`deadline_s` for an application-level staging deadline. The canonical fabric
+also accepts an in-process `threading.Event` cancellation signal for local
+workers. Interruption is checked before file opening, at every bounded mmap
+window, and before the final source identity check. An interrupted batch
+returns no partial proof set and releases measured stream slots even when a
+worker raises. This is cooperative per-window cancellation, not a guarantee
+that an in-flight kernel page fault can be interrupted instantaneously.

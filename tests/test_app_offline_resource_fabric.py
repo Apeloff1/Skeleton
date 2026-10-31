@@ -282,6 +282,34 @@ class FabricTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     fabric.plan(10, readonly_stream="true")
 
+    def test_cancelled_stream_returns_no_partial_receipt_and_releases_slot(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "source.txt").write_bytes(b"verified source" * 100)
+            fabric = AdaptiveResourceFabric(root)
+            cancelled = Event()
+            from skeleton.app.offline_resource_fabric import _open_source_at
+            def cancel_after_open(base, relative):
+                fd = _open_source_at(base, relative)
+                cancelled.set()
+                return fd
+            with patch(
+                "skeleton.app.offline_resource_fabric._open_source_at",
+                side_effect=cancel_after_open,
+            ):
+                with self.assertRaisesRegex(ResourceFabricError, "cancelled"):
+                    fabric.stream_readonly(
+                        root, ("source.txt",), cancel_event=cancelled,
+                    )
+            self.assertEqual(fabric.monitor()["active_streams"], 0)
+            with self.assertRaises(ResourceFabricError):
+                fabric.stream_readonly(root, ("source.txt",), deadline_s=0)
+            with self.assertRaises(ResourceFabricError):
+                fabric.stream_readonly(root, ("source.txt",), deadline_s=float("nan"))
+            self.assertEqual(len(fabric.stream_readonly(
+                root, ("source.txt",), deadline_s=10.0,
+            )), 1)
+
     def test_symlink_escape_is_rejected(self):
         with TemporaryDirectory() as d:
             root = Path(d)

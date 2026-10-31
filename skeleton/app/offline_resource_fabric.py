@@ -13,6 +13,7 @@ import ctypes
 import hashlib
 from itertools import islice
 import json
+import math
 import mmap
 import os
 from pathlib import Path
@@ -511,6 +512,8 @@ class AdaptiveResourceFabric:
     def stream_readonly(
         self, root: str | Path, relative_paths: Iterable[str],
         *, desired_streams: int = 4,
+        deadline_s: float | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> tuple[dict[str, Any], ...]:
         """Verified concurrent read-only mmap streams with bounded copied chunks.
 
@@ -518,6 +521,22 @@ class AdaptiveResourceFabric:
         can coherently address or write the mapping. Only regular files in the
         selected root may be staged. No raw source bytes leave this API.
         """
+        if deadline_s is not None and (
+            type(deadline_s) not in (int, float)
+            or not math.isfinite(deadline_s) or deadline_s <= 0
+        ):
+            raise ResourceFabricError("finite positive stream deadline required")
+        if cancel_event is not None and not isinstance(cancel_event, threading.Event):
+            raise ResourceFabricError("typed cancellation event required")
+        deadline = None if deadline_s is None else time.monotonic() + deadline_s
+
+        def check_interrupted() -> None:
+            if cancel_event is not None and cancel_event.is_set():
+                raise ResourceFabricError("read-only staging cancelled")
+            if deadline is not None and time.monotonic() >= deadline:
+                raise ResourceFabricError("read-only staging deadline exceeded")
+
+        check_interrupted()
         base = Path(root).resolve(strict=True)
         if not base.is_dir() or Path(root).is_symlink():
             raise ResourceFabricError("trusted regular directory required")
@@ -571,6 +590,7 @@ class AdaptiveResourceFabric:
         # read-only, then read bounded spans from OS pages with no writes.
         def worker(entry: tuple[str, Path, int]) -> dict[str, Any]:
             name, path, expected_size = entry
+            check_interrupted()
             fd = _open_source_at(base, Path(name))
             try:
                 before = os.fstat(fd)
@@ -585,6 +605,7 @@ class AdaptiveResourceFabric:
                     for offset in range(
                         0, before.st_size, plan.transfer_chunk_bytes,
                     ):
+                        check_interrupted()
                         aligned = offset // granularity * granularity
                         displacement = offset - aligned
                         length = min(
@@ -597,6 +618,7 @@ class AdaptiveResourceFabric:
                             digest.update(view[displacement:displacement + min(
                                 plan.transfer_chunk_bytes, before.st_size - offset,
                             )])
+                check_interrupted()
                 after = os.fstat(fd)
                 current = path.lstat()
                 if (
