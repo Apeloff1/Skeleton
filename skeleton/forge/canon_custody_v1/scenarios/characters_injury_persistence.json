@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.canon_scenario.v1",
+  "policy": "characters_injury_persistence",
+  "domain": "characters",
+  "topic": "injury_persistence",
+  "evidence_kind": "custodian",
+  "limits": {
+    "max_records": 96,
+    "max_tick_gap": 3
+  },
+  "commands": [
+    {
+      "id": "characters_injury_persistence:a",
+      "entity": "hero",
+      "action": "establish",
+      "value": "injury_persistence:origin",
+      "predecessor": "",
+      "evidence": "verified-world-event:1",
+      "world": "primary",
+      "tick": 1,
+      "expected_revision": 0
+    },
+    {
+      "id": "characters_injury_persistence:b",
+      "entity": "hero",
+      "action": "amend",
+      "value": "injury_persistence:revision",
+      "predecessor": "characters_injury_persistence:a",
+      "evidence": "verified-world-event:2",
+      "world": "primary",
+      "tick": 2,
+      "expected_revision": 1
+    },
+    {
+      "id": "characters_injury_persistence:c",
+      "entity": "hero",
+      "action": "reconcile",
+      "value": "injury_persistence:canon",
+      "predecessor": "characters_injury_persistence:b",
+      "evidence": "verified-world-event:3",
+      "world": "primary",
+      "tick": 3,
+      "expected_revision": 2
+    }
+  ],
+  "expected": {
+    "revision": 3,
+    "records": 3,
+    "all_accepted": true,
+    "world": "primary"
+  },
+  "negative_cases": [
+    "unknown-parent",
+    "duplicate-event",
+    "revision-stale",
+    "cross-world",
+    "entity-lineage-mismatch",
+    "unjustified-clock-gap",
+    "missing-evidence"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "world_provenance_authenticated": false,
+    "release_certified": false
+  }
+}
