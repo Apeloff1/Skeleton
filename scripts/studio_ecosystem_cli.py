@@ -29,13 +29,15 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--dialogue-preview", action="store_true",
+                    help="Preview source-bound NPC scene choices without changing quest history")
     ap.add_argument("--dialogue-export", action="store_true",
                     help="Write exclusive private source-bound dialogue handoff")
     ap.add_argument("--dialogue-revision-source", type=Path,
                     help="Verified original authored revision for NPC scene cues")
     ap.add_argument("--dialogue-import", type=Path,
                     help="Verify an existing dialogue handoff against current source")
-    ap.add_argument("--dialogue-stage", action="store_true",    ap.add_argument("--dialogue-stage", action="store_true",
+    ap.add_argument("--dialogue-stage", action="store_true",
                     help="Compile source-bound NPC scene dialogue cues from quest replay")
     ap.add_argument("--dialogue-actions", metavar="JSON",
                     help="Canonical bounded [quest stage, alternative] history")
@@ -43,11 +45,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="Optional exact authored scene ID")
     ap.add_argument("--dialogue-expected-digest",
                     help="Optional exact original source SHA-256")
-    ap.add_argument("--faction-plan", action="store_true",    ap.add_argument("--faction-plan", action="store_true",
+    ap.add_argument("--faction-plan", action="store_true",
                     help="Plan a shortest replay-verified original faction negotiation")
     ap.add_argument("--faction-goal", metavar="JSON",
                     help='Exact faction threshold, e.g. {"faction_id":"residents","minimum":3}')
-    ap.add_argument("--faction-reputation", action="store_true",    ap.add_argument("--faction-reputation", action="store_true",
+    ap.add_argument("--faction-reputation", action="store_true",
                     help="Replay original authored faction reputation consequences")
     ap.add_argument("--faction-decisions", metavar="JSON",
                     help="Bounded JSON list of distinct authored faction decisions")
@@ -231,16 +233,16 @@ def main(argv: list[str] | None = None) -> int:
                 or args.search is not None or args.deep_search or args.genre
                 or args.biome or (args.output is not None and not args.dialogue_export)
                 or args.quest_actions is not None
-                or args.biome or args.output or args.quest_actions is not None
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
-        if (args.dialogue_export and (args.output is None or args.dialogue_import is not None)
+        if (args.dialogue_preview and (args.dialogue_export or args.dialogue_import is not None
+                                      or args.output is not None)
+                or args.dialogue_export and (args.output is None or args.dialogue_import is not None)
                 or args.dialogue_import is not None and
                 (args.dialogue_actions is not None or args.dialogue_scene_id is not None
                  or args.dialogue_export or args.output is not None)):
             ap.error("dialogue export requires new --output; import excludes replay arguments")
-        from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
         from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
             compile_dialogue_staging,
         )
@@ -269,7 +271,15 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_import is not None:
+            if args.dialogue_preview:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_choice_preview import (
+                    preview_dialogue_choices,
+                )
+                result = preview_dialogue_choices(
+                    docs, actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+            elif args.dialogue_import is not None:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
                     import_dialogue_handoff,
                 )
@@ -289,22 +299,17 @@ def main(argv: list[str] | None = None) -> int:
                     docs, actions, authorized=True,
                     expected_source_digest=args.dialogue_expected_digest,
                     scene_id=args.dialogue_scene_id)
-            result = compile_dialogue_staging(
-                read_blueprint(args.project), actions, authorized=True,
-                expected_source_digest=args.dialogue_expected_digest,
-                scene_id=args.dialogue_scene_id)
         except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    if (args.dialogue_export or args.dialogue_import is not None):
-        ap.error("--dialogue-export and --dialogue-import require --dialogue-stage")
-    if (args.dialogue_actions is not None or args.dialogue_scene_id is not None
+    if (args.dialogue_preview or args.dialogue_export
+            or args.dialogue_import is not None):
+        ap.error("--dialogue-preview, --dialogue-export and --dialogue-import require --dialogue-stage")
     if (args.dialogue_actions is not None or args.dialogue_scene_id is not None
             or args.dialogue_expected_digest is not None
             or args.dialogue_revision_source is not None):
         ap.error("--dialogue-* options require --dialogue-stage")
-    if args.faction_plan:
     if args.faction_plan:
         if (not args.project or args.faction_goal is None
                 or args.faction_reputation or args.ending_plan or args.author_revision
@@ -351,7 +356,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.faction_goal is not None:
         ap.error("--faction-goal requires --faction-plan")
-    if args.faction_reputation:
     if args.faction_reputation:
         if (not args.project or args.ending_plan or args.author_revision
                 or args.cherry_pick_revision or args.merge_revisions

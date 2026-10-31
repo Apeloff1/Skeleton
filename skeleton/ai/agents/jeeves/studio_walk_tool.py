@@ -890,3 +890,76 @@ def execute_dialogue_staging_tool(request: Mapping[str, Any], *,
         payload["author_receipt"] = author_receipt
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_PREVIEW_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_preview_request.v1"
+DIALOGUE_PREVIEW_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_preview_result.v1"
+
+
+def dialogue_preview_tool_schema() -> dict[str, object]:
+    """Typed source-leased editor choice previews; no fabricated NPC speech."""
+    return {
+        "name": "studio_dialogue_choice_preview",
+        "description": "Preview deterministic authored NPC quest alternatives without committing a choice",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_PREVIEW_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                          "items": {"type": "object"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "actions"],
+        },
+    }
+
+
+def execute_dialogue_preview_tool(request: Mapping[str, Any], *,
+                                  authorized: bool = False) -> dict[str, Any]:
+    """Preview persisted/revised authored scenes through the canonical quest engine."""
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue preview requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest", "actions"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"scene_id", "edits"}
+            or request.get("schema") != DIALOGUE_PREVIEW_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or len(request["project_id"]) > 128
+            or not request["project_id"]
+            or type(request.get("expected_source_digest")) is not str
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue preview request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_choice_preview import (
+        preview_dialogue_choices,
+    )
+    source = read_blueprint(request["project_id"])
+    expected = request["expected_source_digest"]
+    author_receipt = None
+    if "edits" in request:
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            REVISION_SCHEMA, preview_canon_revision,
+        )
+        source, _, author_receipt = preview_canon_revision(
+            source, {
+                "schema": REVISION_SCHEMA, "project_id": request["project_id"],
+                "expected_source_digest": expected, "edits": request["edits"],
+            }, authorized=True)
+        expected = author_receipt["revised_source_digest"]
+    detail = preview_dialogue_choices(
+        source, request["actions"], scene_id=request.get("scene_id"),
+        expected_source_digest=expected, authorized=True)
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_PREVIEW_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail, "file_write_performed": False,
+        "release_certified": False,
+    }
+    if author_receipt is not None:
+        payload["author_receipt"] = author_receipt
+    payload["result_digest"] = _digest(payload)
+    return payload

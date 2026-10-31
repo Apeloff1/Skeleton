@@ -575,3 +575,26 @@ The `--dialogue-stage --dialogue-export --output NEW_DIRECTORY` CLI command crea
 ### Persisted original dialogue editing
 
 `--dialogue-stage --dialogue-revision-source VERIFIED_DIRECTORY` loads a source-leased authored revision before staging, export or import. Typed Jeeves `studio_dialogue_staging` accepts optional bounded `edits`, delegates to canonical `preview_canon_revision`, and returns revised source cards and author receipt without file writes. Edited NPC knowledge changes the source digest, invalidating older handoffs; protected NPC identifiers, stage IDs and evidence remain uneditable.
+
+## Authored NPC choice preview (source-bound, read-only)
+
+Use `--project <id> --dialogue-stage --dialogue-preview` to preview every
+currently available original NPC/scene quest alternative. Optional
+`--dialogue-actions '[["stage","choice"]]'` replays previous authored choices;
+`--dialogue-scene-id` filters to one source-verified scene. Verified
+`--dialogue-revision-source` allows previewing persisted prose edits without
+mutating the registered catalog. The typed Jeeves entrypoint is
+`execute_dialogue_preview_tool` with schema
+`skeleton.jeeves.studio_dialogue_preview_request.v1`.
+
+Each counterfactual is replayed by the canonical quest engine and includes
+before/after session digests, next available stages, and explicit unresolved
+ending predicates. Locked and completed scenes have no selectable preview.
+The operation is bounded to 32 alternatives, never writes a save or generates
+unverified NPC speech, and does not certify a native game runtime. The CLI
+refuses combining preview with handoff export/import.
+
+The CLI syntax and revision identity regression suite is
+`tests/test_studio_ecosystem_dialogue_choice_preview.py`, alongside the
+existing dialogue revision/handoff and faction-plan tests. Exact-head
+repository CI remains mandatory before promotion.
