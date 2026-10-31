@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_ecological_restoration_ashen_archipelago",
+  "genre": "ecological_restoration",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Ashen Archipelago: Ecological Restoration",
+  "foundation": {
+    "setting": "Ashen Archipelago",
+    "era": "decades after the crossing",
+    "environment": "basalt islands",
+    "history": "The cliffside signal tower was built to protect freshwater cisterns, but volcanic ash interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Noa Morrow, a field ecologist, must rebuild the broken food web using resource stewardship while volcanic ash threatens the cliffside signal tower.",
+  "central_conflict": "a resource consortium seeks control of freshwater cisterns; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "volcanic ash isolates the cliffside signal tower",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a resource consortium offers privileged access to freshwater cisterns",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "cliffside signal tower",
+    "critical_resource": "freshwater cisterns",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

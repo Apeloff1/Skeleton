@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_ecological_restoration_cloud_canopy",
+  "genre": "ecological_restoration",
+  "biome": "cloud_canopy",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Cloud Canopy: Ecological Restoration",
+  "foundation": {
+    "setting": "Cloud Canopy",
+    "era": "near-future renewal",
+    "environment": "multi-tier boughs",
+    "history": "The suspended library was built to protect aerial roots, but severe canopy winds interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Noa Alto, a field ecologist, must rebuild the broken food web using resource stewardship while severe canopy winds threatens the suspended library.",
+  "central_conflict": "a resource consortium seeks control of aerial roots; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "severe canopy winds isolates the suspended library",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a resource consortium offers privileged access to aerial roots",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "suspended library",
+    "critical_resource": "aerial roots",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

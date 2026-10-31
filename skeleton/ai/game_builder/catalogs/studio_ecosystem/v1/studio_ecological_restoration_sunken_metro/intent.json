@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_sunken_metro",
+  "title": "Sunken Metro: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610300905,
+  "width": 19,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 6
+}
