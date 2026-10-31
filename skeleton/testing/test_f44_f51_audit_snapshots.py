@@ -90,6 +90,60 @@ def test_idempotency_audit_locks_replay_remember_pairs(monkeypatch) -> None:
     assert rows["skeleton.api.gameforge_routes:gameforge_run"]["remember"] is True
 
 
+
+def test_idempotency_decorator_cannot_hide_missing_completion_or_replay(monkeypatch) -> None:
+    import ast
+    import copy
+
+    from skeleton.app.runtime import audit_parse
+
+    parse = audit_parse.parse_module_tree
+    original = parse("skeleton.api.routes")
+    assert isinstance(original, ast.Module)
+    expected = {
+        "skeleton.api.routes:forge_materialise",
+        "skeleton.api.routes:forge_archetype",
+        "skeleton.api.routes:gameforge_run",
+        "skeleton.api.routes:game_build",
+        "skeleton.api.routes:gameforge_intake",
+    }
+    for missing in ("complete", "replay"):
+        modified = copy.deepcopy(original)
+        wrappers = [
+            node for node in ast.walk(modified)
+            if isinstance(node, ast.FunctionDef) and node.name == "_forge_idempotent"
+        ]
+        assert len(wrappers) == 1
+        if missing == "complete":
+            calls = [
+                node for node in ast.walk(wrappers[0])
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "complete"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "_idempotency"
+            ]
+            assert len(calls) == 1
+            calls[0].func.attr = "untrusted_noop"
+        else:
+            checks = [
+                node for node in ast.walk(wrappers[0])
+                if isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+                and isinstance(node.test.left, ast.Name)
+                and node.test.left.id == "replay"
+            ]
+            assert len(checks) == 1
+            checks[0].test = ast.Constant(value=False)
+
+        def substituted(module: str):
+            return modified if module == "skeleton.api.routes" else parse(module)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(audit_parse, "parse_module_tree", substituted)
+            snapshot = idempotency_audit_snapshot()
+        failures = snapshot["missing_remember" if missing == "complete" else "missing_replay"]
+        assert expected <= set(failures)
+
+
 def test_seal_audit_locks_sidecar_depends_and_command_call(monkeypatch) -> None:
     _assert_import_free(monkeypatch, seal_audit_snapshot, SEAL_AUDIT_KIND)
     payload = seal_audit_snapshot()
