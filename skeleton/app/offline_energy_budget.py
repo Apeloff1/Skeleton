@@ -10,7 +10,6 @@ from dataclasses import asdict, dataclass
 from hashlib import sha256
 import json
 import math
-import os
 from pathlib import Path
 import platform
 import re
@@ -229,7 +228,7 @@ def plan_energy_workers(
             workers, reason = min(workers, max(1, workers // 2)), "cpu_thermal_warm"
     elif workers > 2:
         workers, reason = 2, "thermal_telemetry_unavailable"
-    if observed.on_ac is False:
+    if observed.on_ac is False and reason != "cpu_thermal_critical":
         if observed.battery_percent is None:
             workers, reason = min(workers, 1), "battery_telemetry_unavailable"
         elif observed.battery_percent <= policy.critical_battery_pct:
