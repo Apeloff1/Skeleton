@@ -141,15 +141,20 @@ def merge_catalog_walk_audits(
         raise PermissionError("catalog audit aggregation requires operator authorization")
     if type(pages) is not list or not 1 <= len(pages) <= MAX_CATALOG_MERGE_PAGES:
         raise StudioQuestError("catalog audit merge requires 1..4 pages")
+    # Stream the canonical JSON rather than materializing an unbounded copy
+    # of untrusted nested page data before applying the byte admission cap.
+    total_bytes = 0
     try:
-        encoded = json.dumps(
-            pages, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        encoder = json.JSONEncoder(
+            sort_keys=True, separators=(",", ":"), allow_nan=False,
             ensure_ascii=True,
-        ).encode("ascii")
+        )
+        for chunk in encoder.iterencode(pages):
+            total_bytes += len(chunk.encode("ascii"))
+            if total_bytes > MAX_CATALOG_MERGE_BYTES:
+                raise StudioQuestError("catalog audit merge exceeds byte budget")
     except (TypeError, ValueError, UnicodeError, RecursionError) as exc:
         raise StudioQuestError("noncanonical catalog audit pages") from exc
-    if len(encoded) > MAX_CATALOG_MERGE_BYTES:
-        raise StudioQuestError("catalog audit merge exceeds byte budget")
     first = pages[0]
     if type(first) is not dict:
         raise StudioQuestError("invalid first catalog audit page")

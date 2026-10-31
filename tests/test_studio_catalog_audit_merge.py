@@ -39,7 +39,7 @@ def test_merge_revalidates_real_canonical_pages_and_is_deterministic():
     lambda pages: pages[1].update({"page_offset": 0}),
     lambda pages: pages[1].update({"catalog_digest": "0" * 64}),
     lambda pages: pages[1].update({"genre": "forged"}),
-    lambda pages: pages[0]["projects"][0].update({"status": "covered"}),
+    lambda pages: pages[0]["projects"][0].update({"status": "forged"}),
 ])
 def test_untrusted_merge_page_fails_closed(tamper):
     pages = two_pages()
