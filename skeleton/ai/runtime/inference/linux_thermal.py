@@ -7,6 +7,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import glob
 import re
+from itertools import islice
 
 
 class ThermalTelemetryError(ValueError):
@@ -52,7 +53,10 @@ def sample_linux_thermal(
         raise TypeError("read_text must be callable")
     if type(max_zones) is not int or not 1 <= max_zones <= 64:
         raise ThermalTelemetryError("invalid thermal zone budget")
-    selected = list(glob.glob("/sys/class/thermal/thermal_zone[0-9]*") if paths is None else paths)
+    selected = list(islice(
+        glob.iglob("/sys/class/thermal/thermal_zone[0-9]*") if paths is None else paths,
+        max_zones + 1,
+    ))
     if len(selected) > max_zones:
         return LinuxThermalState(None, None, 0, "unavailable")
     if len(set(selected)) != len(selected):
