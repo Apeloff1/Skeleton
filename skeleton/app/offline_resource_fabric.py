@@ -29,6 +29,7 @@ from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from .offline_io_pressure import IOPressureController, probe_io_pressure
 from .offline_cpu_throttle import CPUThrottleController, probe_cpu_throttle
 from .offline_swap_churn import SwapChurnController, probe_swap_counters
+from .offline_cpu_thermal import CPUThermalController, probe_cpu_thermal
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
 )
@@ -384,6 +385,7 @@ class FabricPlan:
     io_backpressure: bool = False
     cpu_throttle_backpressure: bool = False
     swap_churn_backpressure: bool = False
+    cpu_thermal_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -400,6 +402,7 @@ class FabricPlan:
             "io_backpressure": self.io_backpressure,
             "cpu_throttle_backpressure": self.cpu_throttle_backpressure,
             "swap_churn_backpressure": self.swap_churn_backpressure,
+            "cpu_thermal_backpressure": self.cpu_thermal_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -463,6 +466,7 @@ class AdaptiveResourceFabric:
         self._io = IOPressureController()
         self._cpu_throttle = CPUThrottleController()
         self._swap_churn = SwapChurnController()
+        self._cpu_thermal = CPUThermalController()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
@@ -473,6 +477,7 @@ class AdaptiveResourceFabric:
         self._cgroup.sample(probe_cgroup_events())
         self._io.observe(probe_io_pressure())
         self._cpu_throttle.observe(probe_cpu_throttle())
+        self._cpu_thermal.observe(probe_cpu_thermal())
         ram_pressure = 1 - hardware.available_ram_bytes / hardware.total_ram_bytes
         swap_pressure = (
             1 - hardware.free_swap_bytes / hardware.total_swap_bytes
@@ -510,6 +515,7 @@ class AdaptiveResourceFabric:
         io = self._io.snapshot()
         cpu_throttle = self._cpu_throttle.snapshot()
         swap_churn = self._swap_churn.snapshot()
+        cpu_thermal = self._cpu_thermal.snapshot()
         if readonly_stream and cgroup["oom_backpressure"]:
             raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
@@ -551,7 +557,8 @@ class AdaptiveResourceFabric:
         )
         if (cgroup["high_backpressure"] or io["congested"]
                 or cpu_throttle["backpressure"]
-                or swap_churn["backpressure"]):
+                or swap_churn["backpressure"]
+                or cpu_thermal["thermal_backpressure"]):
             streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
@@ -618,6 +625,8 @@ class AdaptiveResourceFabric:
             reason += "; observed cgroup CPU throttling"
         if swap_churn["backpressure"]:
             reason += "; observed host swap page churn"
+        if cpu_thermal["thermal_backpressure"]:
+            reason += "; measured CPU thermal trip hold"
         evidence = {
             "source_bytes": source_bytes,
             "readonly_stream": readonly_stream,
@@ -635,6 +644,7 @@ class AdaptiveResourceFabric:
             "io_backpressure": io["congested"],
             "cpu_throttle_backpressure": cpu_throttle["backpressure"],
             "swap_churn_backpressure": swap_churn["backpressure"],
+            "cpu_thermal_backpressure": cpu_thermal["thermal_backpressure"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -654,6 +664,7 @@ class AdaptiveResourceFabric:
             io_backpressure=bool(io["congested"]),
             cpu_throttle_backpressure=bool(cpu_throttle["backpressure"]),
             swap_churn_backpressure=bool(swap_churn["backpressure"]),
+            cpu_thermal_backpressure=bool(cpu_thermal["thermal_backpressure"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -719,6 +730,7 @@ class AdaptiveResourceFabric:
             "io_pressure": self._io.snapshot(),
             "cpu_throttle": self._cpu_throttle.snapshot(),
             "swap_churn": self._swap_churn.snapshot(),
+            "cpu_thermal": self._cpu_thermal.snapshot(),
         }
         return result
 

@@ -597,3 +597,16 @@ never changes system swap or assumes host traffic belongs to Skeleton alone.
 On platforms without measured page size or Linux vmstat, the sensor remains
 unavailable rather than substituting guessed capacity. The resource monitor
 exposes the actual observation scope, rate and backpressure state.
+
+
+## Linux CPU/SOC thermal trip admission
+
+Read-only Linux sysfs CPU/SOC thermal zones expose measured temperatures and
+kernel trip points where available. Only a valid passive/hot/critical trip
+can trigger a CPU thermal hold; no universal 90-degree threshold is invented.
+A measured trip caps new source staging to one stream until every observed
+tripped CPU zone cools at least five degrees below its own trip. Missing
+trip metadata, unknown sensors and non-Linux platforms remain explicit
+unknowns and cannot erase a prior measured hold. The monitor exposes each
+source zone and its trip measurement, not an asserted CPU package temperature
+on unsupported systems. This does not change firmware fan/thermal policy.

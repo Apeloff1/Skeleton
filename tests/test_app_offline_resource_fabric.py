@@ -37,7 +37,7 @@ class FabricTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_swap_counters']:
+        for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -649,7 +649,7 @@ class CgroupPressureTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_io_pressure','probe_cpu_throttle','probe_swap_counters']:
+        for name in ['probe_io_pressure','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -767,7 +767,7 @@ class IOPressureTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_cgroup_events','probe_cpu_throttle','probe_swap_counters']:
+        for name in ['probe_cgroup_events','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -849,7 +849,7 @@ class CPUThrottleTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_cgroup_events','probe_io_pressure','probe_swap_counters']:
+        for name in ['probe_cgroup_events','probe_io_pressure','probe_swap_counters','probe_cpu_thermal']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -929,7 +929,7 @@ class SwapChurnTests(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
-        for name in ('probe_cgroup_events','probe_io_pressure','probe_cpu_throttle'):
+        for name in ('probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_cpu_thermal'):
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=None)
             guard.start()
@@ -1005,6 +1005,83 @@ class SwapChurnTests(unittest.TestCase):
         self.assertIsNone(tracker.snapshot()["page_bytes"])
         with self.assertRaises(ValueError):
             tracker.observe(SwapCounters(0, 0), physical_ram_bytes=1000)
+
+
+
+class CPUThermalTests(unittest.TestCase):
+    """Measured sysfs trip points, not invented thermal limits."""
+
+    def setUp(self):
+        super().setUp()
+        for name in ('probe_cgroup_events','probe_io_pressure','probe_cpu_throttle',
+                     'probe_swap_counters'):
+            guard = patch("skeleton.app.offline_resource_fabric." + name,
+                          return_value=None)
+            guard.start()
+            self.addCleanup(guard.stop)
+
+    def test_linux_sysfs_probe_requires_measured_trip(self):
+        from skeleton.app.offline_cpu_thermal import probe_cpu_thermal
+        with TemporaryDirectory() as d:
+            zone = Path(d) / "thermal_zone0"
+            zone.mkdir()
+            (zone / "type").write_text("x86_pkg_temp")
+            (zone / "temp").write_text("91000")
+            (zone / "trip_point_0_temp").write_text("90000")
+            (zone / "trip_point_0_type").write_text("critical")
+            with patch("skeleton.app.offline_cpu_thermal.sys.platform", "linux"):
+                sensors = probe_cpu_thermal(d)
+                self.assertEqual(len(sensors), 1)
+                self.assertEqual((sensors[0].temperature_c, sensors[0].trip_c),
+                                 (91.0, 90.0))
+                (zone / "trip_point_0_temp").unlink()
+                self.assertIsNone(probe_cpu_thermal(d)[0].trip_c)
+            with patch("skeleton.app.offline_cpu_thermal.sys.platform", "win32"):
+                self.assertEqual(probe_cpu_thermal(d), ())
+
+    def test_thermal_trip_caps_real_source_plan_and_recovers(self):
+        from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+        hot = CPUThermalSensor("thermal_zone0", "cpu-thermal", 91.0, 90.0)
+        warm = CPUThermalSensor("thermal_zone0", "cpu-thermal", 88.0, 90.0)
+        cool = CPUThermalSensor("thermal_zone0", "cpu-thermal", 84.0, 90.0)
+        with TemporaryDirectory() as d:
+            fabric = AdaptiveResourceFabric(d)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_cpu_thermal",
+                side_effect=[(hot,), (warm,), (cool,), (cool,)],
+            ):
+                held = fabric.plan(1000, desired_streams=8)
+                self.assertEqual(held.stream_count, 1)
+                self.assertTrue(held.cpu_thermal_backpressure)
+                self.assertIn("thermal trip", held.reason)
+                self.assertTrue(fabric.plan(1000, desired_streams=8).cpu_thermal_backpressure)
+                resumed = fabric.plan(1000, desired_streams=8)
+                self.assertFalse(resumed.cpu_thermal_backpressure)
+                self.assertGreater(resumed.stream_count, 1)
+                monitor = fabric.monitor()["controller"]["cpu_thermal"]
+                self.assertEqual(monitor["transitions"], 2)
+                self.assertTrue(monitor["trip_measured"])
+
+    def test_unknown_trip_never_clears_measured_hot_hold(self):
+        from skeleton.app.offline_cpu_thermal import (
+            CPUThermalSensor, CPUThermalController,
+        )
+        controller = CPUThermalController()
+        controller.observe((CPUThermalSensor("cpu0", "cpu", 95.0, 90.0),))
+        controller.observe((CPUThermalSensor("cpu0", "cpu", 20.0, None),))
+        self.assertTrue(controller.snapshot()["thermal_backpressure"])
+        controller.observe(())
+        self.assertTrue(controller.snapshot()["thermal_backpressure"])
+        controller.observe((CPUThermalSensor("cpu0", "cpu", 70.0, 90.0),))
+        self.assertFalse(controller.snapshot()["thermal_backpressure"])
+        with self.assertRaises(TypeError):
+            controller.observe(["not a sensor"])
 
 
 if __name__ == "__main__":
