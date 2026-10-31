@@ -10,6 +10,7 @@ import json
 import sys
 
 from .execution_telemetry import ExecutionTiming
+from .offline_json_guard import load_strict_telemetry_json
 from .tail_latency_profile import (
     LocalTailProfiler, ProfileIdentity, ResourceObservation,
     compare_tail_profiles,
@@ -84,6 +85,8 @@ def _command(raw: object) -> dict[str, object]:
         "checkpoint": profiler.checkpoint(),
         "device_qualified": False,
         "model_quality_qualified": False,
+        "admission_qualified": False,
+        "input_attestation": "unverified_operator_json",
     }
 
 
@@ -96,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         raw_bytes = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
         if len(raw_bytes) > MAX_INPUT_BYTES:
             raise ValueError("tail profile input exceeds byte budget")
-        raw = json.loads(raw_bytes.decode("utf-8", errors="strict"))
+        raw = load_strict_telemetry_json(raw_bytes, max_bytes=MAX_INPUT_BYTES)
         receipt = _command(raw)
         print(json.dumps(receipt, sort_keys=True, separators=(",", ":"), allow_nan=False))
         return 0

@@ -255,3 +255,40 @@ def test_cli_prints_redacted_receipt(monkeypatch, capsys) -> None:
     assert output["summary"]["requests"] == 1
     assert "prompt_text" not in json.dumps(output)
     assert output["device_qualified"] is False
+
+def test_cli_rejects_ambiguous_duplicate_keys(monkeypatch, capsys) -> None:
+    from skeleton.ai.model_runtime.offline_json_guard import load_strict_telemetry_json
+    with pytest.raises(ValueError, match="duplicate"):
+        load_strict_telemetry_json(
+            b'{"schema":"first","schema":"second"}', max_bytes=1024,
+        )
+    original = json.dumps(_payload())
+    malformed = original.replace(
+        '"schema": "skeleton.ai.tail-profile-command.v1"',
+        '"schema": "skeleton.ai.tail-profile-command.v1", "schema": "forged"',
+        1,
+    )
+    monkeypatch.setattr(
+        sys, "stdin", SimpleNamespace(buffer=io.BytesIO(malformed.encode())),
+    )
+    assert main([]) == 2
+    assert "duplicate" in capsys.readouterr().err
+
+
+def test_cli_rejects_nonfinite_and_excessive_json_nesting() -> None:
+    from skeleton.ai.model_runtime.offline_json_guard import load_strict_telemetry_json
+    for payload in (b'{"value":NaN}', b'{"value":1e999}', b'{"value":-Infinity}'):
+        with pytest.raises(ValueError, match="nonfinite"):
+            load_strict_telemetry_json(payload, max_bytes=1024)
+    deeply_nested = b"[" * 35 + b"0" + b"]" * 35
+    with pytest.raises(ValueError, match="structure budget"):
+        load_strict_telemetry_json(deeply_nested, max_bytes=1024, max_depth=32)
+
+
+def test_cli_marks_operator_json_unattested_even_when_measured_claimed() -> None:
+    raw = _payload()
+    raw["identity"]["evidence"] = "measured"
+    receipt = _command(raw)
+    assert receipt["input_attestation"] == "unverified_operator_json"
+    assert receipt["admission_qualified"] is False
+    assert receipt["device_qualified"] is False
