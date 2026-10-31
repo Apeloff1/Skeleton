@@ -531,3 +531,18 @@ Explicit authored stage choices may add a prerequisite-closed detour even if
 the chosen ending is blocked entirely by external evidence. Such a route
 simulates only its authored stage tokens; the ending remains blocked and
 unverified external requirements remain visible.
+
+### Editable original quest alternatives (Studio A)
+
+The existing source-leased `--author-revision` CLI and typed
+`studio_author_revision` Jeeves preview now accept exact paths such as
+`{"section":"quest","path":["stage_graph",0,"alternatives",0],
+"value":"Record the survey before the hearing"}`. The canonical quest
+compiler revalidates choice uniqueness, causal DAG, bounded text, original
+scene/cast canon and deterministic replay before producing a new private
+source/playable HTML/receipt bundle. The same authored choice can be merged
+or selectively cherry-picked between source-bound revisions. Stage IDs,
+rewards, prerequisites, release certification, quest graph shape and evidence
+remain protected; changing a choice invalidates prior source-bound saves.
+This edits original author-owned prose, not external evidence or a native
+genre runtime.

@@ -49,6 +49,13 @@ def _allowed_path(section: str, path: list[object]) -> bool:
         return (len(path) == 3 and path[0] == "episode_plan"
                 and type(path[1]) is int and 0 <= path[1] < 64
                 and path[2] in ("site", "weather_state", "dialogue_hook"))
+    if section == "quest":
+        # Only the prose of existing authored choices is editable. Never
+        # grant access to rewards, prerequisites, stage IDs or release flags.
+        return (len(path) == 4 and path[0] in ("stage_graph", "stages")
+                and type(path[1]) is int and 0 <= path[1] < 64
+                and path[2] == "alternatives"
+                and type(path[3]) is int and 0 <= path[3] < 8)
     return False
 
 def preview_canon_revision(
