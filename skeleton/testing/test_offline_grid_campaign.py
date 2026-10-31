@@ -127,9 +127,9 @@ class OfflineGridCampaignTests(unittest.TestCase):
             Command("bad", "wait", "payload")
 
     def test_interactive_terminal_playthrough(self):
-        inputs = "\\n".join(
+        inputs = "\n".join(
             (f"{kind} {target}".strip() for _, kind, target in COMMANDS)
-        ) + "\\n"
+        ) + "\n"
         process = subprocess.run(
             [sys.executable, "-m", "scripts.game.offline_grid_campaign", "play"],
             input=inputs, capture_output=True, text=True, check=False,

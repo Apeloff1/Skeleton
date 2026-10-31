@@ -76,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
                     session = session.step(Command(f"terminal-{session.tick + 1}", kind, target))
                 except GameplayContractError as exc:
                     print(f"Rejected: {exc}", file=sys.stderr)
+            print()
             print(json.dumps({"save": session.snapshot(), "map": session.render()}, sort_keys=True))
             return 0
         if args.commands is None:
