@@ -16,6 +16,19 @@ from skeleton.game.gameplay.npc_route_planner import NpcRoutePlanner
 MAX_JSON_BYTES = 2_000_000
 
 
+def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise GameplayContractError("duplicate NPC JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_constant(value: str) -> object:
+    raise GameplayContractError("non-finite NPC JSON constant: " + value)
+
+
 def read_json(path: str) -> object:
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(path, flags)
@@ -27,7 +40,10 @@ def read_json(path: str) -> object:
             data = handle.read(MAX_JSON_BYTES + 1)
         if len(data) > MAX_JSON_BYTES:
             raise GameplayContractError("JSON source budget exceeded")
-        return json.loads(data)
+        return json.loads(
+            data.decode("utf-8"), object_pairs_hook=_unique_pairs,
+            parse_constant=_reject_constant,
+        )
     finally:
         os.close(fd)
 

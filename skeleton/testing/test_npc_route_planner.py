@@ -90,3 +90,15 @@ def test_cli_rejects_incompatible_solve_and_mutation_options(tmp_path: Path) -> 
         run = subprocess.run(cmd + extra, capture_output=True, timeout=20)
         assert run.returncode == 2
     assert not (tmp_path / "save.json").exists()
+
+
+def test_cli_rejects_duplicate_and_nonfinite_authored_source(tmp_path: Path) -> None:
+    from scripts.npc_schedule_cli import main
+    for content in (
+        '{"schema_version":1,"schema_version":1}',
+        '{"schema_version":NaN}',
+        '{"schema_version":Infinity}',
+    ):
+        source = tmp_path / "untrusted.json"
+        source.write_text(content)
+        assert main(["--schedule", str(source)]) == 2
