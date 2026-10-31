@@ -67,24 +67,38 @@ def _regular(path: Path) -> None:
 
 
 def _files(root: Path) -> list[dict[str, object]]:
+    """Inventory without sorting or materializing an untrusted directory tree."""
     gathered: list[dict[str, object]] = []
-    for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            raise OfflineKitError("kit contains symlinks")
-        if path.is_dir():
-            continue
-        _regular(path)
-        relative = path.relative_to(root).as_posix()
-        if relative == "manifest.json":
-            continue
-        _relative(relative)
-        gathered.append({
-            "path": relative,
-            "sha256": _hash(path),
-            "size_bytes": path.stat().st_size,
-        })
-        if len(gathered) > MAX_FILES:
-            raise OfflineKitError("too many kit files")
+    pending = [root]
+    visited = 0
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                visited += 1
+                if visited > MAX_FILES * 2:
+                    raise OfflineKitError("kit directory entry budget exceeded")
+                if entry.is_symlink():
+                    raise OfflineKitError("kit contains symlinks")
+                path = Path(entry.path)
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+                    continue
+                if not entry.is_file(follow_symlinks=False):
+                    raise OfflineKitError("kit contains nonregular entries")
+                _regular(path)
+                relative = path.relative_to(root).as_posix()
+                if relative == "manifest.json":
+                    continue
+                _relative(relative)
+                gathered.append({
+                    "path": relative,
+                    "sha256": _hash(path),
+                    "size_bytes": path.stat().st_size,
+                })
+                if len(gathered) > MAX_FILES:
+                    raise OfflineKitError("too many kit files")
+    gathered.sort(key=lambda item: item["path"])
     return gathered
 
 
@@ -194,15 +208,30 @@ def pack(
 
 
 def verify(root: str | Path) -> dict[str, object]:
-    kit = Path(root).expanduser().resolve(strict=True)
-    if not kit.is_dir():
-        raise OfflineKitError("kit root must be a directory")
-    manifest_path = kit / "manifest.json"
-    _regular(manifest_path)
-    if manifest_path.stat().st_size > _MAX_MANIFEST_BYTES:
-        raise OfflineKitError("offline manifest exceeds size limit")
+    kit = Path(root).expanduser().absolute()
+    if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+        try:
+            manifest_bytes, observed, deployment_bytes = _descriptor_inventory(kit)
+        except OSError as exc:
+            raise OfflineKitError("unsafe or inaccessible offline kit") from exc
+    else:
+        if kit.is_symlink():
+            raise OfflineKitError("symlinked offline kit root")
+        kit = kit.resolve(strict=True)
+        if not kit.is_dir():
+            raise OfflineKitError("kit root must be a directory")
+        manifest_path = kit / "manifest.json"
+        _regular(manifest_path)
+        if manifest_path.stat().st_size > _MAX_MANIFEST_BYTES:
+            raise OfflineKitError("offline manifest exceeds size limit")
+        manifest_bytes = manifest_path.read_bytes()
+        observed = _files(kit)
+        deployment_path = kit / "model" / "deployment.json"
+        deployment_bytes = deployment_path.read_bytes() if deployment_path.is_file() else None
+        if deployment_bytes is not None and len(deployment_bytes) > 64 * 1024:
+            raise OfflineKitError("offline metadata exceeds size limit")
     try:
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        data = json.loads(manifest_bytes, object_pairs_hook=_reject_duplicate_keys)
     except (OSError, ValueError, UnicodeError) as exc:
         raise OfflineKitError("invalid offline manifest") from exc
     if (
@@ -235,29 +264,375 @@ def verify(root: str | Path) -> dict[str, object]:
             or item["size_bytes"] < 0
         ):
             raise OfflineKitError("invalid kit artifact digest or size")
-    observed = _files(kit)
     if provided != observed:
         raise OfflineKitError("offline kit files differ from pinned manifest")
-    if not (kit / "offline_kit.py").is_file() or not (kit / "wheelhouse").is_dir():
+    indexed = {entry["path"]: entry for entry in observed}
+    wheels = [path[len("wheelhouse/"):] for path in indexed
+              if path.startswith("wheelhouse/")]
+    if "offline_kit.py" not in indexed or not wheels:
         raise OfflineKitError("missing offline bootstrapper or wheelhouse")
-    if _wheel_version(kit / "wheelhouse") != data["version"]:
+    versions: set[str] = set()
+    for name in wheels:
+        if "/" in name or not _WHEEL.fullmatch(name):
+            raise OfflineKitError("wheelhouse must contain only regular .whl files")
+        pieces = name.split("-")
+        if len(pieces) < 5:
+            raise OfflineKitError("invalid wheel filename")
+        if pieces[0].replace("_", "-").lower() == "skeleton":
+            versions.add(pieces[1])
+    if versions != {data["version"]}:
         raise OfflineKitError("pinned Skeleton wheel version mismatch")
     if data["gguf_included"]:
-        deployment = kit / "model" / "deployment.json"
-        _regular(deployment)
+        if deployment_bytes is None:
+            raise OfflineKitError("missing bundled model deployment")
         try:
-            local = json.loads(deployment.read_text(encoding="utf-8"))
-            binary = kit / "runtime" / (
-                "llama-cli.exe" if data["environment"]["sys_platform"] == "win32" else "llama-cli"
+            local = json.loads(
+                deployment_bytes, object_pairs_hook=_reject_duplicate_keys,
+            )
+            runtime_name = (
+                "llama-cli.exe" if data["environment"]["sys_platform"] == "win32"
+                else "llama-cli"
             )
             if (
-                local["executable_sha256"] != _hash(binary)
-                or local["model_sha256"] != _hash(kit / "model" / "model.gguf")
+                local["executable_sha256"] != indexed["runtime/" + runtime_name]["sha256"]
+                or local["model_sha256"] != indexed["model/model.gguf"]["sha256"]
             ):
                 raise OfflineKitError("pinned local model artifacts differ")
-        except (OSError, ValueError, KeyError, TypeError) as exc:
+        except (ValueError, UnicodeError, KeyError, TypeError) as exc:
             raise OfflineKitError("invalid bundled model deployment") from exc
     return data
+
+
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    data: dict[str, object] = {}
+    for key, value in pairs:
+        if key in data:
+            raise OfflineKitError("duplicate offline manifest key")
+        data[key] = value
+    return data
+
+
+def _descriptor_inventory(root: Path) -> tuple[bytes, list[dict[str, object]], bytes | None]:
+    """Read the manifest and hash the exact opened POSIX file descriptors.
+
+    Neither symlink swaps nor renamed ancestors can redirect an opened handle.
+    File and directory counts remain bounded before materialization.
+    """
+    root_fd = _open_directory_without_symlink_parents(root)
+    pending: list[tuple[int, tuple[str, ...]]] = [(os.dup(root_fd), ())]
+    records: list[dict[str, object]] = []
+    manifest: bytes | None = None
+    deployment: bytes | None = None
+    visited = 0
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    try:
+        while pending:
+            directory, prefix = pending.pop()
+            try:
+                with os.scandir(directory) as entries:
+                    for entry in entries:
+                        visited += 1
+                        if visited > MAX_FILES * 2:
+                            raise OfflineKitError("kit directory entry budget exceeded")
+                        parts = prefix + (entry.name,)
+                        if len(parts) > 35:
+                            raise OfflineKitError("kit path depth exceeded")
+                        relative = "/".join(parts)
+                        _relative(relative)
+                        info = os.stat(entry.name, dir_fd=directory, follow_symlinks=False)
+                        if stat.S_ISDIR(info.st_mode):
+                            child = os.open(
+                                entry.name, flags | os.O_DIRECTORY, dir_fd=directory,
+                            )
+                            pending.append((child, parts))
+                            continue
+                        if not stat.S_ISREG(info.st_mode):
+                            raise OfflineKitError("kit contains symlink or nonregular entry")
+                        opened = os.open(entry.name, flags, dir_fd=directory)
+                        with os.fdopen(opened, "rb") as reader:
+                            before = os.fstat(reader.fileno())
+                            if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+                                raise OfflineKitError("unsafe linked kit artifact")
+                            digest = hashlib.sha256()
+                            size = 0
+                            chunks: list[bytes] = []
+                            while True:
+                                chunk = reader.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                size += len(chunk)
+                                if relative in ("manifest.json", "model/deployment.json"):
+                                    limit = (_MAX_MANIFEST_BYTES if relative == "manifest.json"
+                                             else 64 * 1024)
+                                    if size > limit:
+                                        raise OfflineKitError("offline metadata exceeds size limit")
+                                    chunks.append(chunk)
+                                if relative != "manifest.json":
+                                    digest.update(chunk)
+                            after = os.fstat(reader.fileno())
+                            identity = lambda value: (
+                                value.st_dev, value.st_ino, value.st_size,
+                                value.st_mtime_ns, value.st_ctime_ns,
+                            )
+                            if size != before.st_size or identity(before) != identity(after):
+                                raise OfflineKitError("kit artifact changed during inventory")
+                        if relative == "manifest.json":
+                            manifest = b"".join(chunks)
+                        else:
+                            if relative == "model/deployment.json":
+                                deployment = b"".join(chunks)
+                            records.append({
+                                "path": relative, "sha256": digest.hexdigest(),
+                                "size_bytes": size,
+                            })
+                            if len(records) > MAX_FILES:
+                                raise OfflineKitError("too many kit files")
+            finally:
+                os.close(directory)
+        if manifest is None:
+            raise OfflineKitError("missing offline manifest")
+        records.sort(key=lambda item: item["path"])
+        return manifest, records, deployment
+    finally:
+        for descriptor, _ in pending:
+            os.close(descriptor)
+        os.close(root_fd)
+
+
+def _open_directory_without_symlink_parents(path: Path) -> int:
+    """Pin every POSIX path component by descriptor, rejecting parent symlinks."""
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        raise OfflineKitError("descriptor-safe directory opening unavailable")
+    absolute = os.path.abspath(os.fspath(path))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    current = os.open("/", flags)
+    try:
+        for component in absolute.split("/")[1:]:
+            if not component:
+                continue
+            following = os.open(component, flags, dir_fd=current)
+            os.close(current)
+            current = following
+        return current
+    except BaseException:
+        os.close(current)
+        raise
+
+
+def _bounded_wheel_names(directory: int | Path, maximum: int) -> list[str]:
+    """Stop after the first unlisted wheel, not after a huge list allocation."""
+    names: list[str] = []
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            if len(names) >= maximum:
+                raise OfflineKitError("wheelhouse differs from pinned manifest")
+            names.append(entry.name)
+    return sorted(names)
+
+
+def _snapshot_wheels(kit: Path, manifest: dict[str, object], snapshot: Path) -> None:
+    """Copy only pinned wheel bytes into a private resolver input directory.
+
+    POSIX uses directory-relative nofollow descriptors. Other platforms
+    still verify every copied byte and reject visible symlinks.
+    """
+    expected = {
+        entry["path"][len("wheelhouse/"):]: entry
+        for entry in manifest["files"]
+        if entry["path"].startswith("wheelhouse/")
+    }
+    source_root = kit / "wheelhouse"
+    if source_root.is_symlink() or not source_root.is_dir() or not expected:
+        raise OfflineKitError("missing or unsafe offline wheelhouse")
+    directory_fd = None
+    try:
+        if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+            directory_fd = _open_directory_without_symlink_parents(source_root)
+        names = _bounded_wheel_names(
+            directory_fd if directory_fd is not None else source_root,
+            len(expected),
+        )
+        if set(names) != set(expected):
+            raise OfflineKitError("wheelhouse differs from pinned manifest")
+        snapshot.mkdir(mode=0o700)
+        for name in names:
+            if not _WHEEL.fullmatch(name):
+                raise OfflineKitError("invalid wheel filename")
+            if directory_fd is None:
+                source = source_root / name
+                if source.is_symlink():
+                    raise OfflineKitError("wheelhouse contains a symlink")
+                fd = os.open(source, os.O_RDONLY)
+            else:
+                fd = os.open(
+                    name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd,
+                )
+            with os.fdopen(fd, "rb") as reader:
+                before = os.fstat(reader.fileno())
+                if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                        or before.st_size != expected[name]["size_bytes"]):
+                    raise OfflineKitError("unsafe or changed pinned wheel")
+                digest = hashlib.sha256()
+                with (snapshot / name).open("xb") as writer:
+                    while True:
+                        chunk = reader.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        digest.update(chunk)
+                        writer.write(chunk)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                after = os.fstat(reader.fileno())
+                if (before.st_size, before.st_mtime_ns, before.st_ctime_ns
+                        ) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                    raise OfflineKitError("wheel changed during private snapshot")
+                if digest.hexdigest() != expected[name]["sha256"]:
+                    raise OfflineKitError("private wheel snapshot digest mismatch")
+                if directory_fd is None and (source_root / name).is_symlink():
+                    raise OfflineKitError("wheel became a symlink during snapshot")
+        if set(_bounded_wheel_names(
+            directory_fd if directory_fd is not None else source_root,
+            len(expected),
+        )) != set(names):
+            raise OfflineKitError("wheelhouse changed during snapshot")
+    except OSError as exc:
+        raise OfflineKitError("unable to create verified private wheel snapshot") from exc
+    finally:
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
+
+def _copy_pinned_assets(
+    kit: Path, manifest: dict[str, object], destination: Path,
+) -> None:
+    """Copy only the manifest's three local-model artifacts, never a source tree.
+
+    POSIX opens the kit root and every child with O_NOFOLLOW. Each copy is
+    hashed against the manifest while the original inode remains open.
+    """
+    runtime_name = (
+        "llama-cli.exe" if manifest["environment"]["sys_platform"] == "win32"
+        else "llama-cli"
+    )
+    expected = {
+        "model/deployment.json", "model/model.gguf", "runtime/" + runtime_name,
+    }
+    pinned = {
+        item["path"]: item for item in manifest["files"]
+        if item["path"].startswith(("model/", "runtime/"))
+    }
+    if set(pinned) != expected:
+        raise OfflineKitError("offline model asset inventory differs from manifest")
+    destination.mkdir(mode=0o700)
+    (destination / "model").mkdir(mode=0o700)
+    (destination / "runtime").mkdir(mode=0o700)
+    root_fd: int | None = None
+    if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+        root_fd = _open_directory_without_symlink_parents(kit)
+    try:
+        # Inventory the two source directories before copying. Extra files
+        # must never silently enter a consumer installation.
+        for prefix in ("model", "runtime"):
+            allowed = {
+                relative.split("/", 1)[1] for relative in expected
+                if relative.startswith(prefix + "/")
+            }
+            if root_fd is not None:
+                directory = os.open(
+                    prefix, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=root_fd,
+                )
+                try:
+                    iterator = os.scandir(directory)
+                    with iterator:
+                        observed: set[str] = set()
+                        for entry in iterator:
+                            if len(observed) >= len(allowed):
+                                raise OfflineKitError("model source inventory differs")
+                            observed.add(entry.name)
+                finally:
+                    os.close(directory)
+            else:
+                folder = kit / prefix
+                if folder.is_symlink():
+                    raise OfflineKitError("symlinked local model directory")
+                observed = set()
+                with os.scandir(folder) as iterator:
+                    for entry in iterator:
+                        if len(observed) >= len(allowed) or entry.is_symlink():
+                            raise OfflineKitError("model source inventory differs")
+                        observed.add(entry.name)
+            if observed != allowed:
+                raise OfflineKitError("model source inventory differs")
+        for relative in sorted(expected):
+            source = kit / relative
+            parent_fd: int | None = None
+            if root_fd is not None:
+                parent_fd = os.dup(root_fd)
+                try:
+                    for component in _relative(relative).parts[:-1]:
+                        following = os.open(
+                            component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                            dir_fd=parent_fd,
+                        )
+                        os.close(parent_fd)
+                        parent_fd = following
+                    opened = os.open(
+                        _relative(relative).parts[-1], os.O_RDONLY | os.O_NOFOLLOW,
+                        dir_fd=parent_fd,
+                    )
+                finally:
+                    os.close(parent_fd)
+            else:
+                if source.is_symlink():
+                    raise OfflineKitError("symlinked local model artifact")
+                opened = os.open(source, os.O_RDONLY)
+            with os.fdopen(opened, "rb") as reader:
+                before = os.fstat(reader.fileno())
+                if (
+                    not stat.S_ISREG(before.st_mode)
+                    or before.st_nlink != 1
+                    or before.st_size != pinned[relative]["size_bytes"]
+                ):
+                    raise OfflineKitError("unsafe or changed local model artifact")
+                digest = hashlib.sha256()
+                output = destination / relative
+                with output.open("xb") as writer:
+                    while True:
+                        chunk = reader.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        digest.update(chunk)
+                        writer.write(chunk)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                    if relative.startswith("runtime/") and os.name != "nt":
+                        os.fchmod(
+                            writer.fileno(),
+                            stat.S_IMODE(before.st_mode) & 0o755,
+                        )
+                after = os.fstat(reader.fileno())
+                identity = lambda value: (
+                    value.st_dev, value.st_ino, value.st_size,
+                    value.st_mtime_ns, value.st_ctime_ns,
+                )
+                if (
+                    identity(before) != identity(after)
+                    or digest.hexdigest() != pinned[relative]["sha256"]
+                ):
+                    raise OfflineKitError("local model changed during pinned copy")
+    except OSError as exc:
+        raise OfflineKitError("unable to copy verified local model artifacts") from exc
+    finally:
+        if root_fd is not None:
+            os.close(root_fd)
 
 
 def install(root: str | Path, destination: str | Path) -> Path:
@@ -267,7 +642,7 @@ def install(root: str | Path, destination: str | Path) -> Path:
     from venv creation to first use. On failure, delete only that newly
     created target, never an existing operator installation or its parents.
     """
-    kit = Path(root).expanduser().resolve(strict=True)
+    kit = Path(root).expanduser().absolute()
     manifest = verify(kit)
     if manifest["environment"] != _environment():
         raise OfflineKitError("bundle Python/OS/architecture differs from this host")
@@ -277,13 +652,6 @@ def install(root: str | Path, destination: str | Path) -> Path:
     if not target.parent.is_dir() or target == kit or kit in target.parents:
         raise OfflineKitError("install outside the verified bundle into an existing parent")
 
-    command = [
-        "-m", "pip", "--isolated", "install",
-        "--no-index", "--no-input", "--no-cache-dir",
-        "--disable-pip-version-check", "--only-binary=:all:",
-        "--find-links", str(kit / "wheelhouse"),
-        f"skeleton[local-inference]=={manifest['version']}",
-    ]
     # Isolation is enforced at the package resolver, not claimed as an OS
     # egress sandbox for arbitrary executable wheel-install hooks.
     env = dict(os.environ)
@@ -293,9 +661,21 @@ def install(root: str | Path, destination: str | Path) -> Path:
         "PYTHONNOUSERSITE": "1",
     })
     try:
-        venv.EnvBuilder(with_pip=True, clear=False).create(target)
-        python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        subprocess.run([str(python), *command], check=True, env=env, shell=False)
+        with tempfile.TemporaryDirectory(
+            prefix=".skeleton-wheels-", dir=target.parent,
+        ) as temporary:
+            snapshot = Path(temporary) / "wheelhouse"
+            _snapshot_wheels(kit, manifest, snapshot)
+            command = [
+                "-m", "pip", "--isolated", "install",
+                "--no-index", "--no-input", "--no-cache-dir",
+                "--disable-pip-version-check", "--only-binary=:all:",
+                "--find-links", str(snapshot),
+                f"skeleton[local-inference]=={manifest['version']}",
+            ]
+            venv.EnvBuilder(with_pip=True, clear=False).create(target)
+            python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            subprocess.run([str(python), *command], check=True, env=env, shell=False)
 
         # The verified source bundle must remain byte-identical while pip
         # resolves it. An altered wheel or model invalidates the installation.
@@ -303,20 +683,38 @@ def install(root: str | Path, destination: str | Path) -> Path:
             raise OfflineKitError("offline kit changed during installation")
         if manifest["gguf_included"]:
             assets = target / "offline_model"
-            assets.mkdir()
-            shutil.copytree(kit / "model", assets / "model", symlinks=False)
-            shutil.copytree(kit / "runtime", assets / "runtime", symlinks=False)
+            _copy_pinned_assets(kit, manifest, assets)
             # Verify copied identities, not merely the source kit hashes.
             local = json.loads((assets / "model" / "deployment.json").read_text("utf-8"))
             runtime_name = (
                 "llama-cli.exe" if manifest["environment"]["sys_platform"] == "win32"
                 else "llama-cli"
             )
+            expected_assets = {
+                "model/deployment.json", "model/model.gguf",
+                "runtime/" + runtime_name,
+            }
+            pinned_assets = {
+                item["path"]: item for item in manifest["files"]
+                if item["path"].startswith(("model/", "runtime/"))
+            }
+            if set(pinned_assets) != expected_assets:
+                raise OfflineKitError("offline model asset inventory differs from manifest")
+            for relative, item in pinned_assets.items():
+                copied = assets / relative
+                _regular(copied)
+                if (copied.stat().st_size != item["size_bytes"]
+                        or _hash(copied) != item["sha256"]):
+                    raise OfflineKitError("copied model artifact differs from pinned manifest")
             if (
-                _hash(assets / "model" / "model.gguf") != local["model_sha256"]
+                local.get("schema_version") != "skeleton.local_model.deployment.v1"
+                or local.get("runtime_kind") != "llama.cpp-cli"
+                or local.get("model_path") != "model.gguf"
+                or local.get("executable_path") != "../runtime/" + runtime_name
+                or _hash(assets / "model" / "model.gguf") != local["model_sha256"]
                 or _hash(assets / "runtime" / runtime_name) != local["executable_sha256"]
             ):
-                raise OfflineKitError("copied model or local runtime digest differs")
+                raise OfflineKitError("copied model or local runtime contract differs")
         # Validate the actual install, not only subprocess exit code.
         if not python.is_file():
             raise OfflineKitError("offline installation created no Python runtime")
