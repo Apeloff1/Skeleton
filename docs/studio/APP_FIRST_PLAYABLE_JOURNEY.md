@@ -141,3 +141,31 @@ the stat/read replacement window of a pathname-only import. Unsupported hosts
 remain fail-closed; a Windows consumer install is not certified by POSIX tests.
 `--onboard` avoids file import entirely by constructing the same typed intent
 in memory, then runs the same game build, export and replay verification path.
+
+## Independently pinned historical receipt → live game reconciliation
+
+The archived receipt inspector alone only authenticates the historical bytes;
+it does not prove that the receipt belongs to a game currently on disk. For a
+read-only source-to-receipt handoff, independently retain **both** the game
+release.json SHA-256 and the receipt SHA-256 in a trusted channel, then run:
+
+```sh
+python -m skeleton app studio-journey --reconcile-receipt \\
+  --output ./existing-original-game --receipt ./private-first-replay.json \\
+  --expected-manifest-sha256 <independent-game-pin> \\
+  --expected-receipt-sha256 <independent-receipt-pin> \\
+  --trusted-local-operator
+```
+
+The app replays the source with the canonical verifier, opens the historical
+receipt through the existing descriptor-safe bounded inspector, compares the
+complete original game/replay/source identity (not just the project name), and
+replays the game **again** to detect intervening source mutation. Foreign
+receipts, missing fields, type-confused booleans/integers, modified source,
+symlinked receipt paths and conflicting CLI modes fail closed. Neither source
+nor receipt is modified. This provides point-in-time source/receipt consistency,
+not an immutable filesystem snapshot, publisher signature, model execution,
+rights clearance, native Godot test or consumer release qualification.
+
+Focused canonical regression:
+`python -m pytest -q skeleton/testing/test_app_receipt_reconciliation.py`.

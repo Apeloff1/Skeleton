@@ -44,6 +44,7 @@ from skeleton.ai.game_builder.studio_tool_fabric import ToolFabricError
 SCHEMA = "skeleton.app.first_playable_journey.v1"
 VERIFY_SCHEMA = "skeleton.app.first_playable_journey_verification.v1"
 INSPECT_SCHEMA = "skeleton.app.first_playable_receipt_inspection.v1"
+RECONCILE_SCHEMA = "skeleton.app.first_playable_receipt_reconciliation.v1"
 
 
 class FirstPlayableJourneyError(ValueError):
@@ -251,6 +252,57 @@ def inspect_first_playable_receipt(
     }
 
 
+def reconcile_first_playable_receipt(
+    source_directory: str | Path, receipt_path: str | Path, *,
+    expected_manifest_sha256: str, expected_receipt_sha256: str,
+    authorized: bool,
+) -> dict[str, object]:
+    """Bind an independently pinned historical receipt to fresh source replay.
+
+    The second full canonical verification detects source mutation between
+    reading the historical receipt and completing reconciliation. Both reads
+    are read-only, bounded and descriptor-safe on supported POSIX hosts.
+    This is point-in-time evidence, not a persistent lock or release grant.
+    """
+    if authorized is not True:
+        raise PermissionError("trusted local operator acknowledgement required")
+    before = verify_exported_package(
+        source_directory, expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    inspected = inspect_verified_receipt(
+        receipt_path, expected_sha256=expected_receipt_sha256,
+        expected_source=before, authorized=True,
+    )
+    if inspected.get("source_binding_verified") is not True:
+        raise FirstPlayableJourneyError("archived receipt is not bound to live source")
+    after = verify_exported_package(
+        source_directory, expected_manifest_sha256=expected_manifest_sha256,
+        authorized=True,
+    )
+    if before != after:
+        raise FirstPlayableJourneyError("game source changed during reconciliation")
+    return {
+        "schema": RECONCILE_SCHEMA,
+        "status": "historical_receipt_bound_to_fresh_replay_release_blocked",
+        "project_id": after["project_id"],
+        "manifest_sha256": expected_manifest_sha256,
+        "receipt_sha256": expected_receipt_sha256,
+        "world_digest": after["world_digest"],
+        "replay_digest": after["replay_digest"],
+        "verified_source_files": after["verified_files"],
+        "replayed_actions": after["replayed_actions"],
+        "receipt_integrity_verified": True,
+        "receipt_source_binding_verified": True,
+        "offline_gameplay_reexecuted": True,
+        "model_inference_observed": False,
+        "native_godot_executed": False,
+        "native_device_qualified": False,
+        "rights_certified": False,
+        "release_certified": False,
+    }
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m skeleton app studio-journey",
@@ -269,6 +321,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--levels", type=int, help="level count for --onboard")
     parser.add_argument("--verify-existing", action="store_true",
                         help="read-only re-verification of an existing exported game")
+    parser.add_argument("--reconcile-receipt", action="store_true",
+                        help="bind an archived receipt to freshly replayed source using two independent pins")
     parser.add_argument("--inspect-receipt", action="store_true",
                         help="read-only inspection of an independently pinned archived receipt")
     parser.add_argument("--expected-manifest-sha256",
@@ -295,8 +349,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.project_id, args.title, args.subtitle, args.seed,
             args.theme, args.width, args.height, args.levels,
         )
-        if args.inspect_receipt:
-            if (args.verify_existing or args.onboard or args.output is not None
+        if args.reconcile_receipt:
+            if (args.inspect_receipt or args.verify_existing or args.onboard
+                    or args.output is None or args.receipt is None
+                    or args.expected_manifest_sha256 is None
+                    or args.expected_receipt_sha256 is None
+                    or args.intent is not None
+                    or any(value is not None for value in onboarding_values)
+                    or args.mirror_attempts != 64 or args.practice_games != 0):
+                raise FirstPlayableJourneyError("invalid source/receipt reconciliation mode")
+            receipt = reconcile_first_playable_receipt(
+                args.output, args.receipt,
+                expected_manifest_sha256=args.expected_manifest_sha256,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                authorized=args.trusted_local_operator,
+            )
+        elif args.inspect_receipt:
+            if (args.reconcile_receipt or args.verify_existing or args.onboard or args.output is not None
                     or any(value is not None for value in onboarding_values)
                     or args.intent is not None or args.expected_manifest_sha256 is not None
                     or args.receipt is None or args.expected_receipt_sha256 is None
@@ -307,7 +376,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 authorized=args.trusted_local_operator,
             )
         elif args.verify_existing:
-            if (args.output is None or args.intent is not None or args.onboard
+            if (args.reconcile_receipt or args.output is None or args.intent is not None or args.onboard
                     or any(value is not None for value in onboarding_values)
                     or args.expected_receipt_sha256 is not None
                     or args.mirror_attempts != 64 or args.practice_games != 0):
@@ -320,7 +389,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 receipt_destination=args.receipt,
             )
         else:
-            if (args.output is None or args.expected_manifest_sha256 is not None
+            if (args.reconcile_receipt or args.output is None or args.expected_manifest_sha256 is not None
                     or args.expected_receipt_sha256 is not None):
                 raise FirstPlayableJourneyError(
                     "new game builds require --output and reject verification pins"
@@ -382,7 +451,7 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "SCHEMA", "VERIFY_SCHEMA", "INSPECT_SCHEMA", "FirstPlayableJourneyError",
+    "SCHEMA", "VERIFY_SCHEMA", "INSPECT_SCHEMA", "RECONCILE_SCHEMA", "FirstPlayableJourneyError",
     "build_first_playable_journey", "verify_existing_playable_journey",
-    "inspect_first_playable_receipt", "main",
+    "inspect_first_playable_receipt", "reconcile_first_playable_receipt", "main",
 ]
