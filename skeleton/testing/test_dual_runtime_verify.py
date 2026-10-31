@@ -318,3 +318,50 @@ def test_verify_export_receipt_rejects_source_write_and_symlink_parent(package, 
     alias.symlink_to(outside, target_is_directory=True)
     assert main([*base, str(alias / "receipt.json")]) == 2
     assert not (outside / "receipt.json").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX pinned receipt inspection")
+def test_inspect_receipt_roundtrip_and_tamper_rejection(package, tmp_path, capsys):
+    from skeleton.ai.game_builder.original_game_studio_cli import main as studio
+    root, pin = package
+    output = tmp_path / "verification.json"
+    assert studio([
+        "verify-export", "--package", str(root),
+        "--expected-manifest-sha256", pin, "--trusted-local-operator",
+        "--receipt-output", str(output),
+    ]) == 0
+    capsys.readouterr()
+    trusted = sha256(output.read_bytes()).hexdigest()
+    inspect = ["inspect-receipt", "--receipt", str(output),
+               "--expected-sha256", trusted, "--trusted-local-operator"]
+    assert studio(inspect) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["receipt_integrity_verified"] is True
+    assert result["gameplay_reexecuted_now"] is False
+    assert result["release_certified"] is False
+    assert studio(inspect[:-1]) == 2
+    capsys.readouterr()
+    output.write_bytes(output.read_bytes() + b" ")
+    assert studio(inspect) == 2
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX pinned receipt inspection")
+def test_inspect_receipt_rejects_hardlink_and_noncanonical_json(tmp_path):
+    from skeleton.ai.game_builder.offline_receipt_inspection import (
+        ReceiptInspectionError, inspect_verified_receipt,
+    )
+    source = tmp_path / "receipt.json"
+    source.write_bytes(b'{"schema":"untrusted"}\\n')
+    alias = tmp_path / "alias.json"
+    os.link(source, alias)
+    with pytest.raises(ReceiptInspectionError):
+        inspect_verified_receipt(
+            alias, expected_sha256=sha256(source.read_bytes()).hexdigest(),
+            authorized=True,
+        )
+    source.unlink()
+    with pytest.raises(ReceiptInspectionError):
+        inspect_verified_receipt(
+            alias, expected_sha256=sha256(alias.read_bytes()).hexdigest(),
+            authorized=True,
+        )

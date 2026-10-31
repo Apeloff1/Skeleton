@@ -88,3 +88,14 @@ filenames and failed verification are rejected without overwriting evidence.
 The receipt is **not** a signature, publisher attestation, rights clearance,
 native Godot execution or device qualification. Transfer the independent
 source/index SHA-256 pins separately from the untrusted package.
+
+## Inspect an archived receipt
+
+Run `inspect-receipt --receipt /private/verified-receipt.json
+--expected-sha256 <independently-held-sha256> --trusted-local-operator`
+through the canonical original-game studio CLI. This performs a read-only
+bounded nofollow check of canonical JSON, independent file SHA-256, supported
+receipt schema and embedded digest where present. It **does not** replay
+gameplay again, validate the current source tree, execute Godot or qualify
+consumer hardware. Re-run `verify-export` or `verify-batch` against the
+original independently pinned sources for fresh gameplay acceptance.

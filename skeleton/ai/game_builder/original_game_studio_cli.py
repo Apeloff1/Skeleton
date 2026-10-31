@@ -61,6 +61,9 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "inspect-receipt":
+        from .offline_receipt_inspect_cli import main as inspect_main
+        return inspect_main(arguments[1:])
     if arguments and arguments[0] == "diff-batch":
         from .offline_export_batch_delta_cli import main as delta_main
         return delta_main(arguments[1:])
