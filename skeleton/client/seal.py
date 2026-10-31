@@ -148,6 +148,88 @@ def mint_seal_token(
     return f"{attester}.{expiry}.{sig}"
 
 
+V3_PREFIX = "v3."
+V3_CANONICAL_TAG = "gf-seal/v3"
+TENANT_HEADER = "x-gf-tenant"
+NO_TENANT = "-"
+_V3_TENANT_RE = re.compile(r"^(?:-|[A-Za-z0-9_:-]{1,128})$")
+_V3_METHOD_RE = re.compile(r"^[A-Z]{1,16}$")
+_UNRESERVED = "-._~"
+
+
+def canonical_path(path: str) -> str:
+    """Mirror of ``skeleton.api.hmac_seal.canonical_path`` (decode once, re-encode)."""
+    from urllib.parse import quote, unquote
+
+    return quote(unquote(path or "/"), safe="/" + _UNRESERVED)
+
+
+def canonical_query(query: str) -> str:
+    """Mirror of ``skeleton.api.hmac_seal.canonical_query`` (sorted, RFC 3986)."""
+    from urllib.parse import parse_qsl, quote
+
+    if not query:
+        return ""
+    pairs = parse_qsl(query, keep_blank_values=True, strict_parsing=False)
+    enc = sorted((quote(k, safe=_UNRESERVED), quote(v, safe=_UNRESERVED)) for k, v in pairs)
+    return "&".join(f"{k}={v}" for k, v in enc)
+
+
+def mint_request_seal_token(
+    attester: str,
+    domain: str,
+    *,
+    method: str,
+    path: str,
+    query: str = "",
+    body: bytes = b"",
+    tenant: str | None = None,
+    secret: str | None = None,
+    principal: str | None = None,
+    now: float | None = None,
+    nonce: str | None = None,
+) -> str | None:
+    """Mint a v3 request-bound single-use seal (byte-identical to server ``mint_seal_v3``).
+
+    ``v3.{principal}.{attester}.{domain}.{tenant}.{unix_ts}.{nonce}.{mac}``; the MAC covers
+    method, canonical path and query, ``sha256(body)``, principal, attester, domain,
+    tenant (``-`` for none) and the issue timestamp.
+    """
+    principal = principal or attester
+    nonce = nonce or secrets.token_hex(16)
+    tenant_f = tenant if tenant else NO_TENANT
+    method_u = (method or "").upper()
+    if not all(isinstance(v, str) and _V2_FIELD_RE.fullmatch(v) for v in (principal, attester, domain)):
+        raise ValueError("principal/attester/domain must match [A-Za-z0-9_:-]{1,128}")
+    if not _V3_TENANT_RE.fullmatch(tenant_f):
+        raise ValueError("tenant must match [A-Za-z0-9_:-]{1,128}")
+    if not _V2_NONCE_RE.fullmatch(nonce):
+        raise ValueError("nonce must match [A-Za-z0-9_-]{16,128}")
+    if not _V3_METHOD_RE.fullmatch(method_u):
+        raise ValueError("method must be an HTTP token")
+    key = _mint_key(secret)
+    if key is None:
+        return None
+    ts = int(now if now is not None else time.time())
+    canonical = "\n".join(
+        (
+            V3_CANONICAL_TAG,
+            method_u,
+            canonical_path(path),
+            canonical_query(query),
+            hashlib.sha256(body or b"").hexdigest(),
+            principal,
+            attester,
+            domain,
+            tenant_f,
+            str(ts),
+            nonce,
+        )
+    )
+    sig = hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{V3_PREFIX}{principal}.{attester}.{domain}.{tenant_f}.{ts}.{nonce}.{sig}"
+
+
 class RequestSealer:
     """Caches one minted seal and re-mints ~30s before its absolute expiry.
 
@@ -157,6 +239,7 @@ class RequestSealer:
 
     __slots__ = (
         "_attester", "_principal", "_secret", "_ttl", "_clock", "_lock", "_token", "_expiry", "_domain",
+        "_bind_request", "_tenant",
     )
 
     def __init__(
@@ -168,7 +251,15 @@ class RequestSealer:
         ttl_secs: int = DEFAULT_TTL_SECS,
         clock: Callable[[], float] = time.time,
         domain: str | None = None,
+        bind_request: bool = False,
+        tenant: str | None = None,
     ) -> None:
+        if bind_request and domain is None:
+            raise SkeletonSealConfigError("bind_request=True requires domain=")
+        if tenant is not None and not _V3_TENANT_RE.fullmatch(tenant or ""):
+            raise SkeletonSealConfigError("tenant must match [A-Za-z0-9_:-]{1,128}")
+        self._bind_request = bool(bind_request)
+        self._tenant = tenant
         if not attester or "." in attester:
             raise SkeletonSealConfigError("attester must be non-empty and contain no '.'")
         if principal is not None and (not principal or "." in principal):
@@ -227,3 +318,37 @@ class RequestSealer:
 
     def headers(self) -> dict[str, str]:
         return {SEAL_HEADER: self.token()}
+
+    @property
+    def binds_request(self) -> bool:
+        return self._bind_request
+
+    @property
+    def tenant(self) -> str | None:
+        return self._tenant
+
+    def headers_for(self, method: str, path: str, query: str = "", body: bytes = b"") -> dict[str, str]:
+        """v3: fresh request-bound seal (+ ``x-gf-tenant`` when set). Else :meth:`headers`."""
+        if not self._bind_request:
+            return self.headers()
+        with self._lock:
+            token = mint_request_seal_token(
+                self._attester,
+                self._domain or "",
+                method=method,
+                path=path,
+                query=query,
+                body=body,
+                tenant=self._tenant,
+                secret=self._secret,
+                principal=self._principal,
+                now=self._clock(),
+            )
+        if not token:
+            raise SkeletonSealConfigError(
+                "no seal secret available: pass seal_secret= or set GF_SEAL_SECRET"
+            )
+        out = {SEAL_HEADER: token}
+        if self._tenant:
+            out[TENANT_HEADER] = self._tenant
+        return out
