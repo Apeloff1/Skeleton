@@ -170,3 +170,25 @@ def test_snapshot_directory_flood_rejected_without_private_output(tmp_path):
     with pytest.raises(offline_kit.OfflineKitError, match="differs"):
         offline_kit._snapshot_wheels(root, manifest, snapshot)
     assert not snapshot.exists()
+
+
+
+def test_kit_inventory_bounded_before_untrusted_tree_is_materialized(tmp_path, monkeypatch):
+    root, _, _ = _kit(tmp_path)
+    monkeypatch.setattr(offline_kit, "MAX_FILES", 4)
+    for index in range(12):
+        (root / f"extra-{index:04d}").write_bytes(b"x")
+    with pytest.raises(offline_kit.OfflineKitError, match="entry budget"):
+        offline_kit._files(root)
+
+
+def test_kit_inventory_keeps_canonical_sorted_manifest_order(tmp_path):
+    root, _, wheel = _kit(tmp_path)
+    (root / "offline_kit.py").write_bytes(b"bootstrap")
+    inventory = offline_kit._files(root)
+    assert [entry["path"] for entry in inventory] == sorted(
+        entry["path"] for entry in inventory
+    )
+    assert next(entry for entry in inventory if entry["path"].endswith(".whl"))[
+        "sha256"
+    ] == hashlib.sha256(wheel.read_bytes()).hexdigest()

@@ -67,24 +67,38 @@ def _regular(path: Path) -> None:
 
 
 def _files(root: Path) -> list[dict[str, object]]:
+    """Inventory without sorting or materializing an untrusted directory tree."""
     gathered: list[dict[str, object]] = []
-    for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            raise OfflineKitError("kit contains symlinks")
-        if path.is_dir():
-            continue
-        _regular(path)
-        relative = path.relative_to(root).as_posix()
-        if relative == "manifest.json":
-            continue
-        _relative(relative)
-        gathered.append({
-            "path": relative,
-            "sha256": _hash(path),
-            "size_bytes": path.stat().st_size,
-        })
-        if len(gathered) > MAX_FILES:
-            raise OfflineKitError("too many kit files")
+    pending = [root]
+    visited = 0
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                visited += 1
+                if visited > MAX_FILES * 2:
+                    raise OfflineKitError("kit directory entry budget exceeded")
+                if entry.is_symlink():
+                    raise OfflineKitError("kit contains symlinks")
+                path = Path(entry.path)
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+                    continue
+                if not entry.is_file(follow_symlinks=False):
+                    raise OfflineKitError("kit contains nonregular entries")
+                _regular(path)
+                relative = path.relative_to(root).as_posix()
+                if relative == "manifest.json":
+                    continue
+                _relative(relative)
+                gathered.append({
+                    "path": relative,
+                    "sha256": _hash(path),
+                    "size_bytes": path.stat().st_size,
+                })
+                if len(gathered) > MAX_FILES:
+                    raise OfflineKitError("too many kit files")
+    gathered.sort(key=lambda item: item["path"])
     return gathered
 
 
