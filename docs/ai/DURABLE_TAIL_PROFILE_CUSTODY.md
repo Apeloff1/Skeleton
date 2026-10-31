@@ -36,3 +36,16 @@ operator must implement separate protected storage and durable anchor.
 covers restart, append-only invariants, anchor failure, tampering,
 wrong key, missing anchor, schema mismatch, and byte limits. Tests
 use synthetic CPU observations and simulated anchors only.
+
+
+## Concurrent writer snapshot fence
+
+Verified status pins the independent CAS generation and digest *before*
+loading the authenticated profile, then requires the exact same pair after
+loading and checking the row. A coherent peer advancement between those
+reads quarantines the stale reader rather than labeling an old profile with
+a new generation. Persist uses that paired profile/version and an exact
+SQLite compare-and-swap; a concurrent append cannot be overwritten by a
+stale in-memory profile. Simulated two-writer regression coverage lives in
+`test_tail_profile_custody.py`. This is not a cross-process lock or a
+substitute for a genuinely durable external CAS provider.

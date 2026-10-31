@@ -207,3 +207,48 @@ def test_bool_generation_in_anchor_is_not_trusted():
     anchor.value = (True, anchor.value[1])
     with pytest.raises(TailCustodyQuarantined):
         store.load()
+
+
+def test_status_rejects_concurrent_new_generation_after_load(tmp_path, monkeypatch):
+    path = tmp_path / "tail.db"
+    anchor = Anchor()
+    store = make(sqlite3.connect(path), anchor)
+    store.bootstrap()
+    peer = make(sqlite3.connect(path), anchor)
+    original_load = store.load
+
+    def raced_load():
+        older = original_load()
+        newer = peer.load()
+        record(newer, 1)
+        peer.persist(newer)
+        return older
+
+    monkeypatch.setattr(store, "load", raced_load)
+    with pytest.raises(TailCustodyQuarantined, match="status"):
+        store.verified_snapshot()
+    assert store.quarantined
+    assert len(peer.load().checkpoint()["records"]) == 1
+
+
+def test_persist_rejects_stale_profile_after_peer_advances(tmp_path, monkeypatch):
+    path = tmp_path / "tail.db"
+    anchor = Anchor()
+    store = make(sqlite3.connect(path), anchor)
+    profile = store.bootstrap()
+    record(profile, 1)
+    peer = make(sqlite3.connect(path), anchor)
+    original_snapshot = store.verified_snapshot
+
+    def raced_snapshot():
+        older, generation, digest = original_snapshot()
+        newer = peer.load()
+        record(newer, 2)
+        peer.persist(newer)
+        return older, generation, digest
+
+    monkeypatch.setattr(store, "verified_snapshot", raced_snapshot)
+    with pytest.raises(TailCustodyQuarantined, match="publication"):
+        store.persist(profile)
+    assert store.quarantined
+    assert len(peer.load().checkpoint()["records"]) == 1

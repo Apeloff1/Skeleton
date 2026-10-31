@@ -217,12 +217,21 @@ class DurableTailProfileStore:
         status or claim that the earlier profile is current.
         """
         with self._lock:
-            profile = self.load()
             try:
+                # A second writer can advance the independent anchor and
+                # SQLite between load() and this method's final read.
+                # Pin the version BEFORE loading and require it to remain
+                # identical after the authenticated payload is decoded.
+                before_generation, before_digest = self._anchor.read()
+                profile = self.load()
                 generation, digest = self._anchor.read()
                 row = self._row()
                 if (
-                    type(generation) is not int
+                    type(before_generation) is not int
+                    or type(before_digest) is not str
+                    or generation != before_generation
+                    or digest != before_digest
+                    or type(generation) is not int
                     or not 0 <= generation <= MAX_GENERATION
                     or type(digest) is not str
                     or row is None
@@ -247,7 +256,7 @@ class DurableTailProfileStore:
             raise ValueError("tail profile source identity mismatch")
         payload = _payload(profile.checkpoint())
         with self._lock:
-            previous = self.load()
+            previous, old_generation, old_digest = self.verified_snapshot()
             old = _records(previous)
             new = _records(profile)
             if not old.keys() <= new.keys() or any(
@@ -256,7 +265,9 @@ class DurableTailProfileStore:
                 raise ValueError("tail profile history cannot be deleted or rewritten")
             if len(new) == len(old):
                 raise ValueError("no new tail observations to persist")
-            old_generation, old_digest = self._anchor.read()
+            # Reuse the authenticated version paired with the old profile.
+            # A newer concurrent writer must fail the SQL CAS, never allow
+            # an old profile to overwrite an independently advanced history.
             if old_generation >= MAX_GENERATION:
                 raise TailCustodyQuarantined("tail generation exhausted")
             generation = old_generation + 1
