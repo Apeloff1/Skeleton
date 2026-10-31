@@ -100,7 +100,8 @@ def test_app_rejects_invalid_simulation_flag():
 
 
 def test_app_exposes_authenticated_migration_inventory_without_device_claim():
-    service, journal, storage = setup()
+    controller, journal, storage = simulated_service()
+    service = OfflineKVPageTierService(controller, journal, simulated=True)
     inventory = service.verified_journal_status()
     assert inventory["rows"] == 0
     assert inventory["gpu_device_qualified"] is False
