@@ -395,3 +395,13 @@ They still require measured host stream slots, bounded mmap windows and
 stable source identity; I/O, cancellation and physical-memory failures
 remain possible. Write/index/ingest plans retain the strict existing disk
 and resident-memory admission. The evidence digest binds the read-only mode.
+
+## Effective Linux CPU topology
+
+The CPU scheduler now uses the intersection of observed online logical CPUs,
+process CPU affinity and both cgroup v2 `cpu.max` and cgroup v1 CFS
+quota/period ceilings. Fractional quotas round up to at least one executable
+worker; an unlimited or unreadable v1 quota is not misread as zero capacity.
+This controls admission/stream parallelism, not CPU pinning or privileged
+kernel scheduling. Canonical tests cover a three-CPU affinity mask with a
+1.5-CPU v1 quota and the unlimited-v1 fallback.

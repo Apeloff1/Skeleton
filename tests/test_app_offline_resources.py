@@ -72,6 +72,30 @@ class LocalResourceBudgetTests(unittest.TestCase):
                 snap = probe_local_resources(temp)
             self.assertEqual(snap.cpu_count, 2)
 
+    def test_cpu_affinity_and_cgroup_v1_quota_are_both_respected(self):
+        from skeleton.app import offline_resources
+        counters = {
+            "/sys/fs/cgroup/cpu/cpu.cfs_quota_us": 150000,
+            "/sys/fs/cgroup/cpu/cpu.cfs_period_us": 100000,
+        }
+        with TemporaryDirectory() as temp, patch.object(
+            offline_resources, "_linux_memory",
+            return_value=(8_000_000_000, 4_000_000_000),
+        ), patch.object(
+            offline_resources.os, "cpu_count", return_value=16,
+        ), patch.object(
+            offline_resources.os, "sched_getaffinity",
+            return_value={0, 1, 2}, create=True,
+        ), patch.object(
+            offline_resources.Path, "read_text", return_value="max 100000",
+        ), patch.object(
+            offline_resources, "_read_counter",
+            side_effect=lambda path: counters.get(str(path)),
+        ):
+            self.assertEqual(probe_local_resources(temp).cpu_count, 2)
+            counters.clear()  # Unlimited v1 quota still obeys affinity.
+            self.assertEqual(probe_local_resources(temp).cpu_count, 3)
+
     def test_swap_is_a_pressure_signal_not_extra_free_ram(self):
         plenty = self.snapshot(memory=2_000_000_000, disk=300_000_000_000)
         committed = LocalResourceSnapshot(
