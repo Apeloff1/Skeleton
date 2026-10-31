@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import ctypes
 import hashlib
+from itertools import islice
 import json
 import mmap
 import os
@@ -283,6 +284,8 @@ class FabricPlan:
     memory_pressure: float
     reason: str
     evidence_digest: str
+    host_stream_capacity: int = 1
+    available_stream_slots: int = 1
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -290,6 +293,8 @@ class FabricPlan:
             "residency": self.residency,
             "readonly_staging": self.readonly_staging,
             "stream_count": self.stream_count,
+            "host_stream_capacity": self.host_stream_capacity,
+            "available_stream_slots": self.available_stream_slots,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -393,7 +398,8 @@ class AdaptiveResourceFabric:
         # On UMA systems it may be physically shared with the GPU, but without
         # an explicit driver API this is NOT a GPU-coherent allocation.
         staging = residency == "disk_chunks" or source_bytes > hw.read_chunk_bytes
-        headroom = max(1, hw.suggested_index_jobs - running)
+        # Planning does not reserve capacity: expose zero slots honestly.
+        headroom = max(0, hw.suggested_index_jobs - running)
         # Capacity follows measured headroom; ordinary 50%-used RAM must
         # not collapse a many-core machine to a single stream. Throttle
         # aggressively only as predictive pressure approaches saturation.
@@ -402,10 +408,10 @@ class AdaptiveResourceFabric:
             1.0, hw.available_ram_bytes / (hw.total_ram_bytes * 0.35),
         )
         capacity = max(1, int(hw.cpu_count * pressure_factor * ram_factor))
-        streams = max(1, min(
+        streams = min(
             desired_streams, headroom, capacity,
             max(1, int(hw.cpu_count * learned_parallelism)),
-        ))
+        )
         gpu = None
         budget = 0
         # Never count shared GPU RAM as additional system or dedicated VRAM.
@@ -457,6 +463,8 @@ class AdaptiveResourceFabric:
             requested_gpu_bytes=requested_gpu_bytes,
             dedicated_gpu_budget_bytes=budget,
             memory_pressure=round(ema, 6), reason=reason,
+            host_stream_capacity=hw.suggested_index_jobs,
+            available_stream_slots=headroom,
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -503,11 +511,17 @@ class AdaptiveResourceFabric:
         base = Path(root).resolve(strict=True)
         if not base.is_dir() or Path(root).is_symlink():
             raise ResourceFabricError("trusted regular directory required")
-        names = tuple(relative_paths)
-        if not names or len(names) != len(set(names)):
-            raise ResourceFabricError("nonempty, unique source paths required")
+        # Do not materialize unbounded iterables or hash untyped inputs.
+        try:
+            names = tuple(islice(iter(relative_paths), 10001))
+        except (TypeError, ValueError) as exc:
+            raise ResourceFabricError("iterable source paths required") from exc
         if len(names) > 10000:
             raise ResourceFabricError("one request must page source identity lists")
+        if not names or any(type(name) is not str for name in names):
+            raise ResourceFabricError("nonempty string source paths required")
+        if len(names) != len(set(names)):
+            raise ResourceFabricError("unique source paths required")
         entries: list[tuple[str, Path, int]] = []
         total = 0
         for name in names:
@@ -530,11 +544,19 @@ class AdaptiveResourceFabric:
                 raise ResourceFabricError("source cannot be safely statted") from exc
             entries.append((name, target, info.st_size))
             total += info.st_size
-        plan = self.plan(total, desired_streams=desired_streams)
+        # Hold the reentrant lock across fresh planning and reservation so
+        # two readers cannot claim the same measured host capacity.
+        with self._lock:
+            plan = self.plan(total, desired_streams=desired_streams)
+            reserved = min(plan.stream_count, len(entries))
+            if (reserved < 1 or self._active_streams + reserved
+                    > plan.host_stream_capacity):
+                raise LocalResourcePressure(
+                    "measured read-stream slots occupied; retry after completion"
+                )
+            self._active_streams += reserved
         # Never create 1 mmap covering the entire source; map the file
         # read-only, then read bounded spans from OS pages with no writes.
-        with self._lock:
-            self._active_streams += plan.stream_count
         def worker(entry: tuple[str, Path, int]) -> dict[str, Any]:
             name, path, expected_size = entry
             fd = _open_source_at(base, Path(name))
@@ -583,7 +605,7 @@ class AdaptiveResourceFabric:
         started = time.monotonic_ns()
         succeeded = False
         try:
-            with ThreadPoolExecutor(max_workers=plan.stream_count) as pool:
+            with ThreadPoolExecutor(max_workers=reserved) as pool:
                 futures = [pool.submit(worker, item) for item in entries]
                 records = [future.result() for future in futures]
             succeeded = True
@@ -592,7 +614,7 @@ class AdaptiveResourceFabric:
             elapsed = max(1, time.monotonic_ns() - started)
             rate = total * 1_000_000_000.0 / elapsed
             with self._lock:
-                self._active_streams -= plan.stream_count
+                self._active_streams -= reserved
                 if succeeded:
                     self._stream_batches += 1
                     self._stream_bytes += total
@@ -606,7 +628,7 @@ class AdaptiveResourceFabric:
                     if self._previous_batch_throughput is not None:
                         if rate < self._previous_batch_throughput * 0.8:
                             self._learned_parallelism = max(
-                                1 / max(1, plan.stream_count),
+                                1 / max(1, reserved),
                                 self._learned_parallelism * 0.75,
                             )
                         elif rate > self._previous_batch_throughput * 1.1:
@@ -617,7 +639,7 @@ class AdaptiveResourceFabric:
                 else:
                     self._stream_failures += 1
                     self._learned_parallelism = max(
-                        1 / max(1, plan.stream_count),
+                        1 / max(1, reserved),
                         self._learned_parallelism * 0.5,
                     )
 

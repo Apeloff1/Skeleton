@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from hashlib import sha256
+from threading import Event, Thread
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
@@ -175,6 +176,88 @@ class FabricTests(unittest.TestCase):
                 self.assertFalse(item["gpu_coherence_verified"])
                 self.assertEqual((source / item["source"]).read_bytes(), expected)
             self.assertEqual(fabric.monitor()["active_streams"], 0)
+
+    def test_atomic_stream_slot_lease_and_recovery(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "first.txt").write_bytes(b"first" * 100)
+            (root / "second.txt").write_bytes(b"second" * 100)
+            fabric = AdaptiveResourceFabric(root)
+            single = replace(hardware(ram=4_000_000_000), cpu_count=1)
+            started, release = Event(), Event()
+            results = []
+            from skeleton.app.offline_resource_fabric import _open_source_at
+            def delayed_open(base, relative):
+                started.set()
+                if not release.wait(5):
+                    raise RuntimeError("test release timed out")
+                return _open_source_at(base, relative)
+            def first_reader():
+                try:
+                    results.append(fabric.stream_readonly(root, ("first.txt",)))
+                except BaseException as exc:
+                    results.append(exc)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=single,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric._open_source_at",
+                side_effect=delayed_open,
+            ):
+                worker = Thread(target=first_reader, daemon=True)
+                worker.start()
+                try:
+                    self.assertTrue(started.wait(3))
+                    self.assertEqual(fabric.monitor()["active_streams"], 1)
+                    self.assertEqual(fabric.plan(100).stream_count, 0)
+                    with self.assertRaises(LocalResourcePressure):
+                        fabric.stream_readonly(root, ("second.txt",))
+                finally:
+                    release.set()
+                    worker.join(timeout=5)
+                self.assertFalse(worker.is_alive())
+                self.assertEqual(len(results), 1)
+                self.assertIsInstance(results[0], tuple)
+                self.assertEqual(fabric.monitor()["active_streams"], 0)
+                self.assertEqual(len(fabric.stream_readonly(
+                    root, ("second.txt",),
+                )), 1)
+
+    def test_untrusted_source_iterables_and_failed_worker_release(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "valid.txt").write_bytes(b"verified")
+            fabric = AdaptiveResourceFabric(root)
+            for source in (None, [["unhashable"]], (str(n) for n in range(10001))):
+                with self.assertRaises(ResourceFabricError):
+                    fabric.stream_readonly(root, source)
+            single = replace(hardware(ram=4_000_000_000), cpu_count=1)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=single,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ), patch(
+                "skeleton.app.offline_resource_fabric._open_source_at",
+                side_effect=OSError("simulated I/O failure"),
+            ):
+                with self.assertRaises(OSError):
+                    fabric.stream_readonly(root, ("valid.txt",))
+                self.assertEqual(fabric.monitor()["active_streams"], 0)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=single,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                self.assertEqual(len(fabric.stream_readonly(
+                    root, ("valid.txt",),
+                )), 1)
 
     def test_symlink_escape_is_rejected(self):
         with TemporaryDirectory() as d:
