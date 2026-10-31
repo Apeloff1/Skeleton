@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from contextlib import redirect_stdout, redirect_stderr
+from io import StringIO
+import json
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
@@ -14,6 +17,47 @@ from skeleton.app.offline_resources import (
 
 
 class LocalResourceBudgetTests(unittest.TestCase):
+    def test_canonical_offline_cli_measures_resources_without_model(self):
+        from skeleton.app.offline_cli import main
+        measured = self.snapshot(memory=8_000_000_000, disk=300_000_000_000)
+        stdout, stderr = StringIO(), StringIO()
+        with TemporaryDirectory() as root, patch(
+            "skeleton.app.offline_resource_fabric.probe_local_resources",
+            return_value=measured,
+        ), patch(
+            "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+            return_value=(),
+        ), redirect_stdout(stdout), redirect_stderr(stderr):
+            code = main([
+                "--resource-monitor", "--json", "--resource-root", root,
+                "--resource-plan-bytes", "1000000", "--resource-streams", "3",
+            ])
+        self.assertEqual(code, 0, stderr.getvalue())
+        output = json.loads(stdout.getvalue())
+        self.assertEqual(output["hardware"]["available_ram_bytes"], 8_000_000_000)
+        self.assertEqual(output["readonly_plan"]["source_bytes"], 1_000_000)
+        self.assertTrue(output["readonly_plan"]["readonly_stream"])
+        self.assertEqual(output["readonly_plan"]["stream_count"], 3)
+        self.assertFalse(output["gpu_telemetry_available"])
+
+    def test_resource_cli_rejects_conflicting_modes_and_invalid_roots(self):
+        from skeleton.app.offline_cli import main
+        for args in (
+            ["--resource-monitor", "--model", "untrusted.json"],
+            ["--resource-monitor", "--resource-plan-bytes", "-1"],
+            ["--resource-monitor", "--resource-streams", "0"],
+            ["--resource-plan-bytes", "100"],
+        ):
+            with self.subTest(args=args), redirect_stdout(StringIO()), \
+                 redirect_stderr(StringIO()):
+                self.assertEqual(main(args), 2)
+        with TemporaryDirectory() as root:
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(main([
+                    "--resource-monitor", "--resource-root",
+                    str(Path(root) / "missing"),
+                ]), 2)
+
     def snapshot(self, *, memory: int, disk: int, load: float = 0.0):
         return LocalResourceSnapshot(
             total_ram_bytes=16_000_000_000, available_ram_bytes=memory,

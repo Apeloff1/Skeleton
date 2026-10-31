@@ -52,6 +52,14 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--capability-file", help="selected JSON task for offline deterministic execution")
     capabilities.add_argument("--capability-graph-file", help="execute a bounded local graph of deterministic capability operations")
     capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
+    capabilities.add_argument("--resource-monitor", action="store_true",
+                              help="inspect measured local hardware without a model")
+    parser.add_argument("--resource-plan-bytes", type=int,
+                        help="optional read-only source size for adaptive planning")
+    parser.add_argument("--resource-streams", type=int,
+                        help="optional desired concurrent read streams")
+    parser.add_argument("--resource-root",
+                        help="selected local storage directory for disk telemetry")
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
     capabilities.add_argument("--homebrew-editor", help="open native visual editor for a verified ORIGINAL homebrew capsule")
@@ -97,6 +105,65 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    # This provider-free mode is a real canonical CLI path. Strict comparison
+    # against parser defaults prevents unrelated flags from silently bypassing
+    # model, workspace, capability or state-authority validation.
+    if args.resource_monitor:
+        baseline = vars(_parser().parse_args([]))
+        allowed = {
+            "resource_monitor", "resource_plan_bytes", "resource_streams",
+            "resource_root", "json_output",
+        }
+        if any(
+            getattr(args, name) != default for name, default in baseline.items()
+            if name not in allowed
+        ):
+            print("resource monitoring cannot combine with model or job modes",
+                  file=sys.stderr)
+            return 2
+        if (args.resource_plan_bytes is not None
+                and args.resource_plan_bytes < 0) or (
+                    args.resource_streams is not None and args.resource_streams <= 0
+                ):
+            print("resource plan sizes and stream counts must be non-negative/positive",
+                  file=sys.stderr)
+            return 2
+        root = Path(args.resource_root) if args.resource_root else Path.cwd()
+        if root.is_symlink() or not root.is_dir():
+            print("resource root must be an existing regular directory",
+                  file=sys.stderr)
+            return 2
+        from .offline_resource_fabric import AdaptiveResourceFabric
+        try:
+            fabric = AdaptiveResourceFabric(root)
+            output = fabric.monitor()
+            if args.resource_plan_bytes is not None:
+                output["readonly_plan"] = fabric.plan(
+                    args.resource_plan_bytes,
+                    desired_streams=args.resource_streams or 1,
+                    readonly_stream=True,
+                ).as_dict()
+            if args.json_output:
+                print(json.dumps(output, sort_keys=True, allow_nan=False))
+            else:
+                hardware = output["hardware"]
+                print("Measured local resources (no model loaded)")
+                print("RAM available: " + str(hardware["available_ram_bytes"]))
+                print("CPU workers: " + str(hardware["cpu_count"]))
+                print("GPU telemetry devices: " + str(len(output["gpus"])))
+                if "readonly_plan" in output:
+                    plan = output["readonly_plan"]
+                    print("Read-only streams admitted: " + str(plan["stream_count"]))
+                    print("Read-only chunk bytes: " + str(plan["transfer_chunk_bytes"]))
+            return 0
+        except (OSError, ValueError, RuntimeError) as exc:
+            print("local resource telemetry/admission unavailable: " + str(exc),
+                  file=sys.stderr)
+            return 1
+    if (args.resource_plan_bytes is not None or args.resource_streams is not None
+            or args.resource_root is not None):
+        print("resource planning options require --resource-monitor", file=sys.stderr)
+        return 2
     library_mode = args.index_dir is not None or args.search is not None
     snapshot_mode = bool(
         args.snapshot_to or args.restore_from or args.verify_snapshot

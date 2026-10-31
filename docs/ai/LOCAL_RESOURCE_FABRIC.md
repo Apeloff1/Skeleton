@@ -478,3 +478,20 @@ existing hold, and disconnected devices are retired from the in-process
 controller. This avoids repeated admit/reject oscillation during cooling;
 it does not claim OS clock control, device-level isolation or persistence
 across a process restart. The monitor exposes the number of held devices.
+
+
+## Provider-free hardware resource CLI
+
+The canonical offline application CLI supports a model-free hardware query:
+
+    python -m skeleton.app.offline_cli --resource-monitor --json
+    python -m skeleton.app.offline_cli --resource-monitor --json --resource-plan-bytes 1000000 --resource-streams 4
+
+Optional --resource-root selects the local storage directory whose free-space
+telemetry is measured. The JSON output uses the same versioned resource
+fabric monitor and read-only plan contracts as the authenticated local API.
+Unknown GPU telemetry is not treated as available VRAM. Conflicting model,
+job, workspace or capability flags fail closed; invalid roots, nonpositive
+stream counts and negative source sizes are rejected. The deterministic
+test uses explicitly simulated hardware snapshots and is not device
+qualification.
