@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_neon_undercity",
+  "title": "Neon Undercity: Stealth Route",
+  "subtitle": "An original stealth route brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610300478,
+  "width": 21,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 5
+}

@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_stellar_colony_frosted_crater",
+  "genre": "stellar_colony",
+  "biome": "frosted_crater",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Frosted Crater",
+    "landmark": "impact-hollow vault",
+    "era": "the second settlement",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control basalt shelters while cryogenic pockets destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "high-stakes"
+  },
+  "premise": "Noa Rowan, a habitat architect with expertise in life-support energy allocation and modular construction, must stabilize a remote outpost without sacrificing its inhabitants before cryogenic pockets reaches the impact-hollow vault.",
+  "stakes": [
+    "Residents lose access to basalt shelters",
+    "a privatized oxygen allocator gains authority without independent evidence",
+    "The impact-hollow vault becomes inaccessible beyond frozen crater rims"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured cryogenic pockets closes the main approach",
+      "goal": "Acquire an independent account of basalt shelters",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a privatized oxygen allocator challenges Noa Rowan's mandate",
+      "goal": "Apply life-support energy allocation and modular construction in frozen crater rims",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of impact-hollow vault",
+      "goal": "stabilize a remote outpost without sacrificing its inhabitants",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains impact-hollow vault with auditable access to basalt shelters"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain oxygen and heat reserves without a privatized oxygen allocator"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over basalt shelters persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "impact-hollow vault",
+      "frozen crater rims",
+      "thermal shock"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

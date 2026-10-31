@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_copper_mesa",
+  "title": "Copper Mesa: Outer Settlement",
+  "subtitle": "Original outer settlement design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010311079,
+  "width": 19,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 5
+}

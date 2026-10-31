@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_echo_caverns",
+  "title": "Echo Caverns: Outer Settlement",
+  "subtitle": "Original outer settlement design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010311634,
+  "width": 19,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 11,
+  "theme": "arcade",
+  "starting_health": 4
+}

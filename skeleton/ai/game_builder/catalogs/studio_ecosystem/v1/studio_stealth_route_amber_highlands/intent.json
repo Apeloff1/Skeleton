@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_amber_highlands",
+  "title": "Amber Highlands: Stealth Route",
+  "subtitle": "An original stealth route brief in Amber Highlands; prototype maps are not full genre implementations.",
+  "seed": 202610300495,
+  "width": 23,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 6
+}
