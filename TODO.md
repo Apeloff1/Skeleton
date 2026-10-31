@@ -283,12 +283,12 @@ runtime release readiness. All inference/training keeps existing authority.
 
 ## P2 — Autonomous play, training, cinematics and scaled content
 
-- [ ] GF-P2-01 Build an autonomous emulator closed-loop observe→reason→act→verify controller with authoritative state checks.
+- [ ] GF-P2-01 Build an autonomous emulator closed-loop observe→reason→act→verify controller with authoritative state checks. (GF-L partial: nav loop skeleton/frontier_nav/cognition_loop.py @ 5c77d921; open: emulator/native Godot loop still needs a real run)
 - [ ] GF-P2-02 Add SIMA-style world cognition: object permanence, physics consequences, affordance discovery and goal hierarchy.
 - [ ] GF-P2-03 Add cinematographic reasoning: framing, camera movement, blocking, continuity, timing and subject tracking.
 - [ ] GF-P2-04 Fuse camera, audio, HUD and controller input into grounded event timelines without confusing measurements/interpretation.
 - [ ] GF-P2-05 Train prediction/calibration models for WHAM-style preemptive lookahead against recorded user action histories.
-- [ ] GF-P2-06 Define prediction latency/confidence thresholds, cancellation and rollback to avoid speculative game actions.
+- [x] GF-P2-06 Define prediction latency/confidence thresholds, cancellation and rollback to avoid speculative game actions. (GF-L SpeculationPolicy + cancel/rollback @ 5c77d921)
 - [ ] GF-P2-07 Add adversarial pilot-versus-director cooperation with reproducible game environment evidence.
 - [ ] GF-P2-08 Scale world-axis combinations across biome, geography, ecology, gravity, weather, lore and transit topology.
 - [ ] GF-P2-09 Add longform canonical world and NPC state retention; ensure non-contradictory changes in scene, quest, dialogue.
@@ -322,7 +322,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P2-37 Develop continuous landmark acquisition/resection/calibration and sensor-fusion training without fabricated survey authority.
 - [ ] GF-P2-38 Cross-world 3D in-game GPS survey networks for generated worlds, sky islands, caves and moving structures.
 - [ ] GF-P2-39 Couple between-frame AI navigation and building decisions to signed GDD and double-verified actor/chunk continuity.
-- [ ] GF-P2-40 Dynamically repair path and world-portal routes after construction, floods, collapse, tides and terrain changes.
+- [x] GF-P2-40 Dynamically repair path and world-portal routes after construction, floods, collapse, tides and terrain changes. (GF-L skeleton/frontier_nav/route_repair.py @ 5c77d921)
 - [ ] GF-P2-41 Teach Jeeves/Dragon to reason about verified chunk changes and signaled semantic differences without hallucinating observations.
 - [ ] GF-P2-42 Continuous per-chunk physics/lighting/foliage/weather/audio correspondence checks during multiworld building.
 - [ ] GF-P2-43 Train or adapt Jeeves/Dragon to reason on recorded actual native game-state vs frame-delta context with immutable rights and source gating.
