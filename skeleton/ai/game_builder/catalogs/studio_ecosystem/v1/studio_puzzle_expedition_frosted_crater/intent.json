@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_frosted_crater",
+  "title": "Frosted Crater: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610300103,
+  "width": 23,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "space",
+  "starting_health": 5
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_glacial_fjord",
+  "title": "Glacial Fjord: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010310134,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 4
+}
