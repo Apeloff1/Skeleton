@@ -70,7 +70,7 @@ def _write_new(path: Path, value: object) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Offline source-bound crafting transactions")
-    parser.add_argument("command", choices=("inspect", "run", "verify", "play", "solve"))
+    parser.add_argument("command", choices=("inspect", "run", "verify", "play", "solve", "solve-batch"))
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--actions", type=Path)
     parser.add_argument("--save", type=Path)
@@ -80,26 +80,36 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--goal-flag")
     parser.add_argument("--max-nodes", type=int, default=1024)
     parser.add_argument("--max-depth", type=int, default=24)
+    parser.add_argument("--max-batches", type=int, default=100)
     args = parser.parse_args(argv)
     try:
         plan = CraftPlan.parse(_read(args.plan))
         engine = CraftEngine(plan)
-        if args.command != "solve" and (
+        if args.command not in ("solve", "solve-batch") and (
             args.goal_item is not None or args.goal_flag is not None
             or args.goal_quantity != 1 or args.max_nodes != 1024
-            or args.max_depth != 24
+            or args.max_depth != 24 or args.max_batches != 100
         ):
             raise GameplayContractError("goal options require solve")
-        if args.command == "solve":
+        if args.command in ("solve", "solve-batch"):
             if any((args.actions, args.save, args.resume)):
                 raise GameplayContractError("solve accepts only plan and goal")
             goal = CraftGoal(
                 args.goal_item, args.goal_quantity if args.goal_item else 0,
                 args.goal_flag,
             )
-            result = CraftPlanner(engine).solve(
-                goal, max_nodes=args.max_nodes, max_depth=args.max_depth,
-            ).record()
+            if args.command == "solve-batch":
+                from .crafting_batch_planner import solve_batches
+                result = solve_batches(
+                    engine, goal, max_nodes=args.max_nodes,
+                    max_depth=args.max_depth, max_batches=args.max_batches,
+                )
+            else:
+                if args.max_batches != 100:
+                    raise GameplayContractError("max-batches requires solve-batch")
+                result = CraftPlanner(engine).solve(
+                    goal, max_nodes=args.max_nodes, max_depth=args.max_depth,
+                ).record()
         elif args.command == "inspect":
             if any((args.actions, args.save, args.resume)):
                 raise GameplayContractError("inspect accepts only a plan")
