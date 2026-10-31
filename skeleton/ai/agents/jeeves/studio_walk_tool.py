@@ -509,3 +509,74 @@ def execute_author_merge_tool(request: Mapping[str, Any], *,
     }
     result["result_digest"] = _digest(result)
     return result
+
+
+AUTHOR_LINEAGE_REQUEST_SCHEMA = "skeleton.jeeves.studio_author_lineage_request.v1"
+AUTHOR_LINEAGE_RESULT_SCHEMA = "skeleton.jeeves.studio_author_lineage_result.v1"
+
+
+def author_lineage_tool_schema() -> dict[str, object]:
+    """Typed preview of a chain of source-leased edits, with no file access."""
+    return {
+        "name": "studio_author_lineage",
+        "description": "Verify an original authored revision chain and its replay leases",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": AUTHOR_LINEAGE_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "edit_batches": {"type": "array", "minItems": 1, "maxItems": 8,
+                                 "items": {"type": "array", "minItems": 1,
+                                           "maxItems": 16, "items": {"type": "object"}}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest", "edit_batches"],
+        },
+    }
+
+
+def execute_author_lineage_tool(request: Mapping[str, Any], *,
+                                authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves authored lineage requires operator authorization")
+    if (type(request) is not dict
+            or set(request) != {"schema", "project_id", "expected_source_digest",
+                                "edit_batches"}
+            or request.get("schema") != AUTHOR_LINEAGE_REQUEST_SCHEMA
+            or len(_canonical(request)) > 32768):
+        raise StudioQuestError("invalid typed Jeeves authored lineage request")
+    batches = request["edit_batches"]
+    if type(batches) is not list or not 1 <= len(batches) <= 8:
+        raise StudioQuestError("invalid Jeeves authored lineage batch count")
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+        REVISION_SCHEMA, preview_canon_revision,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_author_lineage import trace_canon_lineage
+    from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+    base = read_blueprint(request["project_id"])
+    proof = audit_canon_source(base, authorized=True)
+    if request["expected_source_digest"] != proof["source_digest"]:
+        raise StudioQuestError("stale Jeeves authored lineage root")
+    steps = []
+    source = base
+    for edits in batches:
+        source, _, receipt = preview_canon_revision(
+            source, {
+                "schema": REVISION_SCHEMA,
+                "project_id": request["project_id"],
+                "expected_source_digest": audit_canon_source(
+                    source, authorized=True)["source_digest"],
+                "edits": edits,
+            }, authorized=True)
+        steps.append((source, receipt))
+    detail = trace_canon_lineage(base, steps, authorized=True)
+    payload = {
+        "schema": AUTHOR_LINEAGE_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

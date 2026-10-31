@@ -466,3 +466,19 @@ save. `studio_author_merge` provides the same operator-gated, typed Jeeves
 preview for two independent edit lists; it does not write files or infer
 permission from a prompt. Merge digests prove content consistency, not
 authorship, licensing, native runtime or consumer release.
+
+
+### Authored revision lineage and replay leases
+
+The operator CLI accepts `--project PROJECT --revision-lineage` followed by
+1..8 `--revision-lineage-source BUNDLE` arguments in chronological order.
+Optionally provide `--revision-source BASE_BUNDLE` to select an earlier verified
+root. Each private bundle is reopened and canon-audited; its receipt must bind
+to the immediately preceding source and playable HTML. Missing, reordered,
+duplicated, tampered, contradictory or cross-project steps fail closed. The
+result exposes deterministic parent/head digests, per-step changed paths and
+conservative replay lease invalidation without writing files. The typed
+`studio_author_lineage` Jeeves preview accepts a bounded list of original
+edit batches, uses the same canonical editor and verifier, and never grants
+the model filesystem privileges. Digests are integrity checks, not signatures
+or proof of authorship, rights or consumer readiness.

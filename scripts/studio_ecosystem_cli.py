@@ -29,6 +29,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--revision-lineage", action="store_true",
+                    help="Verify an ordered source-leased original authoring history")
+    ap.add_argument("--revision-lineage-source", type=Path, action="append",
+                    help="One verified revision bundle in chronological order, at most eight")
     ap.add_argument("--merge-revisions", action="store_true",
                     help="Merge two independently verified original prose revisions against a common base")
     ap.add_argument("--merge-left-source", type=Path,
@@ -184,6 +188,35 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.revision_lineage:
+        if (not args.project or not args.revision_lineage_source
+                or len(args.revision_lineage_source) > 8 or args.output is not None
+                or args.author_revision or args.merge_revisions or args.revision_impact
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.revision_request is not None
+                or args.revision_compare_source is not None or args.merge_left_source is not None
+                or args.merge_right_source is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--revision-lineage requires --project and 1..8 ordered revision sources")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+        from skeleton.ai.game_builder.studio_ecosystem_author_lineage import trace_canon_lineage
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            base = (load_revision_bundle(args.revision_source, authorized=True,
+                                         project_id=args.project)[0]
+                    if args.revision_source is not None else read_blueprint(args.project))
+            steps = [load_revision_bundle(path, authorized=True, project_id=args.project)
+                     for path in args.revision_lineage_source]
+            result = trace_canon_lineage(base, steps, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.revision_lineage_source is not None:
+        ap.error("--revision-lineage-source requires --revision-lineage")
     if args.merge_revisions:
         if (not args.project or args.merge_left_source is None
                 or args.merge_right_source is None or args.output is None
