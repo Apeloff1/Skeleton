@@ -28,3 +28,8 @@ or device qualification. Tests use simulated CPU-to-disk page moves.
 
 Focused simulated regression:
 `python -m pytest -q skeleton/testing/test_kv_migration_journal.py`.
+
+**Critical partial-failure fence:** If the canonical adapter reports any
+rejected move, the journal deliberately remains RUNNING. An adapter may have
+moved a page before raising, so a rejection is not proof of no side effects.
+No further plan is admitted until an authorized storage reconciliation.

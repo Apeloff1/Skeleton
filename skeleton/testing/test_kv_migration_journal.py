@@ -94,13 +94,16 @@ def test_backend_failure_is_not_automatically_retried(tmp_path):
     connection = sqlite3.connect(path)
     service, journal, storage = setup(fail=True, connection=connection)
     plan, _ = service.plan_live()
-    # The planner returns a partial failure receipt, not a fake success.
-    receipt = service.apply_once(plan)
-    assert receipt.moved == ()
-    assert len(receipt.rejected) == 1
+    # An adapter exception may occur AFTER a physical side effect. The
+    # journal must stay RUNNING; a rejected receipt cannot certify no move.
+    with pytest.raises(KVMigrationOutcomeUnknown, match="uncertain"):
+        service.apply_once(plan)
     assert storage.calls == 1
-    with pytest.raises(KVMigrationOutcomeUnknown, match="consumed"):
+    with pytest.raises(KVMigrationOutcomeUnknown, match="unresolved"):
         journal.begin(plan)
+    with pytest.raises(KVMigrationOutcomeUnknown, match="committed"):
+        journal.recover_committed(plan)
+    assert storage.calls == 1
 
 
 def test_crash_between_intent_and_backend_fences_restart(tmp_path):

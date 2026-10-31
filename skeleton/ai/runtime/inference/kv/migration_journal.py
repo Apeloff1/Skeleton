@@ -278,6 +278,14 @@ class KVJournaledTierController:
             self._journal.begin(plan)
             try:
                 receipt = self._controller.apply_live(plan)
+                if receipt.rejected:
+                    # A storage adapter can move a page and then raise.
+                    # A "rejected" per-page result is NOT proof that no
+                    # physical side effect occurred. Leave the RUNNING
+                    # intent unresolved and fence all subsequent moves.
+                    raise KVMigrationOutcomeUnknown(
+                        "partial or rejected KV movement requires operator reconciliation"
+                    )
                 self._journal.commit(plan, receipt)
                 return receipt
             except BaseException as exc:
