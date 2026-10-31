@@ -16,6 +16,7 @@ from .contracts import canonical_digest
 from .dual_runtime_verify import (
     DualRuntimeVerificationError,
     _canonical_bytes,
+    _bounded_names,
     _child_fd,
     _json,
     _read,
@@ -89,7 +90,7 @@ def verify_export_batch(
         if (dirs != tuple(sorted(dirs)) or len(set(dirs)) != len(dirs)
                 or len(set(ids)) != len(ids)):
             raise OfflineBatchVerificationError("duplicate or unordered batch entries")
-        if set(os.listdir(root_fd)) != set(dirs) | {"batch.json"}:
+        if set(_bounded_names(root_fd, MAX_PACKAGES + 1)) != set(dirs) | {"batch.json"}:
             raise OfflineBatchVerificationError("unlisted or missing batch entries")
 
         receipts: list[dict[str, object]] = []
@@ -121,7 +122,7 @@ def verify_export_batch(
                 "verified_bytes": receipt["verified_bytes"],
                 "replayed_actions": receipt["replayed_actions"],
             })
-        if set(os.listdir(root_fd)) != set(dirs) | {"batch.json"}:
+        if set(_bounded_names(root_fd, MAX_PACKAGES + 1)) != set(dirs) | {"batch.json"}:
             raise OfflineBatchVerificationError("batch entries changed during verification")
         body = {
             "schema": RECEIPT_SCHEMA,

@@ -170,3 +170,12 @@ def test_index_package_count_bounded(batch):
     pin = _write_index(root, entries * 17)
     with pytest.raises(OfflineBatchVerificationError, match="count"):
         verify_export_batch(root, expected_index_sha256=pin, authorized=True)
+
+
+
+def test_batch_root_entry_flood_rejected_before_replay(batch):
+    root, pin, _ = batch
+    for index in range(64):
+        (root / f"unlisted-{index:04d}").write_bytes(b"x")
+    with pytest.raises(OfflineBatchVerificationError, match="batch verification rejected"):
+        verify_export_batch(root, expected_index_sha256=pin, authorized=True)

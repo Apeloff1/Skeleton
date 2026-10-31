@@ -16,7 +16,7 @@ from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
 from .dual_runtime_verify import (
-    DualRuntimeVerificationError, _canonical_bytes, _child_fd, _root_fd,
+    DualRuntimeVerificationError, _bounded_names, _canonical_bytes, _child_fd, _root_fd,
     verify_exported_package,
 )
 from .offline_export_batch import (
@@ -67,7 +67,7 @@ def prepare_export_batch(
         if (not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022
                 or info.st_uid != os.geteuid()):
             raise OfflineBatchVerificationError("batch root must be owner-private for writes")
-        if set(os.listdir(root_fd)) != set(directories):
+        if set(_bounded_names(root_fd, MAX_PACKAGES)) != set(directories):
             raise OfflineBatchVerificationError("batch root has unlisted or missing entries")
         replay_digests: list[str] = []
         for project_id, directory, pin in ordered:

@@ -139,3 +139,13 @@ def test_cli_rejects_missing_authorization(unpublished, capsys):
         entry["project_id"], entry["package_dir"], entry["release_sha256"],
     ))]) == 2
     assert json.loads(capsys.readouterr().err)["prepared"] is False
+
+
+
+def test_preparation_root_entry_flood_never_publishes_index(unpublished):
+    root, entries = unpublished
+    for index in range(64):
+        (root / f"unlisted-{index:04d}").write_bytes(b"x")
+    with pytest.raises(OfflineBatchVerificationError, match="batch preparation rejected"):
+        prepare_export_batch(root, entries=entries, authorized=True)
+    assert not (root / "batch.json").exists()

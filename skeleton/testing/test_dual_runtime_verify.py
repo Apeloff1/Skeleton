@@ -108,3 +108,36 @@ def test_untrusted_hardlink_is_rejected(package, tmp_path):
     os.link(original, tmp_path / "alias.html")
     with pytest.raises(DualRuntimeVerificationError):
         verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)
+
+
+
+def test_hostile_directory_entry_flood_is_bounded(package):
+    root, pin = package
+    for index in range(180):
+        (root / f"unlisted-{index:04d}").write_bytes(b"x")
+    with pytest.raises(DualRuntimeVerificationError, match="entry budget"):
+        verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)
+
+
+def test_scandir_enumeration_stops_at_budget_without_exhausting_iterator(monkeypatch):
+    from skeleton.ai.game_builder import dual_runtime_verify as verifier
+
+    class Entries:
+        consumed = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def __iter__(self):
+            for index in range(10_000):
+                self.consumed += 1
+                yield type("Entry", (), {"name": f"entry-{index}"})()
+
+    entries = Entries()
+    monkeypatch.setattr(verifier.os, "scandir", lambda fd: entries)
+    with pytest.raises(DualRuntimeVerificationError, match="entry budget"):
+        verifier._bounded_names(9, 4)
+    assert entries.consumed == 5

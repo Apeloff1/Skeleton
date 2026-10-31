@@ -150,15 +150,30 @@ def _read(root: int, path: str, limit: int) -> bytes:
         os.close(with_fd)
 
 
+def _bounded_names(fd: int, maximum: int) -> tuple[str, ...]:
+    """Enumerate descriptor-relative names without an unbounded allocation.
+
+    The scandir iterator closes even on rejection. At most maximum + 1
+    directory entries are consumed, and callers still validate inode types.
+    """
+    if type(maximum) is not int or maximum < 0:
+        raise DualRuntimeVerificationError("invalid directory entry budget")
+    names: list[str] = []
+    with os.scandir(fd) as entries:
+        for entry in entries:
+            if len(names) >= maximum:
+                raise DualRuntimeVerificationError("directory entry budget exceeded")
+            names.append(entry.name)
+    return tuple(names)
+
+
 def _inventory(root: int) -> set[str]:
     paths: set[str] = set()
     visited = 0
 
     def visit(fd: int, prefix: tuple[str, ...]) -> None:
         nonlocal visited
-        names = os.listdir(fd)
-        if len(names) > _MAX_FILES + 8:
-            raise DualRuntimeVerificationError("directory entry budget exceeded")
+        names = _bounded_names(fd, _MAX_FILES + 8)
         for name in names:
             parts = prefix + (name,)
             _parts("/".join(parts))
