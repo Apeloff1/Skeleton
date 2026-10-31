@@ -441,3 +441,16 @@ displays the full manifest digest for subsequent provenance binding.
 Disconnect clears the selection and approval. The server independently
 enforces file-path, symlink, byte-window, deadline and concurrent-stream
 policy; UI validation is only an additional usability safeguard.
+
+
+## Source re-verification after restart
+
+An authenticated operator can POST /v1/resources/stage/reverify with the
+original selected root, ordered relative paths, previously pinned
+manifest_digest, approved=true, and a bounded deadline. The fabric reopens
+each regular file with the existing path/symlink fences, rehashes every byte,
+reconstructs the ordered manifest, and compares digests in constant time.
+A source mutation or reordered path list produces HTTP 409, not a stale
+success receipt. Missing/invalid input is rejected. This stateless recovery
+requires no new database authority and never trusts an old digest alone;
+it is available in the offline workspace via a separate approval control.

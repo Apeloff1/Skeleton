@@ -88,6 +88,9 @@ HTML = r"""<!doctype html>
           I approve read-only access to these exact local files</label>
         <button id="resource-stage" class="secondary" disabled>Verify source manifest</button>
         <pre id="resource-stage-status" aria-live="polite">No source manifest verified.</pre>
+        <label for="resource-stage-digest">Previously pinned manifest SHA-256</label>
+        <input id="resource-stage-digest" type="text" autocomplete="off" spellcheck="false">
+        <button id="resource-stage-reverify" class="secondary" disabled>Reverify source bytes</button>
       </details>
       <details><summary>Long-form virtual memory (Mac M-series / local)</summary>
         <p class="hint">Spool selected, trusted local text files as compressed,
@@ -265,6 +268,7 @@ JAVASCRIPT = r"""'use strict';
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
     get('resource-stage').disabled = locked || state.busy;
+    get('resource-stage-reverify').disabled = locked || state.busy;
     get('longform-ingest').disabled = locked || state.busy;
     get('longform-import-restore').disabled = locked || state.busy;
     get('longform-query').disabled = locked || state.busy || !state.longformSourceId;
@@ -305,6 +309,7 @@ JAVASCRIPT = r"""'use strict';
     get('resource-stage-root').value = '';
     get('resource-stage-paths').value = '';
     get('resource-stage-grant').checked = false;
+    get('resource-stage-digest').value = '';
     get('longform-status').textContent = 'No staged source.';
     get('longform-work-status').textContent = 'No active work cursor.';
     get('longform-work-id').value = '';
@@ -705,11 +710,36 @@ JAVASCRIPT = r"""'use strict';
       throw new Error('Local source manifest receipt is incomplete.');
     }
     get('resource-stage-grant').checked = false;
+    get('resource-stage-digest').value = receipt.manifest_digest;
     get('resource-stage-status').textContent =
       'Verified SHA-256 manifest: ' + receipt.manifest_digest +
       '\nFiles: ' + receipt.source_count +
       '\nBytes: ' + receipt.source_bytes +
       '\nSource content remains local; manifest is not signed.';
+  }));
+  get('resource-stage-reverify').addEventListener('click', () => run(async () => {
+    if (!get('resource-stage-grant').checked) {
+      throw new Error('Approve a fresh read of these exact sources first.');
+    }
+    const manifest_digest = get('resource-stage-digest').value.trim();
+    const root = get('resource-stage-root').value.trim();
+    const paths = get('resource-stage-paths').value.split(/\r?\n/)
+      .map(name => name.trim()).filter(Boolean);
+    if (!/^[0-9a-f]{64}$/.test(manifest_digest) || !root ||
+        !paths.length || paths.length > 64 || new Set(paths).size !== paths.length) {
+      throw new Error('Select a valid prior digest and 1–64 unique local files.');
+    }
+    get('resource-stage-status').textContent = 'Rehashing source bytes…';
+    const result = await api('POST', '/v1/resources/stage/reverify', {
+      root, paths, manifest_digest, approved: true, deadline_s: 10,
+    });
+    if (result.reverified !== true || result.manifest_digest !== manifest_digest) {
+      throw new Error('Source re-verification did not match the pinned digest.');
+    }
+    get('resource-stage-grant').checked = false;
+    get('resource-stage-status').textContent =
+      'Reverified source bytes: ' + result.manifest_digest +
+      '\nFiles: ' + result.source_count + '\nNo model or GPU transfer performed.';
   }));
   get('longform-ingest').addEventListener('click', () => run(async () => {
     if (!get('longform-grant').checked) throw new Error('Approve this source first.');

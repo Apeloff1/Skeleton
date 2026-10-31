@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import ctypes
 import hashlib
+import hmac
 from itertools import islice
 import json
 import math
@@ -31,6 +32,10 @@ from .offline_resources import (
 
 class ResourceFabricError(RuntimeError):
     """The resource fabric cannot safely stage or schedule this operation."""
+
+
+class StagingManifestMismatch(ResourceFabricError):
+    """Previously pinned source bytes or ordered source identities changed."""
 
 
 STAGING_MANIFEST_SCHEMA = "skeleton.offline.staging-manifest.v1"
@@ -55,7 +60,9 @@ def build_staging_manifest(records: tuple[dict[str, Any], ...]) -> dict[str, Any
             encoded = name.encode("utf-8", errors="strict")
         except UnicodeError as exc:
             raise ResourceFabricError("invalid UTF-8 staged source identity") from exc
-        if len(encoded) > 4096 or any(ord(ch) < 32 for ch in name):
+        if (len(encoded) > 4096 or any(ord(ch) < 32 for ch in name)
+                or name.startswith("/") or "\\" in name
+                or any(part in {"", ".", ".."} for part in name.split("/"))):
             raise ResourceFabricError("invalid staged source identity")
         if type(size) is not int or size < 0:
             raise ResourceFabricError("invalid staged source byte count")
@@ -537,6 +544,29 @@ class AdaptiveResourceFabric:
             ).hexdigest(),
         )
 
+    def reverify_staging_manifest(
+        self, root: str | Path, relative_paths: Iterable[str],
+        expected_digest: str, *, desired_streams: int = 4,
+        deadline_s: float | None = None,
+        cancel_event: threading.Event | None = None,
+    ) -> dict[str, Any]:
+        """Re-read original bytes before replay; a prior digest grants no trust.
+
+        No receipt store is created. The operator must reselect the source
+        root and names after restart, and approve this new read operation.
+        """
+        if (type(expected_digest) is not str or len(expected_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in expected_digest)):
+            raise ResourceFabricError("lowercase SHA-256 manifest digest required")
+        records = self.stream_readonly(
+            root, relative_paths, desired_streams=desired_streams,
+            deadline_s=deadline_s, cancel_event=cancel_event,
+        )
+        receipt = build_staging_manifest(records)
+        if not hmac.compare_digest(receipt["manifest_digest"], expected_digest):
+            raise StagingManifestMismatch("staged source manifest changed")
+        return dict(receipt, reverified=True)
+
     def monitor(self) -> dict[str, Any]:
         snapshot = self.observe()
         with self._lock:
@@ -750,4 +780,5 @@ __all__ = [
     "GPUResource", "FabricSnapshot", "FabricPlan", "AdaptiveResourceFabric",
     "ResourceFabricError", "probe_gpu_resources",
     "build_staging_manifest", "STAGING_MANIFEST_SCHEMA",
+    "StagingManifestMismatch",
 ]

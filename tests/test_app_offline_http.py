@@ -249,6 +249,23 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             ensure_ascii=True,
         ).encode("utf-8")).hexdigest()
         self.assertEqual(output["manifest_digest"], expected)
+        reverify = dict(request, manifest_digest=output["manifest_digest"])
+        status, replay, _ = self._request(
+            "POST", "/v1/resources/stage/reverify", reverify,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(replay["reverified"])
+        (source / "first.txt").write_text("changed after first staging")
+        status, _, _ = self._request(
+            "POST", "/v1/resources/stage/reverify", reverify,
+        )
+        self.assertEqual(status, 409)
+        (source / "first.txt").write_text("immutable selected file")
+        reverify["manifest_digest"] = "invalid"
+        status, _, _ = self._request(
+            "POST", "/v1/resources/stage/reverify", reverify,
+        )
+        self.assertEqual(status, 422)
         self.assertEqual(len(output["sources"]), 2)
         self.assertTrue(all(item["readonly"] for item in output["sources"]))
         request["deadline_s"] = 0
@@ -1038,6 +1055,8 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertIn("receipt.manifest_digest", JAVASCRIPT)
         self.assertIn("manifest_authenticated !== false", JAVASCRIPT)
         self.assertIn("deadline_s: 10", JAVASCRIPT)
+        self.assertIn("resource-stage-reverify", JAVASCRIPT)
+        self.assertIn("resource-stage-digest", HTML)
 
     def test_owner_only_token_file_is_create_once(self) -> None:
         path = self.folder / "bearer.secret"

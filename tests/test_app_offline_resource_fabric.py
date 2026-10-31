@@ -15,6 +15,7 @@ from skeleton.app.offline_resource_fabric import (
     AdaptiveResourceFabric, GPUResource, ResourceFabricError,
     _probe_apple_metal, probe_gpu_resources,
     build_staging_manifest, STAGING_MANIFEST_SCHEMA,
+    StagingManifestMismatch,
 )
 
 
@@ -33,6 +34,34 @@ def hardware(*, ram: int = 2_000_000_000, pressure: float = 0,
 
 
 class FabricTests(unittest.TestCase):
+    def test_reverify_rejects_changed_source_and_changed_order(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.txt").write_bytes(b"original A")
+            (root / "b.txt").write_bytes(b"original B")
+            fabric = AdaptiveResourceFabric(root)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=hardware(ram=4_000_000_000),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                records = fabric.stream_readonly(root, ("a.txt", "b.txt"))
+                digest = build_staging_manifest(records)["manifest_digest"]
+                self.assertTrue(fabric.reverify_staging_manifest(
+                    root, ("a.txt", "b.txt"), digest,
+                )["reverified"])
+                with self.assertRaises(StagingManifestMismatch):
+                    fabric.reverify_staging_manifest(root, ("b.txt", "a.txt"), digest)
+                (root / "a.txt").write_bytes(b"mutated A")
+                with self.assertRaises(StagingManifestMismatch):
+                    fabric.reverify_staging_manifest(root, ("a.txt", "b.txt"), digest)
+                with self.assertRaises(ResourceFabricError):
+                    fabric.reverify_staging_manifest(root, ("a.txt",), "INVALID")
+                with self.assertRaises(ResourceFabricError):
+                    build_staging_manifest((dict(records[0], source="../escape"),))
+
     def test_staged_manifest_is_stable_across_parallelism_and_order_sensitive(self):
         with TemporaryDirectory() as d:
             root = Path(d)
