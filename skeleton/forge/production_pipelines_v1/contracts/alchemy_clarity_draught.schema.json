@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "clarity_draught manufacturing command",
+  "description": "Pure alchemy production lot state transition, no authority over physical machines",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "batch",
+    "expected_version",
+    "tick",
+    "evidence"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "start",
+        "advance",
+        "finish",
+        "cancel",
+        "observe"
+      ]
+    },
+    "batch": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evidence": {
+      "type": "string",
+      "maxLength": 128
+    }
+  },
+  "$comment": "Host must authenticate stage evidence and commit durable state atomically. This schema does not authenticate provenance."
+}
