@@ -37,7 +37,7 @@ class FabricTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         # Deterministic simulated host: real CI cgroup PSI is not test input.
-        for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal']:
+        for name in ['probe_cgroup_events','probe_io_pressure','probe_cpu_throttle','probe_swap_counters','probe_cpu_thermal','probe_reclaim_counters']:
             guard = patch("skeleton.app.offline_resource_fabric." + name,
                           return_value=() if name == "probe_cpu_thermal" else None)
             guard.start()

@@ -29,6 +29,7 @@ from .offline_cgroup_events import CgroupPressureTracker, probe_cgroup_events
 from .offline_io_pressure import IOPressureController, probe_io_pressure
 from .offline_cpu_throttle import CPUThrottleController, probe_cpu_throttle
 from .offline_swap_churn import SwapChurnController, probe_swap_counters
+from .offline_reclaim_pressure import ReclaimPressureController, probe_reclaim_counters
 from .offline_cpu_thermal import CPUThermalController, probe_cpu_thermal
 from .offline_resources import (
     LocalResourcePressure, LocalResourceSnapshot, probe_local_resources,
@@ -386,6 +387,7 @@ class FabricPlan:
     cpu_throttle_backpressure: bool = False
     swap_churn_backpressure: bool = False
     cpu_thermal_backpressure: bool = False
+    reclaim_backpressure: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -403,6 +405,7 @@ class FabricPlan:
             "cpu_throttle_backpressure": self.cpu_throttle_backpressure,
             "swap_churn_backpressure": self.swap_churn_backpressure,
             "cpu_thermal_backpressure": self.cpu_thermal_backpressure,
+            "reclaim_backpressure": self.reclaim_backpressure,
             "transfer_chunk_bytes": self.transfer_chunk_bytes,
             "gpu_eligible": self.gpu_eligible,
             "gpu_device": self.gpu_device,
@@ -467,11 +470,15 @@ class AdaptiveResourceFabric:
         self._cpu_throttle = CPUThrottleController()
         self._swap_churn = SwapChurnController()
         self._cpu_thermal = CPUThermalController()
+        self._reclaim = ReclaimPressureController()
 
     def observe(self) -> FabricSnapshot:
         hardware = probe_local_resources(self.storage_path)
         self._swap_churn.observe(
             probe_swap_counters(), physical_ram_bytes=hardware.total_ram_bytes,
+        )
+        self._reclaim.observe(
+            probe_reclaim_counters(), physical_ram_bytes=hardware.total_ram_bytes,
         )
         gpus = probe_gpu_resources()
         self._cgroup.sample(probe_cgroup_events())
@@ -516,6 +523,7 @@ class AdaptiveResourceFabric:
         cpu_throttle = self._cpu_throttle.snapshot()
         swap_churn = self._swap_churn.snapshot()
         cpu_thermal = self._cpu_thermal.snapshot()
+        reclaim = self._reclaim.snapshot()
         if readonly_stream and cgroup["oom_backpressure"]:
             raise LocalResourcePressure("observed cgroup OOM: staging backpressure")
         with self._lock:
@@ -558,7 +566,8 @@ class AdaptiveResourceFabric:
         if (cgroup["high_backpressure"] or io["congested"]
                 or cpu_throttle["backpressure"]
                 or swap_churn["backpressure"]
-                or cpu_thermal["thermal_backpressure"]):
+                or cpu_thermal["thermal_backpressure"]
+                or reclaim["backpressure"]):
             streams = min(streams, 1)
         # Per-device measured thermal admission with anti-thrash hysteresis.
         # Never invent a threshold: unknown telemetry only retains a prior hold.
@@ -612,6 +621,7 @@ class AdaptiveResourceFabric:
             and requested_gpu_bytes <= budget
             and not cgroup["oom_backpressure"]
             and not (cgroup["high_backpressure"] and gpu.shared_with_system_ram)
+            and not (reclaim["backpressure"] and gpu.shared_with_system_ram)
         )
         reason = (
             "verified read-only host staging, SQLite spill when needed; "
@@ -627,6 +637,8 @@ class AdaptiveResourceFabric:
             reason += "; observed host swap page churn"
         if cpu_thermal["thermal_backpressure"]:
             reason += "; measured CPU thermal trip hold"
+        if reclaim["backpressure"]:
+            reason += "; observed inefficient kernel reclaim or major faults"
         evidence = {
             "source_bytes": source_bytes,
             "readonly_stream": readonly_stream,
@@ -645,6 +657,7 @@ class AdaptiveResourceFabric:
             "cpu_throttle_backpressure": cpu_throttle["backpressure"],
             "swap_churn_backpressure": swap_churn["backpressure"],
             "cpu_thermal_backpressure": cpu_thermal["thermal_backpressure"],
+            "reclaim_backpressure": reclaim["backpressure"],
         }
         return FabricPlan(
             source_bytes=source_bytes, residency=residency,
@@ -665,6 +678,7 @@ class AdaptiveResourceFabric:
             cpu_throttle_backpressure=bool(cpu_throttle["backpressure"]),
             swap_churn_backpressure=bool(swap_churn["backpressure"]),
             cpu_thermal_backpressure=bool(cpu_thermal["thermal_backpressure"]),
+            reclaim_backpressure=bool(reclaim["backpressure"]),
             evidence_digest=hashlib.sha256(
                 json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest(),
@@ -731,6 +745,7 @@ class AdaptiveResourceFabric:
             "cpu_throttle": self._cpu_throttle.snapshot(),
             "swap_churn": self._swap_churn.snapshot(),
             "cpu_thermal": self._cpu_thermal.snapshot(),
+            "reclaim_pressure": self._reclaim.snapshot(),
         }
         return result
 
