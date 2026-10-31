@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_industrial_logistics_neon_undercity",
+  "genre": "industrial_logistics",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Neon Undercity: Industrial Logistics",
+  "foundation": {
+    "setting": "Neon Undercity",
+    "era": "post-isolation",
+    "environment": "elevated night markets",
+    "history": "A forgotten hidden radio library once protected community capacitors, until recurring grid brownouts forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Vera Sen, a engineer, must restart a failing supply corridor, relying on production-chain balancing despite grid brownouts.",
+  "central_conflict": "a brittle monopoly threatens the hidden radio library by restricting community capacitors.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "grid brownouts destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a brittle monopoly contests access to community capacitors",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The hidden radio library becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers community capacitors"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "hidden radio library",
+    "critical_resource": "community capacitors",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

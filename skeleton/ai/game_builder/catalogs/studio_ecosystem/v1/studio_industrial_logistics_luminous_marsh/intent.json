@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_luminous_marsh",
+  "title": "Luminous Marsh: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610302356,
+  "width": 25,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 3
+}
