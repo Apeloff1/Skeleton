@@ -136,11 +136,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--player-id", default="player", help="Original player identity for interactions")
     parser.add_argument("--inspect-tick", type=int, help="Inspect NPC presence at a given tick")
     parser.add_argument("--solve-ending", help="Find replayable commands for an authored ending")
+    parser.add_argument("--audit-endings", action="store_true", help="Replay-qualify all authored endings")
     parser.add_argument("--max-search-nodes", type=int, default=1024)
     parser.add_argument("--max-search-depth", type=int, default=24)
     args = parser.parse_args(argv)
     try:
         schedule = NpcSchedule.parse(read_json(args.schedule))
+        if args.audit_endings:
+            if any((args.solve_ending is not None, args.commands, args.resume,
+                    args.save, args.interactive, args.inspect_tick is not None)):
+                raise GameplayContractError("ending audit forbids playback/save options")
+            from skeleton.game.gameplay.npc_ending_coverage import audit_endings
+            result = audit_endings(
+                schedule, player_id=args.player_id,
+                max_nodes=args.max_search_nodes, max_depth=args.max_search_depth,
+            )
+            print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return 0
         if args.solve_ending is not None:
             if any((args.commands, args.resume, args.save, args.interactive,
                     args.inspect_tick is not None)):
