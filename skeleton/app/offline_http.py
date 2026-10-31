@@ -462,7 +462,7 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(422, "resource plan rejected by live hardware policy") from exc
         if path == "/v1/resources/stage/reverify" and method == "POST":
             _fields(body, {"root", "paths", "manifest_digest", "desired_streams",
-                           "approved", "deadline_s"},
+                           "approved", "deadline_s", "wait_for_slot"},
                     {"root", "paths", "manifest_digest", "approved"})
             if body["approved"] is not True:
                 raise OfflineHTTPError(403, "source re-verification requires operator approval")
@@ -474,6 +474,7 @@ class OfflineHTTPApplication:
                     body["root"], body["paths"], body["manifest_digest"],
                     desired_streams=body.get("desired_streams", 4),
                     deadline_s=body.get("deadline_s"),
+                    wait_for_slot=body.get("wait_for_slot", False),
                 )
             except StagingManifestMismatch as exc:
                 raise OfflineHTTPError(409, "staged source manifest changed") from exc
@@ -484,7 +485,7 @@ class OfflineHTTPApplication:
             # regular files for read-only, digest-verified concurrent I/O.
             # No file contents or credential-bearing paths are returned.
             _fields(body, {"root", "paths", "desired_streams", "approved",
-                           "deadline_s"}, {"root", "paths", "approved"})
+                           "deadline_s", "wait_for_slot"}, {"root", "paths", "approved"})
             if body["approved"] is not True:
                 raise OfflineHTTPError(403, "read-only file staging requires operator approval")
             if (not isinstance(body["root"], str) or
@@ -496,6 +497,7 @@ class OfflineHTTPApplication:
                     body["root"], body["paths"],
                     desired_streams=body.get("desired_streams", 4),
                     deadline_s=body.get("deadline_s"),
+                    wait_for_slot=body.get("wait_for_slot", False),
                 )
                 return 200, build_staging_manifest(records)
             except (OSError, ValueError, RuntimeError) as exc:

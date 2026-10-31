@@ -86,6 +86,8 @@ HTML = r"""<!doctype html>
         <textarea id="resource-stage-paths" rows="4" spellcheck="false"></textarea>
         <label for="resource-stage-grant"><input id="resource-stage-grant" type="checkbox">
           I approve read-only access to these exact local files</label>
+        <label for="resource-stage-wait"><input id="resource-stage-wait" type="checkbox">
+          Wait fairly for a busy read slot (up to ten seconds)</label>
         <button id="resource-stage" class="secondary" disabled>Verify source manifest</button>
         <pre id="resource-stage-status" aria-live="polite">No source manifest verified.</pre>
         <label for="resource-stage-digest">Previously pinned manifest SHA-256</label>
@@ -309,6 +311,7 @@ JAVASCRIPT = r"""'use strict';
     get('resource-stage-root').value = '';
     get('resource-stage-paths').value = '';
     get('resource-stage-grant').checked = false;
+    get('resource-stage-wait').checked = false;
     get('resource-stage-digest').value = '';
     get('longform-status').textContent = 'No staged source.';
     get('longform-work-status').textContent = 'No active work cursor.';
@@ -703,6 +706,7 @@ JAVASCRIPT = r"""'use strict';
     get('resource-stage-status').textContent = 'Verifying selected local sources…';
     const receipt = await api('POST', '/v1/resources/stage', {
       root, paths, desired_streams, approved: true, deadline_s: 10,
+      wait_for_slot: get('resource-stage-wait').checked,
     });
     if (!receipt.verified || receipt.manifest_authenticated !== false ||
         !/^[0-9a-f]{64}$/.test(receipt.manifest_digest) ||
@@ -732,6 +736,7 @@ JAVASCRIPT = r"""'use strict';
     get('resource-stage-status').textContent = 'Rehashing source bytes…';
     const result = await api('POST', '/v1/resources/stage/reverify', {
       root, paths, manifest_digest, approved: true, deadline_s: 10,
+      wait_for_slot: get('resource-stage-wait').checked,
     });
     if (result.reverified !== true || result.manifest_digest !== manifest_digest) {
       throw new Error('Source re-verification did not match the pinned digest.');

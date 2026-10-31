@@ -63,6 +63,8 @@ class LocalResourceBudgetTests(unittest.TestCase):
                 ["--stage-sources", "--stage-approve", "--stage-root", root,
                  "--stage-path", "file.txt", "--stage-deadline-s", "nan"],
                 ["--stage-path", "file.txt"],
+                ["--stage-sources", "--stage-approve", "--stage-root", root,
+                 "--stage-path", "file.txt", "--stage-wait"],
             )
             for args in cases:
                 with self.subTest(args=args), redirect_stdout(StringIO()), \

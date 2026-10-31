@@ -1057,6 +1057,8 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertIn("deadline_s: 10", JAVASCRIPT)
         self.assertIn("resource-stage-reverify", JAVASCRIPT)
         self.assertIn("resource-stage-digest", HTML)
+        self.assertIn("resource-stage-wait", HTML)
+        self.assertIn("wait_for_slot", JAVASCRIPT)
 
     def test_owner_only_token_file_is_create_once(self) -> None:
         path = self.folder / "bearer.secret"

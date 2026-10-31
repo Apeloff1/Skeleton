@@ -524,3 +524,16 @@ emitting a partial source manifest, releases all stream leases and records
 a failed batch. The monitor exposes live_pressure_rechecks for diagnostics.
 This is cooperative memory-pressure protection, not a claim to prevent
 all operating-system OOM conditions or to control GPU driver allocation.
+
+
+## Opt-in FIFO read-stream backpressure
+
+The default stage and reverify operations remain fail-fast under concurrent
+resource contention. The authenticated HTTP routes also accept a typed
+wait_for_slot=true option with a finite deadline; the offline UI exposes a
+separate checkbox. The canonical CLI supports --stage-wait only together
+with --stage-deadline-s. Queued readers are admitted in FIFO ticket order
+under the existing measured stream capacity, cannot be overtaken by new
+fail-fast requests, and release their ticket on cancellation or deadline.
+The monitor exposes waiting_stream_batches. This is a process-local queue,
+not a claim of distributed scheduling or GPU kernel preemption.

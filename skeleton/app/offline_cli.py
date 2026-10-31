@@ -72,6 +72,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="desired concurrent file streams")
     parser.add_argument("--stage-deadline-s", type=float,
                         help="finite positive staging deadline in seconds")
+    parser.add_argument("--stage-wait", action="store_true",
+                        help="wait fairly for a busy read slot until the deadline")
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
     capabilities.add_argument("--homebrew-editor", help="open native visual editor for a verified ORIGINAL homebrew capsule")
@@ -181,7 +183,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         allowed = {
             "stage_sources", "stage_root", "stage_path", "stage_approve",
             "stage_manifest_digest", "stage_streams", "stage_deadline_s",
-            "json_output",
+            "stage_wait", "json_output",
         }
         if any(
             getattr(args, name) != default for name, default in baseline.items()
@@ -201,6 +203,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if root.is_symlink() or not root.is_dir():
             print("stage root must be a regular local directory", file=sys.stderr)
             return 2
+        if args.stage_wait and args.stage_deadline_s is None:
+            print("--stage-wait requires --stage-deadline-s", file=sys.stderr)
+            return 2
         from .offline_resource_fabric import (
             AdaptiveResourceFabric, build_staging_manifest,
         )
@@ -210,6 +215,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 records = fabric.stream_readonly(
                     root, names, desired_streams=args.stage_streams or 1,
                     deadline_s=args.stage_deadline_s,
+                    wait_for_slot=args.stage_wait,
                 )
                 receipt = build_staging_manifest(records)
             else:
@@ -217,6 +223,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     root, names, args.stage_manifest_digest,
                     desired_streams=args.stage_streams or 1,
                     deadline_s=args.stage_deadline_s,
+                    wait_for_slot=args.stage_wait,
                 )
             if args.json_output:
                 print(json.dumps(receipt, sort_keys=True, allow_nan=False))
@@ -232,7 +239,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
     if (args.stage_root is not None or args.stage_path is not None
             or args.stage_approve or args.stage_manifest_digest is not None
-            or args.stage_streams is not None or args.stage_deadline_s is not None):
+            or args.stage_streams is not None or args.stage_deadline_s is not None
+            or args.stage_wait):
         print("source staging options require --stage-sources", file=sys.stderr)
         return 2
     library_mode = args.index_dir is not None or args.search is not None
