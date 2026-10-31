@@ -30,6 +30,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--play-quest", action="store_true",
                     help="Execute deterministic authored quest choices without certifying native gameplay")
     ap.add_argument("--quest-actions", help="Bounded JSON array of [stage, choice] pairs")
+    ap.add_argument("--walk-audit-catalog", action="store_true",
+                    help="Audit a bounded page of original catalog authored walk choices")
+    ap.add_argument("--walk-audit-offset", type=int, default=0,
+                    help="Zero-based offset for --walk-audit-catalog")
+    ap.add_argument("--walk-audit-batch-size", type=int, default=2,
+                    help="Projects per catalog audit page (1..4)")
     ap.add_argument("--play-walk", action="store_true",
                     help="Replay authoritative walk movement and scene choices; print save receipt")
     ap.add_argument("--walk-events", metavar="JSON",
@@ -77,6 +83,27 @@ def main(argv: list[str] | None = None) -> int:
                                or args.walk_timeline or args.walk_audit_choices
                                or args.walk_restore_checkpoint is not None):
         ap.error("--walk-events and --walk-receipt require --play-walk")
+    if args.walk_audit_catalog:
+        if (args.play_walk or args.play_quest or args.project or args.compile_preview
+                or args.materialize_batch or args.output or args.search is not None
+                or args.deep_search or args.limit != 20 or args.quest_actions is not None
+                or args.max_artifact_bytes is not None):
+            ap.error("--walk-audit-catalog excludes gameplay, search and export modes")
+        from skeleton.ai.game_builder.studio_ecosystem_walk_coverage_batch import (
+            audit_catalog_walk_choices,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            result = audit_catalog_walk_choices(
+                authorized=True, genre=args.genre, biome=args.biome,
+                offset=args.walk_audit_offset, limit=args.walk_audit_batch_size,
+            )
+        except (StudioQuestError, ValueError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2:
+        ap.error("--walk-audit-offset and --walk-audit-batch-size require --walk-audit-catalog")
     if args.play_walk:
         if (not args.project or args.play_quest or args.quest_actions is not None
                 or args.search is not None or args.materialize_batch

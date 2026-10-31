@@ -265,3 +265,23 @@ locked/unreachable scenes, event exhaustion, or the 24-stage, 96-choice and
 audit reports `all_branch_combinations_verified=false`. Authorization,
 source drift, forged saves, malformed choices and inconsistent successors fail
 closed. This is a local authoring QA tool, not a release gate or device test.
+
+## Paginated original catalog choice audit
+
+Use `--walk-audit-catalog` for deterministic, read-only authored choice
+assurance across the registered source catalog. `--walk-audit-offset N` and
+`--walk-audit-batch-size 1..4` select a bounded page; optional `--genre`
+and `--biome` filter the canonical index. Each project is read through the
+same safe registered source loader, and its authored alternatives are tested
+by real collision-checked walk replay. No new save or asset is written.
+
+```sh
+python scripts/studio_ecosystem_cli.py --walk-audit-catalog --walk-audit-batch-size 2
+python scripts/studio_ecosystem_cli.py --walk-audit-catalog --walk-audit-offset 2 --walk-audit-batch-size 2
+```
+
+Pages carry a stable catalog digest, next offset, per-project source/coverage
+SHA-256 digests and explicit invalid/partial statuses. Consumers must compare
+catalog digests before combining pages. An index changing during the page
+fails closed. The result never claims all branch combinations, rights,
+artistic merit, native gameplay, external proof or release qualification.
