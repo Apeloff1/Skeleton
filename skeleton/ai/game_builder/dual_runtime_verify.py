@@ -205,13 +205,31 @@ def _world(native: dict[str, object], manifest: dict[str, object]) -> PlayableWo
         raise DualRuntimeVerificationError("missing world intent or levels")
     try:
         intent = GameBuildIntent(**raw_intent)
+        if len(raw_levels) != intent.levels:
+            raise DualRuntimeVerificationError("world level count exceeds declared intent")
         levels: list[TileLevel] = []
         for index, item in enumerate(raw_levels):
             if type(item) is not dict or set(item) != {
                 "rows", "start", "collectibles"
             }:
                 raise DualRuntimeVerificationError("unsupported level structure")
-            rows = tuple(item["rows"])
+            raw_rows = item["rows"]
+            if (type(raw_rows) is not list
+                    or len(raw_rows) != intent.height
+                    or any(type(row) is not str or len(row) != intent.width
+                           or set(row) - set("#.SGCH") for row in raw_rows)):
+                raise DualRuntimeVerificationError("world geometry exceeds declared bounds")
+            rows = tuple(raw_rows)
+            raw_start = item["start"]
+            raw_collectibles = item["collectibles"]
+            if (type(raw_start) is not list or len(raw_start) != 2
+                    or any(type(coord) is not int for coord in raw_start)
+                    or type(raw_collectibles) is not list
+                    or len(raw_collectibles) != intent.collectibles_per_level
+                    or any(type(point) is not list or len(point) != 2
+                           or any(type(coord) is not int for coord in point)
+                           for point in raw_collectibles)):
+                raise DualRuntimeVerificationError("world coordinates exceed declared bounds")
             markers = {
                 tile: tuple(sorted((x, y) for y, row in enumerate(rows)
                                    for x, char in enumerate(row) if char == tile))

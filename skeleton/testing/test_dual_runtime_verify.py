@@ -141,3 +141,63 @@ def test_scandir_enumeration_stops_at_budget_without_exhausting_iterator(monkeyp
     with pytest.raises(DualRuntimeVerificationError, match="entry budget"):
         verifier._bounded_names(9, 4)
     assert entries.consumed == 5
+
+
+
+def test_malicious_world_dimensions_rejected_before_path_solver(monkeypatch):
+    from skeleton.ai.game_builder import dual_runtime_verify as verifier
+
+    intent = GameBuildIntent(
+        project_id="bounded-world", title="Bounded World",
+        subtitle="Adversarial source verification", seed=42,
+        width=9, height=9, levels=1, collectibles_per_level=1,
+        hazards_per_level=0, starting_health=3,
+    )
+    native = {
+        "schema": "skeleton.game_builder.godot_world.v1",
+        "intent": intent.to_payload(),
+        "levels": [{
+            "rows": ["#" * 100_000] * 9,
+            "start": [1, 1],
+            "collectibles": [[2, 2]],
+        }],
+    }
+    manifest = {
+        "world_algorithm": "skeleton.game_builder.maze-puzzle.v1",
+        "world_digest": "0" * 64,
+        "project_id": intent.project_id,
+    }
+
+    def solver_must_not_run(_):
+        raise AssertionError("untrusted oversized grid reached path solver")
+
+    monkeypatch.setattr(verifier, "solve_safe_path", solver_must_not_run)
+    with pytest.raises(DualRuntimeVerificationError, match="geometry"):
+        verifier._world(native, manifest)
+
+
+def test_untrusted_world_level_count_rejected_before_path_solver(monkeypatch):
+    from skeleton.ai.game_builder import dual_runtime_verify as verifier
+
+    intent = GameBuildIntent(
+        project_id="bounded-count", title="Bounded Count",
+        subtitle="Adversarial source verification", seed=43,
+        width=9, height=9, levels=1, collectibles_per_level=1,
+        hazards_per_level=0, starting_health=3,
+    )
+    native = {
+        "schema": "skeleton.game_builder.godot_world.v1",
+        "intent": intent.to_payload(),
+        "levels": [{"rows": ["#" * 9] * 9, "start": [1, 1],
+                    "collectibles": [[2, 2]]}] * 200,
+    }
+    manifest = {
+        "world_algorithm": "skeleton.game_builder.maze-puzzle.v1",
+        "world_digest": "0" * 64,
+        "project_id": intent.project_id,
+    }
+    monkeypatch.setattr(verifier, "solve_safe_path", lambda _: (
+        pytest.fail("oversized level set reached path solver")
+    ))
+    with pytest.raises(DualRuntimeVerificationError, match="level count"):
+        verifier._world(native, manifest)
