@@ -27,6 +27,14 @@ source and verify the actual WSL2/Docker installation before release.
   account of current-main failures. Open fixes must still be integrated and run.
 - The frontend advisory gate has an outstanding low-severity dependency finding;
   see [dependency status](../qa/DEPENDENCY_STATUS_2026-10-28.md).
+- Runtime supervision validation fails because the runtime contract records
+  verification as pending while the masterplan and accountability records carry
+  an older signed verification. Reconcile the linked records through an auditable
+  requalification or revocation; a changed status alone is not evidence.
+- Compose gates frontend startup on backend and engine health. When a required
+  backend dependency stays unhealthy during initial startup, the setup page may
+  not start to display the failure; use the installer output and service logs.
+  A changed startup graph requires qualification on the real deployment.
 
 The earlier VM deployment used older application images and does not qualify
 the current source. Passing focused checks, a healthy process, or a model file

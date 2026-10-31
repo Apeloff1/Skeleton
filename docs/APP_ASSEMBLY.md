@@ -473,6 +473,26 @@ Legacy `/api/health` fields remain compatibility-stable; canonical Skeleton
 identity is attached there as `canonical_application` while new clients use
 `/api/app/bootstrap` as the source of truth.
 
+The backend process liveness probe is `/api/health/live`. The declared backend
+readiness probe is `/api/health/ready`: it returns 503 while Mongo, required
+routes, or either build-vault check are unavailable. A temporary build-vault
+fallback does not count as durable storage. AI provider availability is
+reported separately. If readiness fails for the vault, restore the configured
+`GALAXY_BUILDS_VAULT_DIR` and its write permissions before using build features;
+do not treat process liveness or the temporary fallback as proof that builds
+will persist. The legacy `/api/health` endpoint does not check Mongo.
+
+Vault selection happens when the backend starts. If it selected the temporary
+fallback, first stop new builds and preserve any files in the running backend's
+`/tmp/galaxy_builds_vault` outside the container without overwriting existing
+artifacts. Restore the configured persistent volume and permissions, then
+restart the backend and confirm `/api/health/ready` succeeds before resuming.
+Review and reconcile preserved fallback files separately; do not silently merge
+or delete them. Restarting or recreating a container can discard its `/tmp`
+contents. Vault health checks use bounded shared workers; if a filesystem call
+stalls, readiness fails while its worker remains occupied until the operating
+system returns the call.
+
 ## Frontend endpoint boundary
 
 `frontend/src/utils/apiBase.ts` is the single endpoint resolver for browser and
