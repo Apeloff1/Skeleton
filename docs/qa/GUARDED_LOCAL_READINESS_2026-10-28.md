@@ -9,6 +9,50 @@ closed; the setup instructions cannot yet activate it. Production qualification
 still needs trusted state authorities, a bounded independent reviewer and
 tokenizer attestation tied to the activated GGUF backend.
 
+## Default Compose integration gap
+
+The current deployment cannot be activated by supplying only a guard object.
+The backend's global `MongoConversationAuthority` is created without a source
+epoch. The engine's `MongoMemoryRepository` is created separately. Compose
+uses the backend core database selected by `DB_NAME` (default `tutolage`) and
+the engine database selected by `SKL_MONGO_DATABASE` (`skeleton` in Compose).
+The services therefore need an explicitly shared epoch collection and must
+retain their existing data in their respective databases. Merely constructing
+another epoch in the engine cannot fence the backend's live writers.
+
+The known-writer verifier imports `core.conversations`, but the engine image's
+`Dockerfile.dockerignore` includes only engine source and contracts, excluding
+the backend module. Production composition needs a declared owner boundary and
+an authenticated way to establish backend writer custody; copying the backend
+into the engine or relying on a test-only import path does not establish that
+boundary. The verifier checks known in-process entrypoints and cannot certify
+other deployments or direct database writers.
+
+An actionable migration must be designed and qualified in this order:
+
+1. Declare the shared epoch authority and backend-to-engine custody interface in
+   the canonical architecture. Bind both processes to the same verified Mongo
+   deployment and epoch collection, independently of their source databases.
+2. Inventory every conversation and memory writer, including old service
+   versions and administrative clients. Enforce the epoch on each admitted
+   mutation and restrict unregistered writers at the deployment boundary.
+3. Under a verifiable quiescent maintenance window, inventory tenant/actor
+   identities from both canonical stores, preserve existing data, and initialize
+   missing epoch records through an auditable, restart-safe migration. Existing
+   writing, malformed, or uncertain records must be quarantined for separate
+   reconciliation; never reset them automatically. A read-only snapshot or a
+   caller's assertion of quiescence is not proof that all writers are stopped.
+4. Install an independently managed bounded reviewer, pinned instruction policy,
+   authorized snapshot reader and tokenizer bound to the actual loaded backend.
+   Wire the trusted bootstrap before provider activation, without any request or
+   environment-controlled opt-out from the guard.
+5. Qualify fresh install, upgrade, mixed-version exclusion, interruption and
+   recovery, concurrent mutation, revocation, and restart behavior using real
+   Mongo and both application processes before enabling the path by default.
+
+No automatic epoch initialization, bulk repair, database migration or cross-
+process writer enforcement is provided by the current Compose startup.
+
 The sealed-context guard is available only through explicit trusted application
 composition. The normal local provider path does not enable this protection by
 default. **Docker Compose and the Dockerfile do not supply the required trusted

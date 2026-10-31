@@ -181,11 +181,13 @@ database. A preserved hosted key is reused unless a new key source is supplied.
 
 Portable GGUF executables must be Linux ELF64 for amd64 or arm64. The override
 selects the matching container platform, which Docker must support. Adjacent
-`lib*.so*` runtime dependencies are bounded to 128 files and 128 MiB per runtime;
-the helper does not discover arbitrary system dependencies or establish an
-independent shared-library execution pin. Mixed executable architectures in one
-catalog are rejected. The engine still performs model activation and resource
-admission at startup.
+`lib*.so*` runtime dependencies are bounded to 128 files and 128 MiB per runtime.
+When a deployment declares an adjacent-library inventory, the helper verifies
+its exact names and digests before preparing the read-only file bindings. Legacy
+manifests without an inventory keep their previous behavior; they do not gain
+library pins automatically. Mixed executable architectures in one catalog are
+rejected. The engine still performs model activation and resource admission at
+startup.
 
 ## Activate the reproducible local CPU model
 
@@ -193,8 +195,9 @@ The optional acquisition recipe uses Qwen3-0.6B-Q8_0, an Apache-2.0 model, and
 llama.cpp b11429, an MIT runtime. Both artifacts have fixed URLs, exact byte
 counts and SHA256 values in `scripts/provision_local_ai.py`. The runtime recipe
 targets Linux x86_64 with glibc, including the canonical engine container. This
-small model provides a usable integration path; useful complex planning still
-depends on model capability and measured results.
+small model is intended for local integration; the default Compose local guard
+bootstrap is incomplete, so preparing these files alone does not enable chat.
+Useful complex planning depends on model capability and measured results.
 
 Explicitly download and prepare approximately 657 MB of artifacts:
 
@@ -247,10 +250,18 @@ activation/capacity checks still apply. Existing installations must match the
 requested context and are never rewritten; use a fresh destination when changing it.
 The deployment uses two CPU threads, no GPU,
 finite execution deadlines and the explicit completion-chat profile. The model
-and executable are rehashed by the canonical activation/inference owner. The
-provisioning receipt additionally records acquired library digests. The current
-runtime independently pins the executable and model; it does not establish a
-separate immutable shared-library execution closure.
+and executable are rehashed by the canonical activation/inference owner. Newly
+provisioned manifests also record digests for every extracted adjacent runtime
+library. The runtime checks that flat inventory at activation and around process
+execution, and strips loader search-path overrides in this mode. Existing
+manifests without that field remain unpinned and are not rewritten. The pinned
+inventory requires no-follow file opens, available on the intended Linux/WSL2
+path; it is not qualified for native Windows.
+
+These checks do not prove which objects the operating-system loader actually
+mapped, pin system libraries, or eliminate file changes between a check and
+process loading. They do not attest GGUF tokenizer behavior or make the guarded
+local provider operational.
 
 For another compatible installed GGUF/runtime, use the existing
 `python -m skeleton app prepare-local-model --help`. Modern `llama-completion`

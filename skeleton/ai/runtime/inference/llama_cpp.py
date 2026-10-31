@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import struct
 import subprocess
 import tempfile
@@ -66,6 +67,9 @@ QWEN3_COMPLETION_CHAT_TEMPLATE = (
 _CHATML_CONTENT_DELIMITERS = ("<|im_start|>", "<|im_end|>", "<|endoftext|>")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_RUNTIME_LIBRARY_NAME = re.compile(r"^lib[A-Za-z0-9_+.-]{1,120}\.so(?:\.[A-Za-z0-9_+.-]+)?$")
+_MAX_RUNTIME_LIBRARIES = 128
+_MAX_RUNTIME_LIBRARY_BYTES = 128 * 1024 * 1024
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _PROVIDER_SECRET_NAMES = {
     "OPENAI" + "_API_KEY",
@@ -94,6 +98,7 @@ _INHERITED_ENV_ALLOWLIST = {
     "OMP_NUM_THREADS",
     "GGML_CUDA_ENABLE_UNIFIED_MEMORY",
 }
+_PINNED_RUNTIME_ENV_ALLOWLIST = _INHERITED_ENV_ALLOWLIST - {"LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"}
 _MANAGED_LONG_FLAGS = {
     "--model",
     "--prompt",
@@ -258,6 +263,9 @@ class LlamaCppConfig:
     output_framing: str = "raw"
     runtime_scratch_bytes: int = 512 * 1024 * 1024
     kv_bytes_per_token: int | None = None
+    # Optional integrity inventory for files adjacent to the executable. This
+    # does not attest system libraries or the dynamic loader's complete closure.
+    runtime_libraries: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -332,12 +340,30 @@ class LlamaCppConfig:
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
 
+        if not isinstance(self.runtime_libraries, (tuple, list)) or len(self.runtime_libraries) > _MAX_RUNTIME_LIBRARIES:
+            raise ValueError("runtime library inventory exceeds its bound")
+        libraries: dict[str, str] = {}
+        for entry in self.runtime_libraries:
+            if not isinstance(entry, (tuple, list)) or len(entry) != 2:
+                raise ValueError("runtime library inventory entry must be a name and SHA256")
+            name, digest = entry
+            if (not isinstance(name, str) or not _RUNTIME_LIBRARY_NAME.fullmatch(name)
+                    or name in libraries or not isinstance(digest, str) or not _HEX64.fullmatch(digest)):
+                raise ValueError("invalid or duplicate runtime library identity")
+            libraries[name] = digest
+        object.__setattr__(self, "runtime_libraries", tuple(sorted(libraries.items())))
+
         normalized_env: dict[str, str] = {}
         for key, value in dict(self.environment).items():
             if not isinstance(key, str) or not _ENV_KEY.fullmatch(key):
                 raise ValueError(f"invalid environment key {key!r}")
             if key in _PROVIDER_SECRET_NAMES or key in _PROXY_NAMES or key.startswith("LLAMA_ARG_"):
                 raise ValueError(f"forbidden environment key {key}")
+            if libraries and (key.startswith(("LD_", "DYLD_"))
+                              or key in {"GLIBC_TUNABLES", "GGML_BACKEND_PATH"}):
+                raise ValueError(f"pinned runtime forbids loader environment override {key}")
+            if libraries and key not in _PINNED_RUNTIME_ENV_ALLOWLIST:
+                raise ValueError(f"pinned runtime forbids unrecognized environment override {key}")
             if not isinstance(value, str) or "\x00" in value:
                 raise ValueError(f"invalid environment value for {key}")
             normalized_env[key] = value
@@ -771,6 +797,67 @@ def _stat_matches(identity: ArtifactIdentity) -> bool:
     )
 
 
+def _runtime_library_names(directory: Path) -> set[str]:
+    """Inspect a flat provisioned runtime; nested loader search paths fail closed."""
+    try:
+        names: set[str] = set()
+        with os.scandir(directory) as entries:
+            for count, entry in enumerate(entries, start=1):
+                if count > 512:
+                    raise LlamaCppRuntimeError("runtime directory exceeds entry bound")
+                if entry.is_symlink() or entry.is_dir(follow_symlinks=False):
+                    raise LlamaCppRuntimeError("pinned runtime directory contains a link or nested directory")
+                if entry.name.startswith("lib") and ".so" in entry.name:
+                    if not _RUNTIME_LIBRARY_NAME.fullmatch(entry.name):
+                        raise LlamaCppRuntimeError("runtime contains an invalid library name")
+                    names.add(entry.name)
+        return names
+    except OSError as exc:
+        raise LlamaCppRuntimeError("runtime library directory unavailable") from exc
+
+
+def _runtime_library_identities(
+    directory: Path, pins: tuple[tuple[str, str], ...], *, interrupt: Callable[[], None] | None = None,
+) -> tuple[ArtifactIdentity, ...]:
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise LlamaCppRuntimeError("pinned runtime library no-follow support is unavailable")
+    if _runtime_library_names(directory) != {name for name, _ in pins}:
+        raise LlamaCppRuntimeError("runtime library inventory differs from the deployment")
+    identities: list[ArtifactIdentity] = []
+    total = 0
+    for name, expected in pins:
+        if interrupt is not None:
+            interrupt()
+        path = directory / name
+        try:
+            flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+            descriptor = os.open(path, flags)
+            with os.fdopen(descriptor, "rb") as stream:
+                before = os.fstat(stream.fileno())
+                if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= 32 * 1024 * 1024:
+                    raise LlamaCppRuntimeError("runtime library is not a bounded regular file")
+                total += before.st_size
+                if total > _MAX_RUNTIME_LIBRARY_BYTES:
+                    raise LlamaCppRuntimeError("runtime libraries exceed byte limit")
+                digest = hashlib.sha256()
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    if interrupt is not None:
+                        interrupt()
+                    digest.update(chunk)
+                after = os.fstat(stream.fileno())
+            current = os.stat(path, follow_symlinks=False)
+        except OSError as exc:
+            raise LlamaCppRuntimeError("runtime library is unavailable or symlinked") from exc
+        fingerprint = lambda item: (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns)
+        if (not stat.S_ISREG(current.st_mode) or fingerprint(before) != fingerprint(after)
+                or fingerprint(after) != fingerprint(current) or digest.hexdigest() != expected):
+            raise LlamaCppRuntimeError("runtime library identity changed or digest mismatched")
+        identities.append(ArtifactIdentity(str(path), expected, before.st_size, before.st_mtime_ns, before.st_ino))
+    if _runtime_library_names(directory) != {name for name, _ in pins}:
+        raise LlamaCppRuntimeError("runtime library inventory changed during admission")
+    return tuple(identities)
+
+
 def _approx_tokens(text: str) -> int:
     return len(_TOKEN.findall(text))
 
@@ -821,12 +908,22 @@ class LlamaCppModel:
             or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
         ):
             raise LlamaCppRuntimeError("activated local runtime/model file changed or is unavailable")
+        if self.config.runtime_libraries and (
+            _runtime_library_names(Path(self._runtime.path).parent)
+            != {name for name, _ in self.config.runtime_libraries}
+            or not all(_stat_matches(identity) for identity in self._runtime_libraries)
+        ):
+            raise LlamaCppRuntimeError("activated adjacent runtime library inventory changed")
 
     def __init__(self, config: LlamaCppConfig) -> None:
         if not isinstance(config, LlamaCppConfig):
             raise TypeError("config must be LlamaCppConfig")
         self.config = config
         self._runtime = _identity(config.executable, executable=True, reject_symlink=False)
+        self._runtime_libraries = (
+            _runtime_library_identities(Path(self._runtime.path).parent, config.runtime_libraries)
+            if config.runtime_libraries else ()
+        )
         self._model = _identity(
             config.model_path,
             executable=False,
@@ -891,6 +988,8 @@ class LlamaCppModel:
             "kv_bytes_per_token": self.config.kv_bytes_per_token,
             "seed_policy": "uint32_mod_4294967295_without_random_sentinel",
         }
+        if self.config.runtime_libraries:
+            profile["adjacent_runtime_libraries"] = dict(self.config.runtime_libraries)
         native_chat_profile = self._native_chat_profile()
         if native_chat_profile is not None:
             # A corrected role renderer must not reuse a generation cached
@@ -934,6 +1033,8 @@ class LlamaCppModel:
                     self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound
                 ),
                 "memory_estimate_source": self.memory_estimate_source,
+                "adjacent_runtime_library_pins": len(self.config.runtime_libraries),
+                "system_library_closure_verified": False,
             }
 
     @property
@@ -975,12 +1076,18 @@ class LlamaCppModel:
                 interrupt()
             if not _stat_matches(identity):
                 raise LlamaCppRuntimeError(f"{label} artifact identity changed")
-            if self.config.rehash_artifacts_each_run:
+            if self.config.rehash_artifacts_each_run or (label == "runtime" and self.config.runtime_libraries):
                 observed = _sha256_file(Path(identity.path), interrupt=interrupt)
                 if observed != identity.sha256:
                     raise LlamaCppRuntimeError(f"{label} artifact digest changed")
                 if not _stat_matches(identity):
                     raise LlamaCppRuntimeError(f"{label} artifact changed during admission")
+        if self.config.runtime_libraries:
+            observed = _runtime_library_identities(
+                Path(self._runtime.path).parent, self.config.runtime_libraries, interrupt=interrupt,
+            )
+            if observed != self._runtime_libraries:
+                raise LlamaCppRuntimeError("runtime library file identity changed")
         observed_header = inspect_gguf(Path(self._model.path))
         if observed_header != self._gguf_header:
             raise LlamaCppRuntimeError("GGUF fixed header changed")
@@ -1208,6 +1315,12 @@ class LlamaCppModel:
             and key not in _PROXY_NAMES
         }
         env.update(dict(self.config.environment))
+        if self.config.runtime_libraries:
+            # Do not let ambient search paths override the bundled files.
+            # System libraries and dlopen behavior remain outside this check.
+            for key in tuple(env):
+                if key not in _PINNED_RUNTIME_ENV_ALLOWLIST:
+                    env.pop(key, None)
         for key in _PROVIDER_SECRET_NAMES | _PROXY_NAMES:
             env.pop(key, None)
         return env
