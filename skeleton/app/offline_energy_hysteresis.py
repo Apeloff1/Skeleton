@@ -5,9 +5,11 @@ never starts model work, raises device limits or alters hardware controls.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from hashlib import sha256
 import json
+import hmac
+from typing import Mapping
 
 from skeleton.app.offline_energy_budget import EnergyAdmission
 
@@ -73,7 +75,7 @@ class EnergyHysteresis:
             raise HysteresisError("candidate exceeds its source resource budget")
         if self.last_seen_ns is not None and now_ns <= self.last_seen_ns:
             raise HysteresisError("non-advancing monotonic sample clock")
-        self.last_seen_ns = now_ns
+        # Validate candidate before consuming the monotonic clock tick.
         if target < self.workers:
             self.workers = target
             self.healthy_streak = 0
@@ -92,6 +94,7 @@ class EnergyHysteresis:
                 reason = "recovery_hysteresis"
         else:
             self.healthy_streak = 0
+        self.last_seen_ns = now_ns
         body = {"schema": SCHEMA, "candidate_digest": candidate.digest,
                 "candidate_workers": target, "admitted_workers": self.workers,
                 "healthy_streak": self.healthy_streak, "reason": reason,
@@ -106,5 +109,77 @@ class EnergyHysteresis:
         self.last_receipt = receipt
         return receipt
 
+
+
+    def checkpoint(self) -> dict[str, object]:
+        """Deterministic integrity receipt, not a trusted anti-rollback anchor."""
+        body: dict[str, object] = {
+            "schema": "skeleton.offline.energy-hysteresis-checkpoint.v1",
+            "policy": asdict(self.policy),
+            "workers": self.workers,
+            "healthy_streak": self.healthy_streak,
+            "last_change_ns": self.last_change_ns,
+            "last_seen_ns": self.last_seen_ns,
+            "last_receipt_digest": self.last_receipt.digest if self.last_receipt else None,
+        }
+        digest = sha256(json.dumps(
+            body, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        return {**body, "digest": digest}
+
+    @classmethod
+    def restart_from_checkpoint(
+        cls, state: Mapping[str, object], *, expected_digest: str,
+    ) -> "EnergyHysteresis":
+        """Fail closed across restarts: validate history, import zero grants.
+
+        The caller must pin expected_digest outside this mutable checkpoint.
+        A hash cannot prove the current OS monotonic epoch or prevent a
+        coordinated rollback of both checkpoint and caller's digest.
+        """
+        fields = {
+            "schema", "policy", "workers", "healthy_streak",
+            "last_change_ns", "last_seen_ns", "last_receipt_digest", "digest",
+        }
+        if not isinstance(state, Mapping) or set(state) != fields:
+            raise HysteresisError("invalid energy checkpoint shape")
+        if state["schema"] != "skeleton.offline.energy-hysteresis-checkpoint.v1":
+            raise HysteresisError("unsupported energy checkpoint")
+        if (type(expected_digest) is not str or len(expected_digest) != 64
+                or any(c not in "0123456789abcdef" for c in expected_digest)):
+            raise HysteresisError("trusted checkpoint digest required")
+        body = {k: state[k] for k in fields if k != "digest"}
+        try:
+            actual = sha256(json.dumps(
+                body, sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")).hexdigest()
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise HysteresisError("invalid energy checkpoint encoding") from exc
+        if (type(state["digest"]) is not str
+                or not hmac.compare_digest(state["digest"], actual)
+                or not hmac.compare_digest(expected_digest, actual)):
+            raise HysteresisError("energy checkpoint integrity mismatch")
+        raw_policy = state["policy"]
+        if (type(raw_policy) is not dict
+                or set(raw_policy) != set(HysteresisPolicy.__dataclass_fields__)):
+            raise HysteresisError("invalid checkpoint policy")
+        policy = HysteresisPolicy(**raw_policy)
+        workers, streak = state["workers"], state["healthy_streak"]
+        if (type(workers) is not int or not 0 <= workers <= 256
+                or type(streak) is not int or not 0 <= streak < policy.recovery_samples):
+            raise HysteresisError("invalid checkpoint admission")
+        seen, changed = state["last_seen_ns"], state["last_change_ns"]
+        if any(v is not None and (type(v) is not int or v < 0)
+               for v in (seen, changed)):
+            raise HysteresisError("invalid checkpoint chronology")
+        if changed is not None and (seen is None or changed > seen):
+            raise HysteresisError("invalid checkpoint chronology")
+        prior = state["last_receipt_digest"]
+        if prior is not None and (
+            type(prior) is not str or len(prior) != 64
+            or any(c not in "0123456789abcdef" for c in prior)
+        ):
+            raise HysteresisError("invalid prior energy receipt")
+        return cls(policy)  # No inherited workers or stale monotonic epoch.
 
 __all__ = ["EnergyHysteresis", "HysteresisError", "HysteresisPolicy", "HysteresisReceipt"]

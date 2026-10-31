@@ -132,3 +132,48 @@ class TestEnergyHysteresis(TestCase):
         ):
             with self.assertRaises(HysteresisError):
                 HysteresisPolicy(**options)
+
+    def test_restart_receipt_requires_new_recovery_samples(self):
+        gate = EnergyHysteresis(HysteresisPolicy(
+            recovery_samples=2, recovery_cooldown_ns=0,
+        ))
+        gate.step(candidate(), now_ns=10, sampled_ns=10)
+        gate.step(candidate(), now_ns=20, sampled_ns=20)
+        self.assertEqual(gate.workers, 1)
+        state = gate.checkpoint()
+        recovered = EnergyHysteresis.restart_from_checkpoint(
+            state, expected_digest=state["digest"],
+        )
+        self.assertEqual(recovered.workers, 0)
+        self.assertIsNone(recovered.last_seen_ns)
+        self.assertEqual(recovered.step(
+            candidate(), now_ns=1, sampled_ns=1,
+        ).admitted_workers, 0)
+        self.assertEqual(recovered.step(
+            candidate(), now_ns=2, sampled_ns=2,
+        ).admitted_workers, 1)
+
+    def test_checkpoint_tamper_and_wrong_anchor_rejected(self):
+        gate = EnergyHysteresis()
+        gate.step(candidate(), now_ns=5, sampled_ns=5)
+        state = gate.checkpoint()
+        tampered = dict(state, workers=12)
+        with self.assertRaises(HysteresisError):
+            EnergyHysteresis.restart_from_checkpoint(
+                tampered, expected_digest=state["digest"],
+            )
+        with self.assertRaises(HysteresisError):
+            EnergyHysteresis.restart_from_checkpoint(
+                state, expected_digest="0" * 64,
+            )
+
+    def test_invalid_worker_grant_does_not_consume_sample_clock(self):
+        from dataclasses import replace
+        gate = EnergyHysteresis()
+        original = candidate()
+        invalid = replace(original, allowed_workers=original.base_workers + 1)
+        with self.assertRaises(HysteresisError):
+            gate.step(invalid, now_ns=100, sampled_ns=100)
+        self.assertIsNone(gate.last_seen_ns)
+        gate.step(original, now_ns=100, sampled_ns=100)
+        self.assertEqual(gate.last_seen_ns, 100)
