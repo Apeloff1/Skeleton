@@ -134,6 +134,8 @@ def _parser() -> argparse.ArgumentParser:
         help="operator-selected prompt/output protocol for the pinned local executable",
     )
     prepare.add_argument("--json", action="store_true", dest="as_json")
+    sub.add_parser("studio-journey", add_help=False,
+                   help="build and replay-verify a real original browser/Godot game (studio-journey --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
     sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
     sub.add_parser("down", help="stop the assembled application")
@@ -268,6 +270,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "studio-journey":
+        from skeleton.app.studio_journey import main as journey_main
+        return journey_main(arguments[1:])
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main
         return chat_main(arguments[1:])
