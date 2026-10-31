@@ -10,6 +10,7 @@ import argparse
 from pathlib import Path
 import subprocess
 import sys
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = "test_engine_handoff_recovery.py"
@@ -19,8 +20,18 @@ def discover(root: Path) -> tuple[Path, ...]:
     """Fail closed on missing suites, symlinks, or untrusted file paths."""
     if not root.is_dir() or root.is_symlink():
         raise ValueError("canonical domain suite directory is absent or linked")
+    # The canonical pytest configuration deliberately restricts discovery to
+    # test_*.py. Fail closed if it changes rather than silently under- or
+    # over-collecting tests when explicit filenames are passed to pytest.
+    try:
+        config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        options = config["tool"]["pytest"]["ini_options"]
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f"cannot read canonical pytest discovery policy: {exc}") from exc
+    if options.get("testpaths") != ["skeleton/testing"] or options.get("python_files") != ["test_*.py"]:
+        raise ValueError("canonical pytest discovery policy changed; requalify shard inventory")
     root_real = root.resolve()
-    found = set(root.rglob("test_*.py")) | set(root.rglob("*_test.py"))
+    found = set(root.rglob("test_*.py"))
     result = []
     for path in sorted(found):
         if path.name == EXCLUDED and path.parent == root:

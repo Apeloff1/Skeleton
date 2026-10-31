@@ -16,7 +16,7 @@ class CanonicalDomainShards(unittest.TestCase):
         for i, size in enumerate((30, 70, 12, 40, 20, 25, 50, 18)):
             (self.root / f"test_case_{i}.py").write_text("x" * size, encoding="utf-8")
         (self.root / EXCLUDED).write_text("excluded advisory", encoding="utf-8")
-        (self.root / "custom_test.py").write_text("def test_ok(): pass", encoding="utf-8")
+        (self.root / "custom_test.py").write_text("def test_not_collected(): pass", encoding="utf-8")
 
     def test_exhaustive_disjoint_and_stable(self) -> None:
         original = discover(self.root)
@@ -28,7 +28,7 @@ class CanonicalDomainShards(unittest.TestCase):
         self.assertEqual(len(set(flattened)), len(flattened))
         self.assertTrue(all(shard for shard in first))
         self.assertNotIn(self.root / EXCLUDED, flattened)
-        self.assertIn(self.root / "custom_test.py", flattened)
+        self.assertNotIn(self.root / "custom_test.py", flattened)
 
     def test_invalid_or_empty_inventory_fails_closed(self) -> None:
         with self.assertRaises(ValueError):
@@ -38,6 +38,9 @@ class CanonicalDomainShards(unittest.TestCase):
         with tempfile.TemporaryDirectory() as empty:
             with self.assertRaises(ValueError):
                 discover(Path(empty))
+
+    def test_pytest_file_pattern_is_respected(self) -> None:
+        self.assertTrue(all(p.name.startswith("test_") for p in discover(self.root)))
 
     def test_linked_test_module_fails_closed(self) -> None:
         (self.root / "test_link.py").symlink_to(self.root / "test_case_0.py")
