@@ -52,6 +52,7 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+    scene-travel  Simulate, verify and resume original offline scene journeys
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -736,6 +737,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "scene-travel":
+        from skeleton.game.gameplay.scene_travel import cli as scene_cli
+        return scene_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)
