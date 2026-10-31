@@ -11,7 +11,7 @@ from skeleton.game.gameplay.scene_atlas import (
     inspect_atlas, route_known,
 )
 from skeleton.game.gameplay.scene_travel import (
-    SceneTravelError, new_session, original_demo, simulate,
+    SceneTravelError, original_demo, simulate,
 )
 
 
