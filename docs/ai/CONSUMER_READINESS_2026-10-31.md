@@ -19,7 +19,12 @@ source and verify the actual WSL2/Docker installation before release.
 - The optional Chroma full profile remains blocked until persistence recovery and
   migration have been qualified. Preserve existing containers and volumes; follow
   the [recovery guidance](../APP_ASSEMBLY.md#application-surfaces).
-- Marketplace listing and checkout are restricted until delivery is qualified.
+- Marketplace listing and checkout, and new premium checkout, are restricted
+  until payment and entitlement delivery are qualified. Existing entitlement
+  reads and settlement paths remain available, but some historical orders need
+  manual reconciliation if their source, amount, currency or plan cannot be
+  verified. The legacy webhook requires a scoped account and is not qualified
+  for direct Stripe delivery; concurrent settlement is not yet atomic.
   A generated game has not been demonstrated playable end to end on this source.
 - The latest inspected [merge-readiness run](https://github.com/Apeloff1/Skeleton/actions/runs/41185615613)
   reported failures across its canonical test shards on a separate pull request.
