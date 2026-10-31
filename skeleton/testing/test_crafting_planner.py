@@ -69,7 +69,7 @@ def test_budgets_do_not_claim_false_impossibility() -> None:
 @pytest.mark.parametrize("args", [
     {}, {"minimum_count": 1}, {"item_id": "fiber", "minimum_count": 0},
     {"item_id": "fiber", "minimum_count": True},
-    {"required_flag": "bad\\nflag"},
+    {"required_flag": chr(1) + "bad"},
 ])
 def test_invalid_goals_are_rejected(args: dict) -> None:
     with pytest.raises(GameplayContractError):
