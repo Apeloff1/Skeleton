@@ -133,6 +133,155 @@ class LongContextSpool:
                     raise LongContextSpoolError("spool component must be a directory")
         except OSError as exc:
             raise LongContextSpoolError("cannot initialize spool directory") from exc
+        # POSIX: pin the actual directory inode, not a path that can be
+        # replaced between an is_symlink check and an open.
+        self._root_fd: int | None = None
+        if os.name == "posix":
+            if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+                raise LongContextSpoolError("secure POSIX directory opens unavailable")
+            flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+            try:
+                root_fd = os.open(self.root, flags)
+                mode = os.fstat(root_fd).st_mode
+                if not stat.S_ISDIR(mode) or mode & 0o022:
+                    raise LongContextSpoolError("insecure spool root permissions")
+                self._root_fd = root_fd
+            except BaseException:
+                if "root_fd" in locals():
+                    os.close(root_fd)
+                raise
+
+    def close(self) -> None:
+        fd = getattr(self, "_root_fd", None)
+        self._root_fd = None
+        if fd is not None:
+            os.close(fd)
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except OSError:
+            pass
+
+    def _open_bucket(self, kind: str, digest: str) -> int:
+        if self._root_fd is None:
+            raise LongContextSpoolError("secure spool root is closed")
+        _digest(digest, "content digest")
+        if kind not in {"object", "checkpoint"}:
+            raise LongContextSpoolError("unknown spool object kind")
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        base_name = "objects" if kind == "object" else "checkpoints"
+        try:
+            base_fd = os.open(base_name, flags, dir_fd=self._root_fd)
+            try:
+                if os.fstat(base_fd).st_mode & 0o022:
+                    raise LongContextSpoolError("insecure spool component")
+                try:
+                    os.mkdir(digest[:2], 0o700, dir_fd=base_fd)
+                except FileExistsError:
+                    pass
+                bucket_fd = os.open(digest[:2], flags, dir_fd=base_fd)
+                if os.fstat(bucket_fd).st_mode & 0o022:
+                    os.close(bucket_fd)
+                    raise LongContextSpoolError("insecure spool bucket")
+                return bucket_fd
+            finally:
+                os.close(base_fd)
+        except OSError as exc:
+            raise LongContextSpoolError("secure spool bucket unavailable") from exc
+
+    def _read_exact_fd(self, path: Path, *, limit: int) -> bytes:
+        try:
+            parts = path.relative_to(self.root).parts
+        except ValueError as exc:
+            raise LongContextSpoolError("spool path escaped pinned root") from exc
+        if len(parts) != 3 or parts[0] not in {"objects", "checkpoints"}:
+            raise LongContextSpoolError("invalid spool path shape")
+        digest = _digest(parts[2], "content digest")
+        if parts[1] != digest[:2]:
+            raise LongContextSpoolError("spool bucket identity mismatch")
+        kind = "object" if parts[0] == "objects" else "checkpoint"
+        bucket_fd = self._open_bucket(kind, digest)
+        try:
+            flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+            fd = os.open(digest, flags, dir_fd=bucket_fd)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise LongContextSpoolError("spool object is not a regular file")
+                with os.fdopen(fd, "rb", closefd=False) as stream:
+                    raw = stream.read(limit + 1)
+            finally:
+                os.close(fd)
+            if len(raw) > limit:
+                raise LongContextSpoolError("spool object exceeds byte budget")
+            return raw
+        except OSError as exc:
+            raise LongContextSpoolError("secure spool read failed") from exc
+        finally:
+            os.close(bucket_fd)
+
+    def _publish_fd(self, kind: str, digest: str, raw: bytes) -> None:
+        bucket_fd = self._open_bucket(kind, digest)
+        try:
+            try:
+                existing = os.open(
+                    digest, os.O_RDONLY | os.O_NOFOLLOW |
+                    getattr(os, "O_NONBLOCK", 0), dir_fd=bucket_fd,
+                )
+            except FileNotFoundError:
+                existing = None
+            if existing is not None:
+                try:
+                    if not stat.S_ISREG(os.fstat(existing).st_mode):
+                        raise LongContextSpoolError("existing object is not regular")
+                    with os.fdopen(existing, "rb", closefd=False) as stream:
+                        observed = stream.read(len(raw) + 1)
+                    if observed != raw:
+                        raise LongContextSpoolError("existing immutable object mismatch")
+                    return
+                finally:
+                    os.close(existing)
+            volume = os.fstatvfs(bucket_fd)
+            free = volume.f_bavail * volume.f_frsize
+            if free < self.disk_reserve_bytes or free - self.disk_reserve_bytes < len(raw):
+                raise LongContextSpoolError("disk reserve prevents spool admission")
+            temp = "." + digest + "." + os.urandom(8).hex() + ".tmp"
+            fd = os.open(
+                temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600, dir_fd=bucket_fd,
+            )
+            try:
+                with os.fdopen(fd, "wb", closefd=False) as stream:
+                    stream.write(raw)
+                    stream.flush()
+                    os.fsync(fd)
+                try:
+                    os.link(
+                        temp, digest, src_dir_fd=bucket_fd,
+                        dst_dir_fd=bucket_fd, follow_symlinks=False,
+                    )
+                except FileExistsError:
+                    existing = os.open(
+                        digest, os.O_RDONLY | os.O_NOFOLLOW |
+                        getattr(os, "O_NONBLOCK", 0), dir_fd=bucket_fd,
+                    )
+                    try:
+                        if not stat.S_ISREG(os.fstat(existing).st_mode):
+                            raise LongContextSpoolError("concurrent object not regular")
+                        with os.fdopen(existing, "rb", closefd=False) as stream:
+                            observed = stream.read(len(raw) + 1)
+                        if observed != raw:
+                            raise LongContextSpoolError("concurrent immutable object mismatch")
+                    finally:
+                        os.close(existing)
+                os.fsync(bucket_fd)
+            finally:
+                os.close(fd)
+                os.unlink(temp, dir_fd=bucket_fd)
+        except OSError as exc:
+            raise LongContextSpoolError("secure spool publication failed") from exc
+        finally:
+            os.close(bucket_fd)
 
     def _path(self, kind: str, digest: str) -> Path:
         _digest(digest, "content digest")
@@ -140,6 +289,8 @@ class LongContextSpool:
         return base / digest[:2] / digest
 
     def _read_exact(self, path: Path, *, limit: int) -> bytes:
+        if os.name == "posix":
+            return self._read_exact_fd(path, limit=limit)
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
@@ -158,6 +309,9 @@ class LongContextSpool:
         return raw
 
     def _publish(self, kind: str, digest: str, raw: bytes) -> None:
+        if os.name == "posix":
+            self._publish_fd(kind, digest, raw)
+            return
         path = self._path(kind, digest)
         try:
             if path.parent.is_symlink():

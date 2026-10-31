@@ -140,6 +140,44 @@ class TestLongContextSpool(unittest.TestCase):
         with self.assertRaises(LongContextSpoolError):
             self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
 
+    def test_posix_bucket_replacement_cannot_redirect_pinned_io(self):
+        if os.name != "posix":
+            self.skipTest("POSIX directory-fd contract")
+        start = self.stage()
+        receipt, _ = self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
+        bucket = self.spool._path("object", receipt.object_digest).parent
+        moved = bucket.with_name(bucket.name + "-saved")
+        bucket.rename(moved)
+        target = Path(self.directory.name) / "untrusted"
+        target.mkdir()
+        bucket.symlink_to(target, target_is_directory=True)
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.load(start, expected_tokenizer_digest=TOKENIZER)
+        self.assertEqual(list(target.iterdir()), [])
+
+    def test_posix_root_replacement_keeps_inode_pinned(self):
+        if os.name != "posix":
+            self.skipTest("POSIX directory-fd contract")
+        start = self.stage()
+        old_root = self.root.with_name("original-root")
+        self.root.rename(old_root)
+        adversary = Path(self.directory.name) / "other-root"
+        adversary.mkdir()
+        self.root.symlink_to(adversary, target_is_directory=True)
+        checkpoint, sequence = self.spool.load(
+            start, expected_tokenizer_digest=TOKENIZER,
+        )
+        self.assertEqual(sequence, self.sequence)
+        self.assertEqual(checkpoint.cursor, 0)
+        self.assertEqual(list(adversary.iterdir()), [])
+
+    def test_posix_closed_root_fails_closed(self):
+        if os.name != "posix":
+            self.skipTest("POSIX directory-fd contract")
+        self.spool.close()
+        with self.assertRaises(LongContextSpoolError):
+            self.spool.stage(self.sequence)
+
     def test_reject_symlinked_root(self):
         if not hasattr(os, "symlink"):
             self.skipTest("symlink unavailable")
