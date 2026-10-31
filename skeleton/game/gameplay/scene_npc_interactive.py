@@ -89,13 +89,23 @@ def play_encounter(
     })
     while current["state"]["phase"] == "active":
         scene = current["state"]["scene"]["state"]
+        if scene["phase"] == "active":
+            available_actions = _candidates(current, "")
+        else:
+            available_actions = [
+                {"kind": "finish", "ending_id": ending["id"]}
+                for ending in current["source"]["endings"]
+                if ending["scene_phase"] == scene["phase"]
+                and set(ending["requires_flags"]) <= set(current["state"]["flags"])
+                and current["state"]["reputation"] >= ending["min_reputation"]
+            ]
         _emit(writer, {
             "event": "prompt", "tick": current["state"]["tick"],
             "scene_id": scene["scene_id"], "scene_phase": scene["phase"],
             "flags": current["state"]["flags"],
             "reputation": current["state"]["reputation"],
             "choices": current["state"]["choices"],
-            "available_actions": _candidates(current, ""),
+            "available_actions": available_actions,
             "state_digest": current["state_digest"],
         })
         for attempt in range(3):

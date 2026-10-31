@@ -31,6 +31,9 @@ def test_player_completes_original_npc_scene_and_gets_replayable_checkpoint():
     events = _events(output)
     assert events[0]["event"] == "started"
     assert events[-1]["event"] == "terminal"
+    terminal_prompt = [e for e in events if e["event"] == "prompt"][-1]
+    assert {"kind": "finish", "ending_id": "rescued"} in terminal_prompt["available_actions"]
+    assert all(a["ending_id"] != "lost" for a in terminal_prompt["available_actions"])
     assert any(e["event"] == "checkpoint" and e["reason"] == "interval"
                for e in events)
     assert verify_encounter(
