@@ -289,7 +289,8 @@ def original_expedition() -> dict[str, Any]:
     first["width"] = 5
     first["walls"] = []
     first["actors"][1]["position"] = [4, 1]
-    first["actors"][1]["max_hp"] = 5
+    first["actors"][1]["max_hp"] = 12
+    first["actors"][1]["attack"] = 5
     first["turn_limit"] = 24
     second = json.loads(json.dumps(first))
     second["arena_id"] = "tide_gate"
