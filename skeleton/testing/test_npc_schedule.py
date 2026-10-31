@@ -170,3 +170,15 @@ def test_resume_appends_without_mutating_prior_snapshot():
     resumed = play(spec, commands()[2:], NpcSession.restore(spec, snapshot))
     assert resumed.state_digest == play(spec, commands()).state_digest
     assert snapshot == first.snapshot()
+
+
+def test_direct_command_construction_cannot_bypass_authority():
+    spec = schedule()
+    for bad in (
+        lambda: NpcCommand("interact", 0, "mira_keeper", "ask_for_lens", None),
+        lambda: NpcCommand("advance", 1, npc_id="forged"),
+        lambda: NpcCommand("advance", True),
+        lambda: NpcCommand("unknown", 0),
+    ):
+        with pytest.raises(GameplayContractError):
+            play(spec, [bad()])

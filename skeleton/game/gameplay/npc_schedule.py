@@ -148,6 +148,19 @@ class NpcCommand:
     interaction_id: str | None = None
     player_id: str | None = None
 
+    def __post_init__(self) -> None:
+        _integer(self.tick, "tick", 0, MAX_HORIZON)
+        if self.kind == "advance":
+            if any(value is not None for value in
+                   (self.npc_id, self.interaction_id, self.player_id)):
+                raise GameplayContractError("unexpected advance authority fields")
+        elif self.kind == "interact":
+            req_id(self.npc_id, "npc_id")
+            req_id(self.interaction_id, "interaction_id")
+            req_id(self.player_id, "player_id")
+        else:
+            raise GameplayContractError("invalid NPC command kind")
+
     @classmethod
     def parse(cls, raw: Any) -> "NpcCommand":
         if type(raw) is not dict or raw.get("kind") not in ("advance", "interact"):
