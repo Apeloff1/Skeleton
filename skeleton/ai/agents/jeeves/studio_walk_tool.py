@@ -1313,3 +1313,63 @@ def execute_dialogue_fork_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_CHECKPOINT_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_checkpoint_request.v1"
+DIALOGUE_CHECKPOINT_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_checkpoint_result.v1"
+
+
+def dialogue_checkpoint_tool_schema() -> dict[str, object]:
+    """Typed, bounded source-verified checkpoint timeline discovery."""
+    return {
+        "name": "studio_dialogue_checkpoints",
+        "description": "Page original NPC quest replay checkpoints for an exact source/session",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_CHECKPOINT_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "offset": {"type": "integer", "minimum": 0, "maximum": 64},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 8},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "expected_session_digest", "actions"],
+        },
+    }
+
+
+def execute_dialogue_checkpoint_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue checkpoints require operator authorization")
+    required = {"schema", "project_id", "expected_source_digest",
+                "expected_session_digest", "actions"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"offset", "limit"}
+            or request.get("schema") != DIALOGUE_CHECKPOINT_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue checkpoint request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_checkpoints import (
+        page_dialogue_checkpoints,
+    )
+    source = read_blueprint(request["project_id"])
+    detail = page_dialogue_checkpoints(
+        source, request["actions"], authorized=True,
+        expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request["expected_session_digest"],
+        offset=request.get("offset", 0), limit=request.get("limit", 8))
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_CHECKPOINT_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

@@ -675,3 +675,19 @@ post-fork NPC scene staging, and ending obligations. No generated speech,
 on-disk mutation, external evidence, or native runtime qualification is
 claimed. Typed Jeeves parity is `execute_dialogue_fork_tool` with schema
 `skeleton.jeeves.studio_dialogue_fork_request.v1`.
+
+## Source-verified dialogue checkpoint timeline
+
+`--project <id> --dialogue-stage --dialogue-actions '<history>'`
+`--dialogue-checkpoints` pages the canonical prefix replay timeline,
+including the initial state. `--dialogue-checkpoint-offset` and
+`--dialogue-checkpoint-limit` (maximum eight) support bounded pagination;
+`--dialogue-checkpoint-expected-session` and
+`--dialogue-expected-digest` prevent stale-source and stale-history
+continuation. Each card includes a verified quest receipt, authored NPC
+scene reference, available next stages, and outstanding ending predicates.
+The zero-based checkpoint indexes correspond to replayed history prefixes;
+to replace the choice at index N, use `--dialogue-fork-index N` with the
+full original history and its exact session lease. Typed Jeeves parity is
+`execute_dialogue_checkpoint_tool` with
+`skeleton.jeeves.studio_dialogue_checkpoint_request.v1`.

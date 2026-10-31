@@ -29,6 +29,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--dialogue-checkpoints", action="store_true",
+                    help="Page source-verified original quest dialogue checkpoints")
+    ap.add_argument("--dialogue-checkpoint-offset", type=int, default=0)
+    ap.add_argument("--dialogue-checkpoint-limit", type=int, default=8)
+    ap.add_argument("--dialogue-checkpoint-expected-session",
+                    help="Exact original quest session digest continuation lease")
     ap.add_argument("--dialogue-fork-index", type=int, default=None,
                     help="Zero-based authored choice checkpoint to replace")
     ap.add_argument("--dialogue-fork-alternative",
@@ -262,6 +268,18 @@ def main(argv: list[str] | None = None) -> int:
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
+        if (args.dialogue_checkpoints and (
+                    args.dialogue_fork_index is not None
+                    or args.dialogue_compare_actions is not None
+                    or args.dialogue_transcript or args.dialogue_commit
+                    or args.dialogue_preview or args.dialogue_restore_stdin
+                    or args.dialogue_export or args.dialogue_import is not None
+                    or args.output is not None)
+                or not args.dialogue_checkpoints and (
+                    args.dialogue_checkpoint_offset != 0
+                    or args.dialogue_checkpoint_limit != 8
+                    or args.dialogue_checkpoint_expected_session is not None)):
+            ap.error("dialogue checkpoint pagination requires --dialogue-checkpoints exclusively")
         if (args.dialogue_fork_index is not None and (
                     args.dialogue_compare_actions is not None or args.dialogue_transcript
                     or args.dialogue_commit or args.dialogue_preview
@@ -335,7 +353,17 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_fork_index is not None:
+            if args.dialogue_checkpoints:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_checkpoints import (
+                    page_dialogue_checkpoints,
+                )
+                result = page_dialogue_checkpoints(
+                    docs, actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    expected_session_digest=args.dialogue_checkpoint_expected_session,
+                    offset=args.dialogue_checkpoint_offset,
+                    limit=args.dialogue_checkpoint_limit)
+            elif args.dialogue_fork_index is not None:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_fork import (
                     fork_dialogue_history,
                 )
@@ -435,7 +463,10 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    if (args.dialogue_fork_index is not None or args.dialogue_fork_alternative is not None
+    if (args.dialogue_checkpoints or args.dialogue_checkpoint_offset != 0
+            or args.dialogue_checkpoint_limit != 8
+            or args.dialogue_checkpoint_expected_session is not None
+            or args.dialogue_fork_index is not None or args.dialogue_fork_alternative is not None
             or args.dialogue_fork_expected_session is not None
             or args.dialogue_fork_preserve_suffix
             or args.dialogue_compare_actions is not None or args.dialogue_transcript
