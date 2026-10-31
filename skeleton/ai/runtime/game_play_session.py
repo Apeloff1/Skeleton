@@ -217,9 +217,49 @@ def fork_play_session(
     return _seal(capsule, session["controls"][:frame] + admitted)
 
 
+def compare_play_sessions(
+    capsule: Mapping[str, Any], left: Any, right: Any,
+) -> dict[str, Any]:
+    """Read-only comparison of independently replayed alternate game histories.
+
+    The first divergent frame is one-based, including the point at which one
+    history ends. Stored avatar positions and victory claims are never trusted
+    without canonical replay against the verified original source capsule.
+    """
+    left_receipt = verify_play_session(capsule, left)
+    right_receipt = verify_play_session(capsule, right)
+    if left_receipt["capsule_sha256"] != right_receipt["capsule_sha256"]:
+        raise GamePlaySessionError("comparison requires the same source capsule")
+    left_controls = left["controls"]
+    right_controls = right["controls"]
+    common = 0
+    for left_frame, right_frame in zip(left_controls, right_controls):
+        if _canonical(left_frame) != _canonical(right_frame):
+            break
+        common += 1
+    identical = common == len(left_controls) == len(right_controls)
+    return {
+        "schema_version": "skeleton.game.play_session.compare.v1",
+        "capsule_sha256": left_receipt["capsule_sha256"],
+        "left_session_sha256": left_receipt["session_sha256"],
+        "right_session_sha256": right_receipt["session_sha256"],
+        "left_frame_count": left_receipt["frame_count"],
+        "right_frame_count": right_receipt["frame_count"],
+        "shared_prefix_frames": common,
+        "first_divergent_frame": None if identical else common + 1,
+        "identical_history": identical,
+        "left_avatar": left["final_avatar"],
+        "right_avatar": right["final_avatar"],
+        "left_victory_frame": left_receipt["victory_frame"],
+        "right_victory_frame": right_receipt["victory_frame"],
+        "source_bound_replay_verified": True,
+        "native_renderer_used": False,
+    }
+
+
 __all__ = [
     "SCHEMA", "MAX_FRAMES", "MAX_BATCH_FRAMES", "GamePlaySessionError",
     "start_play_session", "resume_play_session", "verify_play_session",
     "render_play_session", "inspect_play_frame", "render_play_frame",
-    "fork_play_session",
+    "fork_play_session", "compare_play_sessions",
 ]

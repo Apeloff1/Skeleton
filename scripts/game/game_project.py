@@ -33,7 +33,7 @@ from skeleton.ai.runtime.gameplay_capabilities import (
 from skeleton.ai.runtime.game_play_session import (
     GamePlaySessionError, start_play_session, resume_play_session,
     verify_play_session, render_play_session, render_play_frame,
-    fork_play_session,
+    fork_play_session, compare_play_sessions,
 )
 from skeleton.ai.runtime.game_play_bundle import (
     GamePlayBundleError, pack_play_bundle, verify_play_bundle,
@@ -158,6 +158,8 @@ def _parser() -> argparse.ArgumentParser:
                             help="replay and render a verified saved frame without changing it")
     operations.add_argument("--fork-play-session", type=Path,
                             help="create an independent save with alternate inputs at a verified frame")
+    operations.add_argument("--compare-play-sessions", type=Path,
+                            help="compare two independently verified alternate game histories")
     operations.add_argument("--export-play-bundle", type=Path,
                             help="package a verified original capsule and save for offline transfer")
     operations.add_argument("--verify-play-bundle", type=Path,
@@ -186,6 +188,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="JSON object containing a bounded controls array")
     parser.add_argument("--session-capsule", type=Path,
                         help="original capsule for session resume/verification")
+    parser.add_argument("--other-session", type=Path,
+                        help="second saved history for --compare-play-sessions")
     parser.add_argument("--save-session", type=Path,
                         help="write a new exclusive offline session JSON file")
     parser.add_argument("--bundle-output", type=Path,
@@ -213,7 +217,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.play_capsule, args.resume_play_session,
         args.verify_play_session, args.render_play_session,
         args.inspect_play_frame, args.fork_play_session,
-        args.terminal_play_capsule, args.terminal_resume_session,
+        args.compare_play_sessions, args.terminal_play_capsule, args.terminal_resume_session,
     ))
     bundling = any(value is not None for value in (
         args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
@@ -222,6 +226,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     seeking = any(value is not None for value in (
         args.inspect_play_frame, args.fork_play_session, args.fork_play_bundle,
     ))
+    if (args.other_session is not None) != (args.compare_play_sessions is not None):
+        print("--other-session is required only for session comparison", file=sys.stderr)
+        return 2
     if (seeking != (args.at_frame is not None)):
         print("--at-frame is required only for timeline inspection or forks", file=sys.stderr)
         return 2
@@ -336,6 +343,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "output_path": output_path,
                     "rendered_grid": render_play_session(capsule, session)["grid"],
                 }
+            elif args.compare_play_sessions is not None:
+                report = compare_play_sessions(
+                    capsule, _read_json(args.compare_play_sessions),
+                    _read_json(args.other_session),
+                )
             elif args.verify_play_session is not None:
                 report = verify_play_session(capsule, _read_json(args.verify_play_session))
             elif args.render_play_session is not None:
