@@ -1,8 +1,8 @@
-"""Import-free audit of IdempotencyGuard replay/remember handlers.
+"""Import-free audit of direct and decorated IdempotencyGuard handlers.
 
-Materialise, archetype, and GameForge mutate routes remember responses keyed
-by the idempotency header. This snapshot lists those call sites without
-importing the API package or changing replay semantics.
+Materialise, archetype, and GameForge routes use replay/remember or the
+operation/complete decorator. Both paths are audited without importing the API
+package or changing replay semantics.
 """
 
 from __future__ import annotations
@@ -37,8 +37,8 @@ def idempotency_audit_snapshot() -> dict[str, object]:
         "kind": IDEMPOTENCY_AUDIT_KIND,
         "handlers": rows,
         "keys": [str(row["key"]) for row in rows],
-        "missing_remember": [str(row["key"]) for row in rows if row["replay"] and not row["remember"]],
-        "missing_replay": [str(row["key"]) for row in rows if row["remember"] and not row["replay"]],
+        "missing_remember": [str(row["key"]) for row in rows if not row["remember"]],
+        "missing_replay": [str(row["key"]) for row in rows if not row["replay"]],
     }
 
 
