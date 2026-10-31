@@ -52,7 +52,8 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
-    campaign    Play an original deterministic offline grid campaign\n    game        Build a playable Godot project from a natural-language brief
+    campaign    Play an original deterministic offline grid campaign
+    game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
     forge       Blueprint compilation and materialization
