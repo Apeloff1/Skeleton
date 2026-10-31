@@ -56,12 +56,19 @@ Chroma container. Keep the backup outside the repository:
 ```bash
 docker stop tutolage-chroma
 python scripts/chroma_backup.py --output "$HOME/chroma-custody-backup"
+python scripts/chroma_backup.py --verify "$HOME/chroma-custody-backup"
 ```
 
 This reads the stopped container's `/data` and legacy
 `/chroma/chroma` mount separately, records bounded SHA-256 file manifests,
 rechecks container identity and mounts, and refuses existing destinations,
-links, unsafe state and unexpected mounts. It does **not** remove the
+links, unsafe state and unexpected mounts. It rejects restarts during copying
+and uses no-replace publication so a concurrently created destination is not
+overwritten. Offline `--verify` rehashes both copied stores and rejects missing,
+modified, extra or linked files. A matching unsigned manifest does not prove
+authenticity, SQLite consistency, source authority or safety of restoration.
+Use the supported Linux or WSL filesystem path for this procedure; native
+Windows ownership and ACL semantics have not been qualified. It does **not** remove the
 container, change volume mounts, restore data, prove SQLite consistency or
 authorize `--full` startup. Verified restore, database integrity, writer
 fencing and recreation evidence remain mandatory before migration acceptance.
