@@ -134,7 +134,10 @@ class CraftPlan:
                 "recipe_id", "consumes", "produces", "currency_cost", "requires", "grants",
             }:
                 raise GameplayContractError("invalid recipe record")
-            if not all(isinstance(raw[name], list) for name in ("consumes", "produces", "requires", "grants")):
+            if not all(
+                isinstance(raw[name], list)
+                for name in ("consumes", "produces", "requires", "grants")
+            ):
                 raise GameplayContractError("invalid recipe collections")
             recipes.append(CraftRecipe(
                 raw["recipe_id"], tuple(raw["consumes"]), tuple(raw["produces"]),
