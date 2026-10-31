@@ -42,6 +42,10 @@ from skeleton.ai.runtime.game_play_bundle import (
 )
 from skeleton.ai.runtime.game_play_terminal import run_terminal_play
 from skeleton.ai.runtime.game_input_profile import validate_terminal_input_profile
+from skeleton.ai.runtime.game_play_challenge import (
+    GameChallengeError, pack_play_score, verify_play_score,
+    rank_play_scores, verify_play_board,
+)
 
 MAX_INPUT_BYTES = 96 * 1024
 MAX_RESULT_BYTES = 160 * 1024
@@ -173,6 +177,14 @@ def _parser() -> argparse.ArgumentParser:
                             help="append controller frames to a verified portable bundle")
     operations.add_argument("--fork-play-bundle", type=Path,
                             help="create a portable alternate timeline from a verified bundle")
+    operations.add_argument("--score-play-session", type=Path,
+                            help="score a real source-bound game save against local challenge rules")
+    operations.add_argument("--verify-play-score", type=Path,
+                            help="replay and verify a portable local challenge score")
+    operations.add_argument("--rank-play-scores", action="store_true",
+                            help="rank up to eight verified local challenge scores")
+    operations.add_argument("--verify-play-board", type=Path,
+                            help="replay and verify every entry of an offline challenge board")
     operations.add_argument("--catalog", action="store_true",
                             help="catalog targets, not fictional native build support")
     operations.add_argument("--plan", type=Path,
@@ -203,6 +215,14 @@ def _parser() -> argparse.ArgumentParser:
                         help="write a new exclusive offline session JSON file")
     parser.add_argument("--bundle-output", type=Path,
                         help="exclusive new output for a portable play bundle")
+    parser.add_argument("--challenge-policy", type=Path,
+                        help="strict JSON scoring rules for --score-play-session")
+    parser.add_argument("--score-output", type=Path,
+                        help="exclusive new score receipt output")
+    parser.add_argument("--score-input", type=Path, action="append",
+                        help="repeat for each verified score to rank (maximum eight)")
+    parser.add_argument("--board-output", type=Path,
+                        help="exclusive new offline challenge board output")
     parser.add_argument("--output", type=Path,
                         help="exclusive new file for --compose")
     parser.add_argument("--seed", type=int, default=1729,
@@ -229,7 +249,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.compare_play_sessions, args.render_play_comparison,
         args.inspect_play_trace,
         args.terminal_play_capsule, args.terminal_resume_session,
-    ))
+        args.score_play_session, args.verify_play_score, args.verify_play_board,
+    )) or args.rank_play_scores
     bundling = any(value is not None for value in (
         args.export_play_bundle, args.verify_play_bundle, args.resume_play_bundle,
         args.fork_play_bundle,
@@ -251,6 +272,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if (seeking != (args.at_frame is not None)):
         print("--at-frame is required only for timeline inspection or forks", file=sys.stderr)
+        return 2
+    scoring = args.score_play_session is not None
+    ranking = args.rank_play_scores
+    if ((args.challenge_policy is not None) != scoring
+            or (args.score_output is not None) != scoring):
+        print("challenge policy and score output require --score-play-session",
+              file=sys.stderr)
+        return 2
+    if (bool(args.score_input) != ranking
+            or (args.board_output is not None) != ranking):
+        print("score inputs and board output require --rank-play-scores",
+              file=sys.stderr)
         return 2
     if args.terminal_input_profile is not None and not terminal:
         print("--terminal-input-profile requires terminal play", file=sys.stderr)
@@ -340,7 +373,31 @@ def main(argv: Sequence[str] | None = None) -> int:
             capsule = _read_json(
                 args.play_capsule or args.terminal_play_capsule or args.session_capsule,
             )
-            if terminal:
+            if args.score_play_session is not None:
+                policy = _read_json(args.challenge_policy, max_bytes=4096)
+                saved = _read_json(args.score_play_session)
+                score = pack_play_score(capsule, saved, policy)
+                receipt = verify_play_score(capsule, score)
+                report = {
+                    **receipt, "output_path": _write_new(args.score_output, score),
+                }
+            elif args.verify_play_score is not None:
+                score = _read_json(args.verify_play_score, max_bytes=MAX_RESULT_BYTES)
+                report = verify_play_score(capsule, score)
+            elif args.rank_play_scores:
+                scores = [
+                    _read_json(candidate, max_bytes=MAX_RESULT_BYTES)
+                    for candidate in args.score_input
+                ]
+                board = rank_play_scores(capsule, scores)
+                receipt = verify_play_board(capsule, board)
+                report = {
+                    **receipt, "output_path": _write_new(args.board_output, board),
+                }
+            elif args.verify_play_board is not None:
+                board = _read_json(args.verify_play_board, max_bytes=MAX_RESULT_BYTES)
+                report = verify_play_board(capsule, board)
+            elif terminal:
                 previous = (
                     _read_json(args.terminal_resume_session)
                     if args.terminal_resume_session is not None else None
@@ -465,7 +522,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             report = verify_game_capsule(_read_json(args.verify_capsule))
         print(json.dumps(report, sort_keys=True, ensure_ascii=True))
         return 0
-    except (GamePlayBundleError, GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
+    except (GameChallengeError, GamePlayBundleError, GamePlaySessionError, GameCapsuleError, GamePlatformError, GameRightsError,
             GameplayError, ValueError, TypeError, KeyError, OSError) as exc:
         print(
             "cross-era game project rejected: " + type(exc).__name__ + ": " + str(exc),
