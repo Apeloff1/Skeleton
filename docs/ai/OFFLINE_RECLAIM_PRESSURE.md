@@ -27,3 +27,6 @@ cancellation and recovery on each target platform.
 The pressure hold constrains the **aggregate** in-process stream-slot budget,
 not only each request's stream count. Already running streams are allowed to
 finish or cancel; new work cannot overbook the held capacity.
+
+For long staged reads, the fabric also re-samples reclaim counters every 16
+bounded mmap windows and aborts without a successful receipt if a hold appears.

@@ -138,6 +138,39 @@ class ReclaimControllerTests(unittest.TestCase):
 
 
 class ResourceFabricIntegrationTests(unittest.TestCase):
+    def test_active_reclaim_hold_aborts_long_read_without_partial_receipt(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "large.bin").write_bytes(b"x" * (18 * 1024 * 1024))
+            fabric = AdaptiveResourceFabric(root)
+            fabric._reclaim.observe(
+                sample(0, 0), physical_ram_bytes=4096 * 10000, now_ns=1_000_000_000,
+            )
+            fabric._reclaim.observe(
+                sample(1000, 0), physical_ram_bytes=4096 * 10000, now_ns=2_000_000_000,
+            )
+            probes = [
+                patch("skeleton.app.offline_resource_fabric.probe_local_resources", return_value=host()),
+                patch("skeleton.app.offline_resource_fabric.probe_gpu_resources", return_value=()),
+                patch("skeleton.app.offline_resource_fabric.probe_reclaim_counters", return_value=None),
+                patch("skeleton.app.offline_resource_fabric.probe_cgroup_events", return_value=None),
+                patch("skeleton.app.offline_resource_fabric.probe_io_pressure", return_value=None),
+                patch("skeleton.app.offline_resource_fabric.probe_cpu_throttle", return_value=None),
+                patch("skeleton.app.offline_resource_fabric.probe_swap_counters", return_value=None),
+                patch("skeleton.app.offline_resource_fabric.probe_cpu_thermal", return_value=()),
+            ]
+            for guard in probes:
+                guard.start()
+                self.addCleanup(guard.stop)
+            from skeleton.app.offline_resources import LocalResourcePressure
+            with self.assertRaisesRegex(LocalResourcePressure, "kernel reclaim"):
+                fabric.stream_readonly(root, ("large.bin",))
+            controller = fabric.monitor()["controller"]
+            self.assertEqual(controller["completed_stream_batches"], 0)
+            self.assertEqual(controller["failed_stream_batches"], 1)
+            self.assertEqual(controller["active_streams"] if "active_streams" in controller else
+                             fabric.monitor()["active_streams"], 0)
+
     def test_real_plan_reduces_streams_and_vetoes_shared_gpu_when_reclaiming(self):
         with TemporaryDirectory() as directory:
             fabric = AdaptiveResourceFabric(directory)

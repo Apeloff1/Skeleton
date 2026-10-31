@@ -902,8 +902,16 @@ class AdaptiveResourceFabric:
                             with self._lock:
                                 self._stream_pressure_rechecks += 1
                             self._cgroup.sample(probe_cgroup_events())
+                            self._reclaim.observe(
+                                probe_reclaim_counters(),
+                                physical_ram_bytes=live.total_ram_bytes,
+                            )
                             if self._cgroup.snapshot()["oom_backpressure"]:
                                 raise LocalResourcePressure("cgroup OOM during staged read")
+                            if self._reclaim.snapshot()["backpressure"]:
+                                raise LocalResourcePressure(
+                                    "kernel reclaim or major faults during staged read"
+                                )
                             if live.available_ram_bytes < 2 * live.read_chunk_bytes:
                                 raise LocalResourcePressure(
                                     "physical RAM headroom fell during staged read"
