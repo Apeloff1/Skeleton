@@ -2091,7 +2091,7 @@
       "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "c7e8ec2ff0fc605e62e3bbc32bfeb8ce6a8c3549",
+      "source_git_object_sha": "589748c9ddda342775f8b9fff8746ba7e07d1407",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -5449,7 +5449,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "c08dc5b7977ab7ce5ddaf5aa83f75efc194fbdc9",
+      "source_git_object_sha": "feeec724d4da5d17495b5c2227a9addd674deb44",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"
