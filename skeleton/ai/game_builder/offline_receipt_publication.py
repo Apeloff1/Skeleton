@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from hashlib import sha256
 import hmac
-import json
 import os
 from pathlib import Path
 import re
@@ -18,7 +17,7 @@ from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
 from .dual_runtime_verify import (
-    DualRuntimeVerificationError, _assert_original_root, _root_fd,
+    DualRuntimeVerificationError, _assert_original_root, _canonical_bytes, _root_fd,
 )
 
 _MAX_RECEIPT_BYTES = 256 * 1024
@@ -56,10 +55,7 @@ def publish_verified_receipt(
                 or not hmac.compare_digest(digest, canonical_digest(body))):
             raise ReceiptPublicationError("verified receipt digest is inconsistent")
     try:
-        data = (json.dumps(
-            receipt, ensure_ascii=False, sort_keys=True,
-            separators=(",", ":"), allow_nan=False,
-        ) + "\n").encode("utf-8")
+        data = _canonical_bytes(receipt)
     except (TypeError, ValueError, UnicodeError) as exc:
         raise ReceiptPublicationError("receipt is not canonical JSON") from exc
     if len(data) > _MAX_RECEIPT_BYTES:

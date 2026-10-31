@@ -300,6 +300,8 @@ def test_verify_export_cli_publishes_no_clobber_receipt(package, tmp_path, capsy
     assert main(command) == 0
     payload = json.loads(capsys.readouterr().out)
     assert json.loads(receipt_file.read_text()) == payload
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+    assert receipt_file.read_bytes() == _canonical_bytes(payload)
     assert receipt_file.stat().st_mode & 0o077 == 0
     assert main(command) == 2
     assert json.loads(receipt_file.read_text()) == payload

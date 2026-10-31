@@ -51,7 +51,7 @@ def inspect_verified_receipt(
         if not hmac.compare_digest(sha256(raw).hexdigest(), expected_sha256):
             raise ReceiptInspectionError("receipt differs from independent pin")
         payload = _json(raw, _MAX_RECEIPT_BYTES)
-        if raw != _canonical_bytes(payload) + b"\n":
+        if raw != _canonical_bytes(payload):
             raise ReceiptInspectionError("noncanonical receipt bytes")
         kind = payload.get("schema")
         if kind not in _SUPPORTED:
