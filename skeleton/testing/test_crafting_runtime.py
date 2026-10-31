@@ -133,3 +133,73 @@ def test_interactive_play_and_resume(tmp_path: Path) -> None:
     assert json.loads(b.read_text())["state"]["inventory"] == [
         ["fiber", 2], ["lantern", 1], ["oil", 1],
     ]
+
+
+def test_original_fixture_source_to_save_to_verify(tmp_path: Path) -> None:
+    fixture = Path(__file__).resolve().parents[2] / "docs" / "game" / "fixtures"
+    plan_file = fixture / "lantern_harbor_crafting.json"
+    actions_file = fixture / "lantern_harbor_crafting_actions.json"
+    save = tmp_path / "original-save.json"
+    command = [sys.executable, "-m", "skeleton.game.gameplay.crafting_cli"]
+    run = subprocess.run(command + ["run", "--plan", str(plan_file), "--actions",
+                                    str(actions_file), "--save", str(save)],
+                         capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout)["state"]["flags"] == ["light_available", "wick_known"]
+    verified = subprocess.run(command + ["verify", "--plan", str(plan_file),
+                                         "--save", str(save)], capture_output=True, text=True)
+    assert verified.returncode == 0, verified.stderr
+
+
+def test_identical_actions_produce_identical_portable_save_bytes(tmp_path: Path) -> None:
+    p = tmp_path / "plan.json"
+    a = tmp_path / "actions.json"
+    p.write_text(json.dumps(plan().record()))
+    a.write_text(json.dumps([action.record() for action in actions()]))
+    command = [sys.executable, "-m", "skeleton.game.gameplay.crafting_cli",
+               "run", "--plan", str(p), "--actions", str(a)]
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    assert subprocess.run(command + ["--save", str(first)], capture_output=True).returncode == 0
+    assert subprocess.run(command + ["--save", str(second)], capture_output=True).returncode == 0
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_duplicate_keys_and_symlink_inputs_rejected(tmp_path: Path) -> None:
+    import os
+    p = tmp_path / "bad.json"
+    p.write_text('{"schema_version":1,"schema_version":1}')
+    command = [sys.executable, "-m", "skeleton.game.gameplay.crafting_cli",
+               "inspect", "--plan"]
+    result = subprocess.run(command + [str(p)], capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "duplicate" in result.stderr
+    if not hasattr(os, "O_NOFOLLOW"):
+        pytest.skip("platform cannot qualify O_NOFOLLOW symlink rejection")
+    real = tmp_path / "real.json"
+    real.write_text(json.dumps(plan().record()))
+    link = tmp_path / "link.json"
+    link.symlink_to(real)
+    assert subprocess.run(command + [str(link)], capture_output=True).returncode == 2
+
+
+def test_batch_bounds_and_no_funds_cannot_mint() -> None:
+    with pytest.raises(GameplayContractError):
+        CraftAction(0, "make_wick", 101)
+    low = CraftPlan("harbor", plan().recipes, plan().initial_inventory, 0)
+    with pytest.raises(GameplayContractError):
+        CraftEngine(low).replay([CraftAction(0, "make_wick")])
+    assert CraftEngine(low).start().inventory == low.initial_inventory
+
+
+def test_failed_no_clobber_preserves_existing_save(tmp_path: Path) -> None:
+    p = tmp_path / "plan.json"
+    a = tmp_path / "actions.json"
+    save = tmp_path / "existing.json"
+    p.write_text(json.dumps(plan().record()))
+    a.write_text(json.dumps([action.record() for action in actions()]))
+    save.write_text("do not overwrite")
+    command = [sys.executable, "-m", "skeleton.game.gameplay.crafting_cli",
+               "run", "--plan", str(p), "--actions", str(a), "--save", str(save)]
+    assert subprocess.run(command, capture_output=True).returncode == 2
+    assert save.read_text() == "do not overwrite"
