@@ -548,9 +548,41 @@ def _copy_pinned_assets(
     (destination / "model").mkdir(mode=0o700)
     (destination / "runtime").mkdir(mode=0o700)
     root_fd: int | None = None
-    if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
-        root_fd = _open_directory_without_symlink_parents(kit)
+    destination_fd: int | None = None
+    destination_children: dict[str, int] = {}
+
+    def assert_destination_pinned() -> None:
+        """Reject renamed or replaced destination directories around each write."""
+        if destination_fd is None:
+            return
+        try:
+            current_fd = _open_directory_without_symlink_parents(destination)
+            try:
+                current, original = os.fstat(current_fd), os.fstat(destination_fd)
+                if (current.st_dev, current.st_ino) != (original.st_dev, original.st_ino):
+                    raise OfflineKitError("copied model destination changed during write")
+            finally:
+                os.close(current_fd)
+            for prefix, pinned_fd in destination_children.items():
+                current = os.stat(prefix, dir_fd=destination_fd, follow_symlinks=False)
+                original = os.fstat(pinned_fd)
+                if (not stat.S_ISDIR(current.st_mode)
+                        or (current.st_dev, current.st_ino) !=
+                           (original.st_dev, original.st_ino)):
+                    raise OfflineKitError("copied model destination changed during write")
+        except OSError as exc:
+            raise OfflineKitError("copied model destination changed during write") from exc
+
     try:
+        if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+            root_fd = _open_directory_without_symlink_parents(kit)
+            destination_fd = _open_directory_without_symlink_parents(destination)
+            for prefix in ("model", "runtime"):
+                destination_children[prefix] = os.open(
+                    prefix, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=destination_fd,
+                )
+            assert_destination_pinned()
         # Inventory the two source directories before copying. Extra files
         # must never silently enter a consumer installation.
         for prefix in ("model", "runtime"):
@@ -618,7 +650,17 @@ def _copy_pinned_assets(
                     raise OfflineKitError("unsafe or changed local model artifact")
                 digest = hashlib.sha256()
                 output = destination / relative
-                with output.open("xb") as writer:
+                if destination_fd is not None:
+                    assert_destination_pinned()
+                    parts = _relative(relative).parts
+                    descriptor = os.open(
+                        parts[-1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                        0o600, dir_fd=destination_children[parts[0]],
+                    )
+                    writer_stream = os.fdopen(descriptor, "wb")
+                else:
+                    writer_stream = output.open("xb")
+                with writer_stream as writer:
                     while True:
                         chunk = reader.read(1024 * 1024)
                         if not chunk:
@@ -632,6 +674,7 @@ def _copy_pinned_assets(
                             writer.fileno(),
                             stat.S_IMODE(before.st_mode) & 0o755,
                         )
+                assert_destination_pinned()
                 after = os.fstat(reader.fileno())
                 identity = lambda value: (
                     value.st_dev, value.st_ino, value.st_size,
@@ -645,6 +688,10 @@ def _copy_pinned_assets(
     except OSError as exc:
         raise OfflineKitError("unable to copy verified local model artifacts") from exc
     finally:
+        for descriptor in destination_children.values():
+            os.close(descriptor)
+        if destination_fd is not None:
+            os.close(destination_fd)
         if root_fd is not None:
             os.close(root_fd)
 

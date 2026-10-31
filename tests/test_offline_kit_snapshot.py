@@ -467,3 +467,41 @@ def test_copied_asset_verifier_rejects_mutated_bytes_and_unbounded_metadata(tmp_
             root, "model/deployment.json",
             {"size_bytes": 65537, "sha256": "0" * 64}, capture_metadata=True,
         )
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-relative destination")
+def test_model_copy_rejects_swapped_destination_without_writing_outside(tmp_path, monkeypatch):
+    """A swapped destination symlink cannot redirect pinned model bytes."""
+    root, manifest, _ = _verifiable_kit(tmp_path)
+    (root / "model").mkdir()
+    (root / "runtime").mkdir()
+    for relative, content in (
+        ("model/deployment.json", b"{}"),
+        ("model/model.gguf", b"pinned model bytes"),
+        ("runtime/llama-cli", b"pinned runtime bytes"),
+    ):
+        (root / relative).write_bytes(content)
+    manifest["files"] = offline_kit._files(root)
+    destination = tmp_path / "installed" / "offline_model"
+    destination.parent.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    original_open = os.open
+    swapped = False
+
+    def swap_on_create(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped
+        if (path == "model.gguf" and flags & os.O_EXCL
+                and dir_fd is not None and not swapped):
+            swapped = True
+            (destination / "model").rename(destination / "model-original")
+            (destination / "model").symlink_to(outside, target_is_directory=True)
+        if dir_fd is None:
+            return original_open(path, flags, mode)
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(offline_kit.os, "open", swap_on_create)
+    with pytest.raises(offline_kit.OfflineKitError, match="destination changed"):
+        offline_kit._copy_pinned_assets(root, manifest, destination)
+    assert swapped
+    assert list(outside.iterdir()) == []
