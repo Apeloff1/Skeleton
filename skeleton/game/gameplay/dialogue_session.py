@@ -38,12 +38,14 @@ def validate_source(value: Any) -> dict:
         _id(source[key])
     ends = source["ending_ids"]
     nodes = source["nodes"]
-    if type(ends) is not list or not 1 <= len(ends) <= 64 or len(set(ends)) != len(ends):
+    if type(ends) is not list or not 1 <= len(ends) <= 64:
         raise DialogueSessionError("invalid ending IDs")
     if type(nodes) is not list or not 1 <= len(nodes) <= 64:
         raise DialogueSessionError("invalid dialogue node count")
     for ending in ends:
         _id(ending)
+    if len(set(ends)) != len(ends):
+        raise DialogueSessionError("duplicate ending IDs")
     typed = []
     names = []
     for raw in nodes:
@@ -61,10 +63,12 @@ def validate_source(value: Any) -> dict:
                 {"id", "target", "requires", "grants", "reputation_delta"})
             for field in ("requires", "grants"):
                 flags = choice[field]
-                if type(flags) is not list or len(flags) > 64 or len(set(flags)) != len(flags):
+                if type(flags) is not list or len(flags) > 64:
                     raise DialogueSessionError("invalid dialogue flags")
                 for flag in flags:
                     _id(flag)
+                if len(set(flags)) != len(flags):
+                    raise DialogueSessionError("duplicate dialogue flags")
             delta = choice["reputation_delta"]
             if type(delta) is not int or not -20 <= delta <= 20:
                 raise DialogueSessionError("invalid reputation delta")

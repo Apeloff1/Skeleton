@@ -89,6 +89,10 @@ def test_invalid_source_rejected(source):
     malformed["unknown_authority"] = "provider"
     with pytest.raises(DialogueSessionError, match="fields"):
         validate_source(malformed)
+    malformed = deepcopy(source)
+    malformed["nodes"][0]["choices"][0]["requires"] = [{"not": "a flag"}]
+    with pytest.raises(DialogueSessionError, match="id"):
+        validate_source(malformed)
 
 def test_cli_play_verify_resume_and_exclusive_output(tmp_path, capsys, source):
     path = tmp_path / "source.json"
