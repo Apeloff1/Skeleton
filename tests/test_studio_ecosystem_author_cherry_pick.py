@@ -114,7 +114,7 @@ def test_cli_cherry_pick_verified_bundles_and_rejects_malformed_paths(tmp_path, 
     with pytest.raises(SystemExit):
         main(["--project", PROJECT, "--cherry-pick-revision",
               "--revision-compare-source", str(donor_dir),
-              "--cherry-pick-paths", "[[\\\"narrative\\\",\\\"premise\\\"],[\\\"narrative\\\",\\\"premise\\\"]]",
+              "--cherry-pick-paths", json.dumps([PREMISE, PREMISE]),
               "--output", str(tmp_path / "rejected")])
     assert not (tmp_path / "rejected").exists()
 
@@ -145,3 +145,18 @@ def test_jeeves_cherry_pick_typed_preview_rejects_untrusted_requests():
     conflict = {**request, "target_edits": request["donor_edits"]}
     with pytest.raises(StudioQuestError):
         execute_author_cherry_pick_tool(conflict, authorized=True)
+
+def test_cherry_pick_rejects_protected_target_mutation_and_receipt_tampering(tmp_path):
+    base, (donor, _, _), (target, _, _) = branches()
+    forged_target = deepcopy(target)
+    forged_target["quest"]["stage_graph"][0]["reward"] = "unapproved_reward"
+    with pytest.raises(StudioQuestError, match="protected"):
+        cherry_pick_canon_revision(base, donor, forged_target, [PREMISE],
+                                   authorized=True)
+    revised, html, receipt, _ = cherry_pick_canon_revision(
+        base, donor, target, [PREMISE], authorized=True)
+    forged_receipt = deepcopy(receipt)
+    forged_receipt["cherry_pick_provenance"]["selected_count"] = 2
+    with pytest.raises(StudioQuestError, match="drift"):
+        write_revision_bundle(tmp_path / "forged", revised, html, forged_receipt)
+    assert not (tmp_path / "forged").exists()
