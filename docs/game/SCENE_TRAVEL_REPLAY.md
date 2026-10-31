@@ -75,3 +75,24 @@ script execution or remote asset fetch is involved.
 Focused tests also include:
 
     python -m pytest -q skeleton/testing/test_scene_route_solver.py
+
+## Replay-proven alternate-ending and scene coverage audit
+
+\`python -m skeleton scene-travel audit --demo\` traverses actual
+source-authorized gameplay transitions, reporting shortest replayable
+witnesses for victory, failure and draw, along with visited scene
+coverage and unobserved authored scenes. Imported checkpoints can be
+audited with \`--session-json\` after complete journal verification.
+Every witness includes the initial source/state digest and final state
+digest, and can be replayed through the canonical scene engine.
+
+The audit preserves a strict distinction between **not reached** and
+**inconclusive**: if \`--max-states\` or \`--max-depth\` truncates the
+search, missing endings are not falsely declared impossible. Unlike
+the victory-only route solver, the state key includes the tick so
+turn-budget-dependent draw outcomes remain observable. Exploration
+is bounded to at most 4096 states and 512 steps; no scripts or provider
+calls execute.
+
+Focused regression: \`python -m pytest
+skeleton/testing/test_scene_ending_audit.py -q\`.
