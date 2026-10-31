@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_salt_dunes",
+  "title": "Salt Dunes: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610302936,
+  "width": 25,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 5
+}

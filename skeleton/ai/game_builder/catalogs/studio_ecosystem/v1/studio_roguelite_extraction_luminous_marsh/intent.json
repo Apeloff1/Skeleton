@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_luminous_marsh",
+  "title": "Luminous Marsh: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610302868,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 5
+}

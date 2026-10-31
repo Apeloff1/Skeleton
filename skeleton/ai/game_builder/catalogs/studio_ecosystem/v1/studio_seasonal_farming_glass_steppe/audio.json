@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "project_id": "studio_seasonal_farming_glass_steppe",
+  "genre": "seasonal_farming",
+  "biome": "glass_steppe",
+  "release_certified": false,
+  "sound_design": {
+    "acoustics": "glass chimes",
+    "genre": "seasonal_farming",
+    "tempo_bpm": 130,
+    "meter": "4/4",
+    "tonality": "bright",
+    "rendered": false
+  },
+  "sound_layers": [
+    {
+      "id": "ambient",
+      "trigger": "outdoor_glass_steppe",
+      "source": "Original environmental Foley emphasizing glass chimes",
+      "spatial": "outdoor_binaural",
+      "ducking": "below_dialogue"
+    },
+    {
+      "id": "mechanic",
+      "trigger": "cultivate",
+      "source": "Percussive feedback to soil health, rotation, weather and food preservation",
+      "spatial": "diegetic_close",
+      "ducking": "below_warning"
+    },
+    {
+      "id": "risk",
+      "trigger": "glass-shard gales",
+      "source": "Nonverbal hazard escalation for abrasion",
+      "spatial": "wide_dynamic",
+      "ducking": "priority_warning"
+    },
+    {
+      "id": "resolution",
+      "trigger": "verified_branch",
+      "source": "Original acoustic theme varying with soil nutrients and stored seed stewardship",
+      "spatial": "narrative_bus",
+      "ducking": "dialogue_priority"
+    }
+  ],
+  "dialogue_voice": {
+    "casts": [
+      "protagonist",
+      "witness",
+      "technician",
+      "rival"
+    ],
+    "performance_requirement": "new_original_voice_material",
+    "localized_content": "not_recorded"
+  },
+  "audio_accessibility": [
+    "complete_captions",
+    "no_audio_only_navigation",
+    "adjustable_mixer",
+    "dynamic_range_modes"
+  ],
+  "audio_processing": {
+    "cpu_budget": "runtime_measured",
+    "compression": "hardware_profile_adaptive",
+    "sample_quality": "audited_per_target"
+  }
+}

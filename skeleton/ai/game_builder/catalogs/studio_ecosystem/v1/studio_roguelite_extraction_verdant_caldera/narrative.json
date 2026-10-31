@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_roguelite_extraction_verdant_caldera",
+  "genre": "roguelite_extraction",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Verdant Caldera: Roguelite Extraction",
+  "foundation": {
+    "setting": "Verdant Caldera",
+    "era": "early reconstruction",
+    "environment": "stepped jungle terraces",
+    "history": "A forgotten hanging botanical lab once protected mineral terraces, until recurring geothermal plumes forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Amea Lark, a delver, must retrieve the endangered survey archive, relying on risk and retreat despite geothermal plumes.",
+  "central_conflict": "a hostile salvage crew threatens the hanging botanical lab by restricting mineral terraces.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "geothermal plumes destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a hostile salvage crew contests access to mineral terraces",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The hanging botanical lab becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers mineral terraces"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "hanging botanical lab",
+    "critical_resource": "mineral terraces",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

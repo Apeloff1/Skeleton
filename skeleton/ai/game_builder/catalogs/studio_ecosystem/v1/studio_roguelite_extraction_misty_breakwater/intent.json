@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_misty_breakwater",
+  "title": "Misty Breakwater: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610303021,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 6
+}

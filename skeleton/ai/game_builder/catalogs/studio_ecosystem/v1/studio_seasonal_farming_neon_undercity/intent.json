@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_neon_undercity",
+  "title": "Neon Undercity: The Four Harvests",
+  "subtitle": "Original the four harvests design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010315488,
+  "width": 25,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 6
+}

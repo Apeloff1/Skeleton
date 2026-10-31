@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_verdant_caldera",
+  "title": "Verdant Caldera: The Four Harvests",
+  "subtitle": "Original the four harvests design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010315340,
+  "width": 27,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 6
+}

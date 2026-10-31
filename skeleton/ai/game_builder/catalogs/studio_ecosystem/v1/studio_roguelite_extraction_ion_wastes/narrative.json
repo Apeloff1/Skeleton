@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_roguelite_extraction_ion_wastes",
+  "genre": "roguelite_extraction",
+  "biome": "ion_wastes",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Ion Wastes: Roguelite Extraction",
+  "foundation": {
+    "setting": "Ion Wastes",
+    "era": "early reconstruction",
+    "environment": "charged dunes",
+    "history": "A forgotten drifting relay station once protected shielded relay coils, until recurring electromagnetic storms forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Amea Rene, a delver, must retrieve the endangered survey archive, relying on risk and retreat despite electromagnetic storms.",
+  "central_conflict": "a hostile salvage crew threatens the drifting relay station by restricting shielded relay coils.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "electromagnetic storms destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a hostile salvage crew contests access to shielded relay coils",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The drifting relay station becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers shielded relay coils"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "drifting relay station",
+    "critical_resource": "shielded relay coils",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

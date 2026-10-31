@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_ion_wastes",
+  "title": "Ion Wastes: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610302902,
+  "width": 21,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "space",
+  "starting_health": 3
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_luminous_marsh",
+  "title": "Luminous Marsh: The Four Harvests",
+  "subtitle": "Original the four harvests design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010315118,
+  "width": 25,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 4
+}
