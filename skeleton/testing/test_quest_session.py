@@ -63,6 +63,19 @@ def test_unearned_or_replayed_rewards_rejected(triggers: list[QuestTrigger]) -> 
         QuestEngine(make_plan()).replay(triggers)
 
 
+def test_forged_in_memory_session_cannot_claim_rewards() -> None:
+    engine = QuestEngine(make_plan())
+    forged = QuestSession(
+        engine.plan.world_id, engine.plan.digest,
+        completed=("arrival",), inventory=(("map", 999),), currency=999,
+    )
+    with pytest.raises(GameplayContractError, match="verified event history"):
+        engine.apply(forged, events()[1])
+    genuine = engine.apply(engine.new_session(), events()[0])
+    assert genuine.completed == ("arrival",)
+    assert engine.apply(genuine, events()[1]).ending_id == "safe_harbor"
+
+
 def test_no_mutation_on_failed_event() -> None:
     engine = QuestEngine(make_plan())
     before = engine.new_session()
@@ -132,6 +145,9 @@ def test_cli_duplicate_json_and_tampered_save_rejected(tmp_path: Path) -> None:
 
 
 def test_cli_rejects_symlink_plan(tmp_path: Path) -> None:
+    import os
+    if not hasattr(os, "O_NOFOLLOW"):
+        pytest.skip("OS lacks O_NOFOLLOW; symlink rejection is not qualified")
     plan = tmp_path / "plan.json"
     plan.write_text(json.dumps(make_plan().as_record()))
     link = tmp_path / "link.json"

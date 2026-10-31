@@ -199,6 +199,11 @@ class QuestSession:
             raise GameplayContractError("quest session budget exceeded")
         if len(set(self.completed)) != len(self.completed):
             raise GameplayContractError("duplicate completion")
+        for quest_id in self.completed:
+            req_id(quest_id, "completed quest")
+        for index, event in enumerate(self.events):
+            if event.sequence != index:
+                raise GameplayContractError("non-canonical event sequence")
         if tuple(sorted(self.inventory)) != self.inventory:
             raise GameplayContractError("inventory not canonical")
         if len({item for item, _ in self.inventory}) != len(self.inventory):
@@ -247,6 +252,13 @@ class QuestEngine:
         return QuestSession(self.plan.world_id, self.plan.digest)
 
     def apply(self, session: QuestSession, trigger: QuestTrigger) -> QuestSession:
+        # Public state is a value object, not a trusted mutable engine handle.
+        # Reconstruct its provenance before accepting a reward-bearing action.
+        if self.replay(session.events) != session:
+            raise GameplayContractError("quest session lacks verified event history")
+        return self._apply_verified(session, trigger)
+
+    def _apply_verified(self, session: QuestSession, trigger: QuestTrigger) -> QuestSession:
         if session.world_id != self.plan.world_id or session.plan_digest != self.plan.digest:
             raise GameplayContractError("quest source identity changed")
         if len(session.events) >= MAX_EVENTS:
@@ -290,7 +302,7 @@ class QuestEngine:
             raise GameplayContractError("event budget exceeded")
         session = self.new_session()
         for trigger in triggers:
-            session = self.apply(session, trigger)
+            session = self._apply_verified(session, trigger)
         return session
 
     def restore(self, record: Mapping[str, Any]) -> QuestSession:
