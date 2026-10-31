@@ -82,8 +82,8 @@ def main() -> int:
     require(len(mongo_specs) == 1, "canonical PyMongo version must be exactly pinned", failures)
     if len(mongo_specs) == 1:
         require(
-            text.count('"' + mongo_specs[0] + '"') == 2,
-            "both Merge Readiness Python dependency installs must use canonical PyMongo pin",
+            text.count('"' + mongo_specs[0] + '"') == 3,
+            "all three Merge Readiness Python dependency installs must use canonical PyMongo pin",
             failures,
         )
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
@@ -113,8 +113,8 @@ def main() -> int:
         failures,
     )
     require(
-        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 5,
-        "all five Python setup sites must consume PYTHON_VERSION",
+        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 6,
+        "all six Python setup sites must consume PYTHON_VERSION",
         failures,
     )
     require(

@@ -43,6 +43,8 @@ jobs:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Validate merge-readiness workflow contract
         run: python scripts/check_merge_readiness_contract.py
+      - name: Regress exhaustive canonical domain sharding
+        run: python -m unittest discover -s tests -p 'test_domain_suite_shard.py' -v
       - name: Validate required-check policy
         run: python scripts/check_required_checks_policy.py
       - name: Regress exact-head release governance evidence decisions
@@ -87,7 +89,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v6.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Install canonical domain-test runtime
