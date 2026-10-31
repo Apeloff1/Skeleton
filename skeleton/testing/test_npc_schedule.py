@@ -9,7 +9,7 @@ import pytest
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.game.gameplay.npc_schedule import NpcCommand, NpcSchedule, NpcSession, play
-from scripts.npc_schedule_cli import main, read_json, save_new
+from scripts.npc_schedule_cli import interactive_session, main, read_json, save_new
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "skeleton/testing/fixtures/lantern_harbor_npc_schedule.json"
@@ -182,3 +182,30 @@ def test_direct_command_construction_cannot_bypass_authority():
     ):
         with pytest.raises(GameplayContractError):
             play(spec, [bad()])
+
+
+def test_real_terminal_gameplay_acceptance(monkeypatch, capsys):
+    entries = iter([
+        "look", "talk sol_dockwright repair_lens",
+        "talk mira_keeper ask_for_lens",
+        "talk sol_dockwright repair_lens",
+        "advance 8", "talk mira_keeper restore_beacon",
+        "advance 12", "talk sol_dockwright open_tide_gate",
+        "facts", "quit",
+    ])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(entries))
+    session = interactive_session(NpcSession.start(schedule()), "player")
+    assert "tide_gate_open" in session.facts
+    assert len(session.events.events) == 6
+    output = capsys.readouterr().out
+    assert "prerequisites missing" in output
+    assert "lighthouse_gate" in output
+
+
+def test_terminal_rejects_invalid_commands_without_state_change(monkeypatch, capsys):
+    entries = iter(["advance -1", "talk forged fake", "unrecognized", "quit"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(entries))
+    session = interactive_session(NpcSession.start(schedule()), "player")
+    assert session.tick == 0
+    assert not session.commands
+    assert capsys.readouterr().out.count("rejected:") == 3

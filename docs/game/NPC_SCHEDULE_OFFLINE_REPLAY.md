@@ -58,3 +58,19 @@ save/restore, no-clobber publication, symlink and oversized input refusal,
 replay tampering, prerequisite failure and deterministic event ordering.
 Required repository-wide architecture, security, exact-head CI, independent
 review, device and release gates remain pending until actually executed.
+
+## Play directly in a terminal
+
+```sh
+python -m scripts.npc_schedule_cli \
+  --schedule skeleton/testing/fixtures/lantern_harbor_npc_schedule.json \
+  --interactive --save /tmp/lantern-harbor-interactive.json
+```
+
+Use `look` to see present NPCs and locations, `talk mira_keeper
+ask_for_lens` to start the quest, `talk sol_dockwright repair_lens`,
+`advance 8`, `talk mira_keeper restore_beacon`, `advance 12`, and
+`talk sol_dockwright open_tide_gate` to finish. `facts` inspects
+consequences; `quit` saves when `--save` is supplied. Rejected
+actions leave the original session untouched. The terminal game requires
+no AI provider, audio or network access.

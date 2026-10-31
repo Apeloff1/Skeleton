@@ -10,7 +10,7 @@ import stat
 import sys
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
-from skeleton.game.gameplay.npc_schedule import NpcSchedule, NpcSession, play
+from skeleton.game.gameplay.npc_schedule import NpcCommand, NpcSchedule, NpcSession, play
 
 MAX_JSON_BYTES = 2_000_000
 
@@ -62,12 +62,60 @@ def save_new(path: str, data: bytes) -> None:
         os.close(directory)
 
 
+
+def interactive_session(session: NpcSession, player_id: str) -> NpcSession:
+    """Drive a real offline terminal game; invalid moves never change state."""
+    from skeleton.game.gameplay.flgb_gameplay_runtime import req_id
+
+    req_id(player_id, "player_id")
+    print("NPC world ready. Commands: look, facts, advance TICK, talk NPC INTERACTION, quit")
+    for _ in range(8192):
+        try:
+            line = input("npc> ")
+        except EOFError:
+            break
+        if len(line) > 256:
+            print("rejected: command too long")
+            continue
+        words = line.split()
+        if not words:
+            continue
+        if words[0] == "quit" and len(words) == 1:
+            break
+        if words[0] == "look" and len(words) == 1:
+            print(json.dumps({"tick": session.tick,
+                              "active": list(session.schedule.active(session.tick))},
+                             sort_keys=True))
+            continue
+        if words[0] == "facts" and len(words) == 1:
+            print(json.dumps({"facts": list(session.facts)}, sort_keys=True))
+            continue
+        try:
+            if words[0] == "advance" and len(words) == 2:
+                if not words[1].isascii() or not words[1].isdecimal():
+                    raise GameplayContractError("invalid tick")
+                command = NpcCommand("advance", int(words[1]))
+            elif words[0] == "talk" and len(words) == 3:
+                command = NpcCommand("interact", session.tick,
+                                     words[1], words[2], player_id)
+            else:
+                raise GameplayContractError("unknown player command")
+            session = session.apply(command)
+            print(json.dumps({"tick": session.tick, "facts": list(session.facts),
+                              "state_digest": session.state_digest}, sort_keys=True))
+        except (GameplayContractError, ValueError) as exc:
+            print(f"rejected: {exc}")
+    return session
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Offline source-bound NPC schedule replay")
     parser.add_argument("--schedule", required=True, help="Original authored NPC schedule JSON")
     parser.add_argument("--commands", help="JSON list of advance/interact commands")
     parser.add_argument("--resume", help="Previously saved verified NPC snapshot JSON")
     parser.add_argument("--save", help="Create a new immutable verified snapshot file")
+    parser.add_argument("--interactive", action="store_true", help="Play using terminal commands")
+    parser.add_argument("--player-id", default="player", help="Original player identity for interactions")
     parser.add_argument("--inspect-tick", type=int, help="Inspect NPC presence at a given tick")
     args = parser.parse_args(argv)
     try:
@@ -79,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
             if type(commands) is not list:
                 raise GameplayContractError("commands must be a JSON list")
             session = play(schedule, commands, session)
+        if args.interactive:
+            session = interactive_session(session, args.player_id)
         tick = session.tick if args.inspect_tick is None else args.inspect_tick
         result = {"world_id": schedule.world_id, "schedule_digest": schedule.digest,
                   "tick": session.tick, "state_digest": session.state_digest,
