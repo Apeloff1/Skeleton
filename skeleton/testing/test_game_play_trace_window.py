@@ -39,14 +39,18 @@ def test_trace_window_replays_actual_controller_physics():
     assert trace == inspect_play_trace(capsule, saved, 2, 3)
     initial = compile_level({"tiles": capsule["tilemap"]})["spawn"]
     avatar = {"x": initial["x"], "y": initial["y"], "vx": 0, "vy": 0}
-    for action in saved["controls"]:
+    for index, action in enumerate(saved["controls"][:3], 1):
         outcome = platformer_step({
             "tiles": capsule["tilemap"], "avatar": avatar, "control": action,
         })
         avatar = outcome["avatar"]
-        if action == saved["controls"][0]:
-            pass
-    assert trace["final_avatar"] == inspect_play_trace(capsule, saved, 1, 3)["final_avatar"]
+        if index >= 2:
+            observed = trace["frames"][index - 2]
+            assert observed["avatar"] == avatar
+            assert observed["grounded"] == outcome["grounded"]
+            assert observed["goal_reached"] == outcome["goal_reached"]
+            assert observed["vertical_cells_traversed"] == outcome["vertical_cells_traversed"]
+    assert trace["final_avatar"] == avatar
     assert len(trace["window_sha256"]) == 64
     assert trace["frames"][0]["control"] == saved["controls"][1]
 
@@ -117,4 +121,4 @@ def test_canonical_app_trace_cli(tmp_path, capsys):
         "--inspect-play-trace", str(session), "--session-capsule", str(source),
         "--trace-start", "1", "--trace-end", "1", "--at-frame", "1",
     ]) == 2
-    assert "required" in capsys.readouterr().err or True
+    assert "--at-frame" in capsys.readouterr().err
