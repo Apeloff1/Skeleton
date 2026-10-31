@@ -567,3 +567,7 @@ Use `python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glac
 ### Source-bound NPC dialogue staging
 
 The canonical `--dialogue-stage` CLI mode and typed Jeeves `studio_dialogue_staging` tool expose replay-gated scene cards containing original NPC identity, authored knowledge, relationship, scene goal, decision and consequence with explicit source field references. `--dialogue-actions` supplies a bounded canonical quest history, `--dialogue-scene-id` filters one authored scene, and `--dialogue-expected-digest` rejects source drift. Locked scenes remain editor-visible but are not represented as played. The cards contain source quotations and authoring cues, **not** generated spoken lines, actual witness evidence, a native conversation runtime or release certification. They are deterministic, offline and read-only.
+
+### Durable private dialogue handoff for the playable engine
+
+The `--dialogue-stage --dialogue-export --output NEW_DIRECTORY` CLI command creates an exclusive private `dialogue.json` and `receipt.json` handoff. `--dialogue-stage --dialogue-import DIRECTORY` reopens it and recompiles every scene card against the current canonical project source, rejecting stale digests, unexpected files, links, forged qualifications and modified receipts. Writes use private permissions, no-follow file descriptors, exclusive creation, fsync and cleanup on failure. This is an original authored scene-data handoff for Studio B/D integration, **not** evidence of spoken dialogue, native-engine execution or consumer certification.

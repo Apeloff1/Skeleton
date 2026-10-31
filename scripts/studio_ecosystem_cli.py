@@ -29,7 +29,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
-    ap.add_argument("--dialogue-stage", action="store_true",
+    ap.add_argument("--dialogue-export", action="store_true",
+                    help="Write exclusive private source-bound dialogue handoff")
+    ap.add_argument("--dialogue-import", type=Path,
+                    help="Verify an existing dialogue handoff against current source")
+    ap.add_argument("--dialogue-stage", action="store_true",    ap.add_argument("--dialogue-stage", action="store_true",
                     help="Compile source-bound NPC scene dialogue cues from quest replay")
     ap.add_argument("--dialogue-actions", metavar="JSON",
                     help="Canonical bounded [quest stage, alternative] history")
@@ -223,10 +227,18 @@ def main(argv: list[str] | None = None) -> int:
                 or args.compile_preview or args.materialize_batch
                 or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
                 or args.search is not None or args.deep_search or args.genre
+                or args.biome or (args.output is not None and not args.dialogue_export)
+                or args.quest_actions is not None
                 or args.biome or args.output or args.quest_actions is not None
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
+        if (args.dialogue_export and (args.output is None or args.dialogue_import is not None)
+                or args.dialogue_import is not None and
+                (args.dialogue_actions is not None or args.dialogue_scene_id is not None
+                 or args.dialogue_export or args.output is not None)):
+            ap.error("dialogue export requires new --output; import excludes replay arguments")
+        from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
         from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
             compile_dialogue_staging,
         )
@@ -246,6 +258,27 @@ def main(argv: list[str] | None = None) -> int:
                 encoded, object_pairs_hook=unique,
                 parse_constant=lambda _: (_ for _ in ()).throw(
                     StudioQuestError("nonfinite dialogue JSON")))
+            docs = read_blueprint(args.project)
+            if args.dialogue_import is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                    import_dialogue_handoff,
+                )
+                result, _ = import_dialogue_handoff(
+                    args.dialogue_import, docs, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest)
+            elif args.dialogue_export:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                    export_dialogue_handoff,
+                )
+                result = export_dialogue_handoff(
+                    args.output, docs, actions, scene_id=args.dialogue_scene_id,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    authorized=True)
+            else:
+                result = compile_dialogue_staging(
+                    docs, actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
             result = compile_dialogue_staging(
                 read_blueprint(args.project), actions, authorized=True,
                 expected_source_digest=args.dialogue_expected_digest,
@@ -254,6 +287,9 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
+    if (args.dialogue_export or args.dialogue_import is not None):
+        ap.error("--dialogue-export and --dialogue-import require --dialogue-stage")
+    if (args.dialogue_actions is not None or args.dialogue_scene_id is not None
     if (args.dialogue_actions is not None or args.dialogue_scene_id is not None
             or args.dialogue_expected_digest is not None):
         ap.error("--dialogue-* options require --dialogue-stage")
