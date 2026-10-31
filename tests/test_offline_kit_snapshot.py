@@ -424,3 +424,5 @@ def test_install_detects_swapped_parent_after_venv(tmp_path, monkeypatch):
     with pytest.raises(offline_kit.OfflineKitError, match="parent changed"):
         offline_kit.install(root, parent / "installed")
     assert (parent / "installed" / "other-owner").read_text() == "preserve"
+    assert moved.is_dir()
+    assert not (moved / "installed").exists()  # inode-owned rollback cleaned only its reservation
