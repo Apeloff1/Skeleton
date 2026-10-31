@@ -22,7 +22,10 @@ def digest(text: str) -> str:
 def make_plan() -> QuestPlan:
     return QuestPlan("harbor", [
         QuestSpec("arrival", (), "interact", "harbor_gate", digest("greet"), QuestReward("map", 1, 5)),
-        QuestSpec("beacon", ("arrival",), "activate", "lighthouse", digest("light"), QuestReward("star", 2, 9), "safe_harbor"),
+        QuestSpec(
+            "beacon", ("arrival",), "activate", "lighthouse", digest("light"),
+            QuestReward("star", 2, 9), "safe_harbor",
+        ),
     ])
 
 
