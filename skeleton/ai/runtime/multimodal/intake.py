@@ -257,7 +257,7 @@ class MultimodalIntake:
                 "authority_scope",
             )
         ):
-            raise MultimodalSanitizationError("asset id already bound to different source semantics")
+            raise MultimodalSanitizationError("asset identity conflict: asset id already bound to different source semantics")
         if prior is None and len(self._assets) >= self.max_assets:
             raise MultimodalSanitizationError("asset registry capacity exceeded")
         return candidate
