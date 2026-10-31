@@ -139,6 +139,16 @@ class OfflineGridCampaignTests(unittest.TestCase):
         self.assertEqual(result["save"]["state"]["ending"], "homecoming")
         self.assertEqual(Session.restore(self.campaign, result["save"]).tick, 10)
 
+    def test_canonical_application_entrypoint(self):
+        process = subprocess.run(
+            [sys.executable, "-m", "skeleton", "campaign", "inspect"],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(process.returncode, 0, process.stderr)
+        output = json.loads(process.stdout)
+        self.assertEqual(output["source_digest"], self.campaign.source_digest)
+        self.assertIn("@", output["map"])
+
     def test_cli_offline_end_to_end(self):
         with tempfile.TemporaryDirectory() as tmp:
             commands = Path(tmp) / "commands.json"
