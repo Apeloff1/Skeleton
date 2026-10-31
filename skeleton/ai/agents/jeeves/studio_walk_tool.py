@@ -1433,3 +1433,63 @@ def execute_dialogue_route_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_ITINERARY_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_itinerary_request.v1"
+DIALOGUE_ITINERARY_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_itinerary_result.v1"
+
+
+def dialogue_itinerary_tool_schema() -> dict[str, object]:
+    """Discoverable source-bound NPC itinerary planner."""
+    return {
+        "name": "studio_dialogue_itinerary",
+        "description": "Plan ordered original NPC scene prerequisites without playing scenes",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_ITINERARY_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "expected_session_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "target_scene_ids": {"type": "array", "minItems": 1, "maxItems": 8,
+                                     "uniqueItems": True,
+                                     "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "actions", "target_scene_ids"],
+        },
+    }
+
+
+def execute_dialogue_itinerary_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves NPC itinerary requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest",
+                "actions", "target_scene_ids"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"expected_session_digest"}
+            or request.get("schema") != DIALOGUE_ITINERARY_REQUEST_SCHEMA
+            or type(request.get("project_id")) is not str
+            or not 1 <= len(request["project_id"]) <= 128
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves NPC itinerary request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_itinerary import (
+        plan_dialogue_itinerary,
+    )
+    detail = plan_dialogue_itinerary(
+        read_blueprint(request["project_id"]), request["actions"],
+        target_scene_ids=request["target_scene_ids"], authorized=True,
+        expected_source_digest=request["expected_source_digest"],
+        expected_session_digest=request.get("expected_session_digest"))
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_ITINERARY_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request), "detail": detail,
+        "file_write_performed": False, "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

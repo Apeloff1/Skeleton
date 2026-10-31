@@ -729,3 +729,8 @@ handoffs; it does not commit game-engine actions or claim the scene was
 played. The returned wrapper distinguishes the deterministic read-only
 route proof from the written handoff receipt. Reopen with
 `--dialogue-stage --dialogue-import <directory>` and an exact source lease.
+
+
+## Source-bound ordered NPC itinerary
+
+Use `--project <id> --dialogue-stage --dialogue-actions '[]' --dialogue-itinerary-scenes '["scene-a","scene-b"]' --dialogue-expected-digest <sha256>` to plan multiple original NPC scene visits in order. Only missing canonical prerequisites are replayed; target scenes are not asserted played. An optional `--dialogue-itinerary-expected-session` rejects stale history. Add `--output <new-private-directory>` for an exclusive atomic dialogue handoff, reopened through `--dialogue-import`. The typed Jeeves `studio_dialogue_itinerary` tool returns identical read-only proof. Neither surface certifies spoken dialogue or native game execution.

@@ -33,6 +33,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Find and replay-verify prerequisites for an authored NPC scene")
     ap.add_argument("--dialogue-route-choices", metavar="JSON",
                     help="Optional exact stage-to-authored-alternative preferences")
+    ap.add_argument("--dialogue-itinerary-scenes", metavar="JSON",
+                    help="Ordered JSON list of 1..8 authored NPC scene IDs")
+    ap.add_argument("--dialogue-itinerary-expected-session",
+                    help="Exact optimistic quest session digest lease")
     ap.add_argument("--dialogue-checkpoints", action="store_true",
                     help="Page source-verified original quest dialogue checkpoints")
     ap.add_argument("--dialogue-checkpoint-offset", type=int, default=0)
@@ -259,6 +263,9 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if not args.dialogue_stage and (args.dialogue_itinerary_scenes is not None
+                                    or args.dialogue_itinerary_expected_session is not None):
+        ap.error("NPC itinerary requires --dialogue-stage")
     if args.dialogue_stage:
         if (not args.project or args.faction_plan or args.faction_reputation
                 or args.ending_plan or args.author_revision or args.cherry_pick_revision
@@ -268,11 +275,22 @@ def main(argv: list[str] | None = None) -> int:
                 or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
                 or args.search is not None or args.deep_search or args.genre
                 or args.biome or (args.output is not None and not (args.dialogue_export or args.dialogue_fork_index is not None
-                                                     or args.dialogue_route_scene is not None))
+                                                     or args.dialogue_route_scene is not None
+                                                     or args.dialogue_itinerary_scenes is not None))
                 or args.quest_actions is not None
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
+        if (args.dialogue_itinerary_scenes is not None and (
+                    args.dialogue_route_scene is not None or args.dialogue_route_choices is not None
+                    or args.dialogue_checkpoints or args.dialogue_fork_index is not None
+                    or args.dialogue_compare_actions is not None or args.dialogue_transcript
+                    or args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None)
+                or args.dialogue_itinerary_scenes is None and
+                    args.dialogue_itinerary_expected_session is not None):
+            ap.error("NPC itinerary excludes other dialogue modes")
         if (args.dialogue_route_scene is not None and (
                     args.dialogue_checkpoints or args.dialogue_fork_index is not None
                     or args.dialogue_compare_actions is not None
@@ -367,7 +385,31 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_route_scene is not None:
+            if args.dialogue_itinerary_scenes is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_itinerary import (
+                    plan_dialogue_itinerary,
+                )
+                from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+                raw_targets = args.dialogue_itinerary_scenes.encode("utf-8", "strict")
+                if len(raw_targets) > 4096:
+                    raise StudioQuestError("NPC itinerary target byte budget exceeded")
+                targets = json.loads(raw_targets, object_pairs_hook=unique,
+                                     parse_constant=lambda _: (_ for _ in ()).throw(
+                                         StudioQuestError("nonfinite NPC itinerary JSON")))
+                source_digest = (args.dialogue_expected_digest
+                                 or audit_canon_source(docs, authorized=True)["source_digest"])
+                result = plan_dialogue_itinerary(
+                    docs, actions, target_scene_ids=targets, authorized=True,
+                    expected_source_digest=source_digest,
+                    expected_session_digest=args.dialogue_itinerary_expected_session)
+                if args.output is not None:
+                    from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import export_dialogue_handoff
+                    handoff = export_dialogue_handoff(
+                        args.output, docs, result["planned_quest_receipt"]["choices"],
+                        expected_source_digest=result["source_digest"], authorized=True)
+                    result = {"itinerary": result, "handoff": handoff,
+                              "file_write_performed": True, "release_certified": False}
+            elif args.dialogue_route_scene is not None:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_scene_route import (
                     plan_dialogue_scene_route,
                 )
