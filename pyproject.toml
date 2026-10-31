@@ -54,6 +54,7 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-local-fair-stream = "skeleton.ai.model_runtime.fair_stream_cli:main"
 skeleton = "skeleton.__main__:main"
 skeleton-dev = "skeleton.developer.cli:main"
 skeleton-bootstrap = "skeleton.developer.bootstrap:main"

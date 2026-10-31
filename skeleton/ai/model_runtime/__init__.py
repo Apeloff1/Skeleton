@@ -10,6 +10,11 @@ from importlib import import_module
 
 # Keep all public contract names available without importing optional runtimes.
 _LAZY_EXPORTS = {
+    "FairStreamScheduler": ".fair_stream_queue",
+    "FairStreamPlan": ".fair_stream_queue",
+    "MeasuredStreamBudget": ".fair_stream_queue",
+    "StreamLease": ".fair_stream_queue",
+    "StreamRequest": ".fair_stream_queue",
     "ALLOWED_TRANSITIONS": ".flgb_model_runtime",
     "BatchGenerationRequest": ".runtime_contracts",
     "BatchRequest": ".flgb_model_runtime",
@@ -194,6 +199,8 @@ _LAZY_EXPORTS = {
 
 def _load_trusted_lazy_module(module_name: str):
     """Import from the repository-owned export map using only literal targets."""
+    if module_name == ".fair_stream_queue":
+        return import_module(".fair_stream_queue", __name__)
     if module_name == ".admission_checkpoint":
         return import_module(".admission_checkpoint", __name__)
     if module_name == ".admission_redundancy":
@@ -275,6 +282,11 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "FairStreamScheduler",
+    "FairStreamPlan",
+    "MeasuredStreamBudget",
+    "StreamLease",
+    "StreamRequest",
     "RuntimePromotionError",
     "AdmissionLedger",
     "admit_candidate_model",
