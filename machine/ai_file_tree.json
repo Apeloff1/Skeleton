@@ -1180,7 +1180,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "6079b088065094c99cb552a5bd93e2ce152e5bce",
+      "source_git_object_sha": "2118a2e8a1ba147dba9d3f80a36fdce617c9d499",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -1499,7 +1499,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "b72b2c8393eb1178dd2421f841e67fa48c984290",
+      "source_git_object_sha": "adb63d883204d88689d53c59a4863fc6276568f6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
