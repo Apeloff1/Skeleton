@@ -54,6 +54,7 @@ Commands:
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-travel  Simulate, verify and resume original offline scene journeys
+    scene-atlas  Explore fog-of-war maps, legal known routes and portable replay
     scene-mission  Play authored mission DAG and branching choices over scenes
     scene-mission-route  Solve replayable authored mission ending paths
     game        Build a playable Godot project from a natural-language brief
@@ -749,6 +750,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-author":
         from skeleton.game.gameplay.scene_world_author import cli as scene_author_cli
         return scene_author_cli(rest)
+    if cmd == "scene-atlas":
+        from skeleton.game.gameplay.scene_atlas import cli as atlas_cli
+        return atlas_cli(rest)
     if cmd == "scene-travel":
         from skeleton.game.gameplay.scene_travel import cli as scene_cli
         return scene_cli(rest)
