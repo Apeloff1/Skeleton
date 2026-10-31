@@ -2,9 +2,11 @@
 from .self_repair import (
     Budget, BudgetExceeded, Diagnosis, EvalFailure, EvalResult, Mutation,
     ProvenanceRecord, RepairLoop, RepairOutcome, RouteChoice, diagnose,
+    digest, repair_route_task,
 )
 
 __all__ = [
     "Budget", "BudgetExceeded", "Diagnosis", "EvalFailure", "EvalResult", "Mutation",
     "ProvenanceRecord", "RepairLoop", "RepairOutcome", "RouteChoice", "diagnose",
+    "digest", "repair_route_task",
 ]

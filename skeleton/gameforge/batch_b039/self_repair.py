@@ -9,10 +9,16 @@ module consumes them through small typed seams (``RouteChoice`` and
 """
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass, field
 from typing import Callable, Mapping, Sequence
+
+from skeleton.frontier.runtime.model_router_contract import (
+    ROUTER_INTERFACE_VERSION,
+    RouteStatus,
+    RouteTask,
+    RoutingReceipt,
+)
+from skeleton.gameforge.batch_b038 import ProvenanceRecord, digest
 
 
 class BudgetExceeded(RuntimeError):
@@ -90,24 +96,40 @@ class Mutation:
 
 @dataclass(frozen=True)
 class RouteChoice:
-    """B031 seam: which model/provider was routed for a repair step."""
+    """B031 seam: thin adapter over the frozen router contract's ``RoutingReceipt``.
+
+    Kept for B039's public API; build one from a receipt with :meth:`from_receipt`.
+    """
     model: str
     provider: str
     unit_cost: float = 0.0
+    receipt: RoutingReceipt | None = None
+
+    @classmethod
+    def from_receipt(cls, receipt: RoutingReceipt, model: str | None = None,
+                     unit_cost: float | None = None) -> "RouteChoice":
+        if receipt.schema_version != ROUTER_INTERFACE_VERSION:
+            raise ValueError("unsupported router interface version")
+        if receipt.status not in (RouteStatus.PLANNED, RouteStatus.OK):
+            raise BudgetExceeded(f"no usable route: {receipt.status}")
+        provider = receipt.served_by or receipt.selected_provider_id
+        if provider is None:
+            raise ValueError("receipt has no selected provider")
+        cost = unit_cost if unit_cost is not None else (receipt.estimated_cost or 0.0)
+        return cls(model or receipt.task_type, provider, float(cost), receipt)
+
+    def as_dict(self) -> dict[str, object]:
+        out: dict[str, object] = {"model": self.model, "provider": self.provider,
+                                  "unit_cost": self.unit_cost}
+        if self.receipt is not None:
+            out["receipt"] = self.receipt.as_dict()
+        return out
 
 
-@dataclass(frozen=True)
-class ProvenanceRecord:
-    """B038 seam: provenance of one repair step."""
-    step: int
-    model: str
-    provider: str
-    input_digest: str
-    output_digest: str
-    diagnoses: tuple[str, ...]
-    score_before: float
-    score_after: float
-    cost: float
+def repair_route_task(diagnoses: Sequence[Diagnosis], request_id: str | None = None) -> RouteTask:
+    """Build the B031 router request for a repair step from its diagnoses."""
+    return RouteTask(task_type="gameforge.self_repair", request_id=request_id,
+                     metadata={"diagnoses": [d.category for d in diagnoses]})
 
 
 @dataclass
@@ -120,10 +142,6 @@ class RepairOutcome:
     seconds_spent: float
     provenance: list[ProvenanceRecord] = field(default_factory=list)
     stop_reason: str = ""
-
-
-def digest(obj: object) -> str:
-    return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
 Evaluator = Callable[[Mapping[str, object]], EvalResult]
