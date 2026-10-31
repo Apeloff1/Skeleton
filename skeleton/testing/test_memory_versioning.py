@@ -12,8 +12,8 @@ def proposal(key,content,target=None,version=None):
 
 def seeded():
     r=SQLiteMemoryRepository()
-    a=r.write(proposal("a","v1"),now=NOW)
-    b=r.write(proposal("b","v2",a.memory_id,1),now=NOW)
+    a=r.commit(proposal("a","v1"),now=NOW)
+    b=r.commit(proposal("b","v2",a.memory_id,1),now=NOW)
     return r,a,b
 
 def test_export_is_contiguous_and_deterministic():

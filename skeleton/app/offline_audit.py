@@ -114,7 +114,8 @@ def _library(conn: sqlite3.Connection) -> dict[str, int]:
             or ".." in Path(relative).parts
             or not isinstance(digest, str) or not _HEX.fullmatch(digest)
             or not isinstance(body, str)
-            or type(size) is not int or size < 0 or size > MAX_DOCUMENT_BYTES
+            or type(size) is not int or size < 0
+            or (MAX_DOCUMENT_BYTES is not None and size > MAX_DOCUMENT_BYTES)
         ):
             raise OfflineAuditError("local document index row has invalid fields")
         raw = body.encode("utf-8")

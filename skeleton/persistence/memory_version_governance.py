@@ -110,4 +110,4 @@ def governed_rollback(
         expires_at=target.expires_at,
         data_class=target.data_class,
     )
-    return repository.write(proposal, now=now)
+    return repository.commit(proposal, now=now)
