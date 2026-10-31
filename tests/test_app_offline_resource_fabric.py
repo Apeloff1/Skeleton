@@ -56,12 +56,20 @@ class FabricTests(unittest.TestCase):
                 with self.assertRaises(LocalResourcePressure):
                     fabric.stream_readonly(root, ("large.txt",))
             self.assertGreaterEqual(observations["count"], 2)
-            self.assertEqual(fabric.monitor()["active_streams"], 0)
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=healthy,
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                monitor = fabric.monitor()
+            self.assertEqual(monitor["active_streams"], 0)
             self.assertGreaterEqual(
-                fabric.monitor()["controller"]["live_pressure_rechecks"], 1,
+                monitor["controller"]["live_pressure_rechecks"], 1,
             )
             self.assertGreaterEqual(
-                fabric.monitor()["controller"]["failed_stream_batches"], 1,
+                monitor["controller"]["failed_stream_batches"], 1,
             )
 
     def test_live_pressure_recheck_preserves_digest_when_headroom_is_stable(self):
