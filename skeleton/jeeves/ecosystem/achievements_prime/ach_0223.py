@@ -1,0 +1,11 @@
+"""Ach prime 0223.
+"""
+from __future__ import annotations
+
+ID = "ach_prime_0223"
+
+def describe() -> dict:
+    return {"id": ID, "kind": "ach", "index": 223}
+
+def activate(context: str = "") -> dict:
+    return {"ok": True, "id": ID, "context": context[:100], "active": True}
