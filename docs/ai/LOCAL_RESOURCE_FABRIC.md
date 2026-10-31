@@ -422,3 +422,22 @@ measured RAM headroom before admission. A host reporting no free physical
 memory is rejected instead of treating zero RAM as safe because the source
 already resides on disk. The check scales with the live adaptive chunk size,
 not with total source length or an arbitrary per-file limit.
+
+
+## Source-bound staging manifest and offline UI
+
+The private POST /v1/resources/stage response now includes a deterministic
+ordered SHA-256 manifest digest, source count, byte count, and explicit
+manifest_authenticated=false. The digest covers each verified source's
+relative identity, byte count and SHA-256, not file contents or host paths.
+It is a reproducible integrity identifier, **not** a cryptographic signature
+or proof that an inference backend consumed the data. It cannot authorize a
+GPU transfer or model tool call.
+
+The offline web workspace exposes a guarded multi-file source-staging form.
+It accepts 1–64 unique portable relative filenames, requires an explicit
+operator approval, submits a bounded ten-second read-only verification, and
+displays the full manifest digest for subsequent provenance binding.
+Disconnect clears the selection and approval. The server independently
+enforces file-path, symlink, byte-window, deadline and concurrent-stream
+policy; UI validation is only an additional usability safeguard.

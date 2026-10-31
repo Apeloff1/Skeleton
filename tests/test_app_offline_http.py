@@ -1026,6 +1026,19 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             ))
         self.assertFalse(secret_path.exists())
 
+    def test_offline_stage_ui_requires_explicit_grant_and_shows_manifest_digest(self):
+        from skeleton.app.offline_web import HTML, JAVASCRIPT
+        for marker in (
+            'id="resource-stage-root"', 'id="resource-stage-paths"',
+            'id="resource-stage-grant"', 'id="resource-stage-status"',
+            'aria-live="polite"',
+        ):
+            self.assertIn(marker, HTML)
+        self.assertIn("get('resource-stage').addEventListener", JAVASCRIPT)
+        self.assertIn("receipt.manifest_digest", JAVASCRIPT)
+        self.assertIn("manifest_authenticated !== false", JAVASCRIPT)
+        self.assertIn("deadline_s: 10", JAVASCRIPT)
+
     def test_owner_only_token_file_is_create_once(self) -> None:
         path = self.folder / "bearer.secret"
         token = create_token_file(path)
