@@ -166,6 +166,20 @@ class TestOfflineEncryptedSpill(unittest.TestCase):
         self.assertEqual(main(base + ["get", "--id", record_id, "--output", str(output)] + identity), 1)
         self.assertEqual(main(base + ["delete", "--id", record_id] + identity), 0)
 
+    def test_key_file_ancestor_symlink_rejected(self):
+        if os.name != "posix":
+            self.skipTest("POSIX directory-descriptor traversal")
+        parent = self.temp / "private-key-directory"
+        parent.mkdir(mode=0o700)
+        keyfile = parent / "key"
+        keyfile.write_bytes(self.key)
+        keyfile.chmod(0o600)
+        link = self.temp / "key-directory-link"
+        link.symlink_to(parent, target_is_directory=True)
+        self.assertEqual(
+            main(["--store", str(self.root), "--key-file", str(link / "key"), "list"]), 1
+        )
+
     def test_insecure_key_file(self):
         if os.name != "posix":
             self.skipTest("POSIX-only permissions")

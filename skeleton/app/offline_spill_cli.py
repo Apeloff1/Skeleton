@@ -11,27 +11,31 @@ from typing import Sequence
 
 from skeleton.app.offline_encrypted_spill import (
     EncryptedSpillStore, SpillError, SpillIdentity, SpillPolicy,
-    NOFOLLOW, _read, _safe, _new,
+    NOFOLLOW, _read, _safe, _new, _directory_fd, _read_fd,
 )
 
 
 def _key(path: str) -> bytes:
     selected = Path(path)
     _safe(selected)
-    fd = os.open(selected, os.O_RDONLY | NOFOLLOW)
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise SpillError("key must be a regular file")
-        if os.name == "posix" and (info.st_uid != os.getuid() or info.st_mode & 0o077):
-            raise SpillError("key must be user-owned and mode 0600")
-        with os.fdopen(os.dup(fd), "rb") as stream:
-            key = stream.read(33)
-        if len(key) != 32:
-            raise SpillError("key file must contain exactly 32 bytes")
-        return key
-    finally:
-        os.close(fd)
+    with _directory_fd(selected.parent) as parent:
+        fd = os.open(
+            selected.name if parent is not None else selected,
+            os.O_RDONLY | NOFOLLOW,
+            **({"dir_fd": parent} if parent is not None else {}),
+        )
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise SpillError("key must be a regular file")
+            if os.name == "posix" and (info.st_uid != os.getuid() or info.st_mode & 0o077):
+                raise SpillError("key must be user-owned and mode 0600")
+            key = _read_fd(fd, 32)
+            if len(key) != 32:
+                raise SpillError("key file must contain exactly 32 bytes")
+            return key
+        finally:
+            os.close(fd)
 
 
 def _parser() -> argparse.ArgumentParser:
