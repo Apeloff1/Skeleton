@@ -1373,3 +1373,63 @@ def execute_dialogue_checkpoint_tool(
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+DIALOGUE_ROUTE_REQUEST_SCHEMA = "skeleton.jeeves.studio_dialogue_route_request.v1"
+DIALOGUE_ROUTE_RESULT_SCHEMA = "skeleton.jeeves.studio_dialogue_route_result.v1"
+
+
+def dialogue_route_tool_schema() -> dict[str, object]:
+    """Typed authored NPC scene prerequisite navigation and preview."""
+    return {
+        "name": "studio_dialogue_scene_route",
+        "description": "Plan a replay-verified original quest route to an NPC scene",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": DIALOGUE_ROUTE_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "actions": {"type": "array", "maxItems": 64,
+                            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": {"type": "string"}}},
+                "target_scene_id": {"type": "string", "minLength": 1, "maxLength": 512},
+                "preferred_alternatives": {"type": "object", "maxProperties": 64,
+                                           "additionalProperties": {"type": "string"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "actions", "target_scene_id"],
+        },
+    }
+
+
+def execute_dialogue_route_tool(
+    request: Mapping[str, Any], *, authorized: bool = False,
+) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves dialogue route requires operator authorization")
+    required = {"schema", "project_id", "expected_source_digest",
+                "actions", "target_scene_id"}
+    if (type(request) is not dict or not required.issubset(request)
+            or set(request) - required - {"preferred_alternatives"}
+            or request.get("schema") != DIALOGUE_ROUTE_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves dialogue route request")
+    from skeleton.ai.game_builder.studio_ecosystem_dialogue_scene_route import (
+        plan_dialogue_scene_route,
+    )
+    source = read_blueprint(request["project_id"])
+    detail = plan_dialogue_scene_route(
+        source, request["actions"], authorized=True,
+        target_scene_id=request["target_scene_id"],
+        expected_source_digest=request["expected_source_digest"],
+        preferred_alternatives=request.get("preferred_alternatives"))
+    payload: dict[str, Any] = {
+        "schema": DIALOGUE_ROUTE_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "detail": detail,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    payload["result_digest"] = _digest(payload)
+    return payload

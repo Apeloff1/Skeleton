@@ -691,3 +691,17 @@ to replace the choice at index N, use `--dialogue-fork-index N` with the
 full original history and its exact session lease. Typed Jeeves parity is
 `execute_dialogue_checkpoint_tool` with
 `skeleton.jeeves.studio_dialogue_checkpoint_request.v1`.
+
+## Original NPC scene prerequisite route
+
+`--project <id> --dialogue-stage --dialogue-actions '<history>'`
+`--dialogue-route-scene <authored scene id>` computes the exact missing
+quest-prerequisite closure for an NPC scene and replay-verifies the ordered
+original alternatives. Optional `--dialogue-route-choices '<stage:choice map>'`
+selects authored alternatives for required ancestors; extraneous, locked,
+unknown or completed stage preferences fail closed. The target scene remains
+unplayed, and its available original dialogue choices are previewed only.
+The response includes a deterministic planned quest receipt, every source
+anchored NPC waypoint, scene staging and unmet ending predicates.
+Typed Jeeves parity: `execute_dialogue_route_tool` using
+`skeleton.jeeves.studio_dialogue_route_request.v1`.

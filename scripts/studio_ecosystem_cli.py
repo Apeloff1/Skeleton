@@ -29,6 +29,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--dialogue-route-scene",
+                    help="Find and replay-verify prerequisites for an authored NPC scene")
+    ap.add_argument("--dialogue-route-choices", metavar="JSON",
+                    help="Optional exact stage-to-authored-alternative preferences")
     ap.add_argument("--dialogue-checkpoints", action="store_true",
                     help="Page source-verified original quest dialogue checkpoints")
     ap.add_argument("--dialogue-checkpoint-offset", type=int, default=0)
@@ -268,6 +272,16 @@ def main(argv: list[str] | None = None) -> int:
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
             ap.error("--dialogue-stage requires --project and excludes other modes")
+        if (args.dialogue_route_scene is not None and (
+                    args.dialogue_checkpoints or args.dialogue_fork_index is not None
+                    or args.dialogue_compare_actions is not None
+                    or args.dialogue_transcript or args.dialogue_commit
+                    or args.dialogue_preview or args.dialogue_restore_stdin
+                    or args.dialogue_export or args.dialogue_import is not None
+                    or args.output is not None)
+                or args.dialogue_route_scene is None and
+                    args.dialogue_route_choices is not None):
+            ap.error("dialogue route requires --dialogue-route-scene exclusively")
         if (args.dialogue_checkpoints and (
                     args.dialogue_fork_index is not None
                     or args.dialogue_compare_actions is not None
@@ -353,7 +367,22 @@ def main(argv: list[str] | None = None) -> int:
                     project_id=args.project)[0]
             else:
                 docs = read_blueprint(args.project)
-            if args.dialogue_checkpoints:
+            if args.dialogue_route_scene is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_scene_route import (
+                    plan_dialogue_scene_route,
+                )
+                preferences_raw = (args.dialogue_route_choices or "{}").encode("utf-8", "strict")
+                if len(preferences_raw) > 8192:
+                    raise StudioQuestError("dialogue route preferences exceed byte budget")
+                preferences = json.loads(
+                    preferences_raw, object_pairs_hook=unique,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite dialogue route JSON")))
+                result = plan_dialogue_scene_route(
+                    docs, actions, target_scene_id=args.dialogue_route_scene,
+                    preferred_alternatives=preferences, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest)
+            elif args.dialogue_checkpoints:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_checkpoints import (
                     page_dialogue_checkpoints,
                 )
@@ -463,7 +492,8 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(str(exc))
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    if (args.dialogue_checkpoints or args.dialogue_checkpoint_offset != 0
+    if (args.dialogue_route_scene is not None or args.dialogue_route_choices is not None
+            or args.dialogue_checkpoints or args.dialogue_checkpoint_offset != 0
             or args.dialogue_checkpoint_limit != 8
             or args.dialogue_checkpoint_expected_session is not None
             or args.dialogue_fork_index is not None or args.dialogue_fork_alternative is not None
