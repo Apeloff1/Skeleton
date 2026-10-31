@@ -658,11 +658,15 @@ def _verify_v3(
     if expected_domain is not None and not hmac.compare_digest(domain, expected_domain):
         raise AuthError(_OPAQUE)
     if nonce_store is not None:
+        from skeleton.api.nonce_store import NonceStoreFull
+
         try:
             # Retain past the far edge of the skew window (+ replica drift margin).
             fresh = nonce_store.check_and_record(
                 NONCE_SCOPE, f"{principal}.{attester}.{nonce}", issued, skew_secs + REPLAY_SKEW_SECS
             )
+        except NonceStoreFull:
+            raise  # capacity, not auth: middleware answers 503 + Retry-After
         except Exception:
             raise AuthError(_OPAQUE)
         if not fresh:

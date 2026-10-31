@@ -19,6 +19,7 @@ import time
 import uuid
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from skeleton.api.nonce_store import NonceStoreFull
 from skeleton.kernel.errors import KernelError
 
 # ---------------------------------------------------------------------------
@@ -318,7 +319,8 @@ class RequestSealMiddleware:
         # Seal v2 nonce store (pluggable port; in-memory per process by default).
         self.replay_cache = replay_cache if replay_cache is not None else InMemoryReplayCache()
         # Seal v3 nonce store (skeleton.api.nonce_store.NonceStore port, scope "seal").
-        self.nonce_store = nonce_store if nonce_store is not None else InMemoryNonceStore()
+        # Sized from SKELETON_SEAL_NONCE_STORE_MAX (default 100_000); fail-closed when full.
+        self.nonce_store = nonce_store if nonce_store is not None else InMemoryNonceStore.from_env()
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -414,6 +416,11 @@ class RequestSealMiddleware:
             )
         except AuthError:
             resp = _json_response(401, {"error": "invalid_seal"})
+            await resp(scope, receive, send_with_seal)
+            return
+        except NonceStoreFull as full:
+            resp = _json_response(503, {"error": "nonce_store_full"})
+            resp.headers["Retry-After"] = str(full.retry_after_s)
             await resp(scope, receive, send_with_seal)
             return
         request.state.attester = attester

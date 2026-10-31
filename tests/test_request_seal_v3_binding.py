@@ -14,8 +14,13 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 
 from skeleton.api import hmac_seal as hs
-from skeleton.api.nonce_store import InMemoryNonceStore, NonceStore
 from skeleton.api.middleware import AuthError, GatePolicy, RequestSealMiddleware
+from skeleton.api.nonce_store import (
+    InMemoryNonceStore,
+    NonceStore,
+    NonceStoreFull,
+    max_entries_from_env,
+)
 from skeleton.client import seal as cs
 from skeleton.client.gateway import GatewayClient
 
@@ -281,18 +286,102 @@ def test_nonce_store_fresh_replay_scope_ttl():
     assert st.check_and_record("seal", "x", 1011.0, 0) is False
 
 
-def test_nonce_store_bounded_lru():
+def test_full_store_never_evicts_live_nonce_replay_still_rejected():
+    # (a) LRU would have evicted "a" to admit "c"; fail-closed refuses "c" instead.
     t = [0.0]
     st = InMemoryNonceStore(max_entries=2, clock=lambda: t[0])
     assert st.check_and_record("seal", "a", 0, 100)
     assert st.check_and_record("seal", "b", 0, 100)
-    assert not st.check_and_record("seal", "a", 0, 100)  # touches a → b is LRU
-    assert st.check_and_record("seal", "c", 0, 100)
-    assert len(st) == 2
-    assert not st.check_and_record("seal", "a", 0, 100)
-    assert st.check_and_record("seal", "b", 0, 100)  # b was evicted
+    with pytest.raises(NonceStoreFull) as ei:
+        st.check_and_record("seal", "c", 0, 100)
+    assert ei.value.retry_after_s == 100
+    assert st.check_and_record("seal", "a", 0, 100) is False  # replay of live nonce
+    assert st.check_and_record("seal", "b", 0, 100) is False
+    assert st.stats()["nonce_store_full"] == 1 and st.nonce_store_full == 1
     with pytest.raises(ValueError):
         InMemoryNonceStore(max_entries=0)
+
+
+def test_full_store_reclaims_expired_under_pressure():
+    # (b) expired entries are reclaimed before refusing.
+    t = [0.0]
+    st = InMemoryNonceStore(max_entries=2, clock=lambda: t[0])
+    assert st.check_and_record("seal", "a", 0, 10)
+    assert st.check_and_record("seal", "b", 0, 50)
+    t[0] = 11.0  # "a" expired, "b" live
+    assert st.check_and_record("seal", "c", 11, 50) is True
+    assert st.check_and_record("seal", "b", 11, 50) is False
+    assert st.stats() == {"entries": 2, "max_entries": 2, "nonce_store_full": 0, "reclaimed": 1}
+
+
+def test_store_stays_bounded():
+    # (c) never exceeds max_entries no matter the pressure.
+    t = [0.0]
+    st = InMemoryNonceStore(max_entries=50, clock=lambda: t[0])
+    full = 0
+    for i in range(1000):
+        t[0] = i * 0.5
+        try:
+            st.check_and_record("seal", f"n{i}", t[0], 40)
+        except NonceStoreFull:
+            full += 1
+        assert len(st) <= 50
+    assert full > 0 and st.nonce_store_full == full
+    assert st.stats()["reclaimed"] > 0
+
+
+def test_full_counter_emitted_to_metrics_collector():
+    from skeleton.observability.metrics import MetricsCollector
+
+    m = MetricsCollector()
+    st = InMemoryNonceStore(max_entries=1, clock=lambda: 0.0, metrics=m)
+    st.check_and_record("seal", "a", 0, 5)
+    with pytest.raises(NonceStoreFull):
+        st.check_and_record("seal", "b", 0, 5)
+    snap = m.snapshot()
+    assert any("nonce_store_full" in k and v == 1 for k, v in snap["counters"].items()), snap
+
+
+def test_max_entries_from_env(monkeypatch):
+    assert max_entries_from_env({}) == 100_000
+    assert max_entries_from_env({"SKELETON_SEAL_NONCE_STORE_MAX": "250"}) == 250
+    for bad in ("0", "-1", "lots"):
+        with pytest.raises(ValueError):
+            max_entries_from_env({"SKELETON_SEAL_NONCE_STORE_MAX": bad})
+    monkeypatch.setenv("SKELETON_SEAL_NONCE_STORE_MAX", "7")
+    assert InMemoryNonceStore.from_env().max_entries == 7
+    mw = RequestSealMiddleware(lambda *a: None, policy=GatePolicy())
+    assert mw.nonce_store.max_entries == 7
+
+
+def test_verify_seal_propagates_store_full_not_auth_error():
+    st = InMemoryNonceStore(max_entries=1, clock=lambda: NOW)
+    assert _v(_mint(), cache=st) == "svc"
+    with pytest.raises(NonceStoreFull):
+        _v(_mint(), cache=st)
+
+
+def test_middleware_store_full_503_retry_after(monkeypatch):
+    monkeypatch.setenv("GF_SEAL_SECRET", SECRET)
+    monkeypatch.delenv("GF_SEAL_KEYRING", raising=False)
+    monkeypatch.delenv("GF_SEAL_LEGACY", raising=False)
+    monkeypatch.setenv("SKELETON_SEAL_NONCE_STORE_MAX", "1")
+    app = FastAPI()
+
+    @app.post("/api/v1/projects/{pid}")
+    async def write(pid: str, who: str = Depends(hs.require_seal)):
+        return {"pid": pid}
+
+    app.add_middleware(RequestSealMiddleware, policy=GatePolicy())
+    c = TestClient(app)
+    url, body = "/api/v1/projects/p1?b=2&a=1", b'{"x":1}'
+    h1 = {"x-gf-seal": _live(), "x-gf-tenant": "t1"}
+    assert c.post(url, content=body, headers=h1).status_code == 200
+    r = c.post(url, content=body, headers={"x-gf-seal": _live(), "x-gf-tenant": "t1"})
+    assert r.status_code == 503 and r.json() == {"error": "nonce_store_full"}
+    assert int(r.headers["retry-after"]) >= 1
+    r = c.post(url, content=body, headers=h1)  # replay of the live nonce still 401
+    assert r.status_code == 401 and r.json() == {"error": "invalid_seal"}
 
 
 def test_nonce_store_thread_safe_single_winner():
