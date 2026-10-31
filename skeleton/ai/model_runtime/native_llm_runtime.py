@@ -221,6 +221,20 @@ class NativeLLMRuntime:
             weights_digest=self.model_digest,
         )
 
+    def spill_cpu_kv(self, cache: KVCache, store: object) -> str:
+        """Persist an admitted CPU reference KV cache; no GPU tensor migration."""
+        from .cpu_kv_spill import CpuKVSpillStore
+        if not isinstance(store, CpuKVSpillStore):
+            raise RuntimeContractError("CpuKVSpillStore required")
+        return store.stage(self, cache)
+
+    def restore_cpu_kv(self, digest: str, store: object) -> KVCache:
+        """Restore exact native CPU KV state under the current model identity."""
+        from .cpu_kv_spill import CpuKVSpillStore
+        if not isinstance(store, CpuKVSpillStore):
+            raise RuntimeContractError("CpuKVSpillStore required")
+        return store.restore(self, digest)
+
     def estimate_kv_bytes(self, tokens: int) -> int:
         count = max(0, int(tokens))
         return count * self.model.n_layers * self.model.dim * 2 * 8 + count * 8
