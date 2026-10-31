@@ -705,3 +705,16 @@ The response includes a deterministic planned quest receipt, every source
 anchored NPC waypoint, scene staging and unmet ending predicates.
 Typed Jeeves parity: `execute_dialogue_route_tool` using
 `skeleton.jeeves.studio_dialogue_route_request.v1`.
+
+## Private persisted dialogue fork
+
+Add `--output <new-directory>` to the dialogue checkpoint fork command
+to atomically export its forked canonical quest actions as a private
+source-verified NPC handoff. The existing handoff exporter requires an
+exclusive new directory, rejects linked parents and traversal, writes
+mode-0600 files and fsyncs the manifest and receipt. The CLI returns both
+the original deterministic fork proof and the private handoff receipt.
+Reopen with `--dialogue-stage --dialogue-import <directory>` against the
+same project/source; the import replays and checks every authored cue and
+manifest digest. The original save is not overwritten. Without `--output`,
+fork remains a read-only operation with CLI/Jeeves parity.

@@ -136,3 +136,53 @@ def test_cli_and_typed_jeeves_fork_have_identical_canonical_detail(capsys):
               "--dialogue-fork-index", "0"])
     with pytest.raises(SystemExit):
         main(["--project", PROJECT, "--dialogue-fork-index", "0"])
+
+def test_fork_private_handoff_roundtrip_and_exclusive_destination(tmp_path, capsys):
+    from scripts.studio_ecosystem_cli import main
+    docs, original, alternative, source, lease = _fixture()
+    output = tmp_path / "private-fork"
+    args = [
+        "--project", PROJECT, "--dialogue-stage",
+        "--dialogue-actions", json.dumps(original),
+        "--dialogue-fork-index", "0",
+        "--dialogue-fork-alternative", alternative,
+        "--dialogue-fork-expected-session", lease,
+        "--dialogue-expected-digest", source,
+        "--output", str(output),
+    ]
+    assert main(args) == 0
+    written = json.loads(capsys.readouterr().out)
+    assert written["file_write_performed"] is True
+    assert written["handoff"]["file_write_performed"] is True
+    assert written["fork"]["file_write_performed"] is False
+    assert output.is_dir()
+    assert main([
+        "--project", PROJECT, "--dialogue-stage",
+        "--dialogue-import", str(output),
+        "--dialogue-expected-digest", source,
+    ]) == 0
+    restored = json.loads(capsys.readouterr().out)
+    assert restored["staging_digest"] == written["fork"]["staging_after"]["staging_digest"]
+    with pytest.raises(SystemExit):
+        main(args)
+    assert sorted(p.name for p in output.iterdir()) == ["dialogue.json", "receipt.json"]
+
+
+def test_fork_export_rejects_linked_parent_without_writing(tmp_path):
+    from scripts.studio_ecosystem_cli import main
+    docs, original, alternative, source, lease = _fixture()
+    parent = tmp_path / "actual"
+    parent.mkdir()
+    link = tmp_path / "linked"
+    link.symlink_to(parent, target_is_directory=True)
+    with pytest.raises(SystemExit):
+        main([
+            "--project", PROJECT, "--dialogue-stage",
+            "--dialogue-actions", json.dumps(original),
+            "--dialogue-fork-index", "0",
+            "--dialogue-fork-alternative", alternative,
+            "--dialogue-fork-expected-session", lease,
+            "--dialogue-expected-digest", source,
+            "--output", str(link / "forged"),
+        ])
+    assert list(parent.iterdir()) == []

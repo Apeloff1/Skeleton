@@ -267,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
                 or args.compile_preview or args.materialize_batch
                 or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
                 or args.search is not None or args.deep_search or args.genre
-                or args.biome or (args.output is not None and not args.dialogue_export)
+                or args.biome or (args.output is not None and not (args.dialogue_export or args.dialogue_fork_index is not None))
                 or args.quest_actions is not None
                 or args.revision_source is not None or args.limit != 20
                 or args.max_artifact_bytes is not None):
@@ -298,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.dialogue_compare_actions is not None or args.dialogue_transcript
                     or args.dialogue_commit or args.dialogue_preview
                     or args.dialogue_restore_stdin or args.dialogue_export
-                    or args.dialogue_import is not None or args.output is not None
+                    or args.dialogue_import is not None
                     or not args.dialogue_fork_alternative
                     or not args.dialogue_fork_expected_session)
                 or args.dialogue_fork_index is None and (
@@ -403,6 +403,19 @@ def main(argv: list[str] | None = None) -> int:
                     expected_source_digest=args.dialogue_expected_digest,
                     preserve_suffix=args.dialogue_fork_preserve_suffix,
                     authorized=True)
+                if args.output is not None:
+                    from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                        export_dialogue_handoff,
+                    )
+                    handoff = export_dialogue_handoff(
+                        args.output, docs, result["forked_receipt"]["choices"],
+                        expected_source_digest=result["source_digest"],
+                        authorized=True)
+                    result = {
+                        "fork": result, "handoff": handoff,
+                        "file_write_performed": True,
+                        "release_certified": False,
+                    }
             elif args.dialogue_compare_actions is not None:
                 from skeleton.ai.game_builder.studio_ecosystem_dialogue_compare import (
                     compare_dialogue_histories,
