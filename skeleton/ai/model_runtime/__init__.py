@@ -10,6 +10,7 @@ from importlib import import_module
 
 # Keep all public contract names available without importing optional runtimes.
 _LAZY_EXPORTS = {
+    "LiveTailCapture": ".tail_live_capture",
     "ALLOWED_TRANSITIONS": ".flgb_model_runtime",
     "BatchGenerationRequest": ".runtime_contracts",
     "BatchRequest": ".flgb_model_runtime",
@@ -275,6 +276,7 @@ def __dir__():
     return sorted(set(globals()) | set(__all__))
 
 __all__ = [
+    "LiveTailCapture",
     "RuntimePromotionError",
     "AdmissionLedger",
     "admit_candidate_model",
