@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_echo_caverns",
+  "title": "Echo Caverns: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610302304,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 6
+}

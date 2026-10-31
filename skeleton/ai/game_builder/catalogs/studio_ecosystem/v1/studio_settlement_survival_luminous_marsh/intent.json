@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_luminous_marsh",
+  "title": "Luminous Marsh: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610301588,
+  "width": 25,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "forest",
+  "starting_health": 4
+}

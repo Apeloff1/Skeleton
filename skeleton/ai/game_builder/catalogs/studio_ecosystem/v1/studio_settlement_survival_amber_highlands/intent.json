@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_amber_highlands",
+  "title": "Amber Highlands: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Amber Highlands; prototype maps are not full genre implementations.",
+  "seed": 202610301775,
+  "width": 23,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 3
+}

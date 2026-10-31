@@ -1,0 +1,44 @@
+{
+  "project_id": "studio_settlement_survival_ashen_archipelago",
+  "genre": "settlement_survival",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "soundscape": {
+    "lead_instrument": "bass",
+    "ambience": "Environmental volcanic ash filtered by distance in basalt islands",
+    "tempo_bpm": 122,
+    "meter": "4/4",
+    "music_originality": "new_cue_composition_required"
+  },
+  "cue_sheet": [
+    {
+      "id": "survey",
+      "trigger": "arrival",
+      "purpose": "Express uncertainty around cliffside signal tower",
+      "mix_priority": "ambient"
+    },
+    {
+      "id": "conflict",
+      "trigger": "mediate",
+      "purpose": "Stress scarcity of freshwater cisterns without masking dialogue",
+      "mix_priority": "interactive"
+    },
+    {
+      "id": "resolution",
+      "trigger": "deliver",
+      "purpose": "Reflect selected faction outcome using an original reprise",
+      "mix_priority": "narrative"
+    }
+  ],
+  "accessibility": [
+    "independent_sfx_music_dialogue_levels",
+    "subtitles_for_spoken_material",
+    "no_sound_only_objectives"
+  ],
+  "adaptive_mix": {
+    "ducking": "dialogue_over_hazard",
+    "spatialization": "hardware_aware_future_requirement"
+  },
+  "deliverables": "cue_design_only_no_audio_rendered"
+}
