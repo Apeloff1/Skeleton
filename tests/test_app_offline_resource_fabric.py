@@ -281,6 +281,15 @@ class FabricTests(unittest.TestCase):
                 self.assertFalse(plan.as_dict()["backend_gpu_transfer_executed"])
                 with self.assertRaises(ValueError):
                     fabric.plan(10, readonly_stream="true")
+            with patch(
+                "skeleton.app.offline_resource_fabric.probe_local_resources",
+                return_value=replace(disk_full, available_ram_bytes=0),
+            ), patch(
+                "skeleton.app.offline_resource_fabric.probe_gpu_resources",
+                return_value=(),
+            ):
+                with self.assertRaises(LocalResourcePressure):
+                    fabric.plan(2_000_000_000, readonly_stream=True)
 
     def test_cancelled_stream_returns_no_partial_receipt_and_releases_slot(self):
         with TemporaryDirectory() as d:

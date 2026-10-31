@@ -394,8 +394,13 @@ class AdaptiveResourceFabric:
             running = self._active_streams
             learned_parallelism = self._learned_parallelism
         # A verified read-only mmap stream does not duplicate the source on
-        # disk or materialize it in RAM. Apply spill/storage admission only
-        # to operations that can actually allocate those resources.
+        # disk or materialize it in RAM. It still needs measured headroom
+        # for a bounded mmap window and digest/update buffers.
+        if readonly_stream and hw.available_ram_bytes < 2 * hw.read_chunk_bytes:
+            raise LocalResourcePressure(
+                "insufficient measured RAM for bounded read-only staging"
+            )
+        # Apply spill/storage admission only to operations that allocate it.
         if (not readonly_stream and source_bytes > hw.disk_document_budget
                 and source_bytes > hw.resident_document_budget):
             raise LocalResourcePressure("not enough RAM or disk headroom to stage requested source")

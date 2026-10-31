@@ -416,3 +416,9 @@ window, and before the final source identity check. An interrupted batch
 returns no partial proof set and releases measured stream slots even when a
 worker raises. This is cooperative per-window cancellation, not a guarantee
 that an in-flight kernel page fault can be interrupted instantaneously.
+
+Even read-only streaming requires two live bounded transfer windows of
+measured RAM headroom before admission. A host reporting no free physical
+memory is rejected instead of treating zero RAM as safe because the source
+already resides on disk. The check scales with the live adaptive chunk size,
+not with total source length or an arbitrary per-file limit.
