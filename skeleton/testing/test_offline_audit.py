@@ -254,4 +254,3 @@ def test_semantic_audit_rejects_orphaned_disk_chunks_and_fts(
     _change(library, "INSERT INTO offline_document_chunk_fts(rowid, body) VALUES (999999, 'orphan')")
     with pytest.raises(OfflineAuditError, match="orphaned disk chunk FTS5"):
         audit_database(library, "library")
-
