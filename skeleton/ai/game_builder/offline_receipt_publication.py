@@ -7,6 +7,7 @@ Publication is POSIX-only until an equivalent handle-safe Windows path exists.
 from __future__ import annotations
 
 from hashlib import sha256
+import hmac
 import json
 import os
 from pathlib import Path
@@ -15,7 +16,10 @@ import secrets
 import stat
 from typing import Mapping, Sequence
 
-from .dual_runtime_verify import _assert_original_root, _root_fd
+from .contracts import canonical_digest
+from .dual_runtime_verify import (
+    DualRuntimeVerificationError, _assert_original_root, _root_fd,
+)
 
 _MAX_RECEIPT_BYTES = 256 * 1024
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,126}\.json\Z")
@@ -44,6 +48,13 @@ def publish_verified_receipt(
             or not (receipt.get("offline_gameplay_reexecuted") is True
                     or receipt.get("both_cohorts_replayed") is True)):
         raise ReceiptPublicationError("receipt must come from a completed replay verifier")
+    if "receipt_digest" in receipt:
+        digest = receipt["receipt_digest"]
+        body = {key: value for key, value in receipt.items()
+                if key != "receipt_digest"}
+        if (type(digest) is not str
+                or not hmac.compare_digest(digest, canonical_digest(body))):
+            raise ReceiptPublicationError("verified receipt digest is inconsistent")
     try:
         data = (json.dumps(
             receipt, ensure_ascii=False, sort_keys=True,
@@ -117,6 +128,8 @@ def publish_verified_receipt(
                 pass
         if isinstance(exc, (ReceiptPublicationError, PermissionError)):
             raise
+        if isinstance(exc, DualRuntimeVerificationError):
+            raise ReceiptPublicationError("receipt destination changed during publication") from exc
         if isinstance(exc, OSError):
             raise ReceiptPublicationError("atomic receipt publication failed") from exc
         raise

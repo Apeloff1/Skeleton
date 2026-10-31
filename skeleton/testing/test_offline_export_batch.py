@@ -259,3 +259,20 @@ def test_batch_cli_persists_verified_replay_receipt(batch, tmp_path, capsys):
     assert receipt["offline_gameplay_reexecuted"] is True
     assert batch_cli(args) == 2
     assert json.loads(output.read_text()) == receipt
+
+
+def test_receipt_publication_rejects_inconsistent_replay_digest(tmp_path):
+    from skeleton.ai.game_builder.offline_receipt_publication import (
+        ReceiptPublicationError, publish_verified_receipt,
+    )
+    forged = {
+        "schema": "skeleton.game_builder.offline_export_batch_receipt.v1",
+        "offline_gameplay_reexecuted": True,
+        "receipt_digest": "0" * 64,
+    }
+    target = tmp_path / "invalid-receipt.json"
+    with pytest.raises(ReceiptPublicationError, match="digest"):
+        publish_verified_receipt(
+            forged, target, protected_roots=(tmp_path / "source",), authorized=True,
+        )
+    assert not target.exists()
