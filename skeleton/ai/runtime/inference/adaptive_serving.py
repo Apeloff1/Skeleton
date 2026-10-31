@@ -142,6 +142,15 @@ class ServingResources:
         ):
             raise ValueError("invalid measured thermal headroom")
 
+    @property
+    def allocation_headroom_bytes(self) -> int | None:
+        """Conservative shared physical/Windows commit admission headroom."""
+        bounds = tuple(
+            value for value in (self.available_memory_bytes, self.commit_available_bytes)
+            if value is not None
+        )
+        return min(bounds) if bounds else None
+
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 

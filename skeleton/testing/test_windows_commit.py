@@ -68,3 +68,13 @@ def test_critical_commit_pressure_pauses_background() -> None:
 def test_invalid_commit_fraction_rejected(value: object) -> None:
     with pytest.raises(ValueError):
         ServingResources(commit_used_fraction=value)
+
+def test_windows_commit_headroom_is_enforced_alongside_physical_ram() -> None:
+    assert ServingResources(
+        available_memory_bytes=1024, commit_available_bytes=256
+    ).allocation_headroom_bytes == 256
+    assert ServingResources(
+        available_memory_bytes=128, commit_available_bytes=512
+    ).allocation_headroom_bytes == 128
+    assert ServingResources(commit_available_bytes=512).allocation_headroom_bytes == 512
+    assert ServingResources().allocation_headroom_bytes is None

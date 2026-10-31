@@ -1886,7 +1886,7 @@ class LocalInferenceEngine:
         return memory is not None and memory >= self._serving.policy.memory_shed_watermark
 
     def _memory_headroom_locked(self, ticket: _ServingTicket) -> bool:
-        available = self._serving.resources.available_memory_bytes
+        available = self._serving.resources.allocation_headroom_bytes
         if not ticket.estimated_memory_bytes or available is None:
             return True
         # Reserve the conservative native KV estimate until physical drain.
@@ -2483,7 +2483,7 @@ class LocalInferenceEngine:
                 self._memory_shed_rejections += 1
                 self._overloaded += 1
                 raise LocalInferenceOverloaded("local inference admission shed for memory pressure")
-            available = self._serving.resources.available_memory_bytes
+            available = self._serving.resources.allocation_headroom_bytes
             if (
                 estimated_memory_bytes and available is not None and not self._active
                 and estimated_memory_bytes + 32 * 1024 * 1024 > available
