@@ -283,7 +283,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                                 "reason": decision.reason, "digest": decision.digest})
         else:
             result = plan_energy_workers(base, probe_power())
-    except (CpuBudgetError, EnergyError) as exc:
+    except ValueError as exc:
         print("energy admission rejected: " + str(exc), file=sys.stderr)
         return 2
     response = {"schema": SCHEMA, "allowed_workers": result.allowed_workers,
