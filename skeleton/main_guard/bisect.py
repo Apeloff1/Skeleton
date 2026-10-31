@@ -349,7 +349,13 @@ class GitBisectRun:
                 if could:
                     shas = [s for s in could.group(1).split() if s]
                     result.candidates = self.git.commits(shas)
-                elif proc.returncode != 0:
+                elif proc.returncode == 0:
+                    # Git may change its human-readable success wording. The
+                    # fallback still requires a proven adjacent good/bad pair.
+                    proven = _verified_bisect_head(self.git, candidates, good_sha, result.steps)
+                    if proven is not None:
+                        result.first_bad = self.git.commit(proven)
+                else:
                     raise BisectError("git bisect run failed: " + (output.strip().splitlines() or ["?"])[-1])
         finally:
             self._restore(head_before, branch_before)
@@ -373,6 +379,29 @@ class GitBisectRun:
             raise BisectError(
                 f"failed to restore original HEAD {head_before[:10]} ({branch_before or 'detached'})"
             )
+
+
+def _verified_bisect_head(git: Git, candidates: Sequence[str], good_sha: str,
+                          steps: Sequence[BisectStep]) -> str | None:
+    """Recover a first-bad SHA only from a uniquely proven git-bisect boundary.
+
+    Some Git versions omit the canonical first-bad sentence from the captured
+    output. Never infer a culprit from exit status or HEAD alone: require a
+    bad probe of HEAD and a good probe of its immediate candidate predecessor
+    (or the explicitly supplied known-good endpoint).
+    """
+    head = git.head_sha()
+    if head not in candidates:
+        return None
+    index = candidates.index(head)
+    predecessor = good_sha if index == 0 else candidates[index - 1]
+    if not any(step.sha == head and step.outcome == BAD for step in steps):
+        return None
+    if predecessor != good_sha and not any(
+        step.sha == predecessor and step.outcome == GOOD for step in steps
+    ):
+        return None
+    return head
 
 
 def _read_steps(path: Path) -> list[BisectStep]:

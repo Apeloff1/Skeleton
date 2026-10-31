@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from skeleton.main_guard.bisect import BisectError, bisect, classify_returncode, render_bisect_markdown
+from skeleton.main_guard.bisect import (
+    BAD, GOOD, BisectError, BisectStep, _verified_bisect_head,
+    bisect, classify_returncode, render_bisect_markdown,
+)
 from skeleton.testing.main_guard_test_support import commit, git, init_repo
 
 CHECK = [sys.executable, "-c", "import pathlib,sys; sys.exit(1 if 'BROKEN' in pathlib.Path('app.txt').read_text() else 0)"]
@@ -68,3 +71,17 @@ def test_classify_returncode() -> None:
     assert classify_returncode(1) == "bad"
     assert classify_returncode(125) == "skip"
     assert classify_returncode(None, timed_out=True) == "skip"
+
+
+def test_bisect_head_fallback_requires_proven_adjacent_boundary() -> None:
+    class _Git:
+        def head_sha(self):
+            return "b" * 40
+
+    good, earlier, bad = "0" * 40, "a" * 40, "b" * 40
+    bad_step = BisectStep(bad, BAD, 1, 0.01)
+    good_step = BisectStep(earlier, GOOD, 0, 0.01)
+    assert _verified_bisect_head(_Git(), [earlier, bad], good, [bad_step]) is None
+    assert _verified_bisect_head(_Git(), [earlier, bad], good, [good_step, bad_step]) == bad
+    assert _verified_bisect_head(_Git(), [bad], good, [bad_step]) == bad
+    assert _verified_bisect_head(_Git(), [earlier, bad], good, [good_step]) is None
