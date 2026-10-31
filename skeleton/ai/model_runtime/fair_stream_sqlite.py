@@ -6,7 +6,6 @@ anchor, key vault, model executor, or proof of hardware qualification.
 """
 from __future__ import annotations
 
-from hashlib import sha256
 import hmac
 import json
 import sqlite3
@@ -14,7 +13,7 @@ from threading import RLock
 from typing import Mapping
 
 from .fair_stream_custody import (
-    AuthenticatedFairStreamCustody, MAX_BYTES, ZERO,
+    AuthenticatedFairStreamCustody, MAX_BYTES,
 )
 
 SCHEMA = "skeleton.ai.fair-stream-sqlite-cas.v1"

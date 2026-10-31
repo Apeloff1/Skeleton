@@ -1,7 +1,6 @@
 """Deterministic SQLite transaction and recovery tests (simulated CPU only)."""
 from __future__ import annotations
 
-from copy import deepcopy
 import sqlite3
 
 import pytest

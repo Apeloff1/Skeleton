@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from threading import RLock
 from typing import Mapping, Protocol
 
-from .fair_stream_custody import AuthenticatedFairStreamCustody
 from .fair_stream_queue import MeasuredStreamBudget, StreamRequest
 from .fair_stream_sqlite import DurableFairStreamStore
 
