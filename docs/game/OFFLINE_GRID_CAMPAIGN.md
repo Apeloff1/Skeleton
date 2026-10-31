@@ -51,3 +51,10 @@ inflicts 2 damage, and permits a counterattack only while the enemy survives.
 Living enemies block movement. Health starts at 10; zero health terminates in
 `defeat`. No RNG, external game assets, or hidden real-time simulation is used.
 Combat health and enemy state are included in source-bound save/replay hashes.
+
+Crafting is a deterministic, atomic gameplay action. The original
+`signal-beacon` recipe consumes one collected `lantern` and creates a
+`beacon`, unlocking the distinct `bright-harbor` ending after talking to the
+keeper. Recipes are bounded and can only consume explicitly authored pickup
+items; unknown ingredients, duplicate products, cycles and double-spending
+are rejected. Crafting changes are replay-verified with the rest of game state.

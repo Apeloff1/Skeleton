@@ -62,7 +62,7 @@ class Campaign:
         if len(encoded.encode("utf-8")) > MAX_SOURCE_BYTES:
             _fail("campaign exceeds source budget")
         source = json.loads(encoded)
-        _keys(source, {"version", "game_id", "title", "license", "author", "rows", "objects", "quests", "endings"})
+        _keys(source, {"version", "game_id", "title", "license", "author", "rows", "objects", "quests", "endings"}, {"recipes"})
         if type(source["version"]) is not int or source["version"] != 1:
             _fail("unsupported campaign version")
         for field in ("game_id", "title", "author"):
@@ -113,6 +113,21 @@ class Campaign:
                 enemy_ids.add(identifier)
             else:
                 (item_ids if obj["kind"] == "item" else npc_ids).add(identifier)
+        recipes = source.get("recipes", [])
+        if not isinstance(recipes, list) or len(recipes) > MAX_OBJECTS:
+            _fail("invalid crafting recipes")
+        recipe_ids = set()
+        product_ids = set()
+        for recipe in recipes:
+            _keys(recipe, {"id", "ingredients", "product"})
+            recipe_id = req_id(recipe["id"], "recipe id")
+            product = req_id(recipe["product"], "crafted product")
+            ingredients = _ids(recipe["ingredients"], "ingredient")
+            if (recipe_id in recipe_ids or product in product_ids or product in item_ids
+                or not ingredients or not set(ingredients) <= item_ids):
+                _fail("invalid crafting recipe or dependency")
+            recipe_ids.add(recipe_id)
+            product_ids.add(product)
         quests = source["quests"]
         if not isinstance(quests, list) or len(quests) > MAX_OBJECTS:
             _fail("invalid quests")
@@ -123,7 +138,7 @@ class Campaign:
             items = _ids(quest["requires_items"], "item")
             npcs = _ids(quest["requires_npcs"], "npc")
             dependencies = _ids(quest["requires_quests"], "quest")
-            if not set(items) <= item_ids or not set(npcs) <= npc_ids:
+            if not set(items) <= item_ids | product_ids or not set(npcs) <= npc_ids:
                 _fail("quest references missing object")
             quest_nodes.append(QuestNode(identifier, dependencies, dig(quest)))
         quest_order(quest_nodes)
@@ -160,11 +175,11 @@ class Command:
 
     def __post_init__(self) -> None:
         req_id(self.command_id, "command_id")
-        if self.kind not in ("move", "collect", "talk", "strike", "finish", "wait"):
+        if self.kind not in ("move", "collect", "talk", "craft", "strike", "finish", "wait"):
             _fail("unknown command")
         if self.kind == "move" and self.target not in DIRECTIONS:
             _fail("unknown direction")
-        if self.kind in ("collect", "talk", "strike", "finish"):
+        if self.kind in ("collect", "talk", "craft", "strike", "finish"):
             req_id(self.target, "target")
         if self.kind == "wait" and self.target:
             _fail("wait cannot have target")
@@ -243,6 +258,15 @@ class Session:
                 if command.target in spoken:
                     _fail("NPC already contacted")
                 spoken = tuple(sorted((*spoken, command.target)))
+        elif command.kind == "craft":
+            recipe = next((item for item in spec.get("recipes", [])
+                           if item["id"] == command.target), None)
+            if recipe is None or not set(recipe["ingredients"]) <= set(inventory):
+                _fail("crafting recipe or ingredients unavailable")
+            if recipe["product"] in inventory:
+                _fail("crafted product already owned")
+            remaining = set(inventory) - set(recipe["ingredients"])
+            inventory = tuple(sorted(remaining | {recipe["product"]}))
         elif command.kind == "strike":
             target = next((obj for obj in spec["objects"]
                            if obj["id"] == command.target and obj["kind"] == "enemy"), None)

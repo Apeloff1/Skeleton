@@ -44,6 +44,16 @@
         "keeper"
       ],
       "requires_quests": []
+    },
+    {
+      "id": "beaconkeeper",
+      "requires_items": [
+        "beacon"
+      ],
+      "requires_npcs": [
+        "keeper"
+      ],
+      "requires_quests": []
     }
   ],
   "endings": [
@@ -58,6 +68,22 @@
       "id": "wanderer",
       "requires_quests": [],
       "outcome": "alternate"
+    },
+    {
+      "id": "bright-harbor",
+      "requires_quests": [
+        "beaconkeeper"
+      ],
+      "outcome": "alternate"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "signal-beacon",
+      "ingredients": [
+        "lantern"
+      ],
+      "product": "beacon"
     }
   ]
 }

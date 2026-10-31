@@ -103,6 +103,9 @@ class OfflineGridCampaignTests(unittest.TestCase):
             lambda v: v["objects"][0].update(x=0, y=0),
             lambda v: v["objects"][2].update(hp=0),
             lambda v: v["objects"][2].update(attack=True),
+            lambda v: v["recipes"][0].update(ingredients=["unknown"]),
+            lambda v: v["recipes"][0].update(product="lantern"),
+            lambda v: v["recipes"][0].update(ingredients=[]),
             lambda v: v["quests"][0].update(requires_items=["unknown"]),
             lambda v: v["quests"][0].update(requires_quests=["lightkeeper"]),
             lambda v: v["endings"][0].update(requires_quests=["missing"]),
@@ -117,6 +120,24 @@ class OfflineGridCampaignTests(unittest.TestCase):
                 Campaign.load(source)
         with self.assertRaises(GameplayContractError):
             Campaign.load({"rows": []})
+
+    def test_crafting_consumes_inputs_and_unlocks_distinct_ending(self):
+        commands = [
+            ("east", "move", "east"), ("take", "collect", "lantern"),
+            ("craft", "craft", "signal-beacon"), ("east2", "move", "east"),
+            ("greet", "talk", "keeper"), ("south", "move", "south"),
+            ("south2", "move", "south"), ("east3", "move", "east"),
+            ("east4", "move", "east"), ("south3", "move", "south"),
+            ("bright", "finish", "bright-harbor"),
+        ]
+        state = self.play(commands)
+        self.assertEqual(state.ending, "bright-harbor")
+        self.assertIn("beacon", state.inventory)
+        self.assertNotIn("lantern", state.inventory)
+        self.assertIn("beaconkeeper", state.quests)
+        self.assertEqual(Session.restore(self.campaign, state.snapshot()), state)
+        with self.assertRaises(GameplayContractError):
+            Session.new(self.campaign).step(Command("bad", "craft", "signal-beacon"))
 
     def test_combat_collision_damage_and_replay(self):
         state = Session.new(self.campaign)
