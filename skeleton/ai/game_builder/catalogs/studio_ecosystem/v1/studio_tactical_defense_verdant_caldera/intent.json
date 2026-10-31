@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_defense_verdant_caldera",
+  "title": "Verdant Caldera: Tactical Defense",
+  "subtitle": "An original tactical defense brief in Verdant Caldera; prototype maps are not full genre implementations.",
+  "seed": 202610300666,
+  "width": 21,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 6
+}
