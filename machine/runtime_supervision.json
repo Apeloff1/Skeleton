@@ -259,7 +259,7 @@
       "required_symbols": [
         "def _remaining_provider_timeout(",
         "asyncio.wait_for(",
-        "except asyncio.TimeoutError",
+        "except TimeoutError",
         "ProviderInvocationError("
       ]
     },
