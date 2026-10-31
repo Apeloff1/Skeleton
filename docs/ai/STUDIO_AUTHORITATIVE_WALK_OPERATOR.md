@@ -450,3 +450,19 @@ OLDER_DIRECTORY. It reports exact changed source paths and digests, playable
 HTML differences, and conservative save/replay invalidation; it never
 migrates a player's save or certifies the authored ending. Jeeves
 studio_author_revision includes the same impact receipt in its typed preview.
+
+
+### Three-way original-world revision reconciliation
+
+Two independent, source-leased prose revisions can be merged without silently
+overwriting another author's work. Use `--project PROJECT --merge-revisions
+--merge-left-source LEFT --merge-right-source RIGHT --output NEW_DIRECTORY`.
+The common base is the registered source unless `--revision-source BASE` is
+provided. All three inputs are canon-audited, each edit is restricted to the
+existing authoring allowlist, and overlapping divergent edits fail closed.
+The new private bundle contains the merged source, playable HTML, and receipt
+with three-way source digests. It never mutates a prior bundle or migrates a
+save. `studio_author_merge` provides the same operator-gated, typed Jeeves
+preview for two independent edit lists; it does not write files or infer
+permission from a prompt. Merge digests prove content consistency, not
+authorship, licensing, native runtime or consumer release.

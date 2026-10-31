@@ -443,3 +443,69 @@ def execute_author_revision_tool(request: Mapping[str, Any], *,
     }
     payload["result_digest"] = _digest(payload)
     return payload
+
+
+AUTHOR_MERGE_REQUEST_SCHEMA = "skeleton.jeeves.studio_author_merge_request.v1"
+AUTHOR_MERGE_RESULT_SCHEMA = "skeleton.jeeves.studio_author_merge_result.v1"
+
+
+def author_merge_tool_schema() -> dict[str, object]:
+    """Typed, operator-gated merge preview; no model-controlled file writes."""
+    return {
+        "name": "studio_author_merge",
+        "description": "Reconcile independently edited original prose against canonical source",
+        "parameters": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "schema": {"type": "string", "const": AUTHOR_MERGE_REQUEST_SCHEMA},
+                "project_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "expected_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "left_edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                               "items": {"type": "object"}},
+                "right_edits": {"type": "array", "minItems": 1, "maxItems": 16,
+                                "items": {"type": "object"}},
+            },
+            "required": ["schema", "project_id", "expected_source_digest",
+                         "left_edits", "right_edits"],
+        },
+    }
+
+
+def execute_author_merge_tool(request: Mapping[str, Any], *,
+                              authorized: bool = False) -> dict[str, Any]:
+    if authorized is not True:
+        raise PermissionError("Jeeves authored merge requires operator authorization")
+    if (type(request) is not dict
+            or set(request) != {"schema", "project_id", "expected_source_digest",
+                                "left_edits", "right_edits"}
+            or request.get("schema") != AUTHOR_MERGE_REQUEST_SCHEMA
+            or len(_canonical(request)) > 16384):
+        raise StudioQuestError("invalid typed Jeeves authored merge request")
+    from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+        REVISION_SCHEMA, preview_canon_revision,
+    )
+    from skeleton.ai.game_builder.studio_ecosystem_author_merge import merge_canon_revisions
+    base = read_blueprint(request["project_id"])
+    revisions = []
+    for field in ("left_edits", "right_edits"):
+        edit_request = {
+            "schema": REVISION_SCHEMA,
+            "project_id": request["project_id"],
+            "expected_source_digest": request["expected_source_digest"],
+            "edits": request[field],
+        }
+        revision, _, _ = preview_canon_revision(base, edit_request, authorized=True)
+        revisions.append(revision)
+    _, _, receipt, impact = merge_canon_revisions(
+        base, revisions[0], revisions[1], authorized=True)
+    result = {
+        "schema": AUTHOR_MERGE_RESULT_SCHEMA,
+        "project_id": request["project_id"],
+        "request_digest": _digest(request),
+        "merge_receipt": receipt,
+        "impact": impact,
+        "file_write_performed": False,
+        "release_certified": False,
+    }
+    result["result_digest"] = _digest(result)
+    return result

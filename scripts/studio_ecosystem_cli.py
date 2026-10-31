@@ -29,6 +29,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="Maximum deterministic search results, 1..100")
     ap.add_argument("--author-revision", action="store_true",
                     help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--merge-revisions", action="store_true",
+                    help="Merge two independently verified original prose revisions against a common base")
+    ap.add_argument("--merge-left-source", type=Path,
+                    help="Verified first authored revision bundle")
+    ap.add_argument("--merge-right-source", type=Path,
+                    help="Verified second authored revision bundle")
     ap.add_argument("--revision-impact", action="store_true",
                     help="Compare canonical source against a verified authored revision")
     ap.add_argument("--revision-compare-source", type=Path,
@@ -178,6 +184,41 @@ def main(argv: list[str] | None = None) -> int:
     if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
             or args.walk_audit_expected_digest is not None):
         ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if args.merge_revisions:
+        if (not args.project or args.merge_left_source is None
+                or args.merge_right_source is None or args.output is None
+                or args.author_revision or args.revision_impact or args.audit_canon
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.revision_request is not None
+                or args.revision_compare_source is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--merge-revisions requires --project, both verified sources and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_author_merge import merge_canon_revisions
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            base = (load_revision_bundle(args.revision_source, authorized=True,
+                                         project_id=args.project)[0]
+                    if args.revision_source is not None else read_blueprint(args.project))
+            left = load_revision_bundle(args.merge_left_source, authorized=True,
+                                        project_id=args.project)[0]
+            right = load_revision_bundle(args.merge_right_source, authorized=True,
+                                         project_id=args.project)[0]
+            merged, html, receipt, impact = merge_canon_revisions(
+                base, left, right, authorized=True)
+            write_revision_bundle(args.output, merged, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"receipt": receipt, "impact": impact},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.merge_left_source is not None or args.merge_right_source is not None:
+        ap.error("--merge-left-source and --merge-right-source require --merge-revisions")
     if args.revision_impact:
         if (not args.project or args.revision_compare_source is None
                 or args.author_revision or args.audit_canon or args.play_walk
