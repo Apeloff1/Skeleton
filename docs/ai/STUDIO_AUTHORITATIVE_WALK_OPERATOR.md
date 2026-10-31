@@ -285,3 +285,15 @@ SHA-256 digests and explicit invalid/partial statuses. Consumers must compare
 catalog digests before combining pages. An index changing during the page
 fails closed. The result never claims all branch combinations, rights,
 artistic merit, native gameplay, external proof or release qualification.
+
+## Typed Jeeves authored choice coverage parity
+
+The existing operator-authorized `studio_authoritative_walk` Jeeves tool
+accepts `operation="coverage"` using its versioned request schema and the
+same canonical replay authority as `--play-walk --walk-audit-choices`.
+The tool recomputes and verifies the saved receipt, checks source identity,
+returns the deterministic choice coverage receipt under `detail`, and never
+accepts caller-supplied authority or certification flags. A forged receipt,
+invalid project or untrusted request fails before any game-state mutation.
+The operation is a read-only authoring diagnostic, not a provider call or
+native-game certification.

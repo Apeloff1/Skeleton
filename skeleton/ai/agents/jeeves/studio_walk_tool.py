@@ -23,7 +23,7 @@ REQUEST_SCHEMA = "skeleton.jeeves.studio_walk_tool_request.v1"
 RESULT_SCHEMA = "skeleton.jeeves.studio_walk_tool_result.v1"
 OPERATIONS = frozenset({
     "replay", "route", "follow_route", "choices", "forecast", "continuity",
-    "timeline", "compare",
+    "timeline", "compare", "coverage",
 })
 _ALLOWED = frozenset({"schema", "project_id", "operation", "events", "receipt",
                       "forecast_depth", "compare_events"})
@@ -131,6 +131,11 @@ def execute_walk_tool(request: Mapping[str, Any], *, authorized: bool = False) -
         detail = walk_choice_previews(session, docs, authorized=True)
     elif operation == "forecast":
         detail = walk_branch_forecast(session, docs, depth=depth, authorized=True)
+    elif operation == "coverage":
+        from skeleton.ai.game_builder.studio_ecosystem_walk_coverage import (
+            audit_walk_choice_coverage,
+        )
+        detail = audit_walk_choice_coverage(session, docs, authorized=True)
     elif operation == "continuity":
         detail = walk_narrative_continuity(session, docs, authorized=True)
     elif operation == "timeline":
