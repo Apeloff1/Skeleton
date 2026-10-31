@@ -8,25 +8,35 @@ parses active formats, or asks a model to classify indexed text.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import codecs
 import hashlib
+import io
 import os
 from pathlib import Path
 import re
 import sqlite3
 import stat
 import threading
-from typing import Callable
+from typing import Callable, Iterator
 
 from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
+from .offline_resources import (
+    LocalResourcePressure, probe_local_resources, admit_resident_document,
+    admit_disk_document,
+)
+from .offline_disk_index import (
+    DiskChunkWriter, create_chunk_tables, clear_chunks, verify_chunks,
+    search_chunks,
+)
 
 
 SCHEMA = "skeleton.app.offline_library.v1"
-MAX_FILES = 2000
-MAX_DOCUMENT_BYTES = 128 * 1024
-MAX_TOTAL_BYTES = 32 * 1024 * 1024
-# Aggregate storage bounds also apply across separately imported directories.
-MAX_LIBRARY_FILES = 10000
-MAX_LIBRARY_BYTES = 128 * 1024 * 1024
+# Retired compatibility names: local capacity follows hardware and disk space.
+MAX_FILES = None
+MAX_DOCUMENT_BYTES = None
+MAX_TOTAL_BYTES = None
+MAX_LIBRARY_FILES = None
+MAX_LIBRARY_BYTES = None
 EXTENSIONS = frozenset({".txt", ".md", ".markdown", ".rst", ".py", ".json", ".jsonl", ".csv", ".toml", ".yaml", ".yml"})
 SKIP_DIRS = frozenset({".git", ".svn", ".hg", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cache", ".pytest_cache"})
 
@@ -65,8 +75,13 @@ def _read_document(
     path: Path,
     *,
     root: Path | None = None,
-) -> tuple[str, str, int]:
-    """Read bounded bytes without following a swapped parent-directory link.
+    offload: Callable[[str], None] | None = None,
+) -> tuple[str | None, str, int]:
+    """Stream UTF-8 without fixed size caps or swapped parent-directory links.
+
+    Return body=None when the current RAM/swap pressure calls for disk
+    offload. An offload callback persists decoded chunks into SQLite without
+    assembling a full Python string.
 
     On POSIX the root is opened first, then each relative directory is
     traversed with O_DIRECTORY | O_NOFOLLOW via dir_fd. The final document
@@ -107,26 +122,75 @@ def _read_document(
         with os.fdopen(fd, "rb") as handle:
             fd = None
             info = os.fstat(handle.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_DOCUMENT_BYTES:
-                raise OfflineLibraryError("document is not a bounded regular file")
-            raw = handle.read(MAX_DOCUMENT_BYTES + 1)
+            if not stat.S_ISREG(info.st_mode):
+                raise OfflineLibraryError("document is not a regular file")
+            try:
+                resource = probe_local_resources(path)
+            except LocalResourcePressure as exc:
+                raise OfflineLibraryError(str(exc)) from exc
+            resident = (
+                offload is None
+                and info.st_size <= resource.resident_document_budget
+                and not (
+                    resource.should_spill_early
+                    and info.st_size > resource.read_chunk_bytes
+                )
+            )
+            digest = hashlib.sha256()
+            decoder = codecs.getincrementaldecoder("utf-8")("strict")
+            text = io.StringIO() if resident else None
+            byte_count = 0
+            next_probe = max(8 * 1024 * 1024, resource.read_chunk_bytes * 8)
+            try:
+                while chunk := handle.read(resource.read_chunk_bytes):
+                    if b"\x00" in chunk:
+                        raise OfflineLibraryError("binary local document is unsupported")
+                    digest.update(chunk)
+                    byte_count += len(chunk)
+                    decoded = decoder.decode(chunk)
+                    if text is not None:
+                        text.write(decoded)
+                    elif offload is not None and decoded:
+                        offload(decoded)
+                    # Usage can change during a long read. On renewed
+                    # pressure discard the first-pass resident buffer and
+                    # re-run this source through the disk writer transaction.
+                    if byte_count >= next_probe:
+                        try:
+                            resource = probe_local_resources(path)
+                        except LocalResourcePressure as exc:
+                            raise OfflineLibraryError(str(exc)) from exc
+                        if text is not None and (
+                            info.st_size > resource.resident_document_budget
+                            or resource.should_spill_early
+                        ):
+                            text = None
+                        next_probe = byte_count + max(
+                            8 * 1024 * 1024, resource.read_chunk_bytes * 8,
+                        )
+                trailing = decoder.decode(b"", final=True)
+                if text is not None:
+                    text.write(trailing)
+                elif offload is not None and trailing:
+                    offload(trailing)
+            except UnicodeError as exc:
+                raise OfflineLibraryError("selected document is not UTF-8 text") from exc
+            after = os.fstat(handle.fileno())
+            if (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) != (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+            ) or byte_count != info.st_size:
+                raise OfflineLibraryError("local document changed during indexing")
+            body = text.getvalue() if text is not None else None
     except OSError as exc:
         raise OfflineLibraryError("cannot read selected local document safely") from exc
     finally:
         if fd is not None:
             os.close(fd)
-    if len(raw) > MAX_DOCUMENT_BYTES or b"\x00" in raw:
-        raise OfflineLibraryError("unsupported binary or oversized local document")
-    try:
-        body = raw.decode("utf-8", "strict")
-    except UnicodeError as exc:
-        raise OfflineLibraryError("selected document is not UTF-8 text") from exc
-    return body, hashlib.sha256(raw).hexdigest(), len(raw)
+    return body, digest.hexdigest(), byte_count
 
 
-def _files(directory: Path) -> list[tuple[str, str, str, int]]:
-    staged: list[tuple[str, str, str, int]] = []
-    budget = 0
+def _files(directory: Path) -> Iterator[tuple[str, str, str | None, int, Path]]:
+    """Yield one safely opened document at a time; no corpus-wide staging."""
     for parent, dirs, names in os.walk(directory, followlinks=False):
         dirs[:] = sorted(
             name for name in dirs if name not in SKIP_DIRS and not name.startswith(".")
@@ -146,11 +210,7 @@ def _files(directory: Path) -> list[tuple[str, str, str, int]]:
             if len(relative) > 500:
                 raise OfflineLibraryError("document relative path exceeds safety budget")
             body, digest, byte_count = _read_document(path, root=directory)
-            budget += byte_count
-            if budget > MAX_TOTAL_BYTES or len(staged) >= MAX_FILES:
-                raise OfflineLibraryError("indexed corpus exceeds offline budget")
-            staged.append((relative, digest, body, byte_count))
-    return staged
+            yield (relative, digest, body, byte_count, path)
 
 
 def _terms(query: str) -> tuple[str, ...]:
@@ -213,6 +273,7 @@ class OfflineDocumentLibrary:
             )""")
             self._db.execute("""CREATE VIRTUAL TABLE IF NOT EXISTS offline_document_fts
                 USING fts5(body, tokenize='unicode61')""")
+            create_chunk_tables(self._db)
         except sqlite3.Error as exc:
             raise OfflineLibraryError(
                 "local SQLite document search requires working FTS5 support"
@@ -241,10 +302,14 @@ class OfflineDocumentLibrary:
         worker with an expired/reclaimed lease from publishing stale results.
         """
         root = str(_root(directory))
-        staged = _files(Path(root))  # Finish validation before mutating SQLite.
-        seen = {item[0] for item in staged}
+        # Scanning inside BEGIN IMMEDIATE preserves all-or-nothing publication.
+        seen: set[str] = set()
+        indexed_files = 0
+        indexed_bytes = 0
         changed = 0
         removed = 0
+        offloaded_files = 0
+        offloaded_bytes = 0
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
             try:
@@ -253,13 +318,14 @@ class OfflineDocumentLibrary:
                     (root,),
                 ).fetchall()
                 previous = {relative: (docid, digest) for docid, relative, digest in records}
-                for relative, digest, body, size in staged:
+                for relative, digest, body, size, path in _files(Path(root)):
+                    seen.add(relative)
+                    indexed_files += 1
+                    indexed_bytes += size
                     old = previous.get(relative)
                     if old is not None and old[1] == digest:
-                        # A digest match alone is insufficient after a
-                        # damaged/partially rewritten index. Admit the fast
-                        # path only when both the document and FTS projection
-                        # still match the user-selected source bytes.
+                        # Verify the *stored* text and every FTS projection,
+                        # never trust a digest-only unchanged fast path.
                         stored = self._db.execute(
                             "SELECT body, size_bytes FROM offline_documents WHERE id=?",
                             (old[0],),
@@ -268,38 +334,84 @@ class OfflineDocumentLibrary:
                             "SELECT body FROM offline_document_fts WHERE rowid=?",
                             (old[0],),
                         ).fetchone()
-                        if (
-                            stored == (body, size)
-                            and projection == (body,)
-                        ):
-                            continue
+                        if body is None:
+                            if (
+                                stored == ("", size)
+                                and projection is None
+                                and verify_chunks(self._db, old[0], digest, size)
+                            ):
+                                continue
+                        elif stored == (body, size) and projection == (body,):
+                            if not self._db.execute(
+                                "SELECT 1 FROM offline_document_chunks "
+                                "WHERE document_id=? LIMIT 1", (old[0],),
+                            ).fetchone():
+                                continue
+                    # The existing full-text path is preserved for files
+                    # smaller than the live resident memory allowance.
+                    try:
+                        resources = probe_local_resources(self.path)
+                        if body is None:
+                            admit_disk_document(resources, size)
+                        else:
+                            admit_resident_document(resources, size, write=True)
+                    except LocalResourcePressure as exc:
+                        raise OfflineLibraryError(str(exc)) from exc
                     if old is None:
                         docid = self._db.execute(
                             "INSERT INTO offline_documents "
                             "(root, relative_path, sha256, body, size_bytes) "
                             "VALUES (?,?,?,?,?)",
-                            (root, relative, digest, body, size),
+                            (root, relative, digest, body or "", size),
                         ).lastrowid
                     else:
                         docid = old[0]
                         self._db.execute(
-                            "UPDATE offline_documents "
-                            "SET sha256=?, body=?, size_bytes=? WHERE id=?",
-                            (digest, body, size, docid),
-                        )
-                        self._db.execute(
                             "DELETE FROM offline_document_fts WHERE rowid=?", (docid,),
                         )
-                    self._db.execute(
-                        "INSERT INTO offline_document_fts(rowid, body) VALUES (?,?)",
-                        (docid, body),
-                    )
+                        clear_chunks(self._db, docid)
+                        self._db.execute(
+                            "UPDATE offline_documents "
+                            "SET sha256=?, body=?, size_bytes=? WHERE id=?",
+                            (digest, body or "", size, docid),
+                        )
+                    if body is None:
+                        # SQLite is the durable spill backing. The no-follow
+                        # source is opened again and rehashed; a mid-scan
+                        # replacement cannot publish a mismatched index.
+                        writer = DiskChunkWriter(
+                            self._db, docid, max(256, min(
+                                resources.read_chunk_bytes,
+                                max(256, resources.resident_document_budget // 2),
+                            )),
+                        )
+                        streamed_body, checked_digest, checked_size = _read_document(
+                            path, root=Path(root), offload=writer.feed,
+                        )
+                        writer.finish()
+                        if (
+                            streamed_body is not None
+                            or checked_digest != digest
+                            or checked_size != size
+                            or not verify_chunks(self._db, docid, digest, size)
+                        ):
+                            raise OfflineLibraryError(
+                                "streamed source changed or disk projection failed verification"
+                            )
+                        offloaded_files += 1
+                        offloaded_bytes += size
+                    else:
+                        self._db.execute(
+                            "INSERT INTO offline_document_fts(rowid, body) VALUES (?,?)",
+                            (docid, body),
+                        )
                     changed += 1
                 for relative, (docid, _) in previous.items():
                     if relative not in seen:
                         self._db.execute(
                             "DELETE FROM offline_document_fts WHERE rowid=?", (docid,),
                         )
+                        clear_chunks(self._db, docid)
                         self._db.execute("DELETE FROM offline_documents WHERE id=?", (docid,))
                         removed += 1
                 # FTS5 is a derived projection. Drop orphaned rowids that
@@ -314,17 +426,19 @@ class OfflineDocumentLibrary:
                         "DELETE FROM offline_document_fts WHERE rowid=?",
                         (orphan_id,),
                     )
-                total = self._db.execute(
-                    "SELECT COUNT(*), COALESCE(SUM(size_bytes),0) "
-                    "FROM offline_documents"
-                ).fetchone()
-                if (
-                    total[0] > MAX_LIBRARY_FILES
-                    or total[1] > MAX_LIBRARY_BYTES
-                ):
-                    raise OfflineLibraryError(
-                        "aggregate local knowledge library exceeds admitted size limits"
+                # Repair detached disk-index projections, never silently keep
+                # orphaned FTS rows that may match unrelated source material.
+                dangling = self._db.execute(
+                    "SELECT rowid FROM offline_document_chunk_fts "
+                    "WHERE rowid NOT IN (SELECT id FROM offline_document_chunks)"
+                )
+                for (orphan_id,) in dangling:
+                    self._db.execute(
+                        "DELETE FROM offline_document_chunk_fts WHERE rowid=?",
+                        (orphan_id,),
                     )
+                # Actual SQLite/filesystem exhaustion still aborts atomically.
+                # No artificial per-directory or aggregate corpus quota.
                 if before_commit is not None:
                     before_commit()
                 self._db.execute("COMMIT")
@@ -333,11 +447,13 @@ class OfflineDocumentLibrary:
                 raise
         return {
             "schema_version": SCHEMA,
-            "indexed_files": len(staged),
+            "indexed_files": indexed_files,
             "updated_files": changed,
             "removed_files": removed,
             "repaired_orphan_fts_rows": len(orphans),
-            "indexed_bytes": sum(item[3] for item in staged),
+            "indexed_bytes": indexed_bytes,
+            "offloaded_files": offloaded_files,
+            "offloaded_bytes": offloaded_bytes,
         }
 
     def search(self, query: str, *, limit: int = 5) -> tuple[LibraryHit, ...]:
@@ -356,24 +472,50 @@ class OfflineDocumentLibrary:
                     "ORDER BY rank ASC, d.root ASC, d.relative_path ASC LIMIT ?",
                     (expression, limit),
                 ).fetchall()
+                disk_rows = search_chunks(self._db, expression, limit)
+                results: list[LibraryHit] = []
+                for root, relative, digest, body, rank in rows:
+                    if (
+                        not isinstance(body, str)
+                        or not isinstance(digest, str)
+                        or hashlib.sha256(body.encode("utf-8")).hexdigest() != digest
+                    ):
+                        raise OfflineLibraryError(
+                            "offline indexed document failed integrity verification"
+                        )
+                    results.append(LibraryHit(
+                        source=root, relative_path=relative,
+                        excerpt=_excerpt(body, terms),
+                        document_sha256=digest, score=float(rank),
+                    ))
+                verified: set[int] = set()
+                for root, relative, digest, body, rank, document_id in disk_rows:
+                    if document_id not in verified:
+                        metadata = self._db.execute(
+                            "SELECT body, size_bytes FROM offline_documents WHERE id=?",
+                            (document_id,),
+                        ).fetchone()
+                        if (
+                            metadata is None or metadata[0] != ""
+                            or not verify_chunks(
+                                self._db, document_id, digest, metadata[1]
+                            )
+                        ):
+                            raise OfflineLibraryError(
+                                "disk-indexed source failed integrity verification"
+                            )
+                        verified.add(document_id)
+                    results.append(LibraryHit(
+                        source=root, relative_path=relative,
+                        excerpt=_excerpt(body, terms),
+                        document_sha256=digest, score=float(rank),
+                    ))
             except sqlite3.Error as exc:
                 raise OfflineLibraryError("local FTS query could not be executed") from exc
-        results: list[LibraryHit] = []
-        for root, relative, digest, body, rank in rows:
-            if (
-                not isinstance(body, str)
-                or not isinstance(digest, str)
-                or hashlib.sha256(body.encode("utf-8")).hexdigest() != digest
-            ):
-                raise OfflineLibraryError("offline indexed document failed integrity verification")
-            results.append(LibraryHit(
-                source=root,
-                relative_path=relative,
-                excerpt=_excerpt(body, terms),
-                document_sha256=digest,
-                score=float(rank),
-            ))
-        return tuple(results)
+        results.sort(key=lambda hit: (
+            hit.score, hit.source, hit.relative_path, hit.excerpt,
+        ))
+        return tuple(results[:limit])
 
     def count(self) -> int:
         with self._lock:

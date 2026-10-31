@@ -332,7 +332,8 @@ def test_local_ai_seam_dispatch_covers_index_and_two_hundred_numbered_targets() 
     )
     expected = {"skeleton.local_ai." + name for name in listed}
     expected.update("skeleton.local_ai.seam_%03d" % i for i in range(200))
-    assert len(expected) == 245
+    assert len(listed) == 50
+    assert len(expected) == 250
     assert imported == expected
     assert SCANNER.violations(file) == []
 

@@ -33,6 +33,7 @@ from skeleton.skills.tool_contract import (
     validate_json_value,
 )
 
+from .kv_placement import observe_native_kv_placement
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -106,6 +107,10 @@ _MANAGED_LONG_FLAGS = {
     "--threads",
     "--batch-size",
     "--gpu-layers",
+    "--kv-offload",
+    "--no-kv-offload",
+    "--cache-type-k",
+    "--cache-type-v",
     "--grammar",
     "--grammar-file",
     "--json-schema",
@@ -121,6 +126,10 @@ _MANAGED_SHORT_FLAGS = (
     "-b",
     "-bf",
     "-ngl",
+    "-kvo",
+    "-nkvo",
+    "-ctk",
+    "-ctv",
     "-j",
     "-jf",
     "-s",
@@ -250,6 +259,9 @@ class LlamaCppConfig:
     threads: int | None = None
     batch_size: int | None = None
     gpu_layers: int | None = None
+    kv_cache_location: str = "backend"
+    kv_cache_type_k: str | None = None
+    kv_cache_type_v: str | None = None
     temperature: float = 0.0
     extra_args: tuple[str, ...] = ()
     environment: Mapping[str, str] = field(default_factory=dict)
@@ -304,6 +316,19 @@ class LlamaCppConfig:
             "llama_completion_eog",
         }:
             raise ValueError("output_framing must be raw or llama_completion_eog")
+        if type(self.kv_cache_location) is not str or self.kv_cache_location not in {
+            "backend", "host",
+        }:
+            raise ValueError("kv_cache_location must be backend or host")
+        supported_kv_types = {"f16", "q8_0", "q4_0"}
+        for name in ("kv_cache_type_k", "kv_cache_type_v"):
+            value = getattr(self, name)
+            if value is not None and (
+                type(value) is not str or value not in supported_kv_types
+            ):
+                raise ValueError(
+                    f"{name} requires explicit f16, q8_0 or q4_0"
+                )
         normalized_args: list[str] = []
         for item in self.extra_args:
             if not isinstance(item, str) or not item:
@@ -839,6 +864,15 @@ class LlamaCppModel:
         self._draining_processes: set[int] = set()
         self._spawning_processes = 0
         self._processes_started = 0
+        self._inference_admitted = False
+        self._resource_profile_bound = False
+        self._resource_preflight: Callable[[], None] | None = None
+        self._resource_preflight_bound = False
+        self._resource_preflight_checks = 0
+        self._resource_lease_factory: Callable[[], Callable[[], None]] | None = None
+        self._resource_lease_bound = False
+        self._last_kv_observation: dict[str, Any] | None = None
+        self._kv_by_execution_receipt: dict[str, dict[str, Any]] = {}
         self._processes_exited = 0
         self._termination_requests = 0
         if not _stat_matches(self._model):
@@ -853,6 +887,118 @@ class LlamaCppModel:
             else f"llama.cpp:{Path(self._model.path).stem}:{self._model.sha256[:12]}"
         )
         self._admitted_model_id = self.model_id
+
+    def activate_prelaunch_resource_profile(
+        self, profile: LlamaCppConfig,
+    ) -> None:
+        """Bind measured CPU/Metal flags before any inference has started.
+
+        Device memory allocation, actual KV residency and synchronization
+        remain owned by llama.cpp. This cannot escalate source, network,
+        model identity, security or output authority, and may not retune
+        an executing or previously activated process.
+        """
+        if not isinstance(profile, LlamaCppConfig):
+            raise TypeError("verified LlamaCppConfig required")
+        immutable_fields = (
+            "executable", "model_path", "model_id", "timeout_seconds",
+            "max_output_bytes", "max_stderr_bytes", "context_size",
+            "temperature", "extra_args", "environment",
+            "reject_model_symlink", "rehash_artifacts_each_run",
+            "output_framing", "runtime_scratch_bytes",
+            "kv_bytes_per_token", "kv_cache_type_k", "kv_cache_type_v",
+        )
+        if any(getattr(profile, field) != getattr(self.config, field)
+               for field in immutable_fields):
+            raise LlamaCppRuntimeError(
+                "resource retuning cannot change model, safety or context identity"
+            )
+        if profile.kv_cache_location != self.config.kv_cache_location:
+            if not (self.config.kv_cache_location == "backend"
+                    and profile.kv_cache_location == "host"):
+                raise LlamaCppRuntimeError(
+                    "resource adaptation cannot activate GPU KV offloading"
+                )
+        for field in ("gpu_layers", "threads", "batch_size"):
+            original = getattr(self.config, field)
+            proposed = getattr(profile, field)
+            if original is not None and proposed is not None and proposed > original:
+                raise LlamaCppRuntimeError(
+                    "adaptive profile may not exceed operator request"
+                )
+            if field == "gpu_layers" and original is None and proposed not in (None, 0):
+                raise LlamaCppRuntimeError(
+                    "adaptive profile cannot silently activate GPU offload"
+                )
+        with self._process_lock:
+            if getattr(self, "_resource_profile_bound", False):
+                raise LlamaCppRuntimeError(
+                    "adaptive runtime profile was already bound"
+                )
+            if (getattr(self, "_inference_admitted", False)
+                    or self._processes_started or self._active_processes
+                    or self._draining_processes or self._spawning_processes):
+                raise LlamaCppRuntimeError(
+                    "runtime profile cannot change after inference admission"
+                )
+            self._assert_artifacts_stable()
+            self.config = profile
+            self._resource_profile_bound = True
+
+    def kv_observation_for_receipt(
+        self, receipt_digest: str,
+    ) -> dict[str, Any] | None:
+        """Return only the exact invocation's native KV observation.
+
+        A bounded in-memory cache avoids racing another concurrent inference.
+        The digest is part of the original typed LocalInferenceResult, not
+        an observer's guess at the last process to finish.
+        """
+        if not isinstance(receipt_digest, str) or not _HEX64.fullmatch(
+            receipt_digest
+        ):
+            raise LlamaCppRuntimeError("invalid native execution receipt identity")
+        with self._process_lock:
+            observation = self._kv_by_execution_receipt.get(receipt_digest)
+            return None if observation is None else dict(observation)
+
+    def install_prelaunch_resource_guard(self, guard: Callable[[], None]) -> None:
+        """Install one trusted resource-preflight callback before inference.
+
+        The callback may only reject a request: it does not change model,
+        execution flags, backend identity or GPU allocations.
+        """
+        if not callable(guard):
+            raise TypeError("prelaunch resource guard must be callable")
+        with self._process_lock:
+            if (getattr(self, "_resource_preflight_bound", False)
+                    or getattr(self, "_inference_admitted", False)
+                    or self._processes_started or self._spawning_processes):
+                raise LlamaCppRuntimeError(
+                    "resource guard cannot be installed after admission"
+                )
+            self._resource_preflight = guard
+            self._resource_preflight_bound = True
+
+    def install_resource_lease_factory(
+        self, factory: Callable[[], Callable[[], None]],
+    ) -> None:
+        """Reserve unified RAM for the entire native process lifetime.
+
+        A factory returns a single idempotent release callback. It cannot
+        alter pinned execution flags and cannot be installed after admission.
+        """
+        if not callable(factory):
+            raise TypeError("unified-memory lease factory must be callable")
+        with self._process_lock:
+            if (self._resource_lease_bound
+                    or getattr(self, "_inference_admitted", False)
+                    or self._processes_started or self._spawning_processes):
+                raise LlamaCppRuntimeError(
+                    "unified-memory lease factory cannot change after admission"
+                )
+            self._resource_lease_factory = factory
+            self._resource_lease_bound = True
 
     @property
     def model_digest(self) -> str:
@@ -874,6 +1020,9 @@ class LlamaCppModel:
             "threads": self.config.threads,
             "batch_size": self.config.batch_size,
             "gpu_layers": self.config.gpu_layers,
+            "kv_cache_location": self.config.kv_cache_location,
+            "kv_cache_type_k": self.config.kv_cache_type_k,
+            "kv_cache_type_v": self.config.kv_cache_type_v,
             "temperature": float(self.config.temperature),
             "extra_args": list(self.config.extra_args),
             "output_framing": self.config.output_framing,
@@ -934,6 +1083,8 @@ class LlamaCppModel:
                     self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound
                 ),
                 "memory_estimate_source": self.memory_estimate_source,
+                "resource_preflight_bound": self._resource_preflight_bound,
+                "resource_preflight_checks": self._resource_preflight_checks,
             }
 
     @property
@@ -1188,6 +1339,12 @@ class LlamaCppModel:
             command.extend(("-b", str(self.config.batch_size)))
         if self.config.gpu_layers is not None:
             command.extend(("-ngl", str(self.config.gpu_layers)))
+        if self.config.kv_cache_location == "host":
+            command.append("--no-kv-offload")
+        if self.config.kv_cache_type_k is not None:
+            command.extend(("--cache-type-k", self.config.kv_cache_type_k))
+        if self.config.kv_cache_type_v is not None:
+            command.extend(("--cache-type-v", self.config.kv_cache_type_v))
         if schema_file is not None:
             command.extend(("--json-schema-file", str(schema_file)))
         if self._native_chat_profile() is None:
@@ -1396,6 +1553,17 @@ class LlamaCppModel:
             raise TypeError("cancel must be threading.Event")
         if cancel.is_set():
             raise LocalInferenceCancelled("local generation cancelled before launch")
+        with self._process_lock:
+            # Freeze profile before prompt hashing or artifact checks begin.
+            # This prevents a digest/config race with late resource retuning.
+            self._inference_admitted = True
+            resource_guard = self._resource_preflight
+            lease_factory = getattr(self, "_resource_lease_factory", None)
+            if resource_guard is not None:
+                self._resource_preflight_checks += 1
+        if resource_guard is not None:
+            # No prompt or child process is constructed before this check.
+            resource_guard()
         started = time.monotonic()
 
         def interrupt() -> None:
@@ -1451,9 +1619,25 @@ class LlamaCppModel:
                 raise LocalInferenceCancelled("local generation cancelled before launch")
 
             with stdout_file.open("wb") as stdout_handle, stderr_file.open("wb") as stderr_handle:
+                release_lease: Callable[[], None] | None = None
                 with self._process_lock:
                     self._spawning_processes += 1
                 try:
+                    # GGUF identity rehash and prompt preparation may take
+                    # substantial time for large local models. Recheck live
+                    # unified-memory pressure at the native spawn boundary,
+                    # not only before artifact/prompt processing. A failed
+                    # admission decrements the reserved spawning slot below.
+                    if resource_guard is not None:
+                        with self._process_lock:
+                            self._resource_preflight_checks += 1
+                        resource_guard()
+                    if lease_factory is not None:
+                        release_lease = lease_factory()
+                        if not callable(release_lease):
+                            raise LlamaCppRuntimeError(
+                                "Metal lease did not provide release callback"
+                            )
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
@@ -1467,8 +1651,12 @@ class LlamaCppModel:
                         creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
                     )
                 except BaseException:
-                    with self._process_lock:
-                        self._spawning_processes -= 1
+                    try:
+                        if release_lease is not None:
+                            release_lease()
+                    finally:
+                        with self._process_lock:
+                            self._spawning_processes -= 1
                     raise
                 with self._process_lock:
                     self._spawning_processes -= 1
@@ -1509,6 +1697,11 @@ class LlamaCppModel:
                             pump_errors.append(exc)
 
                 stop_output_end: int | None = None
+                # An M-chip may lose unified-memory headroom *during*
+                # long-running decoding. Probe at a bounded cadence while
+                # the child is live; the existing finally block reliably
+                # terminates/drains it if pressure admission fails.
+                next_resource_sample = time.monotonic() + 1.0
                 stop_markers = tuple(marker.encode("utf-8") for marker in request.stop)
                 stop_tail = b""
                 stop_scanned = 0
@@ -1529,7 +1722,15 @@ class LlamaCppModel:
                     while process.poll() is None:
                         if cancel.is_set():
                             raise LocalInferenceCancelled("local generation cancelled")
-                        if time.monotonic() - started > float(self.config.timeout_seconds):
+                        now = time.monotonic()
+                        if resource_guard is not None and now >= next_resource_sample:
+                            with self._process_lock:
+                                self._resource_preflight_checks += 1
+                            # Explicitly deny rather than silently altering
+                            # the launched model's tensor/KV residence.
+                            resource_guard()
+                            next_resource_sample = time.monotonic() + 1.0
+                        if now - started > float(self.config.timeout_seconds):
                             timed_out = True
                             break
                         if stdout_overflow_event.is_set():
@@ -1562,18 +1763,22 @@ class LlamaCppModel:
                             self._draining_processes.add(process.pid)
                             if process.poll() is None:
                                 self._termination_requests += 1
-                    self._terminate(process)
-                    for pump in pumps:
-                        while pump.is_alive():
-                            pump.join(timeout=0.25)
-                    if process.stdout is not None:
-                        process.stdout.close()
-                    if process.stderr is not None:
-                        process.stderr.close()
-                    with self._process_lock:
-                        self._active_processes.discard(process.pid)
-                        self._draining_processes.discard(process.pid)
-                        self._processes_exited += 1
+                    try:
+                        self._terminate(process)
+                        for pump in pumps:
+                            while pump.is_alive():
+                                pump.join(timeout=0.25)
+                        if process.stdout is not None:
+                            process.stdout.close()
+                        if process.stderr is not None:
+                            process.stderr.close()
+                    finally:
+                        with self._process_lock:
+                            self._active_processes.discard(process.pid)
+                            self._draining_processes.discard(process.pid)
+                            self._processes_exited += 1
+                        if release_lease is not None:
+                            release_lease()
                 return_code = process.poll()
                 if return_code is None:
                     raise LlamaCppRuntimeError("local runtime could not be terminated")
@@ -1607,6 +1812,13 @@ class LlamaCppModel:
             if return_code != 0 and stop_output_end is None:
                 diagnostic = stderr_bytes.decode("utf-8", errors="replace").strip()[-4096:]
                 raise LlamaCppRuntimeError(f"local runtime exited with code {return_code}: {diagnostic}")
+            kv_observation = observe_native_kv_placement(stderr_bytes)
+            if (self.config.kv_cache_location == "host"
+                    and kv_observation["reported_device_kv_bytes"] > 0):
+                raise LlamaCppRuntimeError(
+                    "native llama.cpp reported GPU KV buffers despite the "
+                    "pinned host-only KV placement request"
+                )
 
             self._assert_artifacts_stable(interrupt=interrupt)
             if self.execution_profile_digest != execution_profile:
@@ -1645,7 +1857,7 @@ class LlamaCppModel:
             response_id = (
                 "local:llama:" + self.runtime_digest + ":" + self.model_digest + ":" + response_digest
             )
-            return LocalInferenceResult(
+            result = LocalInferenceResult(
                 text=text,
                 model_id=self.model_id,
                 model_digest=self.model_digest,
@@ -1658,6 +1870,8 @@ class LlamaCppModel:
                         "schema": "skeleton.llama-cpp.execution-receipt.v1",
                         "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
                         "output_framing": self.config.output_framing,
+                        "kv_cache_location_requested": self.config.kv_cache_location,
+                        "native_kv_observation": kv_observation,
                         "request": request.digest,
                         "execution_profile": execution_profile,
                         "response_id": response_id,
@@ -1681,6 +1895,18 @@ class LlamaCppModel:
                 structured_output=structured,
                 latency_ms=(time.monotonic() - started) * 1000.0,
             )
+            if result.execution_receipt_digest is None:
+                raise LlamaCppRuntimeError("native result lacks execution receipt")
+            with self._process_lock:
+                self._last_kv_observation = dict(kv_observation)
+                self._kv_by_execution_receipt[
+                    result.execution_receipt_digest
+                ] = dict(kv_observation)
+                while len(self._kv_by_execution_receipt) > 64:
+                    self._kv_by_execution_receipt.pop(
+                        next(iter(self._kv_by_execution_receipt))
+                    )
+            return result
 
 
 def build_llama_cpp_adapter(
