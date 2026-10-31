@@ -213,6 +213,18 @@ class SealedFairStreamResultVault:
             self._require_open()
             if self._row(permit.lease_id) is not None:
                 raise SealedResultUnavailable("result lease already published")
+            # Refuse known capacity exhaustion BEFORE invoking a backend whose
+            # side effects cannot be undone or safely retried. Reserve for the
+            # worst permitted output; the transaction rechecks actual usage.
+            rows, total = self._connection.execute(
+                "SELECT COUNT(*), COALESCE(SUM(LENGTH(ciphertext)), 0)"
+                " FROM " + _TABLE
+            ).fetchone()
+            if (
+                rows >= MAX_RESULT_ROWS
+                or total + MAX_RESULT_BYTES + 16 > MAX_CIPHERTEXT_BYTES
+            ):
+                raise SealedResultUnavailable("result vault capacity exhausted")
             # No database transaction spans inference; other SQLite readers
             # are not blocked by potentially long CPU inference.
             consumed, plaintext = self._backend.generate(permit, state)

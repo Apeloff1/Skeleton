@@ -271,9 +271,8 @@ def test_capacity_rejects_new_lease_without_backend_execution(vault_dir, monkeyp
     second = permit("f" * 64)
     with pytest.raises(SealedResultUnavailable, match="capacity"):
         vault.run_and_commit(second, state(second))
-    # Capacity is checked after backend generation. Journal still prevents
-    # automatic retry; no second ciphertext row was published.
-    assert backend.calls == 2
+    # Known capacity exhaustion is denied before the backend executes.
+    assert backend.calls == 1
     assert handle.connection.execute(
         "SELECT COUNT(*) FROM local_fair_stream_sealed_results"
     ).fetchone()[0] == 1
