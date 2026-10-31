@@ -730,6 +730,83 @@ def _assert_install_identity(
         raise OfflineKitError("installation destination changed")
 
 
+def _read_verified_copied_asset(
+    root: Path, relative: str, pinned: dict[str, object], *,
+    capture_metadata: bool = False,
+) -> bytes | None:
+    """Read installed model bytes from a nofollow descriptor and verify the pin.
+
+    Large GGUF files are hashed in bounded chunks; only deployment metadata
+    may be materialized, with an independent 64-KiB bound. An installed
+    hardlink, symlink, directory swap or in-place concurrent rewrite fails.
+    """
+    parts = _relative(relative).parts
+    if len(parts) != 2 or parts[0] not in ("model", "runtime"):
+        raise OfflineKitError("invalid installed model asset path")
+    if type(pinned.get("size_bytes")) is not int or pinned["size_bytes"] < 0:
+        raise OfflineKitError("invalid copied asset size pin")
+    if type(pinned.get("sha256")) is not str or not _HEX.fullmatch(pinned["sha256"]):
+        raise OfflineKitError("invalid copied asset digest pin")
+    if capture_metadata and pinned["size_bytes"] > 64 * 1024:
+        raise OfflineKitError("copied deployment metadata exceeds byte bound")
+    opened_root: int | None = None
+    opened_parent: int | None = None
+    opened_file: int | None = None
+    try:
+        if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+            opened_root = _open_directory_without_symlink_parents(root)
+            opened_parent = os.open(
+                parts[0], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=opened_root,
+            )
+            opened_file = os.open(
+                parts[1], os.O_RDONLY | os.O_NOFOLLOW,
+                dir_fd=opened_parent,
+            )
+        else:
+            # Non-POSIX paths are checked conservatively. This is not a
+            # claim of Windows reparse-point race qualification.
+            directory = root / parts[0]
+            path = directory / parts[1]
+            if root.is_symlink() or directory.is_symlink() or path.is_symlink():
+                raise OfflineKitError("symlinked copied model artifact")
+            opened_file = os.open(path, os.O_RDONLY)
+        before = os.fstat(opened_file)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_size != pinned["size_bytes"]):
+            raise OfflineKitError("unsafe copied asset differs from pinned manifest")
+        digest = hashlib.sha256()
+        metadata = bytearray() if capture_metadata else None
+        with os.fdopen(os.dup(opened_file), "rb") as stream:
+            while True:
+                chunk = stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                if metadata is not None:
+                    if len(metadata) + len(chunk) > 64 * 1024:
+                        raise OfflineKitError("copied deployment metadata exceeds byte bound")
+                    metadata.extend(chunk)
+        after = os.fstat(opened_file)
+        identity = lambda item: (
+            item.st_dev, item.st_ino, item.st_size, item.st_nlink,
+            item.st_mtime_ns, item.st_ctime_ns,
+        )
+        if (identity(before) != identity(after)
+                or not hmac.compare_digest(digest.hexdigest(), pinned["sha256"])):
+            raise OfflineKitError("copied asset differs from pinned manifest")
+        return bytes(metadata) if metadata is not None else None
+    except OSError as exc:
+        raise OfflineKitError("unsafe or inaccessible copied model artifact") from exc
+    finally:
+        if opened_file is not None:
+            os.close(opened_file)
+        if opened_parent is not None:
+            os.close(opened_parent)
+        if opened_root is not None:
+            os.close(opened_root)
+
+
 def install(
     root: str | Path, destination: str | Path, *,
     expected_manifest_sha256: str | None = None,
@@ -791,8 +868,9 @@ def install(
         if manifest["gguf_included"]:
             assets = target / "offline_model"
             _copy_pinned_assets(kit, manifest, assets)
-            # Verify copied identities, not merely the source kit hashes.
-            local = json.loads((assets / "model" / "deployment.json").read_text("utf-8"))
+            # Verify copied identities from opened file descriptors, not
+            # pathname hashes that can follow a concurrently swapped link.
+            _assert_install_identity(target, parent_fd, owned_identity)
             runtime_name = (
                 "llama-cli.exe" if manifest["environment"]["sys_platform"] == "win32"
                 else "llama-cli"
@@ -807,21 +885,34 @@ def install(
             }
             if set(pinned_assets) != expected_assets:
                 raise OfflineKitError("offline model asset inventory differs from manifest")
-            for relative, item in pinned_assets.items():
-                copied = assets / relative
-                _regular(copied)
-                if (copied.stat().st_size != item["size_bytes"]
-                        or _hash(copied) != item["sha256"]):
-                    raise OfflineKitError("copied model artifact differs from pinned manifest")
+            metadata = None
+            for relative, item in sorted(pinned_assets.items()):
+                content = _read_verified_copied_asset(
+                    assets, relative, item,
+                    capture_metadata=(relative == "model/deployment.json"),
+                )
+                if content is not None:
+                    metadata = content
+            if metadata is None:
+                raise OfflineKitError("missing copied deployment metadata")
+            try:
+                local = json.loads(
+                    metadata.decode("utf-8", "strict"),
+                    object_pairs_hook=_reject_duplicate_keys,
+                )
+            except (ValueError, UnicodeError, TypeError) as exc:
+                raise OfflineKitError("invalid copied deployment metadata") from exc
             if (
-                local.get("schema_version") != "skeleton.local_model.deployment.v1"
+                type(local) is not dict
+                or local.get("schema_version") != "skeleton.local_model.deployment.v1"
                 or local.get("runtime_kind") != "llama.cpp-cli"
                 or local.get("model_path") != "model.gguf"
                 or local.get("executable_path") != "../runtime/" + runtime_name
-                or _hash(assets / "model" / "model.gguf") != local["model_sha256"]
-                or _hash(assets / "runtime" / runtime_name) != local["executable_sha256"]
+                or local.get("model_sha256") != pinned_assets["model/model.gguf"]["sha256"]
+                or local.get("executable_sha256") != pinned_assets["runtime/" + runtime_name]["sha256"]
             ):
                 raise OfflineKitError("copied model or local runtime contract differs")
+            _assert_install_identity(target, parent_fd, owned_identity)
         # Validate the actual install, not only subprocess exit code.
         _assert_install_identity(target, parent_fd, owned_identity)
         if not python.is_file():

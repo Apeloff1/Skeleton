@@ -426,3 +426,44 @@ def test_install_detects_swapped_parent_after_venv(tmp_path, monkeypatch):
     assert (parent / "installed" / "other-owner").read_text() == "preserve"
     assert moved.is_dir()
     assert not (moved / "installed").exists()  # inode-owned rollback cleaned only its reservation
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-safe copied assets")
+def test_copied_asset_verifier_rejects_hardlink_and_symlink_swap(tmp_path):
+    root = tmp_path / "installed" / "offline_model"
+    model = root / "model"
+    model.mkdir(parents=True)
+    payload = b"verified offline model bytes"
+    asset = model / "model.gguf"
+    asset.write_bytes(payload)
+    pin = {"size_bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+    assert offline_kit._read_verified_copied_asset(root, "model/model.gguf", pin) is None
+    outside = tmp_path / "external.gguf"
+    os.link(asset, outside)
+    with pytest.raises(offline_kit.OfflineKitError, match="unsafe copied asset"):
+        offline_kit._read_verified_copied_asset(root, "model/model.gguf", pin)
+    asset.unlink()
+    asset.symlink_to(outside)
+    with pytest.raises(offline_kit.OfflineKitError, match="unsafe|inaccessible"):
+        offline_kit._read_verified_copied_asset(root, "model/model.gguf", pin)
+
+
+def test_copied_asset_verifier_rejects_mutated_bytes_and_unbounded_metadata(tmp_path):
+    root = tmp_path / "installed" / "offline_model"
+    model = root / "model"
+    model.mkdir(parents=True)
+    asset = model / "deployment.json"
+    asset.write_bytes(b'{"schema_version":"skeleton.local_model.deployment.v1"}')
+    data = asset.read_bytes()
+    pin = {"size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    assert offline_kit._read_verified_copied_asset(
+        root, "model/deployment.json", pin, capture_metadata=True,
+    ) == data
+    asset.write_bytes(b"X" * len(data))
+    with pytest.raises(offline_kit.OfflineKitError, match="pinned manifest"):
+        offline_kit._read_verified_copied_asset(root, "model/deployment.json", pin)
+    with pytest.raises(offline_kit.OfflineKitError, match="byte bound"):
+        offline_kit._read_verified_copied_asset(
+            root, "model/deployment.json",
+            {"size_bytes": 65537, "sha256": "0" * 64}, capture_metadata=True,
+        )
